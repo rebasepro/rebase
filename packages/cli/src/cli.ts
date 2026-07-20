@@ -55,7 +55,7 @@ export async function entry(args: string[]) {
     const subcommand = parsedArgs._[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud"];
+    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;

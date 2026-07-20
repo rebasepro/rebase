@@ -94,6 +94,14 @@
 
 ### Fixes
 
+- **`rebase init` told you things that were not true** — the next steps were assembled from the flags you passed rather than from what actually happened. `--introspect` without `--install` printed "Skipping introspection because dependencies were not installed" and then, four lines later, "Database has been introspected & collections generated!" — the second line branched on the flag, never on the outcome. It now reports what really ran, and when introspection did not, it prints the `schema introspect` and `schema generate` commands that finish the job. In the same pass: the `cd` hint used the project's basename, so `init apps/my-app` said `cd my-app` — a directory that does not exist from where you are standing — and `init .` told you to `cd` into a directory you were already in; both now use the path you typed, and in-place scaffolds print no `cd` at all.
+
+- **`rebase init --help` printed the wrong help** — `init` was missing from the dispatcher's namespaced-command list, so `--help` fell through to the global command index. `--template`, `--flavor`, `--yes`, `--database-url`, `--introspect`, `--project` and `--setup-key` were documented in exactly one place: the error you get for running init on a non-TTY. You had to trigger a failure to discover the flags. `init` now has its own help, and a test fails if a flag the parser accepts goes undocumented.
+
+- **`--git` left the work half-done** — it ran `git init` and stopped, leaving every scaffolded file untracked on whatever `init.defaultBranch` happened to be, so the first `git diff` was noise and the first commit was the user's problem. It now lands an initial commit on `main`, authored by the user's own git identity where one is configured. `.gitignore` is in place before the commit, so `.env` and its generated secrets are never in it while `.env.example` is.
+
+- **`--template` was accepted and discarded for the baas flavor** — baas has no collections, so a preset has nothing to swap; the flag was taken silently and the scaffold came out identical either way. It now says the preset is being ignored, and the help spells out that `--template` does not apply to baas.
+
 - **OAuth token substitution allowed account takeover** — the Google path resolved client-supplied access tokens through the userinfo endpoint, which does not check `aud`, so any valid Google access token — including one an attacker obtained for their own OAuth client — was accepted and resolved to whatever account it belonged to. The audience is now verified against our `clientId` via tokeninfo before the identity is trusted, and ID-token paths read the real `email_verified` claim instead of hardcoding it. On Microsoft, `emailVerified` is derived from a provider-provisioned `mail` mailbox rather than asserted `true`, so a bare userPrincipalName can no longer auto-link an OAuth login onto a pre-existing password account. CORS, rate limiting and vector SQL were hardened in the same pass.
 
 - **`/admin/bootstrap` was a land-grab** — the self-promotion endpoint only refused to run once an admin already existed. In a "users exist but no admin" state — reachable via concurrent first-registrations, or by deleting the first user — any authenticated user could seize the initial admin role. It is now gated to the earliest-registered user, deterministically tie-broken by id, with security-audit logs on both the denial and the success.
@@ -141,6 +149,16 @@
 - **The service key did not authenticate websockets** — the HTTP middleware compares it before JWT verification; the websocket path went straight to `extractUserFromToken`, and a static secret can only ever fail that. Any SDK client using a service key (scripts, cron, server-to-server) got `jwt malformed` on every connect and silently received no realtime events.
 
 - **`collection-file → UI package` imports no longer drag React into the backend** — `users.ts` imported `resetPasswordAction` from `@rebasepro/admin`, so the Node backend loaded the entire admin bundle at boot. The action is already injected frontend-side for `auth` collections, making the import redundant. `@rebasepro/admin` is also gone from the config and backend templates, and `@rebasepro/core`/`ui` from `@rebasepro/auth` — none were imported.
+
+### Testing
+
+- **Every `init` template is now driven to a persisted row** — the e2e suite scaffolded one project, in one shape, and checked that tables and indexes existed. A template could scaffold, typecheck and migrate cleanly while being unable to store anything, and nothing would say so. `test/e2e/templates.test.ts` takes all six preset × flavor combinations through the path a user actually walks: scaffold, install, bootstrap a real PostgreSQL database, boot the backend, register, log in, write over the HTTP data API, read back, and confirm the row in Postgres — because an API that echoes what it was sent passes every assertion short of the last one. The baas cases additionally assert the security posture the flavor is built on: a table with no row-level security must **not** be served, the boot log must name it and say how to fix it, and once a policy exists, `auth.uid()` must hide one user's rows from another.
+
+- **`rebase init`'s output is under test** — `test/e2e/init-ux.test.ts` pins the reporting defects above so they cannot return: next steps that contradict what happened, a `cd` that points at a directory that does not exist, undocumented flags, an uncommitted `--git` tree, and a silently discarded `--template`. It drives the real binary and installs nothing, so it runs in about three seconds.
+
+- **`test/` is typechecked** — the build config only ever included `src`, so the e2e suites could drift out of sync with the code they drive and fail only at runtime, minutes into a docker-backed run. `tsconfig.test.json` (`pnpm typecheck:test`) covers them; it caught a missing import while this was being written.
+
+- **A stale `dist/` fails loudly** — the e2e suites link the workspace packages and load their build output, so an unbuilt tree silently tests yesterday's code. This surfaced as `Permission denied on "posts"` — a failure with no visible connection to its cause. The suite now checks that every linked package's `dist/` is newer than its sources and, if not, names the packages and the build command instead of running.
 
 ## [0.9.0] - 2026-07-13
 

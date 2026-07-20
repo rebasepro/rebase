@@ -10,7 +10,7 @@ import path from "path";
 import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
-import { configureEnvFile, buildInitQuestions, validateProjectName } from "./init.js";
+import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp } from "./init.js";
 
 
 let tmpDir: string;
@@ -931,5 +931,59 @@ describe("baas overlay", () => {
         for (const ui of ["react", "@rebasepro/admin", "@rebasepro/ui", "@rebasepro/app", "@rebasepro/studio"]) {
             expect(all).not.toContain(`"${ui}"`);
         }
+    });
+});
+
+describe("next-steps cd target", () => {
+    it("uses the path the user typed, not the basename", () => {
+        // `cd nested-app` would not exist from where the user is standing.
+        expect(formatCdTarget("/work", "/work/apps/nested-app")).toBe("apps/nested-app");
+    });
+
+    it("returns nothing for an in-place init", () => {
+        // `init .` — printing `cd my-dir` would send them somewhere they already are.
+        expect(formatCdTarget("/work/my-dir", "/work/my-dir")).toBe("");
+    });
+
+    it("handles a plain project name", () => {
+        expect(formatCdTarget("/work", "/work/my-app")).toBe("my-app");
+    });
+});
+
+describe("init --help", () => {
+    /** Capture what printInitHelp writes to stdout. */
+    function helpText(): string {
+        const lines: string[] = [];
+        const original = console.log;
+        console.log = (...args: unknown[]) => { lines.push(args.join(" ")); };
+        try {
+            printInitHelp();
+        } finally {
+            console.log = original;
+        }
+        return lines.join("\n");
+    }
+
+    it("documents every flag the parser accepts", () => {
+        // The flags used to be discoverable only by triggering the non-TTY
+        // error. If a new one is added to promptForOptions, document it here too.
+        const text = helpText();
+        for (const flag of [
+            "--template", "--flavor", "--yes", "--install", "--git",
+            "--database-url", "--introspect", "--project", "--setup-key"
+        ]) {
+            expect(text).toContain(flag);
+        }
+    });
+
+    it("lists the valid template and flavor values", () => {
+        const text = helpText();
+        for (const value of ["blog", "ecommerce", "blank", "cms", "baas"]) {
+            expect(text).toContain(value);
+        }
+    });
+
+    it("says --template does nothing for the baas flavor", () => {
+        expect(helpText()).toContain("--template has no effect");
     });
 });

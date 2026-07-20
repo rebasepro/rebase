@@ -90,6 +90,8 @@ export interface InitOptions {
     introspect?: boolean;
     /** Starter template preset. */
     preset: TemplatePreset;
+    /** Whether `preset` came from an explicit --template rather than the default. */
+    explicitPreset?: boolean;
     /** Which parts of Rebase to scaffold. */
     flavor: TemplateFlavor;
     /** Detected package manager (pnpm or npm). */
@@ -196,7 +198,57 @@ export function buildInitQuestions(params: BuildQuestionsParams): Record<string,
     return questions;
 }
 
+/**
+ * The `cd` a user must type to enter the new project.
+ *
+ * Not the project's basename: `init apps/my-app` has to say `cd apps/my-app`,
+ * and `init .` returns "" because they are already in the project.
+ */
+export function formatCdTarget(cwd: string, targetDirectory: string): string {
+    return path.relative(cwd, targetDirectory);
+}
+
+/** Help for `rebase init` — the flags were previously only discoverable by
+ * triggering the non-TTY error. */
+export function printInitHelp(): void {
+    console.log(`
+${chalk.bold("rebase init")} — Create a new Rebase project
+
+${chalk.bold("Usage")}
+  rebase init ${chalk.blue("[name]")} [options]
+
+  ${chalk.gray("The name may be a nested path (apps/my-app) or \".\" for the current directory.")}
+  ${chalk.gray("Defaults to \"my-rebase-app\" when omitted with --yes.")}
+
+${chalk.bold("Options")}
+  ${chalk.blue("-t, --template")} ${chalk.gray("<preset>")}   blog | ecommerce | blank ${chalk.gray("(default: blog)")}
+  ${chalk.blue("-f, --flavor")} ${chalk.gray("<flavor>")}     cms | baas ${chalk.gray("(default: cms)")}
+  ${chalk.blue("-y, --yes")}                 Accept defaults, never prompt ${chalk.gray("(required for CI / non-TTY)")}
+  ${chalk.blue("-i, --install")}             Install dependencies after scaffolding
+  ${chalk.blue("-g, --git")}                 Initialize a git repository and make an initial commit
+  ${chalk.blue("--database-url")} ${chalk.gray("<url>")}      Use an existing database instead of the generated one
+  ${chalk.blue("--introspect")}              Generate collections from that database ${chalk.gray("(implies --template blank; needs --install)")}
+  ${chalk.blue("--project")} ${chalk.gray("<slug>")}          Link the scaffold to a Rebase Cloud project
+  ${chalk.blue("--setup-key")} ${chalk.gray("<key>")}         One-time key authenticating the cloud link ${chalk.gray("(use with --project)")}
+
+${chalk.bold("Flavors")}
+  ${chalk.blue("cms")}   BaaS + admin UI, driven by collections you define ${chalk.gray("(like Payload/Directus)")}
+  ${chalk.blue("baas")}  Headless API over your database — no collections, no UI ${chalk.gray("(like Supabase)")}
+        ${chalk.gray("--template has no effect on this flavor.")}
+
+${chalk.bold("Examples")}
+  ${chalk.gray("$")} rebase init my-shop --template ecommerce --install
+  ${chalk.gray("$")} rebase init my-api --flavor baas --yes
+  ${chalk.gray("$")} rebase init . --yes --git
+`);
+}
+
 export async function createRebaseApp(rawArgs: string[]) {
+    if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+        printInitHelp();
+        return;
+    }
+
     console.log(`
 ${chalk.bold("Rebase")} — Create a new project 🚀
 `);
@@ -274,6 +326,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             databaseUrl: args["--database-url"] || undefined,
             introspect: args["--introspect"] || false,
             preset: templateArg || "blog",
+            explicitPreset: !!templateArg,
             flavor: flavorArg || "cms",
             pm,
             pmCommands,
@@ -320,6 +373,9 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         databaseUrl: (answers.databaseUrl as string)?.trim() || undefined,
         introspect: answers.introspect || false,
         preset: templateArg || (answers.preset as TemplatePreset) || "blog",
+        // Only a flag is "explicit" here: the interactive path never asks for a
+        // preset once baas is chosen, so it can't produce a conflicting answer.
+        explicitPreset: !!templateArg,
         flavor: flavorArg || (answers.flavor as TemplateFlavor) || "cms",
         pm,
         pmCommands,
@@ -428,6 +484,11 @@ async function createProject(options: InitOptions) {
     }
 
     // Apply the selected template preset (swap collection files)
+    if (options.flavor === "baas" && options.explicitPreset) {
+        // baas has no collections, so there is nothing for a preset to swap.
+        // Say so rather than accepting the flag and silently dropping it.
+        console.log(chalk.yellow(`  Ignoring --template ${options.preset}: the baas flavor has no collections.`));
+    }
     if (options.flavor !== "baas") {
         // When introspecting, the database is the source of truth: start from
         // the blank preset so example collections never register on top of
@@ -452,6 +513,35 @@ async function createProject(options: InitOptions) {
         console.log(chalk.gray("  Initializing git repository..."));
         try {
             await execa("git", ["init"], { cwd: options.targetDirectory });
+            // Name the branch `main` rather than inheriting whatever
+            // `init.defaultBranch` is (often still `master`). `git init -b` would
+            // be the obvious way, but it needs git >= 2.28; rewriting HEAD works
+            // on every version and is safe before the first commit.
+            try {
+                await execa("git", ["symbolic-ref", "HEAD", "refs/heads/main"], { cwd: options.targetDirectory });
+            } catch {
+                // Leave the default branch name; not worth failing the scaffold.
+            }
+            // Leaving the tree uncommitted makes the very first `git diff`
+            // useless and hides the scaffold in a wall of untracked files.
+            // .gitignore is already in place, so .env is never committed.
+            await execa("git", ["add", "-A"], { cwd: options.targetDirectory });
+            // A machine with no user.email configured cannot commit at all.
+            // Supply an identity only in that case, so a configured user still
+            // authors their own initial commit.
+            let identity: Record<string, string> = {};
+            try {
+                await execa("git", ["config", "user.email"], { cwd: options.targetDirectory });
+            } catch {
+                identity = {
+                    GIT_AUTHOR_NAME: "Rebase", GIT_AUTHOR_EMAIL: "noreply@rebase.pro",
+                    GIT_COMMITTER_NAME: "Rebase", GIT_COMMITTER_EMAIL: "noreply@rebase.pro"
+                };
+            }
+            await execa("git", ["commit", "-m", "Initial commit from Rebase"], {
+                cwd: options.targetDirectory,
+                env: identity
+            });
         } catch {
             console.warn(chalk.yellow("  Warning: Failed to initialize git repository"));
         }
@@ -476,6 +566,11 @@ async function createProject(options: InitOptions) {
         }
     }
 
+    // Whether introspection actually ran and produced collections. The next
+    // steps below report what really happened, so a skipped or failed
+    // introspection is never announced as a success.
+    let introspected = false;
+
     if (options.introspect) {
         console.log("");
         if (options.installDeps) {
@@ -495,6 +590,7 @@ async function createProject(options: InitOptions) {
                     stdio: "inherit"
                 });
                 console.log(chalk.green("  Database successfully introspected!"));
+                introspected = true;
             } catch {
                 console.warn(chalk.yellow("  Warning: Failed to introspect database automatically."));
                 console.warn(chalk.yellow(`  You can run \`${execCmd.join(" ")}\` then \`${generateCmd.join(" ")}\` manually after setup.`));
@@ -516,16 +612,31 @@ async function createProject(options: InitOptions) {
     const runDev = pmCommands.run("dev");
     const runDbPush = pmCommands.run("db:push");
     const isBaas = options.flavor === "baas";
-    console.log(`  ${chalk.cyan("cd")} ${options.projectName}`);
+    // The path the user has to type, not the project's basename: `init
+    // apps/my-app` must say `cd apps/my-app`, and `init .` needs no cd at all
+    // because they are already standing in the project.
+    const cdTarget = formatCdTarget(process.cwd(), options.targetDirectory);
+    if (cdTarget) {
+        console.log(`  ${chalk.cyan("cd")} ${cdTarget}`);
+    }
     if (!options.installDeps) {
         console.log(`  ${chalk.cyan(installCmd.join(" "))}`);
     }
     console.log("");
 
     if (options.databaseUrl) {
-        if (options.introspect) {
+        if (introspected) {
             console.log(chalk.gray("  # Database has been introspected & collections generated!"));
             console.log(chalk.gray("  # Start the development server (frontend + backend):"));
+            console.log(`  ${chalk.cyan(runDev.join(" "))}`);
+        } else if (options.introspect) {
+            // Introspection was requested but did not run. Point at the steps
+            // that finish the job rather than claiming collections exist.
+            console.log(chalk.gray("  # Introspection did not run — finish it with:"));
+            console.log(`  ${chalk.cyan(execCmd.join(" "))}`);
+            console.log(`  ${chalk.cyan(generateCmd.join(" "))}`);
+            console.log("");
+            console.log(chalk.gray("  # Then start the development server:"));
             console.log(`  ${chalk.cyan(runDev.join(" "))}`);
         } else {
             console.log(chalk.gray("  # Your custom database is configured in .env."));

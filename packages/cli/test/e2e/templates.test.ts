@@ -1,0 +1,342 @@
+/**
+ * Every `rebase init` template, taken all the way to a persisted row.
+ *
+ * For each preset x flavor this scaffolds, installs, bootstraps a real
+ * PostgreSQL database, boots the backend, registers and logs in a user, writes
+ * through the HTTP data API, reads it back, and finally confirms the row in
+ * Postgres — so a template that scaffolds and typechecks but cannot actually
+ * store anything still fails.
+ *
+ * The two flavors are shaped differently on purpose:
+ *   cms  — collections are declared in files, so `db push` creates the tables.
+ *   baas — there are no collection files; a table is served only once it has
+ *          row-level security and a policy. The baas cases therefore assert
+ *          the security posture too: an unprotected table must NOT be served,
+ *          and `auth.uid()` must isolate one user's rows from another's.
+ */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import fs from "fs";
+import path from "path";
+import os from "os";
+import { execa } from "execa";
+import pg from "pg";
+import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
+import {
+    cliBin,
+    getCleanEnv,
+    assertPackagesBuilt,
+    linkLocalPackages,
+    startBackend,
+    stopBackend,
+    registerAndLogin,
+    writeRow,
+    readRows,
+    type RunningBackend
+} from "./helpers.js";
+
+const env = getCleanEnv();
+
+interface CmsCase {
+    preset: "blog" | "ecommerce" | "blank";
+    /** Collection to write into over /api/data. */
+    collection: string;
+    row: Record<string, unknown>;
+    /**
+     * A second, non-colliding row used to probe unknown-field rejection.
+     * It must not reuse `row`'s identity: on the blank preset the collection is
+     * the users table, and a duplicate email trips the unique constraint first,
+     * masking the validation error under test.
+     */
+    probeRow: Record<string, unknown>;
+    /**
+     * Whether an undeclared field is a 400 on this collection.
+     *
+     * Auth collections are exempt by design: a signup body carries `password`
+     * and provider fields the users collection never declares as columns, so
+     * api-generator.ts skips the check and lets `prepareUserCreation` map the
+     * body onto real columns. The consequence is that an undeclared field on an
+     * auth collection is silently dropped rather than reported.
+     */
+    rejectsUnknownFields: boolean;
+    /** Schema-qualified table to confirm the row in. */
+    table: string;
+    /** Column to read back. */
+    column: string;
+    expected: string;
+    /**
+     * Rows the API should report afterwards. The blank preset's only
+     * collection is the auth users table, which already holds the admin that
+     * registering created.
+     */
+    expectedTotal: number;
+}
+
+const CMS_CASES: CmsCase[] = [
+    {
+        preset: "blog",
+        collection: "posts",
+        row: { title: "Hello from e2e", content: "Written by the e2e suite.", status: "published" },
+        probeRow: { title: "Probe", content: "Probe.", status: "published" },
+        rejectsUnknownFields: true,
+        table: "public.posts",
+        column: "title",
+        expected: "Hello from e2e",
+        expectedTotal: 1
+    },
+    {
+        preset: "ecommerce",
+        collection: "products",
+        row: { name: "E2E Widget", description: "Written by the e2e suite.", price: 19.99 },
+        probeRow: { name: "Probe Widget", description: "Probe.", price: 1.0 },
+        rejectsUnknownFields: true,
+        table: "public.products",
+        column: "name",
+        expected: "E2E Widget",
+        expectedTotal: 1
+    },
+    {
+        preset: "blank",
+        collection: "users",
+        row: { email: "second@example.com", password: "StrongPass2!", displayName: "Second User" },
+        probeRow: { email: "probe@example.com", password: "StrongPass3!", displayName: "Probe User" },
+        // `users` is an auth collection — see rejectsUnknownFields.
+        rejectsUnknownFields: false,
+        table: "rebase.users",
+        column: "email",
+        expected: "second@example.com",
+        expectedTotal: 2
+    }
+];
+
+const BAAS_PRESETS = ["blog", "ecommerce", "blank"] as const;
+
+let pgContainer: PgContainer;
+let tempDir: string;
+let adminClient: pg.Client;
+
+/** A connection string for a dedicated database on the shared container. */
+function urlFor(database: string): string {
+    return `postgresql://rebase:rebase@localhost:${pgContainer.port}/${database}` +
+        "?options=-c%20search_path=public&sslmode=disable";
+}
+
+async function createDatabase(name: string): Promise<string> {
+    await adminClient.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+    await adminClient.query(`CREATE DATABASE ${name}`);
+    return urlFor(name);
+}
+
+/** Scaffold, point the deps at the working tree, and install. */
+async function scaffold(name: string, preset: string, flavor: string, databaseUrl: string): Promise<string> {
+    // No --install here: the dependencies must be redirected to the local
+    // packages before anything is fetched.
+    await execa("node", [
+        cliBin, "init", name,
+        "--yes",
+        "--template", preset,
+        "--flavor", flavor,
+        "--database-url", databaseUrl
+    ], { cwd: tempDir, env });
+
+    const projectDir = path.join(tempDir, name);
+    linkLocalPackages(projectDir);
+    await execa("pnpm", ["install"], { cwd: projectDir, env });
+    return projectDir;
+}
+
+beforeAll(async () => {
+    // Before spending minutes on containers and installs: the scaffold links
+    // these packages and loads their dist/, so an unbuilt tree tests old code.
+    assertPackagesBuilt();
+
+    pgContainer = await startPgContainer();
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-templates-e2e-"));
+    adminClient = new pg.Client({ connectionString: pgContainer.connectionString });
+    await adminClient.connect();
+}, 240_000);
+
+afterAll(async () => {
+    try { await adminClient?.end(); } catch { /* ignore */ }
+    if (pgContainer) await stopPgContainer(pgContainer.containerName);
+    if (tempDir && fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+}, 120_000);
+
+describe.each(CMS_CASES)("cms template: $preset", (testCase) => {
+    const name = `${testCase.preset}-cms`;
+    const database = `db_${testCase.preset}_cms`;
+    let projectDir: string;
+    let client: pg.Client;
+    let backend: RunningBackend | undefined;
+    /** The first user registered against this project — see the admin test. */
+    let admin: { uid: string; roles: string[]; accessToken: string };
+
+    beforeAll(async () => {
+        const databaseUrl = await createDatabase(database);
+        projectDir = await scaffold(name, testCase.preset, "cms", databaseUrl);
+
+        // cms declares its schema in files, so this is what creates the tables.
+        await execa("node", [cliBin, "db", "push", "--collections", "../config/collections", "--force"], {
+            cwd: projectDir,
+            env
+        });
+
+        client = new pg.Client({ connectionString: databaseUrl });
+        await client.connect();
+        backend = await startBackend(projectDir, env);
+
+        // Registered once, here, so that the admin-promotion assertion below is
+        // genuinely about the *first* user. Registering inside each test would
+        // also add rows to the blank preset, whose only collection is `users`.
+        admin = await registerAndLogin(backend.baseUrl, "admin@example.com", "StrongPass1!");
+    }, 600_000);
+
+    afterAll(async () => {
+        await stopBackend(backend);
+        try { await client?.end(); } catch { /* ignore */ }
+    }, 60_000);
+
+    it("scaffolds the collections the preset promises", () => {
+        const collections = fs.readdirSync(path.join(projectDir, "config", "collections"));
+        expect(collections).toContain("users.ts");
+        if (testCase.preset === "blog") {
+            expect(collections).toEqual(expect.arrayContaining(["posts.ts", "authors.ts", "tags.ts"]));
+        } else if (testCase.preset === "ecommerce") {
+            expect(collections).toEqual(expect.arrayContaining(["products.ts", "categories.ts", "orders.ts"]));
+        } else {
+            // blank ships auth and nothing else.
+            expect(collections.sort()).toEqual(["index.ts", "users.ts"]);
+        }
+    });
+
+    it("promotes the first registered user to admin", () => {
+        expect(admin.roles).toContain("admin");
+    });
+
+    it("writes through the API and persists the row in Postgres", async () => {
+        const written = await writeRow(backend!.baseUrl, admin.accessToken, testCase.collection, testCase.row);
+        expect(written.status, JSON.stringify(written.body)).toBeLessThan(300);
+        expect(written.body.id).toBeDefined();
+
+        const read = await readRows(backend!.baseUrl, admin.accessToken, testCase.collection);
+        expect(read.status).toBe(200);
+        expect(read.total).toBe(testCase.expectedTotal);
+
+        // Postgres is the source of truth: an API that echoes back what it was
+        // sent without storing it would pass every assertion above.
+        const { rows } = await client.query(
+            `SELECT ${testCase.column} AS value FROM ${testCase.table} WHERE ${testCase.column} = $1`,
+            [testCase.expected]
+        );
+        expect(rows).toHaveLength(1);
+        expect(rows[0].value).toBe(testCase.expected);
+    }, 120_000);
+
+    it.runIf(testCase.rejectsUnknownFields)("rejects a field the collection does not declare", async () => {
+        const bad = await writeRow(backend!.baseUrl, admin.accessToken, testCase.collection, {
+            ...testCase.probeRow,
+            definitely_not_a_field: "x"
+        });
+        expect(bad.status).toBeGreaterThanOrEqual(400);
+        // The message must name the offending field, not just say "invalid".
+        expect(JSON.stringify(bad.body)).toContain("definitely_not_a_field");
+    }, 60_000);
+});
+
+describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
+    const name = `${preset}-baas`;
+    const database = `db_${preset}_baas`;
+    let projectDir: string;
+    let client: pg.Client;
+    let backend: RunningBackend | undefined;
+
+    beforeAll(async () => {
+        const databaseUrl = await createDatabase(database);
+        projectDir = await scaffold(name, preset, "baas", databaseUrl);
+        client = new pg.Client({ connectionString: databaseUrl });
+        await client.connect();
+        // baas has no db:push; the auth schema is created by the server at boot.
+        backend = await startBackend(projectDir, env);
+    }, 600_000);
+
+    afterAll(async () => {
+        await stopBackend(backend);
+        try { await client?.end(); } catch { /* ignore */ }
+    }, 60_000);
+
+    it("scaffolds no collections and no admin UI", () => {
+        expect(fs.existsSync(path.join(projectDir, "config"))).toBe(false);
+        expect(fs.existsSync(path.join(projectDir, "frontend"))).toBe(false);
+    });
+
+    it("bootstraps the auth schema without a db push", async () => {
+        const user = await registerAndLogin(backend!.baseUrl, "admin@example.com", "StrongPass1!");
+        expect(user.uid).toBeTruthy();
+    }, 60_000);
+
+    it("refuses to serve a table that has no row-level security", async () => {
+        // Schema-qualified on purpose: the database role is itself named
+        // `rebase` and a `rebase` schema exists, so an unqualified CREATE TABLE
+        // resolves through search_path's "$user" and lands in the wrong schema.
+        await client.query(`
+            CREATE TABLE public.notes (
+                id serial PRIMARY KEY,
+                body text NOT NULL,
+                user_id text NOT NULL DEFAULT auth.uid()
+            )
+        `);
+
+        await stopBackend(backend);
+        backend = await startBackend(projectDir, env);
+
+        const res = await fetch(`${backend.baseUrl}/api/data/notes`);
+        expect(res.status).toBe(404);
+
+        // Silently skipping would be indistinguishable from a broken server,
+        // so the boot output has to name the table and say what to do.
+        expect(backend.output()).toContain("notes");
+        expect(backend.output()).toMatch(/ENABLE ROW LEVEL SECURITY/i);
+    }, 240_000);
+
+    it("serves the table once RLS and a policy exist, and isolates rows by auth.uid()", async () => {
+        await client.query("ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY");
+        await client.query(`
+            CREATE POLICY notes_owner ON public.notes
+                FOR ALL USING (user_id = auth.uid())
+                WITH CHECK (user_id = auth.uid())
+        `);
+
+        await stopBackend(backend);
+        backend = await startBackend(projectDir, env);
+
+        const login = async (email: string, password: string) => {
+            const res = await fetch(`${backend!.baseUrl}/api/auth/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password })
+            });
+            const body = await res.json() as any;
+            return { uid: body.user.uid, token: body.tokens.accessToken };
+        };
+
+        const owner = await login("admin@example.com", "StrongPass1!");
+        const other = await registerAndLogin(backend.baseUrl, "other@example.com", "StrongPass2!");
+
+        const written = await writeRow(backend.baseUrl, owner.token, "notes", { body: "owner's private note" });
+        expect(written.status, JSON.stringify(written.body)).toBeLessThan(300);
+
+        const ownerView = await readRows(backend.baseUrl, owner.token, "notes");
+        expect(ownerView.rows).toHaveLength(1);
+
+        // The whole point of the RLS gate: another authenticated user must not
+        // see it. auth.uid() is what makes that true.
+        const otherView = await readRows(backend.baseUrl, other.accessToken, "notes");
+        expect(otherView.rows).toHaveLength(0);
+
+        const { rows } = await client.query("SELECT body, user_id FROM public.notes");
+        expect(rows).toHaveLength(1);
+        expect(rows[0].body).toBe("owner's private note");
+        expect(rows[0].user_id).toBe(owner.uid);
+    }, 240_000);
+});

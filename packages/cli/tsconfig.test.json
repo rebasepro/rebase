@@ -1,0 +1,14 @@
+{
+    // The build tsconfig only includes `src`, so nothing under `test/` was ever
+    // typechecked — the e2e suites could drift out of sync with the code they
+    // drive and only fail at runtime, minutes into a docker-backed run.
+    // noEmit only; this never takes part in the build.
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "noEmit": true,
+        "rootDir": ".",
+        "types": ["node", "vitest/globals"]
+    },
+    "include": ["test"],
+    "exclude": []
+}
