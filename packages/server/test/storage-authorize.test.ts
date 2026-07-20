@@ -103,6 +103,95 @@ describe("storage per-object authorization", () => {
         });
     });
 
+    describe("the two principals the hook is not asked about", () => {
+        /**
+         * The hook is deliberately NOT re-run for a `?token=` request or a
+         * declared-public object, and nothing tested either: disabling the
+         * bypass entirely left all 57 storage tests green while breaking every
+         * `<img>` a client renders.
+         *
+         * The two halves were each covered and their seam was not.
+         * `file-token-auth.test.ts` proves `fileTokenAuth` resolves a token to
+         * the synthetic `download-token` principal, and the tests above prove
+         * the hook gates `/metadata`. Neither exercises what happens when the
+         * two meet — which is the only place the bypass lives.
+         */
+        it("serves a token-bearing request the hook would otherwise deny", async () => {
+            // Minted through the real route, so it only exists because the hook
+            // approved alice's object first.
+            const metaRes = await app.fetch(
+                new Request("http://localhost/api/storage/metadata/default/alice/notes.txt")
+            );
+            expect(metaRes.status).toBe(200);
+            const { data } = await metaRes.json() as { data: { token?: string } };
+            expect(data.token).toBeDefined();
+
+            // A hook that refuses everyone. Asking it about `download-token`
+            // would deny — that principal owns nothing and answers no ownership
+            // question. The token is the authorization here.
+            await mount(async () => false);
+
+            const res = await app.fetch(new Request(
+                `http://localhost/api/storage/file/default/alice/notes.txt?token=${data.token}`
+            ));
+
+            expect(res.status).toBe(200);
+            expect(await res.text()).toBe("alice secret");
+        });
+
+        it("serves a declared-public object past a hook that denies everyone", async () => {
+            // The other half of the same bypass, and it was equally uncovered:
+            // dropping `|| user?.userId === "public"` left all 115 storage tests
+            // green. A `public/` object is public by declaration — the hook is
+            // not consulted, exactly as for a token, and a permanent token-less
+            // URL is the point of the prefix.
+            await controller.putObject({
+                file: new File([Buffer.from("open to all")], "logo.txt", { type: "text/plain" }),
+                key: "public/logo.txt"
+            });
+            await mount(async () => false);
+
+            const res = await app.fetch(
+                new Request("http://localhost/api/storage/file/public/logo.txt")
+            );
+
+            expect(res.status).toBe(200);
+            expect(await res.text()).toBe("open to all");
+        });
+
+        it("does not extend that to a private object merely nested under a public-looking folder", async () => {
+            // `reports/public/q3` is not public — the prefix is anchored, not a
+            // substring — so the hook still decides, and here it refuses.
+            await controller.putObject({
+                file: new File([Buffer.from("confidential")], "q3.txt", { type: "text/plain" }),
+                key: "reports/public/q3.txt"
+            });
+            await mount(async () => false);
+
+            const res = await app.fetch(
+                new Request("http://localhost/api/storage/file/reports/public/q3.txt")
+            );
+
+            expect(res.status).not.toBe(200);
+        });
+
+        it("does not let a token stand in for the hook on another path", async () => {
+            // The bypass is only safe because the token is path-scoped. If it
+            // were not, one legitimately minted token would be a skeleton key
+            // past the hook for the whole bucket.
+            const metaRes = await app.fetch(
+                new Request("http://localhost/api/storage/metadata/default/alice/notes.txt")
+            );
+            const { data } = await metaRes.json() as { data: { token?: string } };
+
+            const res = await app.fetch(new Request(
+                `http://localhost/api/storage/file/default/bob/notes.txt?token=${data.token}`
+            ));
+
+            expect(res.status).not.toBe(200);
+        });
+    });
+
     describe("writes", () => {
         it("refuses an upload into someone else's prefix", async () => {
             const form = new FormData();

@@ -96,6 +96,70 @@ auth: {
 }
 ```
 
+### Kontoverknüpfung über Anmeldemethoden hinweg
+
+Was passiert, wenn sich jemand mit E-Mail/Passwort als `ada@example.com`
+registriert und später "Mit Google anmelden" mit einem Google-Konto derselben
+Adresse anklickt? Rebase **verknüpft beide zu einem Konto** — aber nur dann,
+wenn der Anbieter die E-Mail-Adresse als verifiziert bestätigt. Es wird niemals
+stillschweigend ein zweites Konto für dieselbe Adresse angelegt.
+
+Bei `POST /api/auth/<provider>` gilt folgende Auflösungsreihenfolge:
+
+1. **Bereits bekannte Anbieter-Identität** — hat sich genau diese
+   Anbieter-Identität schon einmal angemeldet, wird dieser Benutzer
+   zurückgegeben. Die E-Mail-Adresse wird nicht herangezogen.
+2. **Bestehendes Konto mit derselben E-Mail-Adresse, vom Anbieter verifiziert**
+   — die Identität wird dem bestehenden Konto zugeordnet und der Benutzer wird
+   darin angemeldet. Ein Konto, zwei Zugangswege.
+3. **Bestehendes Konto mit derselben E-Mail-Adresse, vom Anbieter NICHT
+   verifiziert** — abgelehnt mit `403 EMAIL_NOT_VERIFIED`. Es wird nichts
+   erstellt und nichts geändert.
+4. **Kein Konto mit dieser E-Mail-Adresse** — ein neues Konto wird erstellt.
+
+Schritt 3 ist der sicherheitskritische Fall. Würde eine unverifizierte
+Anbieter-E-Mail zum Verknüpfen genügen, könnte jeder, der einen Anbieter dazu
+bringt, eine ihm nicht gehörende Adresse auszugeben, das passende
+Rebase-Konto übernehmen. Google bestätigt für echte Google-Konten immer
+`email_verified`, weshalb Schritt 2 der Normalfall bei der Google-Anmeldung ist;
+Schritt 3 betrifft vor allem Anbieter, bei denen Benutzer eine beliebige,
+unbestätigte Adresse angeben können.
+
+Dieses Verhalten ist nicht konfigurierbar — es gibt bewusst keine Option, bei
+unverifizierten E-Mail-Adressen zu verknüpfen.
+
+Um eine Ablehnung aus Schritt 3 zu beheben, meldet sich der Benutzer mit seiner
+bestehenden Methode an und ruft den expliziten Verknüpfungs-Endpunkt auf:
+
+```http
+POST /api/auth/link/google
+Authorization: Bearer <access token>
+
+{ "idToken": "..." }
+```
+
+Das Verknüpfen im angemeldeten Zustand erfordert bewusst **keine** verifizierte
+E-Mail-Adresse und verlangt auch nicht, dass die Adressen übereinstimmen — die
+Google-Adresse eines Benutzers ist oft nicht seine Adresse in der Anwendung. Die
+Asymmetrie ist beabsichtigt: Bei der Anmeldung ist die E-Mail-Adresse des
+Anbieters der einzige Beleg, der die eingehende Identität mit einem Konto
+verbindet, während der Aufrufer hier den Besitz bereits durch eine gültige
+Sitzung nachgewiesen hat. Der Endpunkt gibt `409 IDENTITY_ALREADY_LINKED`
+zurück, wenn diese Anbieter-Identität einem anderen Benutzer gehört, und ist
+idempotent, wenn sie bereits mit dem Aufrufer verknüpft ist.
+
+#### Die umgekehrte Richtung
+
+Ein Benutzer, der sich mit Google registriert hat und kein Passwort besitzt:
+
+- **Eine Registrierung mit derselben E-Mail-Adresse** wird mit
+  `409 EMAIL_EXISTS` abgelehnt.
+- **`POST /api/auth/change-password`** gibt `400 INVALID_ACCOUNT` zurück — es
+  existiert kein bisheriges Passwort, gegen das geprüft werden könnte.
+- **`forgot-password` → `reset-password` ist der vorgesehene Weg, eines
+  hinzuzufügen.** Damit wird der Besitz der Adresse erneut per E-Mail
+  nachgewiesen; danach verfügt das Konto über beide Anmeldemethoden.
+
 ## Auth-Endpunkte
 
 Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
@@ -106,6 +170,7 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 | `POST` | `/api/auth/login` | Mit E-Mail/Passwort anmelden |
 | `POST` | `/api/auth/refresh` | Das Access-Token aktualisieren |
 | `POST` | `/api/auth/<provider>` | OAuth-Anmeldung (z. B. `/api/auth/google`, `/api/auth/linkedin`) |
+| `POST` | `/api/auth/link/<provider>` | Einen OAuth-Anbieter mit dem angemeldeten Konto verknüpfen |
 | `POST` | `/api/auth/logout` | Refresh-Token widerrufen |
 | `POST` | `/api/auth/forgot-password` | E-Mail zur Passwort-Zurücksetzung senden |
 | `POST` | `/api/auth/reset-password` | Passwort mit Token zurücksetzen |

@@ -516,6 +516,37 @@ newPassword })
         });
     }
 
+    /**
+     * Link an OAuth provider to the **currently signed-in** account.
+     *
+     * Use this when `signIn*` failed with `EMAIL_NOT_VERIFIED` — an account
+     * with that email already exists under a different sign-in method — or to
+     * attach a provider whose email differs from the account's.
+     *
+     * The payload is the same one the provider's sign-in method takes, e.g.
+     * `linkProvider("google", { idToken })`.
+     *
+     * Unlike sign-in, this does not require the provider to have verified the
+     * email, and the emails need not match: the active session already proves
+     * account ownership.
+     *
+     * Throws `IDENTITY_ALREADY_LINKED` (409) if that provider identity is
+     * attached to a different user. Succeeds idempotently (`alreadyLinked:
+     * true`) if it is already attached to the current one.
+     */
+    async function linkProvider(
+        providerId: string,
+        payload: Record<string, unknown>
+    ) {
+        return transport.request<{ success: boolean; provider: string; alreadyLinked: boolean; }>(
+            authPath + "/link/" + providerId,
+            {
+                method: "POST",
+                body: JSON.stringify(payload)
+            }
+        );
+    }
+
     async function sendVerificationEmail() {
         return transport.request<{ success: boolean; message: string; }>(authPath + "/send-verification", {
             method: "POST"
@@ -666,6 +697,7 @@ refreshToken: session.refreshToken };
         resetPasswordForEmail,
         resetPassword,
         changePassword,
+        linkProvider,
         sendVerificationEmail,
         verifyEmail,
         sendMagicLink,

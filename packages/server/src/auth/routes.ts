@@ -462,7 +462,7 @@ displayName: user.displayName });
                         // Only auto-link if the OAuth provider confirmed the email is verified
                         if (!externalUser.emailVerified) {
                             throw ApiError.forbidden(
-                                "Cannot auto-link account: email not verified by the OAuth provider. Please log in with your password first and link the provider from your profile.",
+                                `An account with this email already exists with a different sign-in method. ${provider.id} has not verified this email address, so it cannot be linked automatically. Sign in with your existing method, then POST to /auth/link/${provider.id} to link ${provider.id} to your account.`,
                                 "EMAIL_NOT_VERIFIED"
                             );
                         }
@@ -526,6 +526,69 @@ displayName: user.displayName });
                 const transformedResponse = await applyTransformHook(authResponse, "oauth", c.req.raw, user.id);
                 const finalResponse = redactRefreshToken(transformedResponse, c, refreshToken, config.cookieAuth);
                 return c.json(finalResponse);
+            });
+
+            /**
+             * POST /auth/link/:provider
+             * Attach an OAuth identity to the *already authenticated* account.
+             *
+             * This is the escape hatch from the `EMAIL_NOT_VERIFIED` rejection
+             * on the sign-in route above, and the way to attach a provider
+             * whose email differs from the account's.
+             *
+             * Note the deliberate asymmetry with sign-in: linking here does
+             * NOT require the provider to have verified the email, and does
+             * not require the emails to match at all. On the sign-in route the
+             * provider's email is the *only* evidence tying the incoming
+             * identity to an existing account, so an unverified address would
+             * let an attacker claim someone else's account. Here the caller
+             * has already proven ownership by holding a valid session, and the
+             * OAuth credential proves control of the provider identity — the
+             * email plays no part in the decision, so its verification status
+             * is irrelevant.
+             */
+            router.post(`/link/${provider.id}`, defaultAuthLimiter, requireAuth, async (c) => {
+                const userCtx = c.get("user") as { userId: string } | undefined;
+                if (!userCtx) {
+                    throw ApiError.unauthorized("Not authenticated");
+                }
+
+                const payload = parseBody(provider.schema, await c.req.json());
+
+                let externalUser;
+                try {
+                    externalUser = await provider.verify(payload);
+                } catch (err: unknown) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    throw ApiError.unauthorized(`${provider.id} link failed: ${msg}`, "OAUTH_ERROR");
+                }
+                if (!externalUser) {
+                    throw ApiError.unauthorized(`Invalid ${provider.id} credentials`, "INVALID_TOKEN");
+                }
+
+                // Refuse to attach an identity that already belongs to someone
+                // else — one provider identity must resolve to exactly one
+                // user, or the sign-in lookup above becomes ambiguous.
+                const identityOwner = await authRepo.getUserByIdentity(provider.id, externalUser.providerId);
+                if (identityOwner && identityOwner.id !== userCtx.userId) {
+                    throw ApiError.conflict(
+                        `That ${provider.id} account is already linked to a different user.`,
+                        "IDENTITY_ALREADY_LINKED"
+                    );
+                }
+                if (identityOwner) {
+                    // Already linked to this same user — idempotent success.
+                    return c.json({ success: true, provider: provider.id, alreadyLinked: true });
+                }
+
+                await authRepo.linkUserIdentity(
+                    userCtx.userId,
+                    provider.id,
+                    externalUser.providerId,
+                    { email: externalUser.email }
+                );
+
+                return c.json({ success: true, provider: provider.id, alreadyLinked: false });
             });
         }
     }

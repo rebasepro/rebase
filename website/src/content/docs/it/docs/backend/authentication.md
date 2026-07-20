@@ -96,6 +96,68 @@ auth: {
 }
 ```
 
+### Collegamento degli Account tra Metodi di Accesso
+
+Cosa succede quando qualcuno si registra con email/password come
+`ada@example.com` e in seguito fa clic su "Accedi con Google" con un account
+Google che ha lo stesso indirizzo? Rebase **collega i due in un unico account**,
+ma solo quando il provider dichiara l'email come verificata. Non crea mai in
+silenzio un secondo account per lo stesso indirizzo.
+
+Su `POST /api/auth/<provider>` l'ordine di risoluzione è:
+
+1. **Identità del provider già nota**: se questa esatta identità del provider ha
+   già effettuato l'accesso in precedenza, viene restituito quell'utente.
+   L'email non viene consultata.
+2. **Account esistente con la stessa email, verificata dal provider**:
+   l'identità viene associata all'account esistente e l'utente vi accede. Un
+   solo account, due modi per entrarci.
+3. **Account esistente con la stessa email, NON verificata dal provider**:
+   rifiutato con `403 EMAIL_NOT_VERIFIED`. Nulla viene creato o modificato.
+4. **Nessun account con quell'email**: viene creato un nuovo account.
+
+Il passo 3 è il caso critico per la sicurezza. Se un'email non verificata del
+provider bastasse per il collegamento, chiunque riuscisse a far emettere a un
+provider un indirizzo non suo potrebbe impossessarsi del corrispondente account
+Rebase. Google dichiara sempre `email_verified` per gli account Google reali,
+quindi il passo 2 è il percorso normale per l'accesso con Google; il passo 3
+riguarda soprattutto i provider che consentono all'utente di indicare un
+indirizzo arbitrario non confermato.
+
+Questo comportamento non è configurabile: deliberatamente non esiste alcuna
+opzione per collegare account su email non verificate.
+
+Per rimediare a un rifiuto del passo 3, l'utente accede con il proprio metodo
+esistente e chiama l'endpoint di collegamento esplicito:
+
+```http
+POST /api/auth/link/google
+Authorization: Bearer <access token>
+
+{ "idToken": "..." }
+```
+
+Il collegamento effettuato da autenticati intenzionalmente **non** richiede
+un'email verificata, e non richiede nemmeno che le email coincidano: l'indirizzo
+Google di un utente spesso non è quello che usa nell'applicazione. L'asimmetria
+è voluta: in fase di accesso l'email del provider è l'unica prova che lega
+l'identità in arrivo a un account, mentre qui il chiamante ha già dimostrato di
+esserne il proprietario possedendo una sessione valida. Restituisce
+`409 IDENTITY_ALREADY_LINKED` se quell'identità del provider appartiene a un
+altro utente, ed è idempotente se è già collegata al chiamante.
+
+#### La direzione inversa
+
+Un utente che si è registrato con Google e non ha una password:
+
+- **La registrazione con la stessa email** viene rifiutata con
+  `409 EMAIL_EXISTS`.
+- **`POST /api/auth/change-password`** restituisce `400 INVALID_ACCOUNT`: non
+  esiste alcuna password precedente con cui effettuare la verifica.
+- **`forgot-password` → `reset-password` è il modo supportato per aggiungerne
+  una.** Dimostra nuovamente via email la proprietà dell'indirizzo, dopodiché
+  l'account dispone di entrambi i metodi di accesso.
+
 ## Endpoint di Autenticazione
 
 Tutti gli endpoint di autenticazione sono montati su `/api/auth/`:
@@ -106,6 +168,7 @@ Tutti gli endpoint di autenticazione sono montati su `/api/auth/`:
 | `POST` | `/api/auth/login` | Accedere con email/password |
 | `POST` | `/api/auth/refresh` | Aggiornare il token di accesso |
 | `POST` | `/api/auth/<provider>` | Accesso OAuth (ad es. `/api/auth/google`, `/api/auth/linkedin`) |
+| `POST` | `/api/auth/link/<provider>` | Collegare un provider OAuth all'account autenticato |
 | `POST` | `/api/auth/logout` | Revocare il refresh token |
 | `POST` | `/api/auth/forgot-password` | Inviare l'email di reimpostazione password |
 | `POST` | `/api/auth/reset-password` | Reimpostare la password con un token |

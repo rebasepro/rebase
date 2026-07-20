@@ -219,10 +219,47 @@ Twitter uses OAuth 2.0 with PKCE. The client must send `codeVerifier` alongside 
 
 ### OAuth Account Linking
 
-When an OAuth user signs in:
-1. If an identity record exists for `(providerId, provider)` → log in that user.
-2. If no identity exists but a user with the same email exists → **link** the provider to the existing account.
+When an OAuth user signs in via `POST /api/auth/{provider}`:
+
+1. If an identity record exists for `(provider, providerId)` → log in that user. The email is not consulted.
+2. If no identity exists but a user with the same email exists:
+   - **The provider asserted `emailVerified: true`** → **link** the provider to the existing account and log in as that user. One account, two sign-in methods.
+   - **The provider did NOT verify the email** → reject with `403 EMAIL_NOT_VERIFIED`. Nothing is created or modified.
 3. If neither exists → create a new user, link the identity, assign `defaultRole`.
+
+> **IMPORTANT FOR AGENTS:** A second account is **never** silently created for
+> an email that already exists. If asked "does signing in with Google create a
+> duplicate user?", the answer is no — it either links (verified) or errors
+> (unverified). This is **not configurable**; there is deliberately no option to
+> auto-link on unverified emails, because that would let anyone who can make a
+> provider emit an address they don't own take over the matching account.
+> Google always asserts `email_verified` for real Google accounts, so linking
+> is the normal path for Google sign-in.
+
+### Linking a Provider to a Signed-In Account
+
+`POST /api/auth/link/{provider}` attaches a provider identity to the **already
+authenticated** account (requires `Authorization: Bearer <token>`). The body is
+the same payload the provider's sign-in route takes, e.g. `{ idToken }`.
+
+This is the escape hatch from an `EMAIL_NOT_VERIFIED` rejection, and the way to
+attach a provider whose email differs from the account's.
+
+Unlike sign-in, linking here does **not** require a verified email and does not
+require the emails to match — on sign-in the provider's email is the only
+evidence tying the identity to an account, whereas here the caller has already
+proven ownership by holding a valid session.
+
+- `409 IDENTITY_ALREADY_LINKED` if that provider identity belongs to another user.
+- Idempotent (`alreadyLinked: true`) if already linked to the caller.
+
+### Adding a Password to a Provider-Only Account
+
+A user who signed up via OAuth has no `passwordHash`:
+
+- `POST /auth/register` with the same email → `409 EMAIL_EXISTS`.
+- `POST /auth/change-password` → `400 INVALID_ACCOUNT` (no existing password to verify).
+- **`forgot-password` → `reset-password` is the supported path.** It re-proves ownership of the address by email, after which the account has both sign-in methods.
 
 ### Custom OAuth Provider
 
@@ -659,6 +696,7 @@ All auth endpoints are mounted under `/api/auth`. Admin endpoints are under `/ap
 | `PATCH` | `/auth/me` | Required | Update profile. Body: `{ displayName?, photoURL? }`. |
 | `POST` | `/auth/change-password` | Required | Change password. Body: `{ oldPassword, newPassword }`. Invalidates all sessions. |
 | `POST` | `/auth/send-verification` | Required | Send email verification link. Requires email service. |
+| `POST` | `/auth/link/{provider}` | Required | Link an OAuth provider to the current account. Body: the provider's sign-in payload (e.g. `{ idToken }`). `409 IDENTITY_ALREADY_LINKED` if it belongs to another user. |
 | `GET` | `/auth/sessions` | Required | List active sessions (refresh tokens). |
 | `DELETE` | `/auth/sessions` | Required | Revoke all sessions (remote logout). |
 | `DELETE` | `/auth/sessions/:id` | Required | Revoke a specific session. |

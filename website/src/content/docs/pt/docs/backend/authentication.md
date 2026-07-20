@@ -96,6 +96,67 @@ auth: {
 }
 ```
 
+### Vinculação de Contas entre Métodos de Login
+
+O que acontece quando alguém se registra com e-mail/senha como
+`ada@example.com` e mais tarde clica em "Entrar com o Google" numa conta Google
+com esse mesmo endereço? O Rebase **vincula as duas numa única conta** — mas
+apenas quando o provedor afirma que o e-mail está verificado. Ele nunca cria
+silenciosamente uma segunda conta para o mesmo endereço.
+
+Em `POST /api/auth/<provider>` a ordem de resolução é:
+
+1. **Identidade de provedor já conhecida** — se essa identidade exata do
+   provedor já fez login antes, esse usuário é retornado. O e-mail não é
+   consultado.
+2. **Conta existente com o mesmo e-mail, verificado pelo provedor** — a
+   identidade é anexada à conta existente e o usuário entra nela. Uma conta,
+   duas formas de entrar.
+3. **Conta existente com o mesmo e-mail, NÃO verificado pelo provedor** —
+   rejeitado com `403 EMAIL_NOT_VERIFIED`. Nada é criado nem modificado.
+4. **Nenhuma conta com esse e-mail** — uma nova conta é criada.
+
+O passo 3 é o caso crítico para a segurança. Se um e-mail não verificado do
+provedor bastasse para vincular, qualquer pessoa capaz de fazer um provedor
+emitir um endereço que não lhe pertence poderia assumir o controle da conta
+Rebase correspondente. O Google sempre afirma `email_verified` para contas
+Google reais, portanto o passo 2 é o caminho normal do login com o Google; o
+passo 3 atinge sobretudo provedores que deixam o usuário informar um endereço
+arbitrário e não confirmado.
+
+Esse comportamento não é configurável — deliberadamente não existe opção para
+vincular com e-mails não verificados.
+
+Para se recuperar de uma rejeição do passo 3, o usuário entra com o seu método
+existente e chama o endpoint de vinculação explícito:
+
+```http
+POST /api/auth/link/google
+Authorization: Bearer <access token>
+
+{ "idToken": "..." }
+```
+
+A vinculação feita já autenticado intencionalmente **não** exige um e-mail
+verificado, nem exige que os e-mails coincidam — o endereço do Google de um
+usuário muitas vezes não é o endereço que ele usa no aplicativo. A assimetria é
+deliberada: no login, o e-mail do provedor é a única evidência que liga a
+identidade recebida a uma conta, ao passo que aqui quem chama já provou ser o
+proprietário por possuir uma sessão válida. Retorna
+`409 IDENTITY_ALREADY_LINKED` se essa identidade de provedor pertencer a outro
+usuário, e é idempotente se ela já estiver vinculada a quem chama.
+
+#### O sentido inverso
+
+Um usuário que se cadastrou com o Google e não tem senha:
+
+- **Registrar-se com o mesmo e-mail** é recusado com `409 EMAIL_EXISTS`.
+- **`POST /api/auth/change-password`** retorna `400 INVALID_ACCOUNT` — não há
+  senha anterior contra a qual verificar.
+- **`forgot-password` → `reset-password` é a forma suportada de adicionar
+  uma.** Ela comprova novamente por e-mail a posse do endereço, após o que a
+  conta passa a ter ambos os métodos de login.
+
 ## Endpoints de Autenticação
 
 Todos os endpoints de autenticação são montados em `/api/auth/`:
@@ -106,6 +167,7 @@ Todos os endpoints de autenticação são montados em `/api/auth/`:
 | `POST` | `/api/auth/login` | Entrar com e-mail/senha |
 | `POST` | `/api/auth/refresh` | Atualizar o token de acesso |
 | `POST` | `/api/auth/<provider>` | Login OAuth (por ex., `/api/auth/google`, `/api/auth/linkedin`) |
+| `POST` | `/api/auth/link/<provider>` | Vincular um provedor OAuth à conta autenticada |
 | `POST` | `/api/auth/logout` | Revogar o refresh token |
 | `POST` | `/api/auth/forgot-password` | Enviar e-mail de redefinição de senha |
 | `POST` | `/api/auth/reset-password` | Redefinir a senha com um token |
