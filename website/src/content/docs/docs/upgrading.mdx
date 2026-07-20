@@ -1,0 +1,265 @@
+---
+slug: docs/upgrading
+title: Upgrading
+description: What breaks when you move an existing app to the current release, and what to do about each one.
+---
+
+# Upgrading an existing app
+
+This release renames packages, changes what `id` means, drops CJS, and — most
+importantly — **fixes a security rule that was silently permissive**. Read the
+first section before anything else: it is the only change that can alter who can
+read your data, and it is the only one that will not announce itself.
+
+Work through the sections in order. Each one names the symptom you would
+otherwise debug from the wrong end.
+
+---
+
+## 1. `policy.authenticated()` — read this first
+
+### What changed
+
+`policy.authenticated()` used to compile to:
+
+```sql
+auth.uid() IS NOT NULL
+```
+
+On the user path that is a **tautology**. `applyAuthContext` coerces a blank
+user id to the `'anonymous'` sentinel — deliberately, so that it can never read
+back as `NULL` and be mistaken for the trusted server context. So `IS NOT NULL`
+was true for anonymous visitors too.
+
+A rule that reads as "logged-in users only" therefore granted access to
+**everyone, including signed-out visitors**. It now compiles to:
+
+```sql
+auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'
+```
+
+`policy.not(policy.authenticated())` was separately special-cased to mean "the
+server context". It no longer is — use `policy.serverContext()` for that.
+
+### Why this is the dangerous one
+
+The compiled SQL lives in your **database**, not in your application code.
+Upgrading the packages does not change it. The two failure modes are opposite,
+and both are quiet:
+
+| What you do | What happens |
+|---|---|
+| Upgrade packages, **do not** re-run `db push` | Your database keeps `auth.uid() IS NOT NULL`. **Anonymous visitors keep the access they should never have had.** Nothing warns you. |
+| Upgrade packages **and** re-run `db push` | The policy tightens. Anything that was relying on the permissive behaviour — an unauthenticated read your frontend does on page load, a public listing, a webhook without a session — starts returning zero rows or 403. |
+
+> **`db doctor` will not catch this.** `checkPolicyDrift` compares policy
+> *presence*, roles, and command — not expression text, because Postgres
+> rewrites `qual` when storing it and text comparison reports drift that does
+> not exist. The policy name is also unchanged: it is a hash of the rule *as
+> written in your config*, and your config did not change. So a stale, permissive
+> policy matches the expected one on every field the drift checker looks at, and
+> `db doctor` reports a clean database.
+>
+> A clean drift report is **not** evidence that this change reached your
+> database.
+
+### What to do
+
+**Step 1 — find every affected rule.** From your project root:
+
+```bash
+grep -rn "authenticated()" config/collections/
+```
+
+Every hit is a rule whose meaning changed. Also check for the raw spelling,
+which was the other way to write the same tautology:
+
+```bash
+grep -rn "auth.uid() IS NOT NULL" config/collections/
+```
+
+**Step 2 — decide what each one meant.** For each rule, ask which you intended:
+
+- *"Any signed-in user"* → `policy.authenticated()`. No code change; the
+  behaviour is now what you wrote. Re-run `db push`.
+- *"Anyone at all, including anonymous"* → you were relying on the bug, whether
+  you knew it or not. Make it explicit: `{ operation: "select", access: "public" }`.
+- *"Only the trusted server context"* → replace `policy.not(policy.authenticated())`
+  with `policy.serverContext()`.
+
+**Step 3 — check what your database actually has,** before and after:
+
+```sql
+SELECT tablename, policyname, cmd, qual
+FROM pg_policies
+WHERE schemaname = 'public'
+ORDER BY tablename, policyname;
+```
+
+Any `qual` containing `auth.uid() IS NOT NULL` **without** the
+`<> 'anonymous'` clause is a stale permissive policy. That query is the only
+reliable check — it is what the drift checker does not do.
+
+**Step 4 — re-run `db push` and re-run the query.** Confirm every policy you
+expected to change did change.
+
+**Step 5 — test signed-out.** Open your app in a private window with no session
+and exercise the read paths. This is where you find the public listing that
+quietly depended on the old behaviour.
+
+---
+
+## 2. The authenticated principal is `uid`, not `userId`
+
+Tokens now carry a `uid` claim and `c.get("user")` returns `{ uid, roles }`.
+
+```bash
+grep -rn "\.userId\|payload.userId\|user.userId" src/ config/
+```
+
+Anything reading `payload.userId` or `user.userId` gets `undefined` — which,
+in a permission check, usually fails open or fails silently rather than
+throwing. Search for the defensive `a ?? b` spelling too; several places had
+independently grown one to cope with the two names:
+
+```bash
+grep -rn "uid ?? \|?? .*userId" src/ config/
+```
+
+---
+
+## 3. `id` is an address, not a column
+
+Rows now carry their own columns under their own names and types. Previously a
+synthesized `id` was written into rows on the way out, which collided with your
+data three ways: it renamed the key (a `sku` primary key was served as `id`,
+with `sku` absent), it changed the type (an integer key arrived as `"42"`), and
+it destroyed real values (`drizzleResultToRow` spread it last, so it won over a
+genuine `id` column).
+
+**If your tables are keyed on `id`, nothing changes for you.**
+
+If any table is keyed on something else, code reading `row.id` must read the
+real key. Note the type change too: a numeric primary key now arrives as a
+`number`, so `row.id === "42"` becomes `row.sku === 42`. Strict equality against
+a string will silently stop matching.
+
+---
+
+## 4. ESM only
+
+`main`, `module` and the `import` condition all point at `index.es.js`; the
+`require` condition is gone. The CJS/UMD half was never loadable anyway — the
+output banner injects `import` / `import.meta.url`, which a UMD bundle cannot
+parse as CommonJS — so this removes a build target that could not have been
+working for you.
+
+A CommonJS consumer must use dynamic `import()` or move to ESM.
+
+---
+
+## 5. Package renames
+
+Import paths only — no behaviour moved with them.
+
+| Old | New |
+|---|---|
+| `@rebasepro/core` | `@rebasepro/app` |
+| `@rebasepro/server-core` | `@rebasepro/server` |
+| `@rebasepro/server-postgresql` | `@rebasepro/server-postgres` |
+| `@rebasepro/server-mongodb` | `@rebasepro/server-mongo` |
+| `@rebasepro/client-postgresql` | `@rebasepro/client-postgres` |
+| `@rebasepro/client-firebase` | `@rebasepro/firebase` |
+| `@rebasepro/formex` | `@rebasepro/forms` |
+| `@rebasepro/sdk-generator` | `@rebasepro/codegen` |
+| `@rebasepro/schema-inference` | `@rebasepro/inference` |
+| `@rebasepro/mcp-server` | `@rebasepro/mcp` |
+| `@rebasepro/plugin-data-enhancement` | `@rebasepro/plugin-ai` |
+
+Unchanged: `types`, `utils`, `common`, `client`, `ui`, `admin`, `studio`,
+`cli`, `plugin-insights`.
+
+The retired names are deprecated on npm, so installing one tells you rather
+than resolving to an abandoned version.
+
+Additionally, **`@rebasepro/auth` is removed**. `useRebaseAuthController`,
+`fetchAuthConfig`, `createAuthConfigCache` and `clearAuthConfigCache` now come
+from `@rebasepro/app`, beside the `RebaseAuth` and `LoginView` components they
+are used with.
+
+**`RebaseCMS` is now `RebaseAdmin`.** `mode: "cms"` on `RebaseBackendConfig` is
+unchanged — it describes where collections come from, not the UI.
+
+---
+
+## 6. `defaultSecurityRules` moved off the server config
+
+It used to live on `RebaseBackendConfig`, where it enforced nothing: `db push`
+generates the Postgres policies — the only thing that actually enforces
+access — from the collection *files*, and never sees the running server.
+
+Declare it in `config/collections/index.ts` instead, where the loader reads it
+and both the runtime and `db push` see the same thing:
+
+```ts
+// config/collections/index.ts
+export const defaultSecurityRules: SecurityRule[] = [
+    { operation: "select", access: "public" },
+    { operations: ["insert", "update", "delete"], roles: ["admin"] }
+];
+```
+
+The old documentation claimed collections without rules were "unrestricted".
+They are not — the generator locks them to admin-only.
+
+In `baas` mode there are no collection files and no `db push`, so the
+database's own RLS is the whole model and there is nothing to default.
+
+---
+
+## 7. Smaller behaviour changes
+
+**A write naming a field the collection lacks is now a 400.** Unknown keys used
+to travel into the INSERT, so a typo came back as `column "titel" does not
+exist` — phrased by Postgres, from a stack the caller cannot see, and only when
+the column really was absent. Bulk writes are checked before the transaction
+opens and report the offending row index.
+
+> **Known exemption:** writes to an **auth-enabled collection** skip this check
+> entirely. A signup body carries `password` and provider fields the users
+> collection never declares as columns, so the check is bypassed and
+> `prepareUserCreation` maps the body onto real columns. The consequence is that
+> an undeclared field on an auth collection is **silently dropped** and the
+> request returns 201, where the same write to a normal collection is a 400. Do
+> not rely on validation to catch a typo in a signup payload.
+
+**A collection file that fails to import is now a hard error.** The loader used
+to log and continue, turning a broken file into a missing API route and a
+missing policy with a successful exit code. Both read as "no data" rather than
+as a failure.
+
+**BaaS mode does not serve tables without row-level security.** A table with RLS
+disabled is skipped and named at boot. `baas: { unprotectedTables: "serve" }`
+restores the old behaviour.
+
+---
+
+## Upgrade checklist
+
+```
+[ ] grep for authenticated() and auth.uid() IS NOT NULL in config/collections/
+[ ] decide the intent of each rule; rewrite the ones that meant "public"
+[ ] replace not(authenticated()) with serverContext()
+[ ] SELECT ... FROM pg_policies — record the qual of every policy BEFORE
+[ ] update package names and imports
+[ ] move defaultSecurityRules into config/collections/index.ts
+[ ] grep for .userId
+[ ] grep for row.id on tables not keyed on id
+[ ] run db push
+[ ] SELECT ... FROM pg_policies again — confirm every intended change landed
+[ ] exercise the app signed OUT, in a private window
+```
+
+The `pg_policies` reads before and after are the important pair. They are the
+only step that verifies the security change actually reached your database,
+because neither `db doctor` nor the type system will tell you.

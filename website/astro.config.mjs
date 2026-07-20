@@ -52,7 +52,8 @@ export default defineConfig({
                         { label: "Introduction", slug: "docs" },
                         { label: "Quickstart", slug: "docs/getting-started/quickstart" },
                         { label: "Project Structure", slug: "docs/getting-started/project-structure" },
-                        { label: "Environment & Configuration", slug: "docs/getting-started/configuration" }
+                        { label: "Environment & Configuration", slug: "docs/getting-started/configuration" },
+                        { label: "Upgrading", slug: "docs/upgrading" }
                     ]
                 },
                 {
