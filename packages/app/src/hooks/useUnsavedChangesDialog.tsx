@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
-import { useBlocker } from "react-router-dom";
 import { UnsavedChangesDialogProps } from "../components/UnsavedChangesDialog";
+import { useNavigationBlocker } from "./useNavigationBlocker";
 
 /**
  * A single, unified hook to prevent navigation when there are unsaved changes.
@@ -18,9 +18,12 @@ export function useUnsavedChangesDialog(
 } {
     const [manualDialogOpen, setManualDialogOpen] = useState(false);
 
-    const blocker = useBlocker(
-        ({ currentLocation, nextLocation }) =>
-            when && currentLocation.pathname !== nextLocation.pathname
+    const blocker = useNavigationBlocker(
+        useCallback(
+            ({ currentLocation, nextLocation }) =>
+                when && currentLocation.pathname !== nextLocation.pathname,
+            [when]
+        )
     );
 
     useEffect(() => {

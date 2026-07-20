@@ -1,4 +1,5 @@
 import type { CollectionConfig, UrlController, SidePanelController, NavigateOptions } from "@rebasepro/types";
+import { withViewMode } from "./view_mode";
 
 // Canonical path utilities — single source of truth in @rebasepro/common
 export {
@@ -71,11 +72,7 @@ export function navigateToEntity({
         if (entityId && selectedTab) {
             to += `/${selectedTab}`;
         }
-        // Preserve the __view query param so the target route knows the current view mode
-        const currentViewParam = new URLSearchParams(window.location.search).get("__view");
-        if (currentViewParam) {
-            to += `${to.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
-        }
+        to = withViewMode(to);
         if (!entityId) {
             to += "#new";
         }

@@ -11,6 +11,7 @@ import { FilterPresetsButton } from "./FilterPresetsButton";
 import { toArray } from "@rebasepro/utils";
 import { useNavigate } from "react-router-dom";
 import { useUrlController, useCMSContext } from "../../index";
+import { withViewMode } from "../../util/view_mode";
 
 export type CollectionViewStartActionsProps<M extends Record<string, unknown>> = {
     collection: CollectionConfig<M>;
@@ -72,13 +73,7 @@ parentEntityIds,
     };
 
     const handleBackClick = useCallback(() => {
-        let collectionUrl = urlController.buildUrlCollectionPath(path);
-        // Preserve the __view query param so the view mode is retained
-        const currentViewParam = new URLSearchParams(window.location.search).get("__view");
-        if (currentViewParam) {
-            collectionUrl += `${collectionUrl.includes("?") ? "&" : "?"}__view=${currentViewParam}`;
-        }
-        navigate(collectionUrl);
+        navigate(withViewMode(urlController.buildUrlCollectionPath(path)));
     }, [navigate, urlController, path]);
 
     const backButton = compact && (
