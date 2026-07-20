@@ -168,7 +168,7 @@ Client                                                   Rebase Server
 When using multiple storage backends, pass `storageSources` to the `<Rebase>` provider so the frontend knows how to route uploads directly:
 
 ```tsx
-import { Rebase } from "@rebasepro/admin";
+import { Rebase } from "@rebasepro/app";
 
 <Rebase
     apiUrl="https://api.example.com"

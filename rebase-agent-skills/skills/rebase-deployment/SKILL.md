@@ -348,7 +348,8 @@ Use the `extend` option to add your own typed env variables on top of the base R
 
 ```typescript
 import dotenv from "dotenv";
-import { loadEnv, z } from "@rebasepro/server";
+import { loadEnv } from "@rebasepro/server";
+import { z } from "zod";
 
 dotenv.config({ path: "../../.env" });
 

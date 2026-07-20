@@ -495,7 +495,7 @@ validation: {
 
 Maps store nested objects as `JSONB` in PostgreSQL. They can define their own inner properties schema.
 
-```typescript
+```typescript no-verify
 address: {
     name: "Address",
     type: "map",
@@ -663,7 +663,7 @@ Every property supports a `validation` object with these common options:
 
 Use the `enum` property on `string` or `number` types to define picklist options:
 
-```typescript
+```typescript no-verify
 status: {
     name: "Status",
     type: "string",
@@ -687,7 +687,7 @@ Each `EnumValueConfig` entry supports:
 
 `EnumValues` can also be a `Record<string, string | EnumValueConfig>` for simpler definitions:
 
-```typescript
+```typescript no-verify
 enum: {
     draft: "Draft",
     published: { label: "Published", color: "green" }

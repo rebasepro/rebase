@@ -150,7 +150,7 @@ await rebase.data.posts.delete('post-123');
 
 // Count
 const total = await rebase.data.posts.count({
-    where: { status: 'eq.published' },
+    where: { status: ['==', 'published'] },
 });
 ```
 
@@ -177,31 +177,39 @@ Pass a params object directly to `.find()`:
 const result = await rebase.data.posts.find({
     limit: 20,
     offset: 0,
-    orderBy: 'createdAt:desc',
+    orderBy: ['createdAt', 'desc'],
     searchString: 'search term',
     include: ['tags', 'author'],   // or ['*'] for all relations
     where: {
-        status: 'eq.published',
-        price: 'gte.100',
-        category: 'in.(electronics,books)',
+        status: ['==', 'published'],
+        price: ['>=', 100],
+        category: ['in', ['electronics', 'books']],
     },
 });
 ```
 
-### Filter Operators (String Syntax)
+### Filter Operators (Tuple Syntax)
+
+Every filter is a `[operator, value]` tuple. The bare-string and
+`'eq.published'` wire formats are **not** part of the public API: they are
+`WireFilterValues`, marked `@internal`, and `serializeFilter` passes such a
+string straight through to PostgREST unchanged — so an operator-less value
+silently produces a malformed query rather than an error.
 
 | Operator | Description | Example |
 |----------|-------------|---------|
-| `eq` | Equal | `'eq.published'` |
-| `neq` | Not equal | `'neq.draft'` |
-| `gt` | Greater than | `'gt.100'` |
-| `gte` | Greater than or equal | `'gte.100'` |
-| `lt` | Less than | `'lt.50'` |
-| `lte` | Less than or equal | `'lte.50'` |
-| `in` | In list | `'in.(electronics,books)'` |
-| `nin` | Not in list | `'nin.(archived,deleted)'` |
-| `cs` | Array contains | `'cs.tag1'` |
-| `csa` | Array contains any | `'csa.(tag1,tag2)'` |
+| `==` | Equal | `['==', 'published']` |
+| `!=` | Not equal | `['!=', 'draft']` |
+| `>` | Greater than | `['>', 100]` |
+| `>=` | Greater than or equal | `['>=', 100]` |
+| `<` | Less than | `['<', 50]` |
+| `<=` | Less than or equal | `['<=', 50]` |
+| `in` | In list | `['in', ['electronics', 'books']]` |
+| `not-in` | Not in list | `['not-in', ['archived', 'deleted']]` |
+| `array-contains` | Array contains | `['array-contains', 'tag1']` |
+| `array-contains-any` | Array contains any | `['array-contains-any', ['tag1', 'tag2']]` |
+| `like` / `ilike` | Pattern match (SQL wildcards) | `['ilike', '%john%']` |
+| `is-null` / `is-not-null` | Null checks (value ignored) | `['is-null', null]` |
 
 ### Approach 2: Fluent QueryBuilder
 
@@ -352,7 +360,7 @@ unsubscribe();
 ```typescript
 // Via CollectionClient
 const unsubscribe = rebase.data.posts.listen(
-    { where: { status: 'published' }, limit: 50 },
+    { where: { status: ['==', 'published'] }, limit: 50 },
     (response) => {
         // response: FindResponse with updated data
         console.log('Updated posts:', response.data);

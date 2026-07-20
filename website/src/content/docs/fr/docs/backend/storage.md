@@ -166,7 +166,7 @@ Client                                                   Rebase Server
 Lorsque vous utilisez plusieurs backends de stockage, passez `storageSources` au provider `<Rebase>` afin que le frontend sache router les téléversements directement :
 
 ```tsx
-import { Rebase } from "@rebasepro/admin";
+import { Rebase } from "@rebasepro/app";
 
 <Rebase
     apiUrl="https://api.example.com"

@@ -202,7 +202,7 @@ The typography scale is compact and uses semibold weights for headings — desig
 
 ### Typography Anti-Patterns
 
-```tsx
+```tsx no-verify
 // ❌ NEVER: Gradient text on headings
 <Typography className="bg-gradient-to-r from-violet-600 to-cyan-500 bg-clip-text text-transparent">
 
@@ -270,7 +270,7 @@ The `Card` component from `@rebasepro/ui` automatically applies `cardMixin` and,
 // cardClickableMixin = "hover:bg-surface-50 dark:hover:bg-surface-800 cursor-pointer transition-colors duration-150"
 ```
 
-```tsx
+```tsx no-verify
 // ✅ CORRECT: Using Card component
 <Card className="p-4">
     <Typography variant="subtitle1">Title</Typography>
@@ -407,7 +407,7 @@ The `Button` component accepts these variants and colors. Buttons use `rounded-l
 
 ### Button Anti-Patterns
 
-```tsx
+```tsx no-verify
 // ❌ NEVER: Casting variant to bypass types
 <Button variant={"standard" as any}>
 
@@ -432,7 +432,7 @@ The `Button` component accepts these variants and colors. Buttons use `rounded-l
 
 ### Use the `Alert` Component
 
-```tsx
+```tsx no-verify
 // ✅ CORRECT
 <Alert color="success" size="small">Lead captured successfully!</Alert>
 <Alert color="error">Could not load dashboard statistics.</Alert>
@@ -508,7 +508,7 @@ When displaying numeric KPIs, use plain muted icons (matching NavigationCard) �
 
 ### Metric Card Anti-Patterns
 
-```tsx
+```tsx no-verify
 // ❌ NEVER: Gradient icon backgrounds
 <div className="p-4 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/20">
 
@@ -555,7 +555,7 @@ For larger content sections (like a table, form, or embedded panel), use `Paper`
 
 ### Panel Anti-Patterns
 
-```tsx
+```tsx no-verify
 // ❌ WRONG: Custom panel styling
 <div className="p-6 rounded-2xl border bg-white dark:bg-surface-900/50 backdrop-blur-md shadow-sm">
 

@@ -95,7 +95,7 @@ const { db, pool, connectionString } = createPostgresDatabaseConnection(
 
 **Signature:**
 
-```typescript
+```typescript no-verify
 function createPostgresDatabaseConnection(
     connectionString: string,
     schema?: Record<string, unknown>,
@@ -120,7 +120,7 @@ const readResources = createReadReplicaConnection(
 
 **Signature:**
 
-```typescript
+```typescript no-verify
 function createReadReplicaConnection(
     connectionString: string,
     schema?: Record<string, unknown>,
@@ -145,7 +145,7 @@ const directResources = createDirectDatabaseConnection(
 
 **Signature:**
 
-```typescript
+```typescript no-verify
 function createDirectDatabaseConnection(
     connectionString: string,
     schema?: Record<string, unknown>,
@@ -387,7 +387,8 @@ export const env = loadEnv();
 
 ```typescript
 import dotenv from "dotenv";
-import { loadEnv, z } from "@rebasepro/server";
+import { loadEnv } from "@rebasepro/server";
+import { z } from "zod";
 
 dotenv.config({ path: "../../.env" });
 

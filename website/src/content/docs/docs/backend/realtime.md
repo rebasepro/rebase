@@ -67,7 +67,7 @@ Pass `FindParams` as the first argument to filter the subscription:
 ```typescript
 const unsubscribe = client.data.products.listen(
   {
-    where: { status: "published" },
+    where: { status: ["==", "published"] },
     orderBy: ["created_at", "desc"],
     limit: 50,
   },

@@ -133,7 +133,7 @@ const { data } = await client.data.products
 
 Der Parameter `where` in `find()` unterstützt zwei Formate:
 
-```typescript
+```typescript no-verify
 // 1. Tuple syntax — [operator, value] (recommended)
 await client.data.products.find({
     where: {

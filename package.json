@@ -47,6 +47,7 @@
     "build": "pnpm --filter './packages/*' -r run build && pnpm --filter './app' -r run build",
     "build:stream": "pnpm -r run build --reporter=append-only",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "verify:docs": "node --max-old-space-size=8192 scripts/verify-docs.mjs",
     "check:headless": "node scripts/headless-guard/check.mjs",
     "check:names": "node scripts/headless-guard/check-package-names.mjs",
     "clean": "pnpm -r run clean",

@@ -31,7 +31,7 @@ The package exports five modules:
 export * from "./components";  // All UI components
 export * from "./styles";      // Tailwind style mixin strings
 export * from "./util";        // cls(), debounce(), chip_colors, keyToIconComponent
-export * from "./icons";       // Icon component, iconSize, lucideIcons map, icon_keys, cool_icon_keys
+export * from "./icons";       // Icon component, iconSize, lucideIcons map, iconKeys, cool_icon_keys
 export * from "./hooks";       // React hooks
 ```
 
@@ -1149,13 +1149,13 @@ const IconComponent = lucideIcons["Database"]; // LucideIcon component
 <IconComponent size={24} />
 ```
 
-### `icon_keys` and `cool_icon_keys`
+### `iconKeys` and `cool_icon_keys`
 
-- **`icon_keys`** — Array of ~1900+ all available Lucide icon name strings.
+- **`iconKeys`** — Array of ~1900+ all available Lucide icon name strings.
 - **`cool_icon_keys`** — Curated subset of ~50 visually distinctive icon names for icon pickers.
 
 ```tsx
-import { icon_keys, coolIconKeys, lucideIcons } from "@rebasepro/ui";
+import { iconKeys, coolIconKeys, lucideIcons } from "@rebasepro/ui";
 ```
 
 ### `keyToIconComponent(key: string): string`
@@ -1265,7 +1265,7 @@ debouncedSearch.clear(); // Cancel pending call
 Deterministic 32-bit hash of a string. Returns a positive integer.
 
 ```tsx
-import { hashString } from "@rebasepro/ui";
+import { hashString } from "@rebasepro/utils";
 hashString("my-entity-id"); // e.g. 1234567
 ```
 
@@ -1280,7 +1280,7 @@ import {
 ```
 
 **`ChipColorScheme`** type:
-```ts
+```ts no-verify
 {
     color: string;      // Light mode background hex
     text: string;       // Light mode text hex

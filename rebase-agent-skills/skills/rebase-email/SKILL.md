@@ -217,7 +217,7 @@ import {
 
 #### getPasswordResetTemplate
 
-```typescript
+```typescript no-verify
 function getPasswordResetTemplate(
     resetUrl: string,
     user: { email: string; displayName?: string | null },
@@ -229,7 +229,7 @@ The template includes a "Reset Password" button linking to `resetUrl`, a plain-t
 
 #### getEmailVerificationTemplate
 
-```typescript
+```typescript no-verify
 function getEmailVerificationTemplate(
     verifyUrl: string,
     user: { email: string; displayName?: string | null },
@@ -241,7 +241,7 @@ The template includes a "Verify Email Address" button linking to `verifyUrl`.
 
 #### getUserInvitationTemplate
 
-```typescript
+```typescript no-verify
 function getUserInvitationTemplate(
     setPasswordUrl: string,
     user: { email: string; displayName?: string | null },
@@ -253,7 +253,7 @@ Sent when an admin creates a user via `POST /api/admin/users` without specifying
 
 #### getWelcomeEmailTemplate
 
-```typescript
+```typescript no-verify
 function getWelcomeEmailTemplate(
     user: { email: string; displayName?: string | null },
     appName?: string,   // default: "Rebase"

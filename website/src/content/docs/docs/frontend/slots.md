@@ -12,7 +12,7 @@ Slots are named UI extension points where you can inject custom React components
 
 ### Via `<Rebase>` prop
 
-```tsx
+```tsx no-verify
 <Rebase
     client={client}
     slots={[

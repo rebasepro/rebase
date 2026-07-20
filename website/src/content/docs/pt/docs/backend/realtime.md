@@ -67,7 +67,7 @@ Passe `FindParams` como primeiro argumento para filtrar a assinatura:
 ```typescript
 const unsubscribe = client.data.products.listen(
   {
-    where: { status: "published" },
+    where: { status: ["==", "published"] },
     orderBy: ["created_at", "desc"],
     limit: 50,
   },

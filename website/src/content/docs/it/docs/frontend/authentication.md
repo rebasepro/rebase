@@ -9,7 +9,7 @@ description: Configura il controller di autenticazione, la vista di login, la ge
 Rebase fornisce componenti e hook React pronti all'uso per l'autenticazione:
 
 - **`useRebaseAuthController`** — Gestisce lo stato di autenticazione, i token e la persistenza della sessione
-- **`RebaseLoginView`** — Modulo di login/registrazione predefinito con supporto OAuth
+- **`LoginView`** — Modulo di login/registrazione predefinito con supporto OAuth
 - **`useBackendUserManagement`** — Hook per gestire gli utenti dal pannello di amministrazione
 - **`UsersView`** — Interfaccia integrata di gestione utenti
 - **Simulazione dei ruoli** — Testa ruoli diversi senza disconnetterti
@@ -40,14 +40,14 @@ Passa l'`authController` al controller di navigazione di Rebase per proteggere l
 
 ## Vista di Login
 
-Il componente `RebaseLoginView` fornisce un modulo completo di login e registrazione:
+Il componente `LoginView` fornisce un modulo completo di login e registrazione:
 
 ```tsx
-import { RebaseLoginView } from "@rebasepro/app";
+import { LoginView } from "@rebasepro/app";
 
 if (!authController.user) {
     return (
-        <RebaseLoginView
+        <LoginView
             authController={authController}
             googleEnabled={!!GOOGLE_CLIENT_ID}
             googleClientId={GOOGLE_CLIENT_ID}

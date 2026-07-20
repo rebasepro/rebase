@@ -109,7 +109,7 @@ function ProductList() {
 Fetch and subscribe to a single entity by ID. It renders instantly using cached data if already loaded via a collection fetch, then updates in the background.
 
 ```typescript
-import { useEntityFetch } from "@rebasepro/app";
+import { useFetch } from "@rebasepro/app";
 import { productsCollection } from "../config/collections";
 
 function ProductDetail({ productId }) {
@@ -223,7 +223,7 @@ function CopyButton({ text }) {
 Programmatically open entities in a side panel:
 
 ```typescript
-import { useSidePanel } from "@rebasepro/app";
+import { useSidePanel } from "@rebasepro/admin";
 
 function OpenProductButton({ productId }) {
     const sidePanel = useSidePanel();
@@ -316,7 +316,7 @@ function ThemeToggle() {
 Open a side dialog for selecting entities from a collection. This is the same hook used internally when a relation property is rendered:
 
 ```typescript
-import { useSelectionDialog } from "@rebasepro/app";
+import { useSelectionDialog } from "@rebasepro/admin";
 
 function SelectProduct() {
     const selectionDialog = useSelectionDialog({

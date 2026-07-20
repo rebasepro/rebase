@@ -67,7 +67,7 @@ Passa `FindParams` come primo argomento per filtrare la sottoscrizione:
 ```typescript
 const unsubscribe = client.data.products.listen(
   {
-    where: { status: "published" },
+    where: { status: ["==", "published"] },
     orderBy: ["created_at", "desc"],
     limit: 50,
   },
