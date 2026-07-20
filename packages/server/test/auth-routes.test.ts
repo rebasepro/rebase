@@ -73,7 +73,7 @@ collectionPermissions: null };
 let mockAuthRepo: jest.Mocked<AuthRepository>;
 let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
 
-function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; defaultRole?: string; allowUserLookup?: boolean; isBootstrapCompleted?: () => Promise<boolean> } = {}) {
+function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; defaultRole?: string; allowUserLookup?: boolean; isBootstrapCompleted?: () => Promise<boolean>; cookieAuth?: { sameSite?: "Lax" | "Strict" | "None" } } = {}) {
     // Re-create mocked service instances each time
 
     // Wire constructor mocks to return our instances
@@ -180,6 +180,10 @@ emailVerified: false };
 
     if (opts.isBootstrapCompleted) {
         config.isBootstrapCompleted = opts.isBootstrapCompleted;
+    }
+
+    if (opts.cookieAuth) {
+        config.cookieAuth = opts.cookieAuth as AuthModuleConfig["cookieAuth"];
     }
 
 
@@ -628,6 +632,43 @@ withEmail: false }); // Hack to pass empty list of providers
 
     // ── Token Refresh ───────────────────────────────────────────────────
     describe("POST /auth/refresh", () => {
+        // Cookie mode sends NO body — the refresh token is in the httpOnly
+        // cookie, which is the point of it. Parsing the body unguarded made
+        // every one of these a 500, so sessions never restored and users were
+        // signed out on each page load. Every other test here sends a body,
+        // which is exactly why that shipped.
+        it("refreshes from the cookie alone, with no request body at all", async () => {
+            const app = createApp({ cookieAuth: { sameSite: "Lax" } });
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
+                id: "rt-1",
+                userId: "user-1",
+                tokenHash: "old-hash",
+                expiresAt: new Date(Date.now() + 86400000),
+                createdAt: new Date(),
+                userAgent: "",
+                ipAddress: ""
+            });
+            mockAuthRepo.getUserRoles.mockResolvedValueOnce([mockRole("editor")]);
+
+            const res = await app.request("/auth/refresh", {
+                method: "POST",
+                headers: { cookie: "__rb_refresh=valid-refresh-token" }
+                // deliberately no body and no Content-Type
+            });
+
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.tokens.accessToken).toBeTruthy();
+        });
+
+        it("does not 500 on an empty body, it asks for the token", async () => {
+            // Same empty body without cookie mode: a client error, not ours.
+            const app = createApp();
+            const res = await app.request("/auth/refresh", { method: "POST" });
+            expect(res.status).not.toBe(500);
+            expect(res.status).toBe(400);
+        });
+
         it("returns new tokens on valid refresh", async () => {
             const app = createApp();
             mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({

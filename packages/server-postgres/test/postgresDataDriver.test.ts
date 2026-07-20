@@ -738,6 +738,36 @@ status: "new" });
             expect(result).toEqual(["demo", "cloudsqlsuperuser"]);
             executeSqlSpy.mockRestore();
         });
+
+        it("fetchApplicationRoles should read the users table, not pg_roles", async () => {
+            const executeSqlSpy = jest.spyOn(delegate, "executeSql")
+                .mockResolvedValueOnce([{ table_schema: "rebase",
+table_name: "users" }])
+                .mockResolvedValueOnce([{ role: "admin" }, { role: "editor" }]);
+
+            const result = await delegate.fetchApplicationRoles();
+
+            // Application roles come from assignments on the users table.
+            // Sourcing them from pg_roles yields database roles, which can
+            // never satisfy the auth.roles() condition a policy compiles to.
+            const [locateSql] = executeSqlSpy.mock.calls[0];
+            expect(locateSql).toContain("information_schema.columns");
+            const [rolesSql] = executeSqlSpy.mock.calls[1];
+            expect(rolesSql).toContain("unnest(roles)");
+            expect(rolesSql).toContain("\"rebase\".\"users\"");
+            expect(rolesSql).not.toContain("pg_roles");
+            expect(result).toEqual(["admin", "editor"]);
+            executeSqlSpy.mockRestore();
+        });
+
+        it("fetchApplicationRoles returns empty when no users table is present", async () => {
+            const executeSqlSpy = jest.spyOn(delegate, "executeSql").mockResolvedValueOnce([]);
+
+            expect(await delegate.fetchApplicationRoles()).toEqual([]);
+            // Must not go on to query a table it did not find.
+            expect(executeSqlSpy).toHaveBeenCalledTimes(1);
+            executeSqlSpy.mockRestore();
+        });
     });
 
     describe("storageSource in Callbacks", () => {

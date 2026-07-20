@@ -1066,6 +1066,13 @@ options }
         return response.roles || [];
     }
 
+    async fetchApplicationRoles(): Promise<string[]> {
+        const response = await this.sendMessage({
+            type: "FETCH_APPLICATION_ROLES"
+        }) as { roles?: string[] };
+        return response.roles || [];
+    }
+
     async fetchCurrentDatabase(): Promise<string | undefined> {
         const response = await this.sendMessage({
             type: "FETCH_CURRENT_DATABASE"

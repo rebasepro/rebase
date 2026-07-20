@@ -476,6 +476,24 @@ colors: true }));
                     }
                         break;
 
+                    case "FETCH_APPLICATION_ROLES": {
+                        wsDebug("👤 [WebSocket Server] Processing FETCH_APPLICATION_ROLES request");
+                        const delegate = await getScopedDelegate();
+                        const admin = delegate.admin;
+                        let roles: string[] = [];
+                        if (isSQLAdmin(admin) && admin.fetchApplicationRoles) {
+                            roles = await admin.fetchApplicationRoles();
+                        }
+                        wsDebug(`👤 [WebSocket Server] Fetched ${roles.length} application roles.`);
+                        const response = {
+                            type: "FETCH_APPLICATION_ROLES_SUCCESS",
+                            payload: { roles },
+                            requestId
+                        };
+                        ws.send(JSON.stringify(response));
+                    }
+                        break;
+
                     case "FETCH_CURRENT_DATABASE": {
                         wsDebug("📚 [WebSocket Server] Processing FETCH_CURRENT_DATABASE request");
                         const delegate = await getScopedDelegate();

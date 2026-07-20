@@ -112,6 +112,29 @@ export interface Transport {
     resolveToken: () => Promise<string | null>;
 }
 
+/**
+ * The base every request and every caller-built URL resolves against.
+ *
+ * `baseUrl` is optional because the common production shape is a Rebase
+ * backend serving its own SPA, where the API is simply the page's origin.
+ * Leaving it unset is therefore the *correct* configuration there — and the
+ * one that keeps working when a second hostname (a custom domain) points at
+ * the same app.
+ *
+ * When unset in a browser this resolves to the page origin rather than "".
+ * Requests behave identically either way, but the empty string is a trap for
+ * anything that builds a URL from `client.baseUrl`: `new URL("" + path)`
+ * throws, so apps "fixed" it by baking an absolute host into their bundle —
+ * which is exactly what breaks the day a custom domain is added, and which no
+ * amount of CORS configuration repairs, because a SameSite=Lax auth cookie is
+ * not sent cross-site either.
+ */
+function resolveBaseUrl(configured?: string): string {
+    if (configured) return configured.replace(/\/$/, "");
+    if (typeof window !== "undefined" && window.location?.origin) return window.location.origin;
+    return "";
+}
+
 export function createTransport(config: RebaseClientConfig): Transport {
     const fetchFn = config.fetch || globalThis.fetch;
     const apiPath = config.apiPath || "/api";
@@ -128,8 +151,7 @@ export function createTransport(config: RebaseClientConfig): Transport {
     }
 
     async function request<T = unknown>(path: string, init?: RequestInit): Promise<T> {
-        const base = config.baseUrl ? config.baseUrl.replace(/\/$/, "") : "";
-        const url = base + apiPath + path;
+        const url = resolveBaseUrl(config.baseUrl) + apiPath + path;
 
         let activeToken = token;
         if (tokenGetter) {
@@ -242,7 +264,7 @@ headers: retryHeaders });
         setToken(newToken: string | null) { token = newToken || undefined; },
         setAuthTokenGetter(getter: () => Promise<string | null>) { tokenGetter = getter; },
         setOnUnauthorized(handler: () => Promise<boolean>) { onUnauthorizedHandler = handler; },
-        get baseUrl() { return config.baseUrl ? config.baseUrl.replace(/\/$/, "") : ""; },
+        get baseUrl() { return resolveBaseUrl(config.baseUrl); },
         get apiPath() { return apiPath; },
         get fetchFn() { return fetchFn; },
         getHeaders: (init?: RequestInit) => getHeaders(token, init) as Record<string, string>,

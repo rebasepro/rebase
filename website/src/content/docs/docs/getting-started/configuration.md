@@ -21,8 +21,24 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_API_URL` | Backend API URL. Used by the client SDK. | `http://localhost:3001` |
+| `VITE_API_URL` | Backend API URL for the client SDK. **Set this in development only** — see below. | page origin |
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth client ID. Enables "Sign in with Google". | — |
+
+
+> **Leave `VITE_API_URL` unset in production builds.**
+>
+> In development the frontend and backend are separate origins, so the dev
+> server injects this. In production the Rebase backend serves the SPA, so the
+> API is the page's own origin and the client resolves it that way on its own.
+>
+> Baking an absolute URL into a production bundle works right up until a second
+> hostname points at the same app: a custom domain then loads the page from
+> `example.com` and calls the API on `example.apps.rebase.pro`, which is
+> cross-origin, so every request fails preflight. Allowing the origin in CORS
+> does **not** fix it either — the refresh cookie is `SameSite=Lax` and is not
+> sent cross-site, so you would clear the console errors and still have broken
+> auth. Unset, every domain pointing at the app works with no CORS
+> configuration at all.
 
 ### Backend
 

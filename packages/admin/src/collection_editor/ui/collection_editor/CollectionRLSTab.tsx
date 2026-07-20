@@ -60,32 +60,7 @@ interface SecurityRule {
     mode?: string;
     using?: string;
     withCheck?: string;
-    /** Application roles (`rebase.user_roles`), AND'd into USING/WITH CHECK. */
     roles?: string[];
-    /** Native PostgreSQL roles for the policy's `TO` clause. Defaults to `public`. */
-    pgRoles?: string[];
-}
-
-/**
- * `roles` on a security rule is the application-role shortcut: it AND's a
- * `auth.roles() && ARRAY[...]` condition onto the policy. Leaving it off does
- * NOT mean "nobody" — it means the rule simply isn't filtered by role, so its
- * other conditions decide access on their own. Rendering the bare list left an
- * empty "Roles:" chip that read like the policy granted no one anything.
- *
- * (The Postgres `TO` clause is a separate field, `pgRoles`, defaulting to
- * `public` — see the unmapped-policy chips below.)
- */
-function RuleRolesChip({ roles, className }: { roles?: readonly string[] | string, className: string }) {
-    const list = Array.isArray(roles) ? roles : (roles ? [roles] : []);
-    if (list.length === 0) {
-        return (
-            <Tooltip title="Not restricted by application role — this policy's other conditions apply to every user.">
-                <Chip size="small" className={className}>Roles: Any</Chip>
-            </Tooltip>
-        );
-    }
-    return <Chip size="small" className={className}>Roles: {list.join(", ")}</Chip>;
 }
 
 type CollectionWithSecurity = CollectionConfig & {
@@ -156,6 +131,41 @@ export function CollectionRLSTab() {
         };
         fetchLivePolicies();
     }, [databaseAdmin, values.id, values.table, values.alias]);
+
+    /**
+     * Application roles available to `SecurityRule.roles`.
+     *
+     * Deliberately NOT `fetchAvailableRoles` — that returns native pg_roles
+     * (postgres, rebase_user, …), which can never satisfy an application-role
+     * condition.
+     */
+    const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+    const [rolesUnavailable, setRolesUnavailable] = useState(false);
+
+    useEffect(() => {
+        let mounted = true;
+        const fetchRoles = async () => {
+            if (!databaseAdmin?.fetchApplicationRoles) {
+                // Older backend, or a driver with no application-role concept.
+                if (mounted) setRolesUnavailable(true);
+                return;
+            }
+            try {
+                const fetched = await databaseAdmin.fetchApplicationRoles();
+                if (mounted) {
+                    setAvailableRoles(fetched);
+                    setRolesUnavailable(false);
+                }
+            } catch (e) {
+                console.error("Failed to fetch application roles", e);
+                if (mounted) setRolesUnavailable(true);
+            }
+        };
+        fetchRoles();
+        return () => {
+            mounted = false;
+        };
+    }, [databaseAdmin]);
 
     const tableName = values.id || values.table || values.alias;
 
@@ -235,7 +245,7 @@ export function CollectionRLSTab() {
                                     </div>
                                     <div className="flex gap-2 text-xs pl-6 overflow-x-auto hide-scrollbar">
                                         <Chip size="small" className="bg-surface-100 dark:bg-surface-900 text-text-secondary border-none">Action: {rule.operation || "ALL"}</Chip>
-                                        <RuleRolesChip roles={rule.roles} className="bg-surface-100 dark:bg-surface-900 text-text-secondary border-none"/>
+                                        <Chip size="small" className="bg-surface-100 dark:bg-surface-900 text-text-secondary border-none">Roles: {Array.isArray(rule.roles) ? rule.roles.join(", ") : rule.roles}</Chip>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 sm:gap-2 shrink-0">
@@ -244,10 +254,7 @@ export function CollectionRLSTab() {
                                         tablename: values.id || values.table || values.alias || "your_table",
                                         permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
                                         cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
-                                        // Seeding with ["public"] put a Postgres role into the
-                                        // app-role field: saving compiled it to
-                                        // `auth.roles() && ARRAY['public']`, which no user holds.
-                                        roles: rule.roles ? [...rule.roles] : [],
+                                        roles: rule.roles || [],
                                         qual: rule.using || null,
                                         with_check: rule.withCheck || null
                                     })}>
@@ -292,28 +299,18 @@ export function CollectionRLSTab() {
                                         </div>
                                         <div className="flex gap-2 text-xs pl-6 overflow-x-auto hide-scrollbar">
                                             <Chip size="small" className="bg-white dark:bg-surface-900 text-text-secondary border-none">Action: {dp.cmd || "ALL"}</Chip>
-                                            {/* Live policies report the Postgres `TO` grantees, not app roles. */}
-                                            <Tooltip title="The PostgreSQL roles this policy is granted to (its TO clause).">
-                                                <Chip size="small" className="bg-white dark:bg-surface-900 text-text-secondary border-none">
-                                                    DB roles: {(Array.isArray(dp.roles) ? dp.roles : [dp.roles]).filter(Boolean).join(", ") || "public"}
-                                                </Chip>
-                                            </Tooltip>
+                                            <Chip size="small" className="bg-white dark:bg-surface-900 text-text-secondary border-none">Roles: {Array.isArray(dp.roles) ? dp.roles.join(", ") : dp.roles}</Chip>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                                         <Button size="small" variant="outlined" color="primary" onClick={() => {
-                                             // `dp.roles` is the policy's Postgres TO clause, so it
-                                             // belongs in `pgRoles` — putting it in `roles` turned
-                                             // grantees into an app-role condition nobody satisfies.
-                                             const pgRoles = (Array.isArray(dp.roles) ? dp.roles : [dp.roles]).filter(Boolean);
-                                             const isDefaultGrantee = pgRoles.length === 0 || (pgRoles.length === 1 && pgRoles[0] === "public");
                                              const rule: SecurityRule = {
                                                 name: dp.policyname,
                                                 operation: dp.cmd?.toLowerCase(),
                                                 mode: dp.permissive?.toLowerCase(),
                                                 using: dp.qual || undefined,
                                                 withCheck: dp.with_check || undefined,
-                                                pgRoles: isDefaultGrantee ? undefined : pgRoles
+                                                roles: dp.roles
                                             };
                                             setFieldValue("securityRules", [...rules, rule]);
                                         }}>
@@ -331,6 +328,8 @@ export function CollectionRLSTab() {
                         <InlinePolicyEditor
                             policy={editingPolicy === "new" ? undefined : editingPolicy}
                             table={values.id || values.table || values.alias || "your_table"}
+                            availableRoles={availableRoles}
+                            rolesUnavailable={rolesUnavailable}
                             onSave={handleSave}
                             onCancel={() => setEditingPolicy(null)}
                         />
@@ -345,29 +344,56 @@ export function CollectionRLSTab() {
 
 type PolicyCommand = "ALL" | "SELECT" | "INSERT" | "UPDATE" | "DELETE";
 const COMMAND_OPTIONS: PolicyCommand[] = ["ALL", "SELECT", "INSERT", "UPDATE", "DELETE"];
-const ROLE_OPTIONS = ["public", "authenticated", "anon", "admin"];
 
 function InlinePolicyEditor({
     policy,
     table,
+    availableRoles,
+    rolesUnavailable,
     onSave,
     onCancel
 }: {
     policy?: PostgresPolicy;
     table: string;
+    availableRoles: string[];
+    rolesUnavailable: boolean;
     onSave: (policyData: Partial<PostgresPolicy>) => void;
     onCancel: () => void;
 }) {
     const [name, setName] = useState(policy?.policyname || "");
     const [behavior, setBehavior] = useState<"PERMISSIVE" | "RESTRICTIVE">(policy?.permissive || "PERMISSIVE");
     const [command, setCommand] = useState<PolicyCommand>((policy?.cmd as PolicyCommand) || "ALL");
+    // No roles means "not restricted by role". Seeding a value here would
+    // silently narrow every new policy to it.
     const [roles, setRoles] = useState<string[]>(
-        policy?.roles ? (Array.isArray(policy.roles) ? [...policy.roles] : [policy.roles]) : []
+        policy?.roles ? (Array.isArray(policy.roles) ? policy.roles : [policy.roles]) : []
     );
+    const [customRole, setCustomRole] = useState("");
     const [usingExpr, setUsingExpr] = useState(policy?.qual || "");
     const [checkExpr, setCheckExpr] = useState(policy?.with_check || "");
 
     const showCheck = command === "ALL" || command === "INSERT" || command === "UPDATE";
+
+    /**
+     * Roles offered in the dropdown: those in use in the project, plus any the
+     * rule already carries. The union matters — application roles are derived
+     * from what users hold, so a role that is referenced here but assigned to
+     * nobody would otherwise vanish from its own policy on the next save.
+     */
+    const roleOptions = useMemo(
+        () => Array.from(new Set([...availableRoles, ...roles])).sort(),
+        [availableRoles, roles]
+    );
+
+    const addCustomRole = () => {
+        const trimmed = customRole.trim();
+        if (!trimmed || roles.includes(trimmed)) {
+            setCustomRole("");
+            return;
+        }
+        setRoles([...roles, trimmed]);
+        setCustomRole("");
+    };
 
     return (
         <>
@@ -404,13 +430,40 @@ function InlinePolicyEditor({
                     </div>
                     <div className="flex flex-col gap-1.5">
                         <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Application Roles</Typography>
-                        <MultiSelect size="small" value={roles} onValueChange={setRoles} placeholder="Any role (no restriction)">
-                            {ROLE_OPTIONS.map(r => <MultiSelectItem key={r} value={r}>{r}</MultiSelectItem>)}
-                        </MultiSelect>
-                        <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
-                            Rebase roles from <span className="font-mono">rebase.user_roles</span>, not PostgreSQL roles.
-                            Leave empty to apply this policy to every user.
+                        <Typography variant="caption" className="text-text-secondary opacity-80 -mt-1">
+                            Roles held by users of this project, matched via <span className="font-mono">auth.roles()</span>.
+                            These are not PostgreSQL roles — leave empty to apply the policy to everyone.
                         </Typography>
+                        {roleOptions.length > 0 && (
+                            <MultiSelect size="small" value={roles} onValueChange={setRoles} placeholder="Select roles">
+                                {roleOptions.map(r => <MultiSelectItem key={r} value={r}>{r}</MultiSelectItem>)}
+                            </MultiSelect>
+                        )}
+                        {rolesUnavailable && roleOptions.length === 0 && (
+                            <Typography variant="caption" className="text-text-secondary opacity-80">
+                                Could not load the project&apos;s roles — enter them manually below.
+                            </Typography>
+                        )}
+                        {!rolesUnavailable && roleOptions.length === 0 && (
+                            <Typography variant="caption" className="text-text-secondary opacity-80">
+                                No roles are assigned to any user yet — enter one manually below.
+                            </Typography>
+                        )}
+                        <div className="flex gap-2 items-center">
+                            <TextField size="small" value={customRole}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCustomRole(e.target.value)}
+                                onKeyDown={(e: React.KeyboardEvent) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        addCustomRole();
+                                    }
+                                }}
+                                placeholder="Add a role not listed, e.g. editor"/>
+                            <Button size="small" variant="outlined" color="neutral"
+                                disabled={!customRole.trim()} onClick={addCustomRole}>
+                                Add
+                            </Button>
+                        </div>
                     </div>
                     {command !== "INSERT" && (
                         <div className="flex flex-col gap-1.5">
