@@ -20,6 +20,7 @@ import { extensionsCommand } from "./extensions";
 import { settingsCommand } from "./settings";
 import { deploymentsListCommand, rollbackCommand, cancelCommand } from "./deployments";
 import { powerCommand } from "./power";
+import { debugCommand } from "./debug";
 import {
     statusCommand,
     metricsCommand,
@@ -109,6 +110,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
             break;
         case "metrics":
             await metricsCommand(rawArgs);
+            break;
+        case "debug":
+            await debugCommand(action, rawArgs);
             break;
 
         /* env / domains / extensions / settings */
@@ -237,6 +241,7 @@ ${chalk.green.bold("Deploy & observe")}
   ${chalk.blue.bold("start|stop|restart")} ${chalk.gray("[-y]")}  Power ops ${chalk.gray("(stop/restart need -y)")}
   ${chalk.blue.bold("status")}                  One-glance project status
   ${chalk.blue.bold("metrics")}                 Live CPU / memory / disk
+  ${chalk.blue.bold("debug")} ${chalk.gray("[health|logs|…]")}    Diagnose a misbehaving deployment ${chalk.gray("(read-only)")}
 
 ${chalk.green.bold("Config")}
   ${chalk.blue.bold("env list|set|unset|reveal|pull")}
