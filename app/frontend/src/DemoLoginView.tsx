@@ -37,15 +37,10 @@ export function DemoLoginView({ authController, googleClientId }: DemoLoginViewP
 
                     {/* Privacy policy checkbox */}
                     <label className="flex items-center gap-2 cursor-pointer">
-                        {/* The wrapping <label> can't name this control: Checkbox renders a
-                            `role="checkbox"` button, and implicit label association only works
-                            for native form elements. Without this it announced as an unlabelled
-                            checkbox — on a consent gate that blocks sign-in. */}
                         <Checkbox
                             checked={privacyAccepted}
                             onCheckedChange={(checked) => setPrivacyAccepted(checked === true)}
                             size="small"
-                            aria-label="I accept the Privacy Policy"
                         />
                         <Typography variant="caption" color="secondary" className="select-none">
                             I accept the{" "}

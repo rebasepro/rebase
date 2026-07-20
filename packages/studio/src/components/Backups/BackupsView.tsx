@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
+    Alert,
     Button,
     Chip,
     CircularProgress,
@@ -14,15 +15,6 @@ import {
 } from "@rebasepro/ui";
 import { useRebaseClient, useSnackbarController } from "@rebasepro/app";
 import type { BackupInfo, RebaseClient } from "@rebasepro/types";
-
-/** Inline code chip, matching the other studio empty states. */
-function Code({ children }: { children: React.ReactNode }) {
-    return (
-        <code className="text-xs bg-surface-100 dark:bg-surface-950 px-1.5 py-0.5 rounded font-mono">
-            {children}
-        </code>
-    );
-}
 
 function formatSize(bytes: number | undefined): string {
     if (bytes === undefined || bytes === null) return "—";
@@ -142,35 +134,15 @@ export function BackupsView() {
 
             <div className="flex-1 overflow-y-auto p-5">
                 {!configured ? (
-                    <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-                        <DatabaseIcon size={iconSize.large} className="text-surface-300 dark:text-surface-600"/>
-                        <Typography variant="h6" color="secondary">Backups Not Configured</Typography>
-                        <Typography variant="body2" color="disabled" className="max-w-md">
-                            Rebase backs up your PostgreSQL database with <Code>pg_dump</Code>, writing a
-                            compressed snapshot you can restore into a fresh database at any time.
+                    <Alert color="info">
+                        <Typography variant="body2" className="text-[13px]">
+                            <strong>Backups are not configured.</strong> Set
+                            <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">BACKUP_DESTINATION</code>
+                            (a local path or an <code className="font-mono text-[12px]">s3://</code> / <code className="font-mono text-[12px]">gs://</code> URL) and create backups with
+                            <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-950 font-mono text-[12px]">rebase db backup</code>
+                            or a scheduled cron. See docs/backups.md.
                         </Typography>
-                        <div className={cls("mt-2 max-w-md w-full rounded-lg border bg-surface-50 dark:bg-surface-900 p-4 text-left", defaultBorderMixin)}>
-                            <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark block mb-2">
-                                To get started
-                            </Typography>
-                            <ol className="list-decimal list-outside pl-4 space-y-1.5">
-                                <li>
-                                    <Typography variant="body2" color="disabled" className="inline">
-                                        Set <Code>BACKUP_DESTINATION</Code> to a local path or an
-                                        {" "}<Code>s3://</Code> / <Code>gs://</Code> URL.
-                                    </Typography>
-                                </li>
-                                <li>
-                                    <Typography variant="body2" color="disabled" className="inline">
-                                        Run <Code>rebase db backup</Code>, or schedule it as a cron job.
-                                    </Typography>
-                                </li>
-                            </ol>
-                        </div>
-                        <Typography variant="caption" color="disabled">
-                            See <Code>docs/backups.md</Code> for the full CLI and restore reference.
-                        </Typography>
-                    </div>
+                    </Alert>
                 ) : backups.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
                         <DatabaseIcon size={iconSize.large} className="text-surface-200 dark:text-surface-700"/>

@@ -60,32 +60,7 @@ interface SecurityRule {
     mode?: string;
     using?: string;
     withCheck?: string;
-    /** Application roles (`rebase.user_roles`), AND'd into USING/WITH CHECK. */
     roles?: string[];
-    /** Native PostgreSQL roles for the policy's `TO` clause. Defaults to `public`. */
-    pgRoles?: string[];
-}
-
-/**
- * `roles` on a security rule is the application-role shortcut: it AND's a
- * `auth.roles() && ARRAY[...]` condition onto the policy. Leaving it off does
- * NOT mean "nobody" — it means the rule simply isn't filtered by role, so its
- * other conditions decide access on their own. Rendering the bare list left an
- * empty "Roles:" chip that read like the policy granted no one anything.
- *
- * (The Postgres `TO` clause is a separate field, `pgRoles`, defaulting to
- * `public` — see the unmapped-policy chips below.)
- */
-function RuleRolesChip({ roles, className }: { roles?: readonly string[] | string, className: string }) {
-    const list = Array.isArray(roles) ? roles : (roles ? [roles] : []);
-    if (list.length === 0) {
-        return (
-            <Tooltip title="Not restricted by application role — this policy's other conditions apply to every user.">
-                <Chip size="small" className={className}>Roles: Any</Chip>
-            </Tooltip>
-        );
-    }
-    return <Chip size="small" className={className}>Roles: {list.join(", ")}</Chip>;
 }
 
 type CollectionWithSecurity = CollectionConfig & {
@@ -235,7 +210,7 @@ export function CollectionRLSTab() {
                                     </div>
                                     <div className="flex gap-2 text-xs pl-6 overflow-x-auto hide-scrollbar">
                                         <Chip size="small" className="bg-surface-100 dark:bg-surface-900 text-text-secondary border-none">Action: {rule.operation || "ALL"}</Chip>
-                                        <RuleRolesChip roles={rule.roles} className="bg-surface-100 dark:bg-surface-900 text-text-secondary border-none"/>
+                                        <Chip size="small" className="bg-surface-100 dark:bg-surface-900 text-text-secondary border-none">Roles: {Array.isArray(rule.roles) ? rule.roles.join(", ") : rule.roles}</Chip>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 sm:gap-2 shrink-0">
@@ -244,10 +219,7 @@ export function CollectionRLSTab() {
                                         tablename: values.id || values.table || values.alias || "your_table",
                                         permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
                                         cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
-                                        // Seeding with ["public"] put a Postgres role into the
-                                        // app-role field: saving compiled it to
-                                        // `auth.roles() && ARRAY['public']`, which no user holds.
-                                        roles: rule.roles ? [...rule.roles] : [],
+                                        roles: rule.roles || ["public"],
                                         qual: rule.using || null,
                                         with_check: rule.withCheck || null
                                     })}>
@@ -292,28 +264,18 @@ export function CollectionRLSTab() {
                                         </div>
                                         <div className="flex gap-2 text-xs pl-6 overflow-x-auto hide-scrollbar">
                                             <Chip size="small" className="bg-white dark:bg-surface-900 text-text-secondary border-none">Action: {dp.cmd || "ALL"}</Chip>
-                                            {/* Live policies report the Postgres `TO` grantees, not app roles. */}
-                                            <Tooltip title="The PostgreSQL roles this policy is granted to (its TO clause).">
-                                                <Chip size="small" className="bg-white dark:bg-surface-900 text-text-secondary border-none">
-                                                    DB roles: {(Array.isArray(dp.roles) ? dp.roles : [dp.roles]).filter(Boolean).join(", ") || "public"}
-                                                </Chip>
-                                            </Tooltip>
+                                            <Chip size="small" className="bg-white dark:bg-surface-900 text-text-secondary border-none">Roles: {Array.isArray(dp.roles) ? dp.roles.join(", ") : dp.roles}</Chip>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                                         <Button size="small" variant="outlined" color="primary" onClick={() => {
-                                             // `dp.roles` is the policy's Postgres TO clause, so it
-                                             // belongs in `pgRoles` — putting it in `roles` turned
-                                             // grantees into an app-role condition nobody satisfies.
-                                             const pgRoles = (Array.isArray(dp.roles) ? dp.roles : [dp.roles]).filter(Boolean);
-                                             const isDefaultGrantee = pgRoles.length === 0 || (pgRoles.length === 1 && pgRoles[0] === "public");
                                              const rule: SecurityRule = {
                                                 name: dp.policyname,
                                                 operation: dp.cmd?.toLowerCase(),
                                                 mode: dp.permissive?.toLowerCase(),
                                                 using: dp.qual || undefined,
                                                 withCheck: dp.with_check || undefined,
-                                                pgRoles: isDefaultGrantee ? undefined : pgRoles
+                                                roles: dp.roles
                                             };
                                             setFieldValue("securityRules", [...rules, rule]);
                                         }}>
@@ -362,7 +324,7 @@ function InlinePolicyEditor({
     const [behavior, setBehavior] = useState<"PERMISSIVE" | "RESTRICTIVE">(policy?.permissive || "PERMISSIVE");
     const [command, setCommand] = useState<PolicyCommand>((policy?.cmd as PolicyCommand) || "ALL");
     const [roles, setRoles] = useState<string[]>(
-        policy?.roles ? (Array.isArray(policy.roles) ? [...policy.roles] : [policy.roles]) : []
+        policy?.roles ? (Array.isArray(policy.roles) ? policy.roles : [policy.roles]) : ["public"]
     );
     const [usingExpr, setUsingExpr] = useState(policy?.qual || "");
     const [checkExpr, setCheckExpr] = useState(policy?.with_check || "");
@@ -403,14 +365,10 @@ function InlinePolicyEditor({
                         </div>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                        <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Application Roles</Typography>
-                        <MultiSelect size="small" value={roles} onValueChange={setRoles} placeholder="Any role (no restriction)">
+                        <Typography variant="caption" className="uppercase tracking-wider text-text-secondary">Target Roles</Typography>
+                        <MultiSelect size="small" value={roles} onValueChange={setRoles} placeholder="Select roles">
                             {ROLE_OPTIONS.map(r => <MultiSelectItem key={r} value={r}>{r}</MultiSelectItem>)}
                         </MultiSelect>
-                        <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
-                            Rebase roles from <span className="font-mono">rebase.user_roles</span>, not PostgreSQL roles.
-                            Leave empty to apply this policy to every user.
-                        </Typography>
                     </div>
                     {command !== "INSERT" && (
                         <div className="flex flex-col gap-1.5">

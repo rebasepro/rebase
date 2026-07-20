@@ -671,7 +671,7 @@ function LoginForm({
         <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
             {!bootstrapMode && (
                 <div className="w-full mb-2 -ml-2.5">
-                    <IconButton onClick={onClose} aria-label="Back to sign-in options">
+                    <IconButton onClick={onClose}>
                         <ArrowLeftIcon/>
                     </IconButton>
                 </div>
@@ -707,7 +707,6 @@ function LoginForm({
                         Display Name
                     </Typography>
                     <TextField placeholder="Jane Doe (optional)"
-                        aria-label="Display name"
                         className={loginFieldClasses}
                         value={displayName ?? ""}
                         disabled={authController.initialLoading}
@@ -721,11 +720,7 @@ function LoginForm({
                 <Typography variant="label" color="secondary" className="mb-1">
                     Email
                 </Typography>
-                {/* The "Email" Typography above renders a bare <label> with no htmlFor, so it
-                    never named this input — the placeholder was the only accessible name, and
-                    that disappears as soon as the user types. */}
                 <TextField placeholder="you@example.com"
-                    aria-label="Email"
                     className={loginFieldClasses}
                     autoFocus
                     value={email ?? ""}
@@ -740,7 +735,6 @@ function LoginForm({
                     Password
                 </Typography>
                 <TextField placeholder="••••••••"
-                    aria-label="Password"
                     className={loginFieldClasses}
                     value={password ?? ""}
                     disabled={authController.initialLoading}
@@ -870,7 +864,7 @@ function ForgotPasswordForm({
         return (
             <div className="flex flex-col w-full gap-4 mt-2">
                 <div className="w-full -ml-2.5">
-                    <IconButton onClick={onClose} aria-label="Back to sign in">
+                    <IconButton onClick={onClose}>
                         <ArrowLeftIcon/>
                     </IconButton>
                 </div>
@@ -895,7 +889,7 @@ function ForgotPasswordForm({
     return (
         <form onSubmit={handleSubmit} className="flex flex-col w-full gap-1 mt-2">
             <div className="w-full mb-2 -ml-2.5">
-                    <IconButton onClick={onClose} aria-label="Back to sign in">
+                    <IconButton onClick={onClose}>
                         <ArrowLeftIcon/>
                 </IconButton>
             </div>
@@ -919,7 +913,6 @@ function ForgotPasswordForm({
                 </Typography>
                 <TextField
                     placeholder="you@example.com"
-                    aria-label="Email"
                     className={loginFieldClasses}
                     autoFocus
                     value={email}
