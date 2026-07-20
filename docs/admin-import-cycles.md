@@ -60,7 +60,7 @@ and the dialog renders those same fields. Nine modules import `PropertyFormDialo
 from `PropertyEditView`, so it is effectively a public component living inside an
 unrelated file.
 
-## Why these are currently harmless, and the one way that breaks
+## Why these are harmless, and the one way that broke (now fixed)
 
 React defers component references to render time, so a cycle between two
 components that only mention each other inside JSX resolves fine no matter which
@@ -79,16 +79,28 @@ that come from modules which — through `PropertyFieldBinding` — import
 `field_configs` back. Enter the cycle at a field binding rather than at
 `field_configs` and the read happens while the binding module is still in flight.
 
-It works today only because every field binding is declared `export function`,
-which hoists and initialises before any module body runs. Rewriting a single one
-as `export const Binding = (props) => …` turns that read into a temporal dead zone
-`ReferenceError` at import time, and the failure would look like an unrelated
-blank screen. The preview cluster already mixes styles — `ReferencePreview` and
-`RelationPreview` are `export const` — and is safe only because nothing evaluates
-them at module scope.
+It worked only because every field binding is declared `export function`, which
+hoists and initialises before any module body runs. Rewriting a single one as
+`export const Binding = (props) => …` would have turned that read into a temporal
+dead zone `ReferenceError` at import time, and the failure would have looked like
+an unrelated blank screen. The preview cluster already mixes styles —
+`ReferencePreview` and `RelationPreview` are `export const` — and is safe only
+because nothing evaluates them at module scope.
 
-So the honest status is: latent, load-order dependent, and currently guarded by an
-unwritten convention.
+**Fixed.** Each `Field` is now a getter, so the binding is read on first access
+rather than while the module initialises, and declaration style no longer matters:
+
+```ts
+ui: { get Field() { return TextFieldBinding; } }
+```
+
+`test/components/field_configs.test.ts` guards it, and deliberately imports a
+container binding *before* `field_configs` so the test enters the cycle from the
+dangerous side. One case asserts the descriptor is still a getter rather than a
+value — that is the case that fails if someone inlines the getters back, which no
+behavioural test would catch while the bindings remain hoisted functions.
+
+This removes the hazard but not the cycles; the clusters below are unchanged.
 
 ## Options
 
@@ -109,11 +121,11 @@ splitting, at the cost of a context read per nested property and a less obvious
 data flow.
 
 **C. Leave the recursion, remove the accident.** Keep the cycles, and make the
-thing that is actually fragile impossible: make `DEFAULT_FIELD_CONFIGS` lazy (a
-`getDefaultFieldConfigs()` called after init, or thunked `Field` references in the
-same style as `Relation.target` elsewhere in the codebase). Add a lint rule
-requiring field bindings and previews to be `function` declarations. Suppress the
-remaining cycles with reasons.
+thing that is actually fragile impossible. The `DEFAULT_FIELD_CONFIGS` half of
+this is **done** — the `Field` getters above. What remains under this option is to
+suppress the leftover cycles with reasons, and optionally to stop relying on
+declaration style anywhere else by preferring the same lazy treatment wherever a
+module-scope literal captures a component from inside a cycle.
 
 ## Recommendation
 

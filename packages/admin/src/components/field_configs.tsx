@@ -42,6 +42,23 @@ import { RelationFieldBinding } from "../form/field_bindings/RelationFieldBindin
 import { UserSelectFieldBinding } from "../form/field_bindings/UserSelectFieldBinding";
 import { mergeDeep } from "@rebasepro/utils";
 
+/**
+ * Every `Field` below is a getter on purpose — do not inline it back to
+ * `Field: SomeBinding`.
+ *
+ * This module and the field bindings form an import cycle: we import the
+ * bindings, the container bindings (map, repeat, block, custom-shaped array)
+ * import `PropertyFieldBinding` to render their children, and that imports
+ * `getFieldConfig` from here. Enter the cycle at a binding rather than here and
+ * this object is built while that binding's module is still initialising.
+ *
+ * As a plain value the binding would be read at that moment. It happens to
+ * survive today only because every binding is declared `export function`, which
+ * hoists; rewriting a single one as `export const` would make the read a
+ * temporal dead zone ReferenceError at import time, surfacing as a blank screen
+ * far from its cause. The getter defers the read to first access, long after
+ * every module has initialised, so declaration style stops mattering.
+ */
 export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> = {
     text_field: {
         key: "text_field",
@@ -51,7 +68,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         color: "#2d7ff9",
         property: {
             type: "string",
-            ui: { Field: TextFieldBinding }
+            ui: { get Field() { return TextFieldBinding; } }
         }
     },
     multiline: {
@@ -63,7 +80,7 @@ export const DEFAULT_FIELD_CONFIGS: Record<DefaultFieldConfig, PropertyConfig> =
         property: {
             type: "string",
             ui: { multiline: true,
-Field: TextFieldBinding }
+get Field() { return TextFieldBinding; } }
         }
     },
     markdown: {
@@ -75,7 +92,7 @@ Field: TextFieldBinding }
         property: {
             type: "string",
             ui: { markdown: true,
-Field: MarkdownEditorFieldBinding }
+get Field() { return MarkdownEditorFieldBinding; } }
         }
     },
     url: {
@@ -87,7 +104,7 @@ Field: MarkdownEditorFieldBinding }
         property: {
             type: "string",
             ui: { url: true,
-Field: TextFieldBinding }
+get Field() { return TextFieldBinding; } }
         }
     },
     email: {
@@ -99,7 +116,7 @@ Field: TextFieldBinding }
         property: {
             type: "string",
             email: true,
-            ui: { Field: TextFieldBinding }
+            ui: { get Field() { return TextFieldBinding; } }
         }
     },
     switch: {
@@ -110,7 +127,7 @@ Field: TextFieldBinding }
         color: "#20d9d2",
         property: {
             type: "boolean",
-            ui: { Field: SwitchFieldBinding }
+            ui: { get Field() { return SwitchFieldBinding; } }
         }
     },
     select: {
@@ -122,7 +139,7 @@ Field: TextFieldBinding }
         property: {
             type: "string",
             enum: [],
-            ui: { Field: SelectFieldBinding }
+            ui: { get Field() { return SelectFieldBinding; } }
         }
     },
     multi_select: {
@@ -137,7 +154,7 @@ Field: TextFieldBinding }
                 type: "string",
                 enum: []
             },
-            ui: { Field: MultiSelectFieldBinding }
+            ui: { get Field() { return MultiSelectFieldBinding; } }
         }
     },
     user_select: {
@@ -147,7 +164,7 @@ Field: TextFieldBinding }
         Icon: UserIcon,
         property: {
             type: "string",
-            ui: { Field: UserSelectFieldBinding }
+            ui: { get Field() { return UserSelectFieldBinding; } }
         }
     },
     number_input: {
@@ -158,7 +175,7 @@ Field: TextFieldBinding }
         color: "#bec920",
         property: {
             type: "number",
-            ui: { Field: TextFieldBinding }
+            ui: { get Field() { return TextFieldBinding; } }
         }
     },
     number_select: {
@@ -170,7 +187,7 @@ Field: TextFieldBinding }
         property: {
             type: "number",
             enum: [],
-            ui: { Field: SelectFieldBinding }
+            ui: { get Field() { return SelectFieldBinding; } }
         }
     },
     multi_number_select: {
@@ -185,7 +202,7 @@ Field: TextFieldBinding }
                 type: "number",
                 enum: []
             },
-            ui: { Field: MultiSelectFieldBinding }
+            ui: { get Field() { return MultiSelectFieldBinding; } }
         }
     },
     file_upload: {
@@ -199,7 +216,7 @@ Field: TextFieldBinding }
             storage: {
                 storagePath: "{path}"
             },
-            ui: { Field: StorageUploadFieldBinding }
+            ui: { get Field() { return StorageUploadFieldBinding; } }
         }
     },
     multi_file_upload: {
@@ -216,7 +233,7 @@ Field: TextFieldBinding }
                     storagePath: "{path}"
                 }
             },
-            ui: { Field: StorageUploadFieldBinding }
+            ui: { get Field() { return StorageUploadFieldBinding; } }
         }
     },
     reference: {
@@ -227,7 +244,7 @@ Field: TextFieldBinding }
         color: "#ff0042",
         property: {
             type: "reference",
-            ui: { Field: ReferenceFieldBinding }
+            ui: { get Field() { return ReferenceFieldBinding; } }
         }
     },
     multi_references: {
@@ -241,7 +258,7 @@ Field: TextFieldBinding }
             of: {
                 type: "reference"
             },
-            ui: { Field: ArrayOfReferencesFieldBinding }
+            ui: { get Field() { return ArrayOfReferencesFieldBinding; } }
         }
     },
     relation: {
@@ -253,7 +270,7 @@ Field: TextFieldBinding }
         property: {
             relationName: "",
             type: "relation",
-            ui: { Field: RelationFieldBinding }
+            ui: { get Field() { return RelationFieldBinding; } }
         }
     },
     date_time: {
@@ -264,7 +281,7 @@ Field: TextFieldBinding }
         color: "#8b46ff",
         property: {
             type: "date",
-            ui: { Field: DateTimeFieldBinding }
+            ui: { get Field() { return DateTimeFieldBinding; } }
         }
     },
     group: {
@@ -276,7 +293,7 @@ Field: TextFieldBinding }
         property: {
             type: "map",
             properties: {},
-            ui: { Field: MapFieldBinding }
+            ui: { get Field() { return MapFieldBinding; } }
         }
     },
     key_value: {
@@ -288,7 +305,7 @@ Field: TextFieldBinding }
         property: {
             type: "map",
             keyValue: true,
-            ui: { Field: KeyValueFieldBinding }
+            ui: { get Field() { return KeyValueFieldBinding; } }
         }
     },
     repeat: {
@@ -302,7 +319,7 @@ Field: TextFieldBinding }
             of: {
                 type: "string"
             },
-            ui: { Field: RepeatFieldBinding }
+            ui: { get Field() { return RepeatFieldBinding; } }
         }
     },
     custom_array: {
@@ -313,7 +330,7 @@ Field: TextFieldBinding }
         color: "#ff9408",
         property: {
             type: "array",
-            ui: { Field: ArrayCustomShapedFieldBinding }
+            ui: { get Field() { return ArrayCustomShapedFieldBinding; } }
         }
     },
     block: {
@@ -327,7 +344,7 @@ Field: TextFieldBinding }
             oneOf: {
                 properties: {}
             },
-            ui: { Field: BlockFieldBinding }
+            ui: { get Field() { return BlockFieldBinding; } }
         }
     },
     vector_input: {
@@ -339,7 +356,7 @@ Field: TextFieldBinding }
         property: {
             type: "vector",
             dimensions: 1536,
-            ui: { Field: VectorFieldBinding }
+            ui: { get Field() { return VectorFieldBinding; } }
         }
     }
 };
