@@ -96,6 +96,70 @@ auth: {
 }
 ```
 
+### Liaison de comptes entre méthodes de connexion
+
+Que se passe-t-il lorsqu'une personne s'inscrit avec e-mail/mot de passe sous
+`ada@example.com`, puis clique plus tard sur "Se connecter avec Google" avec
+un compte Google portant cette même adresse ? Rebase **relie les deux en un
+seul compte** — mais uniquement lorsque le fournisseur atteste que l'e-mail est
+vérifié. Il ne crée jamais silencieusement un second compte pour la même
+adresse.
+
+Sur `POST /api/auth/<provider>`, l'ordre de résolution est le suivant :
+
+1. **Identité de fournisseur déjà connue** — si cette identité exacte s'est déjà
+   connectée auparavant, cet utilisateur est renvoyé. L'e-mail n'est pas
+   consulté.
+2. **Compte existant avec le même e-mail, vérifié par le fournisseur** —
+   l'identité est rattachée au compte existant et l'utilisateur y est connecté.
+   Un seul compte, deux façons d'y entrer.
+3. **Compte existant avec le même e-mail, NON vérifié par le fournisseur** —
+   rejet avec `403 EMAIL_NOT_VERIFIED`. Rien n'est créé ni modifié.
+4. **Aucun compte avec cet e-mail** — un nouveau compte est créé.
+
+L'étape 3 est le cas critique pour la sécurité. Si un e-mail non vérifié du
+fournisseur suffisait à établir la liaison, quiconque parviendrait à faire
+émettre par un fournisseur une adresse ne lui appartenant pas pourrait prendre
+le contrôle du compte Rebase correspondant. Google atteste toujours
+`email_verified` pour les vrais comptes Google : l'étape 2 est donc le chemin
+normal de la connexion Google, tandis que l'étape 3 concerne surtout les
+fournisseurs qui laissent l'utilisateur saisir une adresse arbitraire non
+confirmée.
+
+Ce comportement n'est pas configurable — il n'existe délibérément aucune option
+permettant la liaison sur des e-mails non vérifiés.
+
+Pour se remettre d'un rejet à l'étape 3, l'utilisateur se connecte avec sa
+méthode existante et appelle l'endpoint de liaison explicite :
+
+```http
+POST /api/auth/link/google
+Authorization: Bearer <access token>
+
+{ "idToken": "..." }
+```
+
+La liaison effectuée en étant authentifié n'exige volontairement **pas**
+d'e-mail vérifié, et n'exige pas non plus que les adresses correspondent —
+l'adresse Google d'un utilisateur n'est souvent pas son adresse dans
+l'application. Cette asymétrie est délibérée : lors de la connexion, l'e-mail du
+fournisseur est la seule preuve rattachant l'identité entrante à un compte,
+alors qu'ici l'appelant a déjà prouvé qu'il en est le propriétaire en détenant
+une session valide. L'endpoint renvoie `409 IDENTITY_ALREADY_LINKED` si cette
+identité de fournisseur appartient à un autre utilisateur, et il est idempotent
+si elle est déjà liée à l'appelant.
+
+#### Le sens inverse
+
+Un utilisateur inscrit via Google et sans mot de passe :
+
+- **S'inscrire avec le même e-mail** est refusé avec `409 EMAIL_EXISTS`.
+- **`POST /api/auth/change-password`** renvoie `400 INVALID_ACCOUNT` — il
+  n'existe aucun mot de passe permettant la vérification.
+- **`forgot-password` → `reset-password` est la façon prise en charge d'en
+  ajouter un.** Cette procédure prouve à nouveau par e-mail la propriété de
+  l'adresse, après quoi le compte dispose des deux méthodes de connexion.
+
 ## Endpoints d'authentification
 
 Tous les endpoints d'authentification sont montés sous `/api/auth/` :
@@ -106,6 +170,7 @@ Tous les endpoints d'authentification sont montés sous `/api/auth/` :
 | `POST` | `/api/auth/login` | Se connecter avec e-mail/mot de passe |
 | `POST` | `/api/auth/refresh` | Rafraîchir le token d'accès |
 | `POST` | `/api/auth/<provider>` | Connexion OAuth (par ex. `/api/auth/google`, `/api/auth/linkedin`) |
+| `POST` | `/api/auth/link/<provider>` | Lier un fournisseur OAuth au compte authentifié |
 | `POST` | `/api/auth/logout` | Révoquer le refresh token |
 | `POST` | `/api/auth/forgot-password` | Envoyer un e-mail de réinitialisation de mot de passe |
 | `POST` | `/api/auth/reset-password` | Réinitialiser le mot de passe avec un token |

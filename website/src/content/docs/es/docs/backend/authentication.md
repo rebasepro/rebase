@@ -96,6 +96,67 @@ auth: {
 }
 ```
 
+### Vinculación de Cuentas entre Métodos de Inicio de Sesión
+
+¿Qué ocurre cuando alguien se registra con email/contraseña como
+`ada@example.com` y más tarde pulsa "Iniciar sesión con Google" en una cuenta de
+Google con esa misma dirección? Rebase **vincula ambas en una sola cuenta**,
+pero solo cuando el proveedor afirma que el email está verificado. Nunca crea en
+silencio una segunda cuenta para la misma dirección.
+
+En `POST /api/auth/<provider>` el orden de resolución es:
+
+1. **Identidad de proveedor ya conocida**: si esa identidad exacta del proveedor
+   ya ha iniciado sesión antes, se devuelve ese usuario. El email no se consulta.
+2. **Cuenta existente con el mismo email y el proveedor lo ha verificado**: la
+   identidad se adjunta a la cuenta existente y el usuario inicia sesión en ella.
+   Una cuenta, dos formas de entrar.
+3. **Cuenta existente con el mismo email pero el proveedor NO lo ha
+   verificado**: se rechaza con `403 EMAIL_NOT_VERIFIED`. No se crea ni se
+   modifica nada.
+4. **No hay ninguna cuenta con ese email**: se crea una cuenta nueva.
+
+El paso 3 es el caso crítico para la seguridad. Si bastara con un email no
+verificado del proveedor, cualquiera que lograra que un proveedor emitiera una
+dirección que no le pertenece podría apoderarse de la cuenta de Rebase
+correspondiente. Google siempre afirma `email_verified` para las cuentas de
+Google reales, por lo que el paso 2 es la vía habitual del inicio de sesión con
+Google; el paso 3 afecta sobre todo a proveedores que permiten al usuario
+indicar una dirección arbitraria sin confirmar.
+
+Este comportamiento no es configurable: deliberadamente no existe ninguna opción
+para vincular con emails no verificados.
+
+Para recuperarse de un rechazo del paso 3, el usuario inicia sesión con su
+método existente y llama al endpoint de vinculación explícito:
+
+```http
+POST /api/auth/link/google
+Authorization: Bearer <access token>
+
+{ "idToken": "..." }
+```
+
+La vinculación estando autenticado **no** exige intencionadamente un email
+verificado, y tampoco exige que los emails coincidan: la dirección de Google de
+un usuario a menudo no es la que usa en la aplicación. La asimetría es
+deliberada: en el inicio de sesión, el email del proveedor es la única prueba
+que liga la identidad entrante con una cuenta, mientras que aquí quien llama ya
+ha demostrado ser el propietario al disponer de una sesión válida. Devuelve
+`409 IDENTITY_ALREADY_LINKED` si esa identidad de proveedor pertenece a otro
+usuario, y es idempotente si ya está vinculada a quien llama.
+
+#### La dirección inversa
+
+Un usuario que se registró con Google y no tiene contraseña:
+
+- **Registrarse con el mismo email** se rechaza con `409 EMAIL_EXISTS`.
+- **`POST /api/auth/change-password`** devuelve `400 INVALID_ACCOUNT`: no hay
+  ninguna contraseña previa contra la que verificar.
+- **`forgot-password` → `reset-password` es la vía admitida para añadir una.**
+  Vuelve a demostrar la propiedad de la dirección por email, tras lo cual la
+  cuenta dispone de ambos métodos de inicio de sesión.
+
 ## Endpoints de Autenticación
 
 Todos los endpoints de autenticación se montan en `/api/auth/`:
@@ -106,6 +167,7 @@ Todos los endpoints de autenticación se montan en `/api/auth/`:
 | `POST` | `/api/auth/login` | Iniciar sesión con email/contraseña |
 | `POST` | `/api/auth/refresh` | Refrescar el token de acceso |
 | `POST` | `/api/auth/<provider>` | Inicio de sesión OAuth (p. ej., `/api/auth/google`, `/api/auth/linkedin`) |
+| `POST` | `/api/auth/link/<provider>` | Vincular un proveedor OAuth a la cuenta autenticada |
 | `POST` | `/api/auth/logout` | Revocar el token de refresco |
 | `POST` | `/api/auth/forgot-password` | Enviar email de restablecimiento de contraseña |
 | `POST` | `/api/auth/reset-password` | Restablecer la contraseña con un token |
