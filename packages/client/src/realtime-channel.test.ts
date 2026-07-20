@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals
  */
 import {
     RebaseRealtimeChannel,
+    type BroadcastEvent,
     type ChannelTransport,
     type PresenceState
 } from "./realtime-channel";
@@ -99,6 +100,211 @@ describe("RebaseRealtimeChannel", () => {
                 type: "broadcast",
                 payload: { channel: "doc:42", event: "saved", payload: { version: 3 } }
             });
+        });
+
+        it("carries the catch-up cursor inside the envelope", async () => {
+            // Same failure mode as the rest: `payload?.sinceSeq` read flat is
+            // undefined, which the server would treat as "replay from zero" —
+            // a client asking to resume would silently get the whole history
+            // back and re-apply every operation it had already applied.
+            const retained = new RebaseRealtimeChannel("doc:42", fake.transport, { history: true });
+            await retained.join();
+
+            const request = fake.sent.find((m) => m.type === "channel_history");
+            expect(request).toMatchObject({
+                type: "channel_history",
+                payload: { channel: "doc:42", sinceSeq: 0 }
+            });
+            expect(request).not.toHaveProperty("sinceSeq");
+        });
+    });
+
+    describe("history", () => {
+        /**
+         * A joined channel that asks for catch-up.
+         *
+         * `settle` answers the join-time history request the way a server does.
+         * Without it the channel is legitimately still catching up, and holds
+         * live messages back — which is the behaviour one test below asserts on
+         * purpose.
+         */
+        async function retainedChannel({ settle = true } = {}) {
+            const c = new RebaseRealtimeChannel("doc:42", fake.transport, { history: true });
+            const received: BroadcastEvent[] = [];
+            c.onBroadcast((e) => received.push(e));
+            await c.join();
+            // `onBroadcast` already started a join, so the `await` above returns
+            // on the second (idempotent) call while the first is still working
+            // through its sends. Let it finish, or the history request has not
+            // been made yet and there is nothing for `settle` to answer.
+            await jest.advanceTimersByTimeAsync(0);
+            if (settle) {
+                fake.push({ type: "channel_history", channel: "doc:42", retained: true, messages: [] });
+            }
+            return { channel: c, received };
+        }
+
+        it("asks for history on join, and only when asked to", async () => {
+            await channel.join();
+            expect(fake.types()).not.toContain("channel_history");
+
+            fake.sent.length = 0;
+            const { channel: retained } = await retainedChannel();
+            expect(fake.types()).toContain("channel_history");
+            expect(retained.sequence).toBe(0);
+        });
+
+        it("tracks the sequence of live messages", async () => {
+            const { channel: retained, received } = await retainedChannel();
+
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: { n: 1 }, seq: 1 });
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: { n: 2 }, seq: 2 });
+
+            expect(received.map((e) => e.seq)).toEqual([1, 2]);
+            expect(retained.sequence).toBe(2);
+        });
+
+        it("delivers replayed messages through the same handlers, marked as replay", async () => {
+            const { channel: retained, received } = await retainedChannel();
+
+            fake.push({
+                type: "channel_history",
+                channel: "doc:42",
+                retained: true,
+                latestSeq: 2,
+                messages: [
+                    { seq: 1, event: "op", payload: { n: 1 } },
+                    { seq: 2, event: "op", payload: { n: 2 } }
+                ]
+            });
+
+            expect(received.map((e) => e.payload)).toEqual([{ n: 1 }, { n: 2 }]);
+            expect(received.every((e) => e.replayed)).toBe(true);
+            expect(retained.sequence).toBe(2);
+        });
+
+        it("never re-delivers a message it already saw", async () => {
+            // Catch-up ranges overlap with what arrived live — the server
+            // cannot know exactly what landed before the socket dropped. The
+            // watermark is what makes replaying an overlap harmless.
+            const { received } = await retainedChannel();
+
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: { n: 1 }, seq: 1 });
+            fake.push({
+                type: "channel_history",
+                channel: "doc:42",
+                retained: true,
+                messages: [
+                    { seq: 1, event: "op", payload: { n: 1 } },
+                    { seq: 2, event: "op", payload: { n: 2 } }
+                ]
+            });
+
+            expect(received.map((e) => e.payload)).toEqual([{ n: 1 }, { n: 2 }]);
+        });
+
+        it("holds live messages back until the catch-up lands, then orders them", async () => {
+            // The subtle one. A live message arriving mid-catch-up would
+            // otherwise be delivered first AND advance the watermark past the
+            // older messages still in flight — which the catch-up response
+            // would then discard as already-seen. Those messages would be lost
+            // silently, which is precisely the failure history exists to fix.
+            const { channel: retained, received } = await retainedChannel({ settle: false });
+
+            // seq 5 arrives while the replay of 1..4 is still on the wire.
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: { n: 5 }, seq: 5 });
+            expect(received).toHaveLength(0);
+
+            fake.push({
+                type: "channel_history",
+                channel: "doc:42",
+                retained: true,
+                messages: [
+                    { seq: 3, event: "op", payload: { n: 3 } },
+                    { seq: 4, event: "op", payload: { n: 4 } }
+                ]
+            });
+
+            expect(received.map((e) => e.seq)).toEqual([3, 4, 5]);
+            expect(retained.sequence).toBe(5);
+        });
+
+        it("leaves unsequenced channels completely untouched", async () => {
+            // An ephemeral channel retains nothing, so its broadcasts carry no
+            // seq. They must not be buffered, deduped or reordered.
+            const received: BroadcastEvent[] = [];
+            channel.onBroadcast((e) => received.push(e));
+            await channel.join();
+
+            fake.push({ type: "broadcast", channel: "doc:42", event: "cursor", payload: { x: 1 } });
+            fake.push({ type: "broadcast", channel: "doc:42", event: "cursor", payload: { x: 2 } });
+
+            expect(received.map((e) => e.payload)).toEqual([{ x: 1 }, { x: 2 }]);
+            expect(received.every((e) => e.seq === undefined)).toBe(true);
+            expect(channel.sequence).toBe(0);
+        });
+
+        it("resumes from the last sequence on reconnect", async () => {
+            const { channel: retained } = await retainedChannel();
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: { n: 1 }, seq: 7 });
+            fake.sent.length = 0;
+
+            fake.reconnect();
+            await jest.advanceTimersByTimeAsync(0);
+
+            expect(fake.types()).toEqual(["join_channel", "presence_state", "channel_history"]);
+            expect(fake.sent.at(-1)).toMatchObject({ payload: { channel: "doc:42", sinceSeq: 7 } });
+            expect(retained.sequence).toBe(7);
+        });
+
+        it("stops holding messages back if the catch-up never arrives", async () => {
+            // Buffering is only safe because the wait is bounded. A reply that
+            // never comes would otherwise leave the channel silently swallowing
+            // every edit from then on — worse than the problem replay solves.
+            const { received } = await retainedChannel({ settle: false });
+
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: { n: 1 }, seq: 1 });
+            expect(received).toHaveLength(0);
+
+            await jest.advanceTimersByTimeAsync(11_000);
+
+            expect(received.map((e) => e.payload)).toEqual([{ n: 1 }]);
+        });
+
+        it("reports a channel that keeps no history, rather than an empty one", async () => {
+            const { channel: retained } = await retainedChannel();
+
+            const pending = retained.history();
+            await jest.advanceTimersByTimeAsync(0);
+            fake.push({ type: "channel_history", channel: "doc:42", retained: false, messages: [] });
+
+            // The distinction matters: `retained: false` tells a client its
+            // reconnect strategy has to be a full resync.
+            await expect(pending).resolves.toEqual({
+                messages: [], retained: false, latestSeq: undefined
+            });
+        });
+
+        it("upgrades an existing channel when history is asked for later", async () => {
+            // The client hands back the same object per name, so a later
+            // `channel(name, { history: true })` has nothing new to configure.
+            await channel.join();
+            fake.sent.length = 0;
+
+            channel.enableHistory();
+            await jest.advanceTimersByTimeAsync(0);
+
+            expect(fake.types()).toContain("channel_history");
+        });
+
+        it("forgets its position on leave, so a rejoin does not skip the past", async () => {
+            const { channel: retained } = await retainedChannel();
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: {}, seq: 9 });
+            expect(retained.sequence).toBe(9);
+
+            await retained.leave();
+
+            expect(retained.sequence).toBe(0);
         });
     });
 

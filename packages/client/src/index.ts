@@ -10,7 +10,7 @@ import { createFunctionsClient } from "./functions";
 import { createStorage } from "./storage";
 import { ClientStorageSourceRegistry } from "./storage-registry";
 import { RebaseWebSocketClient } from "./websocket";
-import { RebaseRealtimeChannel } from "./realtime-channel";
+import { RebaseRealtimeChannel, type ChannelOptions } from "./realtime-channel";
 import {
     DEFAULT_STORAGE_SOURCE_KEY,
     InsertOf,
@@ -78,7 +78,15 @@ export type { FunctionInvokeOptions, FunctionsClient } from "./functions";
 // driver constructs it directly. Not a stable app-facing API.
 export { RebaseWebSocketClient } from "./websocket";
 export { RebaseRealtimeChannel } from "./realtime-channel";
-export type { PresenceState, PresenceDiff, BroadcastEvent, ChannelTransport } from "./realtime-channel";
+export type {
+    PresenceState,
+    PresenceDiff,
+    BroadcastEvent,
+    ChannelTransport,
+    ChannelOptions,
+    ChannelHistoryEntry,
+    ChannelHistoryResult
+} from "./realtime-channel";
 
 export interface CreateRebaseClientOptions extends RebaseClientConfig {
     auth?: CreateAuthOptions;
@@ -157,8 +165,11 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
          * Join a broadcast/presence channel. Repeated calls with the same name
          * return the same channel object. Throws only when the client was
          * created with `realtime: false`.
+         *
+         * Pass `{ history: true }` to have the channel replay what it missed on
+         * join and on every reconnect, for channels the server retains.
          */
-        channel: (name: string) => RebaseRealtimeChannel;
+        channel: (name: string, options?: ChannelOptions) => RebaseRealtimeChannel;
     };
     /**
      * Release the realtime socket and its reconnect timer.
@@ -458,7 +469,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
              * own membership — and `leave()` from one would otherwise silently
              * cut off the others.
              */
-            channel: (name: string): RebaseRealtimeChannel => {
+            channel: (name: string, options?: ChannelOptions): RebaseRealtimeChannel => {
                 // Only `realtime: false` gets here — a hard opt-out, so this
                 // stays an error. Being merely *unconnected* does not: the
                 // socket opens on the first channel operation, which is the
@@ -470,8 +481,15 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 }
                 let existing = realtimeChannels.get(name);
                 if (!existing) {
-                    existing = new RebaseRealtimeChannel(name, ws);
+                    existing = new RebaseRealtimeChannel(name, ws, options);
                     realtimeChannels.set(name, existing);
+                } else if (options?.history) {
+                    // Same object by name, so options on a later call have no
+                    // new channel to apply to. Asking for history upgrades the
+                    // one that exists rather than being quietly ignored — but
+                    // never the reverse, so a caller that omits the option
+                    // cannot switch it off under one that asked for it.
+                    existing.enableHistory();
                 }
                 return existing;
             }

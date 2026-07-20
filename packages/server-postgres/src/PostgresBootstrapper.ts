@@ -17,7 +17,8 @@ import {
     CollectionConfig,
     type HistoryConfig,
     InitializedDriver,
-    RealtimeProvider
+    RealtimeProvider,
+    type RealtimeChannelsConfig
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import { RealtimeService } from "./services/realtimeService";
@@ -52,6 +53,12 @@ export interface PostgresDriverConfig {
      * (BaaS mode). Defaults to `public`.
      */
     introspectionSchema?: string;
+    /**
+     * Realtime options. Currently only channel retention, which is opt-in:
+     * without rules here no channel keeps any history and broadcast stays
+     * fire-and-forget. See {@link ChannelRetentionRule}.
+     */
+    realtime?: RealtimeChannelsConfig;
 }
 
 /**
@@ -314,6 +321,16 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 } catch (err) {
                     logger.warn("⚠️ Could not initialize branch metadata table", { error: err });
                 }
+            }
+
+            // ── Channel history ──────────────────────────────────────────────
+            // Opt-in per channel pattern. With no rules this creates no tables
+            // and leaves broadcast on its original fire-and-forget path, so
+            // presence-only apps pay nothing for it.
+            try {
+                await realtimeService.configureChannelHistory(pgConfig.realtime?.channels);
+            } catch (err) {
+                logger.warn("⚠️ Could not initialize channel history tables — retained channels will not replay", { error: err });
             }
 
             // ── Realtime change source ───────────────────────────────────────
