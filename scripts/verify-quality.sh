@@ -79,6 +79,22 @@ else
     warn "check-packages.sh not found, skipping."
 fi
 
+# 7. Docs API Drift Check
+section "7. Docs API Drift (snippets + all-locale identifiers)"
+# Warn-first: the baseline is not yet clean, so a finding must not fail the
+# build. Once `node scripts/verify-docs.mjs` reports zero, add --strict here
+# and move this into the err() path to make it blocking.
+if [ -f "./scripts/verify-docs.mjs" ]; then
+    echo "Typechecking doc snippets against workspace source..."
+    if node --max-old-space-size=8192 scripts/verify-docs.mjs; then
+        ok "Docs verification passed."
+    else
+        warn "Docs verification reported findings (see above)."
+    fi
+else
+    warn "verify-docs.mjs not found, skipping."
+fi
+
 # Summary
 section "Verification Summary"
 TOTAL=$(error_count)

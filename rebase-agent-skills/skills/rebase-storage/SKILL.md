@@ -332,7 +332,7 @@ STORAGE_GCS_BUCKET=my-bucket
 ```
 
 ❌ **Anti-pattern (never do this in app/backend code):**
-```typescript
+```typescript no-verify
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";   // ❌
 const s3 = new S3Client({ region, endpoint });                     // ❌ hardcodes S3
 await s3.send(new PutObjectCommand({ Bucket, Key, Body }));        // ❌ bypasses rebase.storage

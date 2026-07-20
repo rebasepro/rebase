@@ -68,8 +68,8 @@ Pass `FindParams` as the first argument to filter the subscription:
 ```typescript
 const unsubscribe = client.data.products.listen(
     {
-        where: { status: "published" },
-        orderBy: "created_at:desc",
+        where: { status: ["==", "published"] },
+        orderBy: ["created_at", "desc"],
         limit: 50,
     },
     (response) => {
@@ -120,7 +120,7 @@ const unsubscribe = client.data.products.listenById(
 
 ### `listenById()` Signature
 
-```typescript
+```typescript no-verify
 listenById(
     id: string | number,
     onUpdate: (entity: Entity<M> | undefined) => void,
@@ -148,7 +148,7 @@ In React, use `useEffect` cleanup:
 ```tsx
 useEffect(() => {
     const unsubscribe = client.data.products.listen(
-        { where: { active: true } },
+        { where: { active: ["==", true] } },
         (response) => setProducts(response.data)
     );
     return () => unsubscribe();

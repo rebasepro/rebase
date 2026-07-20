@@ -1,11 +1,12 @@
 import type { CollectionConfig, ViewMode } from "@rebasepro/types";
-import { Blocker, useBlocker, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { EditViewBinding } from "../components/EditViewBinding";
 import { DetailViewBinding } from "../components/DetailViewBinding";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CollectionViewBinding } from "../components/CollectionViewBinding/CollectionViewBinding";
-import { NotFoundPage, useUserConfigurationPersistence, useComponentOverride } from "@rebasepro/app";
+import { NotFoundPage, useUserConfigurationPersistence, useComponentOverride, useNavigationBlocker } from "@rebasepro/app";
+import { resolveOpenEntityMode, resolveViewMode } from "../util/view_mode";
 import { UnsavedChangesDialog } from "@rebasepro/app";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { getNavigationEntriesFromPath, NavigationViewCollectionInternal, NavigationViewEntityCustomInternal, NavigationViewInternal } from "@rebasepro/common";
@@ -146,23 +147,16 @@ export function RebaseRoute() {
         if (!collection)
             collection = collectionRegistry.getCollection(firstCollectionEntry.slug);
 
-        // Resolve the effective openEntityMode based on the current view mode.
-        // Priority: collection.openEntityMode (explicit) > view-mode-based default.
-        // View mode priority: URL __view param > saved user config > collection default.
-        let effectiveOpenMode: "side_panel" | "full_screen" | "split" | "dialog" | undefined = collection?.openEntityMode;
-        if (!effectiveOpenMode && collection) {
-            const urlViewParam = new URLSearchParams(location.search).get("__view");
-            let currentViewMode: ViewMode = collection.defaultViewMode ?? "list";
-            if (urlViewParam && ["list", "table", "kanban", "cards"].includes(urlViewParam)) {
-                currentViewMode = urlViewParam as ViewMode;
-            } else {
-                const savedView = userConfigPersistence?.getCollectionConfig(collection.slug)?.defaultViewMode;
-                if (savedView) currentViewMode = savedView as ViewMode;
-            }
-            if (currentViewMode === "kanban") effectiveOpenMode = "side_panel";
-            else if (currentViewMode === "table" || currentViewMode === "cards") effectiveOpenMode = "full_screen";
-            else effectiveOpenMode = "split";
-        }
+        const effectiveOpenMode = collection
+            ? resolveOpenEntityMode({
+                collection,
+                viewMode: resolveViewMode({
+                    collection,
+                    search: location.search,
+                    savedViewMode: userConfigPersistence?.getCollectionConfig(collection.slug)?.defaultViewMode as ViewMode | undefined
+                })
+            })
+            : undefined;
         if (collection && effectiveOpenMode === "split") {
             // Extract subcollection tab from the 3rd entry if present
             let selectedTab: string | undefined;
@@ -293,7 +287,7 @@ function EntityFullScreenRoute({
 
     const entityPath = basePath + `/${entityId}`;
 
-    const blocker = useBlocker(({
+    const blocker = useNavigationBlocker(useCallback(({
         currentLocation,
         nextLocation
     }) => {
@@ -316,7 +310,7 @@ function EntityFullScreenRoute({
             return false;
 
         return blocked.current;
-    });
+    }, [entityPath, basePath]));
 
     const lastCollectionEntry = [...navigationEntries].reverse().find((entry) => entry.type === "collection");
 

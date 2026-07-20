@@ -9,7 +9,7 @@ description: Richten Sie den Auth-Controller, die Login-Ansicht, die Benutzerver
 Rebase bietet einsatzbereite React-Komponenten und Hooks für die Authentifizierung:
 
 - **`useRebaseAuthController`** — Verwaltet den Auth-Zustand, Tokens und die Sitzungspersistenz
-- **`RebaseLoginView`** — Vorgefertigtes Login-/Registrierungsformular mit OAuth-Unterstützung
+- **`LoginView`** — Vorgefertigtes Login-/Registrierungsformular mit OAuth-Unterstützung
 - **`useBackendUserManagement`** — Hook zum Verwalten von Benutzern aus dem Admin-Panel
 - **`UsersView`** — Integrierte Benutzerverwaltungsoberfläche
 - **Rollensimulation** — Testen Sie verschiedene Rollen, ohne sich abzumelden
@@ -40,14 +40,14 @@ authController.getAuthToken() // Get current JWT for API calls
 
 ## Login-Ansicht
 
-Die Komponente `RebaseLoginView` bietet ein vollständiges Login- und Registrierungsformular:
+Die Komponente `LoginView` bietet ein vollständiges Login- und Registrierungsformular:
 
 ```tsx
-import { RebaseLoginView } from "@rebasepro/app";
+import { LoginView } from "@rebasepro/app";
 
 if (!authController.user) {
     return (
-        <RebaseLoginView
+        <LoginView
             authController={authController}
             googleEnabled={!!GOOGLE_CLIENT_ID}
             googleClientId={GOOGLE_CLIENT_ID}

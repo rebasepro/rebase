@@ -102,7 +102,7 @@ const unsubscribe = client.data.products.listen(
 
 In a Rebase frontend, the client is created once and shared via context:
 
-```tsx
+```tsx no-verify
 import { createRebaseClient } from "@rebasepro/client";
 
 const client = createRebaseClient({ baseUrl: API_URL });

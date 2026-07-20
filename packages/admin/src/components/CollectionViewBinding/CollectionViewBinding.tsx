@@ -69,6 +69,7 @@ import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { useSelectionController } from "./useSelectionController";
 import { CollectionViewStartActions } from "./CollectionViewStartActions";
 import { addRecentId, getRecentIds } from "./utils";
+import { isViewMode, OpenEntityMode, resolveOpenEntityMode, VIEW_MODE_PARAM } from "../../util/view_mode";
 import { mergeDeep } from "@rebasepro/utils";
 import { useBreadcrumbsController } from "../../hooks/useBreadcrumbsController";
 import { useCMSContext } from "../../hooks/useCMSContext";
@@ -77,18 +78,6 @@ import { useSidePanel } from "../../hooks/useSidePanel";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 
 const EMPTY_ARRAY: never[] = [];
-const DEFAULT_ENTITY_OPEN_MODE = "split";
-
-function getOpenEntityMode(
-    viewMode: ViewMode,
-    configuredMode?: "side_panel" | "full_screen" | "split" | "dialog"
-): "side_panel" | "full_screen" | "split" | "dialog" {
-    if (configuredMode) return configuredMode;
-    if (viewMode === "kanban") return "side_panel";
-    if (viewMode === "table" || viewMode === "cards") return "full_screen";
-    // "list" view defaults to split
-    return "split";
-}
 
 /**
  * @group Components
@@ -247,11 +236,8 @@ const CollectionViewBindingInner = React.memo(
 
         // Read view from React Router's searchParams (reactive on back/forward)
         const urlView = useMemo((): ViewMode | null => {
-            const v = searchParams.get("__view");
-            if (v && ["list", "table", "kanban", "cards"].includes(v)) {
-                return v as ViewMode;
-            }
-            return null;
+            const v = searchParams.get(VIEW_MODE_PARAM);
+            return isViewMode(v) ? v : null;
         }, [searchParams]);
 
         // Get saved view from local persistence
@@ -268,7 +254,10 @@ const CollectionViewBindingInner = React.memo(
             return defaultViewMode;
         });
 
-        const openEntityMode = getOpenEntityMode(viewMode, collection?.openEntityMode);
+        const openEntityMode = resolveOpenEntityMode({
+            collection,
+            viewMode
+        });
 
         // Sync URL with current view on init (if view came from saved config)
         useEffect(() => {
@@ -276,7 +265,7 @@ const CollectionViewBindingInner = React.memo(
                 // View came from saved config but URL doesn't have it - update URL without push
                 setSearchParams((prev) => {
                     const next = new URLSearchParams(prev);
-                    next.set("__view", viewMode);
+                    next.set(VIEW_MODE_PARAM, viewMode);
                     return next;
                 }, { replace: true });
             }
@@ -290,9 +279,9 @@ const CollectionViewBindingInner = React.memo(
             setSearchParams((prev) => {
                 const next = new URLSearchParams(prev);
                 if (newMode === defaultViewMode) {
-                    next.delete("__view");
+                    next.delete(VIEW_MODE_PARAM);
                 } else {
-                    next.set("__view", newMode);
+                    next.set(VIEW_MODE_PARAM, newMode);
                 }
                 return next;
             });
@@ -972,6 +961,7 @@ parentEntityIds,
                 highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
                 size={listSize}
                 emptyComponent={emptyComponent}
+                selectedEntityId={selectedEntityIdProp}
                 getActionsForEntity={getActionsForEntity}
                 path={path}
                 openEntityMode={openEntityMode}
@@ -1006,11 +996,57 @@ parentEntityIds,
                 additionalIDHeaderWidget={<EntityIdHeaderWidget
                     path={path}
                     idPath={path}
-                    collection={collection}/>}
+                    collection={collection}
+                    openEntityMode={openEntityMode}/>}
                 openEntityMode={openEntityMode}
                 onColumnsOrderChange={onColumnsOrderChange}
             />
         );
+
+        const detailOpen = selectedEntityIdProp !== undefined;
+
+        // List view gets a centered, titled reading surface. Opening a detail
+        // panel collapses the title and drops the centering so the list can
+        // shrink into the master column.
+        const collectionSurface = viewMode === "list"
+            ? (
+                <div
+                    className={cls(
+                        "flex flex-col w-full",
+                        detailOpen ? "" : "max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4"
+                    )}
+                >
+                    {/* Collapsible title — grid-rows for smooth height, transform for GPU */}
+                    <div
+                        className={cls(
+                            "grid transition-[grid-template-rows,transform,margin] duration-150 ease-out",
+                            detailOpen
+                                ? "grid-rows-[0fr] -translate-y-2 mt-0 mb-0"
+                                : "grid-rows-[1fr] translate-y-0 mt-12 mb-6"
+                        )}
+                    >
+                        <div className="overflow-hidden flex items-center gap-4">
+                            <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
+                                {collection.name}
+                            </Typography>
+                        </div>
+                    </div>
+                    {pluginInsights.length > 0 && (
+                        <div
+                            className={cls(
+                                "grid transition-[grid-template-rows] duration-150 ease-out",
+                                detailOpen ? "grid-rows-[0fr]" : "grid-rows-[1fr]"
+                            )}
+                        >
+                            <div className="overflow-hidden flex-shrink-0">
+                                {pluginInsights}
+                            </div>
+                        </div>
+                    )}
+                    {innerView}
+                </div>
+            )
+            : innerView;
 
         const mainContent = (
             <div className={cls("overflow-hidden h-full w-full rounded-md flex flex-col dark:bg-surface-800", className)}
@@ -1052,66 +1088,10 @@ parentEntityIds,
                         selectedTab={selectedTabProp}
                         toolbar={toolbarNode}
                     >
-                        {/* When detail panel is open, left panel is always the list
-                            view — regardless of which view mode triggered the entity
-                            click. When no detail, show the active view mode. */}
-                        {(selectedEntityIdProp !== undefined || viewMode === "list") ? (
-                            <div
-                                className={cls(
-                                    "flex flex-col w-full",
-                                    selectedEntityIdProp === undefined
-                                        ? "max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4"
-                                        : ""
-                                )}
-                            >
-                                {/* Collapsible title — grid-rows for smooth height, transform for GPU */}
-                                <div
-                                    className={cls(
-                                        "grid transition-[grid-template-rows,transform,margin] duration-150 ease-out",
-                                        selectedEntityIdProp === undefined
-                                            ? "grid-rows-[1fr] translate-y-0 mt-12 mb-6"
-                                            : "grid-rows-[0fr] -translate-y-2 mt-0 mb-0"
-                                    )}
-                                >
-                                    <div className="overflow-hidden flex items-center gap-4">
-                                        <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
-                                            {collection.name}
-                                        </Typography>
-                                    </div>
-                                </div>
-                                {pluginInsights.length > 0 && (
-                                    <div
-                                        className={cls(
-                                            "grid transition-[grid-template-rows] duration-150 ease-out",
-                                            selectedEntityIdProp === undefined
-                                                ? "grid-rows-[1fr]"
-                                                : "grid-rows-[0fr]"
-                                        )}
-                                    >
-                                        <div className="overflow-hidden flex-shrink-0">
-                                            {pluginInsights}
-                                        </div>
-                                    </div>
-                                )}
-                                <CollectionListViewBinding
-                                    key={`list-view-${path}`}
-                                    collection={collection}
-                                    tableController={tableController}
-                                    onEntityClick={onEntityClick}
-                                    selectionController={usedSelectionController}
-                                    selectionEnabled={selectionEnabled}
-                                    highlightedEntities={highlightedEntity ? [highlightedEntity] : []}
-                                    size={listSize}
-                                    emptyComponent={emptyComponent}
-                                    selectedEntityId={selectedEntityIdProp}
-                                    getActionsForEntity={getActionsForEntity}
-                                    path={path}
-                                    openEntityMode={openEntityMode}
-                                />
-                            </div>
-                        ) : (
-                            innerView
-                        )}
+                        {/* The left panel keeps rendering whichever view mode is
+                            active. Swapping it to a list on selection would make
+                            a board or card grid vanish on every click. */}
+                        {collectionSurface}
                     </SplitListView>
                 ) : (
                     <div className="flex flex-col w-full h-full">
@@ -1120,39 +1100,7 @@ parentEntityIds,
                             "flex-1 flex flex-col",
                             (viewMode === "list" || viewMode === "cards") && "overflow-y-auto"
                         )}>
-                            {viewMode === "list" ? (
-                                <div
-                                    className={cls(
-                                        "flex flex-col w-full",
-                                        selectedEntityIdProp === undefined
-                                            ? "max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4"
-                                            : ""
-                                    )}
-                                >
-                                    <div
-                                        className={cls(
-                                            "grid transition-[grid-template-rows,transform,margin] duration-150 ease-out",
-                                            selectedEntityIdProp === undefined
-                                                ? "grid-rows-[1fr] translate-y-0 mt-12 mb-6"
-                                                : "grid-rows-[0fr] -translate-y-2 mt-0 mb-0"
-                                        )}
-                                    >
-                                        <div className="overflow-hidden flex items-center gap-4">
-                                            <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
-                                                {collection.name}
-                                            </Typography>
-                                        </div>
-                                    </div>
-                                    {pluginInsights.length > 0 && (
-                                        <div className="flex-shrink-0">
-                                            {pluginInsights}
-                                        </div>
-                                    )}
-                                    {innerView}
-                                </div>
-                            ) : (
-                                innerView
-                            )}
+                            {collectionSurface}
                         </div>
                     </div>
                 )}
@@ -1356,11 +1304,17 @@ function buildPropertyWidthOverwrite(key: string, width: number): PartialCollect
 function EntityIdHeaderWidget({
     collection,
     path,
-    idPath
+    idPath,
+    openEntityMode
 }: {
     collection: CollectionConfig,
     path: string,
-    idPath: string
+    idPath: string,
+    /**
+     * Resolved by the parent so that finding an entity by id lands it in the
+     * same surface a row click would — not a different one.
+     */
+    openEntityMode: OpenEntityMode
 }) {
 
     const { t } = useTranslation();
@@ -1369,8 +1323,6 @@ function EntityIdHeaderWidget({
     const [searchString, setSearchString] = React.useState("");
     const [recentIds, setRecentIds] = React.useState<string[]>(getRecentIds(collection.slug).map(String));
     const sidePanelController = useSidePanel();
-
-    const openEntityMode = collection?.openEntityMode ?? DEFAULT_ENTITY_OPEN_MODE;
 
     return (
         <Tooltip title={!openPopup ? t("find_by_id") : undefined} asChild={false}>

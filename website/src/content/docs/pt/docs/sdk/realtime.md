@@ -32,7 +32,7 @@ O método `listen()` aceita os mesmos `FindParams` que `find()` — você pode f
 ```typescript
 const unsubscribe = client.data.orders.listen(
     {
-        where: { status: "pending" },
+        where: { status: ["==", "pending"] },
         orderBy: ["created_at", "desc"],
         limit: 20
     },

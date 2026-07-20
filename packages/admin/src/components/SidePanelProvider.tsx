@@ -9,7 +9,7 @@ import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
-import { useAuthController, useBridgeRegistration } from "@rebasepro/app";
+import { useAuthController, useBridgeRegistration, NavigationBlockerProvider } from "@rebasepro/app";
 
 /**
  * Provider that builds the SidePanelController and makes it available
@@ -55,14 +55,16 @@ export function SidePanelProvider({ children }: { children: React.ReactNode }) {
     );
 
     return (
-        <BreadcrumbsProvider>
-            <SideDialogsControllerContext.Provider value={sideDialogsController}>
-                <SidePanelControllerContext.Provider value={sidePanelController}>
-                    <BridgeAutoRegistrar sidePanelController={sidePanelController}/>
-                    {children}
-                </SidePanelControllerContext.Provider>
-            </SideDialogsControllerContext.Provider>
-        </BreadcrumbsProvider>
+        <NavigationBlockerProvider>
+            <BreadcrumbsProvider>
+                <SideDialogsControllerContext.Provider value={sideDialogsController}>
+                    <SidePanelControllerContext.Provider value={sidePanelController}>
+                        <BridgeAutoRegistrar sidePanelController={sidePanelController}/>
+                        {children}
+                    </SidePanelControllerContext.Provider>
+                </SideDialogsControllerContext.Provider>
+            </BreadcrumbsProvider>
+        </NavigationBlockerProvider>
     );
 }
 

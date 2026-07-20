@@ -7,6 +7,7 @@ import {
     getNavigationEntriesFromPath,
     NavigationViewInternal,
     removeInitialAndTrailingSlashes,
+    removeTrailingSlash,
     resolveDefaultSelectedView
 } from "@rebasepro/common";
 import { resolvedSelectedEntityView } from "../util/resolutions";
@@ -278,6 +279,13 @@ export function buildSidePanelsFromUrl(path: string, collections: CollectionConf
             }
         }
 
+    }
+
+    // `edit` is not a registered view, so the navigation parser skips it. Pick it
+    // up from the raw path so that reloading an edit URL reopens the edit form
+    // rather than silently dropping the user back on the detail view.
+    if (sidePanel && !sidePanel.selectedTab && removeTrailingSlash(path).endsWith("/edit")) {
+        sidePanel.selectedTab = "edit";
     }
 
     // When the URL doesn't contain a tab segment but the collection has a

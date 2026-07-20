@@ -32,7 +32,7 @@ The `listen()` method accepts the same `FindParams` as `find()` — you can filt
 ```typescript
 const unsubscribe = client.data.orders.listen(
     {
-        where: { status: "pending" },
+        where: { status: ["==", "pending"] },
         orderBy: ["created_at", "desc"],
         limit: 20
     },
@@ -104,7 +104,7 @@ const unsubscribe = client.data.products.listenById(
 
 ### Signature
 
-```typescript
+```typescript no-verify
 listenById(
     id: string | number,
     onUpdate: (entity: Entity<M> | undefined) => void,

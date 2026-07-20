@@ -316,7 +316,7 @@ For full documentation on collection callbacks, see the `rebase-collections` ski
 Rebase follows a **fail-closed** security model throughout the stack:
 
 1. **Scoped driver or nothing** — The REST API's `getScopedDriver()` throws if no scoped driver is available. It **never** falls back to the unscoped driver:
-   ```typescript
+   ```typescript no-verify
    private getScopedDriver(c): DataDriver {
        const driver = c.get("driver") as DataDriver | undefined;
        if (!driver) throw ApiError.internal("Scoped driver not available");

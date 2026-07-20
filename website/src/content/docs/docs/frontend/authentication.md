@@ -9,7 +9,7 @@ description: Set up the auth controller, login view, user management, and role s
 Rebase provides ready-to-use React components and hooks for authentication:
 
 - **`useRebaseAuthController`** — Manages auth state, tokens, and session persistence
-- **`RebaseLoginView`** — Pre-built login/signup form with OAuth support
+- **`LoginView`** — Pre-built login/signup form with OAuth support
 - **`useBackendUserManagement`** — Hook for managing users from the admin panel
 - **`UsersView`** — Built-in user management interface
 - **Role simulation** — Test different roles without logging out
@@ -40,14 +40,14 @@ Pass the `authController` to the Rebase navigation controller to gate the entire
 
 ## Login View
 
-The `RebaseLoginView` component provides a complete login and registration form:
+The `LoginView` component provides a complete login and registration form:
 
 ```tsx
-import { RebaseLoginView } from "@rebasepro/app";
+import { LoginView } from "@rebasepro/app";
 
 if (!authController.user) {
     return (
-        <RebaseLoginView
+        <LoginView
             authController={authController}
             googleEnabled={!!GOOGLE_CLIENT_ID}
             googleClientId={GOOGLE_CLIENT_ID}
@@ -98,7 +98,7 @@ This provides a full user table with:
 
 Roles are stored as a `text[]` array column directly on the `rebase.users` table. You define available roles as an enum in your users collection definition:
 
-```typescript title="config/collections/users.ts"
+```typescript title="config/collections/users.ts" no-verify
 roles: {
     name: "Roles",
     type: "array",
