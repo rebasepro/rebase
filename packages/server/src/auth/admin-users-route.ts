@@ -306,10 +306,9 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
 
     router.delete("/users/:userId", requireAdmin, async (c) => {
         const userId = c.req.param("userId");
-        const authUser = c.get("user") as { uid?: string; userId?: string } | undefined;
-        const currentUserId = authUser?.uid || authUser?.userId;
+        const authUser = c.get("user") as { uid?: string } | undefined;
 
-        if (currentUserId === userId) {
+        if (authUser?.uid === userId) {
             throw ApiError.badRequest("Cannot delete your own account", "SELF_DELETE");
         }
 

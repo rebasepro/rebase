@@ -59,7 +59,7 @@ export interface ConnectionPosture {
 }
 
 export interface AuthContext {
-    userId: string;
+    uid: string;
     /** Raw roles as carried on the user (strings or `{ id }` objects). */
     roles: unknown[];
 }
@@ -208,15 +208,15 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
  * semantics: it is why `auth.uid() IS NOT NULL` is true for anonymous requests.
  */
 export async function applyAuthContext(tx: SqlTx, auth: AuthContext, userRole?: string): Promise<void> {
-    const userId = typeof auth.userId === "string" && auth.userId.trim() !== "" ? auth.userId : ANONYMOUS_USER_ID;
+    const uid = typeof auth.uid === "string" && auth.uid.trim() !== "" ? auth.uid : ANONYMOUS_USER_ID;
     const normalizedRoles = auth.roles.map((r: unknown) =>
         typeof r === "string" ? r : (r as Record<string, unknown>)?.id ?? String(r)
     );
     await tx.execute(drizzleSql`
         SELECT
-            set_config('app.user_id', ${userId}, true),
+            set_config('app.user_id', ${uid}, true),
             set_config('app.user_roles', ${normalizedRoles.join(",")}, true),
-            set_config('app.jwt', ${JSON.stringify({ sub: userId, roles: auth.roles })}, true)
+            set_config('app.jwt', ${JSON.stringify({ sub: uid, roles: auth.roles })}, true)
     `);
     if (userRole) {
         await tx.execute(drizzleSql.raw(`SET LOCAL ROLE ${quoteIdent(userRole)}`));

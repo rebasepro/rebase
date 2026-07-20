@@ -25,7 +25,7 @@ interface Subscription {
     config: CollectionSubscriptionConfig | SingleSubscriptionConfig;
     changeStream?: ChangeStream;
     callback?: (data: any) => void;
-    authContext?: { userId: string; roles: string[] };
+    authContext?: { uid: string; roles: string[] };
 }
 
 /**
@@ -60,7 +60,7 @@ export class MongoRealtimeService implements RealtimeProvider {
      */
     subscribeToCollection(
         subscriptionId: string,
-        config: CollectionSubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
+        config: CollectionSubscriptionConfig & { authContext?: { uid: string; roles: string[] } },
         callback?: (rows: Record<string, unknown>[]) => void
     ): void {
         // Clean up existing subscription if any
@@ -133,7 +133,7 @@ export class MongoRealtimeService implements RealtimeProvider {
      */
     private async fetchAndNotifyCollection(
         subscriptionId: string,
-        config: CollectionSubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
+        config: CollectionSubscriptionConfig & { authContext?: { uid: string; roles: string[] } },
         callback?: (rows: Record<string, unknown>[]) => void
     ): Promise<void> {
         try {
@@ -141,7 +141,7 @@ export class MongoRealtimeService implements RealtimeProvider {
             const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
 
             if (config.authContext && this.driver) {
-                const mockUser = { uid: config.authContext.userId,
+                const mockUser = { uid: config.authContext.uid,
 roles: config.authContext.roles } as User;
                 const authenticatedDriver = await this.driver.withAuth(mockUser);
                 rows = await authenticatedDriver.fetchCollection({
@@ -179,7 +179,7 @@ roles: config.authContext.roles } as User;
      */
     subscribeToOne(
         subscriptionId: string,
-        config: SingleSubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
+        config: SingleSubscriptionConfig & { authContext?: { uid: string; roles: string[] } },
         callback?: (row: Record<string, unknown> | null) => void
     ): void {
         // Clean up existing subscription if any
@@ -257,7 +257,7 @@ roles: config.authContext.roles } as User;
      */
     private async fetchAndNotifyOne(
         subscriptionId: string,
-        config: SingleSubscriptionConfig & { authContext?: { userId: string; roles: string[] } },
+        config: SingleSubscriptionConfig & { authContext?: { uid: string; roles: string[] } },
         callback?: (row: Record<string, unknown> | null) => void
     ): Promise<void> {
         try {
@@ -265,7 +265,7 @@ roles: config.authContext.roles } as User;
             const registryCollection = this.driver?.registry?.getCollectionByPath(config.path);
 
             if (config.authContext && this.driver) {
-                const mockUser = { uid: config.authContext.userId,
+                const mockUser = { uid: config.authContext.uid,
 roles: config.authContext.roles } as User;
                 const authenticatedDriver = await this.driver.withAuth(mockUser);
                 row = await authenticatedDriver.fetchOne({
@@ -376,12 +376,12 @@ roles: config.authContext.roles } as User;
     async handleClientMessage(
         clientId: string,
         message: { type: string; payload?: any; subscriptionId?: string },
-        _authContext?: { userId: string; roles: unknown[] }
+        _authContext?: { uid: string; roles: unknown[] }
     ): Promise<void> {
         const ws = this.clients.get(clientId);
         if (!ws) return;
 
-        const authContext = _authContext ? { userId: _authContext.userId,
+        const authContext = _authContext ? { uid: _authContext.uid,
 roles: (_authContext.roles ?? []).map(String) } : undefined;
 
         switch (message.type) {

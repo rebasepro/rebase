@@ -462,7 +462,7 @@ collection: {} as unknown as CollectionConfig,
 callbacks: {} as unknown as Record<string, unknown> });
 
             expect(unsub).toBe(mockUnsubscribe);
-            expect(mockRealtimeService.subscriptions.get("sub1").authContext).toEqual({ userId: "test-user",
+            expect(mockRealtimeService.subscriptions.get("sub1").authContext).toEqual({ uid: "test-user",
 roles: [] });
         });
 
@@ -483,7 +483,7 @@ collection: {} as unknown as CollectionConfig,
 callbacks: {} as unknown as Record<string, unknown> });
 
             expect(unsub).toBe(mockUnsubscribe);
-            expect(mockRealtimeService.subscriptions.get("sub2").authContext).toEqual({ userId: "test-user",
+            expect(mockRealtimeService.subscriptions.get("sub2").authContext).toEqual({ uid: "test-user",
 roles: [] });
         });
 
@@ -568,7 +568,7 @@ email: "hacker@evil.com" };
 collection: { slug: "x",
 properties: {} } as unknown as CollectionConfig });
 
-            // The SQL template tag should have the userId as a parameter value, not embedded in the SQL string
+            // The SQL template tag should have the uid as a parameter value, not embedded in the SQL string
             const sqlObj = mockTx.execute.mock.calls[0][0];
             const serialized = JSON.stringify(sqlObj);
             expect(serialized).toContain("set_config");

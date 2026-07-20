@@ -1374,10 +1374,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         const pendingNotifications: PostgresBackendDriver["_pendingNotifications"] = [];
 
         const result = await this.delegate.db.transaction(async (tx) => {
-            let userId = this.user?.uid;
-            if (!userId) {
+            let uid = this.user?.uid;
+            if (!uid) {
                 logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
-                userId = "anonymous";
+                uid = "anonymous";
             }
 
             const userRoles = this.user?.roles ?? [];
@@ -1396,7 +1396,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             //
             // Fails closed: if the switch cannot be performed, the transaction
             // aborts rather than falling back to an RLS-bypassing connection.
-            await applyAuthContext(tx, { userId, roles: userRoles }, this.delegate.rlsUserRole);
+            await applyAuthContext(tx, { uid, roles: userRoles }, this.delegate.rlsUserRole);
 
             const txEntityService = new DataService(tx, this.delegate.registry);
             const txDelegate = new PostgresBackendDriver(tx, this.delegate.realtimeService, this.delegate.registry, this.user, this.delegate.poolManager, this.delegate.historyService);
@@ -1435,7 +1435,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
      */
     private injectAuthContext(unsubscribe: () => void): () => void {
         const authContext = {
-            userId: this.user?.uid || "anonymous",
+            uid: this.user?.uid || "anonymous",
             roles: this.user?.roles ?? []
         };
         const entries = Array.from(this.delegate.realtimeService.subscriptions.entries());

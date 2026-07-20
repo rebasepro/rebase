@@ -30,7 +30,7 @@ describe("fileTokenAuth Middleware", () => {
         expect(res.status).toBe(200);
         const body = await res.json() as any;
         expect(body.success).toBe(true);
-        expect(body.user).toEqual({ userId: "download-token", roles: ["reader"] });
+        expect(body.user).toEqual({ uid: "download-token", roles: ["reader"] });
     });
 
     it("should allow folder-prefix based scoped download token", async () => {

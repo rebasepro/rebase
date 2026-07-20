@@ -220,15 +220,15 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
         keyGenerator: (c) => {
             const key = c.get("apiKey") as { id: string } | undefined;
             if (key) return `api-key:${key.id}`;
-            const user = c.get("user") as { userId?: string } | undefined;
-            if (user?.userId && user.userId !== "anon") return `user:${user.userId}`;
+            const user = c.get("user") as { uid?: string } | undefined;
+            if (user?.uid && user.uid !== "anon") return `user:${user.uid}`;
             return `ip:${defaultKeyGenerator(c)}`;
         },
         resolveLimit: (c) => {
             const key = c.get("apiKey") as { id: string; rate_limit?: number | null } | undefined;
             if (key) return key.rate_limit ?? apiKeyLimit;
-            const user = c.get("user") as { userId?: string } | undefined;
-            if (user?.userId && user.userId !== "anon") return userLimit;
+            const user = c.get("user") as { uid?: string } | undefined;
+            if (user?.uid && user.uid !== "anon") return userLimit;
             return anonLimit;
         }
     });

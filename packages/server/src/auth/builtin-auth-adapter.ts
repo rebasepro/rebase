@@ -138,15 +138,15 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             // Resolve roles from the repository
             let roles: string[] = payload.roles || [];
             try {
-                roles = await authRepository.getUserRoleIds(payload.userId);
+                roles = await authRepository.getUserRoleIds(payload.uid);
             } catch (err: unknown) {
-                logger.warn("Role lookup from repository failed, using token roles as fallback", { userId: payload.userId, error: err });
+                logger.warn("Role lookup from repository failed, using token roles as fallback", { uid: payload.uid, error: err });
             }
 
             const isAdmin = roles.some((r) => r === "admin" || r === "schema-admin");
 
             return {
-                uid: payload.userId,
+                uid: payload.uid,
                 email: payload.email ?? "",
                 displayName: payload.displayName ?? null,
                 roles,
@@ -175,15 +175,15 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
             let roles: string[] = payload.roles || [];
             try {
-                roles = await authRepository.getUserRoleIds(payload.userId);
+                roles = await authRepository.getUserRoleIds(payload.uid);
             } catch (err: unknown) {
-                logger.warn("Role lookup from repository failed, using token roles as fallback", { userId: payload.userId, error: err });
+                logger.warn("Role lookup from repository failed, using token roles as fallback", { uid: payload.uid, error: err });
             }
 
             const isAdmin = roles.some((r) => r === "admin" || r === "schema-admin");
 
             return {
-                uid: payload.userId,
+                uid: payload.uid,
                 email: payload.email ?? "",
                 displayName: payload.displayName ?? null,
                 roles,
