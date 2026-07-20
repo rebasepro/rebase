@@ -165,6 +165,13 @@ email: "google@test.com",
 displayName: "Google User",
 photoUrl: "https://photo.url",
 emailVerified: true };
+                    // Same email as "link-token", but the provider did NOT
+                    // assert the address as verified.
+                    if (idToken === "unverified-token") return { providerId: "g-999",
+email: "existing@test.com",
+displayName: "Unverified",
+photoUrl: null,
+emailVerified: false };
                     return null;
                 }
             }
@@ -472,6 +479,87 @@ withEmail: false }); // Hack to pass empty list of providers
                 displayName: "Updated Name",
                 photoUrl: "https://new-photo.url"
             }));
+        });
+    });
+
+    // ── Account linking across sign-in methods ──────────────────────────
+    //
+    // Ground truth for: "user signs up with email/password, then signs in
+    // with Google using the same address". Rebase links to the EXISTING
+    // account when — and only when — the provider asserts the email as
+    // verified. It never silently creates a second user for the same
+    // address, in either direction.
+    describe("password account + Google sign-in with the same email", () => {
+        it("links to the existing user (no second account) when the provider verified the email", async () => {
+            const app = createApp();
+            const passwordUser = mockUser({ id: "pw-user-1", email: "existing@test.com", passwordHash: "salt:hash" });
+            mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(passwordUser);
+
+            const res = await app.request("/auth/google", json({ idToken: "link-token" }));
+
+            expect(res.status).toBe(200);
+            // The identity is attached to the pre-existing password account...
+            expect(mockAuthRepo.linkUserIdentity).toHaveBeenCalledWith(
+                passwordUser.id, "google", "g-456", expect.any(Object)
+            );
+            // ...and crucially, no duplicate user is created.
+            expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
+            const body = await res.json() as any;
+            expect(body.user.uid).toBe(passwordUser.id);
+        });
+
+        it("rejects with EMAIL_NOT_VERIFIED when the provider did not verify the email", async () => {
+            const app = createApp();
+            const passwordUser = mockUser({ id: "pw-user-1", email: "existing@test.com", passwordHash: "salt:hash" });
+            mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(passwordUser);
+
+            const res = await app.request("/auth/google", json({ idToken: "unverified-token" }));
+
+            expect(res.status).toBe(403);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("EMAIL_NOT_VERIFIED");
+            // No takeover, and no duplicate account as a consolation prize.
+            expect(mockAuthRepo.linkUserIdentity).not.toHaveBeenCalled();
+            expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("Google account + later email/password signup (reverse direction)", () => {
+        it("refuses to register a second account for an address Google already owns", async () => {
+            const app = createApp();
+            const googleUser = mockUser({ id: "g-user-1", email: "google@test.com", passwordHash: null });
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(googleUser);
+
+            const res = await app.request("/auth/register", json({
+                email: "google@test.com",
+                password: "SomePassword123!"
+            }));
+
+            expect(res.status).toBe(409);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("EMAIL_EXISTS");
+            expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
+        });
+
+        it("cannot add a password via change-password (no existing password to verify)", async () => {
+            const app = createApp();
+            const googleUser = mockUser({ id: "g-user-1", email: "google@test.com", passwordHash: null });
+            mockAuthRepo.getUserById.mockResolvedValue(googleUser);
+
+            const req = json({ oldPassword: "anything", newPassword: "NewPassword123!" });
+            const res = await app.request("/auth/change-password", {
+                ...req,
+                headers: { ...req.headers, ...authHeader(googleUser.id) }
+            });
+
+            // The supported route for a provider-only account to gain a
+            // password is forgot-password → reset-password, which re-proves
+            // ownership of the address via email.
+            expect(res.status).toBe(400);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("INVALID_ACCOUNT");
         });
     });
 
