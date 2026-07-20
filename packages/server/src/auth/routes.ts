@@ -818,7 +818,17 @@ message: "Email verified successfully" });
      * Refresh access token using refresh token
      */
     router.post("/refresh", async (c) => {
-        const body = await c.req.json();
+        // Cookie mode sends NO body: the refresh token lives in the httpOnly
+        // cookie, which is the entire point of it. Hono's `json()` throws
+        // "Unexpected end of JSON input" on an empty body, so parsing it
+        // unguarded turned every cookie-mode refresh into a 500 — and clients
+        // refresh on page load, so sessions never restored and users were
+        // signed out on every reload.
+        //
+        // `refreshToken` is already optional under cookieAuth and
+        // `readRefreshToken` already falls back to the cookie; this is only
+        // what makes that reachable.
+        const body = await c.req.json().catch(() => ({}));
         const parsed = parseBody(refreshSchema, body);
         const refreshToken = readRefreshToken(c, parsed, config.cookieAuth);
 
