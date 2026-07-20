@@ -95,8 +95,8 @@ driver: bareDriver }));
     it("grants an admin API key access to an admin surface", async () => {
         const res = await request(ADMIN_KEY_TOKEN);
         expect(res.status).toBe(200);
-        const body = await res.json() as { user: { userId: string; roles: string[] } };
-        expect(body.user.userId).toMatch(/^api-key:/);
+        const body = await res.json() as { user: { uid: string; roles: string[] } };
+        expect(body.user.uid).toMatch(/^api-key:/);
         expect(body.user.roles).toContain("admin");
         expect(body.user.roles).toContain("service");
     });
@@ -129,8 +129,8 @@ driver: bareDriver }));
     it("still accepts the service key", async () => {
         const res = await request(SERVICE_KEY);
         expect(res.status).toBe(200);
-        const body = await res.json() as { user: { userId: string } };
-        expect(body.user.userId).toBe("service");
+        const body = await res.json() as { user: { uid: string } };
+        expect(body.user.uid).toBe("service");
     });
 
     it("without pre-auth, an rk_ token is still rejected by the JWT gate", async () => {
@@ -460,7 +460,7 @@ describe("createDataRateLimiter with anonymous: null", () => {
         const app = new Hono<HonoEnv>();
         let asUser = false;
         app.use("/*", async (c, next) => {
-            if (asUser) c.set("user", { userId: "u1",
+            if (asUser) c.set("user", { uid: "u1",
 roles: [] });
             await next();
         });

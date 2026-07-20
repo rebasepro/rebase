@@ -44,7 +44,7 @@ export function mountMfaRoutes(
      * Start MFA enrollment: generate TOTP secret and recovery codes
      */
     router.post("/mfa/enroll", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -54,7 +54,7 @@ export function mountMfaRoutes(
         const issuer = typeof body.issuer === "string" ? body.issuer : emailConfig?.appName || "Rebase";
 
         // Get user for account name
-        const user = await authRepo.getUserById(userCtx.userId);
+        const user = await authRepo.getUserById(userCtx.uid);
         if (!user) {
             throw ApiError.notFound("User not found");
         }
@@ -99,7 +99,7 @@ export function mountMfaRoutes(
      * Verify TOTP code to complete MFA enrollment
      */
     router.post("/mfa/verify", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -112,7 +112,7 @@ export function mountMfaRoutes(
 
         // Get the factor
         const factor = await authRepo.getMfaFactorById(factorId);
-        if (!factor || factor.userId !== userCtx.userId) {
+        if (!factor || factor.userId !== userCtx.uid) {
             throw ApiError.notFound("MFA factor not found");
         }
 
@@ -143,7 +143,7 @@ export function mountMfaRoutes(
      * Create an MFA challenge during login (user has MFA enrolled)
      */
     router.post("/mfa/challenge", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -155,7 +155,7 @@ export function mountMfaRoutes(
 
         // Verify the factor belongs to this user and is verified
         const factor = await authRepo.getMfaFactorById(factorId);
-        if (!factor || factor.userId !== userCtx.userId) {
+        if (!factor || factor.userId !== userCtx.uid) {
             throw ApiError.notFound("MFA factor not found");
         }
 
@@ -178,7 +178,7 @@ export function mountMfaRoutes(
      * Verify a TOTP code for an active challenge, upgrade aal1 → aal2
      */
     router.post("/mfa/challenge/verify", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -197,7 +197,7 @@ export function mountMfaRoutes(
 
         // Get the factor and verify ownership
         const factor = await authRepo.getMfaFactorById(challenge.factorId);
-        if (!factor || factor.userId !== userCtx.userId) {
+        if (!factor || factor.userId !== userCtx.uid) {
             throw ApiError.notFound("MFA factor not found");
         }
 
@@ -209,7 +209,7 @@ export function mountMfaRoutes(
         // Fall back to recovery code verification if TOTP didn't match
         if (!isValid) {
             const codeHash = hashRecoveryCode(code);
-            isValid = await authRepo.useRecoveryCode(userCtx.userId, codeHash);
+            isValid = await authRepo.useRecoveryCode(userCtx.uid, codeHash);
         }
 
         if (!isValid) {
@@ -220,14 +220,14 @@ export function mountMfaRoutes(
         await authRepo.verifyMfaChallenge(challengeId);
 
         // Generate new access token with aal2
-        const roles = await authRepo.getUserRoles(userCtx.userId);
+        const roles = await authRepo.getUserRoles(userCtx.uid);
         const roleIds = roles.map((r) => r.id);
-        const accessToken = generateAccessToken(userCtx.userId, roleIds, "aal2");
+        const accessToken = generateAccessToken(userCtx.uid, roleIds, "aal2");
         const refreshToken = generateRefreshToken();
 
         // Create new refresh token
         await authRepo.createRefreshToken(
-            userCtx.userId,
+            userCtx.uid,
             hashRefreshToken(refreshToken),
             getRefreshTokenExpiry(),
             c.req.header("user-agent") || "unknown",
@@ -236,7 +236,7 @@ export function mountMfaRoutes(
 
         // Fire onMfaVerified hook
         if (ops.onMfaVerified) {
-            ops.onMfaVerified(userCtx.userId, factor.id).catch((err) => {
+            ops.onMfaVerified(userCtx.uid, factor.id).catch((err) => {
                 logger.error("[AuthHooks] onMfaVerified error", {
                     error: err instanceof Error ? err.message : err
                 });
@@ -251,7 +251,7 @@ export function mountMfaRoutes(
             }
         };
         if (applyTransformHook) {
-            mfaResponse = await applyTransformHook(mfaResponse, "mfa", c.req.raw, userCtx.userId);
+            mfaResponse = await applyTransformHook(mfaResponse, "mfa", c.req.raw, userCtx.uid);
         }
         return c.json(mfaResponse);
     });
@@ -261,12 +261,12 @@ export function mountMfaRoutes(
      * List enrolled MFA factors for the current user
      */
     router.get("/mfa/factors", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
 
-        const factors = await authRepo.getMfaFactors(userCtx.userId);
+        const factors = await authRepo.getMfaFactors(userCtx.uid);
         return c.json({
             factors: factors.map((f) => ({
                 id: f.id,
@@ -303,16 +303,16 @@ export function mountMfaRoutes(
 
         // Verify ownership
         const factor = await authRepo.getMfaFactorById(factorId);
-        if (!factor || factor.userId !== userCtx.userId) {
+        if (!factor || factor.userId !== userCtx.uid) {
             throw ApiError.notFound("MFA factor not found");
         }
 
-        await authRepo.deleteMfaFactor(factorId, userCtx.userId);
+        await authRepo.deleteMfaFactor(factorId, userCtx.uid);
 
         // If no more verified factors, clean up recovery codes
-        const hasFactors = await authRepo.hasVerifiedMfaFactors(userCtx.userId);
+        const hasFactors = await authRepo.hasVerifiedMfaFactors(userCtx.uid);
         if (!hasFactors) {
-            await authRepo.deleteAllRecoveryCodes(userCtx.userId);
+            await authRepo.deleteAllRecoveryCodes(userCtx.uid);
         }
 
         return c.json({

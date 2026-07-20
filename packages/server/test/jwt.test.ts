@@ -53,11 +53,11 @@ accessExpiresIn: "2h" });
                 .toThrow("JWT secret is too short");
         });
 
-        it("should include userId and roles in payload", () => {
+        it("should include uid and roles in payload", () => {
             const token = generateAccessToken("user-456", ["viewer"]);
             const payload = verifyAccessToken(token);
             expect(payload).toEqual({
-                userId: "user-456",
+                uid: "user-456",
                 roles: ["viewer"],
                 aal: "aal1"
             });
@@ -75,7 +75,7 @@ accessExpiresIn: "2h" });
             const token = generateAccessToken("user-123", ["admin"]);
             const payload = verifyAccessToken(token);
             expect(payload).toEqual({
-                userId: "user-123",
+                uid: "user-123",
                 roles: ["admin"],
                 aal: "aal1"
             });
@@ -304,7 +304,7 @@ accessExpiresIn: "1s" });
 
             // We can't easily wait for expiry in a unit test,
             // but we can verify the token structure is correct
-            expect(payload!.userId).toBe("user-1");
+            expect(payload!.uid).toBe("user-1");
             expect(payload!.roles).toEqual(["admin"]);
         });
     });
@@ -315,21 +315,21 @@ accessExpiresIn: "1s" });
             const roles = ["admin", "editor", "viewer", "moderator"];
             const token = generateAccessToken("user-multi", roles);
             const payload = verifyAccessToken(token);
-            expect(payload!.userId).toBe("user-multi");
+            expect(payload!.uid).toBe("user-multi");
             expect(payload!.roles).toEqual(roles);
         });
 
-        it("should handle special characters in userId", () => {
+        it("should handle special characters in uid", () => {
             const token = generateAccessToken("user@example.com", ["admin"]);
             const payload = verifyAccessToken(token);
-            expect(payload!.userId).toBe("user@example.com");
+            expect(payload!.uid).toBe("user@example.com");
         });
 
-        it("should handle UUID-style userId", () => {
+        it("should handle UUID-style uid", () => {
             const uuid = "550e8400-e29b-41d4-a716-446655440000";
             const token = generateAccessToken(uuid, []);
             const payload = verifyAccessToken(token);
-            expect(payload!.userId).toBe(uuid);
+            expect(payload!.uid).toBe(uuid);
         });
     });
 

@@ -27,7 +27,7 @@ interface WsAuthConfig {
  * Normalized user identity for WebSocket sessions.
  */
 interface WsUserIdentity {
-    userId: string;
+    uid: string;
     roles: string[];
     isAdmin: boolean;
 }
@@ -183,7 +183,7 @@ code } }
 
                             if (adapterUser) {
                                 verifiedUser = {
-                                    userId: adapterUser.uid,
+                                    uid: adapterUser.uid,
                                     roles: adapterUser.roles,
                                     isAdmin: adapterUser.isAdmin
                                 };
@@ -195,13 +195,13 @@ code } }
                         // Service key: a static secret, not a JWT. Checked
                         // before verification, mirroring the HTTP middleware —
                         // verifying it as a JWT can only ever fail.
-                        verifiedUser = { userId: "service", roles: ["admin"], isAdmin: true };
+                        verifiedUser = { uid: "service", roles: ["admin"], isAdmin: true };
                     } else {
                         // Standard JWT path
                         const jwtPayload = extractUserFromToken(token);
                         if (jwtPayload) {
                             verifiedUser = {
-                                userId: jwtPayload.userId,
+                                uid: jwtPayload.uid,
                                 roles: jwtPayload.roles ?? [],
                                 isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin")
                             };
@@ -218,10 +218,10 @@ code } }
                         ws.send(JSON.stringify({
                             type: "AUTH_SUCCESS",
                             requestId,
-                            payload: { userId: verifiedUser.userId,
+                            payload: { uid: verifiedUser.uid,
 roles: verifiedUser.roles }
                         }));
-                        wsDebug(`🔐 [WebSocket Server] Client ${clientId} authenticated as ${verifiedUser.userId}`);
+                        wsDebug(`🔐 [WebSocket Server] Client ${clientId} authenticated as ${verifiedUser.uid}`);
                     } else {
                         wsDebug(`[WS] replying AUTH_ERROR for requestId ${requestId} (invalid token)`);
                         sendError("AUTH_ERROR", "INVALID_TOKEN", "Invalid or expired token");
@@ -272,7 +272,7 @@ roles: verifiedUser.roles }
                         try {
                             const userForAuth: User = session?.user
                                 ? {
-                                    uid: session.user.userId,
+                                    uid: session.user.uid,
                                     displayName: null,
                                     email: null,
                                     photoURL: null,
@@ -421,7 +421,7 @@ colors: true }));
                                 sql: typeof sql === "string" ? sql.substring(0, 500) : sql,
                                 options,
                                 resultRows: Array.isArray(result) ? result.length : "unknown",
-                                userId: auditSession?.user?.userId ?? "unknown",
+                                uid: auditSession?.user?.uid ?? "unknown",
                                 roles: auditSession?.user?.roles ?? [],
                                 isAdmin: auditSession?.user?.isAdmin ?? false,
                             }));
@@ -618,9 +618,9 @@ colors: true }));
                         // Attach auth context from the WS session so RLS-aware refetches work
                         const session = clientSessions.get(clientId);
                         const authContext = session?.user
-                            ? { userId: session.user.userId,
+                            ? { uid: session.user.uid,
 roles: session.user.roles ?? [] }
-                            : { userId: "anon",
+                            : { uid: "anon",
 roles: ["anon"] };
                         // Let RealtimeService handle these messages
                         await realtimeService.handleClientMessage(clientId, {

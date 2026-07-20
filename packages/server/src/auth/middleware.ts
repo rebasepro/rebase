@@ -12,7 +12,7 @@ import { logger } from "../utils/logger";
  * Result from a custom auth validator.
  * - `false`/`null`/`undefined` = not authenticated
  * - `true` = authenticated as default user
- * - object with `userId` or `uid` = authenticated with user info
+ * - object with `uid` (or legacy `userId`) = authenticated with user info
  */
 export type AuthResult = boolean | null | undefined | { userId?: string; uid?: string; roles?: string[]; [key: string]: unknown };
 
@@ -142,7 +142,7 @@ export function createRequireAuth(options?: { serviceKey?: string }): Middleware
 
         // Check service key first (constant-time comparison)
         if (safeCompare(token, key)) {
-            c.set("user", { userId: "service",
+            c.set("user", { uid: "service",
 roles: ["admin"] } as AccessTokenPayload);
             return next();
         }
@@ -265,11 +265,15 @@ export function createAuthMiddleware(options: AuthMiddlewareOptions): Middleware
             try {
                 const authResult = await validator(c);
                 if (authResult && typeof authResult === "object") {
-                    const id = ("userId" in authResult ? authResult.userId : undefined)
-                        || ("uid" in authResult ? authResult.uid : undefined);
+                    // `uid` first: it is the spelling everything else uses. A
+                    // custom validator written against the older `userId` shape
+                    // still works — this is a user-supplied extension point, so
+                    // it stays tolerant of both rather than breaking on rename.
+                    const id = ("uid" in authResult ? authResult.uid : undefined)
+                        || ("userId" in authResult ? authResult.userId : undefined);
                     if (id) {
                         const roles = authResult.roles || [];
-                        c.set("user", { userId: id,
+                        c.set("user", { uid: id,
 roles });
                         const user = { uid: id,
 roles,
@@ -281,7 +285,7 @@ roles,
 roles: ["anon"] }));
                     }
                 } else if (authResult === true) {
-                    c.set("user", { userId: "default",
+                    c.set("user", { uid: "default",
 roles: [] });
                     c.set("driver", await scopeDataDriver(driver, { uid: "default",
 roles: [] }));
@@ -310,7 +314,7 @@ code: "UNAUTHORIZED" } }, 401);
                 // for scripts, cron jobs, and server-to-server calls.
                 if (serviceKey && safeCompare(token, serviceKey)) {
                     const serviceUser: AccessTokenPayload = {
-                        userId: "service",
+                        uid: "service",
                         roles: ["admin"]
                     };
                     c.set("user", serviceUser);
@@ -342,7 +346,7 @@ code: "INTERNAL_ERROR" } }, 500);
                     if (payload) {
                         c.set("user", payload);
                         try {
-                            const user = { uid: payload.userId,
+                            const user = { uid: payload.uid,
 roles: payload.roles };
                             c.set("driver", await scopeDataDriver(driver, user));
                         } catch (error) {
@@ -443,7 +447,7 @@ export const publicObjectAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     const rawPath = idx < 0 ? "" : fullPath.substring(idx + prefix.length + 1);
 
     if (rawPath && isPublicStoragePath(decodeURIComponent(rawPath))) {
-        c.set("user", { userId: "public", roles: ["public"] });
+        c.set("user", { uid: "public", roles: ["public"] });
     }
 
     return next();
@@ -526,7 +530,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
                 const requestedFullPath = `${bucket}/${resolvedPath}`;
 
                 if (isPathMatch(requestedFullPath, payload.path)) {
-                    c.set("user", { userId: "download-token", roles: ["reader"] });
+                    c.set("user", { uid: "download-token", roles: ["reader"] });
                     return next();
                 } else {
                     return c.json({ error: { message: "Forbidden: Scoped token path mismatch", code: "FORBIDDEN" } }, 403);
@@ -555,7 +559,7 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
                 const requestedFullPath = `${bucket}/${resolvedPath}`;
 
                 if (isPathMatch(requestedFullPath, payload.path)) {
-                    c.set("user", { userId: "download-token", roles: ["reader"] });
+                    c.set("user", { uid: "download-token", roles: ["reader"] });
                     return next();
                 } else {
                     return c.json({ error: { message: "Forbidden: Scoped token path mismatch", code: "FORBIDDEN" } }, 403);

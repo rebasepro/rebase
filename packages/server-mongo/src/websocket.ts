@@ -110,7 +110,7 @@ code } } }));
                         }
                         ws.send(JSON.stringify({ type: "AUTH_SUCCESS",
 requestId,
-payload: { userId: user.userId,
+payload: { uid: user.uid,
 roles: user.roles } }));
                     } else {
                         sendError("AUTH_ERROR", "INVALID_TOKEN", "Invalid or expired token");
@@ -155,7 +155,7 @@ roles: user.roles } }));
                     if (session?.user && isDriverWithAuth(driver)) {
                         try {
                             const userForAuth: User = {
-                                uid: session.user.userId,
+                                uid: session.user.uid,
                                 email: session.user.email ?? "",
                                 displayName: session.user.displayName ?? "",
                                 photoURL: session.user.photoURL ?? "",
@@ -273,7 +273,7 @@ requestId }));
                     case "subscribe_one":
                     case "unsubscribe": {
                         const session = clientSessions.get(clientId);
-                        const authContext = session?.user ? { userId: session.user.userId,
+                        const authContext = session?.user ? { uid: session.user.uid,
 roles: session.user.roles ?? [] } : undefined;
                         await realtimeService.handleClientMessage(clientId, {
                             type,

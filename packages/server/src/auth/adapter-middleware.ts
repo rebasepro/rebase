@@ -77,7 +77,7 @@ code: "UNAUTHORIZED" } }, 401);
         if (authenticatedUser) {
             // Authenticated — set user context and scope driver
             c.set("user", {
-                userId: authenticatedUser.uid,
+                uid: authenticatedUser.uid,
                 email: authenticatedUser.email,
                 roles: authenticatedUser.roles
             });

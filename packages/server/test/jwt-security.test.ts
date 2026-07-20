@@ -51,10 +51,10 @@ refreshExpiresIn: "30d" });
             expect(token.split(".")).toHaveLength(3);
         });
 
-        it("embeds userId and roles in payload", () => {
+        it("embeds uid and roles in payload", () => {
             const token = generateAccessToken("user-42", ["admin", "editor"]);
             const payload = verifyAccessToken(token);
-            expect(payload?.userId).toBe("user-42");
+            expect(payload?.uid).toBe("user-42");
             expect(payload?.roles).toEqual(["admin", "editor"]);
         });
 
@@ -80,7 +80,7 @@ writable: true });
             const token = generateAccessToken("user-1", ["editor"]);
             const payload = verifyAccessToken(token);
             expect(payload).not.toBeNull();
-            expect(payload!.userId).toBe("user-1");
+            expect(payload!.uid).toBe("user-1");
         });
 
         it("returns null for tampered token", () => {

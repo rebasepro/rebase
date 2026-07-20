@@ -85,7 +85,7 @@ export type StorageOperation = "read" | "write" | "delete" | "list";
 
 /** The caller, as resolved by whichever auth middleware ran. */
 export interface StorageAuthorizeUser {
-    userId: string;
+    uid: string;
     email?: string;
     roles?: string[];
 }

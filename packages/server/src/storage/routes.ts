@@ -137,7 +137,7 @@ function buildAdapterAuthMiddleware(
 
             if (authenticatedUser) {
                 c.set("user", {
-                    userId: authenticatedUser.uid,
+                    uid: authenticatedUser.uid,
                     email: authenticatedUser.email,
                     roles: authenticatedUser.roles
                 });
@@ -180,7 +180,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
      * fall open.
      */
     const checkAuthorized = async (
-        c: { get: (k: "user") => { userId: string; email?: string; roles?: string[] } | undefined },
+        c: { get: (k: "user") => { uid: string; email?: string; roles?: string[] } | undefined },
         operation: StorageOperation,
         key: string,
         bucket: string,
@@ -197,7 +197,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // answer, and would break every <img> the client already renders.
         // Public paths are declared public, so they are equally not the hook's
         // business.
-        if (user?.userId === "download-token" || user?.userId === "public") return;
+        if (user?.uid === "download-token" || user?.uid === "public") return;
 
         let allowed: boolean;
         try {

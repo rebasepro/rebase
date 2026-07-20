@@ -26,7 +26,7 @@ const PG_NOTIFY_CHANNEL = "rebase_entity_changes";
  * Mirrors the session variables set by PostgresBackendDriver.withAuth().
  */
 export interface SubscriptionAuthContext {
-    userId: string;
+    uid: string;
     roles: string[];
 }
 
@@ -701,10 +701,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
             // Refetches are reads: apply the same GUCs + reader-role downgrade as the
             // driver's read path, so realtime cannot leak rows the initial fetch hid.
-            const activeAuth = authContext || { userId: "anon",
+            const activeAuth = authContext || { uid: "anon",
 roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
-                await applyAuthContext(tx, { userId: activeAuth.userId, roles: activeAuth.roles }, this.rlsUserRole);
+                await applyAuthContext(tx, { uid: activeAuth.uid, roles: activeAuth.roles }, this.rlsUserRole);
                 const txEntityService = new DataService(tx, this.registry);
                 let fetchedEntities;
                 if (collectionRequest.searchString) {
@@ -743,7 +743,7 @@ roles: ["anon"] };
 
                 if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
                     const contextForCallback = {
-                        user: { uid: activeAuth.userId,
+                        user: { uid: activeAuth.uid,
 roles: activeAuth.roles },
                         driver: this.driver,
                         data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined
@@ -881,10 +881,10 @@ roles: activeAuth.roles },
 
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
             // Same read isolation as collection refetches: GUCs + reader-role downgrade.
-            const activeAuth = authContext || { userId: "anon",
+            const activeAuth = authContext || { uid: "anon",
 roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
-                await applyAuthContext(tx, { userId: activeAuth.userId, roles: activeAuth.roles }, this.rlsUserRole);
+                await applyAuthContext(tx, { uid: activeAuth.uid, roles: activeAuth.roles }, this.rlsUserRole);
                 const txEntityService = new DataService(tx, this.registry);
                 let processedEntity = await txEntityService.fetchOne(notifyPath, id, collection?.databaseId);
 
@@ -899,7 +899,7 @@ roles: ["anon"] };
 
                     if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
                         const contextForCallback = {
-                            user: { uid: activeAuth.userId,
+                            user: { uid: activeAuth.uid,
 roles: activeAuth.roles },
                             driver: this.driver,
                             data: (this.driver && "data" in this.driver) ? (this.driver as DataDriverWithData).data : undefined

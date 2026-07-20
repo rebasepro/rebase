@@ -9,9 +9,14 @@ export interface JwtConfig {
 }
 
 export interface AccessTokenPayload {
-    userId: string;
+    /**
+     * The user's id — the same spelling the domain model, the auth adapters and
+     * the RLS layer (`auth.uid()`) all use. Tokens minted before this rename
+     * carry `userId` instead, and older external IdPs may send `sub`;
+     * {@link verifyAccessToken} accepts all three and normalises to this.
+     */
+    uid: string;
     roles: string[];
-    uid?: string;
     /** Authentication Assurance Level: aal1 = password/oauth, aal2 = MFA verified */
     aal?: "aal1" | "aal2";
     /** Email claim from the JWT, if present */
@@ -84,7 +89,7 @@ export function configureJwt(config: JwtConfig): void {
  * Generate an access token (short-lived, 1 hour by default)
  */
 export function generateAccessToken(
-    userId: string,
+    uid: string,
     roles: string[],
     aal: "aal1" | "aal2" = "aal1",
     customClaims?: Record<string, unknown>
@@ -94,7 +99,7 @@ export function generateAccessToken(
     }
 
     const payload: Record<string, unknown> = {
-        userId,
+        uid,
         roles,
         aal,
         ...customClaims
@@ -162,7 +167,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
             logger.error("[JWT] Verification failed: a purpose-scoped token is not an access token", { purpose: decoded.purpose });
             return null;
         }
-        const id = decoded.userId || decoded.uid || decoded.sub;
+        const id = decoded.uid || decoded.userId || decoded.sub;
         if (!id) {
             logger.error("[JWT] Verification failed: missing id in payload", { detail: decoded });
             return null;
@@ -171,7 +176,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
         const aal = (decoded.aal === "aal1" || decoded.aal === "aal2") ? decoded.aal : "aal1";
 
         return {
-            userId: id,
+            uid: id,
             roles: decoded.roles || [],
             aal
         };

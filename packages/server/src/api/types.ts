@@ -9,7 +9,7 @@ import type { ApiKeyMasked } from "../auth/api-keys/api-key-types";
  */
 export type HonoEnv = {
     Variables: {
-        user?: AuthResult | { userId?: string, roles?: string[] };
+        user?: AuthResult | { uid?: string, roles?: string[] };
         driver?: DataDriver;
         /** Set when the request is authenticated via a Service API Key. */
         apiKey?: ApiKeyMasked;

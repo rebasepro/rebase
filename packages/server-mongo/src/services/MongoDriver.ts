@@ -781,7 +781,7 @@ export class AuthenticatedMongoDriver implements DataDriver {
 
     listenCollection<M extends Record<string, any>>(props: ListenCollectionProps<M>): () => void {
         const unsubscribe = this.delegate.listenCollection(props);
-        const authContext = { userId: this.user.uid,
+        const authContext = { uid: this.user.uid,
 roles: this.user.roles ?? [] };
         const subscriptions = this.delegate.getRealtimeService().getSubscriptions();
         const lastEntry = Array.from(subscriptions.entries()).pop();
@@ -806,7 +806,7 @@ roles: this.user.roles ?? [] };
 
     listenOne<M extends Record<string, any>>(props: ListenOneProps<M>): () => void {
         const unsubscribe = this.delegate.listenOne(props);
-        const authContext = { userId: this.user.uid,
+        const authContext = { uid: this.user.uid,
 roles: this.user.roles ?? [] };
         const subscriptions = this.delegate.getRealtimeService().getSubscriptions();
         const lastEntry = Array.from(subscriptions.entries()).pop();

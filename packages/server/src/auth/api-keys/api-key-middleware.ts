@@ -97,9 +97,9 @@ code: "UNAUTHORIZED" }
     }
 
     // Set user identity — API keys represent service accounts
-    const userId = `api-key:${apiKey.id}`;
+    const uid = `api-key:${apiKey.id}`;
     const roles: string[] = apiKey.admin ? ["admin", "service"] : ["service"];
-    c.set("user", { userId,
+    c.set("user", { uid,
 roles });
 
     // Expose masked key metadata for downstream permission checks
@@ -126,7 +126,7 @@ roles });
     // bound by whatever the collection policies grant the "service" role.
     try {
         const scopedDriver = await scopeDataDriver(driver, {
-            uid: userId,
+            uid,
             roles
         });
         c.set("driver", scopedDriver);

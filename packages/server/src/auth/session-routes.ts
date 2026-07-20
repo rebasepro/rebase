@@ -85,7 +85,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             const { verifyAccessToken } = await import("./jwt");
             const payload = verifyAccessToken(authHeader.substring(7));
             if (payload) {
-                ops.afterLogout(payload.userId).catch((err: unknown) => {
+                ops.afterLogout(payload.uid).catch((err: unknown) => {
                     logger.error("[AuthHooks] afterLogout error", {
                         error: err instanceof Error ? err.message : err
                     });
@@ -101,7 +101,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Get active refresh tokens (sessions) for the current user
      */
     router.get("/sessions", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -109,7 +109,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const currentRefreshToken = c.req.header("x-refresh-token") as string;
         const currentTokenHash = currentRefreshToken ? hashRefreshToken(currentRefreshToken) : null;
 
-        const sessions = await authRepo.listRefreshTokensForUser(userCtx.userId);
+        const sessions = await authRepo.listRefreshTokensForUser(userCtx.uid);
 
         const mappedSessions = sessions.map((s) => ({
             id: s.id,
@@ -127,12 +127,12 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Delete all refresh tokens for the current user (remote logout every device)
      */
     router.delete("/sessions", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
 
-        await authRepo.deleteAllRefreshTokensForUser(userCtx.userId);
+        await authRepo.deleteAllRefreshTokensForUser(userCtx.uid);
         return c.json({
             success: true,
             message: "All sessions revoked successfully"
@@ -144,7 +144,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Delete a specific refresh token (remote logout)
      */
     router.delete("/sessions/:id", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -154,7 +154,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             throw ApiError.badRequest("Session ID is required", "INVALID_INPUT");
         }
 
-        await authRepo.deleteRefreshTokenById(id, userCtx.userId);
+        await authRepo.deleteRefreshTokenById(id, userCtx.uid);
         return c.json({
             success: true,
             message: "Session revoked successfully"
@@ -166,12 +166,12 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Get current authenticated user
      */
     router.get("/me", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
 
-        const result = await authRepo.getUserWithRoles(userCtx.userId);
+        const result = await authRepo.getUserWithRoles(userCtx.uid);
         if (!result) {
             throw ApiError.notFound("User not found");
         }
@@ -201,7 +201,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      */
     if (config.allowUserLookup) {
         router.post("/find-user", defaultAuthLimiter, requireAuth, async (c) => {
-            const userCtx = c.get("user") as { userId: string } | undefined;
+            const userCtx = c.get("user") as { uid: string } | undefined;
             if (!userCtx) {
                 throw ApiError.unauthorized("Not authenticated");
             }
@@ -220,14 +220,14 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Update current authenticated user profile
      */
     router.patch("/me", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
 
         const { displayName, photoURL } = parseBody(updateProfileSchema, await c.req.json());
 
-        const updatedUser = await authRepo.updateUser(userCtx.userId, {
+        const updatedUser = await authRepo.updateUser(userCtx.uid, {
             displayName: displayName !== undefined ? displayName : undefined,
             photoUrl: photoURL !== undefined ? photoURL : undefined
         });
@@ -236,7 +236,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             throw ApiError.notFound("User not found");
         }
 
-        const result = await authRepo.getUserWithRoles(userCtx.userId);
+        const result = await authRepo.getUserWithRoles(userCtx.uid);
         if (!result) {
             throw ApiError.notFound("User not found");
         }
@@ -340,12 +340,12 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Upgrade an anonymous user to a permanent account with email/password
      */
     router.post("/anonymous/link", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
 
-        const user = await authRepo.getUserById(userCtx.userId);
+        const user = await authRepo.getUserById(userCtx.uid);
         if (!user?.isAnonymous) {
             throw ApiError.badRequest("User is not anonymous", "NOT_ANONYMOUS");
         }

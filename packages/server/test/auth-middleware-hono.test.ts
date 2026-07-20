@@ -34,7 +34,7 @@ accessExpiresIn: "1h" });
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
-            expect(body.user.userId).toBe("user-1");
+            expect(body.user.uid).toBe("user-1");
             expect(body.user.roles).toEqual(["admin"]);
         });
 
@@ -76,7 +76,7 @@ accessExpiresIn: "1h" });
             const res = await app.request(`/protected/resource?token=${token}`);
             expect(res.status).toBe(200);
             const body = await res.json() as any;
-            expect(body.user.userId).toBe("user-2");
+            expect(body.user.uid).toBe("user-2");
         });
 
         it("prefers Bearer token over query parameter", async () => {
@@ -94,7 +94,7 @@ accessExpiresIn: "1h" });
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
-            expect(body.user.userId).toBe("bearer-user");
+            expect(body.user.uid).toBe("bearer-user");
         });
     });
 
@@ -168,7 +168,7 @@ user: user ?? null });
             const body = await res.json() as any;
             expect(res.status).toBe(200);
             expect(body.authenticated).toBe(true);
-            expect(body.user.userId).toBe("opt-user");
+            expect(body.user.uid).toBe("opt-user");
         });
 
         it("proceeds without user when no token", async () => {
@@ -258,7 +258,7 @@ requireAuth: false }));
                 headers: { Authorization: `Bearer ${token}` }
             });
             const body = await res.json() as any;
-            expect(body.user.userId).toBe("jwt-user");
+            expect(body.user.uid).toBe("jwt-user");
             expect(body.user.roles).toEqual(["admin"]);
         });
 
@@ -283,7 +283,7 @@ requireAuth: false }));
                 validator: async (c: Context<HonoEnv>) => {
                     const apiKey = c.req.header("x-api-key");
                     if (apiKey === "valid-key") {
-                        return { userId: "api-user",
+                        return { uid: "api-user",
 roles: ["api"] };
                     }
                     return false;
@@ -299,7 +299,7 @@ roles: ["api"] };
                 headers: { "x-api-key": "valid-key" }
             });
             const body = await res.json() as any;
-            expect(body.user.userId).toBe("api-user");
+            expect(body.user.uid).toBe("api-user");
 
             // Invalid API key — requireAuth not set, defaults to true,
             // so unauthenticated requests are rejected
@@ -362,7 +362,7 @@ roles: ["editor"] })
 
             const res = await app.request("/test");
             const body = await res.json() as any;
-            expect(body.user.userId).toBe("default");
+            expect(body.user.uid).toBe("default");
         });
     });
 
@@ -392,7 +392,7 @@ roles: ["editor"] })
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
-            expect(body.user.userId).toBe("service");
+            expect(body.user.uid).toBe("service");
             expect(body.user.roles).toEqual(["admin"]);
         });
 
@@ -430,7 +430,7 @@ roles: ["editor"] })
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
-            expect(body.user.userId).toBe("jwt-user");
+            expect(body.user.uid).toBe("jwt-user");
             expect(body.user.roles).toEqual(["editor"]);
         });
 
@@ -498,7 +498,7 @@ roles: ["admin"] })
             app.use("/*", createRequireAuth({ serviceKey: SERVICE_KEY }));
             app.get("/admin/users", (c) => {
                 const user = c.get("user");
-                return c.json({ userId: user?.userId,
+                return c.json({ uid: user?.uid,
 roles: user?.roles });
             });
 
@@ -507,7 +507,7 @@ roles: user?.roles });
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
-            expect(body.userId).toBe("service");
+            expect(body.uid).toBe("service");
             expect(body.roles).toEqual(["admin"]);
         });
 
@@ -528,7 +528,7 @@ roles: user?.roles });
             app.use("/*", createRequireAuth({ serviceKey: SERVICE_KEY }));
             app.get("/admin/users", (c) => {
                 const user = c.get("user");
-                return c.json({ userId: user?.userId,
+                return c.json({ uid: user?.uid,
 roles: user?.roles });
             });
 
@@ -537,7 +537,7 @@ roles: user?.roles });
             });
             expect(res.status).toBe(200);
             const body = await res.json() as any;
-            expect(body.userId).toBe("user-123");
+            expect(body.uid).toBe("user-123");
             expect(body.roles).toEqual(["admin"]);
         });
 

@@ -42,7 +42,7 @@ describe("createDataRateLimiter", () => {
         app.fetch(new Request("http://localhost/data", { headers: { "x-real-ip": ip } }));
 
     it("limits a signed-in user, which nothing did before", async () => {
-        const app = appWith((c) => c.set("user", { userId: "user-1" }), { user: 2 });
+        const app = appWith((c) => c.set("user", { uid: "user-1" }), { user: 2 });
 
         expect((await hit(app)).status).toBe(200);
         expect((await hit(app)).status).toBe(200);
@@ -55,8 +55,8 @@ code: "RATE_LIMITED" } });
     });
 
     it("gives each user their own allowance", async () => {
-        const appA = appWith((c) => c.set("user", { userId: "user-a" }), { user: 1 });
-        const appB = appWith((c) => c.set("user", { userId: "user-b" }), { user: 1 });
+        const appA = appWith((c) => c.set("user", { uid: "user-a" }), { user: 1 });
+        const appB = appWith((c) => c.set("user", { uid: "user-b" }), { user: 1 });
 
         expect((await hit(appA)).status).toBe(200);
         expect((await hit(appA)).status).toBe(429);
@@ -77,7 +77,7 @@ code: "RATE_LIMITED" } });
         // The auth middleware scopes unauthenticated requests as `anon` so RLS
         // can evaluate them — all of them, so they must not share one bucket
         // and they must not be counted as a signed-in user.
-        const app = appWith((c) => c.set("user", { userId: "anon" }), { anonymous: 1,
+        const app = appWith((c) => c.set("user", { uid: "anon" }), { anonymous: 1,
 user: 100 });
 
         expect((await hit(app, "7.7.7.7")).status).toBe(200);
@@ -105,7 +105,7 @@ rate_limit: null }), { apiKey: 1 });
         const app = appWith((c) => {
             c.set("apiKey", { id: "key-3",
 rate_limit: 1 });
-            c.set("user", { userId: "user-1" });
+            c.set("user", { uid: "user-1" });
         }, { user: 100 });
 
         expect((await hit(app)).status).toBe(200);
@@ -114,7 +114,7 @@ rate_limit: 1 });
     });
 
     it("reports what is left", async () => {
-        const app = appWith((c) => c.set("user", { userId: "user-h" }), { user: 5 });
+        const app = appWith((c) => c.set("user", { uid: "user-h" }), { user: 5 });
 
         const res = await hit(app);
         expect(res.headers.get("X-RateLimit-Limit")).toBe("5");

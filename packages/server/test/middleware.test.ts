@@ -66,7 +66,7 @@ describe("Auth Middleware", () => {
 
             expect(nextFn).toHaveBeenCalled();
             expect(getUser()).toEqual({
-                userId: "user-123",
+                uid: "user-123",
                 roles: ["admin", "editor"],
                 aal: "aal1"
             });
@@ -156,7 +156,7 @@ describe("Auth Middleware", () => {
 
             expect(nextFn).toHaveBeenCalled();
             expect(getUser()).toEqual({
-                userId: "user-123",
+                uid: "user-123",
                 roles: ["viewer"],
                 aal: "aal1"
             });
@@ -188,7 +188,7 @@ describe("Auth Middleware", () => {
 
             expect(nextFn).toHaveBeenCalled();
             expect(getUser()).toEqual({
-                userId: "user-456",
+                uid: "user-456",
                 roles: ["viewer"],
                 aal: "aal1"
             });
@@ -239,7 +239,7 @@ describe("Auth Middleware", () => {
         });
 
         it("should return 403 if user has no roles array", async () => {
-            const { c, getStatus } = createMockContext({ user: { userId: "user-123" } });
+            const { c, getStatus } = createMockContext({ user: { uid: "user-123" } });
 
             await requireAdmin(c, nextFn);
 
@@ -248,7 +248,7 @@ describe("Auth Middleware", () => {
         });
 
         it("should return 403 if user has empty roles array", async () => {
-            const { c, getStatus } = createMockContext({ user: { userId: "user-123",
+            const { c, getStatus } = createMockContext({ user: { uid: "user-123",
 roles: [] } });
 
             await requireAdmin(c, nextFn);
@@ -258,7 +258,7 @@ roles: [] } });
         });
 
         it("should return 403 if user has standard roles (forbidden)", async () => {
-            const { c, getStatus } = createMockContext({ user: { userId: "user-123",
+            const { c, getStatus } = createMockContext({ user: { uid: "user-123",
 roles: ["editor", "viewer"] } });
 
             await requireAdmin(c, nextFn);
@@ -268,7 +268,7 @@ roles: ["editor", "viewer"] } });
         });
 
         it("should allow access if user has 'admin' role", async () => {
-            const { c, getStatus } = createMockContext({ user: { userId: "user-123",
+            const { c, getStatus } = createMockContext({ user: { uid: "user-123",
 roles: ["editor", "admin"] } });
 
             await requireAdmin(c, nextFn);
@@ -278,7 +278,7 @@ roles: ["editor", "admin"] } });
         });
 
         it("should allow access if user has 'schema-admin' role", async () => {
-            const { c } = createMockContext({ user: { userId: "user-123",
+            const { c } = createMockContext({ user: { uid: "user-123",
 roles: ["schema-admin"] } });
 
             await requireAdmin(c, nextFn);
@@ -287,7 +287,7 @@ roles: ["schema-admin"] } });
         });
 
         it("should block access for malformed spoofed string roles", async () => {
-            const { c, getStatus } = createMockContext({ user: { userId: "user-123",
+            const { c, getStatus } = createMockContext({ user: { uid: "user-123",
 roles: ["schema-adminstration", "admins", "admin "] } });
 
             await requireAdmin(c, nextFn);
@@ -303,7 +303,7 @@ roles: ["schema-adminstration", "admins", "admin "] } });
             const payload = extractUserFromToken(token);
 
             expect(payload).toEqual({
-                userId: "ws-user-123",
+                uid: "ws-user-123",
                 roles: ["admin"],
                 aal: "aal1"
             });
@@ -324,7 +324,7 @@ roles: ["schema-adminstration", "admins", "admin "] } });
             const payload = extractUserFromToken(token);
 
             expect(payload).toEqual({
-                userId: "user-no-roles",
+                uid: "user-no-roles",
                 roles: [],
                 aal: "aal1"
             });

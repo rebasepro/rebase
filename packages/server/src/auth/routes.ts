@@ -548,7 +548,7 @@ displayName: user.displayName });
              * is irrelevant.
              */
             router.post(`/link/${provider.id}`, defaultAuthLimiter, requireAuth, async (c) => {
-                const userCtx = c.get("user") as { userId: string } | undefined;
+                const userCtx = c.get("user") as { uid: string } | undefined;
                 if (!userCtx) {
                     throw ApiError.unauthorized("Not authenticated");
                 }
@@ -570,7 +570,7 @@ displayName: user.displayName });
                 // else — one provider identity must resolve to exactly one
                 // user, or the sign-in lookup above becomes ambiguous.
                 const identityOwner = await authRepo.getUserByIdentity(provider.id, externalUser.providerId);
-                if (identityOwner && identityOwner.id !== userCtx.userId) {
+                if (identityOwner && identityOwner.id !== userCtx.uid) {
                     throw ApiError.conflict(
                         `That ${provider.id} account is already linked to a different user.`,
                         "IDENTITY_ALREADY_LINKED"
@@ -582,7 +582,7 @@ displayName: user.displayName });
                 }
 
                 await authRepo.linkUserIdentity(
-                    userCtx.userId,
+                    userCtx.uid,
                     provider.id,
                     externalUser.providerId,
                     { email: externalUser.email }
@@ -698,7 +698,7 @@ message: "Password has been reset successfully" });
      * Change password for authenticated user
      */
     router.post("/change-password", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -706,7 +706,7 @@ message: "Password has been reset successfully" });
         const { oldPassword, newPassword } = parseBody(changePasswordSchema, await c.req.json());
 
         // Get user
-        const user = await authRepo.getUserById(userCtx.userId);
+        const user = await authRepo.getUserById(userCtx.uid);
         if (!user || !user.passwordHash) {
             throw ApiError.badRequest("Cannot change password for this account", "INVALID_ACCOUNT");
         }
@@ -739,7 +739,7 @@ message: "Password has been changed successfully" });
      * Send email verification link (authenticated)
      */
     router.post("/send-verification", requireAuth, async (c) => {
-        const userCtx = c.get("user") as { userId: string; roles?: string[] } | undefined;
+        const userCtx = c.get("user") as { uid: string; roles?: string[] } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
         }
@@ -749,7 +749,7 @@ message: "Password has been changed successfully" });
             throw ApiError.serviceUnavailable("Email service not configured. Email verification is not available.", "EMAIL_NOT_CONFIGURED");
         }
 
-        const user = await authRepo.getUserById(userCtx.userId);
+        const user = await authRepo.getUserById(userCtx.uid);
         if (!user) {
             throw ApiError.notFound("User not found");
         }
