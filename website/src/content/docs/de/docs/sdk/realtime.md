@@ -190,6 +190,62 @@ await channel.leave();
 
 Kanäle sind leichtgewichtig und ephemer — sie existieren, solange mindestens ein Client abonniert ist.
 
+> **Standardmäßig werden Broadcasts nicht wiederholt.** Sie erreichen nur die aktuell verbundenen Mitglieder. Genau das will man für Benachrichtigungen, die sich selbst korrigieren — ein «jemand hat gespeichert»-Hinweis wird vom nächsten Speichern abgelöst — und es kostet nichts. Für einen Operationsstrom, bei dem eine stille Lücke zu Divergenz führt, aktivieren Sie den [Nachrichtenverlauf](#nachrichtenverlauf-und-aufholen) für den Kanal.
+
+## Nachrichtenverlauf und Aufholen
+
+Ein Kanal kann so konfiguriert werden, dass er seine Broadcasts aufbewahrt. Ein Client, der sich neu verbindet, holt dann das Verpasste nach, statt von vorn zu synchronisieren. Das macht Kanäle als Transport für kollaboratives Bearbeiten überhaupt erst brauchbar.
+
+Die Aufbewahrung wird **auf dem Server** konfiguriert, pro Kanalmuster — siehe [Realtime-Backend](/docs/backend/realtime#kanal-aufbewahrung). Ein Client kann sie nicht selbst einschalten: Ein Kanal entsteht dadurch, dass jemand ihn benennt, und eine vom Client gewählte Verlaufstiefe würde jedem Besucher erlauben, Ihr Backend auf unbegrenzten Speicher festzulegen.
+
+Übergeben Sie bei einem Kanal mit Aufbewahrung `{ history: true }` — den Rest erledigt das SDK:
+
+```typescript
+const channel = client.realtime.channel("doc:42", { history: true });
+
+// Handlers receive replayed messages exactly like live ones, in order.
+channel.onBroadcast("op", (payload) => {
+    applyOperation(payload);
+});
+
+await channel.join();
+```
+
+Bei `join()` und nach jeder Wiederverbindung fragt das SDK den Server nach allem seit der zuletzt gesehenen Sequenznummer und liefert das Ergebnis über dieselben Handler aus. Es gibt keinen zweiten Codepfad zu schreiben: Ein Handler, der eine Operation live korrekt anwendet, wendet sie auch beim Aufholen korrekt an.
+
+### Sequenznummern
+
+Jeder Broadcast auf einem Kanal mit Aufbewahrung trägt ein `seq` — pro Kanal, lückenlos und aufsteigend. Es ist der Wiederaufsetzpunkt des Clients.
+
+```typescript
+channel.onBroadcast((event) => {
+    console.log(event.seq);       // 1, 2, 3, …
+    console.log(event.replayed);  // true when delivered by catch-up
+});
+
+console.log(channel.sequence); // highest seq delivered so far
+```
+
+Speichern Sie `channel.sequence` dauerhaft, wenn das Aufholen auch ein Neuladen der Seite überstehen soll, und geben Sie es über `history({ sinceSeq })` zurück.
+
+### Verlauf explizit abrufen
+
+```typescript
+const { messages, retained, latestSeq } = await channel.history({
+    sinceSeq: 0,
+    limit: 100
+});
+```
+
+`retained: false` bedeutet, dass der Kanal keinen Verlauf führt und nie führen wird — eine ausdrückliche Antwort, damit Sie «Sie haben nichts verpasst» von «dieser Kanal hat keine Aufbewahrungsregel» unterscheiden können. Im zweiten Fall muss ein Client, der konvergieren muss, auf eine vollständige Neusynchronisation zurückfallen.
+
+`latestSeq` ist die höchste Sequenz, die der Server vorhält — unabhängig davon, ob dieser Stapel sie erreicht hat. Liegt sie weit über Ihrem zuletzt ausgelieferten `seq`, sind Sie weiter zurück als eine Seite, und eine Neusynchronisation kann günstiger sein als seitenweises Nachladen.
+
+:::note[Wiederholungen dürfen sich überschneiden]
+Der Server kann nicht wissen, welche Nachrichten Sie vor dem Verbindungsabbruch noch erreicht haben. Ein Aufholbereich kann daher Nachrichten enthalten, die Sie bereits angewendet haben. Das SDK verwirft alles bis einschließlich der bereits ausgelieferten Sequenz, sodass Handler eine Nachricht nie zweimal sehen.
+
+Ihre eigenen Nachrichten werden **nicht** aus einer Wiederholung herausgefiltert: Eine Wiederverbindung vergibt eine neue Client-ID, sodass ausgerechnet der Fall, für den das Aufholen existiert, derjenige wäre, in dem dieser Filter versagt. Machen Sie Operationen idempotent, falls das erneute Anwenden eigener Operationen ein Problem wäre.
+:::
 ## Präsenz-Tracking
 
 Präsenz ermöglicht es Ihnen, zu verfolgen, welche Benutzer online sind, und den gemeinsamen Zustand über alle Teilnehmer hinweg zu synchronisieren:
@@ -230,6 +286,7 @@ Die Präsenz baut auf Broadcast-Kanälen mit automatischem Zustandsvergleich auf
 |----------|--------|
 | Dashboard mit Live-Daten | `listen()` mit Filtern |
 | Chat oder Messaging | `channel.broadcast()` |
+| Kollaboratives Bearbeiten / Operationsströme | `channel(name, { history: true })` |
 | Tippindikatoren / Online-Status | `channel.track()` + `channel.onPresence()` |
 | Detailseite mit Live-Updates | `listenById()` |
 | Überwachung im Admin-Panel | `listen()` mit `orderBy` und `limit` |

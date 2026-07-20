@@ -192,8 +192,62 @@ Los canales son ligeros y efímeros — existen mientras al menos un cliente est
 
 Las tramas de canal y presencia no requieren una cuenta: los visitantes anónimos pueden unirse a canales públicos, y el servidor sigue autorizando cada trama.
 
-> **Las difusiones no se reproducen.** Solo llegan a los miembros conectados en ese momento; no hay historial. Un cliente que se reconecta no tiene forma de saber que se perdió una. Esto es aceptable para notificaciones que se autocorrigen, pero significa que los canales no son un transporte para un flujo de operaciones donde un hueco silencioso causaría divergencia.
+> **Por defecto, las difusiones no se reproducen.** Solo llegan a los miembros conectados en ese momento. Eso es lo que se quiere para notificaciones que se autocorrigen — un aviso de «alguien ha guardado» queda sustituido por el siguiente guardado — y no cuesta nada. Para un flujo de operaciones, donde un hueco silencioso causa divergencia, active el [historial de mensajes](#historial-de-mensajes-y-recuperación) en el canal.
 
+## Historial de Mensajes y Recuperación
+
+Un canal puede configurarse para conservar sus difusiones, de modo que un cliente que se reconecta recupere lo que se perdió en lugar de resincronizarse desde cero. Esto es lo que hace que los canales sirvan como transporte para la edición colaborativa.
+
+La retención se configura **en el servidor**, por patrón de canal — consulte [Backend de Tiempo Real](/docs/backend/realtime#retención-de-canales). Un cliente no puede activarla por su cuenta, porque un canal lo crea quien lo nombra, y una profundidad de historial elegida por el cliente permitiría a cualquier visitante comprometer su backend con almacenamiento ilimitado.
+
+En un canal con retención, pase `{ history: true }` y el SDK hace el resto:
+
+```typescript
+const channel = client.realtime.channel("doc:42", { history: true });
+
+// Handlers receive replayed messages exactly like live ones, in order.
+channel.onBroadcast("op", (payload) => {
+    applyOperation(payload);
+});
+
+await channel.join();
+```
+
+Al hacer `join()` y tras cada reconexión, el SDK pide al servidor todo lo posterior al último número de secuencia que vio, y entrega el resultado a través de los mismos manejadores. No hay un segundo camino de código que escribir: un manejador que aplica una operación correctamente en vivo la aplica correctamente al recuperar.
+
+### Números de secuencia
+
+Cada difusión en un canal con retención lleva un `seq` — por canal, sin huecos y creciente. Es el punto de reanudación del cliente.
+
+```typescript
+channel.onBroadcast((event) => {
+    console.log(event.seq);       // 1, 2, 3, …
+    console.log(event.replayed);  // true when delivered by catch-up
+});
+
+console.log(channel.sequence); // highest seq delivered so far
+```
+
+Guarde `channel.sequence` si quiere que la recuperación sobreviva también a una recarga de página, y devuélvalo mediante `history({ sinceSeq })`.
+
+### Obtener el historial explícitamente
+
+```typescript
+const { messages, retained, latestSeq } = await channel.history({
+    sinceSeq: 0,
+    limit: 100
+});
+```
+
+`retained: false` significa que el canal no guarda historial y nunca lo hará — una respuesta explícita, para que pueda distinguir «no se perdió nada» de «este canal no tiene regla de retención». En el segundo caso, un cliente que necesite converger debe recurrir a una resincronización completa.
+
+`latestSeq` es la secuencia más alta que tiene el servidor, haya llegado o no este lote hasta ella. Si está muy por delante de su último `seq` entregado, va más atrasado que una página y resincronizar puede salir más barato que paginar.
+
+:::note[Las repeticiones pueden solaparse, y no pasa nada]
+El servidor no puede saber exactamente qué mensajes le llegaron antes de que cayera la conexión, así que un rango de recuperación puede incluir algunos que ya aplicó. El SDK descarta todo lo que esté en o por debajo de la secuencia que ya entregó, de modo que los manejadores nunca ven un mensaje dos veces.
+
+Sus propios mensajes **no** se filtran de una repetición: una reconexión asigna un nuevo id de cliente, así que el caso mismo para el que existe la recuperación es aquel en el que ese filtro fallaría. Haga que las operaciones sean idempotentes si volver a aplicar las suyas fuera un problema.
+:::
 ## Seguimiento de Presencia
 
 La presencia le permite rastrear qué usuarios están en línea y sincronizar el estado compartido entre todos los participantes:
@@ -234,6 +288,7 @@ La presencia se construye sobre los canales de difusión con diferenciación aut
 |----------|--------|
 | Panel con datos en vivo | `listen()` con filtros |
 | Chat o mensajería | `channel.broadcast()` |
+| Edición colaborativa / flujos de operaciones | `channel(name, { history: true })` |
 | Indicadores de escritura / estado en línea | `channel.track()` + `channel.onPresence()` |
 | Página de detalle con actualizaciones en vivo | `listenById()` |
 | Monitorización del panel de administración | `listen()` con `orderBy` y `limit` |

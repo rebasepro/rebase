@@ -190,6 +190,62 @@ await channel.leave();
 
 I canali sono leggeri ed effimeri — esistono finché almeno un client è sottoscritto.
 
+> **Per impostazione predefinita, i broadcast non vengono ritrasmessi.** Raggiungono solo i membri connessi in quel momento. È ciò che serve per le notifiche che si autocorreggono — un avviso «qualcuno ha salvato» è superato dal salvataggio successivo — e non costa nulla. Per un flusso di operazioni, dove un vuoto silenzioso causa divergenza, abilita la [cronologia dei messaggi](#cronologia-dei-messaggi-e-recupero) sul canale.
+
+## Cronologia dei Messaggi e Recupero
+
+Un canale può essere configurato per conservare i suoi broadcast, così che un client che si riconnette recuperi ciò che ha perso invece di risincronizzarsi da zero. È questo che rende i canali utilizzabili come trasporto per l'editing collaborativo.
+
+La conservazione si configura **sul server**, per pattern di canale — vedi [Backend Realtime](/docs/backend/realtime#conservazione-dei-canali). Un client non può attivarla da sé, perché un canale è creato da chi lo nomina, e una profondità di cronologia scelta dal client permetterebbe a qualsiasi visitatore di impegnare il tuo backend in uno storage illimitato.
+
+Su un canale con conservazione, passa `{ history: true }` e il SDK fa il resto:
+
+```typescript
+const channel = client.realtime.channel("doc:42", { history: true });
+
+// Handlers receive replayed messages exactly like live ones, in order.
+channel.onBroadcast("op", (payload) => {
+    applyOperation(payload);
+});
+
+await channel.join();
+```
+
+Al `join()` e dopo ogni riconnessione, il SDK chiede al server tutto ciò che segue l'ultimo numero di sequenza visto, e consegna il risultato agli stessi handler. Non c'è un secondo percorso di codice da scrivere: un handler che applica correttamente un'operazione dal vivo la applica correttamente anche in recupero.
+
+### Numeri di sequenza
+
+Ogni broadcast su un canale con conservazione porta un `seq` — per canale, senza vuoti e crescente. È il punto di ripresa del client.
+
+```typescript
+channel.onBroadcast((event) => {
+    console.log(event.seq);       // 1, 2, 3, …
+    console.log(event.replayed);  // true when delivered by catch-up
+});
+
+console.log(channel.sequence); // highest seq delivered so far
+```
+
+Salva `channel.sequence` se vuoi che il recupero sopravviva anche a un ricaricamento di pagina, e restituiscilo tramite `history({ sinceSeq })`.
+
+### Recuperare la cronologia esplicitamente
+
+```typescript
+const { messages, retained, latestSeq } = await channel.history({
+    sinceSeq: 0,
+    limit: 100
+});
+```
+
+`retained: false` significa che il canale non conserva cronologia e non lo farà mai — una risposta esplicita, così puoi distinguere «non hai perso nulla» da «questo canale non ha una regola di conservazione». Nel secondo caso un client che deve convergere deve ripiegare su una risincronizzazione completa.
+
+`latestSeq` è la sequenza più alta che il server possiede, che questo lotto l'abbia raggiunta o no. Se è molto oltre il tuo ultimo `seq` consegnato, sei indietro più di una pagina e risincronizzare può costare meno che paginare.
+
+:::note[Le ritrasmissioni possono sovrapporsi, ed è normale]
+Il server non può sapere esattamente quali messaggi ti sono arrivati prima della caduta della connessione, quindi un intervallo di recupero può includerne alcuni già applicati. Il SDK scarta tutto ciò che è pari o inferiore alla sequenza già consegnata, così gli handler non vedono mai due volte lo stesso messaggio.
+
+I tuoi messaggi **non** vengono filtrati da una ritrasmissione: una riconnessione assegna un nuovo id client, quindi il caso stesso per cui esiste il recupero è quello in cui quel filtro fallirebbe. Rendi le operazioni idempotenti se riapplicare le tue fosse un problema.
+:::
 ## Tracciamento della Presenza
 
 La presenza ti permette di tracciare quali utenti sono online e di sincronizzare lo stato condiviso tra tutti i partecipanti:
@@ -230,6 +286,7 @@ La presenza è costruita sui canali di broadcast con un diff automatico dello st
 |----------|--------|
 | Dashboard con dati in diretta | `listen()` con filtri |
 | Chat o messaggistica | `channel.broadcast()` |
+| Editing collaborativo / flussi di operazioni | `channel(name, { history: true })` |
 | Indicatori di digitazione / stato online | `channel.track()` + `channel.onPresence()` |
 | Pagina di dettaglio con aggiornamenti in diretta | `listenById()` |
 | Monitoraggio del pannello di amministrazione | `listen()` con `orderBy` e `limit` |

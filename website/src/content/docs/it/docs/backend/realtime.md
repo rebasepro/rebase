@@ -165,6 +165,8 @@ Il broadcast è gestito a livello del protocollo WebSocket. Il server supporta q
 | `leave_channel` | Client → Server | Lasciare un canale                       |
 | `broadcast`     | Client → Server | Inviare un messaggio a tutti i membri del canale |
 | `broadcast`     | Server → Client | Ricevere un messaggio da un altro membro |
+| `channel_history` | Client → Server | Richiedere i messaggi conservati dopo una sequenza |
+| `channel_history` | Server → Client | I messaggi conservati che un client ha perso |
 
 Quando un client invia un messaggio `broadcast`, il server lo ritrasmette a **tutti gli altri membri** di quel canale (il mittente non riceve il proprio messaggio).
 
@@ -188,6 +190,67 @@ Quando un client invia un messaggio `broadcast`, il server lo ritrasmette a **tu
 }
 ```
 
+## Conservazione dei Canali
+
+Per impostazione predefinita un broadcast raggiunge i membri connessi in quel momento e poi sparisce. È il compromesso giusto per notifiche e cursori, e non costa nulla.
+
+Per un flusso di operazioni — editing collaborativo, qualsiasi cosa in cui un vuoto silenzioso causi divergenza — un canale può essere configurato per **conservare** i suoi messaggi. I broadcast conservati ricevono un numero di sequenza per canale e vengono memorizzati, così un client che si riconnette può chiedere tutto ciò che segue l'ultimo che ha visto.
+
+La conservazione è opzionale e si configura qui, sul server:
+
+```typescript
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
+
+await initializeRebaseBackend({
+    app,
+    server,
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations },
+        realtime: {
+            channels: [
+                // Most specific first — the first match wins.
+                { match: "doc:draft:*", limit: 100 },
+                { match: "doc:*", limit: 500, ttl: "24h" }
+            ]
+        }
+    })
+});
+```
+
+| Campo | Descrizione |
+|-------|-------------|
+| `match` | Nome esatto del canale (`"doc:42"`) o un prefisso con `*` finale (`"doc:*"`) |
+| `limit` | Conservare al massimo questo numero di messaggi più recenti per canale |
+| `ttl` | Conservare i messaggi al massimo per questo tempo — `"30s"`, `"15m"`, `"24h"`, `"7d"`, o millisecondi |
+
+Una regola richiede almeno `limit` o `ttl`. Una che non abbia nessuno dei due viene ignorata e registrata, perché la conservazione illimitata non è quasi mai intenzionale e non si può tornare indietro una volta che la tabella è cresciuta.
+
+:::note[Perché non lasciare che siano i client a chiedere la cronologia?]
+Un canale è creato da chi lo nomina. Se un client potesse scegliere la propria profondità di cronologia, qualsiasi visitatore potrebbe impegnare il tuo backend in uno storage illimitato. Configurarlo qui significa anche che i canali di presenza e notifica — la stragrande maggioranza — non pagano nulla: senza regole configurate non viene creata alcuna tabella e il broadcast segue lo stesso percorso sincrono di sempre.
+:::
+
+### Archiviazione
+
+I canali con conservazione usano due tabelle nello schema `rebase`, create automaticamente all'avvio quando è configurata almeno una regola:
+
+| Tabella | Contenuto |
+|-------|-----------|
+| `rebase.channel_messages` | I messaggi conservati, indicizzati per `(channel, seq)` |
+| `rebase.channel_cursors` | La sequenza più alta emessa per canale |
+
+La potatura avviene man mano che arrivano i messaggi, limitata per canale così che il costo dipenda dal tempo trascorso e non dal volume di scrittura. Rimuove righe solo da `channel_messages` — i cursori sono mantenuti a tempo indeterminato (una piccola riga per canale), perché riavviare la sequenza di un canale cambierebbe il significato del punto di ripresa salvato da un client.
+
+### Garanzie di consegna
+
+- **Ordinato.** I numeri di sequenza sono assegnati per canale, e l'ordine di consegna coincide con l'ordine di sequenza.
+- **Durevole prima che consegnato.** Un messaggio che non può essere memorizzato non viene consegnato a nessuno, e il mittente viene avvisato. Consegnarlo lo metterebbe davanti ai sottoscrittori dal vivo lasciandolo fuori da ogni ritrasmissione futura, e nessun messaggio successivo potrebbe riparare quel vuoto.
+- **Almeno una volta in recupero.** Un intervallo di ritrasmissione può sovrapporsi a messaggi già ricevuti dal client; il SDK scarta quelli già consegnati.
+
+:::caution[La cronologia ha lo stesso modello di accesso del canale]
+Chiunque possa unirsi a un canale può ritrasmettere i suoi messaggi conservati, compresi quelli diffusi prima del suo arrivo. La conservazione è opzionale per pattern di canale, quindi considera che abilitarla su un canale ad accesso pubblico rende leggibile il passato di quel canale a qualsiasi visitatore.
+:::
 ## Tracciamento della Presenza
 
 La presenza traccia quali utenti sono attualmente online in un canale e permette a ciascun utente di condividere uno stato personalizzato (ad es. posizione del cursore, stato).

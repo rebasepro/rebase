@@ -165,6 +165,8 @@ Broadcast wird auf der Ebene des WebSocket-Protokolls verwaltet. Der Server unte
 | `leave_channel` | Client → Server | Einen Kanal verlassen                    |
 | `broadcast`     | Client → Server | Eine Nachricht an alle Kanalmitglieder senden |
 | `broadcast`     | Server → Client | Eine Nachricht von einem anderen Mitglied empfangen |
+| `channel_history` | Client → Server | Aufbewahrte Nachrichten nach einer Sequenz anfordern |
+| `channel_history` | Server → Client | Die aufbewahrten Nachrichten, die ein Client verpasst hat |
 
 Wenn ein Client eine `broadcast`-Nachricht sendet, leitet der Server sie an **alle anderen Mitglieder** dieses Kanals weiter (der Absender erhält seine eigene Nachricht nicht).
 
@@ -188,6 +190,67 @@ Wenn ein Client eine `broadcast`-Nachricht sendet, leitet der Server sie an **al
 }
 ```
 
+## Kanal-Aufbewahrung
+
+Standardmäßig erreicht ein Broadcast die aktuell verbundenen Mitglieder und ist danach fort. Das ist der richtige Kompromiss für Benachrichtigungen und Cursor, und er kostet nichts.
+
+Für einen Operationsstrom — kollaboratives Bearbeiten, alles, wo eine stille Lücke zu Divergenz führt — kann ein Kanal so konfiguriert werden, dass er seine Nachrichten **aufbewahrt**. Aufbewahrte Broadcasts erhalten eine kanalweise Sequenznummer und werden gespeichert, sodass ein Client nach einer Wiederverbindung alles ab der zuletzt gesehenen Nachricht anfordern kann.
+
+Die Aufbewahrung ist optional und wird hier, auf dem Server, konfiguriert:
+
+```typescript
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
+
+await initializeRebaseBackend({
+    app,
+    server,
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations },
+        realtime: {
+            channels: [
+                // Most specific first — the first match wins.
+                { match: "doc:draft:*", limit: 100 },
+                { match: "doc:*", limit: 500, ttl: "24h" }
+            ]
+        }
+    })
+});
+```
+
+| Feld | Beschreibung |
+|-------|-------------|
+| `match` | Exakter Kanalname (`"doc:42"`) oder ein Präfix mit abschließendem `*` (`"doc:*"`) |
+| `limit` | Höchstens so viele der neuesten Nachrichten pro Kanal behalten |
+| `ttl` | Nachrichten höchstens so lange behalten — `"30s"`, `"15m"`, `"24h"`, `"7d"` oder Millisekunden |
+
+Eine Regel braucht mindestens `limit` oder `ttl`. Eine ohne beides wird ignoriert und protokolliert, denn unbegrenzte Aufbewahrung ist fast nie beabsichtigt und lässt sich nicht mehr rückgängig machen, sobald die Tabelle gewachsen ist.
+
+:::note[Warum dürfen Clients keinen Verlauf anfordern?]
+Ein Kanal entsteht dadurch, dass jemand ihn benennt. Könnte ein Client seine eigene Verlaufstiefe wählen, könnte jeder Besucher Ihr Backend auf unbegrenzten Speicher festlegen. Die Konfiguration an dieser Stelle bedeutet außerdem, dass Präsenz- und Benachrichtigungskanäle — die überwiegende Mehrheit — nichts zahlen: Ohne konfigurierte Regeln wird keine Tabelle angelegt, und Broadcast läuft denselben synchronen Weg wie zuvor.
+:::
+
+### Speicherung
+
+Kanäle mit Aufbewahrung nutzen zwei Tabellen im `rebase`-Schema, die beim Start automatisch angelegt werden, sobald mindestens eine Regel konfiguriert ist:
+
+| Tabelle | Inhalt |
+|-------|-----------|
+| `rebase.channel_messages` | Die aufbewahrten Nachrichten, indiziert nach `(channel, seq)` |
+| `rebase.channel_cursors` | Die höchste je Kanal vergebene Sequenz |
+
+Bereinigt wird, während Nachrichten eintreffen, pro Kanal gedrosselt, sodass die Kosten mit der verstrichenen Zeit statt mit dem Schreibvolumen wachsen. Entfernt werden ausschließlich Zeilen aus `channel_messages` — Cursor bleiben dauerhaft erhalten (eine kleine Zeile pro Kanal), denn ein Neustart der Kanalsequenz würde die Bedeutung des von einem Client gespeicherten Wiederaufsetzpunkts verändern.
+
+### Zustellgarantien
+
+- **Geordnet.** Sequenznummern werden pro Kanal vergeben, und die Zustellreihenfolge entspricht der Sequenzreihenfolge.
+- **Erst dauerhaft, dann zugestellt.** Eine Nachricht, die nicht gespeichert werden kann, wird niemandem zugestellt, und der Absender wird benachrichtigt. Sie zuzustellen würde sie den Live-Abonnenten zeigen und zugleich aus jeder künftigen Wiederholung auslassen — eine Lücke, die keine spätere Nachricht heilen könnte.
+- **Mindestens einmal beim Aufholen.** Ein Wiederholungsbereich kann Nachrichten enthalten, die ein Client bereits erhalten hat; das SDK verwirft die bereits zugestellten.
+
+:::caution[Der Verlauf hat dasselbe Zugriffsmodell wie der Kanal]
+Wer einem Kanal beitreten darf, darf auch dessen aufbewahrte Nachrichten wiederholen — einschließlich derer, die vor seiner Ankunft gesendet wurden. Die Aufbewahrung ist pro Kanalmuster optional. Sie auf einem öffentlich beitretbaren Kanal zu aktivieren macht dessen Vergangenheit daher für jeden Besucher lesbar.
+:::
 ## Präsenz-Tracking
 
 Präsenz verfolgt, welche Benutzer aktuell in einem Kanal online sind, und erlaubt jedem Benutzer, benutzerdefinierten Zustand zu teilen (z. B. Cursorposition, Status).

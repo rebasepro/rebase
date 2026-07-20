@@ -161,10 +161,12 @@ Broadcast is managed at the WebSocket protocol level. The server supports these 
 
 | Message Type     | Direction       | Description                              |
 |-----------------|-----------------|------------------------------------------|
-| `join_channel`  | Client → Server | Join a named channel                     |
-| `leave_channel` | Client → Server | Leave a channel                          |
-| `broadcast`     | Client → Server | Send a message to all channel members    |
-| `broadcast`     | Server → Client | Receive a message from another member    |
+| `join_channel`    | Client → Server | Join a named channel                     |
+| `leave_channel`   | Client → Server | Leave a channel                          |
+| `broadcast`       | Client → Server | Send a message to all channel members    |
+| `broadcast`       | Server → Client | Receive a message from another member    |
+| `channel_history` | Client → Server | Request retained messages after a sequence |
+| `channel_history` | Server → Client | The retained messages a client missed    |
 
 When a client sends a `broadcast` message, the server relays it to **all other members** of that channel (the sender does not receive its own message).
 
@@ -187,6 +189,68 @@ When a client sends a `broadcast` message, the server relays it to **all other m
   payload: { userId: "user-1", isTyping: true }
 }
 ```
+
+## Channel Retention
+
+By default a broadcast reaches currently-connected members and is then gone. That is the right trade for notifications and cursors, and it costs nothing.
+
+For an operation stream — collaborative editing, anything where a silent gap causes divergence — a channel can be configured to **retain** its messages. Retained broadcasts are given a per-channel sequence number and stored, so a client that reconnects can ask for everything after the last one it saw.
+
+Retention is opt-in and configured here, on the server:
+
+```typescript
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createPostgresAdapter } from "@rebasepro/server-postgres";
+
+await initializeRebaseBackend({
+    app,
+    server,
+    database: createPostgresAdapter({
+        connection: db,
+        schema: { tables, enums, relations },
+        realtime: {
+            channels: [
+                // Most specific first — the first match wins.
+                { match: "doc:draft:*", limit: 100 },
+                { match: "doc:*", limit: 500, ttl: "24h" }
+            ]
+        }
+    })
+});
+```
+
+| Field   | Description                                                                 |
+|---------|-----------------------------------------------------------------------------|
+| `match` | Exact channel name (`"doc:42"`) or a trailing-`*` prefix (`"doc:*"`)        |
+| `limit` | Keep at most this many of the most recent messages per channel               |
+| `ttl`   | Keep messages for at most this long — `"30s"`, `"15m"`, `"24h"`, `"7d"`, or milliseconds |
+
+A rule needs at least one of `limit` or `ttl`. One with neither is ignored and logged, because unbounded retention is almost never intended and cannot be walked back once the table has grown.
+
+:::note[Why not let clients ask for history?]
+A channel is created by whoever names it. If a client could choose its own history depth, any visitor could commit your backend to unbounded storage. Configuring it here also means presence and notification channels — the overwhelming majority — pay nothing: with no rules configured, no table is created and broadcast runs the same synchronous path it always did.
+:::
+
+### Storage
+
+Retained channels use two tables in the `rebase` schema, created automatically on startup when at least one rule is configured:
+
+| Table                     | Contents                                                        |
+|---------------------------|-----------------------------------------------------------------|
+| `rebase.channel_messages` | The retained messages, keyed by `(channel, seq)`                 |
+| `rebase.channel_cursors`  | The highest sequence issued per channel                          |
+
+Pruning happens as messages arrive, throttled per channel so cost tracks elapsed time rather than write volume. It only ever removes rows from `channel_messages` — cursors are kept indefinitely (they are one small row per channel), because restarting a channel's sequence would change what a client's saved resume point means.
+
+### Delivery guarantees
+
+- **Ordered.** Sequence numbers are allocated per channel, and delivery order matches sequence order.
+- **Durable before delivered.** A message that cannot be stored is not delivered to anyone, and the sender is told. Delivering it would put it in front of live subscribers while leaving it out of every future replay, and no later message could repair that gap.
+- **At-least-once on catch-up.** A replay range may overlap messages a client already received; the SDK discards ones it has already delivered.
+
+:::caution[History has the same access model as the channel]
+Anyone who may join a channel may replay its retained messages, including those broadcast before they arrived. Retention is opt-in per channel pattern, so treat enabling it on a publicly-joinable channel as making that channel's past readable to any visitor.
+:::
 
 ## Presence Tracking
 
