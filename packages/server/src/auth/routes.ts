@@ -181,11 +181,14 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         newPassword: z.string().min(1, "New password is required").max(128)
     });
     const refreshSchema = z.object({
-        // When cookieAuth is enabled the refresh token arrives via cookie, so
-        // the body field becomes optional.
-        refreshToken: config.cookieAuth
-            ? z.string().optional()
-            : z.string().min(1, "Refresh token is required")
+        // Always optional. The token may arrive in the body or, under cookieAuth,
+        // in an httpOnly cookie, so "is a token present" cannot be decided at the
+        // schema — `readRefreshToken` decides it, and the handler answers a
+        // missing one with 401 NO_SESSION. Making the body field required in
+        // non-cookie mode meant an anonymous visitor (who sends no body) got a
+        // 400 INVALID_INPUT logged at warn on every page load, when the honest
+        // answer is simply "not signed in".
+        refreshToken: z.string().min(1).optional()
     });
     const logoutSchema = z.object({
         refreshToken: z.string().optional()
@@ -833,7 +836,14 @@ message: "Email verified successfully" });
         const refreshToken = readRefreshToken(c, parsed, config.cookieAuth);
 
         if (!refreshToken) {
-            throw ApiError.badRequest("Refresh token is required", "INVALID_INPUT");
+            // Presenting no token at all is not a malformed request — it is an
+            // unauthenticated one, and the overwhelmingly common case is a
+            // first-time visitor, because clients refresh on page load before
+            // they know whether a session exists. Answering 400 INVALID_INPUT
+            // told them their request was wrong and logged a warning for every
+            // anonymous page view. The invalid- and expired-token branches below
+            // already answer 401; having no token is the same class of thing.
+            throw ApiError.unauthenticated("No refresh token presented", "NO_SESSION");
         }
 
         const tokenHash = hashRefreshToken(refreshToken);

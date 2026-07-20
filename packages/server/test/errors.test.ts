@@ -1,4 +1,5 @@
 import { ApiError, errorHandler } from "../src/api/errors";
+import { logger } from "../src/utils/logger";
 
 // ── Minimal Hono-context mock ────────────────────────────────────────────
 function createMockContext(method = "GET", path = "/test") {
@@ -58,6 +59,14 @@ describe("ApiError", () => {
             const err = ApiError.unauthorized("Bad token");
             expect(err.statusCode).toBe(401);
             expect(err.code).toBe("UNAUTHORIZED");
+            expect(err.expected).toBe(false);
+        });
+
+        it("unauthenticated → 401 marked expected", () => {
+            const err = ApiError.unauthenticated("No session", "NO_SESSION");
+            expect(err.statusCode).toBe(401);
+            expect(err.code).toBe("NO_SESSION");
+            expect(err.expected).toBe(true);
         });
 
         it("forbidden → 403", () => {
@@ -151,5 +160,31 @@ code: "RATE_LIMITED" });
         errorHandler(err, c);
 
         expect(getStatus()).toBe(429);
+    });
+
+    it("logs an ordinary operational error at warn", () => {
+        const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
+        const debug = jest.spyOn(logger, "debug").mockImplementation(() => {});
+        const { c } = createMockContext();
+
+        errorHandler(ApiError.unauthorized("Bad token"), c);
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(debug).not.toHaveBeenCalled();
+        warn.mockRestore();
+        debug.mockRestore();
+    });
+
+    it("logs an expected error at debug, not warn — no noise for anonymous refresh", () => {
+        const warn = jest.spyOn(logger, "warn").mockImplementation(() => {});
+        const debug = jest.spyOn(logger, "debug").mockImplementation(() => {});
+        const { c } = createMockContext();
+
+        errorHandler(ApiError.unauthenticated("No session", "NO_SESSION"), c);
+
+        expect(warn).not.toHaveBeenCalled();
+        expect(debug).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
+        debug.mockRestore();
     });
 });

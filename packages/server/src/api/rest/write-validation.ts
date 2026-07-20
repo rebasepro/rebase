@@ -15,12 +15,14 @@ import { ApiError } from "../errors";
  *   columns, so the set is exact);
  * - the foreign-key column behind an owning relation, which callers may write
  *   directly instead of through the relation property;
+ * - anything named in `options.extraKnownFields` — for an auth collection the
+ *   credential keys the auth adapter consumes before a row is ever built;
  * - nothing else. `id` in particular is not automatically known — see below.
  */
 export function assertKnownWriteFields(
     values: Record<string, unknown>,
     collection: CollectionConfig,
-    options?: { rowIndex?: number }
+    options?: { rowIndex?: number; extraKnownFields?: readonly string[] }
 ): void {
     if (collection.strictWrites === false) return;
 
@@ -37,6 +39,8 @@ export function assertKnownWriteFields(
     for (const relation of Object.values(resolveCollectionRelations(collection))) {
         if (relation.localKey) known.add(relation.localKey);
     }
+
+    for (const field of options?.extraKnownFields ?? []) known.add(field);
 
     const unknown = Object.keys(values).filter(key => !known.has(key));
     if (unknown.length === 0) return;

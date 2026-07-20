@@ -280,16 +280,27 @@ export class RestApiGenerator {
                 const isAuth = collection.auth;
                 const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
 
+                const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
+
                 // Auth signups carry credential fields (`password`, provider
                 // bits) that the users collection does not declare as columns —
-                // `prepareUserCreation` turns them into what the table has. So
-                // the shape is only this collection's to judge once that has run.
+                // `prepareUserCreation` turns them into what the table has. The
+                // adapter says which those are, so the body can still be checked
+                // for everything else. Skipping the check outright (as this used
+                // to) meant a typo on the users table was silently dropped and
+                // answered 201, while the same typo on `posts` was a 400.
                 if (!isAuthCollection) {
                     assertKnownWriteFields(body, resolvedCollection);
+                } else {
+                    const contract = this.authAdapter?.describeUserCreationContract?.(collectionAuthConfig);
+                    if (contract?.validate) {
+                        assertKnownWriteFields(body, resolvedCollection, {
+                            extraKnownFields: contract.extraFields
+                        });
+                    }
                 }
 
                 if (isAuthCollection && this.authAdapter?.prepareUserCreation) {
-                    const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
                     const prepared = await this.authAdapter.prepareUserCreation(body, collectionAuthConfig);
 
                     const entity = await driver.save({

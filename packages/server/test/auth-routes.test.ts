@@ -661,12 +661,18 @@ withEmail: false }); // Hack to pass empty list of providers
             expect(body.tokens.accessToken).toBeTruthy();
         });
 
-        it("does not 500 on an empty body, it asks for the token", async () => {
-            // Same empty body without cookie mode: a client error, not ours.
+        it("401s an empty body — no session, not a malformed request", async () => {
+            // A visitor with no session is not sending a bad request: clients
+            // refresh on page load before they know whether one exists, so this
+            // is the single most common way the route is called. It used to
+            // answer 400 INVALID_INPUT and log a warning for every anonymous
+            // page view; it is a 401 now, alongside the other token failures.
             const app = createApp();
             const res = await app.request("/auth/refresh", { method: "POST" });
             expect(res.status).not.toBe(500);
-            expect(res.status).toBe(400);
+            expect(res.status).toBe(401);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("NO_SESSION");
         });
 
         it("returns new tokens on valid refresh", async () => {
@@ -781,10 +787,22 @@ withEmail: false }); // Hack to pass empty list of providers
             expect(mockAuthRepo.deleteRefreshToken).toHaveBeenCalled();
         });
 
-        it("returns 400 for missing refreshToken field", async () => {
+        it("401s a body with no refreshToken — no session, not a bad request", async () => {
             const app = createApp();
             const res = await app.request("/auth/refresh", json({}));
+            expect(res.status).toBe(401);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("NO_SESSION");
+        });
+
+        it("still 400s a malformed refreshToken (wrong type)", async () => {
+            // A present-but-invalid value is a genuine client error and stays a
+            // 400 — only the *absence* of a token is reclassified as 401.
+            const app = createApp();
+            const res = await app.request("/auth/refresh", json({ refreshToken: 12345 }));
             expect(res.status).toBe(400);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("INVALID_INPUT");
         });
     });
 

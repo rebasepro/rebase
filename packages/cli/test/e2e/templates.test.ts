@@ -99,8 +99,13 @@ const CMS_CASES: CmsCase[] = [
         collection: "users",
         row: { email: "second@example.com", password: "StrongPass2!", displayName: "Second User" },
         probeRow: { email: "probe@example.com", password: "StrongPass3!", displayName: "Probe User" },
-        // `users` is an auth collection — see rejectsUnknownFields.
-        rejectsUnknownFields: false,
+        // `users` is an auth collection. Its signup body legitimately carries
+        // `password`, which the table does not declare — but that is the *only*
+        // exemption (the adapter's create contract), so any other undeclared
+        // field is still a 400, same as a normal collection. This used to be
+        // `false`, because the check was skipped for auth collections wholesale
+        // and an undeclared field was silently dropped with a 201.
+        rejectsUnknownFields: true,
         table: "rebase.users",
         column: "email",
         expected: "second@example.com",

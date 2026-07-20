@@ -29,6 +29,14 @@ export interface PolicyRef {
     hasUsing: boolean;
     /** Whether a WITH CHECK clause is present at all (not what it says). */
     hasWithCheck: boolean;
+    /**
+     * The live clause text, when read from `pg_policies`. Present only for live
+     * policies (the expected side is parsed from DDL and does not carry it).
+     * Used solely for the insecure-tautology scan, not for divergence — Postgres
+     * rewrites this text, so it is not safe to diff against expected.
+     */
+    qual?: string | null;
+    withCheck?: string | null;
 }
 
 export interface PolicyDrift {
@@ -38,6 +46,19 @@ export interface PolicyDrift {
     orphaned: PolicyRef[];
     /** Same policy name, different roles or command. */
     diverged: { expected: PolicyRef; actual: PolicyRef; differences: string[] }[];
+    /**
+     * A live policy whose expression is the known-permissive tautology
+     * `auth.uid() IS NOT NULL` — true for anonymous visitors too, because the
+     * user path coerces a blank id to the `'anonymous'` sentinel. This is what
+     * `policy.authenticated()` used to compile to, so a database pushed before
+     * that fix carries it, and neither the name, roles, command nor clause
+     * *presence* differs from the corrected policy — the only thing that changed
+     * is the expression text, which this checker otherwise (correctly) ignores.
+     * So it is the one drift that hides from every other check here.
+     *
+     * @see reason  a sentence naming the clause and what to do.
+     */
+    insecure: { policy: PolicyRef; reason: string }[];
 }
 
 export interface Queryable {
@@ -122,8 +143,28 @@ async function readLivePolicies(client: Queryable, schemas: string[]): Promise<P
         // Presence only. Postgres rewrites the text, but it does not invent or
         // drop a clause: NULL here means the policy genuinely has none.
         hasUsing: r.qual != null,
-        hasWithCheck: r.with_check != null
+        hasWithCheck: r.with_check != null,
+        qual: r.qual,
+        withCheck: r.with_check
     }));
+}
+
+/**
+ * The permissive tautology `auth.uid() IS NOT NULL`, without the
+ * `<> 'anonymous'` guard that makes it mean "signed in".
+ *
+ * Whitespace varies with Postgres's rewrite, so match on a collapsed form. The
+ * guard clause (`<> 'anonymous'`, in any spelling) is what distinguishes the
+ * corrected policy from the stale one, so its presence clears the text.
+ */
+function isPermissiveAuthTautology(clause: string | null | undefined): boolean {
+    if (!clause) return false;
+    const flat = clause.toLowerCase().replace(/\s+/g, " ");
+    if (!/auth\.uid\(\)\s*is not null/.test(flat)) return false;
+    // The fix appends `AND auth.uid() <> 'anonymous'`; Postgres may store the
+    // literal as `'anonymous'::text`. Either spelling means it is the corrected
+    // policy, not the tautology.
+    return !/<>\s*'anonymous'/.test(flat) && !/!=\s*'anonymous'/.test(flat);
 }
 
 const keyOf = (p: PolicyRef) => `${p.schema}.${p.table}.${p.name}`;
@@ -154,13 +195,31 @@ export async function checkPolicyDrift(
     const schemas = [...new Set(expected.map((p) => p.schema))];
     // Nothing expected means nothing to reconcile against; scanning every
     // schema would report the whole database as orphaned.
-    if (schemas.length === 0) return { missing: [], orphaned: [], diverged: [] };
+    if (schemas.length === 0) return { missing: [], orphaned: [], diverged: [], insecure: [] };
 
     const live = await readLivePolicies(client, schemas);
     const liveByKey = new Map(live.map((p) => [keyOf(p), p]));
     const expectedByKey = new Map(expected.map((p) => [keyOf(p), p]));
 
-    const drift: PolicyDrift = { missing: [], orphaned: [], diverged: [] };
+    const drift: PolicyDrift = { missing: [], orphaned: [], diverged: [], insecure: [] };
+
+    // Scan every live policy for the permissive tautology. This is deliberately
+    // independent of the name-keyed diff below: a database pushed before the
+    // `authenticated()` fix matches its expected policy on name, roles, command
+    // and clause presence, so nothing else here would flag it.
+    for (const p of live) {
+        const clause = isPermissiveAuthTautology(p.qual)
+            ? "USING"
+            : isPermissiveAuthTautology(p.withCheck) ? "WITH CHECK" : null;
+        if (clause) {
+            drift.insecure.push({
+                policy: p,
+                reason: `${clause} is \`auth.uid() IS NOT NULL\`, which is true for anonymous ` +
+                    `visitors too — this grants access to signed-out requests. It predates the ` +
+                    `\`policy.authenticated()\` fix; re-run \`rebase db push\` to tighten it.`
+            });
+        }
+    }
 
     for (const [key, want] of expectedByKey) {
         const got = liveByKey.get(key);
@@ -249,7 +308,7 @@ export async function dropOrphanedPolicies(
 }
 
 export const hasDrift = (d: PolicyDrift): boolean =>
-    d.missing.length > 0 || d.orphaned.length > 0 || d.diverged.length > 0;
+    d.missing.length > 0 || d.orphaned.length > 0 || d.diverged.length > 0 || d.insecure.length > 0;
 
 /** Human-readable report; empty string when the database matches the config. */
 export function formatPolicyDrift(drift: PolicyDrift): string {
@@ -271,6 +330,13 @@ export function formatPolicyDrift(drift: PolicyDrift): string {
         for (const d of drift.diverged) {
             lines.push(`    • ${d.expected.schema}.${d.expected.table} → "${d.expected.name}"`);
             for (const diff of d.differences) lines.push(`        ${diff}`);
+        }
+    }
+    if (drift.insecure.length > 0) {
+        lines.push("  Insecure — a live policy grants access it should not:");
+        for (const i of drift.insecure) {
+            lines.push(`    • ${i.policy.schema}.${i.policy.table} → "${i.policy.name}"`);
+            lines.push(`        ${i.reason}`);
         }
     }
     return lines.join("\n");

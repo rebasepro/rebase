@@ -225,13 +225,13 @@ exist` — phrased by Postgres, from a stack the caller cannot see, and only whe
 the column really was absent. Bulk writes are checked before the transaction
 opens and report the offending row index.
 
-> **Known exemption:** writes to an **auth-enabled collection** skip this check
-> entirely. A signup body carries `password` and provider fields the users
-> collection never declares as columns, so the check is bypassed and
-> `prepareUserCreation` maps the body onto real columns. The consequence is that
-> an undeclared field on an auth collection is **silently dropped** and the
-> request returns 201, where the same write to a normal collection is a 400. Do
-> not rely on validation to catch a typo in a signup payload.
+> **Auth collections are checked too, with one narrow exemption.** A signup body
+> carries credential fields — `password` above all — that the users collection
+> does not declare as columns, so the auth adapter names those explicitly and
+> everything else is validated as usual. A typo like `emial` on a signup is a
+> 400, same as on any other collection. (An auth collection wired to a custom
+> `onCreateUser` hook opts out of the check, because the hook, not the
+> collection, then defines the body's shape.)
 
 **A collection file that fails to import is now a hard error.** The loader used
 to log and continue, turning a broken file into a missing API route and a

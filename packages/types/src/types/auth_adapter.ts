@@ -224,6 +224,27 @@ export interface UserCreationPrepareResult {
 }
 
 /**
+ * What a create body for an auth collection may name beyond the collection's
+ * own declared fields — see `AuthAdapter.describeUserCreationContract()`.
+ *
+ * @group Auth
+ */
+export interface UserCreationWriteContract {
+    /**
+     * Whether to check the body for fields neither the collection nor
+     * {@link extraFields} declares. `false` skips the check entirely.
+     */
+    validate: boolean;
+    /**
+     * Credential and provider keys the adapter consumes itself, which the
+     * collection therefore does not declare as columns. `password` is the
+     * canonical one: `prepareUserCreation` hashes it into `passwordHash` and
+     * deletes it before the row is ever built.
+     */
+    extraFields: string[];
+}
+
+/**
  * Result of `AuthAdapter.finalizeUserCreation()`.
  *
  * Returned to the REST API for inclusion in the response.
@@ -424,6 +445,33 @@ export interface AuthAdapter {
         values: Record<string, unknown>,
         collectionAuth?: unknown
     ): Promise<UserCreationPrepareResult>;
+
+    /**
+     * Describe what a create body for this auth collection is allowed to name,
+     * so unknown-field validation can run on it.
+     *
+     * A signup body is not the collection's shape: it carries credential fields
+     * like `password` that the users table never declares as columns, and
+     * `prepareUserCreation` maps them onto real ones. Validating the raw body
+     * against the collection alone would reject every legitimate signup — which
+     * is why the check used to be skipped outright for auth collections. That
+     * skip was total, so an undeclared field was silently dropped and the write
+     * still returned 201, while the same typo on a normal collection was a 400.
+     *
+     * This narrows the exemption to the fields the adapter actually consumes.
+     *
+     * `validate: false` disables the check for this collection, and is the right
+     * answer when a custom `onCreateUser` hook is configured: the body is then
+     * the hook's contract, not the collection's, and this layer cannot know what
+     * the hook accepts.
+     *
+     * If not implemented, validation is skipped — the pre-existing behaviour.
+     *
+     * @param collectionAuth - The parsed `AuthCollectionConfig` from the collection (if `auth` is an object).
+     */
+    describeUserCreationContract?(
+        collectionAuth?: unknown
+    ): UserCreationWriteContract;
 
     /**
      * Finalize a user creation after the entity has been persisted.

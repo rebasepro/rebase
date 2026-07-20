@@ -249,6 +249,26 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             });
         },
 
+        describeUserCreationContract(collectionAuth) {
+            const parsedCollectionAuth = collectionAuth as import("@rebasepro/types").AuthCollectionConfig | undefined;
+            const authConfig = parsedCollectionAuth ?? collectionAuthConfig;
+
+            // A custom hook owns the body's shape — `prepareAdminUserValues`
+            // hands it the raw body and returns whatever the hook built, so the
+            // fields it accepts are the hook's business and unknowable here.
+            // Checking against the collection would reject bodies the hook is
+            // designed to take.
+            if (authConfig?.onCreateUser || resolvedOps.onAdminCreateUser) {
+                return { validate: false, extraFields: [] };
+            }
+
+            // The built-in path consumes exactly one field the users table does
+            // not declare: `password`, which it hashes into `passwordHash` and
+            // deletes. Everything else it spreads through untouched, so
+            // everything else has to be a real column.
+            return { validate: true, extraFields: ["password"] };
+        },
+
         async finalizeUserCreation(entity, clearPassword) {
             return finalizeAdminUserCreation(entity, clearPassword, {
                 authRepo: authRepository,

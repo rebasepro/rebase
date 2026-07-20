@@ -123,6 +123,52 @@ describe("checkPolicyDrift", () => {
         expect(hasDrift(drift)).toBe(false);
     });
 
+    it("flags the pre-fix permissive tautology that every other check misses", async () => {
+        // A database pushed before the `policy.authenticated()` fix carries
+        // `auth.uid() IS NOT NULL` — true for anonymous visitors. Its name,
+        // roles, command and clause presence all match the corrected policy, so
+        // this is the only signal that catches it.
+        const cols = [collection("posts")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const live = expected.map((p) => liveRow(p, {
+            qual: p.hasUsing ? "(auth.uid() IS NOT NULL)" : null
+        }));
+
+        const drift = await checkPolicyDrift(dbWith(live), cols);
+
+        expect(drift.insecure.length).toBeGreaterThan(0);
+        expect(hasDrift(drift)).toBe(true);
+        expect(drift.diverged).toHaveLength(0); // nothing else notices
+        expect(formatPolicyDrift(drift)).toContain("anonymous");
+        expect(formatPolicyDrift(drift)).toContain("db push");
+    });
+
+    it("clears the corrected expression, in either literal spelling", async () => {
+        const cols = [collection("posts")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        for (const guard of ["<> 'anonymous'::text", "<> 'anonymous'", "!= 'anonymous'"]) {
+            const live = expected.map((p) => liveRow(p, {
+                qual: p.hasUsing ? `((auth.uid() IS NOT NULL) AND ((auth.uid())::text ${guard}))` : null
+            }));
+            const drift = await checkPolicyDrift(dbWith(live), cols);
+            expect(drift.insecure).toHaveLength(0);
+        }
+    });
+
+    it("also flags the tautology in a WITH CHECK clause", async () => {
+        const cols = [collection("posts")];
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const live = expected.map((p) => liveRow(p, {
+            with_check: p.hasWithCheck ? "(auth.uid() IS NOT NULL)" : null
+        }));
+
+        const drift = await checkPolicyDrift(dbWith(live), cols);
+
+        const flagged = drift.insecure.some((i) => /WITH CHECK/.test(i.reason));
+        // Only assert when the fixture actually had a WITH CHECK policy to carry it.
+        if (expected.some((p) => p.hasWithCheck)) expect(flagged).toBe(true);
+    });
+
     it("parses roles when the driver returns the raw {a,b} text form", async () => {
         const cols = [collection("tags")];
         const live = [{ schemaname: "public", tablename: "tags", policyname: "test_policy", roles: "{authenticated,anon}", cmd: "ALL", qual: "true", with_check: null }];

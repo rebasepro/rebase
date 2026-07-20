@@ -62,13 +62,24 @@ export class ApiError extends Error {
     public readonly statusCode: number;
     public readonly code: string;
     public readonly details?: unknown;
+    /**
+     * Whether this outcome is a routine part of normal operation rather than
+     * something an operator should look at. Expected errors log at debug; every
+     * other operational error logs at warn.
+     *
+     * The motivating case is `POST /auth/refresh` with no session: clients
+     * refresh on page load before they know whether one exists, so every
+     * anonymous page view is a 401 — correct, and not worth a warning line.
+     */
+    public readonly expected: boolean;
 
-    constructor(statusCode: number, code: string, message: string, details?: unknown) {
+    constructor(statusCode: number, code: string, message: string, details?: unknown, expected = false) {
         super(message);
         this.name = "ApiError";
         this.statusCode = statusCode;
         this.code = code;
         this.details = details;
+        this.expected = expected;
     }
 
     // ── Factory methods ──────────────────────────────────────────────
@@ -79,6 +90,14 @@ export class ApiError extends Error {
 
     static unauthorized(message: string, code = "UNAUTHORIZED"): ApiError {
         return new ApiError(401, code, message);
+    }
+
+    /**
+     * A 401 that is a normal outcome, not an incident — logged at debug.
+     * See {@link ApiError.expected}.
+     */
+    static unauthenticated(message: string, code = "UNAUTHORIZED"): ApiError {
+        return new ApiError(401, code, message, undefined, true);
     }
 
     static forbidden(message: string, code = "FORBIDDEN"): ApiError {
@@ -145,11 +164,17 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     const reqId = typeof c.get === "function" ? c.get("requestId") : undefined;
 
     if (error instanceof ApiError || error.name === "ApiError") {
-        // Operational errors — log at warn level
-        logger.warn(
-            `⚠️ [API] ${c.req.method} ${c.req.path} → ${error.statusCode} ${error.code}: ${error.message}` +
-            (reqId ? ` [${reqId}]` : "")
-        );
+        // Operational errors — log at warn, unless the error declares itself a
+        // routine outcome (see ApiError.expected), which would otherwise put a
+        // warning in the log for every anonymous page view.
+        const expected = error instanceof ApiError && error.expected;
+        const line = `[API] ${c.req.method} ${c.req.path} → ${error.statusCode} ${error.code}: ${error.message}` +
+            (reqId ? ` [${reqId}]` : "");
+        if (expected) {
+            logger.debug(line);
+        } else {
+            logger.warn(`⚠️ ${line}`);
+        }
         return c.json({
             error: {
                 message: error.message,
