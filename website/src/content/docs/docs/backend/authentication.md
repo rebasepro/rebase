@@ -96,6 +96,65 @@ auth: {
 }
 ```
 
+### Account Linking Across Sign-In Methods
+
+What happens when someone registers with email/password as `ada@example.com`,
+then later clicks "Sign in with Google" on a Google account with that same
+address? Rebase **links the two into one account** — but only when the provider
+asserts the email as verified. It never silently creates a second account for
+the same address.
+
+On `POST /api/auth/<provider>` the resolution order is:
+
+1. **Known provider identity** — if this exact provider identity has signed in
+   before, that user is returned. The email is not consulted.
+2. **Existing account with the same email, provider verified it** — the
+   identity is attached to the existing account and the user is signed in to
+   it. One account, two ways in.
+3. **Existing account with the same email, provider did NOT verify it** —
+   rejected with `403 EMAIL_NOT_VERIFIED`. Nothing is created or modified.
+4. **No account with that email** — a new account is created.
+
+Step 3 is the security-critical case. If an unverified provider email were
+enough to link, anyone who could get a provider to emit an address they don't
+own could take over the matching Rebase account. Google always asserts
+`email_verified` for real Google accounts, so step 2 is the normal path for
+Google sign-in; step 3 mostly catches providers that let users supply an
+arbitrary unconfirmed address.
+
+This behavior is not configurable — there is deliberately no option to link on
+unverified emails.
+
+To recover from a step-3 rejection, the user signs in with their existing
+method and calls the explicit link endpoint:
+
+```http
+POST /api/auth/link/google
+Authorization: Bearer <access token>
+
+{ "idToken": "..." }
+```
+
+Linking while authenticated intentionally does **not** require a verified
+email, and does not require the emails to match at all — a user's Google
+address is often not their app address. The asymmetry is deliberate: on
+sign-in the provider's email is the only evidence tying the incoming identity
+to an account, whereas here the caller has already proven ownership by holding
+a valid session. It returns `409 IDENTITY_ALREADY_LINKED` if that provider
+identity belongs to another user, and is idempotent if it is already linked to
+the caller.
+
+#### The reverse direction
+
+A user who signed up with Google and has no password:
+
+- **Registering with the same email** is refused with `409 EMAIL_EXISTS`.
+- **`POST /api/auth/change-password`** returns `400 INVALID_ACCOUNT` — there is
+  no existing password to verify against.
+- **`forgot-password` → `reset-password` is the supported way to add one.**
+  It re-proves ownership of the address by email, after which the account has
+  both sign-in methods.
+
 ## Auth Endpoints
 
 All auth endpoints are mounted at `/api/auth/`:
@@ -106,6 +165,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `POST` | `/api/auth/login` | Login with email/password |
 | `POST` | `/api/auth/refresh` | Refresh the access token |
 | `POST` | `/api/auth/<provider>` | OAuth sign-in (e.g., `/api/auth/google`, `/api/auth/linkedin`) |
+| `POST` | `/api/auth/link/<provider>` | Link an OAuth provider to the authenticated account |
 | `POST` | `/api/auth/logout` | Revoke refresh token |
 | `POST` | `/api/auth/forgot-password` | Send password reset email |
 | `POST` | `/api/auth/reset-password` | Reset password with token |
