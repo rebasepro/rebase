@@ -20,7 +20,9 @@ import { VirtualTableContextProps } from "./types";
 import { VirtualTableHeaderRow } from "./VirtualTableHeaderRow";
 import { VirtualTableRow } from "./VirtualTableRow";
 import { VirtualTableCell } from "./VirtualTableCell";
-import { CenteredView, cls, Typography } from "../../index";
+import { CenteredView } from "../CenteredView";
+import { Typography } from "../Typography";
+import { cls } from "../../util/cls";
 import { useDebounceCallback } from "../../hooks/useDebounceCallback";
 import {
     closestCenter,

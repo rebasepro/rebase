@@ -1,5 +1,13 @@
-import { ChipColorKey, ChipColorScheme } from "../components";
 import { hashString } from "./hash";
+
+export type ChipColorScheme = {
+    color: string;
+    text: string;
+    /** Background color override for dark mode */
+    darkColor?: string;
+    /** Text color override for dark mode */
+    darkText?: string;
+}
 
 export const CHIP_COLORS: Record<string, ChipColorScheme> = {
     blue: { color: "#cfdfff",
@@ -63,6 +71,8 @@ text: "#064e3b",
 darkColor: "#059669",
 darkText: "#d1fae5" }
 };
+
+export type ChipColorKey = keyof typeof CHIP_COLORS;
 
 export function getColorSchemeForKey(key: ChipColorKey): ChipColorScheme {
     return CHIP_COLORS[key];

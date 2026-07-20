@@ -1,7 +1,7 @@
 
 
 import React from "react";
-import { FilterFormFieldProps } from "./VirtualTableHeader";
+import type { FilterFormFieldProps } from "./VirtualTableHeader";
 
 export type OnRowClickParams<T extends Record<string, unknown>> = {
     rowData: T;

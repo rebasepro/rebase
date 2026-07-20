@@ -5,7 +5,8 @@ import { iconSize } from "../icons/Icon";
 import React, { useCallback, useState } from "react";
 
 import { defaultBorderMixin } from "../styles";
-import { CircularProgress, IconButton } from "./index";
+import { CircularProgress } from "./CircularProgress";
+import { IconButton } from "./IconButton";
 
 import { cls } from "../util";
 import { useDebounceValue } from "../hooks";

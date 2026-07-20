@@ -1,6 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { TextField, TextFieldProps } from "./index";
+import { TextField, TextFieldProps } from "./TextField";
 
 type TextFieldChangeEvent = React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>;
 

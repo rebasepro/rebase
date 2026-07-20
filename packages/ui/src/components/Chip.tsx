@@ -1,16 +1,8 @@
 import React from "react";
 import { CHIP_COLORS, cls, getColorSchemeForKey } from "../util";
+import type { ChipColorKey, ChipColorScheme } from "../util/chip_colors";
 
-export type ChipColorScheme = {
-    color: string;
-    text: string;
-    /** Background color override for dark mode */
-    darkColor?: string;
-    /** Text color override for dark mode */
-    darkText?: string;
-}
-
-export type ChipColorKey = keyof typeof CHIP_COLORS;
+export type { ChipColorKey, ChipColorScheme };
 
 export interface ChipProps {
     className?: string;
