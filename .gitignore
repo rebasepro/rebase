@@ -89,6 +89,7 @@ app/uploads/
 /eslint_report.json
 /scratch/
 /test-cli-init-project/
+/test-cli-init-baas-project/
 
 # Test results
 test-results/

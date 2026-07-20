@@ -394,6 +394,17 @@ function writeEnvVar(projectPath: string, name: string, value: string): boolean 
     return true;
 }
 
+/** Read a variable's value out of a project's .env, or undefined if unset. */
+function readEnvVar(projectPath: string, name: string): string | undefined {
+    const envPath = path.join(projectPath, ".env");
+    if (!fs.existsSync(envPath)) return undefined;
+    for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
+        const match = line.match(new RegExp(`^\\s*${name}=(.*)$`));
+        if (match) return match[1].trim();
+    }
+    return undefined;
+}
+
 export function configureServiceKey(projectPath: string, key: string) {
     if (!writeEnvVar(projectPath, "REBASE_SERVICE_KEY", key)) return;
     console.log("🔑 Configured REBASE_SERVICE_KEY in .env file");
@@ -930,7 +941,14 @@ timeout: 10000 });
             }
         }
 
-        // Run database migrations BEFORE starting the backend
+        // Run database migrations BEFORE starting the backend.
+        //
+        // The password comes from the project's own .env, not a literal.
+        // docker-compose.yml interpolates `${DATABASE_PASSWORD:-changeme}` into
+        // POSTGRES_PASSWORD, so hardcoding "changeme" here silently depended on
+        // that variable being *absent* — which stopped being true the moment
+        // the CLI started writing it, and cost a CI run to notice.
+        const composeDbPassword = readEnvVar(projectPath, "DATABASE_PASSWORD") ?? "changeme";
         console.log("Running migrations on Docker DB from the host...");
         await execa("node", [
             cliBin,
@@ -941,7 +959,7 @@ timeout: 10000 });
             stdio: "inherit",
             env: {
                 ...cleanEnv,
-                DATABASE_URL: "postgresql://rebase:changeme@localhost:5433/rebase?options=-c%20search_path=public&sslmode=disable"
+                DATABASE_URL: `postgresql://rebase:${composeDbPassword}@localhost:5433/rebase?options=-c%20search_path=public&sslmode=disable`
             }
         });
         console.log("Migrations applied inside Docker.");

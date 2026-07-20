@@ -60,6 +60,13 @@ services:
       ADMIN_CONNECTION_STRING: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
       NODE_ENV: production
       PORT: "3001"
+      # The server refuses to boot with local storage under NODE_ENV=production,
+      # because the container filesystem is destroyed on the next restart and
+      # uploads go with it. That does not apply here: the `uploads` volume below
+      # is a durable named volume mounted at the storage path, which is exactly
+      # the case the check tells you to acknowledge with this flag. Switch to
+      # STORAGE_TYPE=s3 or gcs and drop this line if you move storage off-box.
+      FORCE_LOCAL_STORAGE: "true"
     depends_on:
       db:
         condition: service_healthy
