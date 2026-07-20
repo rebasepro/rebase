@@ -1,4 +1,8 @@
 import { defineCollection } from "@rebasepro/common";
+// Mutually recursive by design: an author has posts, a post has an author. The
+// reference is only dereferenced inside the `target: () =>` thunk below, which is
+// the framework contract for exactly this, so module init order never matters.
+// fallow-ignore-next-line circular-dependency
 import postsCollection from "./posts";
 
 const authorsCollection = defineCollection({

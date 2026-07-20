@@ -1,4 +1,7 @@
 import { defineCollection } from "@rebasepro/common";
+// Mutually recursive by design; the reference is only dereferenced inside the
+// `target: () =>` thunk below, so module init order never matters.
+// fallow-ignore-next-line circular-dependency
 import ordersCollection from "./orders";
 
 const customersCollection = defineCollection({
