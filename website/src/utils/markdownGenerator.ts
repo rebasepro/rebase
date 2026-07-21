@@ -165,7 +165,7 @@ Let AI agents read, write, and act on your Postgres data autonomously.
 ## Capabilities
 - **Model Context Protocol (MCP) Server**: Exposes your Postgres database and admin tools directly to AI assistants like Cursor and Claude.
 - **AI Data Enhancement Plugin**: Schema-aware prompts, auto-filled fields, suggestions, and translation within the admin UI.
-- **DataTalk**: Ask questions about your data in plain English; DataTalk converts natural language to SQL and displays charts/tables.
+- **Scoped API Keys**: Per-collection, per-operation permissions for agents, enforced by Postgres row-level security on every query.
 `;
   }
 

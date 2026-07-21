@@ -2,6 +2,13 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import matter from "gray-matter";
+import { createRequire } from "module";
+
+// gray-matter's bundled engine calls yaml.safeLoad, which js-yaml 4 removed —
+// without this override every matter() call throws and llms.txt ends up empty.
+const require_ = createRequire(import.meta.url);
+const yaml = createRequire(require_.resolve("gray-matter"))("js-yaml");
+const matterOptions = { engines: { yaml: (s) => yaml.load(s) } };
 
 /**
  * Attempts to locate a file by trying multiple possible extensions.
@@ -38,6 +45,28 @@ function resolveFilePath(basePath, relativePath) {
 }
 
 /**
+ * Applies a per-line transform to lines outside fenced code blocks, leaving
+ * fenced content untouched. Return null from the transform to drop the line.
+ * @param {string} text - The markdown text to process.
+ * @param {(line: string) => string | null} transform - The per-line transform.
+ * @returns {string} - The transformed text.
+ */
+function mapLinesOutsideCodeFences(text, transform) {
+    let inFence = false;
+    return text
+        .split("\n")
+        .map((line) => {
+            if (/^\s*(```|~~~)/.test(line)) {
+                inFence = !inFence;
+                return line;
+            }
+            return inFence ? line : transform(line);
+        })
+        .filter((line) => line !== null)
+        .join("\n");
+}
+
+/**
  * Processes the MDX file by resolving Code and CodeSampleWithSource components,
  * removing import statements, and stripping out interactive samples from the output.
  * @param {string} mdxFilePath - The file path to the MDX file.
@@ -48,7 +77,7 @@ async function resolveCodeBlocks(mdxFilePath) {
     const mdxBasePath = path.dirname(mdxFilePath);
 
     // Parse frontmatter
-    const parsed = matter(mdxContent);
+    const parsed = matter(mdxContent, matterOptions);
     const frontmatter = parsed.data;
     const content = parsed.content;
 
@@ -118,6 +147,14 @@ async function resolveCodeBlocks(mdxFilePath) {
         }
     });
 
+    // Drop self-closing component tags that have no text representation
+    // (e.g. <AdminDemoCarousel ... /> or <FieldWidgetPreview ... />), but
+    // leave JSX inside fenced code samples alone
+    const unhandledComponentPattern = /^\s*<[A-Z][A-Za-z0-9]*(\s[^>]*)?\/>\s*$/;
+    contentWithoutImports = mapLinesOutsideCodeFences(contentWithoutImports, (line) =>
+        unhandledComponentPattern.test(line) ? null : line
+    );
+
     // Remove multiple new lines for cleaner output
     const finalResolvedContent = contentWithoutImports.replace(/\n{3,}/g, "\n\n");
     return finalResolvedContent;
@@ -178,7 +215,7 @@ async function buildSlugMap(directoryPath, slugMap) {
                     const ext = path.extname(entry.name).toLowerCase();
                     if (ext === ".mdx" || ext === ".md") {
                         const mdxContent = fs.readFileSync(fullPath, "utf-8");
-                        const parsed = matter(mdxContent);
+                        const parsed = matter(mdxContent, matterOptions);
                         const frontmatter = parsed.data;
 
                         // Derive slug from file path relative to content root
@@ -253,7 +290,8 @@ async function buildSlugMap(directoryPath, slugMap) {
             }
         }
 
-        result = result.replaceAll("# ", "## "); // Convert H1 to H2 and so on
+        // Convert H1 to H2 and so on, but leave # comments in code blocks alone
+        result = mapLinesOutsideCodeFences(result, (line) => line.replaceAll("# ", "## "));
         result = intro + result; // Add the intro to the beginning
         result = result.replaceAll("](./", "](https://rebase.pro/docs/"); // Replace relative links with absolute links
         result = result.replaceAll("](../", "](https://rebase.pro/docs/"); // Replace relative links with absolute links
@@ -268,10 +306,12 @@ async function buildSlugMap(directoryPath, slugMap) {
 
 const intro = `# Rebase Documentation
 
-> Rebase is an open-source Postgres admin panel and headless CMS built with React and TypeScript.
-> Connect your existing PostgreSQL database and get a full admin UI, REST & GraphQL APIs, a SQL editor,
-> row-level security, and an MCP server for AI agents — all generated from your schema.
-> Rebase uses Drizzle ORM under the hood and keeps your TypeScript collection definitions as the single source of truth.
-> Great for existing projects (it adapts to any Postgres schema) and new ones alike.
+> Rebase is an open-source TypeScript backend built on Postgres: REST & GraphQL APIs, authentication,
+> row-level security, realtime subscriptions, storage, cron jobs, and an MCP server for AI agents —
+> all generated from your schema, with a full admin panel and SQL editor included on top.
+> Connect an existing PostgreSQL database or start fresh; Rebase uses Drizzle ORM under the hood and
+> keeps your TypeScript collection definitions as the single source of truth.
+> Scoped API keys with per-collection permissions plus Postgres-enforced RLS make it safe for
+> autonomous agents to read and write production data.
 
 `;

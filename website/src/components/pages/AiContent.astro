@@ -47,14 +47,14 @@ const enhancementCode = `<span class="text-blue-400">import</span> { useDataEnha
 
       <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
         <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20 mx-auto">
-          <span class="text-sm font-medium">MCP · AI Autofill · DataTalk</span>
+          <span class="text-sm font-medium">MCP Server · Scoped API Keys · AI Autofill</span>
         </div>
         <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
           The backend an agent<br class="hidden sm:inline"/> can't screw up.
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
-          Let AI agents read, write, and manage your data — through an MCP server with real tools, packaged
-          agent skills, and authorization the agent can't forget, because Postgres enforces it on every query.
+          Let AI agents read, write, and manage your data — through an MCP server with real tools, scoped
+          API keys, and authorization the agent can't forget, because Postgres enforces it on every query.
         </p>
       </div>
     </section>
@@ -88,7 +88,15 @@ const enhancementCode = `<span class="text-blue-400">import</span> { useDataEnha
               </div>
               <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
                 <h4 class="text-white font-semibold mb-1">🗄️ Schema & DB Tools</h4>
-                <p class="text-sm text-surface-400"><code class="text-xs bg-surface-800 px-1 rounded">schema_generate</code>, <code class="text-xs bg-surface-800 px-1 rounded">db_push</code>, <code class="text-xs bg-surface-800 px-1 rounded">db_pull</code>, <code class="text-xs bg-surface-800 px-1 rounded">db_generate</code>, <code class="text-xs bg-surface-800 px-1 rounded">db_migrate</code>, <code class="text-xs bg-surface-800 px-1 rounded">generate_sdk</code></p>
+                <p class="text-sm text-surface-400"><code class="text-xs bg-surface-800 px-1 rounded">schema_generate</code>, <code class="text-xs bg-surface-800 px-1 rounded">schema_introspect</code>, <code class="text-xs bg-surface-800 px-1 rounded">db_push</code>, <code class="text-xs bg-surface-800 px-1 rounded">db_generate</code>, <code class="text-xs bg-surface-800 px-1 rounded">db_migrate</code>, <code class="text-xs bg-surface-800 px-1 rounded">generate_sdk</code>, <code class="text-xs bg-surface-800 px-1 rounded">doctor</code></p>
+              </div>
+              <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
+                <h4 class="text-white font-semibold mb-1">🌿 Database Branching</h4>
+                <p class="text-sm text-surface-400">Create, list, inspect, and delete database branches — agents can try schema changes on an isolated copy of your data.</p>
+              </div>
+              <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
+                <h4 class="text-white font-semibold mb-1">⚙️ Storage, Cron & Functions</h4>
+                <p class="text-sm text-surface-400">Manage storage objects, list and trigger cron jobs, read execution logs, and invoke your custom functions.</p>
               </div>
               <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
                 <h4 class="text-white font-semibold mb-1">🖥️ Dev Server</h4>
@@ -133,60 +141,41 @@ const enhancementCode = `<span class="text-blue-400">import</span> { useDataEnha
       </div>
     </section>
 
-    <!-- DataTalk -->
+    <!-- Least-privilege agents: scoped keys + RLS -->
  <section class="py-16 sm:py-24">
       <div class="mx-auto max-w-7xl px-6 lg:px-8">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-cyan-500/10 text-cyan-400 ring-1 ring-inset ring-cyan-500/20">
-              Natural Language → SQL
+            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
+              Least-Privilege Agents
             </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">DataTalk</h2>
-            <p class="text-lg text-surface-400 mb-6">Ask questions about your data in plain English. DataTalk converts natural language to SQL, executes it against your Postgres database, and renders the results in charts and tables.</p>
+            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Authorization the agent can't forget</h2>
+            <p class="text-lg text-surface-400 mb-6">Hand your agent a scoped API key instead of god-mode credentials. Permissions are declared per collection and per operation — and because every request runs through Postgres row-level security, the limits hold even if the agent goes off-script.</p>
             <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Schema-aware query generation</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Auto-generated visualizations</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Conversation history and follow-ups</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Integrated as a Rebase admin view</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Per-collection, per-operation permission scoping</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Enforced twice: permission checks on every request, RLS on every query</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> Keys are SHA-256 hashed, rate-limited, expiring, and revocable</li>
+              <li class="flex gap-3"><span class="text-primary">✓</span> No prompt, jailbreak, or bug can widen what the database allows</li>
             </ul>
           </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900/50 p-8">
-            <div class="space-y-4">
-              <div class="flex items-start gap-3">
-                <div class="h-8 w-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                  <span class="text-blue-400 text-sm">You</span>
-                </div>
-                <div class="bg-surface-800/50 rounded-xl px-4 py-2.5">
-                  <p class="text-surface-300 text-sm">Show me the top 10 users by order count this month</p>
-                </div>
-              </div>
-              <div class="flex items-start gap-3">
-                <div class="h-8 w-8 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-                  <span class="text-violet-400 text-sm">AI</span>
-                </div>
-                <div class="bg-surface-800/50 rounded-xl px-4 py-2.5 flex-1">
-                  <p class="text-surface-300 text-sm mb-2">Here are the top 10 users:</p>
-                  <div class="bg-surface-900 rounded-lg p-3 font-mono text-xs text-surface-400">
-                    <div class="text-emerald-400 mb-1">SELECT u.display_name, COUNT(o.id)</div>
-                    <div>FROM users u JOIN orders o ON ...</div>
-                    <div>WHERE o.created_at &gt;= ...</div>
-                    <div>GROUP BY u.id ORDER BY count DESC</div>
-                    <div>LIMIT 10;</div>
-                  </div>
-                  <div class="mt-3 flex items-end gap-1 h-20">
-                    <div class="flex-1 rounded-t bg-gradient-to-t from-violet-500/30 to-violet-500/80" style="height: 100%"></div>
-                    <div class="flex-1 rounded-t bg-gradient-to-t from-violet-500/30 to-violet-500/80" style="height: 85%"></div>
-                    <div class="flex-1 rounded-t bg-gradient-to-t from-violet-500/30 to-violet-500/80" style="height: 75%"></div>
-                    <div class="flex-1 rounded-t bg-gradient-to-t from-violet-500/30 to-violet-500/80" style="height: 60%"></div>
-                    <div class="flex-1 rounded-t bg-gradient-to-t from-violet-500/30 to-violet-500/80" style="height: 53%"></div>
-                    <div class="flex-1 rounded-t bg-gradient-to-t from-violet-500/30 to-violet-500/80" style="height: 45%"></div>
-                    <div class="flex-1 rounded-t bg-gradient-to-t from-violet-500/30 to-violet-500/80" style="height: 38%"></div>
-                    <div class="flex-1 rounded-t bg-gradient-to-t from-violet-500/30 to-violet-500/80" style="height: 33%"></div>
-                    <div class="flex-1 rounded-t bg-gradient-to-t from-violet-500/30 to-violet-500/80" style="height: 25%"></div>
-                    <div class="flex-1 rounded-t bg-gradient-to-t from-violet-500/30 to-violet-500/80" style="height: 18%"></div>
-                  </div>
-                </div>
-              </div>
+          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
+            <div class="text-xs font-semibold text-surface-500 mb-3 uppercase tracking-wider">Scoped key for an agent</div>
+            <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300"><span class="text-surface-500">// The agent's key can read products and manage orders.</span>
+<span class="text-surface-500">// Everything else 403s — checked in the API, enforced in Postgres.</span>
+{"{"}
+  <span class="text-blue-400">"name"</span>: <span class="text-emerald-400">"support-agent"</span>,
+  <span class="text-blue-400">"permissions"</span>: [
+    {"{"} <span class="text-blue-400">"collection"</span>: <span class="text-emerald-400">"products"</span>, <span class="text-blue-400">"operations"</span>: [<span class="text-emerald-400">"read"</span>] {"}"},
+    {"{"} <span class="text-blue-400">"collection"</span>: <span class="text-emerald-400">"orders"</span>,   <span class="text-blue-400">"operations"</span>: [<span class="text-emerald-400">"read"</span>, <span class="text-emerald-400">"write"</span>] {"}"}
+  ],
+  <span class="text-blue-400">"expires_at"</span>: <span class="text-emerald-400">"2026-10-01"</span>
+{"}"}</code></pre>
+            <div class="mt-4 pt-4 border-t border-surface-800">
+              <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300"><span class="text-surface-500">// Drop it into the MCP config:</span>
+<span class="text-blue-400">"env"</span>: {"{"}
+  <span class="text-blue-400">"REBASE_BASE_URL"</span>: <span class="text-emerald-400">"https://api.yourapp.com"</span>,
+  <span class="text-blue-400">"REBASE_API_TOKEN"</span>: <span class="text-emerald-400">"rk_live_…"</span>
+{"}"}</code></pre>
             </div>
           </div>
         </div>
@@ -202,11 +191,27 @@ const enhancementCode = `<span class="text-blue-400">import</span> { useDataEnha
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
+            <p class="text-white font-semibold mb-1">Claude Code</p>
+            <p class="text-sm text-surface-400">MCP integration</p>
+          </div>
+          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
             <p class="text-white font-semibold mb-1">Cursor</p>
             <p class="text-sm text-surface-400">MCP integration</p>
           </div>
           <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
             <p class="text-white font-semibold mb-1">Claude Desktop</p>
+            <p class="text-sm text-surface-400">MCP integration</p>
+          </div>
+          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
+            <p class="text-white font-semibold mb-1">GitHub Copilot</p>
+            <p class="text-sm text-surface-400">MCP integration</p>
+          </div>
+          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
+            <p class="text-white font-semibold mb-1">Codex</p>
+            <p class="text-sm text-surface-400">MCP integration</p>
+          </div>
+          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
+            <p class="text-white font-semibold mb-1">Gemini CLI</p>
             <p class="text-sm text-surface-400">MCP integration</p>
           </div>
           <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
@@ -439,7 +444,7 @@ const enhancementCode = `<span class="text-blue-400">import</span> { useDataEnha
           <a href="/sdk"
              class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
             Client SDK
-            
+
 <svg
   class="lucide lucide-arrow-right"
   xmlns="http://www.w3.org/2000/svg"
@@ -459,7 +464,7 @@ const enhancementCode = `<span class="text-blue-400">import</span> { useDataEnha
           </a>
           <a href="/backend" class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
             Backend & APIs
-            
+
 <svg
   class="lucide lucide-arrow-right"
   xmlns="http://www.w3.org/2000/svg"

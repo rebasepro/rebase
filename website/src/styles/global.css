@@ -337,3 +337,10 @@ iframe {
 html.banner-dismissed-instant #manifesto-banner {
     display: none !important;
 }
+
+/* Neat gradient dividers: fade the WebGL art out toward both edges so the
+   overflow-hidden container never shows a hard horizontal cut. */
+.neat-divider {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 30%, black 70%, transparent);
+    mask-image: linear-gradient(to bottom, transparent, black 30%, black 70%, transparent);
+}
