@@ -11,6 +11,7 @@ import { createStorage } from "./storage";
 import { ClientStorageSourceRegistry } from "./storage-registry";
 import { RebaseWebSocketClient } from "./websocket";
 import { RebaseRealtimeChannel, type ChannelOptions } from "./realtime-channel";
+import { OfflineManager, type OfflineApi, type OfflineConfig } from "./offline";
 import {
     DEFAULT_STORAGE_SOURCE_KEY,
     InsertOf,
@@ -88,6 +89,15 @@ export type {
     ChannelHistoryResult
 } from "./realtime-channel";
 
+// Offline: config + the `client.offline` surface, plus the store contract so
+// other environments (React Native/AsyncStorage, Electron, …) can supply
+// their own persistence. `MemoryOfflineStore` is exported for tests and as
+// the reference implementation; the IndexedDB store is wired automatically
+// in the browser and needs no direct construction.
+export type { OfflineApi, OfflineConfig } from "./offline";
+export type { OfflineStore, OfflineCacheEntry, PendingMutation } from "./offline-store";
+export { MemoryOfflineStore } from "./offline-store";
+
 export interface CreateRebaseClientOptions extends RebaseClientConfig {
     auth?: CreateAuthOptions;
     admin?: CreateAdminOptions;
@@ -108,6 +118,15 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
      * correct slugs via this map before falling back to automatic snake_casing.
      */
     collections?: Record<string, string>;
+    /**
+     * Offline support for the data layer. `true` enables it with defaults
+     * (network-first reads served from cache on network failure, writes
+     * queued and replayed when connectivity returns); pass an
+     * {@link OfflineConfig} to control the store, cache size, or sync error
+     * handling. Cached reads and queued writes are partitioned per signed-in
+     * user. Off by default.
+     */
+    offline?: boolean | OfflineConfig;
 }
 
 // ─── Typed Data Proxy ────────────────────────────────────────────────────────
@@ -186,6 +205,8 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     call: <T = unknown>(endpoint: string, payload?: unknown) => Promise<T>;
     collection: <M extends Record<string, unknown> = Record<string, unknown>>(slug: string) => CollectionClient<M>;
     data: TypedDataLayer<DB>;
+    /** Present only when the client was created with `offline` enabled. */
+    offline?: OfflineApi;
 };
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
@@ -398,12 +419,33 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         return undefined;
     }
 
+    // Offline layer: wraps every collection client with a read cache and a
+    // write queue. Replay goes through *unwrapped* clients (the factory below)
+    // so a failing replay can never re-queue itself.
+    const offlineManager = options.offline
+        ? new OfflineManager(
+            typeof options.offline === "object" ? options.offline : {},
+            (slug) => createCollectionClient(transport, slug)
+        )
+        : undefined;
+
+    if (offlineManager) {
+        // Cache and queue are partitioned per user: cached rows are RLS-scoped
+        // to whoever fetched them, and queued writes must replay as the user
+        // who made them — a shared browser must never mix the two.
+        offlineManager.setScope(auth.getSession()?.user?.uid);
+        auth.onAuthStateChange((event, session) => {
+            offlineManager.setScope(event === "SIGNED_OUT" ? undefined : session?.user?.uid);
+        });
+    }
+
     const collectionClients = new Map<string, CollectionClient<Record<string, unknown>>>();
     let untypedWarned = false;
 
     function collection(slug: string): CollectionClient<Record<string, unknown>> {
         if (!collectionClients.has(slug)) {
-            collectionClients.set(slug, createCollectionClient(transport, slug, ws));
+            const inner = createCollectionClient(transport, slug, ws);
+            collectionClients.set(slug, offlineManager ? offlineManager.wrap(slug, inner) : inner);
         }
         return collectionClients.get(slug)!;
     }
@@ -510,6 +552,9 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             // Permanent: nothing queued afterwards may redial and keep the
             // event loop alive, which is the reason this method exists.
             ws?.disconnect(true);
+            // The offline retry timer is unref'd but the `online` listener is
+            // not, and neither should outlive the client.
+            offlineManager?.dispose();
         },
         setToken: transport.setToken,
         setAuthTokenGetter: transport.setAuthTokenGetter,
@@ -526,6 +571,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             return res.data ?? (res as T);
         },
         data: dataProxy,
+        ...(offlineManager ? { offline: offlineManager.api } : {}),
     } as unknown as CreateRebaseClientResult<DB>;
 
     return target;

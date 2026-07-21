@@ -24,7 +24,10 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export function App() {
     const rebaseClient = React.useMemo(() => createRebaseClient({
-        baseUrl: API_URL
+        baseUrl: API_URL,
+        // Network-first reads with an IndexedDB fallback, and writes queued
+        // for replay when connectivity returns.
+        offline: true
     }), []);
 
     // Forward all Rebase analytics events to GA4
