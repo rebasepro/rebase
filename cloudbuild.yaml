@@ -1,12 +1,23 @@
 steps:
+  # VITE_GOOGLE_CLIENT_ID is passed as a build-arg sourced from the
+  # GOOGLE_CLIENT_ID secret (mounted via availableSecrets below). The frontend
+  # needs it at build time to show the Google login button; the value is a
+  # public OAuth client id (it ships in the client bundle by design).
   - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
     args:
-      - 'build'
-      - '-t'
-      - 'europe-west3-docker.pkg.dev/rebase-578f2/rebase-demo/rebase-backend:latest'
-      - '-f'
-      - 'app/backend/Dockerfile'
-      - '.'
+      - '-c'
+      - |
+        docker build \
+          -t europe-west3-docker.pkg.dev/rebase-578f2/rebase-demo/rebase-backend:latest \
+          -f app/backend/Dockerfile \
+          --build-arg VITE_GOOGLE_CLIENT_ID="$$GOOGLE_CLIENT_ID" \
+          .
+    secretEnv: ['GOOGLE_CLIENT_ID']
+availableSecrets:
+  secretManager:
+    - versionName: projects/rebase-578f2/secrets/GOOGLE_CLIENT_ID/versions/latest
+      env: 'GOOGLE_CLIENT_ID'
 images:
   - 'europe-west3-docker.pkg.dev/rebase-578f2/rebase-demo/rebase-backend:latest'
 timeout: '1800s'

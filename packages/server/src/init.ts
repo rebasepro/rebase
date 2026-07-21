@@ -1284,7 +1284,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     const driverAdmin = defaultBootstrapper.getAdmin?.(defaultDriverResult);
     if (isSQLAdmin(driverAdmin)) {
         Object.assign(serverClient, {
-            sql: (query: string, options?: { database?: string; role?: string }) =>
+            sql: (query: string, options?: { database?: string; role?: string; params?: unknown[] }) =>
                 driverAdmin.executeSql(query, options)
         });
         logger.info("SQL capability attached to singleton");

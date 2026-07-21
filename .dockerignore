@@ -1,5 +1,14 @@
 .git
 **/node_modules
+
+# Build output. These are gitignored, so whatever stale copy happens to sit in
+# the local working tree would otherwise be copied into the build context by
+# `COPY packages ./packages` / `COPY app ./app` and shipped as-is. Everything
+# here is rebuilt inside the image, so it must never be inherited from the host.
+**/dist
+**/build
+**/*.tsbuildinfo
+
 .rebase-dev-port
 .rebase/
 .rebase-dev-url

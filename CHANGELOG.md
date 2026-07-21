@@ -20,6 +20,8 @@
 
   **Upgrading does not change your database.** The compiled SQL lives in `pg_policies`, so an existing app keeps the permissive `auth.uid() IS NOT NULL` until `db push` runs again — and `checkPolicyDrift` will not say so. It compares policy presence, roles and command, not expression text (Postgres rewrites `qual` on store, so text comparison reports drift that does not exist), and the policy name is a hash of the rule *as written in config*, which did not change. A stale permissive policy therefore matches the expected one on every field the checker looks at and `db doctor` reports clean. Read the qual out of `pg_policies` directly to confirm. See [Upgrading](https://rebase.pro/docs/upgrading).
 
+- **RLS is the whole authorization model — reads are bound too** — enforcement used to split by operation: writes ran through app-layer callbacks while reads leaned on RLS `SELECT` policies. But a privileged connection — superuser, `BYPASSRLS`, or the table owner — bypasses RLS unconditionally, so on any such connection (the common case) tenant read isolation was silently dead. Authenticated, user-context requests now run as a restricted, non-owner `rebase_user` role, so Postgres RLS binds *every* statement: `SELECT`, `INSERT`, `UPDATE`, `DELETE`. A collection's `securityRules` are now the entire authorization model; callbacks (`beforeSave` and friends) are validation and side-effects, not a security boundary. The server context — auth flows, migrations, `dataAsAdmin` — stays the trusted owner plane and bypasses RLS by design. Default policies are locked-by-default for every collection (a permissive server-or-admin read/write baseline; auth collections also get a self-read and keep the restrictive admin write gate), so RLS-on does not default-deny everything; `FORCE ROW LEVEL SECURITY` is gone, since the user role is already a non-owner. The opt-out is `disableDefaultPolicies`. Isolation is provisioned at boot and on `db push` / `migrate`; a privileged connection that cannot be isolated fails boot with the exact setup SQL, and connecting as superuser or `BYPASSRLS` warns loudly — the auth-collection write gates do not bind those.
+
 - **22 retired package names deprecated on npm** — the names the repo no longer publishes now carry a deprecation notice pointing at their replacement, so an install of an old name says so instead of silently resolving to an abandoned version.
 
 - **Package renames** — packages are now named for their role, not their position. `core` was frontend-only React while `server-core` was the actual core of the product; they shared a word and were otherwise unrelated. `client-firebase` depended on `admin`/`core`/`ui`, so it was a UI integration wearing a client-SDK name. Import paths are the only change — no behavior moved with them.
@@ -64,6 +66,8 @@
 
 - **Ordered, replayable per-channel history** — broadcast was fire-and-forget to whoever happened to be connected. Enough for presence and for "someone saved"; not enough for op-based collaborative editing, where a client that blinks out for two seconds had to resync a whole document rather than catch up on the four operations it missed. Every broadcast on a retained channel now gets a per-channel sequence number, allocated by the same statement that stores it, so a reconnecting client can say where it got to and receive only what it missed. Retention is server-side and opt-in (`realtime.channels`, matching exact names or a trailing `*` prefix) — a channel is created by whoever names it, so a client-supplied history depth would let any visitor commit the backend to unbounded storage. With no rules configured nothing is written, no table is created, and broadcast runs the same synchronous path as before.
 
+- **Database-level realtime — change data capture** — realtime events were application-level: only writes through the Rebase API emitted them, so a change made with `psql`, another service's cron, a raw SQL statement or Studio's SQL editor committed silently and no subscriber heard it. A database-level CDC source now feeds the existing `RealtimeService`, matching Supabase Realtime's WAL-tailing model: an idempotent `AFTER INSERT/UPDATE/DELETE` trigger per managed table emits `pg_notify`, a dedicated `LISTEN` client fans the events in, and delivery is RLS-safe — a change is marked invalidated so every subscriber re-reads under its own auth context rather than trusting the publisher's row. `REALTIME_CDC` is `auto` by default: on where the connection supports it, silent fallback to app-level otherwise (`wal` degrades to `trigger` — native WAL streaming is not bundled). An 8KB-overflow guard means CDC can never abort a write.
+
 - **Per-object authorization for storage** — storage routes authenticated but did not authorize. `requireAuth` and `publicRead` are global switches: they decide whether a caller must be signed in, not what that caller may touch, so any authenticated user could read any key they could name. For multi-tenant apps the only thing between two tenants' files was key unguessability, which is not an access-control model. `storageAuthorize({ key, bucket, operation, user })` is the storage analogue of a collection's security rules; denials are 403, and a hook that throws denies too, so a failed ownership lookup cannot fall open. The load-bearing placement is `/metadata` rather than `/file/*`, because `/metadata` mints the short-lived path-scoped download token that `/file/*` trusts — and it minted one for any authenticated caller for any path. Listing is gated on the prefix, since a listing is how you discover keys nobody told you about, and TUS is gated at create time so a denied upload leaves no temp file to resume.
 
 - **Bulk writes and upsert** — only single-row create/update/delete existed, so a ~10k-row ETL had no way to express itself and dropped to `admin.executeSql` with hand-bound parameters, which is where injection bugs live. `createMany(rows, { upsert: true })` is available on both the HTTP and server-side clients, and as `POST /api/data/:collection/bulk`. Every row still runs the normal pipeline — callbacks, relations, RLS — because `saveMany` reuses `save()`; the win is that the batch shares one transaction and one round trip. `upsert` is `INSERT ... ON CONFLICT DO UPDATE` on the primary key, one statement, so it cannot lose the race a read-then-write can.
@@ -73,6 +77,8 @@
 - **Account linking** — the `EMAIL_NOT_VERIFIED` rejection on OAuth sign-in told users to link the provider from their profile, but no such endpoint existed; the only link route was anonymous→password, so the error was a dead end. An authenticated `POST /auth/link/:provider` now attaches a provider identity to the current account, with a matching client `linkProvider()`. Linking deliberately does not require a verified email or matching addresses: on sign-in the provider's email is the only evidence tying an identity to an account, so an unverified address would allow takeover, but here the caller already proved ownership with a valid session. Refuses with 409 `IDENTITY_ALREADY_LINKED` when the identity belongs to another user, and is idempotent for the caller's own.
 
 - **Cron is coordinated across instances** — every app instance ran every cron job, since the scheduler is in-process `setTimeout` and the executing flag only guards within one process, so N replicas meant N executions per tick. Handlers stay app-level closures; only the mutual exclusion moves to the database, where each instance derives the same scheduled fire time from the cron expression and atomically claims the slot.
+
+- **First-class database backups** — `rebase db backup` / `restore` / `backups`, writing to a local path or an `s3://` / `gs://` destination. Restore is confirmation-gated into a fresh database (`--create-db` / `--target-db`) so it cannot clobber a live one. Backups can run on a schedule from a cron file (`createBackupCron`, `backupCronConfigFromEnv`) with retention pruning (`BACKUP_RETENTION_DAYS` / `BACKUP_KEEP_MINIMUM`). A `rebase.backups` client surface and server routes expose the same operations, and the scaffold's `.env.example` documents the settings.
 
 - **`rebase cloud` reaches operational parity** — project slugs replace UUIDs across every user-facing surface (`--project` takes the subdomain the console URLs show; raw UUIDs still resolve for old scripts and link files), plus `rebase cloud debug` for diagnosing deployed projects and `rebase cloud storage create` / `attach`. `rebase init` gains real `--project` / `--setup-key` handling — the setup page advertised both flags while permissive arg parsing silently swallowed them.
 
@@ -138,7 +144,7 @@
 
 - **Subscriptions could hang forever** — a collection view could sit on its loading spinner indefinitely with no error until reload. `subscribe_collection` / `subscribe_one` are in the `expectsResponse = false` set, so unlike ordinary requests they had no timeout, and a subscribe that got no reply left the subscription pending forever; a subscribe whose send rejected — a token refresh losing a cold-load race — failed the same silent way.
 
-- **The service key did not authenticate websockets, and channel messages lost their envelope** — channel payloads are now wrapped consistently, and the realtime socket connects lazily rather than in the constructor, so constructing a client no longer opens a connection.
+- **Channel messages lost their envelope** — channel payloads are now wrapped consistently, and the realtime socket connects lazily rather than in the constructor, so constructing a client no longer opens a connection.
 
 - **Realtime told subscribers the wrong name for their rows**, and a save now names the row it saved rather than deriving an address the caller never asked for.
 
@@ -180,59 +186,22 @@
 
 ### Breaking
 
-- **Entity → Entity vocabulary rename** — The `Entity` noun has been removed from the entire public API surface. Every type, hook, component, prop, config key, and wire-protocol message that previously used "entity" now uses "entity" (or, in backend callbacks, the flat database term "row"). This is a search-and-replace-level migration for consumers — no behavioral changes. The full rename map follows.
+- **Collection & callback API renames** — several collection-related types took role-based names, the callback parameters flattened to plain rows, and the WebSocket protocol dropped the redundant `ENTITY` from its message names. The `Entity` type itself is unchanged. This is a search-and-replace-level migration for consumers — no behavioral changes.
 
   **Types (`@rebasepro/types`)**
 
   | Old Name | New Name |
   |----------|----------|
-  | `Entity<M>` | `Entity<M>` |
   | `EntityCollection<M>` | `CollectionConfig<M>` |
   | `EntityCallbacks<M>` | `CollectionCallbacks<M>` |
-  | `EntityValues<M>` | `EntityValues<M>` |
-  | `EntityStatus` | `EntityStatus` |
-  | `EntityReference` | `EntityReference` |
   | `EntityView` | `EntityCustomView` |
-  | `EntityAction<M>` | `EntityAction<M>` |
-  | `EntityActionClickProps<M>` | `EntityActionClickProps<M>` |
-  | `EntityFormProps` | `EntityFormProps` |
-  | `EntitySidePanelProps` | `EntitySidePanelProps` |
-  | `SideEntityController` | `SideEntityController` |
-  | `EntitySelectionProps` | `EntitySelectionProps` |
-  | `EntityPreview` | `EntityPreview` |
   | `EntityCollectionView` | `DataCollectionView` |
-  | `EntityCard` | `EntityCard` |
-  | `EntitySelectionTable` | `EntitySelectionTable` |
-
-  **Collection config props**
-
-  | Old Prop | New Prop |
-  |----------|----------|
-  | `entityViews` | `entityViews` |
-  | `entityActions` | `entityActions` |
-  | `openEntityMode` | `openEntityMode` |
-  | `includeEntityLink` | `includeEntityLink` |
-  | `entityId` (in panel props) | `entityId` |
-
-  **React hooks & components (`@rebasepro/admin`)**
-
-  | Old Name | New Name |
-  |----------|----------|
-  | `useSideEntityController()` | `useSideEntityController()` |
-  | `useEntitySelectionDialog()` | `useEntitySelectionDialog()` |
-  | `SideEntityProvider` | `SideEntityProvider` |
-  | `mergeEntityActions()` | `mergeEntityActions()` |
-  | `resolveEntityAction()` | `resolveEntityAction()` |
-  | `resolveEntityView()` | `resolveEntityView()` |
-  | `editEntityAction` | `editEntityAction` |
-  | `copyEntityAction` | `copyEntityAction` |
-  | `deleteEntityAction` | `deleteEntityAction` |
 
   **Callback API (`CollectionCallbacks`)** — beyond the rename, the parameter shapes changed:
 
   | Old Param | New Param | Notes |
   |-----------|-----------|-------|
-  | `entity` (in `afterRead`) | `row` | Now a flat `Record<string, unknown>`, not a `Entity<M>` wrapper |
+  | `entity` (in `afterRead`) | `row` | Now a flat `Record<string, unknown>`, not an `Entity<M>` wrapper |
   | `entityId` (in save/delete) | `id` | `string \| number` |
   | `previousEntity` | `previousValues` | `Partial<EntityValues<M>>` |
   | `afterCreate` / `afterUpdate` | `afterSave` | Use `status: "new" \| "existing"` to distinguish |
@@ -266,14 +235,6 @@
   | `COUNT_ENTITIES` | `COUNT` |
   | `subscribe_entity` | `subscribe_one` |
   | `collection_entity_patch` | `collection_patch` |
-
-  **Database schema**
-
-  | Old Name | New Name |
-  |----------|----------|
-  | `rebase.entity_history` (table) | `rebase.entity_history` |
-  | `entity_id` (column) | `entity_id` |
-  | `rebase_entity_changes` (PG NOTIFY channel) | `rebase_entity_changes` |
 
 - **Unified `<Rebase>` data props** — Removed the `data` and `driver` props. There are now exactly two ways to provide data: `client` (server transport) and `dataSources` (everything else). A `dataSources` entry keyed `"(default)"` with a `driver` replaces `client.data` as the default source — this is how a fully client-side app (e.g. Firestore-only via `RebaseFirebaseApp`) is wired. Migration: `driver={x}` → `dataSources={[{ key: "(default)", engine: "firestore", driver: x }]}`; `data={x}` had no known users (custom backends implement `DataDriver`, now the documented integration SPI).
 - **Deterministic default-source resolution** — The default data source resolves as: `"(default)"`-keyed entry with driver → `client.data` → the sole registered source. Several sources without an explicit default now throw instead of silently picking the first object entry (order-dependent).

@@ -358,6 +358,80 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             `);
         }
 
+        // ── Migration: reconcile refresh_tokens for the device-session upsert ──
+        // The refresh-token rotation does `INSERT ... ON CONFLICT (uid, user_agent,
+        // ip_address) DO UPDATE`, which requires the `unique_device_session`
+        // constraint. `CREATE TABLE IF NOT EXISTS` never adds it to a table that
+        // predates the constraint, so every login on such a database 500s with
+        // `42P10 no unique or exclusion constraint matching the ON CONFLICT`.
+        // Reconcile EVERY table named refresh_tokens, in whatever schema it lives,
+        // rather than only the derived name: a database provisioned by an older
+        // era can carry the table in a different schema than the one this run
+        // derives, and the login upsert then hits a table without the constraint.
+        try {
+            const rtTables = await db.execute(sql`
+                SELECT table_schema, table_name
+                FROM information_schema.tables
+                WHERE table_name = 'refresh_tokens'
+            `);
+            const found = (rtTables.rows as { table_schema: string; table_name: string }[]);
+            logger.info(`🔍 refresh_tokens reconcile: found ${found.length} table(s): ${found.map(r => `"${r.table_schema}"."${r.table_name}"`).join(", ") || "(none)"}`);
+            for (const { table_schema } of found) {
+                const qualified = `"${table_schema}"."refresh_tokens"`;
+                try {
+                    // Old tables may lack these columns entirely.
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS user_agent TEXT`);
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS ip_address TEXT`);
+                    // The upsert relies on '' (not NULL) so a device with no UA/IP collides.
+                    await db.execute(sql`UPDATE ${sql.raw(qualified)} SET user_agent = '' WHERE user_agent IS NULL`);
+                    await db.execute(sql`UPDATE ${sql.raw(qualified)} SET ip_address = '' WHERE ip_address IS NULL`);
+                    // Drop pre-existing duplicates that would block the unique constraint,
+                    // keeping one row per (uid, user_agent, ip_address).
+                    await db.execute(sql`
+                        DELETE FROM ${sql.raw(qualified)} a
+                        USING ${sql.raw(qualified)} b
+                        WHERE a.ctid < b.ctid
+                          AND a.uid = b.uid
+                          AND a.user_agent = b.user_agent
+                          AND a.ip_address = b.ip_address
+                    `);
+                    // Log every unique constraint on the table so drift is visible.
+                    const uniques = await db.execute(sql`
+                        SELECT conname, pg_get_constraintdef(oid) AS def
+                        FROM pg_constraint
+                        WHERE conrelid = ${sql.raw(`'${qualified}'`)}::regclass AND contype = 'u'
+                    `);
+                    for (const u of uniques.rows as { conname: string; def: string }[]) {
+                        logger.info(`   ${qualified} unique: ${u.conname} → ${u.def}`);
+                    }
+                    // Does a usable unique constraint cover EXACTLY (uid, user_agent, ip_address)?
+                    // Checking by name alone is not enough: an older era may carry a
+                    // `unique_device_session` on different columns, which the ON CONFLICT
+                    // cannot infer, so login keeps 500ing with 42P10.
+                    const hasCorrect = (uniques.rows as { def: string }[]).some((u) => {
+                        const cols = (u.def.match(/\(([^)]*)\)/)?.[1] || "")
+                            .split(",").map((c) => c.trim().replace(/"/g, ""));
+                        return cols.length === 3 && cols.includes("uid") && cols.includes("user_agent") && cols.includes("ip_address");
+                    });
+                    if (hasCorrect) {
+                        logger.info(`✓ correct device-session unique already present on ${qualified}`);
+                    } else {
+                        // Remove a wrong-columned constraint squatting on the name, then add the right one.
+                        await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} DROP CONSTRAINT IF EXISTS unique_device_session`);
+                        await db.execute(sql`
+                            ALTER TABLE ${sql.raw(qualified)}
+                                ADD CONSTRAINT unique_device_session UNIQUE (uid, user_agent, ip_address)
+                        `);
+                        logger.info(`✅ Added correct unique_device_session constraint to ${qualified}`);
+                    }
+                } catch (perTableError: unknown) {
+                    logger.warn(`⚠️  refresh_tokens reconcile failed for ${qualified}: ${perTableError instanceof Error ? perTableError.message : String(perTableError)}`);
+                }
+            }
+        } catch (migrationError: unknown) {
+            logger.warn(`⚠️  refresh_tokens device-session migration skipped: ${migrationError instanceof Error ? migrationError.message : String(migrationError)}`);
+        }
+
         // ── Migration: Copy roles from legacy junction table to inline column ──
         // If the old rebase.user_roles and rebase.roles tables exist, migrate
         // the data into the new TEXT[] column then drop the legacy tables.

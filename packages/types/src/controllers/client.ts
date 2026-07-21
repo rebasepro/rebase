@@ -384,9 +384,10 @@ export interface RebaseServerClient<DB = unknown> extends RebaseClient<DB> {
 
     /**
      * Execute raw SQL against the database. Always present server-side for SQL
-     * engines.
+     * engines. Values interpolated into the query should be passed via
+     * `params`, referenced as `$1`, `$2`, … placeholders in the query text.
      */
-    sql(query: string, options?: { database?: string; role?: string }): Promise<Record<string, unknown>[]>;
+    sql(query: string, options?: { database?: string; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
 }
 
 // ─── RebaseBrowserClient ─────────────────────────────────────────────────────

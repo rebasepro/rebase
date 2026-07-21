@@ -30,16 +30,22 @@ COPY scripts ./scripts
 # (many packages rely on hoisted devDependencies like @vitejs/plugin-react)
 RUN pnpm install --shamefully-hoist
 
-# Build all packages using pnpm recursive with --no-bail.
-# Some packages may fail tsc declarations — that's fine, we only need vite bundles + esbuild outputs.
-RUN pnpm --filter './packages/*' -r --no-bail run build; exit 0
+# Build all packages. This must fail the image on error: `dist` is dockerignored,
+# so a swallowed failure here produces an image with missing or partial output
+# rather than a loud build error.
+RUN pnpm --filter './packages/*' -r run build
 
 # Build the backend (TypeScript → JavaScript), then resolve ESM import extensions
 # 1. tsc compiles TS→JS  2. tsc-alias resolves path aliases  3. sed adds .js to remaining relative imports
 RUN cd app/backend && npx tsc -p tsconfig.docker.json && npx tsc-alias -p tsconfig.docker.json -f \
     && find dist -name '*.js' -exec sed -i 's/from "\(\.[^"]*\)"/from "\1.js"/g; s/\.js\.js/.js/g' {} +
 
-# Build frontend (reads .env.production for VITE_API_URL etc.)
+# Build frontend. VITE_GOOGLE_CLIENT_ID is injected as a build-arg because the
+# only other source, app/frontend/.env.production, is gitignored AND stripped
+# from the build context by .dockerignore's **/.env.* rule — so without this the
+# SPA compiles with an empty client id and the Google login button hides itself.
+ARG VITE_GOOGLE_CLIENT_ID=""
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 RUN cd app/frontend && npx vite build
 
 # Prune devDependencies to reduce image size
