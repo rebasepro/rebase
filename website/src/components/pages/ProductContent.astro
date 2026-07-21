@@ -3,8 +3,6 @@ const { lang, t } = Astro.props;
 import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 import { NeatBackground } from '../../components/NeatBackground';
 import SpotlightCard from '../../components/SpotlightCard.astro';
-import { SchemaEditorDemo } from '../../components/SchemaEditorDemo';
-import { SQLEditorDemo } from '../../components/demos/SQLEditorDemo';
 
 import { KanbanDemo } from '../../components/demos/KanbanDemo';
 import { RichTextEditorDemo } from '../../components/demos/RichTextEditorDemo';
@@ -16,6 +14,7 @@ import { Terminal, ShieldCheck, Folder, Network, History, Bot, Zap, Database, La
 import "../../styles/editor.css";
 import RebaseMosaicDemo from '../../components/demos/RebaseMosaicDemo';
 import CollectionPowerSection from '../../components/CollectionPowerSection.astro';
+import ScrollSyncShowcase from '../../components/ScrollSyncShowcase.astro';
 
 ---
 
@@ -150,46 +149,9 @@ import CollectionPowerSection from '../../components/CollectionPowerSection.astr
 
 
   <!-- ═══════════════════════════════════════════════════════════ -->
-  <!-- 2 · SCHEMA-AS-CODE                                         -->
+  <!-- 2 · WORKFLOW SHOWCASE (entity view · schema editor · SQL)   -->
   <!-- ═══════════════════════════════════════════════════════════ -->
- <section class="py-24 sm:py-32">
-    <div class="mx-auto max-w-7xl px-6 lg:px-8">
-      <div class="mx-auto max-w-3xl text-center mb-10 animate-on-scroll fade-in-up">
-        <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-indigo-500/10 text-indigo-400 ring-1 ring-inset ring-indigo-500/20">Schema-as-Code</div>
-        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Visual building. Real TypeScript.</h2>
-        <p class="text-lg text-surface-400">Design your schema visually — every change writes back to your local TypeScript files via AST. Or connect your existing database and get a full admin panel instantly.</p>
-      </div>
-      <div class="mx-auto max-w-[1400px]">
-        <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950" style="height:600px;">
-          <SchemaEditorDemo client:load/>
-        </div>
-      </div>
-    </div>
-  </section>
-
-
-  <!-- ═══════════════════════════════════════════════════════════ -->
-  <!-- 3 · SQL EDITOR                                            -->
-  <!-- ═══════════════════════════════════════════════════════════ -->
- <section class="py-24 sm:py-32">
-    <div class="mx-auto max-w-7xl px-6 lg:px-8">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        <div class="lg:order-last">
-          <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-cyan-500/10 text-cyan-400 ring-1 ring-inset ring-cyan-500/20">Built-in SQL</div>
-          <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">SQL Editor</h2>
-          <p class="text-lg text-surface-400 mb-6">Write and execute SQL directly against your database. Schema-aware autocomplete, result previews, and query history.</p>
-          <ul class="space-y-3 text-surface-300">
-            <li class="flex gap-3"><span class="text-primary">✓</span> Monaco-based editor with syntax highlighting</li>
-            <li class="flex gap-3"><span class="text-primary">✓</span> Schema browser with table/column introspection</li>
-            <li class="flex gap-3"><span class="text-primary">✓</span> Inline result table with sorting and pagination</li>
-          </ul>
-        </div>
-        <div class="rounded-xl overflow-hidden ring-1 ring-surface-700 bg-surface-950 shadow-2xl">
-          <SQLEditorDemo client:only="react" />
-        </div>
-      </div>
-    </div>
-  </section>
+  <ScrollSyncShowcase/>
 
 
   <!-- ═══════════════════════════════════════════════════════════ -->
@@ -239,7 +201,7 @@ import CollectionPowerSection from '../../components/CollectionPowerSection.astr
         <SpotlightCard icon={ShieldCheck} title="Row-Level Security" description="Create and manage Postgres RLS policies visually. Per-row, per-role access rules."/>
         <SpotlightCard icon={Network} title="Typed Client SDK" description="Fetch data and resolve deep relations with pure TypeScript autocompletion."/>
         <SpotlightCard icon={Globe} title="REST & OpenAPI" description="Auto-generated REST endpoints with OpenAPI 3.0 spec and Swagger UI."/>
-        <SpotlightCard icon={Bot} title="AI & MCP Server" description="AI autofill, natural language queries, and full MCP integration for AI agents."/>
+        <SpotlightCard icon={Bot} title="AI & MCP Server" description="AI autofill, scoped API keys for agents, and full MCP integration."/>
         <SpotlightCard icon={Users} title="Users & Roles" description="Manage users, assign roles, and configure RBAC directly from the admin panel."/>
         <SpotlightCard icon={History} title="Entity History" description="Full audit trail with versioning. See who changed what, when, and revert to any previous state."/>
         <SpotlightCard icon={Layers} title="Import & Export" description="Bulk import from CSV/JSON with field mapping. Export with a single click."/>

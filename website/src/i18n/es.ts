@@ -30,37 +30,50 @@ export const es = {
   "howitworks.step3.title": "Auth y permisos frágiles",
   "howitworks.step3.desc":
     "Olvídate de montar JWT a mano y de repartir controles de acceso por todo el código. Define seguridad a nivel de fila y permisos por rol directamente en tu esquema TypeScript — auditable, versionable, blindado.",
-  "showcase.badge": "Construido para Productos Reales",
+  "showcase.badge": "Construido para productos reales",
   "showcase.title.part1": "Los equipos lanzan más rápido con",
-  "showcase.title.part2": "REBASE",
+  "showcase.title.part2": "Rebase",
   "showcase.subtitle":
     "Desde <b>marketplaces</b> hasta <b>plataformas SaaS</b> y <b>herramientas internas</b>, Rebase elimina el código intermedio entre base de datos, API y UI.",
+  "showcase.case0.badge": "Editor Vectorial · Creado por el equipo de Rebase",
+  "showcase.case0.title": "Dadaki",
+  "showcase.case0.desc":
+    "Nuestro propio producto: un editor vectorial rápido en el navegador con sincronización en la nube. Dadaki funciona sobre un backend Rebase completamente estándar — el mismo auth, storage y APIs generadas de cualquier proyecto — desplegado en Rebase Cloud.",
+  "showcase.case0.feat1.title": "Archivos de diseño sincronizados",
+  "showcase.case0.feat1.desc":
+    "Los documentos viven en Postgres y los assets en el storage de Rebase. Inicia sesión en cualquier dispositivo y tu trabajo está ahí — sin escribir ningún servicio de sync.",
+  "showcase.case0.feat2.title": "Auth sin proyecto de auth",
+  "showcase.case0.feat2.desc":
+    "El login y las sesiones vienen directamente del auth de Rebase. El editor sigue siendo un frontend puro hablando con APIs generadas y tipadas.",
+  "showcase.case0.feat3.title": "Desplegado en Rebase Cloud",
+  "showcase.case0.feat3.desc":
+    "En producción sobre Rebase Cloud con dominio propio — publicamos nuestros productos en la misma infraestructura que vendemos.",
   "showcase.case.badge": "Marketplace & Portal de Empleo",
   "showcase.case.title": "SustenTalent",
   "showcase.case.desc":
-    "Un marketplace de talento bilateral que conecta a profesionales de la sostenibilidad con empresas verdes. Construido íntegramente sobre Rebase, SustenTalent gestiona routing complejo por roles, perfiles de usuario con múltiples roles y miles de ofertas de empleo.",
+    "Un marketplace bilateral que conecta a profesionales de la sostenibilidad con empresas verdes. Rebase impulsa ambos lados del mercado: auth por roles, APIs de matching tipadas y el back office de moderación.",
   "showcase.case.feat1.title": "Autenticación de Doble Rol",
   "showcase.case.feat1.desc":
-    "Usando el auth de Rebase, los usuarios pueden mantener perfiles de 'talento' y 'empresa' a la vez, con redirección automática al dashboard correspondiente.",
-  "showcase.case.feat2.title": "APIs de Datos Generadas",
+    "Una misma cuenta puede tener perfil de talento y de empresa a la vez — los roles de Rebase gobiernan el routing y los permisos, sin servicio de auth propio.",
+  "showcase.case.feat2.title": "APIs de Matching Tipadas",
   "showcase.case.feat2.desc":
-    "Con el SDK TypeScript autogenerado obtienen ofertas de empleo filtradas por intereses profesionales de forma segura, con tipado completo en su app frontend.",
-  "showcase.case.feat3.title": "Admin Listo para Usar",
+    "El matching de vacantes corre sobre el SDK TypeScript generado, con tipado seguro desde Postgres hasta el frontend en React.",
+  "showcase.case.feat3.title": "Un Back Office que Nunca Construyeron",
   "showcase.case.feat3.desc":
-    "El personal utiliza el panel de administración generado por Rebase para moderar ofertas de trabajo, verificar empresas y gestionar la taxonomía propietaria de intereses.",
+    "Moderan ofertas, verifican empresas y curan la taxonomía de skills desde el panel de administración generado — cero código de herramientas internas.",
   "showcase.case2.badge": "Terapia Digital del Dolor",
   "showcase.case2.title": "MedicalMotion",
   "showcase.case2.desc":
-    "Una app médica digital certificada que usa IA para ofrecer terapia holística personalizada contra el dolor. Rebase gestiona todo entre bastidores: datos de pacientes, seguimiento clínico y distribución de contenidos.",
-  "showcase.case2.feat1.title": "Datos de Pacientes Seguros",
+    "Un dispositivo médico digital certificado que ofrece terapia del dolor personalizada con IA. Rebase ejecuta todo el backend: historiales de pacientes, planes de terapia, la biblioteca de ejercicios y los dashboards clínicos sobre ellos.",
+  "showcase.case2.feat1.title": "Datos de Pacientes con Row-Level Security",
   "showcase.case2.feat1.desc":
-    "Perfiles médicos de pacientes, planes de terapia y registros de salud sensibles se almacenan de forma segura, con seguridad a nivel de fila configurada desde el esquema de Rebase.",
-  "showcase.case2.feat2.title": "Distribución de Contenidos",
+    "Perfiles, planes de terapia y registros de salud quedan aislados con RLS de Postgres definida en el esquema de Rebase — control de acceso de nivel compliance sin middleware propio.",
+  "showcase.case2.feat2.title": "Contenido vía APIs Generadas",
   "showcase.case2.feat2.desc":
-    "Rebase entrega los planes de terapia diarios, ejercicios de fisioterapia en vídeo y contenido educativo sin interrupciones a través de las APIs generadas.",
-  "showcase.case2.feat3.title": "Seguimiento Clínico",
+    "Los planes de terapia diarios y toda la videoteca de fisioterapia se sirven por las APIs generadas y tipadas de Rebase — sin endpoints escritos a mano.",
+  "showcase.case2.feat3.title": "Operativa Clínica en el Admin",
   "showcase.case2.feat3.desc":
-    "Los equipos internos usan el panel de administración de Rebase para monitorizar el uso de la app, gestionar la biblioteca de ejercicios y generar informes de salud.",
+    "Clínicos y equipos de contenido monitorizan el engagement, gestionan la biblioteca de ejercicios y generan informes desde el admin generado — sin construir herramientas internas.",
   "features.title": "Todo lo que genera tu esquema",
   "features.subtitle":
     "Funcionalidades listas para producción, todas generadas desde tu esquema TypeScript. Cada vista se actualiza en tiempo real.",
@@ -145,7 +158,7 @@ export const es = {
   "showcase.sync.tab3.desc":
     "Diseña tu modelo de datos visualmente en Rebase Studio. Cada cambio se escribe de vuelta a tus archivos locales TypeScript vía AST — tu código se mantiene limpio, tu equipo se mantiene sincronizado.",
   "power.title":
-    'Una colección.<br/><span class="text-primary subtle-shimmer">Todo generado.</span>',
+    'Una colección.<br/><span class="text-primary">Todo generado.</span>',
   "power.subtitle":
     "Define tu modelo de datos una vez en TypeScript. Rebase crea automáticamente tu interfaz de administración, formularios, esquema de base de datos, APIs REST, y tipos de TypeScript.",
   "power.badge": "El código es la fuente de verdad",
@@ -532,7 +545,7 @@ export const es = {
 
   // AI & Agents Section
   "ai.badge": "Infraestructura para Agentes",
-  "ai.title": "El backend que <span class=\"text-primary subtle-shimmer\">los agentes de IA necesitan.</span>",
+  "ai.title": "El backend que <span class=\"text-primary\">los agentes de IA necesitan.</span>",
   "ai.subtitle": "Búsqueda vectorial, API keys con alcance, funciones personalizadas, sincronización en tiempo real y cron jobs — todo lo que tus agentes de IA necesitan para leer, escribir y actuar sobre tus datos de Postgres de forma autónoma.",
 
   // Grouped Features Section
