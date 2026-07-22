@@ -33,19 +33,87 @@ export interface PMCommands {
 }
 
 /**
+ * How long to wait for `pnpm --version` before giving up on the probe.
+ *
+ * `pnpm --version` is a cold Node start, and on a machine that is busy — a
+ * parallel install, a full test run — it routinely takes seconds. Measured at
+ * 630ms, 990ms and 4293ms on three consecutive runs of one developer laptop
+ * under load, so the previous 3s budget was inside the normal spread rather
+ * than safely outside it.
+ */
+const PNPM_PROBE_TIMEOUT_MS = 5000;
+
+/** Memoised result of the probe. pnpm cannot appear or vanish mid-process. */
+let cachedPnpmAvailable: boolean | undefined;
+
+/**
+ * Decide availability from a `spawnSync` outcome.
+ *
+ * Split out from the spawn itself so the decision is testable without starting
+ * a process — which is what made the old test load-sensitive and occasionally
+ * red for reasons that had nothing to do with the code under test.
+ *
+ * The three outcomes are distinguishable, and the old code conflated two of
+ * them by asking only `status === 0`:
+ *
+ *   not installed   status null, signal null,    error.code ENOENT
+ *   timed out       status null, signal SIGTERM, error.code ETIMEDOUT
+ *   broken install  status non-zero, no error
+ */
+export function pnpmAvailabilityFromProbe(res: {
+    status: number | null;
+    signal?: NodeJS.Signals | null;
+    error?: { code?: string } | Error;
+}): boolean {
+    const code = (res.error as { code?: string } | undefined)?.code;
+
+    // The binary is not on PATH. Genuinely absent.
+    if (code === "ENOENT") return false;
+
+    // We killed it for taking too long. That means it WAS found and did start,
+    // so pnpm is installed — it was merely slow, which on a loaded machine is
+    // routine rather than exceptional. Reporting "absent" here is what silently
+    // scaffolded npm projects for developers who had pnpm all along.
+    //
+    // The trade-off, stated plainly: a pnpm that hangs forever (a misbehaving
+    // corepack shim) now resolves to pnpm instead of falling back to npm. That
+    // is the rarer and more visible failure — the user sees their next command
+    // hang — whereas the case this fixes was silent and produced a project
+    // pinned to the wrong package manager. The timeout still bounds how long
+    // detection itself waits, which was always its real job.
+    if (code === "ETIMEDOUT" || res.signal) return true;
+
+    // Any other spawn error: treat as unavailable rather than guess.
+    if (res.error) return false;
+
+    return res.status === 0;
+}
+
+/**
  * Whether pnpm is runnable on this machine.
  *
  * Used to decide whether a fresh project can be scaffolded with pnpm. Kept
- * cheap and non-interactive (short timeout, output discarded) so it never
- * hangs detection if a corepack shim misbehaves.
+ * cheap and non-interactive (bounded timeout, output discarded) so it never
+ * hangs detection if a corepack shim misbehaves, and memoised so that repeated
+ * detection in one CLI run costs one process rather than one per call.
  */
 export function isPnpmAvailable(): boolean {
+    if (cachedPnpmAvailable !== undefined) return cachedPnpmAvailable;
     try {
-        const res = spawnSync("pnpm", ["--version"], { stdio: "ignore", timeout: 3000 });
-        return res.status === 0;
+        const res = spawnSync("pnpm", ["--version"], {
+            stdio: "ignore",
+            timeout: PNPM_PROBE_TIMEOUT_MS
+        });
+        cachedPnpmAvailable = pnpmAvailabilityFromProbe(res);
     } catch {
-        return false;
+        cachedPnpmAvailable = false;
     }
+    return cachedPnpmAvailable;
+}
+
+/** Forget the memoised probe. For tests; nothing in a CLI run needs it. */
+export function resetPnpmAvailabilityCache(): void {
+    cachedPnpmAvailable = undefined;
 }
 
 /**

@@ -9,7 +9,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { detectPackageManager, getPMCommands } from "./package-manager";
+import {
+    detectPackageManager,
+    getPMCommands,
+    pnpmAvailabilityFromProbe,
+    resetPnpmAvailabilityCache
+} from "./package-manager";
 import type { PackageManager, PMCommands } from "./package-manager";
 
 let tmpDir: string;
@@ -211,5 +216,73 @@ describe("type contracts", () => {
         const b = cmds.exec("rebase", args);
         expect(a).toEqual(b);
         expect(a).not.toBe(b);
+    });
+});
+
+// =============================================================================
+// Probe interpretation
+// =============================================================================
+
+/**
+ * These replaced a real `pnpm --version` spawn as the only coverage of this
+ * decision. That spawn carried a 3s budget, and `pnpm --version` on a loaded
+ * machine was measured at 630ms, 990ms and 4293ms on three consecutive runs —
+ * so the suite went red whenever the machine happened to be busy, which is
+ * exactly when a full test run happens.
+ *
+ * Interpreting a `spawnSync` result needs no process, so these are exact.
+ */
+describe("pnpmAvailabilityFromProbe", () => {
+    it("reports absent when the binary is not on PATH", () => {
+        expect(pnpmAvailabilityFromProbe({
+            status: null, signal: null, error: Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" })
+        })).toBe(false);
+    });
+
+    it("reports AVAILABLE when the probe timed out", () => {
+        // The regression this whole change exists for. A timeout means the
+        // binary was found and started, so pnpm is installed — it was slow, not
+        // missing. Calling it missing silently scaffolded npm projects for
+        // developers who had pnpm.
+        expect(pnpmAvailabilityFromProbe({
+            status: null, signal: "SIGTERM", error: Object.assign(new Error("ETIMEDOUT"), { code: "ETIMEDOUT" })
+        })).toBe(true);
+    });
+
+    it("reports available when killed by a signal even without an error code", () => {
+        expect(pnpmAvailabilityFromProbe({ status: null, signal: "SIGKILL" })).toBe(true);
+    });
+
+    it("reports available on a clean exit", () => {
+        expect(pnpmAvailabilityFromProbe({ status: 0, signal: null })).toBe(true);
+    });
+
+    it("reports absent on a non-zero exit — installed but broken is not usable", () => {
+        expect(pnpmAvailabilityFromProbe({ status: 3, signal: null })).toBe(false);
+    });
+
+    it("reports absent for an unrecognised spawn error rather than guessing", () => {
+        expect(pnpmAvailabilityFromProbe({
+            status: null, signal: null, error: Object.assign(new Error("EACCES"), { code: "EACCES" })
+        })).toBe(false);
+    });
+
+    it("does not confuse a timeout with a missing binary", () => {
+        // The precise conflation the old `status === 0` check made: both cases
+        // have status null, and it answered false to both.
+        const timedOut = { status: null, signal: "SIGTERM" as const, error: Object.assign(new Error(""), { code: "ETIMEDOUT" }) };
+        const missing = { status: null, signal: null, error: Object.assign(new Error(""), { code: "ENOENT" }) };
+        expect(pnpmAvailabilityFromProbe(timedOut)).not.toBe(pnpmAvailabilityFromProbe(missing));
+    });
+});
+
+describe("pnpm probe caching", () => {
+    it("resetPnpmAvailabilityCache lets a fresh probe run", () => {
+        // Detection is called several times in one CLI run; without memoisation
+        // each call spawned its own process, multiplying the chance that one of
+        // them hit the timeout.
+        resetPnpmAvailabilityCache();
+        expect(() => detectPackageManager(tmpDir)).not.toThrow();
+        expect(detectPackageManager(tmpDir)).toBe(detectPackageManager(tmpDir));
     });
 });
