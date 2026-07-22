@@ -116,6 +116,11 @@ roles: [mockRole("editor")] };
         deleteAllRefreshTokensForUser: jest.fn().mockResolvedValue(undefined),
         listRefreshTokensForUser: jest.fn().mockResolvedValue([]),
         deleteRefreshTokenById: jest.fn().mockResolvedValue(undefined),
+        markRefreshTokenRotated: jest.fn().mockResolvedValue(undefined),
+        revokeRefreshTokenSession: jest.fn().mockResolvedValue(undefined),
+        pruneRefreshTokens: jest.fn().mockResolvedValue(undefined),
+        getTokensValidAfter: jest.fn().mockResolvedValue(null),
+        setTokensValidAfter: jest.fn().mockResolvedValue(undefined),
         createPasswordResetToken: jest.fn().mockResolvedValue(undefined),
         findValidPasswordResetToken: jest.fn().mockResolvedValue(null),
         markPasswordResetTokenUsed: jest.fn().mockResolvedValue(undefined),
@@ -199,6 +204,24 @@ function json(body: Record<string, unknown>) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
     };
+}
+
+/** A live, unrotated refresh-token row, unless the test says otherwise. */
+function storedToken(overrides: Record<string, unknown> = {}) {
+    return {
+        id: "rt-1",
+        uid: "user-1",
+        sessionId: "session-1",
+        tokenHash: "old-hash",
+        expiresAt: new Date(Date.now() + 86400000),
+        createdAt: new Date(),
+        sessionStartedAt: new Date(),
+        rotatedAt: null,
+        revoked: false,
+        userAgent: "",
+        ipAddress: "",
+        ...overrides
+    } as any;
 }
 
 function authHeader(uid = "user-1", roles = ["editor"]) {
@@ -739,23 +762,41 @@ withEmail: false }); // Hack to pass empty list of providers
             expect(body.user).toBeUndefined();
         });
 
-        it("rotates refresh token — deletes old, creates new", async () => {
+        it("rotates refresh token — supersedes old, creates new, never deletes", async () => {
             const app = createApp();
-            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce({
-                id: "rt-1",
-                uid: "user-1",
-                tokenHash: "old-hash",
-                expiresAt: new Date(Date.now() + 86400000),
-                createdAt: new Date(),
-                userAgent: "",
-                ipAddress: ""
-            });
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(storedToken());
 
             await app.request("/auth/refresh", json({ refreshToken: "the-token" }));
-            // Old token deleted
-            expect(mockAuthRepo.deleteRefreshToken).toHaveBeenCalledTimes(1);
-            // New token stored
+            // Superseded, NOT deleted: the row is the only thing that can later
+            // tell a client replaying this token apart from a forgery.
+            expect(mockAuthRepo.markRefreshTokenRotated).toHaveBeenCalledTimes(1);
+            expect(mockAuthRepo.deleteRefreshToken).not.toHaveBeenCalled();
             expect(mockAuthRepo.createRefreshToken).toHaveBeenCalledTimes(1);
+        });
+
+        it("keeps the successor in the same session, dated from the sign-in", async () => {
+            const app = createApp();
+            const startedAt = new Date(Date.now() - 3 * 86400000);
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(
+                storedToken({ sessionId: "session-42", sessionStartedAt: startedAt })
+            );
+
+            await app.request("/auth/refresh", json({ refreshToken: "the-token" }));
+
+            const session = mockAuthRepo.createRefreshToken.mock.calls[0][5];
+            expect(session).toEqual({ id: "session-42", startedAt });
+        });
+
+        it("falls back to deleting when the repository predates rotation tracking", async () => {
+            const app = createApp();
+            // A host application's own TokenRepository, written before these
+            // methods existed, must still work — just without the grace.
+            (mockAuthRepo as any).markRefreshTokenRotated = undefined;
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(storedToken());
+
+            const res = await app.request("/auth/refresh", json({ refreshToken: "the-token" }));
+            expect(res.status).toBe(200);
+            expect(mockAuthRepo.deleteRefreshToken).toHaveBeenCalledTimes(1);
         });
 
         it("returns 401 for unknown refresh token", async () => {
@@ -766,6 +807,100 @@ withEmail: false }); // Hack to pass empty list of providers
             expect(res.status).toBe(401);
             const body = await res.json() as any;
             expect(body.error.code).toBe("INVALID_TOKEN");
+        });
+
+        it("does NOT clear the cookie when the token is unrecognised", async () => {
+            // The regression this whole design exists to prevent: one stale
+            // request — a duplicate from another tab, a retry after a deploy —
+            // used to wipe the cookie and sign out a live session.
+            const app = createApp({ cookieAuth: { sameSite: "Lax" } });
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(null);
+
+            const res = await app.request("/auth/refresh", {
+                method: "POST",
+                headers: { cookie: "__rb_refresh=stale-token" }
+            });
+
+            expect(res.status).toBe(401);
+            expect(res.headers.get("set-cookie")).toBeNull();
+        });
+
+        it("accepts a token replayed inside the reuse window and mints a sibling", async () => {
+            // The lost-response case: the client never saw the rotated token,
+            // so it presents the old one. It gets a working session, not a 401.
+            const app = createApp();
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(
+                storedToken({ sessionId: "session-1", rotatedAt: new Date(Date.now() - 2000) })
+            );
+
+            const res = await app.request("/auth/refresh", json({ refreshToken: "lost-response-token" }));
+
+            expect(res.status).toBe(200);
+            const body = await res.json() as any;
+            expect(body.tokens.accessToken).toBeTruthy();
+            // The parent keeps its original rotation stamp — re-marking it
+            // would slide the window forward on every replay.
+            expect(mockAuthRepo.markRefreshTokenRotated).not.toHaveBeenCalled();
+            expect(mockAuthRepo.createRefreshToken.mock.calls[0][5]).toMatchObject({ id: "session-1" });
+        });
+
+        it("rejects a replay after the window without touching the live session", async () => {
+            const app = createApp({ cookieAuth: { sameSite: "Lax" } });
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(
+                storedToken({ sessionId: "session-1", rotatedAt: new Date(Date.now() - 60_000) })
+            );
+
+            const res = await app.request("/auth/refresh", {
+                method: "POST",
+                headers: { cookie: "__rb_refresh=long-stale-token" }
+            });
+
+            expect(res.status).toBe(401);
+            expect((await res.json() as any).error.code).toBe("TOKEN_ALREADY_USED");
+            // The sibling this token was rotated into is still good — the
+            // straggler must not take the whole sign-in down with it.
+            expect(mockAuthRepo.revokeRefreshTokenSession).not.toHaveBeenCalled();
+            expect(mockAuthRepo.createRefreshToken).not.toHaveBeenCalled();
+            expect(res.headers.get("set-cookie")).toBeNull();
+        });
+
+        it("rejects a hard-revoked token and clears the cookie", async () => {
+            const app = createApp({ cookieAuth: { sameSite: "Lax" } });
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(storedToken({ revoked: true }));
+
+            const res = await app.request("/auth/refresh", {
+                method: "POST",
+                headers: { cookie: "__rb_refresh=revoked-token" }
+            });
+
+            expect(res.status).toBe(401);
+            expect((await res.json() as any).error.code).toBe("SESSION_REVOKED");
+            // This session really is over, so the cookie should go.
+            expect(res.headers.get("set-cookie")).toContain("Max-Age=0");
+        });
+
+        it("voids a session that began before the user's revocation watermark", async () => {
+            // Closes the reset-password race: a refresh already in flight can
+            // insert a fresh row just after every row was deleted.
+            const app = createApp();
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(
+                storedToken({ sessionStartedAt: new Date(Date.now() - 86400000) })
+            );
+            mockAuthRepo.getTokensValidAfter.mockResolvedValueOnce(new Date(Date.now() - 3600000));
+
+            const res = await app.request("/auth/refresh", json({ refreshToken: "pre-reset-token" }));
+            expect(res.status).toBe(401);
+            expect((await res.json() as any).error.code).toBe("SESSION_REVOKED");
+            expect(mockAuthRepo.createRefreshToken).not.toHaveBeenCalled();
+        });
+
+        it("survives a session whose repository reports no watermark support", async () => {
+            const app = createApp();
+            (mockAuthRepo as any).getTokensValidAfter = undefined;
+            mockAuthRepo.findRefreshTokenByHash.mockResolvedValueOnce(storedToken());
+
+            const res = await app.request("/auth/refresh", json({ refreshToken: "the-token" }));
+            expect(res.status).toBe(200);
         });
 
         it("returns 401 and deletes expired refresh token", async () => {

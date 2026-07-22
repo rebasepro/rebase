@@ -14,6 +14,7 @@ import {
     RoleData,
     CreateRoleData,
     RefreshTokenInfo,
+    RefreshTokenSession,
     PasswordResetTokenInfo,
     MagicLinkTokenInfo,
     UserIdentityData,
@@ -529,6 +530,7 @@ export class UserService implements UserRepository {
 
 export class RefreshTokenService {
     private refreshTokensTable: RebasePgTable;
+    private usersTable: RebasePgTable | null;
 
     constructor(
         private db: NodePgDatabase,
@@ -536,55 +538,159 @@ export class RefreshTokenService {
     ) {
         if (tableOrTables && ((tableOrTables as Partial<AuthSchemaTables>).refreshTokens || (tableOrTables as Partial<AuthSchemaTables>).users)) {
             this.refreshTokensTable = ((tableOrTables as Partial<AuthSchemaTables>).refreshTokens || refreshTokens) as RebasePgTable;
+            this.usersTable = ((tableOrTables as Partial<AuthSchemaTables>).users || users) as RebasePgTable;
         } else {
             this.refreshTokensTable = (tableOrTables as RebasePgTable) || (refreshTokens as unknown as RebasePgTable);
+            this.usersTable = users as unknown as RebasePgTable;
         }
     }
 
-    async createToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
-        // Fallback to empty string because UNIQUE constraints treat NULLs as strictly distinct in standard Postgres.
-        // We want (uid, NULL, NULL) to collide and overwrite, so we map undefined/null to empty strings.
+    /**
+     * Whether the table actually carries a column, so a host application that
+     * supplied its own `refresh_tokens` table — one that predates session
+     * grouping — degrades instead of throwing on every sign-in.
+     */
+    private has(column: string): boolean {
+        return Boolean((this.refreshTokensTable as unknown as Record<string, unknown>)[column]);
+    }
+
+    private col(column: string) {
+        return (this.refreshTokensTable as unknown as Record<string, never>)[column];
+    }
+
+    /** The columns to read back, narrowed to the ones this table has. */
+    private selection() {
+        const selection: Record<string, never> = {
+            id: this.refreshTokensTable.id,
+            uid: this.refreshTokensTable.uid,
+            tokenHash: this.refreshTokensTable.tokenHash,
+            expiresAt: this.refreshTokensTable.expiresAt,
+            createdAt: this.refreshTokensTable.createdAt,
+            userAgent: this.refreshTokensTable.userAgent,
+            ipAddress: this.refreshTokensTable.ipAddress
+        } as unknown as Record<string, never>;
+        for (const optional of ["sessionId", "rotatedAt", "revoked", "sessionStartedAt"]) {
+            if (this.has(optional)) selection[optional] = this.col(optional);
+        }
+        return selection;
+    }
+
+    async createToken(
+        uid: string,
+        tokenHash: string,
+        expiresAt: Date,
+        userAgent?: string,
+        ipAddress?: string,
+        session?: RefreshTokenSession
+    ): Promise<void> {
+        // Empty strings rather than NULLs: the device-session UNIQUE constraint
+        // that needed them is gone, but sessions-list UIs already render "" as
+        // "unknown device" and would start showing blanks otherwise.
         const safeUserAgent = userAgent || "";
         const safeIpAddress = ipAddress || "";
 
-        // Atomic upsert keyed on the device session (uid, user_agent, ip_address).
-        // A DELETE-then-INSERT races under concurrent refreshes — cookie-mode boot can
-        // fire two /refresh calls at once (both carrying the same refresh cookie): both
-        // DELETE, then the second INSERT violates `unique_device_session` and 500s.
-        // A single INSERT ... ON CONFLICT DO UPDATE rotates the token atomically.
-        await this.db.insert(this.refreshTokensTable)
-            .values({
-                uid,
-                tokenHash,
-                expiresAt,
-                userAgent: safeUserAgent,
-                ipAddress: safeIpAddress
-            })
-            .onConflictDoUpdate({
-                target: [
-                    this.refreshTokensTable.uid,
-                    this.refreshTokensTable.userAgent,
-                    this.refreshTokensTable.ipAddress
-                ],
-                set: { tokenHash, expiresAt }
-            });
+        // A plain INSERT. Rotation ADDS a token; it does not replace a device's
+        // row. Two refreshes racing on the same session therefore both succeed
+        // and both end holding a usable token, where the previous upsert had
+        // them overwrite each other and logged one of the two tabs out.
+        const values: Record<string, unknown> = {
+            uid,
+            tokenHash,
+            expiresAt,
+            userAgent: safeUserAgent,
+            ipAddress: safeIpAddress
+        };
+        if (session && this.has("sessionId")) values.sessionId = session.id;
+        if (session && this.has("sessionStartedAt")) values.sessionStartedAt = session.startedAt;
+
+        await this.db.insert(this.refreshTokensTable).values(values);
     }
 
     async findByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
         const [token] = await this.db
-            .select({
-                id: this.refreshTokensTable.id,
-                uid: this.refreshTokensTable.uid,
-                tokenHash: this.refreshTokensTable.tokenHash,
-                expiresAt: this.refreshTokensTable.expiresAt,
-                createdAt: this.refreshTokensTable.createdAt,
-                userAgent: this.refreshTokensTable.userAgent,
-                ipAddress: this.refreshTokensTable.ipAddress
-            })
+            .select(this.selection())
             .from(this.refreshTokensTable)
             .where(eq(this.refreshTokensTable.tokenHash, tokenHash));
 
-        return (token as RefreshTokenInfo) || null;
+        return (token as unknown as RefreshTokenInfo) || null;
+    }
+
+    /**
+     * Record that a token was rotated away, keeping the row.
+     *
+     * The row is what lets `/auth/refresh` distinguish "you already used this,
+     * here is a fresh one" from "no idea what this is". Deleting it — which is
+     * what this used to do — collapsed both into a 401 and signed the user out
+     * for the crime of losing a response.
+     */
+    async markRotated(tokenHash: string): Promise<void> {
+        if (!this.has("rotatedAt")) {
+            await this.deleteByHash(tokenHash);
+            return;
+        }
+        await this.db
+            .update(this.refreshTokensTable)
+            .set({ rotatedAt: new Date() })
+            .where(eq(this.refreshTokensTable.tokenHash, tokenHash));
+    }
+
+    /** Final kill of one sign-in: logout, or revoking a device remotely. */
+    async revokeSession(sessionId: string): Promise<void> {
+        if (!this.has("sessionId")) return;
+        if (this.has("revoked")) {
+            await this.db
+                .update(this.refreshTokensTable)
+                .set({ revoked: true, ...(this.has("rotatedAt") ? { rotatedAt: new Date() } : {}) })
+                .where(eq(this.col("sessionId"), sessionId));
+            return;
+        }
+        await this.db.delete(this.refreshTokensTable).where(eq(this.col("sessionId"), sessionId));
+    }
+
+    /**
+     * Housekeeping: rotation would otherwise leave a row per refresh forever.
+     * Superseded rows are only needed for as long as a straggler might still
+     * present them, and expired ones are dead weight everywhere.
+     */
+    async prune(uid: string, sessionId: string, supersededBefore: Date): Promise<void> {
+        const uidCol = this.refreshTokensTable.uid;
+        const expiresCol = this.refreshTokensTable.expiresAt;
+        if (!this.has("rotatedAt") || !this.has("sessionId")) {
+            await this.db.delete(this.refreshTokensTable)
+                .where(sql`${uidCol} = ${uid} AND ${expiresCol} < NOW()`);
+            return;
+        }
+        const rotatedCol = this.col("rotatedAt");
+        const sessionCol = this.col("sessionId");
+        await this.db.delete(this.refreshTokensTable).where(sql`
+            ${uidCol} = ${uid}
+            AND (
+                ${expiresCol} < NOW()
+                OR (
+                    ${sessionCol} = ${sessionId}
+                    AND ${rotatedCol} IS NOT NULL
+                    AND ${rotatedCol} < ${supersededBefore}
+                )
+            )
+        `);
+    }
+
+    async getTokensValidAfter(uid: string): Promise<Date | null> {
+        if (!this.usersTable || !(this.usersTable as unknown as Record<string, unknown>).tokensValidAfter) return null;
+        const [row] = await this.db
+            .select({ tokensValidAfter: (this.usersTable as unknown as Record<string, never>).tokensValidAfter })
+            .from(this.usersTable)
+            .where(eq(this.usersTable.id, uid));
+        const value = (row as { tokensValidAfter?: Date | string | null } | undefined)?.tokensValidAfter;
+        return value ? new Date(value) : null;
+    }
+
+    async setTokensValidAfter(uid: string, at: Date): Promise<void> {
+        if (!this.usersTable || !(this.usersTable as unknown as Record<string, unknown>).tokensValidAfter) return;
+        await this.db
+            .update(this.usersTable)
+            .set({ tokensValidAfter: at })
+            .where(eq(this.usersTable.id, uid));
     }
 
     async deleteByHash(tokenHash: string): Promise<void> {
@@ -597,20 +703,12 @@ export class RefreshTokenService {
 
     async listForUser(uid: string): Promise<RefreshTokenInfo[]> {
         const tokens = await this.db
-            .select({
-                id: this.refreshTokensTable.id,
-                uid: this.refreshTokensTable.uid,
-                tokenHash: this.refreshTokensTable.tokenHash,
-                expiresAt: this.refreshTokensTable.expiresAt,
-                createdAt: this.refreshTokensTable.createdAt,
-                userAgent: this.refreshTokensTable.userAgent,
-                ipAddress: this.refreshTokensTable.ipAddress
-            })
+            .select(this.selection())
             .from(this.refreshTokensTable)
             .where(eq(this.refreshTokensTable.uid, uid))
             .orderBy(this.refreshTokensTable.createdAt);
 
-        return tokens as RefreshTokenInfo[];
+        return tokens as unknown as RefreshTokenInfo[];
     }
 
     async deleteById(id: string, uid: string): Promise<void> {
@@ -804,8 +902,28 @@ export class PostgresTokenRepository implements TokenRepository {
 
     // Refresh token operations
 
-    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
-        await this.refreshTokenService.createToken(uid, tokenHash, expiresAt, userAgent, ipAddress);
+    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<void> {
+        await this.refreshTokenService.createToken(uid, tokenHash, expiresAt, userAgent, ipAddress, session);
+    }
+
+    async markRefreshTokenRotated(tokenHash: string): Promise<void> {
+        await this.refreshTokenService.markRotated(tokenHash);
+    }
+
+    async revokeRefreshTokenSession(sessionId: string): Promise<void> {
+        await this.refreshTokenService.revokeSession(sessionId);
+    }
+
+    async pruneRefreshTokens(uid: string, sessionId: string, supersededBefore: Date): Promise<void> {
+        await this.refreshTokenService.prune(uid, sessionId, supersededBefore);
+    }
+
+    async getTokensValidAfter(uid: string): Promise<Date | null> {
+        return this.refreshTokenService.getTokensValidAfter(uid);
+    }
+
+    async setTokensValidAfter(uid: string, at: Date): Promise<void> {
+        await this.refreshTokenService.setTokensValidAfter(uid, at);
     }
 
     async findRefreshTokenByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
@@ -1018,8 +1136,28 @@ collectionPermissions: null }
 
     // Token operations (delegate to PostgresTokenRepository)
 
-    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
-        await this.tokenRepository.createRefreshToken(uid, tokenHash, expiresAt, userAgent, ipAddress);
+    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<void> {
+        await this.tokenRepository.createRefreshToken(uid, tokenHash, expiresAt, userAgent, ipAddress, session);
+    }
+
+    async markRefreshTokenRotated(tokenHash: string): Promise<void> {
+        await this.tokenRepository.markRefreshTokenRotated(tokenHash);
+    }
+
+    async revokeRefreshTokenSession(sessionId: string): Promise<void> {
+        await this.tokenRepository.revokeRefreshTokenSession(sessionId);
+    }
+
+    async pruneRefreshTokens(uid: string, sessionId: string, supersededBefore: Date): Promise<void> {
+        await this.tokenRepository.pruneRefreshTokens(uid, sessionId, supersededBefore);
+    }
+
+    async getTokensValidAfter(uid: string): Promise<Date | null> {
+        return this.tokenRepository.getTokensValidAfter(uid);
+    }
+
+    async setTokensValidAfter(uid: string, at: Date): Promise<void> {
+        await this.tokenRepository.setTokensValidAfter(uid, at);
     }
 
     async findRefreshTokenByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {

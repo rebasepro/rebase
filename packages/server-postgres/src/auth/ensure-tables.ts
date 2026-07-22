@@ -107,6 +107,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                 email_verification_sent_at TIMESTAMP WITH TIME ZONE,
                 is_anonymous BOOLEAN DEFAULT FALSE NOT NULL,
                 metadata JSONB DEFAULT '{}' NOT NULL,
+                tokens_valid_after TIMESTAMP WITH TIME ZONE,
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
             )
@@ -209,17 +210,23 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         `);
 
 
-        // Create refresh tokens table (includes user_agent, ip_address, and unique constraint)
+        // Create refresh tokens table. One row per TOKEN, grouped into a
+        // sign-in by session_id — deliberately without a uniqueness rule on
+        // (uid, user_agent, ip_address); see the schema module for why that
+        // constraint had to go.
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ${sql.raw(refreshTokensTableName)} (
                 id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
                 uid ${sql.raw(userIdType)} NOT NULL REFERENCES ${sql.raw(usersTableName)}(id) ON DELETE CASCADE,
+                session_id TEXT NOT NULL DEFAULT gen_random_uuid()::text,
                 token_hash TEXT NOT NULL UNIQUE,
                 expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                revoked BOOLEAN DEFAULT FALSE NOT NULL,
+                rotated_at TIMESTAMP WITH TIME ZONE,
+                session_started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
                 user_agent TEXT,
                 ip_address TEXT,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                CONSTRAINT unique_device_session UNIQUE (uid, user_agent, ip_address)
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             )
         `);
 
@@ -348,6 +355,7 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             "email_verification_sent_at TIMESTAMP WITH TIME ZONE",
             "is_anonymous BOOLEAN DEFAULT FALSE NOT NULL",
             "metadata JSONB DEFAULT '{}' NOT NULL",
+            "tokens_valid_after TIMESTAMP WITH TIME ZONE",
             "created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL",
             "updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL"
         ];
@@ -358,16 +366,26 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             `);
         }
 
-        // ── Migration: reconcile refresh_tokens for the device-session upsert ──
-        // The refresh-token rotation does `INSERT ... ON CONFLICT (uid, user_agent,
-        // ip_address) DO UPDATE`, which requires the `unique_device_session`
-        // constraint. `CREATE TABLE IF NOT EXISTS` never adds it to a table that
-        // predates the constraint, so every login on such a database 500s with
-        // `42P10 no unique or exclusion constraint matching the ON CONFLICT`.
-        // Reconcile EVERY table named refresh_tokens, in whatever schema it lives,
-        // rather than only the derived name: a database provisioned by an older
-        // era can carry the table in a different schema than the one this run
-        // derives, and the login upsert then hits a table without the constraint.
+        // ── Migration: refresh_tokens become session-scoped, rotation-safe ──
+        // Two shapes are reconciled here, on EVERY table named refresh_tokens
+        // in whatever schema it lives (a database provisioned by an older era
+        // can carry the table in a different schema than the one this run
+        // derives, and auth would then read a table nobody migrated):
+        //
+        //   1. The new columns. A token is now a member of a session
+        //      (`session_id`) and is retained after rotation (`revoked`,
+        //      `rotated_at`) so a replayed token can be recognised instead of
+        //      looking like a forgery. `session_started_at` is carried across
+        //      rotations so `users.tokens_valid_after` cannot be outrun.
+        //   2. The removal of `unique_device_session`. It made (uid,
+        //      user_agent, ip_address) the identity of a session, which evicted
+        //      a second browser profile behind one NAT and churned rows as
+        //      phones changed networks. UA and IP are metadata now.
+        //
+        // Every existing row is adopted rather than dropped: it keeps its
+        // token_hash, gets a session of its own, and stays unrevoked — so the
+        // sessions live in browsers right now survive the upgrade rather than
+        // everyone being signed out by the fix for being signed out.
         try {
             const rtTables = await db.execute(sql`
                 SELECT table_schema, table_name
@@ -379,57 +397,53 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             for (const { table_schema } of found) {
                 const qualified = `"${table_schema}"."refresh_tokens"`;
                 try {
-                    // Old tables may lack these columns entirely.
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS user_agent TEXT`);
-                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS ip_address TEXT`);
-                    // The upsert relies on '' (not NULL) so a device with no UA/IP collides.
-                    await db.execute(sql`UPDATE ${sql.raw(qualified)} SET user_agent = '' WHERE user_agent IS NULL`);
-                    await db.execute(sql`UPDATE ${sql.raw(qualified)} SET ip_address = '' WHERE ip_address IS NULL`);
-                    // Drop pre-existing duplicates that would block the unique constraint,
-                    // keeping one row per (uid, user_agent, ip_address).
+                    // Added nullable, then back-filled, then constrained: adding
+                    // `session_id NOT NULL DEFAULT gen_random_uuid()` in one step
+                    // would stamp every existing row with the SAME uuid on some
+                    // Postgres versions, silently merging every live session into
+                    // one that a single logout would then wipe.
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS session_id TEXT`);
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS revoked BOOLEAN DEFAULT FALSE NOT NULL`);
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS rotated_at TIMESTAMP WITH TIME ZONE`);
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ADD COLUMN IF NOT EXISTS session_started_at TIMESTAMP WITH TIME ZONE`);
+
+                    // One session per pre-existing row: under the old model a row
+                    // WAS a device session, and there is no record of which rows
+                    // descended from the same sign-in.
                     await db.execute(sql`
-                        DELETE FROM ${sql.raw(qualified)} a
-                        USING ${sql.raw(qualified)} b
-                        WHERE a.ctid < b.ctid
-                          AND a.uid = b.uid
-                          AND a.user_agent = b.user_agent
-                          AND a.ip_address = b.ip_address
+                        UPDATE ${sql.raw(qualified)}
+                        SET session_id = gen_random_uuid()::text
+                        WHERE session_id IS NULL
                     `);
-                    // Log every unique constraint on the table so drift is visible.
-                    const uniques = await db.execute(sql`
-                        SELECT conname, pg_get_constraintdef(oid) AS def
-                        FROM pg_constraint
-                        WHERE conrelid = ${sql.raw(`'${qualified}'`)}::regclass AND contype = 'u'
+                    await db.execute(sql`
+                        UPDATE ${sql.raw(qualified)}
+                        SET session_started_at = COALESCE(created_at, NOW())
+                        WHERE session_started_at IS NULL
                     `);
-                    for (const u of uniques.rows as { conname: string; def: string }[]) {
-                        logger.info(`   ${qualified} unique: ${u.conname} → ${u.def}`);
-                    }
-                    // Does a usable unique constraint cover EXACTLY (uid, user_agent, ip_address)?
-                    // Checking by name alone is not enough: an older era may carry a
-                    // `unique_device_session` on different columns, which the ON CONFLICT
-                    // cannot infer, so login keeps 500ing with 42P10.
-                    const hasCorrect = (uniques.rows as { def: string }[]).some((u) => {
-                        const cols = (u.def.match(/\(([^)]*)\)/)?.[1] || "")
-                            .split(",").map((c) => c.trim().replace(/"/g, ""));
-                        return cols.length === 3 && cols.includes("uid") && cols.includes("user_agent") && cols.includes("ip_address");
-                    });
-                    if (hasCorrect) {
-                        logger.info(`✓ correct device-session unique already present on ${qualified}`);
-                    } else {
-                        // Remove a wrong-columned constraint squatting on the name, then add the right one.
-                        await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} DROP CONSTRAINT IF EXISTS unique_device_session`);
-                        await db.execute(sql`
-                            ALTER TABLE ${sql.raw(qualified)}
-                                ADD CONSTRAINT unique_device_session UNIQUE (uid, user_agent, ip_address)
-                        `);
-                        logger.info(`✅ Added correct unique_device_session constraint to ${qualified}`);
-                    }
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_id SET DEFAULT gen_random_uuid()::text`);
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_started_at SET DEFAULT NOW()`);
+                    // SET NOT NULL only once the back-fill above has definitely
+                    // run; on a table that somehow still holds a NULL this throws
+                    // and is caught below rather than failing the boot.
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_id SET NOT NULL`);
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} ALTER COLUMN session_started_at SET NOT NULL`);
+
+                    await db.execute(sql`
+                        CREATE INDEX IF NOT EXISTS idx_refresh_tokens_session
+                        ON ${sql.raw(qualified)}(session_id)
+                    `);
+
+                    // The device-session constraint is now actively harmful: two
+                    // live tokens of one session (a rotation in flight) share a
+                    // uid, and usually a user agent and IP too.
+                    await db.execute(sql`ALTER TABLE ${sql.raw(qualified)} DROP CONSTRAINT IF EXISTS unique_device_session`);
+                    logger.info(`✅ refresh_tokens reconciled for session-scoped rotation: ${qualified}`);
                 } catch (perTableError: unknown) {
                     logger.warn(`⚠️  refresh_tokens reconcile failed for ${qualified}: ${perTableError instanceof Error ? perTableError.message : String(perTableError)}`);
                 }
             }
         } catch (migrationError: unknown) {
-            logger.warn(`⚠️  refresh_tokens device-session migration skipped: ${migrationError instanceof Error ? migrationError.message : String(migrationError)}`);
+            logger.warn(`⚠️  refresh_tokens session migration skipped: ${migrationError instanceof Error ? migrationError.message : String(migrationError)}`);
         }
 
         // ── Migration: Copy roles from legacy junction table to inline column ──

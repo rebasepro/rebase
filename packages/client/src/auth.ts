@@ -166,9 +166,35 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
      */
     function isFatalRefreshError(err: unknown): boolean {
         if (!(err instanceof RebaseApiError)) return false; // network/other → transient
+        // Another tab (or a retry of our own request) rotated the token we
+        // were holding. In cookie mode the jar may ALREADY contain the
+        // replacement, so this is the one 401 that is worth retrying: giving
+        // up here is precisely the bug where opening a second tab signs you
+        // out of both.
+        if (err.code === "TOKEN_ALREADY_USED") return false;
         if (err.code === "INVALID_TOKEN" || err.code === "TOKEN_EXPIRED") return true;
         // 401/403 are auth failures; other statuses (incl. 5xx, 0) are transient.
         return err.status === 401 || err.status === 403;
+    }
+
+    /**
+     * Drop this client's session without telling the server.
+     *
+     * `signOut()` is a user action: it POSTs /logout, which revokes the whole
+     * sign-in. That is the wrong hammer for a refresh that failed. Our token
+     * may be stale precisely because a sibling tab holds a live one, and
+     * logging out on its behalf would turn one tab's bad luck into everybody
+     * being signed out — the exact failure this work exists to remove.
+     */
+    function abandonSessionLocally() {
+        currentSession = null;
+        clearStoredSession();
+        if (refreshTimeout) {
+            clearTimeout(refreshTimeout);
+            refreshTimeout = null;
+        }
+        transport.setToken(null);
+        emit("SIGNED_OUT", null);
     }
 
     async function attemptScheduledRefresh(attempt: number) {
@@ -177,11 +203,11 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
             // On success, refreshSession() re-schedules the next refresh itself.
         } catch (err) {
             if (isFatalRefreshError(err)) {
-                signOut();
+                abandonSessionLocally();
                 return;
             }
             if (attempt >= MAX_REFRESH_RETRIES) {
-                signOut();
+                abandonSessionLocally();
                 return;
             }
             // Transient failure — back off and retry rather than dropping the session.
@@ -395,10 +421,52 @@ redirectUri });
         emit("SIGNED_OUT", null);
     }
 
+    /**
+     * Serialise refreshes across TABS, not just within one.
+     *
+     * The in-flight promise below covers callers inside a single JavaScript
+     * context. It does nothing about the far more common case: two tabs of the
+     * same app booting together, each firing its own /refresh with the same
+     * cookie. The server tolerates that now (superseded tokens stay usable for
+     * a grace window), but tolerating a stampede is not the same as avoiding
+     * one, and every extra rotation is another chance to end up holding a
+     * token whose response never arrived.
+     *
+     * Web Locks are best-effort on purpose. supabase-js shipped this and then
+     * spent a year fielding deadlock reports — a lock held by a crashed or
+     * frozen tab must never be able to wedge sign-in — so a lock we cannot
+     * take within the timeout is simply not taken, and the refresh proceeds
+     * unserialised, exactly as it did before.
+     */
+    const REFRESH_LOCK_NAME = "rebase-auth-refresh";
+    const REFRESH_LOCK_TIMEOUT_MS = 5000;
+
+    async function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+        const locks = (globalThis as { navigator?: { locks?: LockManager } }).navigator?.locks;
+        if (!locks?.request) return fn();
+
+        const controller = new AbortController();
+        const giveUp = setTimeout(() => controller.abort(), REFRESH_LOCK_TIMEOUT_MS);
+        try {
+            return await locks.request(
+                REFRESH_LOCK_NAME,
+                { signal: controller.signal },
+                async () => fn()
+            ) as T;
+        } catch (e) {
+            // AbortError means only that we waited long enough for the lock.
+            // Anything the callback itself threw has to keep propagating.
+            if ((e as { name?: string })?.name !== "AbortError") throw e;
+            return fn();
+        } finally {
+            clearTimeout(giveUp);
+        }
+    }
+
     function refreshSession(): Promise<RebaseSession> {
         // Share a single in-flight refresh across concurrent callers.
         if (inFlightRefresh) return inFlightRefresh;
-        inFlightRefresh = doRefreshSession().finally(() => {
+        inFlightRefresh = withRefreshLock(() => doRefreshSession()).finally(() => {
             inFlightRefresh = null;
         });
         return inFlightRefresh;

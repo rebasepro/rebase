@@ -92,7 +92,10 @@ const rebaseEnvSchema = z.object({
     ADMIN_CONNECTION_STRING: z.string().url().optional(),
     JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters long"),
     JWT_ACCESS_EXPIRES_IN: z.string().default("1h"),
-    JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
+    // Sliding: every rotation re-ups it, so this governs how long a session
+    // survives INACTIVITY, not how long it survives. 400d is the ceiling any
+    // browser will honour on the cookie that carries it.
+    JWT_REFRESH_EXPIRES_IN: z.string().default("400d"),
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     REBASE_SERVICE_KEY: z.string().optional(),

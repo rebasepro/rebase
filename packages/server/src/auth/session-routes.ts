@@ -72,7 +72,18 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
 
         if (refreshToken) {
             const tokenHash = hashRefreshToken(refreshToken);
-            await authRepo.deleteRefreshToken(tokenHash);
+            // Kill the whole sign-in, not just the token that happened to be
+            // presented. Rotation can leave siblings alive (a second tab, a
+            // replay inside the reuse window), and deleting one row would
+            // leave the others perfectly usable — a logout that does not log
+            // you out is worse than no logout at all.
+            const stored = await authRepo.findRefreshTokenByHash(tokenHash).catch(() => null);
+            const sessionId = stored?.sessionId;
+            if (sessionId && authRepo.revokeRefreshTokenSession) {
+                await authRepo.revokeRefreshTokenSession(sessionId);
+            } else {
+                await authRepo.deleteRefreshToken(tokenHash);
+            }
         }
 
         // Always clear the cookie if in cookie mode
@@ -109,14 +120,34 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         const currentRefreshToken = c.req.header("x-refresh-token") as string;
         const currentTokenHash = currentRefreshToken ? hashRefreshToken(currentRefreshToken) : null;
 
-        const sessions = await authRepo.listRefreshTokensForUser(userCtx.uid);
+        const tokens = await authRepo.listRefreshTokensForUser(userCtx.uid);
 
-        const mappedSessions = sessions.map((s) => ({
+        // One entry per SIGN-IN, not per token row. Rotation leaves several
+        // rows behind for one session (the live token, its superseded parent
+        // inside the reuse window, a sibling minted for a second tab), and a
+        // user reading "your devices" must not be shown three copies of the
+        // laptop they are sitting at. Revoked rows are tombstones and never
+        // appear at all.
+        const bySession = new Map<string, typeof tokens[number]>();
+        for (const token of tokens) {
+            if (token.revoked) continue;
+            const key = token.sessionId ?? token.id;
+            const existing = bySession.get(key);
+            // Keep the newest row of the session as its representative, so the
+            // id offered for revocation belongs to a token that still exists.
+            if (!existing || existing.createdAt < token.createdAt) bySession.set(key, token);
+        }
+
+        const mappedSessions = [...bySession.values()].map((s) => ({
             id: s.id,
             userAgent: s.userAgent,
             ipAddress: s.ipAddress,
-            createdAt: s.createdAt,
-            isCurrentSession: currentTokenHash ? s.tokenHash === currentTokenHash : false
+            // The sign-in, not the last rotation — otherwise every session
+            // looks like it started an hour ago, whatever its real age.
+            createdAt: s.sessionStartedAt ?? s.createdAt,
+            isCurrentSession: currentTokenHash
+                ? tokens.some(t => t.tokenHash === currentTokenHash && (t.sessionId ?? t.id) === (s.sessionId ?? s.id))
+                : false
         }));
 
         return c.json({ sessions: mappedSessions });
@@ -133,6 +164,10 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         }
 
         await authRepo.deleteAllRefreshTokensForUser(userCtx.uid);
+        // Belt and braces: a refresh already in flight can insert a rotated
+        // token a moment after the delete has run and walk away with a live
+        // session. The watermark voids it on its next use.
+        await authRepo.setTokensValidAfter?.(userCtx.uid, new Date()).catch(() => undefined);
         return c.json({
             success: true,
             message: "All sessions revoked successfully"
@@ -154,7 +189,16 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             throw ApiError.badRequest("Session ID is required", "INVALID_INPUT");
         }
 
-        await authRepo.deleteRefreshTokenById(id, userCtx.uid);
+        // The id names one token row, but the user is revoking a device — so
+        // resolve it to its session and take the whole family down. Deleting
+        // the single row would leave that device holding a live sibling.
+        const owned = await authRepo.listRefreshTokensForUser(userCtx.uid).catch(() => []);
+        const target = owned.find(t => t.id === id);
+        if (target?.sessionId && authRepo.revokeRefreshTokenSession) {
+            await authRepo.revokeRefreshTokenSession(target.sessionId);
+        } else {
+            await authRepo.deleteRefreshTokenById(id, userCtx.uid);
+        }
         return c.json({
             success: true,
             message: "Session revoked successfully"

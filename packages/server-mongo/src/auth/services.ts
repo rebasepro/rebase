@@ -12,6 +12,7 @@ import {
     RoleData,
     CreateRoleData,
     RefreshTokenInfo,
+    RefreshTokenSession,
     PasswordResetTokenInfo,
     MagicLinkTokenInfo,
     UserIdentityData,
@@ -336,31 +337,7 @@ export class MongoRefreshTokenService {
         return this.db.collection<MongoDoc>("rebase_refresh_tokens");
     }
 
-    async createToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
-        const safeUserAgent = userAgent || "";
-        const safeIpAddress = ipAddress || "";
-
-        await this.collection.deleteMany({
-            uid,
-            userAgent: safeUserAgent,
-            ipAddress: safeIpAddress
-        });
-
-        await this.collection.insertOne({
-            _id: new ObjectId().toString(),
-            id: new ObjectId().toString(),
-            uid,
-            tokenHash,
-            expiresAt,
-            createdAt: new Date(),
-            userAgent: safeUserAgent,
-            ipAddress: safeIpAddress
-        });
-    }
-
-    async findByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
-        const doc = await this.collection.findOne({ tokenHash });
-        if (!doc) return null;
+    private toInfo(doc: MongoDoc): RefreshTokenInfo {
         return {
             id: doc.id,
             uid: doc.uid,
@@ -368,8 +345,81 @@ export class MongoRefreshTokenService {
             expiresAt: new Date(doc.expiresAt),
             createdAt: new Date(doc.createdAt),
             userAgent: doc.userAgent,
-            ipAddress: doc.ipAddress
+            ipAddress: doc.ipAddress,
+            sessionId: doc.sessionId,
+            rotatedAt: doc.rotatedAt ? new Date(doc.rotatedAt) : null,
+            revoked: Boolean(doc.revoked),
+            sessionStartedAt: new Date(doc.sessionStartedAt || doc.createdAt)
         };
+    }
+
+    async createToken(
+        uid: string,
+        tokenHash: string,
+        expiresAt: Date,
+        userAgent?: string,
+        ipAddress?: string,
+        session?: RefreshTokenSession
+    ): Promise<void> {
+        const safeUserAgent = userAgent || "";
+        const safeIpAddress = ipAddress || "";
+
+        // No deleteMany first. Tokens of one sign-in accumulate under a shared
+        // sessionId and are pruned once nobody can still be holding them —
+        // evicting by (uid, userAgent, ipAddress) is what used to sign out a
+        // second browser profile behind the same address.
+        const now = new Date();
+        await this.collection.insertOne({
+            _id: new ObjectId().toString(),
+            id: new ObjectId().toString(),
+            uid,
+            tokenHash,
+            expiresAt,
+            createdAt: now,
+            userAgent: safeUserAgent,
+            ipAddress: safeIpAddress,
+            sessionId: session?.id ?? new ObjectId().toString(),
+            sessionStartedAt: session?.startedAt ?? now,
+            rotatedAt: null,
+            revoked: false
+        });
+    }
+
+    async findByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
+        const doc = await this.collection.findOne({ tokenHash });
+        return doc ? this.toInfo(doc) : null;
+    }
+
+    /** Superseded, not gone — see the Postgres service for why that matters. */
+    async markRotated(tokenHash: string): Promise<void> {
+        await this.collection.updateOne({ tokenHash }, { $set: { rotatedAt: new Date() } });
+    }
+
+    async revokeSession(sessionId: string): Promise<void> {
+        await this.collection.updateMany(
+            { sessionId },
+            { $set: { revoked: true, rotatedAt: new Date() } }
+        );
+    }
+
+    async prune(uid: string, sessionId: string, supersededBefore: Date): Promise<void> {
+        await this.collection.deleteMany({
+            uid,
+            $or: [
+                { expiresAt: { $lt: new Date() } },
+                { sessionId, rotatedAt: { $ne: null, $lt: supersededBefore } }
+            ]
+        });
+    }
+
+    async getTokensValidAfter(uid: string): Promise<Date | null> {
+        const user = await this.db.collection<MongoDoc>("rebase_users").findOne({ id: uid });
+        return user?.tokensValidAfter ? new Date(user.tokensValidAfter) : null;
+    }
+
+    async setTokensValidAfter(uid: string, at: Date): Promise<void> {
+        await this.db.collection<MongoDoc>("rebase_users")
+            .updateOne({ id: uid }, { $set: { tokensValidAfter: at } });
     }
 
     async deleteByHash(tokenHash: string): Promise<void> {
@@ -382,15 +432,7 @@ export class MongoRefreshTokenService {
 
     async listForUser(uid: string): Promise<RefreshTokenInfo[]> {
         const docs = await this.collection.find({ uid }).sort({ createdAt: 1 }).toArray();
-        return docs.map(doc => ({
-            id: doc.id,
-            uid: doc.uid,
-            tokenHash: doc.tokenHash,
-            expiresAt: new Date(doc.expiresAt),
-            createdAt: new Date(doc.createdAt),
-            userAgent: doc.userAgent,
-            ipAddress: doc.ipAddress
-        }));
+        return docs.map(doc => this.toInfo(doc));
     }
 
     async deleteById(id: string, uid: string): Promise<void> {
@@ -459,8 +501,28 @@ export class MongoTokenRepository implements TokenRepository {
         this.passwordResetTokenService = new MongoPasswordResetTokenService(db);
     }
 
-    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
-        await this.refreshTokenService.createToken(uid, tokenHash, expiresAt, userAgent, ipAddress);
+    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<void> {
+        await this.refreshTokenService.createToken(uid, tokenHash, expiresAt, userAgent, ipAddress, session);
+    }
+
+    async markRefreshTokenRotated(tokenHash: string): Promise<void> {
+        await this.refreshTokenService.markRotated(tokenHash);
+    }
+
+    async revokeRefreshTokenSession(sessionId: string): Promise<void> {
+        await this.refreshTokenService.revokeSession(sessionId);
+    }
+
+    async pruneRefreshTokens(uid: string, sessionId: string, supersededBefore: Date): Promise<void> {
+        await this.refreshTokenService.prune(uid, sessionId, supersededBefore);
+    }
+
+    async getTokensValidAfter(uid: string): Promise<Date | null> {
+        return this.refreshTokenService.getTokensValidAfter(uid);
+    }
+
+    async setTokensValidAfter(uid: string, at: Date): Promise<void> {
+        await this.refreshTokenService.setTokensValidAfter(uid, at);
     }
 
     async findRefreshTokenByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {
@@ -631,8 +693,28 @@ export class MongoAuthRepository implements AuthRepository {
         await this.roleService.deleteRole(id);
     }
 
-    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void> {
-        await this.tokenRepository.createRefreshToken(uid, tokenHash, expiresAt, userAgent, ipAddress);
+    async createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<void> {
+        await this.tokenRepository.createRefreshToken(uid, tokenHash, expiresAt, userAgent, ipAddress, session);
+    }
+
+    async markRefreshTokenRotated(tokenHash: string): Promise<void> {
+        await this.tokenRepository.markRefreshTokenRotated(tokenHash);
+    }
+
+    async revokeRefreshTokenSession(sessionId: string): Promise<void> {
+        await this.tokenRepository.revokeRefreshTokenSession(sessionId);
+    }
+
+    async pruneRefreshTokens(uid: string, sessionId: string, supersededBefore: Date): Promise<void> {
+        await this.tokenRepository.pruneRefreshTokens(uid, sessionId, supersededBefore);
+    }
+
+    async getTokensValidAfter(uid: string): Promise<Date | null> {
+        return this.tokenRepository.getTokensValidAfter(uid);
+    }
+
+    async setTokensValidAfter(uid: string, at: Date): Promise<void> {
+        await this.tokenRepository.setTokensValidAfter(uid, at);
     }
 
     async findRefreshTokenByHash(tokenHash: string): Promise<RefreshTokenInfo | null> {

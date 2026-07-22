@@ -1,4 +1,4 @@
-import { pgSchema, pgTable, varchar, uuid, timestamp, boolean, jsonb, text, unique } from "drizzle-orm/pg-core";
+import { pgSchema, pgTable, varchar, uuid, timestamp, boolean, jsonb, text, unique, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 /**
@@ -25,24 +25,62 @@ export function createAuthSchema(usersSchemaName = "rebase") {
         isAnonymous: boolean("is_anonymous").default(false).notNull(),
         roles: text("roles").array().default([]).notNull(),
         metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
+        /**
+         * Sessions that began before this instant are dead, whatever tokens
+         * they still hold. Password resets and admin revocations stamp it.
+         *
+         * Deleting the user's refresh-token rows (which we also do) is not
+         * sufficient on its own: a request already in flight can insert a
+         * freshly rotated row microseconds after the delete and survive it.
+         * This timestamp cannot be outrun that way — it is checked against
+         * `refresh_tokens.session_started_at`, which rotation carries forward.
+         */
+        tokensValidAfter: timestamp("tokens_valid_after"),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
 
 
     /**
-     * Refresh tokens for long-lived sessions
+     * Refresh tokens for long-lived sessions.
+     *
+     * A row is one token, not one device. Every token minted from the same
+     * sign-in shares a `sessionId`, and rotation ADDS a row rather than
+     * replacing one: the superseded token stays on file, flagged `revoked`
+     * with a `rotatedAt` stamp. That record is what lets the refresh endpoint
+     * tell a client replaying a token it never got an answer for (a response
+     * lost to a redeploy, a second tab racing on boot) apart from a stranger
+     * presenting a token that was never issued. Deleting the old row on sight
+     * — the previous behaviour — made those two cases indistinguishable, and
+     * the legitimate one is overwhelmingly the common one.
+     *
+     * There is deliberately NO unique constraint on (uid, user_agent,
+     * ip_address). Keying a session on the IP meant one row per "device",
+     * so a second browser profile behind the same NAT silently evicted the
+     * first, and a phone changing networks orphaned a row on every hop.
+     * User agent and IP are descriptive metadata for the sessions list;
+     * `sessionId` is the identity.
      */
     const refreshTokens = tableCreator("refresh_tokens", {
         id: uuid("id").defaultRandom().primaryKey(),
         uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
+        sessionId: uuid("session_id").defaultRandom().notNull(),
         tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
         expiresAt: timestamp("expires_at").notNull(),
+        revoked: boolean("revoked").default(false).notNull(),
+        rotatedAt: timestamp("rotated_at"),
+        /**
+         * When the sign-in this token descends from happened — carried across
+         * every rotation, unlike `createdAt`. `users.tokensValidAfter` is
+         * compared against this, so a revocation cannot be outrun by a token
+         * that rotates immediately after it.
+         */
+        sessionStartedAt: timestamp("session_started_at").defaultNow().notNull(),
         userAgent: varchar("user_agent", { length: 500 }),
         ipAddress: varchar("ip_address", { length: 45 }),
         createdAt: timestamp("created_at").defaultNow().notNull()
     }, (table) => ({
-        uniqueDeviceSession: unique("unique_device_session").on(table.uid, table.userAgent, table.ipAddress)
+        sessionIdx: index("idx_refresh_tokens_session").on(table.sessionId)
     }));
 
     /**

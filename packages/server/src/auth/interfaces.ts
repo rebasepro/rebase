@@ -130,6 +130,34 @@ export interface RefreshTokenInfo {
     createdAt: Date;
     userAgent?: string | null;
     ipAddress?: string | null;
+    /**
+     * The sign-in this token descends from. Every token minted by rotating
+     * this one carries the same id.
+     *
+     * Optional because a custom {@link TokenRepository} written against an
+     * older release does not supply it; the refresh endpoint then treats the
+     * token as a session of one, which costs reuse tolerance but still works.
+     */
+    sessionId?: string;
+    /**
+     * Set when this token was superseded by a rotation. Being superseded is
+     * not an error — a client whose response was lost still holds it — so it
+     * stays usable to mint a sibling for a short window after this instant.
+     */
+    rotatedAt?: Date | null;
+    /** Hard kill (logout, remote session revoke). Never usable again. */
+    revoked?: boolean;
+    /** When the sign-in happened; carried across rotations, unlike createdAt. */
+    sessionStartedAt?: Date;
+}
+
+/**
+ * Identity of the sign-in a refresh token belongs to, threaded through
+ * rotation so descendants stay grouped.
+ */
+export interface RefreshTokenSession {
+    id: string;
+    startedAt: Date;
 }
 
 /**
@@ -321,9 +349,50 @@ export interface TokenRepository {
     // Refresh tokens
 
     /**
-     * Create a new refresh token
+     * Create a new refresh token.
+     *
+     * `session` groups this token with the sign-in it descends from. It is
+     * optional so that repositories written against an older release keep
+     * satisfying this interface; implementations that ignore it degrade to one
+     * session per token.
      */
-    createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string): Promise<void>;
+    createRefreshToken(uid: string, tokenHash: string, expiresAt: Date, userAgent?: string, ipAddress?: string, session?: RefreshTokenSession): Promise<void>;
+
+    /**
+     * Mark a token as superseded by a rotation, WITHOUT making it unusable.
+     *
+     * The distinction from deletion is the entire point: a client that never
+     * received the rotated response still holds this token, and must be able
+     * to present it and be recognised. Implementations that omit this method
+     * fall back to {@link TokenRepository.deleteRefreshToken}, which restores
+     * the old, lossy behaviour.
+     */
+    markRefreshTokenRotated?(tokenHash: string): Promise<void>;
+
+    /**
+     * Hard-kill every token of one sign-in (logout, remote session revoke).
+     * Unlike rotation this is final — no grace, no replay.
+     */
+    revokeRefreshTokenSession?(sessionId: string): Promise<void>;
+
+    /**
+     * Drop tokens of a session that were superseded before `supersededBefore`,
+     * plus anything already expired. Keeps rotation from growing a row per
+     * refresh forever; called opportunistically, never load-bearing.
+     */
+    pruneRefreshTokens?(uid: string, sessionId: string, supersededBefore: Date): Promise<void>;
+
+    /**
+     * The instant before which every session of this user is void, or null if
+     * none is set. See `users.tokens_valid_after`.
+     */
+    getTokensValidAfter?(uid: string): Promise<Date | null>;
+
+    /**
+     * Void every session that began before `at`. Set alongside deleting the
+     * user's tokens so a rotation racing the delete cannot survive it.
+     */
+    setTokensValidAfter?(uid: string, at: Date): Promise<void>;
 
     /**
      * Find a refresh token by hash

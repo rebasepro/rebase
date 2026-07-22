@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { ApiError, errorHandler } from "../api/errors";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { generateSecureToken, hashToken } from "./admin-user-ops";
 import type { AuthRepository, OAuthProvider, CreateUserData } from "./interfaces";
 import { generateAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry } from "./jwt";
@@ -64,6 +64,22 @@ export interface AuthModuleConfig {
      * auth endpoints, and CORS must allow credentials (no `origin: "*"`).
      */
     cookieAuth?: CookieAuthConfig;
+    /**
+     * How long a refresh token stays usable after it has been rotated away,
+     * in seconds. Default 10, matching GoTrue's `refresh_token_reuse_interval`.
+     *
+     * Rotation is only safe if the client is guaranteed to receive the
+     * replacement, and no network guarantees that. A pod rolls mid-response, a
+     * laptop suspends, a second tab boots at the same instant — and the client
+     * is left holding a token the database has moved past. Within this window
+     * that client is handed a fresh token of the same session instead of a
+     * 401, which is the difference between a hiccup and being silently signed
+     * out of an app you were using.
+     *
+     * Widen it if your clients are flaky or your deploys are long; the cost is
+     * how long a captured token stays useful to someone who copied it.
+     */
+    refreshTokenReuseIntervalSeconds?: number;
 }
 
 /**
@@ -269,12 +285,18 @@ aal: "aal1" };
         const accessToken = generateAccessToken(uid, roleIds, "aal1", customClaims);
         const refreshToken = generateRefreshToken();
 
+        // A sign-in opens a session; every token later rotated out of it
+        // inherits this id and start time. `startedAt` is what
+        // `tokens_valid_after` is judged against, so it must NOT advance on
+        // rotation — otherwise a session could stay one step ahead of a
+        // revocation forever simply by refreshing.
         await authRepo.createRefreshToken(
             uid,
             hashRefreshToken(refreshToken),
             getRefreshTokenExpiry(),
             userAgent,
-            ipAddress
+            ipAddress,
+            { id: randomUUID(), startedAt: new Date() }
         );
 
         return { roleIds,
@@ -682,8 +704,13 @@ displayName: user.displayName }, appName);
         // Mark token as used
         await authRepo.markPasswordResetTokenUsed(tokenHash);
 
-        // Invalidate all refresh tokens (security: log out all sessions)
+        // Invalidate all refresh tokens (security: log out all sessions).
+        // The watermark is what makes this airtight: deleting rows only
+        // catches the sessions that exist at this instant, and the whole
+        // point of a reset is that someone else may be holding a token and
+        // actively refreshing it.
         await authRepo.deleteAllRefreshTokensForUser(storedToken.uid);
+        await authRepo.setTokensValidAfter?.(storedToken.uid, new Date()).catch(() => undefined);
 
         // Fire onPasswordReset hook (fire-and-forget)
         if (ops.onPasswordReset) {
@@ -732,6 +759,7 @@ message: "Password has been reset successfully" });
 
         // Invalidate all refresh tokens (security: log out all sessions)
         await authRepo.deleteAllRefreshTokensForUser(user.id);
+        await authRepo.setTokensValidAfter?.(user.id, new Date()).catch(() => undefined);
 
         return c.json({ success: true,
 message: "Password has been changed successfully" });
@@ -850,15 +878,61 @@ message: "Email verified successfully" });
         const storedToken = await authRepo.findRefreshTokenByHash(tokenHash);
 
         if (!storedToken) {
-            // When cookie mode is active, clear the stale cookie
-            clearRefreshCookie(c, config.cookieAuth);
+            // Deliberately NOT clearing the cookie. A token we do not recognise
+            // means we cannot authenticate THIS request; it does not mean the
+            // credential in the browser should be destroyed. Clearing here made
+            // any single stale request — a duplicate from a second tab, a retry
+            // after a rolled pod — permanently sign out a user whose session was
+            // otherwise perfectly alive, because the good cookie went with it.
             throw ApiError.unauthorized("Invalid refresh token", "INVALID_TOKEN");
+        }
+
+        if (storedToken.revoked) {
+            // A hard kill: logout, a remotely revoked device, an admin action.
+            // Unlike the case above this session really is over, so clearing is
+            // correct — there is nothing left for the cookie to authenticate.
+            clearRefreshCookie(c, config.cookieAuth);
+            throw ApiError.unauthorized("Session has been revoked", "SESSION_REVOKED");
         }
 
         if (new Date() > storedToken.expiresAt) {
             await authRepo.deleteRefreshToken(tokenHash);
             clearRefreshCookie(c, config.cookieAuth);
             throw ApiError.unauthorized("Refresh token expired", "TOKEN_EXPIRED");
+        }
+
+        // A session that began before the user's revocation mark is void, even
+        // if its row survived. This closes the race in which a refresh already
+        // in flight inserts a rotated token microseconds after a password reset
+        // has deleted every row it could see.
+        const sessionStartedAt = storedToken.sessionStartedAt ?? storedToken.createdAt;
+        const tokensValidAfter = await authRepo.getTokensValidAfter?.(storedToken.uid).catch(() => null);
+        if (tokensValidAfter && sessionStartedAt < tokensValidAfter) {
+            await authRepo.deleteRefreshToken(tokenHash);
+            clearRefreshCookie(c, config.cookieAuth);
+            throw ApiError.unauthorized("Session has been revoked", "SESSION_REVOKED");
+        }
+
+        // A token that was already rotated away is the normal signature of a
+        // client that never received the answer — a response lost to a deploy,
+        // a suspended laptop, two tabs booting together. Inside the reuse window
+        // it earns a fresh token of the same session rather than a 401.
+        const reuseWindowMs = Math.max(0, config.refreshTokenReuseIntervalSeconds ?? 10) * 1000;
+        const supersededAt = storedToken.rotatedAt ? new Date(storedToken.rotatedAt) : null;
+        if (supersededAt && Date.now() - supersededAt.getTime() > reuseWindowMs) {
+            // Outside the window we decline the request but leave the session
+            // standing: the live token this one was rotated into is still good,
+            // and punishing its holder for a late straggler is how a legitimate
+            // user gets signed out. Logged because a genuine replay of an old
+            // token — long after it was superseded — is also what a stolen
+            // token looks like, and that signal should not vanish silently.
+            logger.warn("[Auth] Refresh token replayed after the reuse window", {
+                uid: storedToken.uid,
+                sessionId: storedToken.sessionId,
+                supersededSecondsAgo: Math.round((Date.now() - supersededAt.getTime()) / 1000),
+                userAgent: c.req.header("user-agent") || "unknown"
+            });
+            throw ApiError.unauthorized("Refresh token already used", "TOKEN_ALREADY_USED");
         }
 
         // Generate new tokens
@@ -890,18 +964,53 @@ aal: "aal1" };
         const newAccessToken = generateAccessToken(storedToken.uid, roleIds, "aal1", customClaims);
         const newRefreshToken = generateRefreshToken();
 
-        // Rotate refresh token (delete old, create new)
+        // Rotate: mark the presented token superseded and mint its successor
+        // into the same session. Note the ORDER and the absence of a delete —
+        // the old row has to survive, because it is the only thing that can
+        // tell a client replaying it apart from a stranger.
+        //
+        // If the presented token was ALREADY superseded (a replay inside the
+        // reuse window, allowed above), leave the existing rotation stamp alone
+        // and simply add a sibling: two tabs then hold two live tokens of one
+        // session, which is exactly what we want them to have.
         const userAgent = c.req.header("user-agent") || "unknown";
         const ipAddress = c.req.header("x-forwarded-for") || "unknown";
+        const session = {
+            id: storedToken.sessionId ?? storedToken.id,
+            startedAt: sessionStartedAt
+        };
 
-        await authRepo.deleteRefreshToken(tokenHash);
+        if (!supersededAt) {
+            if (authRepo.markRefreshTokenRotated) {
+                await authRepo.markRefreshTokenRotated(tokenHash);
+            } else {
+                // Repository from an older release: no way to record the
+                // supersession, so fall back to the lossy delete.
+                await authRepo.deleteRefreshToken(tokenHash);
+            }
+        }
+
         await authRepo.createRefreshToken(
             storedToken.uid,
             hashRefreshToken(newRefreshToken),
             getRefreshTokenExpiry(),
             userAgent,
-            ipAddress
+            ipAddress,
+            session
         );
+
+        // Housekeeping, deliberately after the new token exists and never
+        // allowed to fail the request: rotation adds a row per refresh, and
+        // nothing else would ever remove them.
+        authRepo.pruneRefreshTokens?.(
+            storedToken.uid,
+            session.id,
+            new Date(Date.now() - reuseWindowMs)
+        ).catch((err: unknown) => {
+            logger.warn("[Auth] Refresh token prune failed", {
+                error: err instanceof Error ? err.message : String(err)
+            });
+        });
 
         const tokensOnlyResponse: AuthResponsePayload = {
             tokens: {

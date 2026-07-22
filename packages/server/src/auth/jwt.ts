@@ -34,7 +34,10 @@ export interface AccessTokenPayload {
 let jwtConfig: JwtConfig = {
     secret: "",
     accessExpiresIn: "1h",
-    refreshExpiresIn: "30d"
+    // 400 days, sliding — see getRefreshTokenTtlMs. A 30-day default meant a
+    // user who took a summer off came back signed out, which nobody asked for
+    // and which neither of the auth services people compare us to does.
+    refreshExpiresIn: "400d"
 };
 
 /**
@@ -204,30 +207,45 @@ export function hashRefreshToken(token: string): string {
 }
 
 /**
+ * The longest a cookie can live. Chrome (since 104) and RFC 6265bis silently
+ * rewrite any `Max-Age` beyond 400 days down to 400 days, so promising a
+ * browser more is not a stricter policy — it is a policy that differs from
+ * what is actually enforced, which is worse than knowing the ceiling.
+ */
+export const MAX_COOKIE_AGE_MS = 400 * 24 * 60 * 60 * 1000;
+
+/** Fallback when `refreshExpiresIn` is unset or unparseable. */
+const DEFAULT_REFRESH_TTL_MS = MAX_COOKIE_AGE_MS;
+
+/**
+ * How long a refresh token is valid for, in milliseconds.
+ *
+ * Every rotation issues a token with a fresh TTL, so this is a sliding window:
+ * a user who visits at all keeps their session indefinitely, and one who
+ * disappears loses it this long after their last visit. That is what both
+ * Firebase and Supabase do by default, and it is the behaviour people mean
+ * when they say they expect to still be signed in.
+ */
+export function getRefreshTokenTtlMs(): number {
+    const duration = jwtConfig.refreshExpiresIn;
+    const match = duration?.match(/^(\d+)([dhms])$/);
+    if (!match) return DEFAULT_REFRESH_TTL_MS;
+
+    const value = parseInt(match[1], 10);
+    switch (match[2]) {
+        case "d": return value * 24 * 60 * 60 * 1000;
+        case "h": return value * 60 * 60 * 1000;
+        case "m": return value * 60 * 1000;
+        case "s": return value * 1000;
+        default: return DEFAULT_REFRESH_TTL_MS;
+    }
+}
+
+/**
  * Calculate refresh token expiration date
  */
 export function getRefreshTokenExpiry(): Date {
-    const duration = jwtConfig.refreshExpiresIn || "30d";
-    const match = duration.match(/^(\d+)([dhms])$/);
-
-    if (!match) {
-        // Default to 30 days
-        return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    }
-
-    const value = parseInt(match[1], 10);
-    const unit = match[2];
-
-    let ms: number;
-    switch (unit) {
-        case "d": ms = value * 24 * 60 * 60 * 1000; break;
-        case "h": ms = value * 60 * 60 * 1000; break;
-        case "m": ms = value * 60 * 1000; break;
-        case "s": ms = value * 1000; break;
-        default: ms = 30 * 24 * 60 * 60 * 1000;
-    }
-
-    return new Date(Date.now() + ms);
+    return new Date(Date.now() + getRefreshTokenTtlMs());
 }
 
 export interface DownloadTokenPayload {

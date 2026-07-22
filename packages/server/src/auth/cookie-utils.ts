@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import type { AuthResponsePayload } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import type { CookieAuthConfig } from "./routes";
+import { getRefreshTokenTtlMs, MAX_COOKIE_AGE_MS } from "./jwt";
 
 /**
  * Cookie auth helpers for httpOnly refresh tokens.
@@ -35,8 +36,14 @@ export function setRefreshCookie(c: Context<HonoEnv>, refreshToken: string, conf
     let cookie = `${settings.name}=${encodeURIComponent(refreshToken)}; Path=${settings.path}; HttpOnly; SameSite=${settings.sameSite}`;
     if (isSecure) cookie += "; Secure";
     if (settings.domain) cookie += `; Domain=${settings.domain}`;
-    // Match the server's refresh token expiry (30 days default)
-    cookie += `; Max-Age=${30 * 24 * 60 * 60}`;
+    // Match the server's refresh token expiry rather than assuming it. This
+    // was hardcoded to 30 days, which quietly capped every deployment's
+    // sessions at 30 days no matter what JWT_REFRESH_EXPIRES_IN said: the row
+    // in the database stayed valid for as long as it was configured to, and
+    // the browser threw away the cookie that pointed at it. Re-set on every
+    // rotation, so an active session's cookie slides forward with it.
+    const maxAgeSeconds = Math.floor(Math.min(getRefreshTokenTtlMs(), MAX_COOKIE_AGE_MS) / 1000);
+    cookie += `; Max-Age=${maxAgeSeconds}`;
     c.header("Set-Cookie", cookie, { append: true });
 }
 

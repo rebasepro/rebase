@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { randomUUID } from "crypto";
 import { z } from "zod";
 import { ApiError } from "../api/errors";
 import { HonoEnv } from "../api/types";
@@ -225,13 +226,16 @@ export function mountMfaRoutes(
         const accessToken = generateAccessToken(userCtx.uid, roleIds, "aal2");
         const refreshToken = generateRefreshToken();
 
-        // Create new refresh token
+        // Create new refresh token. Stepping up to aal2 opens a new session:
+        // it is a fresh authentication, and dating it now is what lets a later
+        // revocation void it.
         await authRepo.createRefreshToken(
             userCtx.uid,
             hashRefreshToken(refreshToken),
             getRefreshTokenExpiry(),
             c.req.header("user-agent") || "unknown",
-            c.req.header("x-forwarded-for") || "unknown"
+            c.req.header("x-forwarded-for") || "unknown",
+            { id: randomUUID(), startedAt: new Date() }
         );
 
         // Fire onMfaVerified hook

@@ -5,6 +5,8 @@ import {
     generateRefreshToken,
     hashRefreshToken,
     getRefreshTokenExpiry,
+    getRefreshTokenTtlMs,
+    MAX_COOKIE_AGE_MS,
     getAccessTokenExpiryMs,
     getAccessTokenExpiry,
     generateDownloadToken,
@@ -251,13 +253,22 @@ refreshExpiresIn: "3600s" });
             expect(expiry.getTime()).toBeLessThanOrEqual(expected + 1000);
         });
 
-        it("should default to 30 days for invalid refresh format", () => {
+        it("should default to the 400-day cookie ceiling for invalid refresh format", () => {
             configureJwt({ secret: testSecret,
 refreshExpiresIn: "invalid" });
             const expiry = getRefreshTokenExpiry();
-            const expected = Date.now() + (30 * 24 * 60 * 60 * 1000);
+            const expected = Date.now() + (400 * 24 * 60 * 60 * 1000);
             expect(expiry.getTime()).toBeGreaterThanOrEqual(expected - 1000);
             expect(expiry.getTime()).toBeLessThanOrEqual(expected + 1000);
+        });
+
+        it("caps the cookie Max-Age at what browsers actually honour", () => {
+            // Config may ask for more; Chrome and RFC 6265bis rewrite anything
+            // past 400 days, so the cookie must not claim otherwise.
+            configureJwt({ secret: testSecret,
+refreshExpiresIn: "3650d" });
+            expect(getRefreshTokenTtlMs()).toBe(3650 * 24 * 60 * 60 * 1000);
+            expect(Math.min(getRefreshTokenTtlMs(), MAX_COOKIE_AGE_MS)).toBe(MAX_COOKIE_AGE_MS);
         });
     });
 
