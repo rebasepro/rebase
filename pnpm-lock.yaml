@@ -1858,6 +1858,9 @@ importers:
       ssh2:
         specifier: ^1.17.0
         version: 1.17.0
+      ws:
+        specifier: '>=8.21.0'
+        version: 8.21.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -1871,6 +1874,9 @@ importers:
       '@types/ssh2':
         specifier: ^1.15.5
         version: 1.15.5
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
