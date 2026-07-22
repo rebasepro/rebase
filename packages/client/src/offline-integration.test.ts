@@ -1,4 +1,4 @@
-import { createRebaseClient, RebaseApiError } from "./index";
+import { createRebaseClient, RebaseApiError, type LiveResult } from "./index";
 import { MemoryOfflineStore } from "./offline-store";
 
 /**
@@ -52,7 +52,7 @@ describe("createRebaseClient({ offline })", () => {
             fetch: fetchStub,
             offline
         });
-        return { client, network, requests };
+        return { client, network, requests, fetchStub };
     }
 
     it("exposes client.offline only when enabled", () => {
@@ -119,8 +119,10 @@ describe("createRebaseClient({ offline })", () => {
         network.online = false;
         const cached = await posts.where("title", "==", "hello").find();
         expect(cached.data).toEqual(online.data);
-        // A different filter is a different cache key, so it must miss.
-        await expect(posts.where("title", "==", "other").find()).rejects.toThrow(TypeError);
+        // A filter the server never answered here is still evaluated locally
+        // against the rows that *are* cached — and this one matches none.
+        expect((await posts.where("title", "==", "other").find()).data).toEqual([]);
+        expect((await posts.where("title", "==", "hello").limit(5).find()).data).toEqual(online.data);
     });
 
     it("does not serve cache on a server error — only on network failure", async () => {
@@ -130,5 +132,44 @@ describe("createRebaseClient({ offline })", () => {
 
         network.serverError = true;
         await expect(posts.find()).rejects.toThrow(RebaseApiError);
+    });
+
+    it("drives a live query through the data proxy, offline included", async () => {
+        const { client, network } = createHarness();
+        const posts = client.data.collection("posts");
+        await posts.find();
+
+        const results: LiveResult<Record<string, unknown>>[] = [];
+        const stop = posts.observe(undefined, (r) => results.push(r));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(results[0].data.map((r) => r.id)).toEqual(["p1"]);
+
+        network.online = false;
+        await posts.create({ title: "written offline" });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const last = results[results.length - 1];
+        expect(last.data.map((r) => r.title)).toEqual(["hello", "written offline"]);
+        expect(last.hasPendingWrites).toBe(true);
+        expect(client.offline!.status()).toMatchObject({ online: false, pending: 1 });
+        stop();
+    });
+
+    it("observes without offline support too, straight off the network", async () => {
+        const { fetchStub } = createHarness();
+        const plain = createRebaseClient({
+            baseUrl: "http://localhost:9999",
+            realtime: false,
+            fetch: fetchStub
+        });
+
+        const results: LiveResult<Record<string, unknown>>[] = [];
+        const stop = plain.data.collection("posts").observe(undefined, (r) => results.push(r));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(results[0].data.map((r) => r.id)).toEqual(["p1"]);
+        // No local database, so nothing here is ever cached, pending or partial.
+        expect(results[0]).toMatchObject({ fromCache: false, hasPendingWrites: false, partial: false });
+        stop();
     });
 });

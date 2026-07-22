@@ -89,13 +89,18 @@ export type {
     ChannelHistoryResult
 } from "./realtime-channel";
 
-// Offline: config + the `client.offline` surface, plus the store contract so
-// other environments (React Native/AsyncStorage, Electron, …) can supply
-// their own persistence. `MemoryOfflineStore` is exported for tests and as
-// the reference implementation; the IndexedDB store is wired automatically
-// in the browser and needs no direct construction.
-export type { OfflineApi, OfflineConfig } from "./offline";
-export type { OfflineStore, OfflineCacheEntry, PendingMutation } from "./offline-store";
+// Offline: config, the `client.offline` surface, and the metadata a UI needs
+// to reflect sync state. `isOfflineError` distinguishes "there was no network
+// and nothing local to answer with" from a request that genuinely failed.
+// The store contract is public so other environments (React Native/
+// AsyncStorage, Electron, …) can supply their own persistence;
+// `MemoryOfflineStore` is exported for tests and as the reference
+// implementation, while the IndexedDB store is wired automatically in the
+// browser and needs no direct construction.
+export type { OfflineApi, OfflineConfig, OfflineStatus } from "./offline";
+export { isOfflineError } from "./offline";
+export type { LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
+export type { OfflineStore, OfflineCacheEntry, OfflineCacheRecord, PendingMutation, MutationRollback } from "./offline-store";
 export { MemoryOfflineStore } from "./offline-store";
 
 export interface CreateRebaseClientOptions extends RebaseClientConfig {
@@ -119,12 +124,18 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
      */
     collections?: Record<string, string>;
     /**
-     * Offline support for the data layer. `true` enables it with defaults
-     * (network-first reads served from cache on network failure, writes
-     * queued and replayed when connectivity returns); pass an
-     * {@link OfflineConfig} to control the store, cache size, or sync error
-     * handling. Cached reads and queued writes are partitioned per signed-in
-     * user. Off by default.
+     * Local-first sync for the data layer.
+     *
+     * `true` enables it with defaults: reads populate a local row database and
+     * fall back to it (evaluating filters and sorts locally) when the network
+     * is gone, writes made offline apply immediately and replay in order when
+     * it returns, and `observe()` becomes a live query that emits from the
+     * local database first. A rejected write is rolled back. Pass an
+     * {@link OfflineConfig} to control the store, cache sizes, retry backoff,
+     * or rejection handling.
+     *
+     * Local rows and queued writes are partitioned per signed-in user, and
+     * shared across tabs. Off by default.
      */
     offline?: boolean | OfflineConfig;
 }

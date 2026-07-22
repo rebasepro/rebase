@@ -1,6 +1,6 @@
 ---
 name: rebase-sdk
-description: Guide for using the Rebase generated TypeScript SDK and client library. Use this skill when the user needs to interact with a Rebase backend from client-side or server-side code, including CRUD operations, filtering, authentication, realtime subscriptions, file storage, custom functions, or admin operations.
+description: Guide for using the Rebase generated TypeScript SDK and client library. Use this skill when the user needs to interact with a Rebase backend from client-side or server-side code, including CRUD operations, filtering, authentication, realtime subscriptions, live queries, offline support and local-first sync, file storage, custom functions, or admin operations.
 ---
 
 # Rebase SDK
@@ -90,6 +90,9 @@ Passing your generated `Database` type maps camelCase collection names (e.g. `po
 | `websocketUrl` | `string` | Auto-derived from `baseUrl` | WebSocket URL for realtime |
 | `fetch` | `typeof fetch` | Global `fetch` | Custom fetch implementation |
 | `onUnauthorized` | `() => void` | — | Handler called on 401 responses |
+| `realtime` | `boolean` | `true` | Open the WebSocket. Set `false` in one-shot scripts, or the process will not exit |
+| `collections` | `Record<string, string>` | — | Maps accessor names to collection slugs |
+| `offline` | `boolean \| OfflineConfig` | `false` | Local-first sync — see **Offline & Local-First Sync** below |
 
 ### Server-Side Usage
 
@@ -451,6 +454,85 @@ Channels are per-name singletons, so two components asking for `"document-42"` s
 
 The SDK handles two protocol details that are easy to get wrong by hand: **the roster is not pushed on join** (a joining client's `presence_diff` contains only itself, so the full state must be requested), and **presence expires after 30 seconds** unless re-sent — the SDK heartbeats at 20s. Channel and presence frames do not require an account, so anonymous visitors can join public channels; the server still authorizes them. See the **rebase-realtime** skill for the raw protocol.
 
+## Offline & Local-First Sync
+
+Opt in with one option. It is **off by default**, so nothing below applies unless you enable it:
+
+```typescript
+const rebase = createRebaseClient<Database>({
+    baseUrl: API_URL,
+    offline: true,
+});
+```
+
+With it on, the data layer keeps a **normalized local database of rows** (IndexedDB in the browser, memory elsewhere) and evaluates queries against it — filters, sorting and pagination included. Nothing in the CRUD API changes shape; the calls simply stop failing when the network does.
+
+| Behaviour | What it means when writing code |
+|-----------|--------------------------------|
+| Reads fall back locally | `find()` offline returns the matching cached rows instead of throwing. `findById()` answers for a row only ever seen inside a `find()` |
+| Writes apply immediately | `create()`/`update()`/`delete()` offline return right away and queue. Rows created offline get a client-generated id |
+| Local writes join their lists | An offline create shows up in every filtered query it matches, and disappears from one an offline edit moves it out of |
+| Rejections roll back | A write the server refuses (400/403/404) is undone locally and reported via `onSyncError` |
+| Retries are automatic | Network failures and 429/503 replay on an exponential backoff; the `online` event and a sign-in also trigger one |
+| Per-user and per-tab-safe | Local rows and the outbox are partitioned by signed-in uid, shared across tabs, and replayed by one tab at a time |
+
+### Live queries — prefer these in a UI
+
+`observe()` is the reactive read. It emits from the local database **before** any request, de-duplicates, and re-emits on local writes, replays, rollbacks and realtime events:
+
+```typescript
+const unsubscribe = rebase.data.products.observe(
+    { where: { active: ['==', true] }, orderBy: ['created_at', 'desc'] },
+    (result) => {
+        render(result.data);          // same shape as find()
+        setSaving(result.hasPendingWrites);
+        setStale(result.fromCache);
+    },
+    (error) => console.error(error),
+    { realtime: true }                // default when realtime is enabled
+);
+
+// Single row; the callback receives undefined when it is deleted.
+const stopOne = rebase.data.products.observeById('p1', (row, meta) => { /* ... */ });
+```
+
+Each result carries `fromCache`, `hasPendingWrites`, `partial` (the local database may not hold every matching row) and `error`. `observe()` exists without offline too — it is then `find()` + `listen()` with all three flags `false`.
+
+### Sync state
+
+```typescript
+rebase.offline!.onStatusChange(({ online, syncing, pending, lastSyncedAt, lastError }) => {
+    // Drive an offline badge / "N unsaved" counter / spinner.
+});
+
+await rebase.offline!.sync();      // "retry now" — resolves { flushed, remaining }
+await rebase.offline!.pending();   // the queued mutations themselves
+await rebase.offline!.clear();     // DESTRUCTIVE: drops queued writes and local rows
+```
+
+`isOfflineError(error)` distinguishes "offline with nothing local to answer with" from a request that genuinely failed:
+
+```typescript
+import { isOfflineError } from '@rebasepro/client';
+
+try {
+    await rebase.data.products.find();
+} catch (error) {
+    if (isOfflineError(error)) showOfflinePlaceholder();
+    else throw error;
+}
+```
+
+### Limits agents must not paper over
+
+- **The client is not a replica.** Only rows the app has read or written are local, so a query answered from the cache may be missing rows. Live results flag this as `partial` — surface it rather than presenting it as complete.
+- **`searchString` is approximated** locally as a case-insensitive substring scan; the server runs real full-text search.
+- **`include`d relations cannot be evaluated locally** — such a query is always `partial` when answered from the cache.
+- **Replay is at-least-once.** Prefer idempotent writes (`createMany` with `upsert`) where a duplicate would matter.
+- **Do not enable `offline` in a server-side script.** It is for interactive clients; a one-shot script wants `realtime: false` and a plain client.
+
+Full reference: [rebase.pro/docs/sdk/offline](https://rebase.pro/docs/sdk/offline).
+
 ## File Storage
 
 ```typescript
@@ -656,4 +738,5 @@ export function useAuth() {
 - **Client package source:** `packages/client/src/`
 - **SDK generator source:** `packages/codegen/src/`
 - **QueryBuilder source:** `packages/common/src/data/query_builder.ts`
+- **Offline sync engine source:** `packages/client/src/offline.ts` (and `offline-query.ts`, `offline-store.ts`)
 - **SDK demo example:** `examples/sdk-demo/`

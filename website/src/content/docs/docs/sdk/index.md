@@ -11,6 +11,7 @@ The `@rebasepro/client` package provides a type-safe JavaScript SDK for interact
 - **Data operations** — CRUD with filtering, sorting, and pagination
 - **Relation fetching** — Include related entities with `.include()`
 - **Real-time subscriptions** — WebSocket-based live updates
+- **Offline & local-first sync** — Opt-in local row database, instant offline writes, live queries
 - **Authentication** — Token management, login, signup, OAuth
 - **Storage** — File upload, download, and management
 - **Custom functions** — Call custom server endpoints
@@ -50,6 +51,9 @@ const client = createRebaseClient({
 | `apiPath` | `string` | API prefix (default: `"/api"`) |
 | `fetch` | `typeof fetch` | Custom fetch implementation (e.g. for SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Custom 401 handler — return `true` to retry |
+| `realtime` | `boolean` | Open the WebSocket (default `true`) — set `false` in one-shot scripts |
+| `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
+| `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
 
 ## Typed SDK Generation
 
@@ -126,4 +130,5 @@ function MyComponent() {
 - **[Querying Data](/docs/sdk/querying)** — CRUD, filters, pagination, and relations
 - **[Authentication](/docs/sdk/authentication)** — Sign in, sign up, OAuth, sessions
 - **[Realtime Subscriptions](/docs/sdk/realtime)** — Live data with WebSockets
+- **[Offline & Local-First Sync](/docs/sdk/offline)** — Work without a connection, and sync when it returns
 - **[Storage & Files](/docs/sdk/storage)** — Upload, download, and manage files

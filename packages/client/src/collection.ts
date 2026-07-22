@@ -12,14 +12,51 @@ import {
 import { SDKQueryBuilder } from "./sdk_query_builder";
 
 /**
+ * A live query result: a normal {@link FindResult} plus what an interface
+ * needs to decide whether to show a "saving…" or "offline" affordance over it.
+ *
+ * The three flags are always `false` on a client without offline support —
+ * every result there came straight from the server.
+ */
+export interface LiveResult<M extends Record<string, unknown>> extends FindResult<M> {
+    /** The data came from the local database, not from a completed request. */
+    fromCache: boolean;
+    /** At least one row here carries a write the server has not accepted yet. */
+    hasPendingWrites: boolean;
+    /**
+     * The local database may not hold every row the server would have
+     * returned, so treat this as a best effort rather than a complete answer.
+     */
+    partial: boolean;
+    /** The most recent revalidation failure, when the last one failed. */
+    error?: Error;
+}
+
+/** Snapshot metadata for a single observed row. */
+export interface RowSnapshotMeta {
+    fromCache: boolean;
+    hasPendingWrites: boolean;
+}
+
+export interface ObserveOptions {
+    /**
+     * Keep the subscription live off the realtime socket, so changes made by
+     * other clients arrive without a refetch. On by default whenever realtime
+     * is enabled on the client; pass `false` for a one-shot read that still
+     * reports offline/pending metadata.
+     */
+    realtime?: boolean;
+}
+
+/**
  * The concrete, HTTP-backed implementation of the public
  * {@link SDKCollectionClient} contract — flat rows (no Entity wrapper), plus
  * fluent query-builder methods (`.where()`, `.orderBy()`, …).
  *
  * This is what `createRebaseClient().data.<collection>` returns. It is not a
  * separate API from {@link SDKCollectionClient}; it only widens it with
- * `count()`. Program against {@link SDKCollectionClient} when you want a
- * transport-agnostic type.
+ * `count()` and the reactive `observe()` pair. Program against
+ * {@link SDKCollectionClient} when you want a transport-agnostic type.
  */
 export interface CollectionClient<
     M extends Record<string, unknown> = Record<string, unknown>,
@@ -27,6 +64,36 @@ export interface CollectionClient<
     U = Partial<M>
 > extends SDKCollectionClient<M, I, U> {
     count(params?: FindParams): Promise<number>;
+
+    /**
+     * Subscribe to a query's results.
+     *
+     * This is the reactive read primitive, and the one to reach for in a UI:
+     * unlike `find()` it keeps emitting. On a client with `offline` enabled it
+     * is local-first — the first emission comes from the local database, with
+     * no request in the way — and re-emits on every local write, every queued
+     * write reaching the server, and every rollback. With realtime enabled it
+     * also re-emits on changes made by other clients.
+     *
+     * Emissions are de-duplicated: a refresh that changes nothing does not
+     * call back.
+     *
+     * @returns An unsubscribe function.
+     */
+    observe(
+        params: FindParams | undefined,
+        onResult: (result: LiveResult<M>) => void,
+        onError?: (error: Error) => void,
+        options?: ObserveOptions
+    ): () => void;
+
+    /** {@link CollectionClient.observe} for a single row. */
+    observeById(
+        id: string | number,
+        onResult: (row: M | undefined, meta: RowSnapshotMeta) => void,
+        onError?: (error: Error) => void,
+        options?: ObserveOptions
+    ): () => void;
 }
 
 export function createCollectionClient<M extends Record<string, unknown> = Record<string, unknown>>(transport: Transport, slug: string, ws?: RebaseWebSocketClient): CollectionClient<M> {
@@ -109,6 +176,55 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             const qs = buildQueryString(countParams);
             const raw = await transport.request<{ count: number }>(basePath + "/count" + qs, { method: "GET" });
             return raw.count ?? 0;
+        },
+
+        // Reactive reads. Without the offline layer there is no local database
+        // to read from, so this is a fetch plus — when realtime is available —
+        // the live subscription that keeps it current.
+        observe(
+            params: FindParams | undefined,
+            onResult: (result: LiveResult<M>) => void,
+            onError?: (error: Error) => void,
+            options?: ObserveOptions
+        ) {
+            let closed = false;
+            const emit = (result: FindResult<M>) => {
+                if (closed) return;
+                onResult({ ...result, fromCache: false, hasPendingWrites: false, partial: false });
+            };
+            client.find(params).then(emit).catch((error) => {
+                if (!closed) onError?.(error as Error);
+            });
+            const live = options?.realtime !== false && client.listen
+                ? client.listen(params, emit, onError)
+                : undefined;
+            return () => {
+                closed = true;
+                live?.();
+            };
+        },
+
+        observeById(
+            id: string | number,
+            onResult: (row: M | undefined, meta: RowSnapshotMeta) => void,
+            onError?: (error: Error) => void,
+            options?: ObserveOptions
+        ) {
+            let closed = false;
+            const emit = (row: M | undefined) => {
+                if (closed) return;
+                onResult(row, { fromCache: false, hasPendingWrites: false });
+            };
+            client.findById(id).then(emit).catch((error) => {
+                if (!closed) onError?.(error as Error);
+            });
+            const live = options?.realtime !== false && client.listenById
+                ? client.listenById(id, emit, onError)
+                : undefined;
+            return () => {
+                closed = true;
+                live?.();
+            };
         },
 
         // Fluent builder instantiation

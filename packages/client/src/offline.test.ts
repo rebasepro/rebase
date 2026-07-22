@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { OfflineManager } from "./offline";
+import { isOfflineError, OfflineManager } from "./offline";
 import { MemoryOfflineStore, PendingMutation } from "./offline-store";
 import { RebaseApiError } from "./transport";
 import type { CollectionClient } from "./collection";
@@ -113,11 +113,16 @@ describe("OfflineManager", () => {
             expect(offline.meta.total).toBe(1);
         });
 
-        it("rethrows the network error when nothing is cached", async () => {
+        it("reports an offline read that has nothing local to answer with", async () => {
             const server = createFakeServer();
             const { wrap } = createManager(server);
             server.state.online = false;
-            await expect(wrap("posts").find()).rejects.toThrow(TypeError);
+            const error = await wrap("posts").find().catch((e) => e);
+            // A typed, recognisable failure rather than fetch's bare TypeError:
+            // "you are offline and I have nothing" is a distinct condition from
+            // "the request blew up", and apps need to tell them apart.
+            expect(isOfflineError(error)).toBe(true);
+            expect(error.message).toContain("posts");
         });
 
         it("does not swallow server errors into the cache path", async () => {
@@ -183,23 +188,43 @@ describe("OfflineManager", () => {
             expect(await posts.count()).toBe(2);
         });
 
-        it("never appends queued creates to a filtered query, but still applies updates and deletes", async () => {
+        it("puts an offline create into the filtered lists it belongs to, and only those", async () => {
             const server = createFakeServer();
             const { wrap } = createManager(server);
             const posts = wrap("posts");
             await server.client("posts").create({ title: "a", status: "draft" }, "p1");
-            const filter: FindParams = { where: { status: ["==", "draft"] } };
-            await posts.find(filter);
+            const drafts: FindParams = { where: { status: ["==", "draft"] } };
+            const published: FindParams = { where: { status: ["==", "published"] } };
+            await posts.find(drafts);
+            await posts.find(published);
 
             server.state.online = false;
             await posts.create({ title: "b", status: "draft" });
             await posts.update("p1", { title: "a2" });
 
-            const res = await posts.find(filter);
-            // The queued create may or may not match the filter — we cannot
-            // evaluate it client-side, so it must not be guessed into the result.
-            expect(res.data).toHaveLength(1);
-            expect(res.data[0].title).toBe("a2");
+            const inDrafts = await posts.find(drafts);
+            expect(inDrafts.data.map((r) => r.title).sort()).toEqual(["a2", "b"]);
+            expect(inDrafts.meta.total).toBe(2);
+
+            // The same row must not leak into a list whose filter it fails.
+            expect((await posts.find(published)).data).toHaveLength(0);
+        });
+
+        it("takes a row out of a list when an offline edit moves it out of the filter", async () => {
+            const server = createFakeServer();
+            const { wrap } = createManager(server);
+            const posts = wrap("posts");
+            await server.client("posts").create({ title: "a", status: "draft" }, "p1");
+            await server.client("posts").create({ title: "b", status: "draft" }, "p2");
+            const drafts: FindParams = { where: { status: ["==", "draft"] } };
+            await posts.find(drafts);
+
+            server.state.online = false;
+            await posts.update("p1", { status: "published" });
+
+            const res = await posts.find(drafts);
+            expect(res.data.map((r) => r.id)).toEqual(["p2"]);
+            expect(res.meta.total).toBe(1);
         });
 
         it("reports a pending delete of a cached row as gone", async () => {
@@ -332,7 +357,7 @@ describe("OfflineManager", () => {
 
             manager.setScope("user-b");
             expect(await manager.api.pending()).toHaveLength(0);
-            await expect(posts.find()).rejects.toThrow(TypeError);
+            expect(isOfflineError(await posts.find().catch((e) => e))).toBe(true);
 
             // Coming back, user A finds both again.
             manager.setScope("user-a");
@@ -479,7 +504,7 @@ describe("OfflineManager", () => {
     });
 
     describe("concurrency", () => {
-        it("gives concurrent offline writes distinct, ordered sequence numbers", async () => {
+        it("gives concurrent offline writes distinct, ordered mutation ids", async () => {
             const server = createFakeServer();
             const { manager, wrap } = createManager(server);
             const posts = wrap("posts");
@@ -493,9 +518,11 @@ describe("OfflineManager", () => {
 
             const pending = await manager.api.pending();
             expect(pending.map((m) => m.id)).toEqual(["c1", "c2", "c3"]);
-            const seqs = pending.map((m) => m.seq);
-            expect([...new Set(seqs)]).toHaveLength(3);
-            expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
+            const ids = pending.map((m) => m.mutationId);
+            expect([...new Set(ids)]).toHaveLength(3);
+            // Lexicographic order is replay order — that is the whole contract
+            // the store's prefix listing relies on.
+            expect(ids).toEqual([...ids].sort());
 
             server.state.online = true;
             await manager.sync();
@@ -530,10 +557,14 @@ describe("OfflineManager", () => {
             await posts.find({ limit: 2 });
             await posts.find({ limit: 3 });
 
+            const kept = (await store.listCache("anon|q|posts|")).map((e) => e.key).sort();
+            expect(kept).toEqual(["anon|q|posts|?limit=2", "anon|q|posts|?limit=3"]);
+
+            // Evicting a snapshot costs the server's page composition, not the
+            // rows: the query still answers, from the local database.
             server.state.online = false;
-            await expect(posts.find({ limit: 1 })).rejects.toThrow(TypeError);
+            expect((await posts.find({ limit: 1 })).data).toHaveLength(1);
             expect((await posts.find({ limit: 2 })).data).toHaveLength(1);
-            expect((await posts.find({ limit: 3 })).data).toHaveLength(1);
         });
 
         it("eviction never touches another collection's queries or cached rows", async () => {
@@ -571,7 +602,7 @@ describe("OfflineManager", () => {
             await manager.api.clear();
 
             expect(await manager.api.pending()).toHaveLength(0);
-            await expect(posts.find()).rejects.toThrow(TypeError);
+            expect(isOfflineError(await posts.find().catch((e) => e))).toBe(true);
 
             server.state.online = true;
             expect(await manager.sync()).toEqual({ flushed: 0, remaining: 0 });
@@ -665,7 +696,7 @@ describe("OfflineManager", () => {
             }
         });
 
-        it("continues sequence numbers after a restart, keeping replay order", async () => {
+        it("keeps replay order across a restart", async () => {
             const server = createFakeServer();
             const store = new MemoryOfflineStore();
             const first = createManager(server, { store });
@@ -678,7 +709,7 @@ describe("OfflineManager", () => {
 
             const pending = await second.manager.api.pending();
             expect(pending.map((m) => m.id)).toEqual(["p1", "p2"]);
-            expect(pending[0].seq).toBeLessThan(pending[1].seq);
+            expect(pending[0].mutationId < pending[1].mutationId).toBe(true);
 
             server.state.online = true;
             await second.manager.sync();

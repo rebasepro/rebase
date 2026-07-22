@@ -25,8 +25,9 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 export function App() {
     const rebaseClient = React.useMemo(() => createRebaseClient({
         baseUrl: API_URL,
-        // Network-first reads with an IndexedDB fallback, and writes queued
-        // for replay when connectivity returns.
+        // Local-first: reads populate an IndexedDB row database and fall back
+        // to it when the network is gone, and writes made offline apply
+        // immediately and replay when it returns.
         offline: true
     }), []);
 

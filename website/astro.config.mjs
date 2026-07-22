@@ -112,6 +112,7 @@ export default defineConfig({
                         { label: "Querying Data", slug: "docs/sdk/querying" },
                         { label: "Authentication", slug: "docs/sdk/authentication" },
                         { label: "Realtime Subscriptions", slug: "docs/sdk/realtime" },
+                        { label: "Offline & Local-First", slug: "docs/sdk/offline" },
                         { label: "Storage & Files", slug: "docs/sdk/storage" }
                     ]
                 },

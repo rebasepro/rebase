@@ -170,6 +170,14 @@ A full WebSocket engine built into every Rebase backend:
 - **Presence tracking** — Track who's online, sync user state across clients (typing indicators, cursor positions, online status).
 - **Auto-reconnect** — Exponential backoff, automatic resubscription, and token refresh on reconnect.
 
+### 📴 Offline & Local-First Sync
+
+Opt in with `offline: true` and the client SDK keeps a local database of rows instead of a cache of responses:
+
+- **Reads survive a dropped connection** — filters, sorting and pagination are evaluated against the local rows, so lists keep rendering.
+- **Writes apply instantly** — a write made offline lands locally, queues, and replays in order when the connection returns. One the server rejects is rolled back.
+- **Live queries** — `observe()` emits from the local database before any request, and re-emits on local writes, replays, rollbacks, realtime events, and changes from other tabs.
+
 ### ⚡ Extensible API & Edge Functions
 
 Drop custom Hono routes or scheduled tasks into the `functions/` and `crons/` directories. Rebase auto-loads them with database access and JWT authentication middleware injected automatically.

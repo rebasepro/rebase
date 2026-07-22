@@ -317,11 +317,33 @@ A reconnect also drops server-side channel membership and presence; the SDK re-j
 | Typing indicators / online status | `channel.track()` + `channel.onPresence()` |
 | Detail page with live updates | `listenById()` |
 | Admin panel monitoring | `listen()` with `orderBy` and `limit` |
+| A list that must survive a dropped connection | `observe()` with [offline](/docs/sdk/offline) enabled |
 
 > **Tip:** For one-time data fetches, use `find()` or `findById()` instead. Subscriptions are best for data that changes frequently and needs to be reflected in the UI immediately.
+
+## `listen()` vs `observe()`
+
+Both keep a query current, and both return an unsubscribe function — but they answer different questions.
+
+`listen()` is the socket: it delivers what the server pushes, and delivers nothing when the socket is down.
+
+`observe()` is the query: with [offline](/docs/sdk/offline) enabled it emits from the local database first — before any request — and re-emits on local writes, on queued writes reaching the server, on rollbacks, and on realtime events, which it subscribes to itself unless you pass `{ realtime: false }`. Each result says whether it came from the cache and whether it carries writes the server has not accepted yet.
+
+```typescript
+const unsubscribe = client.data.products.observe(
+    { where: { active: ["==", true] } },
+    (result) => {
+        render(result.data);
+        setSaving(result.hasPendingWrites);
+    }
+);
+```
+
+Without offline enabled, `observe()` is `find()` plus `listen()` in one call, with those flags always `false`.
 
 ## Next Steps
 
 - **[Querying Data](/docs/sdk/querying)** — CRUD operations and query builder
+- **[Offline & Local-First Sync](/docs/sdk/offline)** — Live queries that survive a dropped connection
 - **[Authentication](/docs/sdk/authentication)** — Sign in and session management
 - **[Realtime Backend](/docs/backend/realtime)** — Server-side WebSocket configuration

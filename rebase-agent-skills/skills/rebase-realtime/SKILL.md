@@ -866,9 +866,17 @@ In production (`NODE_ENV=production`):
 | Collaborative editing cursors | Broadcast channels + presence |
 | Typing indicators | Broadcast channels |
 | Online user tracking | Presence tracking |
+| A live list that must survive a dropped connection | `observe()` with `offline: true` |
+
+### `listen()` vs `observe()`
+
+`listen()` is the socket — it delivers what the server pushes and nothing at all when the socket is down.
+
+`observe()` is the query. With `offline: true` on the client it emits from the local database first (before any request), subscribes to realtime itself, and re-emits on local writes, on queued writes reaching the server, and on rollbacks. Each result carries `fromCache` / `hasPendingWrites` / `partial`. Reach for it in a UI; reach for `listen()` when you specifically want the raw server stream. See the **rebase-sdk** skill.
 
 ## References
 
 - **Backend Realtime Docs:** [rebase.pro/docs/backend/realtime](https://rebase.pro/docs/backend/realtime)
 - **SDK Realtime Docs:** [rebase.pro/docs/sdk/realtime](https://rebase.pro/docs/sdk/realtime)
+- **Offline & Live Queries:** [rebase.pro/docs/sdk/offline](https://rebase.pro/docs/sdk/offline)
 - **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)

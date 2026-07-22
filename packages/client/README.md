@@ -1,6 +1,6 @@
 # @rebasepro/client
 
-HTTP SDK client for the Rebase backend — typed CRUD, auth, storage, realtime WebSockets, admin, cron, and custom functions.
+HTTP SDK client for the Rebase backend — typed CRUD, auth, storage, realtime WebSockets, offline / local-first sync, admin, cron, and custom functions.
 
 ## Installation
 
@@ -17,6 +17,7 @@ pnpm add @rebasepro/client
 - **Admin** — user CRUD for admins
 - **Storage** — file upload, download, delete, list
 - **Realtime** — WebSocket subscriptions for collection and snapshot changes
+- **Offline / local-first sync** (opt-in) — a local row database, writes that apply instantly offline and replay when the connection returns, and live queries
 - **Cron** — list, trigger, and manage cron jobs
 - **Custom functions** — invoke server-side Hono route functions
 - **Type-safe data proxy** — `client.data.products` auto-maps to the `products` collection
@@ -41,6 +42,9 @@ pnpm add @rebasepro/client
 | `fetch` | `typeof fetch` | `globalThis.fetch` | Custom fetch implementation |
 | `onUnauthorized` | `() => Promise<boolean>` | auto-refresh | Handler for 401 responses |
 | `websocketUrl` | `string` | derived from `baseUrl` | WebSocket URL for realtime |
+| `realtime` | `boolean` | `true` | Open the WebSocket — `false` lets a one-shot script exit |
+| `collections` | `Record<string, string>` | — | Maps accessor names to collection slugs |
+| `offline` | `boolean \| OfflineConfig` | `false` | Local-first sync — see [the docs](https://rebase.pro/docs/sdk/offline) |
 
 ### Collection Client
 
@@ -61,6 +65,8 @@ pnpm add @rebasepro/client
 | `include(...rels)` | Include related snapshots — returns `QueryBuilder` |
 | `listen(params, onUpdate, onError?)` | Realtime subscription (requires WebSocket) |
 | `listenById(id, onUpdate, onError?)` | Realtime single-snapshot subscription |
+| `observe(params, onResult, onError?, options?)` | Live query — local-first when `offline` is on, otherwise fetch + `listen` |
+| `observeById(id, onResult, onError?, options?)` | Live query for a single row |
 
 ### Auth Module (`client.auth`)
 
@@ -116,6 +122,8 @@ pnpm add @rebasepro/client
 |---|---|
 | `RebaseApiError` | Error class with `status`, `message`, `code`, `details` |
 | `RebaseWebSocketClient` | WebSocket client for realtime subscriptions |
+| `isOfflineError(error)` | True when a read failed with no network *and* nothing cached |
+| `MemoryOfflineStore` | Reference `OfflineStore`; the IndexedDB one is wired automatically |
 | `createCookieStorage(options?)` | Cookie-based auth storage adapter |
 | `createMemoryStorage()` | In-memory auth storage adapter |
 | `QueryBuilder` | Fluent query builder (also re-exported from `@rebasepro/common`) |

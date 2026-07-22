@@ -18,6 +18,7 @@ It provides **auto-generated REST APIs**, **built-in authentication**, **role-ba
 | **Roles & RLS** | Application-level row-level security policies |
 | **Storage** | Local, S3-compatible, or Google Cloud Storage — always via `rebase.storage` (never a cloud SDK directly) |
 | **Realtime** | WebSocket-based live updates (LISTEN/NOTIFY) |
+| **Offline** | Opt-in local-first sync in the client SDK — local row database, queued writes, live queries |
 | **Studio** | Visual admin panel (table, cards, kanban, list views) |
 | **Collection Editor** | AST-backed visual schema editing |
 | **Custom Functions** | Auto-mounted Hono route files |
@@ -56,6 +57,8 @@ Relations are defined **directly on the property** using `type: "relation"` with
 
 For specific topics, see:
 - `rebase-basics` — Setup, CLI, MCP tools, project structure
+- `rebase-sdk` — The client SDK: CRUD, filtering, live queries, offline / local-first sync
+- `rebase-realtime` — WebSocket engine, broadcast channels, presence
 - `rebase-collections` — Collection schemas, properties, relations, callbacks, entity actions
 - `rebase-backend-postgres` — PostgreSQL setup, Drizzle, migrations, bootstrapper protocol
 - `rebase-auth` — Authentication, roles, RLS policies

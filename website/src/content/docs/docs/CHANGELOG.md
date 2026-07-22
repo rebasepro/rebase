@@ -6,6 +6,16 @@ title: Changelog
 
 ## [Unreleased]
 
+### Added
+
+- **Local-first sync in the client SDK (`offline: true`)** — the data layer keeps a normalized local database of rows rather than a cache of responses, and answers queries against it. A row written offline therefore appears in *every* filtered list it belongs to (filters, sorting and pagination are evaluated locally), a row edited in one view updates in all of them, and `findById` answers for a row only ever seen inside a `find`. Server responses merge into that database instead of replacing it, so a row carrying unsynced local writes keeps them — the user's own change never flickers away underneath them.
+
+  Writes are decided locally: once the client knows the connection is gone it stops attempting requests, so an offline write costs nothing instead of a timeout, and it applies immediately and replays in order when connectivity returns. A write the server *rejects* is rolled back, along with the queued edits that were built on it — but not a later create or delete for the same row, which stands on its own. Temporary failures (429, 503, a dropped connection) are retried on an exponential backoff instead, up to `maxRetries`.
+
+  `observe()` / `observeById()` are the new reactive reads, on every collection client: local-first, de-duplicated, and re-emitted on any local write, replay, rollback, realtime event, or change from another tab. Each result carries `fromCache`, `hasPendingWrites` and `partial`, so an interface can say what it is showing. Tabs share the local database and the outbox over a `BroadcastChannel`, and only one replays the queue at a time. `client.offline` gained `status()` and `onStatusChange()` for a sync indicator, and `isOfflineError()` distinguishes "offline with nothing local to answer with" from a request that genuinely failed.
+
+  See [Offline & Local-First Sync](https://rebase.pro/docs/sdk/offline).
+
 ## [0.10.0] - 2026-07-20
 
 ### Breaking
