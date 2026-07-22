@@ -263,6 +263,7 @@ export const de = {
   "footer.privacy": "Datenschutz",
   "footer.terms": "Nutzungsbedingungen",
   "footer.cookies": "Cookie-Richtlinie",
+  "footer.reportVulnerability": "Sicherheitslücke melden",
   "footer.waitlistTitle": "Rebase Cloud",
   "footer.waitlistBlurb": "Gehostetes Rebase kommt bald. Trag dich in die Warteliste ein für frühen Zugang.",
   "footer.waitlistPlaceholder": "du@firma.com",

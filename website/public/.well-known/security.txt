@@ -1,0 +1,8 @@
+# Rebase — security contact (RFC 9116)
+# Please report vulnerabilities privately. Do not open a public GitHub issue.
+
+Contact: mailto:security@rebase.pro
+Expires: 2027-07-22T00:00:00.000Z
+Preferred-Languages: en, es
+Canonical: https://rebase.pro/.well-known/security.txt
+Policy: https://github.com/rebasepro/rebase/blob/main/SECURITY.md

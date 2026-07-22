@@ -289,6 +289,7 @@ export const en = {
   "footer.privacy": "Privacy Policy",
   "footer.terms": "Terms of Service",
   "footer.cookies": "Cookie Policy",
+  "footer.reportVulnerability": "Report a Vulnerability",
   "footer.waitlistTitle": "Rebase Cloud",
   "footer.waitlistBlurb": "Hosted Rebase is on its way. Join the waitlist for early access.",
   "footer.waitlistPlaceholder": "you@company.com",

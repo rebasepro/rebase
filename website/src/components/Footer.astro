@@ -65,6 +65,9 @@ const footerNavs = [
             { label: t("footer.privacy"), url: "/policy/privacy_policy" },
             { label: t("footer.terms"), url: "/policy/terms_conditions" },
             { label: t("footer.cookies"), url: "/policy/cookies_policy" },
+            // `plain` so the mailto: is emitted verbatim — translatePath would
+            // otherwise prefix it with the language segment.
+            { label: t("footer.reportVulnerability"), url: "mailto:security@rebase.pro", plain: true },
         ],
     },
 ];
