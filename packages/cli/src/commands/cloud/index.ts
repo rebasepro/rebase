@@ -233,9 +233,9 @@ ${chalk.green.bold("Projects")}
   ${chalk.blue.bold("projects delete")} ${chalk.gray("[id]")}    Delete a project
 
 ${chalk.green.bold("Deploy & observe")}
-  ${chalk.blue.bold("deploy")} ${chalk.gray("[--source .]")}     Deploy the linked project + stream build logs
+  ${chalk.blue.bold("deploy")} ${chalk.gray("[--source .] [-m msg]")}  Deploy the linked project + stream build logs
   ${chalk.blue.bold("logs")} ${chalk.gray("[--runtime] [-f]")}   Show build (or runtime) logs
-  ${chalk.blue.bold("deployments list")}        Deployment history ${chalk.gray("(status, duration, trigger)")}
+  ${chalk.blue.bold("deployments list")} ${chalk.gray("[--limit N|--all]")}  Deployment history ${chalk.gray("(status, duration, trigger)")}
   ${chalk.blue.bold("rollback")} ${chalk.gray("[id] [-y]")}       Roll back to a successful deploy
   ${chalk.blue.bold("cancel")} ${chalk.gray("[-y]")}             Cancel the in-flight build
   ${chalk.blue.bold("start|stop|restart")} ${chalk.gray("[-y]")}  Power ops ${chalk.gray("(stop/restart need -y)")}

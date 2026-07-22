@@ -161,8 +161,33 @@ export function parseEnvAssignment(operands: string[]): { key: string; value: st
     return { key: first.trim(), value: operands[1] ?? "" };
 }
 
+/**
+ * Prefixes whose variables are read by a BUNDLER at build time, not by the
+ * process at run time.
+ *
+ * These are the ones this command cannot deliver. A project's environment is
+ * applied at rollout — after Kaniko has already built the image — so a
+ * `VITE_API_URL` set here is present in the running container and absent from
+ * the JavaScript that was compiled minutes earlier. Nothing fails: the variable
+ * exists, the deploy succeeds, and the bundle carries `undefined` where the
+ * value should be. The bug then presents in the browser as missing
+ * configuration, which is several steps away from the cause.
+ *
+ * `import.meta.env` inlining is Vite's; `NEXT_PUBLIC_`/`PUBLIC_`/`REACT_APP_`
+ * are the same contract in Next, Astro/SvelteKit and CRA.
+ */
+const BUILD_TIME_ENV_PREFIXES = ["VITE_", "NEXT_PUBLIC_", "PUBLIC_", "REACT_APP_"];
+
+/** The prefix that makes `key` a build-time variable, or undefined. */
+export function buildTimeEnvPrefix(key: string): string | undefined {
+    return BUILD_TIME_ENV_PREFIXES.find((prefix) => key.toUpperCase().startsWith(prefix));
+}
+
 async function setEnv(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--secret": Boolean, "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const args = arg(
+        { "--secret": Boolean, "--force": Boolean, "--project": String, "-p": "--project" },
+        { argv: rawArgs.slice(2), permissive: true }
+    );
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -171,6 +196,22 @@ async function setEnv(rawArgs: string[]): Promise<void> {
     const parsed = parseEnvAssignment(operands);
     if (!parsed || !parsed.key) {
         fail("Usage: rebase cloud env set KEY=VALUE [--secret]", undefined, "usage");
+    }
+
+    // Refused rather than warned. A warning is the wrong instrument here: this
+    // command is most often run non-interactively, where a warning scrolls past
+    // and the variable is stored anyway — leaving a project that looks
+    // configured, deploys clean, and is broken in the browser. `--force` exists
+    // because a custom build could legitimately read one of these at run time.
+    const buildTimePrefix = buildTimeEnvPrefix(parsed!.key);
+    if (buildTimePrefix && !args["--force"]) {
+        fail(
+            `${parsed!.key} is read by your bundler at BUILD time, and project variables are applied at ` +
+                `rollout — after the image is built. Setting it here would not reach the bundle.`,
+            `Put ${buildTimePrefix}* variables in the source you deploy (a committed .env, or your build ` +
+                `config), then \`rebase cloud deploy\`. Pass --force if your build genuinely reads this at run time.`,
+            "build_time_variable"
+        );
     }
 
     const body: { key: string; value: string; secret?: boolean } = { key: parsed!.key, value: parsed!.value };
@@ -346,10 +387,13 @@ ${chalk.green.bold("Commands")}
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--secret")}                  Mark a variable write-only ${chalk.gray("(set)")}
+  ${chalk.blue("--force")}                   Set a build-time key anyway ${chalk.gray("(set)")}
   ${chalk.blue("--json")}                    Machine-readable output
   ${chalk.blue("--project, -p")}             Project slug ${chalk.gray("(defaults to the linked project)")}
 
 ${chalk.gray("Values are encrypted at rest (AES-256-GCM) and only decrypted at deploy time.")}
+${chalk.gray("VITE_* / NEXT_PUBLIC_* / PUBLIC_* / REACT_APP_* are read by your bundler at BUILD time;")}
+${chalk.gray("these are applied at rollout, after the image is built, so they never reach the bundle.")}
 `);
 }
 

@@ -476,9 +476,17 @@ function stripAnsi(s: string): string {
     return s.replace(ANSI_RE, "");
 }
 
-/** Write one JSON value to stdout, followed by a newline. */
-function printJson(value: unknown): void {
-    process.stdout.write(JSON.stringify(value) + "\n");
+/**
+ * Write one JSON value to stdout, followed by a newline.
+ *
+ * Indented, because the overwhelmingly common reader is a person or an agent
+ * looking at a terminal — JSON mode is entered automatically whenever stdout is
+ * not a TTY, so `rebase cloud deployments list` piped anywhere at all produced
+ * a project's entire deployment history as one unwrapped line. `JSON.parse`
+ * does not care about the whitespace; everything else does.
+ */
+export function printJson(value: unknown): void {
+    process.stdout.write(JSON.stringify(value, null, 2) + "\n");
 }
 
 /**
