@@ -1032,3 +1032,66 @@ tr:hover td {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+
+/* ===== Offline / sync ===== */
+
+.offline-panel {
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.offline-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.offline-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.offline-pill-ok {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.offline-pill-busy {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.offline-pill-warn {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* The dot pulses only while there is something in flight, so a steady
+   "Synced" pill never draws the eye. */
+.offline-pill-busy .offline-dot {
+  animation: offline-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes offline-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.offline-error {
+  margin: 6px 12px 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--danger);
+}
+
+.page-subtitle-note {
+  color: var(--text-muted);
+}

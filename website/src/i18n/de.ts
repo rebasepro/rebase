@@ -215,6 +215,7 @@ export const de = {
   "roadmap.now.item7": "Auth- und Rollen-System",
   "roadmap.now.item8": "Backend-Crons und Functions",
   "roadmap.now.item9": "Nativer S3-kompatibler Storage",
+  "roadmap.now.item10": "Offline- und Local-First-Sync",
   "roadmap.next.title": "Demnächst",
   "roadmap.next.badge": "In Arbeit",
   "roadmap.next.item1": "KI-SQL-Generierung im Editor",

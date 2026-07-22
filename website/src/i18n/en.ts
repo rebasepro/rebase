@@ -241,6 +241,7 @@ export const en = {
   "roadmap.now.item7": "Auth and roles system",
   "roadmap.now.item8": "Backend crons and functions",
   "roadmap.now.item9": "Native S3 compatible storage",
+  "roadmap.now.item10": "Offline & local-first sync — local database, queued writes, live queries",
   "roadmap.next.title": "Next",
   "roadmap.next.badge": "In Progress",
   "roadmap.next.item1": "AI SQL generation in editor",

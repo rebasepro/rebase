@@ -8,7 +8,18 @@ A sample React + Vite app demonstrating the `@rebasepro/client` SDK.
 - **Collection Browsing** — Navigate Authors, Posts, Tags, Profiles
 - **CRUD Operations** — Create, edit, delete records via the SDK
 - **Pagination** — Server-side pagination with page navigation
+- **Live queries** — Lists are driven by `observe()`, so writes appear without a refetch
+- **Offline & local-first sync** — `offline: true`, with a sync pill and a switch that cuts the network
 - **Dark Theme** — follows the Rebase UI design language (blue primary, neutral surfaces)
+
+## Trying offline
+
+Hit **Simulate offline** in the sidebar. It makes every request fail the way a
+dead network does, which is what the SDK's offline engine keys on.
+
+With it on: lists keep rendering from the local database (the page subtitle says
+so), edits apply instantly and the sync pill counts what is unsaved. Hit
+**Reconnect** and the queue replays on its own — no refetch, no reload.
 
 ## Prerequisites
 

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import "./index.css";
-import { useAuth, useCollection } from "./hooks";
-import { client } from "./client";
+import { useAuth, useCollection, useOfflineStatus } from "./hooks";
+import { client, isNetworkDown, onNetworkChange, setNetworkDown } from "./client";
 
 // ===== Logo =====
 // The real Rebase mark — copied verbatim from the console's RebaseLogo.tsx.
@@ -243,7 +243,7 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
 // ===== Collection Table =====
 function CollectionView({ slug, label }: { slug: string; label: string }) {
   const [page, setPage] = useState(1);
-  const { data, meta, loading, refetch } = useCollection(slug, { limit: 15,
+  const { data, meta, loading, fromCache, hasPendingWrites, refetch } = useCollection(slug, { limit: 15,
 page });
   const [editingEntity, setEditingEntity] = useState<any>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -257,8 +257,10 @@ type }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
   }, []);
 
-  // Derive columns from first entity's values
-  const columns = data.length > 0 ? Object.keys(data[0].values).slice(0, 6) : [];
+  // Rows are flat: the columns are the row's own keys, minus the id.
+  const columns = data.length > 0
+    ? Object.keys(data[0]).filter((key) => key !== "id").slice(0, 6)
+    : [];
 
   const handleDelete = async (id: string | number) => {
     if (!confirm("Delete this record?")) return;
@@ -295,7 +297,11 @@ type }]);
       <div className="page-header">
         <div>
           <h2 className="page-title">{label}</h2>
-          <p className="page-subtitle">{meta.total} records · page {page} of {totalPages}</p>
+          <p className="page-subtitle">
+            {meta.total} records · page {page} of {totalPages}
+            {fromCache && <span className="page-subtitle-note"> · from the local database</span>}
+            {hasPendingWrites && <span className="page-subtitle-note"> · unsaved changes</span>}
+          </p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowCreate(true)}>+ Add {label.slice(0, -1)}</button>
       </div>
@@ -326,16 +332,16 @@ type }]);
                 </td>
               </tr>
             )}
-            {!loading && data.map((entity) => (
-              <tr key={entity.id}>
-                <td className="cell-id">{entity.id}</td>
+            {!loading && data.map((row) => (
+              <tr key={row.id}>
+                <td className="cell-id">{row.id}</td>
                 {columns.map((col) => (
-                  <td key={col}>{renderCellValue(entity.values[col], col)}</td>
+                  <td key={col}>{renderCellValue(row[col], col)}</td>
                 ))}
                 <td>
                   <div className="btn-group">
-                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingEntity(entity)}>Edit</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(entity.id)}>✕</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingEntity(row)}>Edit</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(row.id)}>✕</button>
                   </div>
                 </td>
               </tr>
@@ -354,9 +360,9 @@ type }]);
 
       {(editingEntity || showCreate) && (
         <EntityDialog
-          snapshot={editingEntity}
+          row={editingEntity}
           slug={slug}
-          columns={editingEntity ? Object.keys(editingEntity.values) : columns}
+          columns={editingEntity ? Object.keys(editingEntity).filter((key) => key !== "id") : columns}
           onSave={handleSave}
           onClose={() => { setEditingEntity(null); setShowCreate(false); }}
         />
@@ -380,25 +386,30 @@ function renderCellValue(value: any, col: string): React.ReactNode {
 
 // ===== Snapshot Dialog =====
 function EntityDialog({
-  snapshot,
+  row,
   slug,
   columns,
   onSave,
   onClose
 }: {
-  entity: any | null;
+  row: any | null;
   slug: string;
   columns: string[];
   onSave: (values: Record<string, any>, id?: string | number) => Promise<void>;
   onClose: () => void;
 }) {
-  const [values, setValues] = useState<Record<string, any>>(entity?.values ?? {});
+  const [values, setValues] = useState<Record<string, any>>(() => {
+    if (!row) return {};
+    const editable = { ...row };
+    delete editable.id;
+    return editable;
+  });
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    await onSave(values, entity?.id);
+    await onSave(values, row?.id);
     setSaving(false);
   };
 
@@ -406,7 +417,7 @@ function EntityDialog({
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
-          <h3 className="dialog-title">{entity ? `Edit #${entity.id}` : `New ${slug}`}</h3>
+          <h3 className="dialog-title">{row ? `Edit #${row.id}` : `New ${slug}`}</h3>
           <button className="btn btn-icon btn-secondary" onClick={onClose}>✕</button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -448,7 +459,7 @@ function EntityDialog({
           <div className="dialog-footer">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? <span className="spinner"/> : entity ? "Save Changes" : "Create"}
+              {saving ? <span className="spinner"/> : row ? "Save Changes" : "Create"}
             </button>
           </div>
         </form>
@@ -472,6 +483,44 @@ icon: "🏷️" },
 label: "Profiles",
 icon: "📋" }
 ];
+
+/**
+ * The offline engine, made visible: what the client believes about the
+ * connection, how many writes are still local, and a switch to cut the network
+ * so you can watch it happen.
+ */
+function OfflinePanel() {
+  const status = useOfflineStatus();
+  const [down, setDown] = useState(isNetworkDown());
+
+  useEffect(() => { const off = onNetworkChange(setDown); return () => { off(); }; }, []);
+
+  const unsaved = status.pending > 0 ? `${status.pending} unsaved` : "";
+  // The queue depth matters most while offline — that is the number telling
+  // you what you stand to lose if you close the tab.
+  const label = !status.online
+    ? ["Offline", unsaved].filter(Boolean).join(" · ")
+    : status.syncing
+      ? "Syncing…"
+      : unsaved || "Synced";
+
+  const tone = !status.online ? "warn" : status.pending > 0 || status.syncing ? "busy" : "ok";
+
+  return (
+    <div className="offline-panel">
+      <div className="sidebar-section-title">Sync</div>
+      <div className={`offline-pill offline-pill-${tone}`}>
+        <span className="offline-dot"/>
+        {label}
+      </div>
+      <button className="sidebar-item" onClick={() => setNetworkDown(!down)}>
+        <span className="sidebar-item-icon">{down ? "\u2191" : "\u2715"}</span>
+        {down ? "Reconnect" : "Simulate offline"}
+      </button>
+      {status.lastError && <div className="offline-error">{status.lastError}</div>}
+    </div>
+  );
+}
 
 export default function App() {
   const { user, loading, signOut } = useAuth();
@@ -523,6 +572,8 @@ export default function App() {
         </div>
 
         <div className="sidebar-spacer"/>
+
+        <OfflinePanel/>
 
         {user && (
           <div className="sidebar-user">

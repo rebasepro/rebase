@@ -220,6 +220,7 @@ export const fr = {
   "roadmap.now.item7": "Système d'auth et de rôles",
   "roadmap.now.item8": "Crons et fonctions backend",
   "roadmap.now.item9": "Stockage natif compatible S3",
+  "roadmap.now.item10": "Synchronisation hors ligne et local-first",
   "roadmap.next.title": "Ensuite",
   "roadmap.next.badge": "En cours",
   "roadmap.next.item1": "Génération SQL par IA dans l'éditeur",

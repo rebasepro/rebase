@@ -222,6 +222,7 @@ export const es = {
   "roadmap.now.item7": "Sistema de autenticación y roles",
   "roadmap.now.item8": "Crons y funciones backend",
   "roadmap.now.item9": "Almacenamiento nativo compatible con S3",
+  "roadmap.now.item10": "Sincronización offline y local-first",
   "roadmap.next.title": "Próximo",
   "roadmap.next.badge": "En curso",
   "roadmap.next.item1": "Generación de SQL por IA en el editor",

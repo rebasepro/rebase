@@ -492,20 +492,23 @@ describe("replay", () => {
 });
 
 describe("live queries", () => {
-    it("emits from the local database before the network answers", async () => {
+    it("emits from the local database when the network cannot answer", async () => {
         const server = createFakeServer();
         const { wrap } = createManager(server);
         const posts = wrap("posts");
         await server.client("posts").create({ title: "a" }, "p1");
         await posts.find();
 
+        server.state.online = false;
         const results: LiveResult<Row>[] = [];
         const stop = posts.observe(undefined, (r) => results.push(r));
         await settle();
 
+        // The subscription still delivers, and — once its own revalidation has
+        // failed — says the rows came from the local database.
         expect(results.length).toBeGreaterThanOrEqual(1);
         expect(results[0].data.map((r) => r.id)).toEqual(["p1"]);
-        expect(results[0].fromCache).toBe(true);
+        expect(results[results.length - 1].fromCache).toBe(true);
         stop();
     });
 
@@ -529,6 +532,54 @@ describe("live queries", () => {
         const last = results[results.length - 1];
         expect(last.data[0].title).toBe("edited");
         expect(last.hasPendingWrites).toBe(true);
+        stop();
+    });
+
+    it("distinguishes a served-from-cache result from a fresh one", async () => {
+        const server = createFakeServer();
+        const { wrap } = createManager(server);
+        const posts = wrap("posts");
+        await server.client("posts").create({ title: "a" }, "p1");
+
+        const results: LiveResult<Row>[] = [];
+        const stop = posts.observe(undefined, (r) => results.push(r));
+        await settle();
+        // The request completed, so this is the server's answer — a flag that
+        // is always `true` tells an interface nothing.
+        expect(results[results.length - 1].fromCache).toBe(false);
+
+        server.state.online = false;
+        await posts.find();
+        await settle();
+        expect(results[results.length - 1].fromCache).toBe(true);
+
+        server.state.online = true;
+        await posts.find();
+        await settle();
+        expect(results[results.length - 1].fromCache).toBe(false);
+        stop();
+    });
+
+    it("reports a single observed row as fresh only while the server has confirmed it", async () => {
+        const server = createFakeServer();
+        const { manager, wrap } = createManager(server);
+        const posts = wrap("posts");
+        await server.client("posts").create({ title: "a" }, "p1");
+
+        const seen: { fromCache: boolean; hasPendingWrites: boolean }[] = [];
+        const stop = posts.observeById("p1", (_row, meta) => seen.push(meta));
+        await settle();
+        expect(seen[seen.length - 1]).toEqual({ fromCache: false, hasPendingWrites: false });
+
+        server.state.online = false;
+        await posts.update("p1", { title: "edited offline" });
+        await settle();
+        expect(seen[seen.length - 1]).toEqual({ fromCache: true, hasPendingWrites: true });
+
+        server.state.online = true;
+        await manager.sync();
+        await settle();
+        expect(seen[seen.length - 1]).toEqual({ fromCache: false, hasPendingWrites: false });
         stop();
     });
 

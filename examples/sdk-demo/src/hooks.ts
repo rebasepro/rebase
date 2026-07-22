@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { client } from "./client";
 import type { RebaseUser, RebaseSession } from "@rebasepro/client";
 
@@ -52,6 +52,14 @@ signOut };
 // ===== Collection Hook =====
 type FindParams = NonNullable<Parameters<ReturnType<typeof client.data.collection>["find"]>[0]>;
 
+/**
+ * A live query.
+ *
+ * `observe()` emits from the local row database before any request goes out,
+ * then re-emits on every change to the rows it covers — this app's own writes,
+ * queued writes reaching the server, rollbacks, and changes pushed over
+ * realtime. So none of the mutation handlers below need to refetch.
+ */
 export function useCollection(
   slug: string,
   options?: { limit?: number; page?: number; orderBy?: FindParams["orderBy"]; where?: FindParams["where"] }
@@ -63,37 +71,61 @@ offset: 0,
 hasMore: false });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState(false);
+  const [hasPendingWrites, setHasPendingWrites] = useState(false);
 
   const limit = options?.limit ?? 20;
   const page = options?.page ?? 1;
   const offset = (page - 1) * limit;
+  const where = JSON.stringify(options?.where);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await client.data.collection(slug).find({
-        limit,
-        offset,
-        orderBy: options?.orderBy,
-        where: options?.where
-      });
-      setData(result.data);
-      setMeta(result.meta);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch data");
-    } finally {
-      setLoading(false);
-    }
-  }, [slug, limit, offset, options?.orderBy, JSON.stringify(options?.where)]);
+  const params = useMemo(() => ({
+    limit,
+    offset,
+    orderBy: options?.orderBy,
+    where: options?.where
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [limit, offset, options?.orderBy, where]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    // No loading reset here: switching collections remounts this view (the
+    // list is keyed by slug), and a page change re-emits from the local
+    // database immediately, so there is nothing to wait behind.
+    const unsubscribe = client.data.collection(slug).observe(
+      params,
+      (result) => {
+        setData(result.data);
+        setMeta(result.meta);
+        setFromCache(result.fromCache);
+        setHasPendingWrites(result.hasPendingWrites);
+        setError(null);
+        setLoading(false);
+      },
+      (err: Error) => {
+        setError(err.message || "Failed to fetch data");
+        setLoading(false);
+      }
+    );
+    return unsubscribe;
+  }, [slug, params]);
+
+  const refetch = useCallback(
+    () => client.data.collection(slug).find(params).catch(() => undefined),
+    [slug, params]
+  );
 
   return { data,
 meta,
 loading,
 error,
-refetch: fetchData };
+fromCache,
+hasPendingWrites,
+refetch };
+}
+
+// ===== Offline Status Hook =====
+export function useOfflineStatus() {
+  const [status, setStatus] = useState(() => client.offline!.status());
+  useEffect(() => client.offline!.onStatusChange(setStatus), []);
+  return status;
 }

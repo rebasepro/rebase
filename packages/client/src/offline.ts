@@ -178,6 +178,14 @@ interface RowEntry {
 interface CollectionState {
     rows: Map<string, RowEntry>;
     snapshots: Map<string, QuerySnapshot>;
+    /**
+     * Query keys whose snapshot came from a request that completed in this
+     * session. Deliberately not persisted: a snapshot read back off disk is
+     * exactly what "from the cache" means, however recent it looks.
+     */
+    fresh: Set<string>;
+    /** The same, per row id, for `observeById`. */
+    freshRows: Set<string>;
     /** Ids the server has confirmed do not exist — a negative cache. */
     absent: Set<string>;
     loaded?: Promise<void>;
@@ -346,6 +354,8 @@ export class OfflineManager {
             this.collections.set(slug, {
                 rows: new Map(),
                 snapshots: new Map(),
+                fresh: new Set(),
+                freshRows: new Set(),
                 absent: new Set(),
                 ready: true
             });
@@ -398,6 +408,9 @@ export class OfflineManager {
                     }
                 }
                 const answer = this.localFind<M>(slug, params);
+                // Falling back is a state change even when the rows are the
+                // same — it is how a "showing cached data" badge lights up.
+                this.notifyCollection(slug, false);
                 return { data: answer.data, meta: answer.meta };
             },
 
@@ -656,7 +669,11 @@ export class OfflineManager {
             emit: () => {
                 if (closed || !this.collections.get(slug)?.ready) return;
                 const result = this.answer<M>(slug, params, this.snapshotFor(slug, params));
-                const signature = this.signature(slug, result.data, result.meta.total);
+                // Every field the callback receives has to be in the
+                // signature, or a change to one of them is deduplicated away —
+                // a row settling from "saving" to saved is exactly that.
+                const signature = `${result.fromCache ? "c" : "s"}${result.hasPendingWrites ? "p" : "-"}`
+                    + this.signature(slug, result.data, result.meta.total);
                 if (observer.settled && signature === observer.signature) return;
                 observer.signature = signature;
                 observer.settled = true;
@@ -723,11 +740,14 @@ export class OfflineManager {
                 if (closed || !this.collections.get(slug)?.ready) return;
                 const row = this.localRow<M>(slug, id);
                 const entry = this.collections.get(slug)?.rows.get(String(id));
-                const signature = row === undefined ? MISSING : `${String(id)}:${entry?.rev ?? 0}`;
+                const fromCache = !this.collections.get(slug)?.freshRows.has(String(id));
+                const hasPendingWrites = this.hasPending(slug, id);
+                const signature = `${fromCache ? "c" : "s"}${hasPendingWrites ? "p" : "-"}|`
+                    + (row === undefined ? MISSING : `${String(id)}:${entry?.rev ?? 0}`);
                 if (observer.settled && signature === observer.signature) return;
                 observer.signature = signature;
                 observer.settled = true;
-                onResult(row, { fromCache: true, hasPendingWrites: this.hasPending(slug, id) });
+                onResult(row, { fromCache, hasPendingWrites });
             }
         };
         this.observersFor(slug).add(observer);
@@ -804,7 +824,14 @@ export class OfflineManager {
     private collectionState(slug: string): CollectionState {
         let state = this.collections.get(slug);
         if (!state) {
-            state = { rows: new Map(), snapshots: new Map(), absent: new Set(), ready: false };
+            state = {
+                rows: new Map(),
+                snapshots: new Map(),
+                fresh: new Set(),
+                freshRows: new Set(),
+                absent: new Set(),
+                ready: false
+            };
             this.collections.set(slug, state);
         }
         return state;
@@ -871,6 +898,7 @@ export class OfflineManager {
     ): LiveResult<M> {
         const state = this.collections.get(slug);
         const exact = isExactlyEvaluable(params);
+        const fromCache = !state?.fresh.has(buildQueryString(params));
         if (!state) {
             return {
                 data: [],
@@ -885,7 +913,7 @@ export class OfflineManager {
             const local = runLocalQuery<M>([...state.rows.values()].map((e) => e.row) as M[], params);
             return {
                 ...local,
-                fromCache: true,
+                fromCache,
                 hasPendingWrites: local.data.some((row) => this.hasPending(slug, row.id as string | number)),
                 partial: true
             };
@@ -940,7 +968,7 @@ export class OfflineManager {
                 offset,
                 hasMore: snapshot.hasMore
             },
-            fromCache: true,
+            fromCache,
             hasPendingWrites: rows.some((row) => this.hasPending(slug, row.id as string | number)),
             partial: !exact
         };
@@ -949,6 +977,8 @@ export class OfflineManager {
     private localFind<M extends AnyRow>(slug: string, params?: FindParams): LiveResult<M> {
         const state = this.collections.get(slug);
         const snapshot = this.snapshotFor(slug, params);
+        // However recent it looks, this answer did not come from the server.
+        state?.fresh.delete(buildQueryString(params));
         if (!snapshot && (!state || state.rows.size === 0)) {
             throw offlineError(`Offline: no cached data for "${slug}".`);
         }
@@ -972,6 +1002,7 @@ export class OfflineManager {
         const key = String(id);
         const cachedAt = Date.now();
         state.rows.set(key, { row: { ...row }, cachedAt, rev: ++this.revCounter });
+        state.freshRows.delete(key);
         this.forgetTombstone(slug, key);
         void this.writeCache(this.rowKey(slug, key), dehydrateRow(row), cachedAt);
         this.evictRows(slug);
@@ -989,7 +1020,10 @@ export class OfflineManager {
         const existed = state.rows.delete(key);
         if (known) {
             state.absent.add(key);
+            state.freshRows.add(key);
             void this.writeCache(this.absentKey(slug, key), true);
+        } else {
+            state.freshRows.delete(key);
         }
         if (existed) void this.deleteCache([this.rowKey(slug, key)]);
     }
@@ -1028,6 +1062,7 @@ export class OfflineManager {
                 continue;
             }
             this.forgetTombstone(slug, key);
+            state.freshRows.add(key);
             const existing = state.rows.get(key);
             if (existing && JSON.stringify(existing.row) === JSON.stringify(merged)) {
                 existing.cachedAt = cachedAt;
@@ -1086,6 +1121,7 @@ export class OfflineManager {
         const state = this.collectionState(slug);
         const key = buildQueryString(params);
         state.snapshots.set(key, snapshot);
+        state.fresh.add(key);
         void this.writeCache(`${this.scope}|q|${slug}|${key}`, snapshot);
         this.evictSnapshots(slug);
         return snapshot;
@@ -1422,6 +1458,10 @@ export class OfflineManager {
         }
         const cachedAt = Date.now();
         state.rows.set(key, { row: merged, cachedAt, rev: ++this.revCounter });
+        if (this.applyPendingToRow(slug, key, undefined, op.mutationId) === undefined) {
+            // Nothing local is left on top of it, so this *is* the server's row.
+            state.freshRows.add(key);
+        }
         void this.writeCache(this.rowKey(slug, key), dehydrateRow(merged), cachedAt);
     }
 
