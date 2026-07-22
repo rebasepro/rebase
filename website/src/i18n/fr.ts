@@ -269,6 +269,7 @@ export const fr = {
   "footer.privacy": "Politique de confidentialité",
   "footer.terms": "Conditions d'utilisation",
   "footer.cookies": "Politique des cookies",
+  "footer.reportVulnerability": "Signaler une vulnérabilité",
   "footer.waitlistTitle": "Rebase Cloud",
   "footer.waitlistBlurb": "Rebase hébergé arrive bientôt. Rejoignez la liste d'attente pour un accès anticipé.",
   "footer.waitlistPlaceholder": "vous@entreprise.com",

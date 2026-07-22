@@ -271,6 +271,7 @@ export const es = {
   "footer.privacy": "Política de Privacidad",
   "footer.terms": "Términos de Servicio",
   "footer.cookies": "Política de Cookies",
+  "footer.reportVulnerability": "Reportar una Vulnerabilidad",
   "footer.waitlistTitle": "Rebase Cloud",
   "footer.waitlistBlurb": "Rebase alojado está en camino. Únete a la lista de espera para acceso anticipado.",
   "footer.waitlistPlaceholder": "tu@empresa.com",

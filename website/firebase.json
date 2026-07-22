@@ -4,7 +4,8 @@
     "site": "rebase-578f2",
     "ignore": [
       "firebase.json",
-      "**/.*",
+      "**/.DS_Store",
+      "**/.git/**",
       "**/node_modules/**"
     ],
     "redirects": [
