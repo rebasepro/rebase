@@ -597,16 +597,35 @@ and both are quiet:
 | Upgrade packages, **do not** re-run `db push` | Your database keeps `auth.uid() IS NOT NULL`. **Anonymous visitors keep the access they should never have had.** Nothing warns you. |
 | Upgrade packages **and** re-run `db push` | The policy tightens. Anything that was relying on the permissive behaviour — an unauthenticated read your frontend does on page load, a public listing, a webhook without a session — starts returning zero rows or 403. |
 
-> **`db doctor` will not catch this.** `checkPolicyDrift` compares policy
-> *presence*, roles, and command — not expression text, because Postgres
-> rewrites `qual` when storing it and text comparison reports drift that does
-> not exist. The policy name is also unchanged: it is a hash of the rule *as
-> written in your config*, and your config did not change. So a stale, permissive
-> policy matches the expected one on every field the drift checker looks at, and
-> `db doctor` reports a clean database.
+> **`rebase doctor --policies` catches this, from 0.10.0 on.** It reads the live
+> `qual` and `with_check` straight out of `pg_policies` and reports, under
+> **Insecure**, any policy still carrying the bare `auth.uid() IS NOT NULL`
+> tautology. It reports the other half of the problem under **Orphaned**: a
+> policy an earlier push superseded but never dropped. Editing a rule renames its
+> policy — the generated name is a hash of the rule — so the old one is left
+> behind, and Postgres ORs permissive policies together, which makes an abandoned
+> grant outrank the tightening that replaced it. The command exits non-zero, so
+> CI can gate on it.
 >
-> A clean drift report is **not** evidence that this change reached your
-> database.
+> Plain `rebase doctor` runs the same policy checks alongside the schema diff;
+> `--policies` is the policies-only form, and the one to point at a deployed
+> database. Both need `DATABASE_URL` (or `ADMIN_CONNECTION_STRING`) — without it
+> the policy checks are *skipped with a warning*, not failed.
+
+> **What the scan does not catch.** It matches that one expression shape — in
+> whatever whitespace Postgres stored it in — and treats an `<> 'anonymous'` (or
+> `!= 'anonymous'`) guard anywhere in the same clause as the corrected form. A
+> fail-open policy written by hand in some other spelling — `USING (true)`,
+> `USING (1 = 1)`, `USING (current_setting('rebase.uid', true) IS NOT NULL)` — is
+> **not** flagged, and neither is a compound expression that happens to mention
+> `'anonymous'` in an unrelated branch. It also needs collections to compare
+> against: a project whose collections generate no policies at all gets no scan.
+> The `pg_policies` read in Step 3 is how you see the expressions yourself.
+
+> **Nothing applies the fix for you.** Policies are not re-run at container boot.
+> Upgrading the packages, redeploying and restarting all leave `pg_policies`
+> exactly as it was. Only `db push` rewrites it — and it is what drops the
+> superseded policies too.
 
 #### What to do
 
@@ -642,11 +661,20 @@ ORDER BY tablename, policyname;
 ```
 
 Any `qual` containing `auth.uid() IS NOT NULL` **without** the
-`<> 'anonymous'` clause is a stale permissive policy. That query is the only
-reliable check — it is what the drift checker does not do.
+`<> 'anonymous'` clause is a stale permissive policy. `rebase doctor --policies`
+reports exactly those, and the superseded policies alongside them; this query is
+how you read the expressions yourself, which is what catches a fail-open policy
+written in a spelling the detector does not match.
 
-**Step 4 — re-run `db push` and re-run the query.** Confirm every policy you
-expected to change did change.
+**Step 4 — re-run `db push` and re-run the query.** `db push` applies the current
+policies and then drops the ones an earlier push superseded. Confirm every policy
+you expected to change did change, then run:
+
+```bash
+rebase doctor --policies
+```
+
+It should exit 0 with no Insecure or Orphaned entries.
 
 **Step 5 — test signed-out.** Open your app in a private window with no session
 and exercise the read paths. This is where you find the public listing that
@@ -801,13 +829,18 @@ restores the old behaviour.
 [ ] grep for .userId
 [ ] grep for row.id on tables not keyed on id
 [ ] run db push
+[ ] run rebase doctor --policies — expect no Insecure or Orphaned entries
 [ ] SELECT ... FROM pg_policies again — confirm every intended change landed
 [ ] exercise the app signed OUT, in a private window
 ```
 
-The `pg_policies` reads before and after are the important pair. They are the
-only step that verifies the security change actually reached your database,
-because neither `db doctor` nor the type system will tell you.
+`rebase doctor --policies` is the one to wire into CI: it exits non-zero on a
+policy still carrying the permissive tautology, and on one an earlier push
+superseded. The `pg_policies` reads before and after are still worth the minute —
+they show you the expressions themselves, which is the only way to spot a
+fail-open policy written in a spelling the detector does not match. Neither the
+packages nor the type system will tell you: the change lives in the database, and
+`db push` is the only thing that puts it there.
 
 ## Collections
 

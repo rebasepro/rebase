@@ -87,12 +87,21 @@ const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", ".astro", "p
 // two scripts below have to name the old packages to do their job — this one to
 // find them, the other to deprecate them on npm — so they are the exceptions
 // that make the rule enforceable.
+//
+// `llms.txt` is generated: `website/scripts/generate_llms_txt.js` concatenates
+// every sidebar page, `upgrading.mdx` and its rename table included. Exempting
+// the source but not the artifact left twelve permanent violations that no edit
+// could clear — rewriting the table's left column would make it read
+// `@rebasepro/app | @rebasepro/app`, and the next `prebuild` would restore it
+// anyway. Nothing is lost by skipping it: it holds no text of its own, and the
+// pages it is built from are scanned individually.
 const SKIP_FILES = new Set([
     "CHANGELOG.md",
     "upgrading.mdx",
     "pnpm-lock.yaml",
     "pnpm-publish-summary.json",
     "MODULAR-ARCHITECTURE.md",
+    "website/public/llms.txt",
     "scripts/headless-guard/check-package-names.mjs",
     "scripts/deprecate-old-packages.sh"
 ]);

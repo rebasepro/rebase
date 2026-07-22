@@ -103,7 +103,15 @@ jobs:
       # The only place a scaffolded project is installed and booted for real —
       # workspace: deps don't resolve anywhere else — so it's what proves the
       # baas template rather than just the library behind it.
+      #
+      # `always()` because the two suites cover different things, and a failure in
+      # the first said nothing about this one: it was skipped, so a single broken
+      # run reported half the truth and each fix revealed the next failure. This
+      # does not soften anything — the step still fails the job on its own, and
+      # the earlier step's failure still fails it. It only stops the second
+      # report from being suppressed by the first.
       - name: Run BaaS E2E
+        if: always()
         run: npx tsx e2e/tests/cli-init-baas-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
