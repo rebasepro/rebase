@@ -43,7 +43,13 @@ export function ApiExplorer() {
 
         (async () => {
             try {
-                const res = await fetch(specUrl);
+                // The spec endpoint itself is public on a stock backend, but
+                // `apiUrl` may route through an authenticated proxy (the
+                // console's Studio embed) — carry the token like every other
+                // request in this view, and like LogsExplorer does.
+                const getAuthToken = apiConfig?.getAuthToken ?? authController.getAuthToken;
+                const token = getAuthToken ? await getAuthToken() : null;
+                const res = await fetch(specUrl, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
                 if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
                 const data = await res.json();
                 if (!cancelled) {
@@ -60,7 +66,7 @@ export function ApiExplorer() {
         return () => {
             cancelled = true;
         };
-    }, [apiUrl]);
+    }, [apiUrl, apiConfig, authController]);
 
     // Parse spec into grouped endpoints
     const { groups, allEndpoints } = useMemo(() => {
