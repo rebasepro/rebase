@@ -33,6 +33,20 @@ export interface RebaseClientConfig {
      * Defaults to `"/api"`; override only if the server mounts it elsewhere.
      */
     apiPath?: string;
+    /**
+     * Origin to use instead of {@link baseUrl} for URLs that are handed to the
+     * browser to fetch on its own — storage file downloads and previews.
+     *
+     * API *requests* always go to `baseUrl`; this only changes URLs the SDK
+     * *returns* (e.g. `storage.getSignedUrl`). It exists for proxied setups:
+     * when `baseUrl` routes through an authenticated middleman (the Rebase
+     * console's Studio proxy), a plain `<img src>` or a copied link cannot
+     * satisfy the middleman's auth — but the file route itself is reachable
+     * directly at the origin server and secured by its own scoped `?token=`.
+     * Set this to that server's public origin (no path; {@link apiPath} is
+     * appended) and returned file URLs point straight at it.
+     */
+    storageUrlOrigin?: string;
     fetch?: typeof globalThis.fetch;
     onUnauthorized?: () => Promise<boolean>;
     websocketUrl?: string; // Optional real-time WebSocket connection
@@ -107,6 +121,8 @@ export interface Transport {
     setOnUnauthorized: (handler: () => Promise<boolean>) => void;
     readonly baseUrl: string;
     readonly apiPath: string;
+    /** See {@link RebaseClientConfig.storageUrlOrigin}. Undefined = use `baseUrl`. */
+    readonly storageUrlOrigin?: string;
     readonly fetchFn: typeof globalThis.fetch;
     getHeaders: (init?: RequestInit) => Record<string, string>;
     resolveToken: () => Promise<string | null>;
@@ -266,6 +282,7 @@ headers: retryHeaders });
         setOnUnauthorized(handler: () => Promise<boolean>) { onUnauthorizedHandler = handler; },
         get baseUrl() { return resolveBaseUrl(config.baseUrl); },
         get apiPath() { return apiPath; },
+        get storageUrlOrigin() { return config.storageUrlOrigin?.replace(/\/$/, "") || undefined; },
         get fetchFn() { return fetchFn; },
         getHeaders: (init?: RequestInit) => getHeaders(token, init) as Record<string, string>,
         resolveToken: async () => {

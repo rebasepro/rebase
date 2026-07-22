@@ -130,6 +130,23 @@ alsoNope: null } as any
             expect(result.url).not.toContain("ACCESS-JWT");
         });
 
+        it("builds file URLs against storageUrlOrigin when set, while API requests keep baseUrl", async () => {
+            // Proxied setups (the console's Studio embed): metadata goes through
+            // the authenticated proxy at baseUrl, but the returned file URL must
+            // point at the tenant itself — an <img src> can't satisfy the
+            // proxy's auth, and the file route carries its own scoped token.
+            (mockTransport as unknown as { storageUrlOrigin?: string }).storageUrlOrigin = "https://tenant.example";
+            const storage = createStorage(mockTransport);
+
+            mockTransport.request.mockResolvedValueOnce({ data: { size: 1, token: "tok" } });
+            mockTransport.resolveToken.mockResolvedValueOnce(null);
+
+            const result = await storage.getSignedUrl("file.jpg");
+
+            expect(mockTransport.request).toHaveBeenCalledWith("/storage/metadata/file.jpg");
+            expect(result.url).toBe("https://tenant.example/api/storage/file/file.jpg?token=tok");
+        });
+
         it("strips local:// prefix", async () => {
             const storage = createStorage(mockTransport);
 

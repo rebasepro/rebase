@@ -12,6 +12,14 @@ import { Transport } from "./transport";
 export function createStorage(transport: Transport, storageId?: string): StorageSource {
     const urlsCache = new Map<string, { config: DownloadConfig; expiresAt?: number }>();
 
+    /**
+     * Base for URLs the *browser* will fetch on its own (file downloads,
+     * previews). API requests keep going to `baseUrl`; see
+     * {@link RebaseClientConfig.storageUrlOrigin} for why these can differ.
+     */
+    const fileUrlBase = (): string =>
+        `${transport.storageUrlOrigin ?? transport.baseUrl}${transport.apiPath}`;
+
     /** Append ?storageId=... to a path when multi-backend routing is active. */
     const withStorageId = (path: string): string => {
         if (!storageId) return path;
@@ -95,7 +103,7 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         // token are needed — build the URL directly and cache it forever.
         if (isPublicStoragePath(filePath)) {
             const publicConfig: DownloadConfig = {
-                url: withStorageId(`${transport.baseUrl}${transport.apiPath}/storage/file/${filePath}`)
+                url: withStorageId(`${fileUrlBase()}/storage/file/${filePath}`)
             };
             urlsCache.set(cacheKey, { config: publicConfig }); // no expiry
             return publicConfig;
@@ -107,7 +115,7 @@ export function createStorage(transport: Transport, storageId?: string): Storage
             // Public object (server-confirmed): token-less permanent URL.
             if (result.data.public) {
                 const publicConfig: DownloadConfig = {
-                    url: withStorageId(`${transport.baseUrl}${transport.apiPath}/storage/file/${filePath}`),
+                    url: withStorageId(`${fileUrlBase()}/storage/file/${filePath}`),
                     metadata: result.data
                 };
                 urlsCache.set(cacheKey, { config: publicConfig }); // no expiry
@@ -125,7 +133,7 @@ export function createStorage(transport: Transport, storageId?: string): Storage
                 // `withStorageId` picks `?` or `&` based on whether the token
                 // query is already present, so the URL stays valid even when
                 // there is no token.
-                url: withStorageId(`${transport.baseUrl}${transport.apiPath}/storage/file/${filePath}${tokenQuery}`),
+                url: withStorageId(`${fileUrlBase()}/storage/file/${filePath}${tokenQuery}`),
                 metadata: result.data
             };
 
