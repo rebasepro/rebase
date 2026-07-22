@@ -64,6 +64,15 @@ interface StorageFile {
 // Helpers
 // ──────────────────────────────────────────────
 
+/**
+ * The query parameter holding the folder being browsed.
+ *
+ * Namespaced because Studio does not always own the URL it renders under: the
+ * SaaS console embeds this view in a page that keeps its own state in `?tab=`
+ * and `?sub=`, and a bare `path` is a name any host app might already be using.
+ */
+const STORAGE_PATH_PARAM = "storagePath";
+
 function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -489,7 +498,9 @@ export const StorageView = () => {
 
     // Navigation
     const [searchParams, setSearchParams] = useSearchParams();
-    const currentPath = searchParams.get("path") || "";
+    // Accepts the historical unqualified `path` so links already shared keep
+    // working; only the namespaced one is ever written.
+    const currentPath = searchParams.get(STORAGE_PATH_PARAM) || searchParams.get("path") || "";
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -580,12 +591,21 @@ export const StorageView = () => {
     }, [currentPath, fetchContents, selectedSourceKey]);
 
     // Navigate to path
+    //
+    // Updates only this view's own parameter and leaves the rest of the query
+    // string alone. It used to assign the whole thing (`setSearchParams({})`),
+    // which is fine when Studio owns the URL but destructive when it is
+    // embedded: the SaaS console keeps the open tab in `?tab=`, so opening a
+    // folder erased it and bounced the user out of Storage entirely. The key is
+    // namespaced for the same reason — a bare `path` is a name a host app can
+    // easily be using for something else.
     const handleNavigate = useCallback((path: string) => {
-        if (!path) {
-            setSearchParams({});
-        } else {
-            setSearchParams({ path });
-        }
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            if (path) next.set(STORAGE_PATH_PARAM, path);
+            else next.delete(STORAGE_PATH_PARAM);
+            return next;
+        }, { replace: true });
         setSelectedFile(null);
         setSelectedDownloadUrl(null);
         setSelectedPaths(new Set());
