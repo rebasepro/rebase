@@ -164,9 +164,8 @@ describe("env list --json", () => {
         cap.restore();
 
         const text = cap.output().trim();
-        const lines = text.split("\n").filter(Boolean);
-        expect(lines).toHaveLength(1); // exactly one JSON value, nothing human
-        const parsed = JSON.parse(lines[0]);
+        // The WHOLE of stdout must parse: one JSON value, nothing human.
+        const parsed = JSON.parse(text);
         expect(parsed.vars.map((v: { key: string }) => v.key)).toEqual(["PUBLIC_URL", "STRIPE_SECRET"]);
         expect(parsed.pendingRedeploy).toBe(true);
         // The secret's shape is present; its VALUE is not — no `value` field at all.
@@ -199,7 +198,7 @@ describe("env reveal of a secret var", () => {
         // /reveal was never invoked (only the list call happened).
         const revealCalls = invoke.mock.calls.filter((c) => c[2]?.path === "reveal");
         expect(revealCalls).toHaveLength(0);
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.error.code).toBe("secret_write_only");
     });
 });
@@ -228,7 +227,7 @@ describe("rollback --json", () => {
         exit.mockRestore();
 
         expect(invoke).not.toHaveBeenCalled(); // never reached the server
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.error.code).toBe("deploy_not_rollbackable");
     });
 
@@ -249,7 +248,7 @@ describe("rollback --json", () => {
         // failed d3 (which is newest overall) and not the old d1.
         expect(invoke).toHaveBeenCalledTimes(1);
         expect((invoke.mock.calls[0][1] as { deploymentId: string }).deploymentId).toBe("d2");
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.rolledBackTo).toBe("d2");
     });
 });
@@ -278,7 +277,7 @@ describe("db info --json", () => {
         await dbCommand("info", ["node", "rebase", "cloud", "db", "info", "--json"]);
         cap.restore();
 
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed).not.toHaveProperty("password");
         expect(parsed.passwordAvailable).toBe(true);
     });
@@ -293,7 +292,7 @@ describe("db info --json", () => {
         await dbCommand("info", ["node", "rebase", "cloud", "db", "info", "--reveal", "--json"]);
         cap.restore();
 
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.password).toBe("s3cr3t");
     });
 });
@@ -311,7 +310,7 @@ describe("deployments list --json", () => {
         await deploymentsListCommand(["node", "rebase", "cloud", "deployments", "list", "--json"]);
         cap.restore();
 
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean).pop() as string);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.deployments).toHaveLength(2);
         expect(parsed.deployments[0].durationMs).toBeNull(); // still running
         expect(parsed.deployments[0].rollbackable).toBe(false);
@@ -342,7 +341,7 @@ describe("confirmDestructive", () => {
         await expect(context.confirmDestructive({ yes: false, prompt: "delete?" })).rejects.toThrow("__exit__");
         cap.restore();
         exit.mockRestore();
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean)[0]);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.error.code).toBe("confirmation_required");
     });
 });

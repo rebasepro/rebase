@@ -44,6 +44,10 @@ export interface DeploymentRow {
     triggered_by_user_id?: string;
     gitCommitHash?: string;
     gitCommitMessage?: string;
+    deployMessage?: string;
+    deploy_message?: string;
+    frameworkVersion?: string;
+    framework_version?: string;
 }
 
 function str(dep: DeploymentRow, camel: keyof DeploymentRow, snake: keyof DeploymentRow): string | null {
@@ -118,6 +122,12 @@ export function deploymentView(dep: DeploymentRow): Record<string, unknown> {
         isRollback: str(dep, "rollbackOf", "rollback_of") !== null,
         rollbackable: isRollbackable(dep),
         trigger: triggerInfo(dep),
+        // The caller's own label for this deploy, and the framework version the
+        // bundle resolved. Without them a `--source` project's history is N rows
+        // carrying an identical placeholder commit message, distinguishable only
+        // by timestamp — which is not enough to answer "did mine go out?".
+        message: str(dep, "deployMessage", "deploy_message"),
+        frameworkVersion: str(dep, "frameworkVersion", "framework_version"),
         commit: {
             hash: str(dep, "gitCommitHash", "gitCommitHash"),
             message: str(dep, "gitCommitMessage", "gitCommitMessage")
@@ -134,13 +144,44 @@ async function fetchDeployments(client: CloudClient, projectId: string, limit = 
     return res.data as unknown as DeploymentRow[];
 }
 
+/**
+ * Rows shown when `--limit` is not given.
+ *
+ * History is unbounded and grows one row per deploy, so "all of it" is the
+ * wrong default in both directions: a wall of near-identical lines in a
+ * terminal, and — since JSON mode is entered automatically for any non-TTY
+ * stdout — a project's entire history dumped at anything that pipes the
+ * command. Recent deploys are what the question is almost always about.
+ */
+export const DEFAULT_DEPLOYMENTS_LIMIT = 20;
+
+/** Hard ceiling on `--limit`, matching the backend's own page size. */
+const MAX_DEPLOYMENTS_LIMIT = 100;
+
+/** `--limit N`, bounded. A garbage value is a refusal, never a silent default. */
+export function parseDeploymentsLimit(raw: number | undefined): number {
+    if (raw === undefined) return DEFAULT_DEPLOYMENTS_LIMIT;
+    if (!Number.isInteger(raw) || raw < 1 || raw > MAX_DEPLOYMENTS_LIMIT) {
+        fail(`--limit must be a whole number between 1 and ${MAX_DEPLOYMENTS_LIMIT}.`, undefined, "usage");
+    }
+    return raw;
+}
+
 export async function deploymentsListCommand(rawArgs: string[]): Promise<void> {
+    const args = arg(
+        { "--limit": Number, "--all": Boolean, "--project": String, "-p": "--project" },
+        { argv: rawArgs.slice(2), permissive: true }
+    );
+    const limit = args["--all"] ? MAX_DEPLOYMENTS_LIMIT : parseDeploymentsLimit(args["--limit"]);
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
     try {
-        const rows = await fetchDeployments(client, projectId);
+        const rows = await fetchDeployments(client, projectId, limit);
         const views = rows.map(deploymentView);
+        // Never let a truncated list read as a complete one. `truncated` is in
+        // the JSON for the same reason the note is in the human output.
+        const truncated = views.length === limit;
         emit(
             () => {
                 console.log("");
@@ -158,10 +199,21 @@ export async function deploymentsListCommand(rawArgs: string[]): Promise<void> {
                     console.log(
                         `  ${chalk.gray(`[${v.id}]`)} ${colorStatus(v.status as string)}  ${chalk.gray(String(v.createdAt ?? "—"))}  ${dur}  ${chalk.gray(trig)}${roll}`
                     );
+                    // The label and framework version are what make one row
+                    // distinguishable from the next; indented under it so the
+                    // status line stays scannable when they are absent.
+                    const label = [v.message, v.frameworkVersion ? `@rebasepro/* ${v.frameworkVersion}` : null]
+                        .filter(Boolean)
+                        .join("  ·  ");
+                    if (label) console.log(`      ${chalk.gray(label)}`);
+                }
+                if (truncated) {
+                    console.log("");
+                    console.log(chalk.gray(`  Showing the ${limit} most recent. Use \`--limit N\` or \`--all\` for more.`));
                 }
                 console.log("");
             },
-            { projectId, deployments: views }
+            { projectId, limit, truncated, deployments: views }
         );
     } catch (e) {
         reportError(e, "Failed to list deployments");

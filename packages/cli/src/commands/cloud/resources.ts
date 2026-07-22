@@ -12,6 +12,7 @@ import {
     getContextOrg,
     readLink,
     colorStatus,
+    emit,
     keyValues,
     fetchTenantBaseDomain,
     projectHost,
@@ -24,6 +25,68 @@ import { firstRow, latestDeployment, fmtDate } from "./projects";
 
 /* ─── status: quick project dashboard ──────────────────────────── */
 
+/** The control plane's verdict on what a tenant's uploads actually do. */
+interface StorageState {
+    effective?: { kind?: string; summary?: string; storageType?: string; missing?: string[] };
+    source?: string;
+    configured?: string;
+    overridden?: boolean;
+}
+
+/**
+ * One line describing this project's storage — or `undefined` when the control
+ * plane could not be asked, which prints as a blank rather than a guess.
+ *
+ * `status` used to render the `storages` row and nothing else, so a project
+ * whose bucket is configured through its own `STORAGE_TYPE`/`S3_*` variables —
+ * the supported path, and the one `mergeStorageEnv` deliberately lets WIN over
+ * the row — was reported as `Storage: none` while its pod logged `Initialized
+ * storage backends count: 1` against a live bucket. Storage is the thing an app
+ * refuses to boot without, so that false negative sends someone off to
+ * provision a bucket they already have. The row is not the answer; the tenant's
+ * resolved environment is, and the control plane computes it with the same two
+ * functions the build log uses.
+ */
+export function describeStorageState(state: StorageState | undefined): string | undefined {
+    const verdict = state?.effective;
+    if (!verdict?.kind) return undefined;
+    const via = state?.overridden ? chalk.gray(" · from env vars") : "";
+    switch (verdict.kind) {
+        case "durable":
+            return `${chalk.green("durable")}${verdict.summary ? ` · ${verdict.summary}` : ""}${via}`;
+        case "ephemeral":
+            // Not "none": nothing is configured, so uploads land on the pod
+            // filesystem and are lost at the next restart. That is a state, and
+            // a bad one — saying "none" makes it sound merely unset.
+            return `${chalk.yellow("ephemeral")} ${chalk.gray("· uploads are lost on restart")}`;
+        case "incomplete":
+            return `${chalk.red("incomplete")} ${chalk.gray(`· missing ${(verdict.missing ?? []).join(", ")}`)}`;
+        case "unrecognized":
+            return `${chalk.red("unrecognized")} ${chalk.gray(`· STORAGE_TYPE=${verdict.storageType ?? "?"}`)}`;
+        default:
+            return undefined;
+    }
+}
+
+/**
+ * One line describing the database.
+ *
+ * `connectionStatus` is written `"untested"` at creation and only ever changed
+ * by `rebase cloud db test`, so `managed (untested)` was reporting the absence
+ * of a manual test as though it were the database's condition — on a project
+ * that had just deployed against it. A never-tested database says only its
+ * type; the verdict appears once there is one.
+ */
+export function describeDatabaseState(db: Record<string, unknown> | undefined): string | undefined {
+    if (!db) return undefined;
+    const type = typeof db.type === "string" ? db.type : "database";
+    const connection = db.connectionStatus;
+    if (connection === "connected" || connection === "failed") {
+        return `${type} (${colorStatus(connection)})`;
+    }
+    return `${type} ${chalk.gray("· not tested (`rebase cloud db test`)")}`;
+}
+
 export async function statusCommand(rawArgs: string[]): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -31,26 +94,49 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
         const project = (await client.data.collection("projects").findById(projectId)) as
             | { id: string | number; name?: string; subdomain?: string; host?: string; status?: string; gitBranch?: string }
             | undefined;
-        if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`);
+        if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`, undefined, "not_found");
 
         const [db, storage, deploy, baseDomain] = await Promise.all([
             firstRow(client, "databases", projectId),
-            firstRow(client, "storages", projectId),
+            // A control plane that does not have this route yet, or a lookup
+            // that fails, yields `undefined` — which prints as a blank. A blank
+            // is a better answer than a wrong one for exactly this field.
+            client.functions
+                .invoke<StorageState>("storage-provision", undefined, { method: "GET", path: projectId })
+                .catch(() => undefined),
             latestDeployment(client, projectId),
             fetchTenantBaseDomain(client, url)
         ]);
 
-        console.log("");
-        console.log(`  ${chalk.bold(project.name ?? project.subdomain ?? "")} ${chalk.gray(`[${project.subdomain ?? displayProjectRef(rawArgs)}]`)} ${colorStatus(project.status)}`);
-        console.log("");
-        keyValues([
-            ["URL", projectHost(project, baseDomain)],
-            ["Branch", project.gitBranch],
-            ["Last deploy", deploy ? `${colorStatus(deploy.status)} · ${fmtDate(deploy.createdAt)}` : "never"],
-            ["Database", db ? `${db.type} (${colorStatus(db.connectionStatus as string)})` : "none"],
-            ["Storage", storage ? `${storage.type} (${colorStatus(storage.status as string)})` : "none"]
-        ]);
-        console.log("");
+        const storageLine = describeStorageState(storage);
+        const databaseLine = describeDatabaseState(db);
+
+        emit(
+            () => {
+                console.log("");
+                console.log(`  ${chalk.bold(project.name ?? project.subdomain ?? "")} ${chalk.gray(`[${project.subdomain ?? displayProjectRef(rawArgs)}]`)} ${colorStatus(project.status)}`);
+                console.log("");
+                keyValues([
+                    ["URL", projectHost(project, baseDomain)],
+                    ["Branch", project.gitBranch],
+                    ["Last deploy", deploy ? `${colorStatus(deploy.status)} · ${fmtDate(deploy.createdAt)}` : "never"],
+                    ["Database", databaseLine],
+                    ["Storage", storageLine]
+                ]);
+                console.log("");
+            },
+            {
+                projectId: String(project.id),
+                name: project.name ?? null,
+                subdomain: project.subdomain ?? null,
+                status: project.status ?? null,
+                url: projectHost(project, baseDomain) ?? null,
+                branch: project.gitBranch ?? null,
+                lastDeploy: deploy ? { id: String(deploy.id), status: deploy.status ?? null, createdAt: deploy.createdAt ?? null } : null,
+                database: db ? { type: db.type ?? null, connectionStatus: db.connectionStatus ?? null } : null,
+                storage: storage ?? null
+            }
+        );
     } catch (e) {
         reportError(e, "Failed to load status");
     }

@@ -440,9 +440,8 @@ describe("debug health --json", () => {
         await debugCommand("health", ["node", "rebase", "cloud", "debug", "health", "--json"]);
         cap.restore();
 
-        const lines = cap.output().trim().split("\n").filter(Boolean);
-        expect(lines).toHaveLength(1); // exactly one JSON value, nothing human
-        const parsed = JSON.parse(lines[0]);
+        // The WHOLE of stdout must parse: one JSON value, nothing human.
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.overall).toBe("ok");
         expect(parsed.origin).toBe("https://proj-one.apps.example");
         expect(parsed.probes).toHaveLength(PROBES.length);
@@ -463,7 +462,7 @@ describe("debug health --json", () => {
         cap.restore();
         exit.mockRestore();
 
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean)[0]);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.overall).toBe("fail");
         const fn = parsed.probes.find((p: { id: string }) => p.id === "functions");
         expect(fn.status).toBe(404);
@@ -502,7 +501,7 @@ describe("debug health --json", () => {
         expect(exit).not.toHaveBeenCalled();
         exit.mockRestore();
 
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean)[0]);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.overall).toBe("ok");
         const fn = parsed.probes.find((p: { id: string }) => p.id === "functions");
         expect(fn.verdict).toBe("ok");
@@ -525,7 +524,7 @@ describe("debug health --json", () => {
         cap.restore();
         exit.mockRestore();
 
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean)[0]);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.overall).toBe("warn");
     });
 
@@ -540,7 +539,7 @@ describe("debug health --json", () => {
         cap.restore();
         exit.mockRestore();
 
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean)[0]);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.origin).toBe("https://staging.example");
     });
 
@@ -592,7 +591,7 @@ describe("debug is read-only", () => {
         cap.restore();
 
         const text = cap.output().trim();
-        const parsed = JSON.parse(text.split("\n").filter(Boolean)[0]);
+        const parsed = JSON.parse(text.trim());
         expect(parsed).not.toHaveProperty("password");
         expect(parsed.passwordAvailable).toBe(true);
         expect(parsed.portForwardCommand).toContain("kubectl port-forward -n rebase-tenant-proj_1");
@@ -627,7 +626,7 @@ describe("debug is read-only", () => {
         cap.restore();
 
         expect(update).not.toHaveBeenCalled();
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean)[0]);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.placement.replicas.available).toBe(1);
     });
 });
@@ -647,7 +646,7 @@ describe("--since validation", () => {
         cap.restore();
         exit.mockRestore();
 
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean)[0]);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.error.message).toMatch(/--since must be a duration/);
     });
 });
@@ -682,7 +681,7 @@ describe("debug subcommand dispatch", () => {
         cap.restore();
         exit.mockRestore();
 
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean)[0]);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.probes).toHaveLength(PROBES.length);
     });
 
@@ -697,7 +696,7 @@ describe("debug subcommand dispatch", () => {
         cap.restore();
         exit.mockRestore();
 
-        const parsed = JSON.parse(cap.output().trim().split("\n").filter(Boolean)[0]);
+        const parsed = JSON.parse(cap.output().trim());
         expect(parsed.error.code).toBe("unknown_command");
     });
 });
