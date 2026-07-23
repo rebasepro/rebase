@@ -110,13 +110,27 @@ export function linkLocalPackages(projectPath: string) {
         if (!fs.existsSync(pkgPath)) continue;
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
 
+        // Point @rebasepro/* at the working tree, and — crucially — pin hono and
+        // drizzle-orm to the SAME physical copies `@rebasepro/server`'s dist was
+        // compiled against. Left to the registry, the scaffold's `^4.x` resolves
+        // to whatever hono published most recently; a second, newer hono under a
+        // workspace child is a structurally-incompatible `Hono<>` type, so the
+        // scaffold's `tsc --noEmit` fails with an error that has nothing to do
+        // with the code under test and reappears every time hono ships a minor.
+        const linkFor = (name: string): string | undefined => {
+            if (name.startsWith("@rebasepro/")) {
+                return `link:${path.join(repoRoot, "packages", name.replace("@rebasepro/", ""))}`;
+            }
+            if (name === "hono") return `link:${honoPath}`;
+            if (name === "drizzle-orm") return `link:${drizzlePath}`;
+            return undefined;
+        };
+
         const updateDeps = (deps: Record<string, string> | undefined) => {
             if (!deps) return;
             for (const name of Object.keys(deps)) {
-                if (name.startsWith("@rebasepro/")) {
-                    const localPath = path.join(repoRoot, "packages", name.replace("@rebasepro/", ""));
-                    deps[name] = `link:${localPath}`;
-                }
+                const linked = linkFor(name);
+                if (linked) deps[name] = linked;
             }
         };
 

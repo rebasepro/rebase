@@ -8,7 +8,13 @@ export default defineConfig({
         globals: true,
         environment: "node",
         include: ["test/e2e/**/*.test.ts"],
-        testTimeout: 180_000 // 3 min — container startup + migrations
+        testTimeout: 180_000, // 3 min — container startup + migrations
+        // Each e2e file boots and tears down its own Postgres container. Running
+        // the files in parallel means N containers racing for the Docker daemon
+        // and host resources at once, which flakes on constrained runners (a
+        // container fails to become ready, or the daemon drops a connection).
+        // Serialize the files so exactly one container is live at a time.
+        fileParallelism: false
     },
     resolve: {
         // Resolve workspace packages to their SOURCE, not their built dist.

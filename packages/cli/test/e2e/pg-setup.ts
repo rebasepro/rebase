@@ -1,5 +1,6 @@
 import { execa } from "execa";
 import crypto from "crypto";
+import pg from "pg";
 
 export interface PgContainer {
     containerName: string;
@@ -49,17 +50,26 @@ export async function startPgContainer(): Promise<PgContainer> {
 
     console.log(`Container started on port ${port}. Waiting for database readiness...`);
 
-    // Wait until pg_isready succeeds
+    // Gate on a real host connection, not just `pg_isready`. The postgres image
+    // boots a temporary server to run its init scripts, then restarts for real;
+    // `pg_isready` can pass against that transient server, so a client that
+    // connects in the gap gets "Connection terminated unexpectedly". Opening an
+    // actual libpq connection and running `SELECT 1` — retrying through the
+    // restart — is the only check that proves the server clients will use is up.
     let attempts = 0;
-    const maxAttempts = 30;
+    const maxAttempts = 60;
     while (attempts < maxAttempts) {
+        const client = new pg.Client({ connectionString, connectionTimeoutMillis: 2000 });
         try {
-            await execa("docker", ["exec", containerName, "pg_isready", "-U", "rebase", "-d", "rebase"]);
+            await client.connect();
+            await client.query("SELECT 1");
             console.log("PostgreSQL database is ready.");
             break;
         } catch (e) {
             attempts++;
             await new Promise((resolve) => setTimeout(resolve, 500));
+        } finally {
+            await client.end().catch(() => {});
         }
     }
 

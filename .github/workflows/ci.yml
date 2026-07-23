@@ -83,6 +83,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The vitest e2e suites drive @rebasepro/server's built dist, and the CLI
+      # suite scaffolds a project that consumes every package as built output
+      # (its `assertPackagesBuilt` guard fails otherwise). This job runs on its
+      # own runner, so the `ci` job's build does not reach it — build here. Only
+      # `./packages/*`, not the admin app, which the e2e never boots.
+      - name: Build packages
+        run: pnpm --filter './packages/*' -r run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
       - name: Start PostgreSQL container
         run: |
           docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
@@ -113,6 +123,28 @@ jobs:
       - name: Run BaaS E2E
         if: always()
         run: npx tsx e2e/tests/cli-init-baas-e2e.ts
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # The product's real security coverage, orphaned until now (this suite ran
+      # in NO pipeline, so a change breaking RLS shipped green — AUDIT P0 #2).
+      # rls-enforcement boots a real Postgres and asserts DB state after every
+      # RLS denial; policy-agreement proves the Postgres and JS policy backends
+      # agree; cdc/db/channel-history/cli round out the integration surface.
+      #
+      # Each test file boots and tears down its OWN Postgres via Docker (random
+      # host ports — no clash with the 5432 service above), so there are no
+      # connection settings to wire. `--workspace-concurrency=1` runs the two
+      # packages' suites one after another, and each vitest config sets
+      # `fileParallelism: false`, so exactly one container is ever live — the
+      # arrangement that makes this reliable on a shared runner.
+      #
+      # `always()`: like the two steps above, this covers different ground, so a
+      # failure there must not suppress this report. It still fails the job on
+      # its own.
+      - name: Run security & integration E2E (vitest)
+        if: always()
+        run: pnpm --filter @rebasepro/server-postgres --filter @rebasepro/cli --workspace-concurrency=1 test:e2e
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 

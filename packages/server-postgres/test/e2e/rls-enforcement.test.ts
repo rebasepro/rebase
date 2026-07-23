@@ -97,8 +97,8 @@ describe("Unified RLS enforcement (E2E)", () => {
     }
     async function realtimeFetchAs(uid: string): Promise<unknown[]> {
         return (realtime as unknown as {
-            fetchCollectionWithAuth(path: string, req: Record<string, unknown>, auth?: { userId: string; roles: string[] }): Promise<unknown[]>;
-        }).fetchCollectionWithAuth("tasks", {}, { userId: uid, roles: [] });
+            fetchCollectionWithAuth(path: string, req: Record<string, unknown>, auth?: { uid: string; roles: string[] }): Promise<unknown[]>;
+        }).fetchCollectionWithAuth("tasks", {}, { uid, roles: [] });
     }
     async function rawCount(table: string, where = ""): Promise<number> {
         const r = await adminClient.query(`SELECT count(*)::int AS c FROM public.${table} ${where}`);
@@ -276,18 +276,18 @@ describe("Unified RLS enforcement (E2E)", () => {
     // realtime path calls it directly, bypassing the driver's own guard, so
     // exercise it there against the default-read (null-or-admin) policy.
     it("does not escalate an empty user id to server context (realtime refetch)", async () => {
-        const rtDocs = (auth: { userId: string; roles: string[] }) =>
+        const rtDocs = (auth: { uid: string; roles: string[] }) =>
             (realtime as unknown as {
-                fetchCollectionWithAuth(p: string, r: Record<string, unknown>, a?: { userId: string; roles: string[] }): Promise<unknown[]>;
+                fetchCollectionWithAuth(p: string, r: Record<string, unknown>, a?: { uid: string; roles: string[] }): Promise<unknown[]>;
             }).fetchCollectionWithAuth("docs", {}, auth);
 
         // Empty uid → coerced to "anonymous" → auth.uid() is NON-null → the
         // null-server default policy does NOT match → sees 0, not all rows.
-        expect((await rtDocs({ userId: "", roles: [] })).length).toBe(0);
-        expect((await rtDocs({ userId: "   ", roles: [] })).length).toBe(0);
+        expect((await rtDocs({ uid: "", roles: [] })).length).toBe(0);
+        expect((await rtDocs({ uid: "   ", roles: [] })).length).toBe(0);
         // Sanity: a real user sees only their own; an admin sees all via default read.
-        expect((await rtDocs({ userId: "user-a", roles: [] })).length).toBe(1);
-        expect((await rtDocs({ userId: "admin1", roles: ["admin"] })).length).toBe(2);
+        expect((await rtDocs({ uid: "user-a", roles: [] })).length).toBe(1);
+        expect((await rtDocs({ uid: "admin1", roles: ["admin"] })).length).toBe(2);
     });
 
     // A table created AFTER provisioning, using auto-generated ids. Proves the
