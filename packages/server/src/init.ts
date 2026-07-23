@@ -1131,6 +1131,26 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         storageRouter.route("/", storageRoutes);
         config.app.route(`${basePath}/storage`, storageRouter);
+    } else {
+        // No storage backend: say so, instead of 404ing as if the route were a
+        // typo. A bare 404 reads as "wrong URL" and sends people debugging
+        // their client; this names the actual state of the deployment.
+        //
+        // 501, not 503: this is permanent until someone configures a bucket,
+        // and the client's offline queue retries 503 forever (see
+        // RETRYABLE_STATUSES in @rebasepro/client), which would silently pile
+        // up uploads that can never land.
+        const storageStub = new Hono<HonoEnv>();
+        storageStub.all("/*", (c) => c.json({
+            error: {
+                message: "File storage is not configured on this deployment, so uploads and " +
+                    "downloads are disabled. Configure a storage backend (STORAGE_TYPE=s3 or " +
+                    "STORAGE_TYPE=gcs plus its bucket and credentials) and redeploy.",
+                code: "STORAGE_NOT_CONFIGURED"
+            }
+        }, 501));
+        config.app.route(`${basePath}/storage`, storageStub);
+        logger.info("Storage not configured — /storage returns 501 STORAGE_NOT_CONFIGURED");
     }
 
     if (activeCollections.length > 0) {

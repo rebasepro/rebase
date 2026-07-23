@@ -22,16 +22,16 @@ describe("initializeStorage", () => {
 
     const local = () => ({ type: "local" as const, basePath: tempDir });
 
-    it("refuses local storage in production", async () => {
+    it("disables local storage in production", async () => {
         // The whole point: on a managed platform "local" is the pod's
         // ephemeral disk, so this config loses every uploaded file at the next
-        // restart. A warning here was not enough — nothing failed until the
-        // data was already gone.
-        await expect(initializeStorage(local(), true)).rejects.toThrow(/local.*production/is);
-    });
+        // restart. No controller is registered, which leaves the app serving
+        // and the upload routes answering 501 rather than accepting files it
+        // is about to destroy.
+        const { storageController, storageRegistry } = await initializeStorage(local(), true);
 
-    it("names the way out in the error", async () => {
-        await expect(initializeStorage(local(), true)).rejects.toThrow(/FORCE_LOCAL_STORAGE/);
+        expect(storageController).toBeUndefined();
+        expect(storageRegistry).toBeUndefined();
     });
 
     it("allows local storage in production when explicitly forced", async () => {
@@ -50,12 +50,34 @@ describe("initializeStorage", () => {
         expect(storageController?.getType()).toBe("local");
     });
 
-    it("refuses a local entry hiding in a multi-backend map", async () => {
+    it("drops a local entry hiding in a multi-backend map", async () => {
         // The named-backend form takes the same path, so the guard cannot be
         // sidestepped by declaring more than one backend.
-        await expect(
-            initializeStorage({ uploads: local() }, true)
-        ).rejects.toThrow(/uploads/);
+        const { storageController } = await initializeStorage({ uploads: local() }, true);
+
+        expect(storageController).toBeUndefined();
+    });
+
+    it("keeps the durable backends when only one entry is local", async () => {
+        // Dropping the ephemeral entry must not take the rest of the map with
+        // it: a project with a real bucket plus a stray local entry still gets
+        // working storage, promoted to the default.
+        const s3 = {
+            type: "s3" as const,
+            bucket: "media",
+            region: "auto",
+            accessKeyId: "key",
+            secretAccessKey: "secret"
+        };
+
+        const { storageRegistry, storageController } = await initializeStorage(
+            { scratch: local(), media: s3 },
+            true
+        );
+
+        expect(storageRegistry?.list()).toContain("media");
+        expect(storageRegistry?.has("scratch")).toBe(false);
+        expect(storageController?.getType()).toBe("s3");
     });
 
     it("leaves a pre-built controller alone", async () => {

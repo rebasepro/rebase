@@ -184,10 +184,14 @@ La `key` di ogni sorgente deve corrispondere a una chiave di backend registrata 
 ## Suggerimenti per la Produzione
 
 :::caution
-**L'archiviazione locale non è adatta per i deployment di produzione** su piattaforme effimere (Cloud Run, Heroku, ecc.) dove il filesystem viene cancellato a ogni deployment. Usa S3 per la produzione.
+**In produzione `type: "local"` disattiva l'archiviazione dei file invece di usarla.** Su piattaforme effimere (Cloud Run, Heroku, un pod Kubernetes) il filesystem viene cancellato a ogni deployment, riavvio ed eviction: i caricamenti riuscirebbero, si rileggerebbero correttamente e sparirebbero al rollout successivo, senza alcun errore.
+
+Per questo non viene registrato alcun backend di archiviazione e `/api/storage/*` risponde **`501 STORAGE_NOT_CONFIGURED`**. I caricamenti falliscono in modo visibile e recuperabile, e il resto dell'applicazione continua a funzionare.
+
+Imposta `STORAGE_TYPE=s3` o `gcs`. Se un **volume durevole** è davvero montato su `STORAGE_PATH`, dichiaralo esplicitamente con `FORCE_LOCAL_STORAGE=true`.
 :::
 
-- Monta un **volume persistente** se usi l'archiviazione locale su Docker/Kubernetes
+- Monta un **volume persistente** se usi l'archiviazione locale su Docker/Kubernetes, e imposta `FORCE_LOCAL_STORAGE=true`
 - Usa **S3** o compatibile (R2, MinIO) per i deployment di produzione
 - Configura una **CDN** (CloudFront, Cloudflare) davanti al tuo bucket S3 per le prestazioni
 

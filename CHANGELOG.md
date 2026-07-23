@@ -12,6 +12,12 @@
 
   See [Offline & Local-First Sync](https://rebase.pro/docs/sdk/offline).
 
+### Changed
+
+- **No bucket means no file storage, rather than a crash or a disappearing disk** — 0.10.0 made a production backend *refuse to boot* on `type: "local"`, which stopped the silent data loss but replaced it with a crash-looping rollout for anyone who simply had not configured storage — a project that never uploads a file was taken down by a feature it does not use. Storage is now opt-in instead: with no bucket configured in production, no storage backend is registered, `/api/storage/*` answers `501 STORAGE_NOT_CONFIGURED` with the fix in the message, and everything else — data, auth, realtime — keeps serving. `501` and not `503`, so the client's offline queue does not retry uploads that can never land.
+
+  The scaffolded backend matches: it configures S3 for `STORAGE_TYPE=s3` and now GCS for `STORAGE_TYPE=gcs`, and falls back to local disk only outside production (or with `FORCE_LOCAL_STORAGE=true`, for a deployment with a real volume mounted). A named backend that is local-in-production is dropped from a multi-backend map without taking the durable ones with it.
+
 ## [0.10.0] - 2026-07-20
 
 ### Breaking

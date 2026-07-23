@@ -184,10 +184,14 @@ A `key` de cada fonte deve corresponder a uma chave de backend registrada no map
 ## Dicas para Produção
 
 :::caution
-**O armazenamento local não é adequado para implantações em produção** em plataformas efêmeras (Cloud Run, Heroku, etc.) onde o sistema de arquivos é apagado a cada implantação. Use S3 para produção.
+**Em produção, `type: "local"` desativa o armazenamento de arquivos em vez de usá-lo.** Em plataformas efêmeras (Cloud Run, Heroku, um pod Kubernetes) o sistema de arquivos é apagado a cada implantação, reinício e remoção: os uploads teriam sucesso, seriam lidos normalmente e desapareceriam na implantação seguinte, sem erro algum.
+
+Por isso nenhum backend de armazenamento é registrado e `/api/storage/*` responde **`501 STORAGE_NOT_CONFIGURED`**. Os uploads falham de forma visível e recuperável, e o resto da aplicação continua funcionando.
+
+Defina `STORAGE_TYPE=s3` ou `gcs`. Se realmente houver um **volume durável** montado em `STORAGE_PATH`, declare isso explicitamente com `FORCE_LOCAL_STORAGE=true`.
 :::
 
-- Monte um **volume persistente** se usar armazenamento local no Docker/Kubernetes
+- Monte um **volume persistente** se usar armazenamento local no Docker/Kubernetes, e defina `FORCE_LOCAL_STORAGE=true`
 - Use **S3** ou compatível (R2, MinIO) para implantações em produção
 - Configure uma **CDN** (CloudFront, Cloudflare) na frente do seu bucket S3 para desempenho
 

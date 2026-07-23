@@ -68,8 +68,9 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `STORAGE_TYPE` | Storage backend: `local` or `s3` | `local` |
+| `STORAGE_TYPE` | Storage backend: `local`, `s3` or `gcs`. In production `local` disables storage unless `FORCE_LOCAL_STORAGE=true` | `local` |
 | `STORAGE_PATH` | Base path for local storage | `./uploads` |
+| `FORCE_LOCAL_STORAGE` | Allow local storage in production — only with a durable volume mounted at `STORAGE_PATH` | `false` |
 | `S3_BUCKET` | S3 bucket name (when `STORAGE_TYPE=s3`) | — |
 | `S3_REGION` | AWS region | — |
 | `S3_ACCESS_KEY_ID` | AWS access key | — |
@@ -123,6 +124,9 @@ await initializeRebaseBackend({
         serviceKey: env.REBASE_SERVICE_KEY
     },
 
+    // No bucket configured in production means storage is off, not local:
+    // uploads answer 501 rather than landing on a filesystem that is erased
+    // on the next redeploy.
     storage: env.STORAGE_TYPE === "s3"
         ? {
             type: "s3",
@@ -132,10 +136,19 @@ await initializeRebaseBackend({
             secretAccessKey: env.S3_SECRET_ACCESS_KEY,
             endpoint: env.S3_ENDPOINT
         }
-        : {
-            type: "local",
-            basePath: env.STORAGE_PATH || "./uploads"
-        },
+        : env.STORAGE_TYPE === "gcs"
+            ? {
+                type: "gcs",
+                bucket: env.GCS_BUCKET!,
+                projectId: env.GCS_PROJECT_ID,
+                keyFilename: env.GCS_KEY_FILENAME
+            }
+            : isProduction && !env.FORCE_LOCAL_STORAGE
+                ? undefined
+                : {
+                    type: "local",
+                    basePath: env.STORAGE_PATH || "./uploads"
+                },
 
     history: true,           // Enable entity change history
 

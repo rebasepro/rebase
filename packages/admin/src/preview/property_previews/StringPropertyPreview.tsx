@@ -15,7 +15,8 @@ export function StringPropertyPreview({
     propertyKey,
     value,
     property,
-    size
+    size,
+    textOnly
 }: PropertyPreviewProps<StringProperty>): React.ReactElement {
 
     const strValue = value as string;
@@ -44,14 +45,19 @@ export function StringPropertyPreview({
         );
     } else {
         if (!strValue) return <></>;
-        const lines = strValue.split("\n");
-        return strValue && strValue.includes("\n")
-            ? <div className={cls("overflow-x-scroll overflow-hidden", size === "small" ? "text-sm" : "")}>
-                {lines.map((str: any, index: number) =>
-                    <React.Fragment key={`string_preview_${index}`}>
-                        <span>{str}</span>
-                        {index !== lines.length - 1 && <br/>}
-                    </React.Fragment>)}
+        // When used as a title/subtitle (textOnly), collapse newlines so the
+        // parent `truncate` can clamp it to a single line.
+        if (textOnly) {
+            const singleLine = strValue.replace(/\s*\n\s*/g, " ");
+            return size === "small"
+                ? <span className={"text-sm"}>{singleLine}</span>
+                : <>{singleLine}</>;
+        }
+        return strValue.includes("\n")
+            ? <div className={cls(
+                "whitespace-pre-line line-clamp-3 overflow-hidden",
+                size === "small" ? "text-sm" : "")}>
+                {strValue}
             </div>
             : (size === "small"
                 ? <span className={"text-sm"}>{strValue}</span>

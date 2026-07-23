@@ -184,10 +184,14 @@ Der `key` jeder Quelle muss mit einem im `storage`-Map des Servers registrierten
 ## Tipps für die Produktion
 
 :::caution
-**Lokaler Speicher ist nicht für Produktionsbereitstellungen geeignet** auf ephemeren Plattformen (Cloud Run, Heroku usw.), bei denen das Dateisystem bei jedem Deployment gelöscht wird. Verwenden Sie S3 für die Produktion.
+**In der Produktion deaktiviert `type: "local"` den Dateispeicher, statt ihn zu verwenden.** Auf ephemeren Plattformen (Cloud Run, Heroku, ein Kubernetes-Pod) wird das Dateisystem bei jedem Deployment, Neustart und Eviction gelöscht — Uploads würden also erfolgreich sein, sich sauber lesen lassen und beim nächsten Rollout verschwunden sein, ohne jede Fehlermeldung.
+
+Deshalb wird kein Speicher-Backend registriert und `/api/storage/*` antwortet mit **`501 STORAGE_NOT_CONFIGURED`**. Uploads scheitern sichtbar und behebbar, und der Rest der Anwendung läuft weiter.
+
+Setzen Sie `STORAGE_TYPE=s3` oder `gcs`. Wenn wirklich ein **dauerhaftes Volume** unter `STORAGE_PATH` eingebunden ist, sagen Sie das explizit mit `FORCE_LOCAL_STORAGE=true`.
 :::
 
-- Binden Sie ein **persistentes Volume** ein, wenn Sie lokalen Speicher auf Docker/Kubernetes verwenden
+- Binden Sie ein **persistentes Volume** ein, wenn Sie lokalen Speicher auf Docker/Kubernetes verwenden, und setzen Sie `FORCE_LOCAL_STORAGE=true`
 - Verwenden Sie **S3** oder Kompatibles (R2, MinIO) für Produktionsbereitstellungen
 - Konfigurieren Sie ein **CDN** (CloudFront, Cloudflare) vor Ihrem S3-Bucket für die Leistung
 

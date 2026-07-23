@@ -243,9 +243,9 @@ permissive: true }
 export async function storageCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     // `rebase cloud storage` used to only ever list. A tenant could therefore
     // reach durable storage only by creating a bucket by hand in a cloud
-    // console, minting credentials, and pasting them into the web UI — and the
-    // fallback for not doing so is an ephemeral pod filesystem that loses
-    // uploads silently. These make it a thing the platform can do for you.
+    // console, minting credentials, and pasting them into the web UI — and
+    // until they did, the project simply had no file storage. These make it a
+    // thing the platform can do for you.
     //
     // `action` is the positional the dispatcher already resolved, as for every
     // other resource group. Re-deriving it here by index was wrong — the group
@@ -297,8 +297,9 @@ function printStorageHelp(): void {
     console.log(chalk.gray("    --region <region>        Region"));
     console.log(chalk.gray("    --force-path-style       Required by MinIO and some gateways"));
     console.log("");
-    console.log(chalk.gray("  Without either, a tenant falls back to the container filesystem and"));
-    console.log(chalk.gray("  loses uploaded files on its next restart."));
+    console.log(chalk.gray("  Without either, file storage stays off: uploads are refused with"));
+    console.log(chalk.gray("  501 STORAGE_NOT_CONFIGURED rather than written to a container"));
+    console.log(chalk.gray("  filesystem that is erased on the next restart."));
     console.log("");
 }
 

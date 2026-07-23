@@ -17,26 +17,33 @@ export async function initializeStorage(
     logger.info("Configuring storage");
     const controllers: Record<string, StorageController> = {};
 
-    const toController = async (entry: BackendStorageConfig | StorageController, label: string): Promise<StorageController> => {
+    const toController = async (entry: BackendStorageConfig | StorageController, label: string): Promise<StorageController | undefined> => {
         if (typeof (entry as StorageController).putObject === "function") {
             return entry as StorageController;
         }
         const conf = entry as BackendStorageConfig;
-        // A warning was not enough. On a managed platform the local backend is a
-        // pod's ephemeral filesystem, so every uploaded file disappears at the
-        // next restart — with no error at write time, no error at read time, and
-        // a log line nobody reads until the data is already gone. Refusing to
-        // boot trades that for a failure the deploy actually surfaces: a crashed
-        // rollout is recoverable, deleted user files are not.
+        // On a managed platform the local backend is a pod's ephemeral
+        // filesystem, so every uploaded file disappears at the next restart —
+        // with no error at write time, no error at read time, and a log line
+        // nobody reads until the data is already gone.
+        //
+        // So in production this backend is not registered at all. Storage is
+        // off until a bucket is configured: uploads are refused with
+        // STORAGE_NOT_CONFIGURED (see the stub router in `init.ts`) instead of
+        // succeeding into a filesystem that is about to be wiped. Dropping the
+        // backend rather than throwing keeps the rest of the app — data, auth,
+        // realtime — serving, which a crash-looping rollout would not.
         if (isProduction && conf.type === "local" && !process.env.FORCE_LOCAL_STORAGE) {
-            throw new Error(
-                `Storage backend "${label}" is set to "local" in production. Local storage is the ` +
-                "container filesystem, so uploaded files are destroyed on the next restart or " +
-                "redeploy. Configure S3-compatible storage (STORAGE_TYPE=s3) or GCS " +
+            logger.error(
+                `Storage backend "${label}" is set to "local" in production — DISABLED. Local ` +
+                "storage is the container filesystem, so uploaded files would be destroyed on the " +
+                "next restart or redeploy. File uploads will be refused until storage is " +
+                "configured: set S3-compatible storage (STORAGE_TYPE=s3) or GCS " +
                 "(STORAGE_TYPE=gcs), or pass a custom StorageController. If this deployment " +
                 "really does have a durable volume mounted at the storage path, set " +
-                "FORCE_LOCAL_STORAGE=true to proceed."
+                "FORCE_LOCAL_STORAGE=true."
             );
+            return undefined;
         }
         return await createStorageController(conf);
     };
@@ -45,15 +52,17 @@ export async function initializeStorage(
         typeof storageConfig === "object" &&
         ("type" in storageConfig || typeof (storageConfig as StorageController).putObject === "function")
     ) {
-        controllers[DEFAULT_STORAGE_ID] = await toController(
+        const controller = await toController(
             storageConfig as BackendStorageConfig | StorageController,
             DEFAULT_STORAGE_ID
         );
+        if (controller) controllers[DEFAULT_STORAGE_ID] = controller;
     } else {
         for (const [storageId, entry] of Object.entries(
             storageConfig as Record<string, BackendStorageConfig | StorageController>
         )) {
-            controllers[storageId] = await toController(entry, storageId);
+            const controller = await toController(entry, storageId);
+            if (controller) controllers[storageId] = controller;
         }
     }
 

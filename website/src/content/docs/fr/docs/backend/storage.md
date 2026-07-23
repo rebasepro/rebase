@@ -184,10 +184,14 @@ Le `key` de chaque source doit correspondre à une clé de backend enregistrée 
 ## Conseils pour la production
 
 :::caution
-**Le stockage local ne convient pas aux déploiements en production** sur des plateformes éphémères (Cloud Run, Heroku, etc.) où le système de fichiers est effacé à chaque déploiement. Utilisez S3 pour la production.
+**En production, `type: "local"` désactive le stockage de fichiers au lieu de l'utiliser.** Sur des plateformes éphémères (Cloud Run, Heroku, un pod Kubernetes), le système de fichiers est effacé à chaque déploiement, redémarrage et éviction : les téléversements réussiraient, se reliraient correctement, et auraient disparu au déploiement suivant, sans la moindre erreur.
+
+Aucun backend de stockage n'est donc enregistré et `/api/storage/*` répond **`501 STORAGE_NOT_CONFIGURED`**. Les téléversements échouent de façon visible et réparable, et le reste de l'application continue de fonctionner.
+
+Définissez `STORAGE_TYPE=s3` ou `gcs`. Si un **volume durable** est réellement monté sur `STORAGE_PATH`, déclarez-le explicitement avec `FORCE_LOCAL_STORAGE=true`.
 :::
 
-- Montez un **volume persistant** si vous utilisez le stockage local sur Docker/Kubernetes
+- Montez un **volume persistant** si vous utilisez le stockage local sur Docker/Kubernetes, et définissez `FORCE_LOCAL_STORAGE=true`
 - Utilisez **S3** ou compatible (R2, MinIO) pour les déploiements en production
 - Configurez un **CDN** (CloudFront, Cloudflare) devant votre bucket S3 pour la performance
 

@@ -123,6 +123,12 @@ pass: env.SMTP_PASS! }
                 }
                 : undefined
         },
+        // File storage is opt-in. With no bucket configured, storage is OFF in
+        // production — the upload routes answer 501 STORAGE_NOT_CONFIGURED —
+        // rather than writing to the container filesystem, which is erased on
+        // every restart and redeploy. Uploads that fail loudly are recoverable;
+        // uploads that succeed into a disk about to be wiped are not.
+        // Local disk stays the default in development, where it is what you want.
         storage: env.STORAGE_TYPE === "s3"
             ? {
                 type: "s3",
@@ -133,10 +139,21 @@ pass: env.SMTP_PASS! }
                 endpoint: env.S3_ENDPOINT,
                 forcePathStyle: env.S3_FORCE_PATH_STYLE
             }
-            : {
-                type: "local",
-                basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
-            },
+            : env.STORAGE_TYPE === "gcs"
+                ? {
+                    type: "gcs",
+                    bucket: env.GCS_BUCKET!,
+                    projectId: env.GCS_PROJECT_ID,
+                    keyFilename: env.GCS_KEY_FILENAME
+                }
+                // Set FORCE_LOCAL_STORAGE=true only if this deployment really
+                // does have a durable volume mounted at STORAGE_PATH.
+                : isProduction && !env.FORCE_LOCAL_STORAGE
+                    ? undefined
+                    : {
+                        type: "local",
+                        basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
+                    },
         history: true
     });
 

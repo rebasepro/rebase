@@ -186,7 +186,9 @@ Each source's `key` must match a backend key registered in the server's `storage
 ## Production Tips
 
 :::caution
-**In production the backend refuses to boot on `type: "local"`.** On an ephemeral platform (Cloud Run, Heroku, a Kubernetes pod) the filesystem is wiped on every deploy, restart and eviction — so uploads succeed, read back fine, and are gone at the next rollout, with no error at any point. A failed boot is recoverable; lost user files are not.
+**In production, `type: "local"` disables file storage instead of using it.** On an ephemeral platform (Cloud Run, Heroku, a Kubernetes pod) the filesystem is wiped on every deploy, restart and eviction — so uploads would succeed, read back fine, and be gone at the next rollout, with no error at any point.
+
+So no storage backend is registered, and `/api/storage/*` answers **`501 STORAGE_NOT_CONFIGURED`**. Uploads fail loudly and recoverably; the rest of the app keeps serving. File storage is opt-in in production: it exists once a bucket does.
 
 Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really is mounted at `STORAGE_PATH`, set `FORCE_LOCAL_STORAGE=true` to say so explicitly.
 :::

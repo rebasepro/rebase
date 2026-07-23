@@ -184,10 +184,14 @@ La `key` de cada fuente debe coincidir con una clave de backend registrada en el
 ## Consejos para Producción
 
 :::caution
-**El almacenamiento local no es adecuado para despliegues en producción** en plataformas efímeras (Cloud Run, Heroku, etc.) donde el sistema de archivos se borra en cada despliegue. Use S3 para producción.
+**En producción, `type: "local"` desactiva el almacenamiento de archivos en lugar de usarlo.** En plataformas efímeras (Cloud Run, Heroku, un pod de Kubernetes) el sistema de archivos se borra en cada despliegue, reinicio y desalojo: las subidas funcionarían, se leerían bien y desaparecerían en el siguiente despliegue, sin ningún error.
+
+Por eso no se registra ningún backend de almacenamiento y `/api/storage/*` responde **`501 STORAGE_NOT_CONFIGURED`**. Las subidas fallan de forma visible y recuperable, y el resto de la aplicación sigue funcionando.
+
+Configure `STORAGE_TYPE=s3` o `gcs`. Si realmente hay un **volumen duradero** montado en `STORAGE_PATH`, indíquelo explícitamente con `FORCE_LOCAL_STORAGE=true`.
 :::
 
-- Monte un **volumen persistente** si usa almacenamiento local en Docker/Kubernetes
+- Monte un **volumen persistente** si usa almacenamiento local en Docker/Kubernetes, y configure `FORCE_LOCAL_STORAGE=true`
 - Use **S3** o compatible (R2, MinIO) para despliegues en producción
 - Configure una **CDN** (CloudFront, Cloudflare) delante de su bucket de S3 para rendimiento
 

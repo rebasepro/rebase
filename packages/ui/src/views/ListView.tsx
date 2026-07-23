@@ -240,7 +240,7 @@ export function ListView<T>({
                                     {renderRow({
                                         item,
                                         index: actualIndex,
-                                        style: { height: estimatedRowHeight },
+                                        style: { height: estimatedRowHeight, overflow: "hidden" },
                                         className: cls(
                                             !isLast && "border-b",
                                             !isLast && borderMixinClass
