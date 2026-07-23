@@ -21,6 +21,7 @@ import {
     buildPgRestoreArgs,
     buildPgRestoreListArgs,
     checkToolServerCompatibility,
+    globalsFileForDump,
     joinStorageKey,
     parsePgToolMajor,
     parseBackupTimestamp,
