@@ -37,6 +37,8 @@ import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./s
 import { buildDrizzleTablesFromSchema, buildDrizzleRelationsFromSchema } from "./schema/dynamic-tables";
 import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, warnOnAnonymousGrants, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
+import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
+import { isChannelBusInstance } from "@rebasepro/types";
 
 export interface PostgresDriverConfig {
     connectionString?: string;
@@ -54,9 +56,13 @@ export interface PostgresDriverConfig {
      */
     introspectionSchema?: string;
     /**
-     * Realtime options. Currently only channel retention, which is opt-in:
-     * without rules here no channel keeps any history and broadcast stays
-     * fire-and-forget. See {@link ChannelRetentionRule}.
+     * Realtime options, both opt-in:
+     *
+     *  - `channels` — retention. Without rules no channel keeps any history and
+     *    broadcast stays fire-and-forget. See {@link ChannelRetentionRule}.
+     *  - `bus` — the cross-instance transport for channel broadcast and
+     *    presence. Defaults to in-process only, which is correct for a single
+     *    instance and wrong for two. See {@link ChannelBusConfig}.
      */
     realtime?: RealtimeChannelsConfig;
 }
@@ -336,6 +342,29 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             // ── Realtime change source ───────────────────────────────────────
             // Prefer DATABASE_DIRECT_URL to bypass PgBouncer for LISTEN/NOTIFY.
             const directUrl = process.env.DATABASE_DIRECT_URL || pgConfig.connectionString;
+
+            // ── Cross-instance channel bus ───────────────────────────────────
+            // Entity changes already span instances (CDC / LISTEN below).
+            // Channel broadcast and presence did not — they lived in per-process
+            // maps, so behind two replicas the clients of one were invisible to
+            // the other. Opt-in, and a no-op when left at "memory".
+            try {
+                const busSetting = resolveChannelBusSetting(pgConfig.realtime?.bus);
+                // A supplied instance is always installed; a named built-in only
+                // when it is not the in-process default, so the common case
+                // touches none of this machinery.
+                const wantsBus = isChannelBusInstance(busSetting) || busSetting.type !== "memory";
+                if (wantsBus) {
+                    await realtimeService.configureChannelBus(
+                        createChannelBus(busSetting, {
+                            db: schemaAwareDb as unknown as NodePgDatabase<Record<string, unknown>>,
+                            directUrl
+                        })
+                    );
+                }
+            } catch (err) {
+                logger.warn("⚠️ [ChannelBus] Could not configure the channel bus — channel broadcast and presence stay per-instance", { error: err });
+            }
 
             // Database-level Change Data Capture. When active, realtime events are
             // emitted for EVERY committed write — including ones that bypass the

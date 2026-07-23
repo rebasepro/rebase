@@ -1,6 +1,6 @@
-import { Client as PgClient } from "pg";
 import { logger } from "@rebasepro/server";
 import { CDC_CHANNEL } from "./trigger-cdc";
+import { PgNotifyListener } from "../pg-notify-listener";
 
 /**
  * A single database change captured by the CDC triggers and delivered over the
@@ -54,22 +54,30 @@ export function parseCdcPayload(payload: string): CdcChangeEvent | null {
 /**
  * Dedicated Postgres LISTEN client for database-level CDC.
  *
- * Mirrors the resilience of the RealtimeService cross-instance LISTEN client: a
- * standalone `pg.Client` (outside the Drizzle pool) that stays connected, and
- * transparently reconnects on error/disconnect. Each backend instance runs one,
- * so every instance observes every committed change regardless of which
- * instance (or external process) made the write.
+ * A {@link PgNotifyListener} — a connection outside the Drizzle pool that stays
+ * open and repairs itself — plus the parsing that turns a `rebase_cdc` payload
+ * into a change event. Each backend instance runs one, so every instance
+ * observes every committed change regardless of which instance (or external
+ * process) made the write.
  */
 export class CdcListener {
-    private client?: PgClient;
-    private running = false;
-    private reconnectTimer?: ReturnType<typeof setTimeout>;
-    private static readonly RECONNECT_DELAY_MS = 3000;
+    private readonly listener: PgNotifyListener;
 
-    constructor(
-        private readonly connectionString: string,
-        private readonly onEvent: (event: CdcChangeEvent) => void | Promise<void>
-    ) {}
+    constructor(connectionString: string, onEvent: (event: CdcChangeEvent) => void | Promise<void>) {
+        this.listener = new PgNotifyListener({
+            connectionString,
+            channel: CDC_CHANNEL,
+            logLabel: "[CDC]",
+            onPayload: (payload) => {
+                const event = parseCdcPayload(payload);
+                if (!event) {
+                    logger.warn("⚠️ [CDC] Dropping unparseable change notification.");
+                    return;
+                }
+                return onEvent(event);
+            }
+        });
+    }
 
     /**
      * Connect and begin listening. Idempotent.
@@ -78,90 +86,18 @@ export class CdcListener {
      * established (or `LISTEN` is refused), this rejects so callers — notably
      * `REALTIME_CDC=auto` — can detect an unusable connection and fall back to
      * app-level realtime. Once the initial connection succeeds, later drops
-     * self-heal via {@link scheduleReconnect}.
+     * self-heal in the background.
      */
     async start(): Promise<void> {
-        if (this.running) {
+        if (this.listener.active) {
             logger.warn("⚠️ [CDC] CdcListener.start() called but already running. Ignoring.");
             return;
         }
-        this.running = true;
-        try {
-            await this.connect({ initial: true });
-        } catch (err) {
-            this.running = false;
-            throw err;
-        }
+        await this.listener.start();
     }
 
     /** Stop listening and release the connection. */
     async stop(): Promise<void> {
-        this.running = false;
-        if (this.reconnectTimer) {
-            clearTimeout(this.reconnectTimer);
-            this.reconnectTimer = undefined;
-        }
-        if (this.client) {
-            try {
-                await this.client.end();
-            } catch { /* ignore close errors */ }
-            this.client = undefined;
-        }
-    }
-
-    private async connect({ initial = false }: { initial?: boolean } = {}): Promise<void> {
-        try {
-            const client = new PgClient({ connectionString: this.connectionString });
-
-            client.on("error", (err) => {
-                logger.error("❌ [CDC] LISTEN client error", { detail: err.message });
-                this.scheduleReconnect();
-            });
-
-            client.on("end", () => {
-                if (this.running) {
-                    logger.warn("⚠️ [CDC] LISTEN client disconnected unexpectedly.");
-                    this.scheduleReconnect();
-                }
-            });
-
-            client.on("notification", (msg) => {
-                if (!msg.payload) return;
-                const event = parseCdcPayload(msg.payload);
-                if (!event) {
-                    logger.warn("⚠️ [CDC] Dropping unparseable change notification.");
-                    return;
-                }
-                // Never let a handler rejection escape into the pg client.
-                Promise.resolve(this.onEvent(event)).catch((err) =>
-                    logger.error("❌ [CDC] Error handling change event", { error: err })
-                );
-            });
-
-            await client.connect();
-            await client.query(`LISTEN ${CDC_CHANNEL}`);
-            this.client = client;
-            logger.info(`📡 [CDC] Listening for database changes on channel "${CDC_CHANNEL}".`);
-        } catch (err) {
-            // Surface the initial failure so callers can choose to fall back;
-            // for reconnects, keep retrying quietly in the background.
-            if (initial) throw err;
-            logger.error("❌ [CDC] Failed to connect LISTEN client", { error: err });
-            this.scheduleReconnect();
-        }
-    }
-
-    private scheduleReconnect(): void {
-        if (!this.running || this.reconnectTimer) return;
-
-        this.reconnectTimer = setTimeout(async () => {
-            this.reconnectTimer = undefined;
-            if (!this.running) return;
-            if (this.client) {
-                try { await this.client.end(); } catch { /* ignore */ }
-                this.client = undefined;
-            }
-            await this.connect();
-        }, CdcListener.RECONNECT_DELAY_MS);
+        await this.listener.stop();
     }
 }

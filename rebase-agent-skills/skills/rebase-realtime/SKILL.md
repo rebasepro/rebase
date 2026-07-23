@@ -24,7 +24,9 @@ The realtime pipeline has three stages:
 2. **Server fan-out** — The `RealtimeService` detects the change and fans out to every active WebSocket subscription matching the affected collection or entity.
 3. **Client callback** — The client SDK fires the registered `onUpdate` callback with fresh data.
 
-For multi-instance deployments, PostgreSQL `LISTEN/NOTIFY` broadcasts changes across server instances via the `rebase_entity_changes` channel.
+For multi-instance deployments, PostgreSQL `LISTEN/NOTIFY` broadcasts **row changes** across server instances via the `rebase_entity_changes` channel.
+
+> **IMPORTANT FOR AGENTS:** That covers collection/entity subscriptions only. **Broadcast channels and presence are per-instance unless a channel bus is configured** — see [Multi-instance channels](#multi-instance-channels-and-presence). This is the single most likely cause of "collaboration works locally but not in production": behind a load balancer, two clients on different replicas see an empty room and nothing errors.
 
 ### Zero Configuration
 
@@ -450,6 +452,67 @@ ws.send(JSON.stringify({
 ```
 
 When a client disconnects, they are automatically removed from all channels.
+
+## Multi-instance channels and presence
+
+Broadcast and presence fan out **only to clients on the instance that received them**, unless a channel bus is configured. Correct and free on one instance; silently broken on two.
+
+```typescript
+createPostgresAdapter({
+    connection: db,
+    schema: { tables, enums, relations },
+    realtime: {
+        bus: { type: "postgres" }   // "memory" (default) | "postgres"
+    }
+})
+```
+
+Or per deployment: `REALTIME_CHANNEL_BUS=postgres`.
+
+| Bus | Use when |
+|-----|----------|
+| `memory` | Single instance. Default; zero overhead. |
+| `postgres` | Two or more instances. Uses the database you already have — no extra service. |
+
+> **No Redis ships in the box, and that is deliberate.** The Postgres bus measured ~10k cross-instance messages/second (flat out to 8 instances), about 8× what live-cursor collaboration generates, so a broker would add a stateful service to every deployment for no gain. Never suggest adding a broker dependency *to the framework*. If a user has genuinely outgrown it, point them at the extension point below.
+
+### A transport can ship as its own package
+
+`realtime.bus` accepts either a built-in name or **any `ChannelBus` instance**, so a Redis (or NATS, or anything) transport lives in its own package and plugs in without a framework change:
+
+```typescript
+import type { ChannelBus, ChannelBusFrame, ChannelBusHandler } from "@rebasepro/types";
+
+class MyBus implements ChannelBus {
+    readonly kind = "my-transport";
+    readonly maxFrameBytes = Infinity;   // finite → large retained msgs go by pointer
+    async start(handler: ChannelBusHandler) { /* reject if unusable */ }
+    async publish(frame: ChannelBusFrame) { /* reach every other instance, or reject */ }
+    async stop() { /* idempotent */ }
+}
+
+realtime: { bus: new MyBus(url) }
+```
+
+The contract is declared in `@rebasepro/types` (`types/channel_bus.ts`) — a transport package depends on that alone, never on `@rebasepro/server-postgres`. Must guarantee: `start()` rejects when unusable, `publish()` reaches all other instances or rejects, `stop()` is idempotent, malformed frames are dropped not thrown. Need **not** guarantee ordering, durability or exactly-once — retained frames dedupe by `seq`, presence diffs are idempotent.
+
+`REALTIME_CHANNEL_BUS` only names built-ins; it never overrides a supplied instance (it warns if both are set).
+
+**Diagnosing:** `realtimeService.getChannelBusKind()` returns the active transport. A misconfigured bus never blocks boot — it logs a warning and falls back to `"memory"`, so check the startup logs for `[ChannelBus]` when cross-instance delivery is missing.
+
+### Coalescing (Postgres bus)
+
+Outgoing frames are batched into one `pg_notify` per ~10ms window, leading-edge (the first frame of an idle stream goes immediately, so no added latency). Measured: **44× fewer database queries** on burst traffic, **12.5×** on paced ~500 msg/s traffic, 100% delivery in both. Tune with `bus: { type: "postgres", batchWindowMs: N }`; `0` disables it. The window is not sensitive — 5/10/20ms measured identically, since batches hit the 8KB ceiling or the traffic's natural gaps first.
+
+> **IMPORTANT FOR AGENTS:** if a user reports missing channel messages *during a rolling deploy under load*, this is the likely cause: a batched payload is a different wire shape that an older instance drops. Single frames are always sent unwrapped, so idle/low-rate traffic is unaffected, and retained channels self-repair via history replay. Not a bug to "fix" by disabling batching — it resolves when the deploy completes.
+
+### Two things agents get wrong here
+
+1. **The Postgres bus needs a direct connection.** `LISTEN` is session state, so it must not go through pgBouncer or any transaction-mode pooler. Rebase uses `DATABASE_DIRECT_URL` when set.
+
+2. **`pg_notify` caps payloads at 8000 bytes.** On a **retained** channel a large message travels as a `(channel, seq)` pointer and each instance reads the body back — no size limit. On an **ephemeral** channel it cannot: the message is delivered locally, the sender gets a `CHANNEL_BUS_PAYLOAD_TOO_LARGE` error, and a warning names the channel. The fix is always the same — add a retention rule for that channel.
+
+With a bus active, presence rosters live in `rebase.channel_presence` (created automatically), so `presence_state` answers for the whole cluster. Rows whose instance stops heartbeating are reaped after the 30s presence timeout, which is also how a crashed pod's clients disappear from everyone's roster.
 
 ## Channel History and Catch-Up
 

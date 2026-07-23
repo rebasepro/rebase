@@ -16,6 +16,8 @@ import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
+import { ChannelPresenceStore } from "./channel-presence";
+import { ChannelBus, ChannelBusFrame, MemoryChannelBus, frameByteLength } from "./channel-bus";
 import type { ChannelHistoryEntry, ChannelRetentionRule } from "@rebasepro/types";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
@@ -76,8 +78,38 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * wait on each other.
      */
     private channelSendQueues = new Map<string, Promise<void>>();
+
+    /**
+     * Cross-instance transport for channel frames and presence.
+     *
+     * Defaults to the memory bus, which publishes nowhere — so a single-instance
+     * deployment runs the same fan-out it always did, with one resolved promise
+     * per broadcast for company. See `channel-bus/ChannelBus.ts`.
+     */
+    private bus: ChannelBus = new MemoryChannelBus();
+
+    /**
+     * The shared presence roster, present only when a real bus is active.
+     *
+     * Fan-out alone is not enough for presence: `presence_state` has to answer
+     * with everyone in the channel, and per-process maps can only answer for
+     * this replica's clients. See `channel-presence.ts`.
+     */
+    private presenceStore?: ChannelPresenceStore;
+
+    /** Sweeps roster rows left behind by instances that stopped heartbeating. */
+    private presenceSweepInterval?: ReturnType<typeof setInterval>;
+
+    /**
+     * Channels whose oversized ephemeral broadcasts have already been reported,
+     * so a hot channel logs the problem once rather than once per message.
+     */
+    private oversizedBroadcastWarned = new Set<string>();
+
     private presenceInterval?: ReturnType<typeof setInterval>;
     private static readonly PRESENCE_TIMEOUT_MS = 30000; // 30s
+    /** How often stale roster rows from other instances are reaped. */
+    private static readonly PRESENCE_SWEEP_INTERVAL_MS = 10000; // 10s
     private dataService: DataService;
     // Enhanced subscriptions storage with full request parameters
     private _subscriptions = new Map<string, {
@@ -307,15 +339,19 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         for (const [channel, members] of this.channels.entries()) {
             if (members.has(clientId)) {
                 members.delete(clientId);
-                this.removePresence(clientId, channel);
+                this.removePresence(clientId, channel, { skipStore: true });
                 if (members.size === 0) this.channels.delete(channel);
             }
         }
 
         // Remove from all presence channels
         for (const [channel] of this.presence) {
-            this.removePresence(clientId, channel);
+            this.removePresence(clientId, channel, { skipStore: true });
         }
+
+        // One statement for every channel the client was in, rather than one
+        // per channel above — a disconnect is the common case, not a rare one.
+        void this.presenceStoreOp(() => this.presenceStore!.removeClient(clientId), "client removal");
     }
 
     private async handleMessage(clientId: string, message: WebSocketMessage, authContext?: SubscriptionAuthContext) {
@@ -1098,6 +1134,11 @@ roles: activeAuth.roles },
         const retention = this.channelHistory?.retentionFor(channel);
         if (!retention) {
             this.fanOutBroadcast(clientId, channel, event, payload);
+            // Other instances get the same frame, but never before the clients
+            // on this one: the local fan-out above is synchronous and the
+            // publish is not, which is also what keeps the ephemeral path free
+            // of any await for a single-instance deployment.
+            this.publishBroadcast(clientId, channel, event, payload);
             return;
         }
 
@@ -1147,6 +1188,7 @@ roles: activeAuth.roles },
         }
 
         this.fanOutBroadcast(clientId, channel, event, payload, seq);
+        this.publishBroadcast(clientId, channel, event, payload, seq);
 
         try {
             await this.channelHistory!.prune(channel, retention);
@@ -1177,6 +1219,186 @@ roles: activeAuth.roles },
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(message);
             }
+        }
+    }
+
+    // =============================================================================
+    // Cross-Instance Channel Bus
+    // =============================================================================
+
+    /**
+     * Install the transport that carries channel frames between instances.
+     *
+     * Called once at boot. A bus that cannot start is reported and replaced with
+     * the memory bus: losing cross-instance fan-out degrades collaboration to
+     * what it was before this existed, whereas refusing to boot takes the whole
+     * backend down for it.
+     */
+    async configureChannelBus(bus: ChannelBus): Promise<void> {
+        if (bus.kind === "memory") {
+            this.bus = bus;
+            return;
+        }
+
+        try {
+            await bus.start((frame) => this.handleBusFrame(frame));
+        } catch (error) {
+            logger.warn(
+                `⚠️ [ChannelBus] Could not start the "${bus.kind}" channel bus — channel broadcast and presence ` +
+                "stay per-instance. Clients served by different replicas will not see each other.",
+                { error }
+            );
+            await bus.stop().catch(() => { /* best effort */ });
+            this.bus = new MemoryChannelBus();
+            return;
+        }
+
+        this.bus = bus;
+
+        // Presence needs shared *state*, not just shared fan-out — see
+        // `channel-presence.ts`. It comes up with the bus and only with it.
+        try {
+            const store = new ChannelPresenceStore(this.db, this.instanceId);
+            await store.ensureTables();
+            this.presenceStore = store;
+            this.ensurePresenceSweep();
+        } catch (error) {
+            logger.warn(
+                "⚠️ [ChannelBus] Could not create the shared presence table — presence rosters will only list " +
+                "clients connected to this instance (broadcast is unaffected).",
+                { error }
+            );
+            this.presenceStore = undefined;
+        }
+
+        logger.info(
+            `📡 [ChannelBus] Cross-instance channels active via ${bus.kind} (instanceId: ${this.instanceId}).`
+        );
+    }
+
+    /** Which transport is in use — `"memory"` means per-instance only. */
+    public getChannelBusKind(): ChannelBus["kind"] {
+        return this.bus.kind;
+    }
+
+    /**
+     * Send a broadcast to the other instances.
+     *
+     * Fire-and-forget by design: the clients on this instance have already been
+     * served, and a bus that is briefly unreachable must not turn a broadcast
+     * into an error for the sender.
+     */
+    private publishBroadcast(clientId: string, channel: string, event: string, payload: unknown, seq?: number): void {
+        if (this.bus.kind === "memory") return;
+
+        const frame: ChannelBusFrame = {
+            kind: "broadcast",
+            sid: this.instanceId,
+            channel,
+            event,
+            from: clientId,
+            ...(seq !== undefined ? { seq } : {}),
+            payload
+        };
+
+        // Postgres caps a NOTIFY payload at 8 KB. A retained message is already
+        // durable and addressable, so it travels as a pointer and each receiver
+        // reads the body back — the same shape as the entity path, which
+        // notifies an address and refetches the row.
+        if (frameByteLength(frame) > this.bus.maxFrameBytes) {
+            if (seq === undefined) {
+                this.reportOversizedBroadcast(clientId, channel);
+                return;
+            }
+            void this.publishFrame({
+                kind: "broadcast_ref",
+                sid: this.instanceId,
+                channel,
+                from: clientId,
+                seq
+            });
+            return;
+        }
+
+        void this.publishFrame(frame);
+    }
+
+    private async publishFrame(frame: ChannelBusFrame): Promise<void> {
+        try {
+            await this.bus.publish(frame);
+        } catch (error) {
+            logger.error("❌ [ChannelBus] Failed to publish frame — other instances did not receive it", {
+                detail: `${frame.kind} on "${frame.channel}"`,
+                error
+            });
+        }
+    }
+
+    /**
+     * Tell the sender that a message was delivered locally but nowhere else.
+     *
+     * Staying quiet here would be the worst option available: on one instance
+     * the app works, on two it works for half the users, and nothing in the
+     * logs connects the two. The fix is a one-liner in config — give the
+     * channel a retention rule and the message travels as a pointer instead —
+     * so the message says exactly that.
+     */
+    private reportOversizedBroadcast(clientId: string, channel: string): void {
+        const remedy =
+            `Add a retention rule for "${channel}" (realtime.channels) — retained messages travel by reference ` +
+            "and have no size limit.";
+
+        if (!this.oversizedBroadcastWarned.has(channel)) {
+            this.oversizedBroadcastWarned.add(channel);
+            logger.warn(
+                `⚠️ [ChannelBus] A broadcast on ephemeral channel "${channel}" exceeds the ` +
+                `${this.bus.maxFrameBytes}-byte limit of the ${this.bus.kind} bus and reached only this instance. ` +
+                remedy
+            );
+        }
+        this.sendError(
+            clientId,
+            `Broadcast on "${channel}" was too large to reach other instances. ${remedy}`,
+            undefined,
+            "CHANNEL_BUS_PAYLOAD_TOO_LARGE"
+        );
+    }
+
+    /**
+     * Deliver a frame published by another instance to this one's clients.
+     *
+     * Frames we published ourselves are dropped on arrival — the local fan-out
+     * happened before the publish — exactly as the entity-change handler skips
+     * its own `sid`.
+     */
+    private async handleBusFrame(frame: ChannelBusFrame): Promise<void> {
+        if (frame.sid === this.instanceId) return;
+
+        switch (frame.kind) {
+            case "broadcast":
+                this.fanOutBroadcast(frame.from ?? "", frame.channel, frame.event, frame.payload, frame.seq);
+                return;
+
+            case "broadcast_ref": {
+                // Nothing to read back for: skip the query rather than pay for
+                // a message no client here is waiting for.
+                if (!this.channels.get(frame.channel)?.size) return;
+
+                const entry = await this.channelHistory?.getBySeq(frame.channel, frame.seq);
+                if (!entry) {
+                    logger.warn(
+                        `⚠️ [ChannelBus] Message ${frame.seq} on "${frame.channel}" is no longer retained — ` +
+                        "clients on this instance will need to replay (channel_history) to catch up."
+                    );
+                    return;
+                }
+                this.fanOutBroadcast(frame.from ?? "", frame.channel, entry.event, entry.payload, entry.seq);
+                return;
+            }
+
+            case "presence_diff":
+                this.deliverPresenceDiff(frame.channel, frame.joins, frame.leaves);
+                return;
         }
     }
 
@@ -1257,32 +1479,59 @@ roles: activeAuth.roles },
     // Presence
     // =============================================================================
 
-    /** Track presence in a channel */
+    /**
+     * Track presence in a channel.
+     *
+     * The client re-sends this every ~20s as a heartbeat against the 30s
+     * timeout, so most calls carry the state that is already recorded. Those
+     * refresh `last_seen` and stop there: re-announcing an unchanged state to
+     * every instance would put a bus message per client per heartbeat on the
+     * wire to tell everyone nothing happened.
+     */
     trackPresence(clientId: string, channel: string, state: Record<string, unknown>): void {
         if (!this.presence.has(channel)) {
             this.presence.set(channel, new Map());
         }
 
         const channelPresence = this.presence.get(channel)!;
+        const previous = channelPresence.get(clientId);
+        const changed = !previous || JSON.stringify(previous.state) !== JSON.stringify(state);
         channelPresence.set(clientId, { state,
 lastSeen: Date.now() });
 
+        // Refresh the shared roster on every heartbeat — that timestamp is what
+        // tells other instances this client is still here.
+        void this.presenceStoreOp(() => this.presenceStore!.track(channel, clientId, state), "track");
+
         // Broadcast join / state update to channel
-        this.broadcastPresenceDiff(channel, { [clientId]: state }, {});
+        this.deliverPresenceDiff(channel, { [clientId]: state }, {});
+        if (changed) {
+            this.publishPresenceDiff(channel, { [clientId]: state }, {});
+        }
 
         // Start cleanup interval if not running
         this.ensurePresenceCleanup();
     }
 
-    /** Remove presence from a channel */
-    removePresence(clientId: string, channel: string): void {
+    /**
+     * Remove presence from a channel.
+     *
+     * `skipStore` is for the socket-close path, which clears every channel at
+     * once and then deletes the client's rows in a single statement instead of
+     * one per channel.
+     */
+    removePresence(clientId: string, channel: string, options?: { skipStore?: boolean }): void {
         const channelPresence = this.presence.get(channel);
         if (!channelPresence) return;
 
         const entry = channelPresence.get(clientId);
         if (entry) {
             channelPresence.delete(clientId);
-            this.broadcastPresenceDiff(channel, {}, { [clientId]: entry.state });
+            this.deliverPresenceDiff(channel, {}, { [clientId]: entry.state });
+            this.publishPresenceDiff(channel, {}, { [clientId]: entry.state });
+            if (!options?.skipStore) {
+                void this.presenceStoreOp(() => this.presenceStore!.remove(channel, clientId), "remove");
+            }
         }
 
         if (channelPresence.size === 0) {
@@ -1290,17 +1539,50 @@ lastSeen: Date.now() });
         }
     }
 
-    /** Send full presence state to a specific client */
+    /**
+     * Send the full roster for a channel to one client.
+     *
+     * Answered from the shared table when there is one, because "who is in this
+     * document?" has a single answer that must not depend on which replica the
+     * asker happens to be connected to. Without a bus there is nothing to share
+     * and the local map *is* the roster — that path stays synchronous, which is
+     * what it always was.
+     */
     sendPresenceState(clientId: string, channel: string): void {
+        if (!this.presenceStore) {
+            this.sendPresenceStateMessage(clientId, channel, this.localPresences(channel));
+            return;
+        }
+
+        void this.presenceStore.roster(channel)
+            .then((presences) => {
+                this.sendPresenceStateMessage(clientId, channel, presences);
+            })
+            .catch((error) => {
+                // A roster the asker can act on beats none: fall back to the
+                // clients we can see rather than leaving the request unanswered.
+                logger.warn(`⚠️ [Presence] Could not read the shared roster for "${channel}" — answering with this instance's clients only.`, { error });
+                this.sendPresenceStateMessage(clientId, channel, this.localPresences(channel));
+            });
+    }
+
+    /** Presence of the clients connected to this instance. */
+    private localPresences(channel: string): Record<string, Record<string, unknown>> {
         const channelPresence = this.presence.get(channel);
         const presences: Record<string, Record<string, unknown>> = {};
-
         if (channelPresence) {
             for (const [id, { state }] of channelPresence) {
                 presences[id] = state;
             }
         }
+        return presences;
+    }
 
+    private sendPresenceStateMessage(
+        clientId: string,
+        channel: string,
+        presences: Record<string, Record<string, unknown>>
+    ): void {
         const ws = this.clients.get(clientId);
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
@@ -1311,8 +1593,8 @@ lastSeen: Date.now() });
         }
     }
 
-    /** Broadcast presence diff (joins/leaves) to channel */
-    private broadcastPresenceDiff(
+    /** Deliver a presence diff to this instance's members of the channel. */
+    private deliverPresenceDiff(
         channel: string,
         joins: Record<string, Record<string, unknown>>,
         leaves: Record<string, Record<string, unknown>>
@@ -1335,6 +1617,26 @@ lastSeen: Date.now() });
         }
     }
 
+    /** Tell the other instances about a presence change. */
+    private publishPresenceDiff(
+        channel: string,
+        joins: Record<string, Record<string, unknown>>,
+        leaves: Record<string, Record<string, unknown>>
+    ): void {
+        if (this.bus.kind === "memory") return;
+        void this.publishFrame({ kind: "presence_diff", sid: this.instanceId, channel, joins, leaves });
+    }
+
+    /** Run a roster write when there is a roster, and never let it throw. */
+    private async presenceStoreOp(op: () => Promise<void>, label: string): Promise<void> {
+        if (!this.presenceStore) return;
+        try {
+            await op();
+        } catch (error) {
+            logger.warn(`⚠️ [Presence] Shared roster ${label} failed`, { error });
+        }
+    }
+
     /** Periodic cleanup for stale presences */
     private ensurePresenceCleanup(): void {
         if (this.presenceInterval) return;
@@ -1353,6 +1655,43 @@ lastSeen: Date.now() });
                 this.presenceInterval = undefined;
             }
         }, 10000); // Check every 10s
+    }
+
+    /**
+     * Reap roster rows whose owning instance stopped heartbeating.
+     *
+     * This is the cross-instance half of the sweep above, and it doubles as
+     * crash recovery: a pod that dies takes its clients with it but leaves
+     * their rows behind, and after one TTL window they look exactly like any
+     * other client that went quiet. The delete returns what it removed, so
+     * whichever instance wins the race is the one that announces the
+     * departures — once for the cluster, not once per replica.
+     */
+    private ensurePresenceSweep(): void {
+        if (this.presenceSweepInterval || !this.presenceStore) return;
+
+        this.presenceSweepInterval = setInterval(
+            () => void this.sweepStalePresence(),
+            RealtimeService.PRESENCE_SWEEP_INTERVAL_MS
+        );
+
+        // Never hold the process open for housekeeping.
+        (this.presenceSweepInterval as unknown as { unref?: () => void }).unref?.();
+    }
+
+    /** One pass of the stale-roster sweep. See {@link ensurePresenceSweep}. */
+    private async sweepStalePresence(): Promise<void> {
+        if (!this.presenceStore) return;
+        try {
+            const removed = await this.presenceStore.sweepStale(RealtimeService.PRESENCE_TIMEOUT_MS);
+            for (const row of removed) {
+                this.debugLog(`👻 [Presence] Reaped stale presence ${row.clientId} on "${row.channel}"`);
+                this.deliverPresenceDiff(row.channel, {}, { [row.clientId]: row.state });
+                this.publishPresenceDiff(row.channel, {}, { [row.clientId]: row.state });
+            }
+        } catch (error) {
+            logger.warn("⚠️ [Presence] Stale-roster sweep failed", { error });
+        }
     }
 
     // =============================================================================
@@ -1393,10 +1732,30 @@ lastSeen: Date.now() });
             clearInterval(this.presenceInterval);
             this.presenceInterval = undefined;
         }
+        if (this.presenceSweepInterval) {
+            clearInterval(this.presenceSweepInterval);
+            this.presenceSweepInterval = undefined;
+        }
+        this.oversizedBroadcastWarned.clear();
+
+        // Drop this instance's roster rows now rather than leaving every other
+        // replica to wait out a TTL window on ghosts — a rolling deploy would
+        // otherwise show 30s of departed users on every restart.
+        if (this.presenceStore) {
+            try {
+                await this.presenceStore.removeInstance();
+            } catch (error) {
+                logger.warn("⚠️ [Presence] Could not clear this instance's roster rows on shutdown", { error });
+            }
+            this.presenceStore = undefined;
+        }
 
         // 4. Disconnect the dedicated LISTEN client(s)
         await this.stopListening();
         await this.stopCdc();
+        await this.bus.stop().catch((error) =>
+            logger.warn("⚠️ [ChannelBus] Error while stopping the channel bus", { error }));
+        this.bus = new MemoryChannelBus();
 
         // 5. Drop client references (don't close — server.close drains them)
         this.clients.clear();

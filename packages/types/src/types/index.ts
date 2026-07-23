@@ -16,6 +16,7 @@ export * from "./modify_collections";
 export * from "./formex";
 export * from "./websockets";
 export * from "./backend";
+export * from "./channel_bus";
 export * from "./translations";
 export * from "./plugins";
 export * from "./builders";

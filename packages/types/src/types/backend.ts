@@ -1,6 +1,7 @@
 import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
 import type { AuthAdapter } from "./auth_adapter";
 import type { HistoryConfig } from "../controllers/client";
+import type { ChannelBusSetting } from "./channel_bus";
 
 // =============================================================================
 // DATABASE CONNECTION INTERFACES
@@ -272,13 +273,23 @@ export interface ChannelRetentionRule {
     ttl?: number | string;
 }
 
-/** Server-side realtime options. */
+/**
+ * Server-side realtime options.
+ *
+ * The channel bus contract and its config live in `./channel_bus` so that a
+ * transport shipped as its own package depends on the contract alone.
+ */
 export interface RealtimeChannelsConfig {
     /**
      * Retention rules, most specific first — the first match wins. Omitted or
      * empty means no channel retains anything.
      */
     channels?: ChannelRetentionRule[];
+    /**
+     * How channel broadcast and presence reach other backend instances.
+     * Defaults to `{ type: "memory" }` — i.e. they don't.
+     */
+    bus?: ChannelBusSetting;
 }
 
 /**

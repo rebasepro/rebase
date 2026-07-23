@@ -291,6 +291,41 @@ export class ChannelHistoryStore {
     }
 
     /**
+     * One retained message by its address.
+     *
+     * This is what makes the cross-instance pointer path work: a broadcast too
+     * large to travel inside a `pg_notify` payload is already stored here, so
+     * the notification carries `(channel, seq)` and each receiving instance
+     * reads the body back. Returns null when the message has since been pruned
+     * — a receiver that is that far behind has nothing useful to deliver, and
+     * the client's own `channel_history` replay is the repair path.
+     */
+    async getBySeq(channel: string, seq: number): Promise<ChannelHistoryEntry | null> {
+        const result = await this.db.execute(sql`
+            SELECT seq, event, payload, sender_id, created_at
+            FROM rebase.channel_messages
+            WHERE channel = ${channel} AND seq = ${seq}
+        `);
+
+        const row = result.rows[0] as {
+            seq: string | number;
+            event: string;
+            payload: unknown;
+            sender_id: string | null;
+            created_at: Date | string;
+        } | undefined;
+        if (!row) return null;
+
+        return {
+            seq: Number(row.seq),
+            event: row.event,
+            payload: row.payload,
+            senderId: row.sender_id ?? undefined,
+            at: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at)
+        };
+    }
+
+    /**
      * Enforce a channel's retention bounds.
      *
      * Throttled per channel, so a burst of operations prunes once rather than
