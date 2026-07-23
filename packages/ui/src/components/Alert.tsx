@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cls } from "../util";
+import { AlertCircleIcon, AlertTriangleIcon, CheckCircleIcon, InfoIcon, XIcon } from "../icons";
 
 export interface AlertProps {
     children: React.ReactNode;
@@ -15,27 +16,61 @@ export interface AlertProps {
 const getSizeClasses = (size: "small" | "medium" | "large") => {
     switch (size) {
         case "small":
-            return "px-4 py-1";
+            return "px-3 py-1.5 text-xs gap-2 rounded-md";
         case "large":
-            return "px-4 py-4";
+            return "px-4 py-3.5 text-sm gap-3 rounded-lg";
         case "medium":
         default:
-            return "px-4 py-2";
+            return "px-3.5 py-2.5 text-sm gap-2.5 rounded-lg";
     }
 }
+
+const getIconSize = (size: "small" | "medium" | "large") => size === "small" ? 16 : 18;
+
 const getColorClasses = (severity: string) => {
     switch (severity) {
         case "error":
-            return "bg-red-50 dark:bg-red-800 dark:text-red-100 text-red-900 border-l-[3px] border-l-red-500";
+            return "bg-red-500/8 dark:bg-red-500/12 text-red-800 dark:text-red-200 border border-red-500/20 dark:border-red-500/25";
         case "warning":
-            return "bg-amber-50 dark:bg-amber-800 dark:text-amber-100 text-amber-900 border-l-[3px] border-l-amber-500";
+            return "bg-amber-500/8 dark:bg-amber-500/12 text-amber-800 dark:text-amber-200 border border-amber-500/20 dark:border-amber-500/25";
         case "info":
-            return "bg-blue-100 dark:bg-blue-800 dark:text-blue-100 text-blue-900 border-l-[3px] border-l-blue-500";
+            return "bg-blue-500/8 dark:bg-blue-500/12 text-blue-800 dark:text-blue-200 border border-blue-500/20 dark:border-blue-500/25";
         case "success":
-            return "bg-emerald-50 dark:bg-emerald-800 dark:text-emerald-100 text-emerald-900 border-l-[3px] border-l-emerald-500";
+            return "bg-emerald-500/8 dark:bg-emerald-500/12 text-emerald-800 dark:text-emerald-200 border border-emerald-500/20 dark:border-emerald-500/25";
         case "base":
         default:
-            return "bg-surface-accent-50 dark:bg-surface-accent-800 dark:text-white text-surface-accent-900 border-l-[3px] border-l-surface-accent-400";
+            return "bg-surface-accent-500/8 dark:bg-surface-accent-400/10 text-surface-accent-800 dark:text-surface-accent-100 border border-surface-accent-500/15 dark:border-surface-accent-400/20";
+    }
+};
+
+const getIconColor = (severity: string) => {
+    switch (severity) {
+        case "error":
+            return "text-red-500 dark:text-red-400";
+        case "warning":
+            return "text-amber-500 dark:text-amber-400";
+        case "info":
+            return "text-blue-500 dark:text-blue-400";
+        case "success":
+            return "text-emerald-500 dark:text-emerald-400";
+        case "base":
+        default:
+            return "text-surface-accent-500 dark:text-surface-accent-400";
+    }
+};
+
+const getIcon = (severity: string, size: number, className: string) => {
+    switch (severity) {
+        case "error":
+            return <AlertCircleIcon size={size} className={className}/>;
+        case "warning":
+            return <AlertTriangleIcon size={size} className={className}/>;
+        case "success":
+            return <CheckCircleIcon size={size} className={className}/>;
+        case "info":
+        case "base":
+        default:
+            return <InfoIcon size={size} className={className}/>;
     }
 };
 
@@ -50,6 +85,7 @@ export const Alert: React.FC<AlertProps> = ({
                                                 style
                                             }) => {
     const classes = getColorClasses(color);
+    const iconSize = getIconSize(size);
 
     return (
         <div
@@ -57,19 +93,26 @@ export const Alert: React.FC<AlertProps> = ({
             className={cls(
                 getSizeClasses(size),
                 "w-full",
-                "font-medium",
-                "rounded-lg flex items-center gap-2",
+                "font-medium leading-snug",
+                "flex items-start",
                 classes,
                 outerClassName)}>
-            <div className={cls("grow", className)}>{children}</div>
+            <span className={cls("shrink-0 mt-px", getIconColor(color))}>
+                {getIcon(color, iconSize, "")}
+            </span>
+            <div className={cls("grow min-w-0 self-center", className)}>{children}</div>
+            {action}
             {onDismiss && (
                 <button
-                    className="text-surface-accent-400 hover:text-surface-accent-600 dark:text-surface-accent-500 dark:hover:text-surface-accent-400"
+                    type="button"
+                    aria-label="Dismiss"
+                    className={cls(
+                        "shrink-0 rounded p-0.5 opacity-60 transition-opacity hover:opacity-100",
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-current/40")}
                     onClick={onDismiss}>
-                    &times;
+                    <XIcon size={iconSize - 2}/>
                 </button>
             )}
-            {action}
         </div>
     );
 };
