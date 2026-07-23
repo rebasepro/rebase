@@ -8,6 +8,7 @@ export * from "./resolutions";
 export * from "./policy";
 export * from "./permissions";
 export * from "./references";
+export * from "./title-property";
 export * from "./navigation_from_path";
 export * from "./parent_references_from_path";
 export * from "./builders";

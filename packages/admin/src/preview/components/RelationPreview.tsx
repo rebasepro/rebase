@@ -7,7 +7,7 @@ import { useCustomizationController, useFetch, ErrorView, useComponentOverride, 
 import { Skeleton } from "@rebasepro/ui";
 import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
-import { getEntityTitlePropertyKey } from "../../util/previews";
+import { getEntityTitlePropertyKeyForEntity } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 
 export type RelationPreviewProps = {
@@ -228,7 +228,7 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     }
 
     if (textOnly) {
-        const titleProperty = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
+        const titleProperty = getEntityTitlePropertyKeyForEntity(collection, usedEntity.values, usedEntity.id);
         const titleValue = titleProperty ? getValueInPath(usedEntity.values, titleProperty) : undefined;
         const displayValue = titleValue !== undefined && titleValue !== null ? String(titleValue) : String(relation.id);
         return <span className="truncate">{displayValue}</span>;

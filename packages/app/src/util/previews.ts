@@ -1,6 +1,6 @@
 import type { CollectionConfig, Property, PropertyConfig } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/types";
-import { isPropertyBuilder } from "@rebasepro/common";
+import { getTitlePropertyKey, isPropertyBuilder } from "@rebasepro/common";
 
 function isReferenceProperty(property: Property) {
     if (!property) return null;
@@ -94,32 +94,12 @@ export function getRelationIncludeParams(collection: CollectionConfig<any>): str
     return hasRelations ? INCLUDE_ALL_RELATIONS : undefined;
 }
 
+/**
+ * The property that fills the title slot for a collection. Ranking lives in
+ * `@rebasepro/common`, shared with the admin package so both agree on what an
+ * entity is called.
+ */
 export function getEntityTitlePropertyKey<M extends Record<string, any>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
-    if (collection.titleProperty) {
-        return collection.titleProperty as string;
-    }
-
-    const orderToSearch = (collection.propertiesOrder as string[]) || Object.keys(collection.properties);
-    let firstStringCandidate: string | undefined;
-
-    for (const key of orderToSearch) {
-        const property = collection.properties[key];
-        if (property && !isPropertyBuilder(property)) {
-            const prop = property as Property;
-            if (isHiddenProperty(prop)) {
-                continue;
-            }
-            if (prop.type === "string" && !prop.ui?.multiline && !prop.ui?.markdown && !prop.storage && !prop.isId) {
-                if (!firstStringCandidate) {
-                    firstStringCandidate = key;
-                }
-                const lowerKey = key.toLowerCase();
-                if (["name", "title", "label", "displayname", "username"].includes(lowerKey)) {
-                    return key; // Immediate return if it's a strong title candidate
-                }
-            }
-        }
-    }
-    return firstStringCandidate;
+    return getTitlePropertyKey(collection as CollectionConfig<Record<string, unknown>>);
 }
 

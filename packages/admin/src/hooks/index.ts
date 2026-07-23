@@ -2,6 +2,7 @@ export * from "./useSidePanel";
 export * from "./useSelectionDialog";
 export * from "./useBuildSidePanel";
 export * from "./useResolvedNavigationFrom";
+export * from "./useResolvedUsers";
 export * from "./useHistory";
 export * from "./navigation/contexts";
 export * from "./navigation/useBuildCollectionRegistryController";

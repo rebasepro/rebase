@@ -34,6 +34,9 @@ export interface AdminUsersRouteConfig {
     setBootstrapCompleted?: () => Promise<void>;
 }
 
+/** Upper bound for `GET /users?ids=…`, so one request can't fan out unbounded. */
+const MAX_USER_IDS_PER_LOOKUP = 100;
+
 export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const authRepo = config.authRepo;
@@ -153,6 +156,24 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
     });
 
     router.get("/users", requireAdmin, async (c) => {
+        // `?ids=a,b,c` resolves a known set of users in one round trip. The admin
+        // UI needs it to turn the ids stored in `userSelect` columns into names
+        // without firing one request per row.
+        const idsParam = c.req.query("ids");
+        if (idsParam !== undefined) {
+            const ids = [...new Set(idsParam.split(",").map(id => id.trim()).filter(Boolean))]
+                .slice(0, MAX_USER_IDS_PER_LOOKUP);
+            const resolved = await Promise.all(ids.map(async (id) => {
+                const result = await authRepo.getUserWithRoles(id);
+                return result ? toAdminUser(result.user, result.roles.map((r) => r.id)) : undefined;
+            }));
+            const users = resolved.filter((u): u is AdminUser => u !== undefined);
+            return c.json({ users,
+total: users.length,
+limit: ids.length,
+offset: 0 });
+        }
+
         const limitParam = c.req.query("limit");
         const offsetParam = c.req.query("offset");
         const search = c.req.query("search");
@@ -233,7 +254,8 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
         }
 
         const finalizeResult = await finalizeAdminUserCreation(
-            { id: user.id, values: prepResult.values },
+            { id: user.id,
+values: prepResult.values },
             prepResult.clearPassword,
             {
                 authRepo,

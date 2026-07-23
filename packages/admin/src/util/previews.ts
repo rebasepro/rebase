@@ -1,6 +1,6 @@
 import type { CollectionConfig, Property, PropertyConfig } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/types";
-import { isPropertyBuilder } from "@rebasepro/common";
+import { getTitlePropertyKey, getTitlePropertyKeyForValues, isPropertyBuilder } from "@rebasepro/common";
 import { isReferenceProperty, isRelationProperty } from "./property_utils";
 
 function isHiddenProperty(property: Property | undefined): boolean {
@@ -58,54 +58,43 @@ export function getEntityPreviewKeys(
     }
 }
 
+/**
+ * The property that fills the title slot for a collection.
+ *
+ * Ranking lives in `@rebasepro/common` so every surface (list rows, cards,
+ * board cards, detail header, relation chips) agrees on what an entity is
+ * called. Identifiers are excluded from the property *schema* — primary keys,
+ * foreign keys, UUID columns — not from the key name.
+ */
 export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
-    if (collection.titleProperty) {
-        return collection.titleProperty as string;
-    }
+    return getTitlePropertyKey(collection);
+}
 
-    const hasExplicitOrder = !!(collection.propertiesOrder as string[] | undefined);
-    const orderToSearch = (collection.propertiesOrder as string[]) || Object.keys(collection.properties);
+/**
+ * Same as {@link getEntityTitlePropertyKey}, but skips candidates that carry
+ * no readable value for this particular entity (empty, or an opaque id).
+ */
+export function getEntityTitlePropertyKeyForEntity<M extends Record<string, unknown>>(
+    collection: CollectionConfig<M>,
+    values: Record<string, unknown> | undefined,
+    entityId?: string | number
+): string | undefined {
+    return getTitlePropertyKeyForValues(collection, values, entityId);
+}
 
-    // If explicit propertiesOrder is set, allow the first non-ID relation or string to be the titleKey.
-    // Storage/image properties are excluded — they are rendered by the dedicated image slot,
-    // so using one here would duplicate the same image in both the image and title slots.
-    if (hasExplicitOrder) {
-        for (const key of orderToSearch) {
-            const property = collection.properties[key];
-            if (property && !isPropertyBuilder(property)) {
-                const prop = property as Property;
-                const isIdProp = prop && typeof prop === "object" && "isId" in prop && Boolean((prop as { isId?: boolean }).isId);
-                if (isIdProp || key === "id" || isHiddenProperty(prop)) {
-                    continue;
-                }
-                if (prop.type === "relation" || (prop.type === "string" && !isStorageProperty(prop))) {
-                    return key;
-                }
-            }
-        }
-    }
-
-    let firstStringCandidate: string | undefined;
-
-    for (const key of orderToSearch) {
-        const property = collection.properties[key];
-        if (property && !isPropertyBuilder(property)) {
-            const prop = property as Property;
-            if (isHiddenProperty(prop)) {
-                continue;
-            }
-            if (prop.type === "string" && !prop.ui?.multiline && !prop.ui?.markdown && !prop.storage && !prop.isId) {
-                if (!firstStringCandidate) {
-                    firstStringCandidate = key;
-                }
-                const lowerKey = key.toLowerCase();
-                if (["name", "title", "label", "displayname", "username"].includes(lowerKey)) {
-                    return key; // Immediate return if it's a strong title candidate
-                }
-            }
-        }
-    }
-    return firstStringCandidate;
+/**
+ * True when a property key points at a user picker, whose stored value is an
+ * auth user id that has to be resolved before it can be displayed.
+ */
+export function isUserSelectProperty<M extends Record<string, unknown>>(
+    collection: CollectionConfig<M>,
+    propertyKey: string | undefined
+): boolean {
+    if (!propertyKey) return false;
+    const property = collection.properties[propertyKey];
+    if (!property || isPropertyBuilder(property)) return false;
+    const prop = property as Property;
+    return prop.type === "string" && Boolean(prop.userSelect);
 }
 
 /**

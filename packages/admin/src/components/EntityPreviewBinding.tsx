@@ -25,7 +25,7 @@ import {
 import { useAnalyticsController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { getPropertyInPath } from "../util/property_utils";
-import { getEntityPreviewKeys, getEntityTitlePropertyKey } from "../util/previews";
+import { getEntityPreviewKeys, getEntityTitlePropertyKeyForEntity } from "../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";
@@ -98,7 +98,7 @@ export function EntityPreviewBindingData({
         );
     }
 
-    const titleProperty = includeTitle ? getEntityTitlePropertyKey(collection, customizationController.propertyConfigs) : undefined;
+    const titleProperty = includeTitle ? getEntityTitlePropertyKeyForEntity(collection, entity.values, entity.id) : undefined;
     const imagePropertyKey = includeImage ? getEntityImagePreviewPropertyKey(collection) : undefined;
     const imageProperty = imagePropertyKey ? collection.properties[imagePropertyKey] : undefined;
     const ofProp = imageProperty && "of" in imageProperty ? imageProperty.of : undefined;

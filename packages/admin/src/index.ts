@@ -89,7 +89,8 @@ export {
     getDefaultPropertiesOrder,
     // Preview utilities (moved from @rebasepro/app — property-aware logic belongs in CMS)
     getEntityPreviewKeys,
-    getEntityTitlePropertyKey
+    getEntityTitlePropertyKey,
+    getEntityTitlePropertyKeyForEntity
 } from "./util";
 
 // Headless collection view adapters

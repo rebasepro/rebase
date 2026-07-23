@@ -26,7 +26,8 @@ import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
 
-import { getEntityTitlePropertyKey, resolveTitleToString } from "../util/previews";
+import { getEntityTitlePropertyKeyForEntity, isUserSelectProperty, resolveTitleToString } from "../util/previews";
+import { getUserLabel, useResolvedUser } from "../hooks/useResolvedUsers";
 import { getValueInPath, mergeDeep } from "@rebasepro/utils";
 import {
     getChanges,
@@ -313,11 +314,17 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const actionsDisabled = disabled || formex.isSubmitting || (status === "existing" && !formex.dirty) || Boolean(disabledProp);
 
-    const titlePropertyKey = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
+    const titlePropertyKey = getEntityTitlePropertyKeyForEntity(collection, formex.values as Record<string, unknown> | undefined, entityId);
     const rawTitle = formex.values && titlePropertyKey ? getValueInPath(formex.values, titlePropertyKey) : undefined;
-    const title = rawTitle !== undefined && rawTitle !== null
-        ? resolveTitleToString(rawTitle)
-        : (collection.singularName ?? collection.name);
+    // A user picker stores an id: resolve it to the person, like a relation.
+    const titleUser = useResolvedUser(isUserSelectProperty(collection, titlePropertyKey) && typeof rawTitle === "string"
+        ? rawTitle
+        : undefined);
+    const title = titleUser
+        ? getUserLabel(titleUser)
+        : (rawTitle !== undefined && rawTitle !== null
+            ? resolveTitleToString(rawTitle)
+            : (collection.singularName ?? collection.name));
 
     const modified = formex.dirty;
 

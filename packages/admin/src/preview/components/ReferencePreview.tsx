@@ -9,7 +9,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/app";
 import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
-import { getEntityTitlePropertyKey } from "../../util/previews";
+import { getEntityTitlePropertyKeyForEntity } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 
 export type ReferencePreviewProps = {
@@ -196,7 +196,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     }
 
     if (textOnly) {
-        const titleProperty = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
+        const titleProperty = getEntityTitlePropertyKeyForEntity(collection, usedEntity.values, usedEntity.id);
         const titleValue = titleProperty ? getValueInPath(usedEntity.values, titleProperty) : undefined;
         const displayValue = titleValue !== undefined && titleValue !== null ? String(titleValue) : String(reference.id);
         return <span className="truncate">{displayValue}</span>;

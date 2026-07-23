@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import type { CollectionConfig, Property, RelationProperty } from "@rebasepro/types";
 import type { Entity, PropertyConfig, EntityRelation } from "@rebasepro/types";
-import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
+import { getEntityImagePreviewPropertyKey, getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/common";
 import { getEntityFromCache } from "@rebasepro/app";
-import { getEntityTitlePropertyKey, getEntityPreviewKeys } from "../../util/previews";
+import { getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 import type { AuthController } from "@rebasepro/types";
 import { ChipColorScheme, CHIP_COLORS } from "@rebasepro/ui";
@@ -90,6 +90,8 @@ export interface EntityPreviewSlots {
  */
 export interface CollectionSlotKeys {
     titleKey: string | undefined;
+    /** Every property that could act as the title, best first (see `getTitlePropertyCandidates`) */
+    titleKeyCandidates: string[];
     imageKey: string | undefined;
     subtitleKey: string | undefined;
     relationKeys: string[];
@@ -106,7 +108,8 @@ export function resolveCollectionSlotKeys(
     authController: AuthController,
     propertyConfigs: Record<string, PropertyConfig>
 ): CollectionSlotKeys {
-    const titleKey = getEntityTitlePropertyKey(collection, propertyConfigs);
+    const titleKeyCandidates = getTitlePropertyCandidates(collection);
+    const titleKey = titleKeyCandidates[0];
     const imageKey = getEntityImagePreviewPropertyKey(collection);
 
     // Status: first string-enum that isn't the title
@@ -201,6 +204,7 @@ export function resolveCollectionSlotKeys(
     const subtitleKey = sortedPreviewKeys.length > 0 ? sortedPreviewKeys[0] : undefined;
 
     return { titleKey,
+titleKeyCandidates,
 imageKey,
 subtitleKey,
 relationKeys,
@@ -240,6 +244,30 @@ function resolveImageSlot(
         propertyKey: imageKey,
         value: resolvedValue
     };
+}
+
+// ── Title resolution (entity-level) ───────────────────────────────────
+
+/**
+ * Walk the collection's ranked title candidates and return the first one that
+ * holds something a person can read for this entity. Candidates are already
+ * ordered and free of identifier properties; this only rejects values —
+ * empties, and strings that turn out to be an id at runtime.
+ */
+function resolveEntityTitleKey(
+    entity: Entity<Record<string, unknown>>,
+    candidates: string[]
+): string | undefined {
+    for (const key of candidates) {
+        const value = getValueInPath(entity.values, key);
+        if (value === undefined || value === null || value === "") continue;
+        if (typeof value === "string") {
+            if (looksLikeIdentifierValue(value)) continue;
+            if (value === String(entity.id)) continue;
+        }
+        return key;
+    }
+    return candidates[0];
 }
 
 // ── Date formatting ───────────────────────────────────────────────────
@@ -299,24 +327,27 @@ export function resolveEntitySlots(
     collection: CollectionConfig<Record<string, unknown>>,
     slotKeys: CollectionSlotKeys
 ): EntityPreviewSlots {
-    const { titleKey, imageKey, subtitleKey, relationKeys, statusKey, dateKey } = slotKeys;
+    const { titleKey, titleKeyCandidates, imageKey, subtitleKey, relationKeys, statusKey, dateKey } = slotKeys;
 
     // Image
     const image = imageKey ? resolveImageSlot(collection, imageKey, entity) : undefined;
 
-    // Title
+    // Title — the best-ranked candidate that carries a readable value for THIS
+    // entity, so a row whose name is empty (or whose column happens to hold a
+    // UUID) falls through to the next candidate instead of showing an id.
+    const resolvedTitleKey = resolveEntityTitleKey(entity, titleKeyCandidates ?? (titleKey ? [titleKey] : []));
     let title: PreviewSlot | undefined;
-    if (titleKey) {
-        const prop = collection.properties[titleKey] as Property | undefined;
-        const val = getValueInPath(entity.values, titleKey);
+    if (resolvedTitleKey) {
+        const prop = collection.properties[resolvedTitleKey] as Property | undefined;
+        const val = getValueInPath(entity.values, resolvedTitleKey);
         if (prop) title = { property: prop,
-propertyKey: titleKey,
+propertyKey: resolvedTitleKey,
 value: val };
     }
 
     // Subtitle
     let subtitle: PreviewSlot | undefined;
-    if (subtitleKey) {
+    if (subtitleKey && subtitleKey !== resolvedTitleKey) {
         const prop = collection.properties[subtitleKey] as Property | undefined;
         const val = getValueInPath(entity.values, subtitleKey);
         if (prop && val !== undefined && val !== null && val !== "") {

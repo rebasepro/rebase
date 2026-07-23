@@ -44,7 +44,8 @@ import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigate } from "react-router-dom";
 import { getValueInPath } from "@rebasepro/utils";
-import { getEntityTitlePropertyKey, resolveTitleToString } from "../util/previews";
+import { getEntityTitlePropertyKeyForEntity, isUserSelectProperty, resolveTitleToString } from "../util/previews";
+import { getUserLabel, useResolvedUser } from "../hooks/useResolvedUsers";
 import { JsonPreviewBinding } from "../components/JsonPreviewBinding";
 
 const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
@@ -267,11 +268,17 @@ entityId }
     const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<EntityCustomViewParams>(formViewConfig.Builder as ComponentRef<EntityCustomViewParams>) : null;
 
     // Title resolution
-    const titlePropertyKey = getEntityTitlePropertyKey(collection, customizationController.propertyConfigs);
+    const titlePropertyKey = getEntityTitlePropertyKeyForEntity(collection, usedEntity?.values, usedEntity?.id);
     const rawTitle = usedEntity?.values && titlePropertyKey ? getValueInPath(usedEntity.values, titlePropertyKey) : undefined;
-    const title = rawTitle !== undefined && rawTitle !== null
-        ? resolveTitleToString(rawTitle)
-        : (collection.singularName ?? collection.name);
+    // A user picker stores an id: resolve it to the person, like a relation.
+    const titleUser = useResolvedUser(isUserSelectProperty(collection, titlePropertyKey) && typeof rawTitle === "string"
+        ? rawTitle
+        : undefined);
+    const title = titleUser
+        ? getUserLabel(titleUser)
+        : (rawTitle !== undefined && rawTitle !== null
+            ? resolveTitleToString(rawTitle)
+            : (collection.singularName ?? collection.name));
 
     // Non-action custom views
     const nonActionCustomViews = useMemo(() =>

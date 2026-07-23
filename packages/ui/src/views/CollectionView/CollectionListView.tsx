@@ -12,6 +12,7 @@ import type {
     CollectionViewSize,
     CollectionSelectionController,
 } from "./CollectionViewTypes";
+import { resolveTitlePropertyKey } from "./resolveTitleProperty";
 
 import { getValueInPath } from "./utils";
 
@@ -64,16 +65,10 @@ export function CollectionListView<T extends Record<string, unknown> = Record<st
     );
 
     // ── Resolve title property ───────────────────────────────────────
-    const titlePropertyKey = useMemo(() => {
-        if (titleProperty) return titleProperty;
-        for (const key of order) {
-            const prop = properties[key];
-            if (prop && prop.type === "string" && !prop.hideFromCollection && !prop.storage) {
-                return key;
-            }
-        }
-        return idProperty;
-    }, [titleProperty, order, properties, idProperty]);
+    const titlePropertyKey = useMemo(
+        () => resolveTitlePropertyKey(order, properties, idProperty, titleProperty),
+        [titleProperty, order, properties, idProperty]
+    );
 
     // ── Subtitle properties (up to 2) ────────────────────────────────
     const subtitleProperties = useMemo(() => {
