@@ -4,7 +4,7 @@ import { Client as PgClient } from "pg";
 import { randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
-import { FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, CollectionConfig, RebaseCallContext } from "@rebasepro/types";
+import { FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, CollectionConfig, RebaseCallContext, resolveClientListLimit } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
@@ -391,6 +391,16 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 return;
             }
 
+            // Bound the client-supplied limit with the SAME guarantee the REST
+            // ingress applies (`resolveClientListLimit`): clamp to the hard max
+            // and default an absent limit by mode. A subscription is re-fetched
+            // on every matching write, so an unbounded one is a DoS amplified
+            // per write — resolve it once and reuse for the stored request and
+            // the initial fetch.
+            const boundedLimit = resolveClientListLimit(request.limit, {
+                vectorSearch: !!request.vectorSearch
+            });
+
             // Store subscription with full request parameters and auth context for RLS
             this._subscriptions.set(subscriptionId, {
                 clientId,
@@ -400,7 +410,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     filter: request.filter,
                     orderBy: request.orderBy,
                     order: request.order,
-                    limit: request.limit,
+                    limit: boundedLimit,
                     startAfter: request.startAfter as Record<string, unknown> | undefined,
                     databaseId: request.collection?.databaseId,
                     searchString: request.searchString
@@ -415,7 +425,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     filter: request.filter,
                     orderBy: request.orderBy,
                     order: request.order,
-                    limit: request.limit,
+                    limit: boundedLimit,
                     startAfter: request.startAfter as Record<string, unknown> | undefined,
                     searchString: request.searchString
                 },

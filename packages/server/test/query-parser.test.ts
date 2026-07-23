@@ -1,4 +1,4 @@
-import { mapOperator, parseQueryOptions } from "../src/api/rest/query-parser";
+import { mapOperator, parseQueryOptions, DEFAULT_LIST_LIMIT, DEFAULT_VECTOR_LIST_LIMIT, MAX_LIST_LIMIT } from "../src/api/rest/query-parser";
 import { deserializeFilter } from "@rebasepro/common";
 
 // ─────────────────────────────────────────────────────────────
@@ -52,15 +52,65 @@ limit: "10" });
         expect(result.offset).toBe(20); // (3-1) * 10
     });
 
-    it("uses default limit of 20 for page calculation when limit not set", () => {
+    it("uses the default limit for page calculation when limit not set", () => {
         const result = parseQueryOptions({ page: "2" });
-        expect(result.offset).toBe(20); // (2-1) * 20
+        expect(result.offset).toBe(DEFAULT_LIST_LIMIT); // (2-1) * DEFAULT_LIST_LIMIT
+        // The returned page size must match the offset stride so pages neither
+        // overlap nor gap.
+        expect(result.limit).toBe(DEFAULT_LIST_LIMIT);
     });
 
-    it("handles no pagination params", () => {
+    it("injects the default limit when none is provided (no unbounded reads)", () => {
         const result = parseQueryOptions({});
-        expect(result.limit).toBeUndefined();
+        expect(result.limit).toBe(DEFAULT_LIST_LIMIT);
         expect(result.offset).toBeUndefined();
+    });
+
+    it("clamps an over-large limit to the hard maximum", () => {
+        // The core DoS fix: `?limit=100000000` must never be honoured verbatim.
+        const result = parseQueryOptions({ limit: "100000000" });
+        expect(result.limit).toBe(MAX_LIST_LIMIT);
+    });
+
+    it("honours a limit at or below the maximum unchanged", () => {
+        expect(parseQueryOptions({ limit: "50" }).limit).toBe(50);
+        expect(parseQueryOptions({ limit: String(MAX_LIST_LIMIT) }).limit).toBe(MAX_LIST_LIMIT);
+    });
+
+    it("clamps zero and negative limits up to 1 (never an unlimited bypass)", () => {
+        expect(parseQueryOptions({ limit: "0" }).limit).toBe(1);
+        expect(parseQueryOptions({ limit: "-5" }).limit).toBe(1);
+    });
+
+    it("falls back to the default when the limit is non-numeric", () => {
+        expect(parseQueryOptions({ limit: "abc" }).limit).toBe(DEFAULT_LIST_LIMIT);
+        expect(parseQueryOptions({ limit: "" }).limit).toBe(DEFAULT_LIST_LIMIT);
+    });
+
+    it("respects caller-supplied default and max bounds", () => {
+        expect(parseQueryOptions({}, { defaultLimit: 25 }).limit).toBe(25);
+        expect(parseQueryOptions({ limit: "9999" }, { maxLimit: 200 }).limit).toBe(200);
+    });
+
+    it("defaults a vector search to the vector page size, not the list default", () => {
+        // A vector search must resolve to its own smaller default (10), never
+        // the plain-read default (50).
+        const result = parseQueryOptions({
+            vector_search: "embedding",
+            vector: "[0.1,0.2,0.3]"
+        });
+        expect(result.limit).toBe(DEFAULT_VECTOR_LIST_LIMIT);
+        expect(result.limit).not.toBe(DEFAULT_LIST_LIMIT);
+        expect(result.vectorSearch).toBeDefined();
+    });
+
+    it("still clamps an explicit over-large limit on a vector search", () => {
+        const result = parseQueryOptions({
+            vector_search: "embedding",
+            vector: "[0.1,0.2,0.3]",
+            limit: "100000000"
+        });
+        expect(result.limit).toBe(MAX_LIST_LIMIT);
     });
 });
 

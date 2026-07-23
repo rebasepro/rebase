@@ -1,5 +1,5 @@
 import type { LogicalCondition, VectorSearchParams } from "@rebasepro/types";
-import { toCanonicalOp } from "@rebasepro/types";
+import { toCanonicalOp, resolveClientListLimit, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { deserializeOrderBy, deserializeFilter, deserializeLogicalCondition } from "@rebasepro/common";
 import { QueryOptions } from "../types";
 
@@ -33,15 +33,36 @@ function parseLogicalGroup(type: "or" | "and", raw: unknown): LogicalCondition |
     return "type" in parsed ? parsed : undefined;
 }
 
+// Re-exported for callers/tests that reference the REST list bounds. The
+// numbers and clamp live in `@rebasepro/types` so the REST parser and the
+// WebSocket ingress enforce ONE shared guarantee. See `resolveClientListLimit`.
+export { DEFAULT_LIST_LIMIT, DEFAULT_VECTOR_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
+
+/**
+ * Overridable list-pagination bounds for {@link parseQueryOptions}. Without
+ * these, `GET /<collection>` with no `?limit` would buffer the ENTIRE table
+ * into a JS array + JSON response (a trivial OOM/DoS), and `?limit=100000000`
+ * would be honoured verbatim.
+ */
+export interface ListLimitOptions {
+    /**
+     * Page size used when the client sends no `?limit`. Applied to plain and
+     * text-search reads — a vector search falls back to its own default (10).
+     */
+    defaultLimit?: number;
+    /** Upper bound clamped onto any client-supplied `?limit`. */
+    maxLimit?: number;
+}
+
 /**
  * Parse query parameters into QueryOptions
  */
-export function parseQueryOptions(query: Record<string, unknown>): QueryOptions {
+export function parseQueryOptions(
+    query: Record<string, unknown>,
+    limits: ListLimitOptions = {}
+): QueryOptions {
     const options: QueryOptions = {};
-
-    // Pagination
-    const limitVal = getLastValue(query.limit);
-    if (limitVal) options.limit = parseInt(String(limitVal));
+    const rawLimit = getLastValue(query.limit) as number | string | null | undefined;
 
     const offsetVal = getLastValue(query.offset);
     if (offsetVal) options.offset = parseInt(String(offsetVal));
@@ -49,7 +70,13 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
     const pageVal = getLastValue(query.page);
     if (pageVal) {
         const page = parseInt(String(pageVal));
-        const limit = options.limit || 20;
+        // Page stride uses the same bounded page size the read will use, so
+        // pages neither overlap nor gap. (Vector search never paginates by
+        // page, so the plain/text default is correct here.)
+        const limit = resolveClientListLimit(rawLimit, {
+            defaultLimit: limits.defaultLimit,
+            maxLimit: limits.maxLimit
+        });
         options.offset = (page - 1) * limit;
     }
 
@@ -160,6 +187,17 @@ export function parseQueryOptions(query: Record<string, unknown>): QueryOptions 
 
         options.vectorSearch = vectorSearch;
     }
+
+    // Resolve the limit LAST — once we know whether this is a vector search —
+    // so a client-supplied limit is clamped to the hard max and an absent one
+    // falls back to the correct mode default (plain/text = defaultLimit, vector
+    // = 10). Without this a bare `GET /<collection>` would return the whole
+    // table. Shared with the WebSocket ingress via `resolveClientListLimit`.
+    options.limit = resolveClientListLimit(rawLimit, {
+        vectorSearch: !!options.vectorSearch,
+        defaultLimit: limits.defaultLimit,
+        maxLimit: limits.maxLimit
+    });
 
     return options;
 }

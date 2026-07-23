@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError, isRebaseApiError } from "../errors";
-import { parseQueryOptions } from "./query-parser";
+import { parseQueryOptions, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { assertKnownWriteFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
@@ -37,6 +37,7 @@ export class RestApiGenerator {
     private router: Hono<HonoEnv>;
     private driver: DataDriver;
     private maxBulkRows: number;
+    private listLimits: ListLimitOptions;
 
     private authAdapter?: AuthAdapter;
 
@@ -44,13 +45,27 @@ export class RestApiGenerator {
         collections: CollectionConfig[],
         driver: DataDriver,
         authAdapter?: AuthAdapter,
-        maxBulkRows: number = DEFAULT_MAX_BULK_ROWS
+        maxBulkRows: number = DEFAULT_MAX_BULK_ROWS,
+        listLimits: ListLimitOptions = {}
     ) {
         this.collections = collections;
         this.driver = driver;
         this.authAdapter = authAdapter;
         this.maxBulkRows = maxBulkRows;
+        this.listLimits = {
+            defaultLimit: listLimits.defaultLimit ?? DEFAULT_LIST_LIMIT,
+            maxLimit: listLimits.maxLimit ?? MAX_LIST_LIMIT
+        };
         this.router = new Hono<HonoEnv>();
+    }
+
+    /**
+     * Parse request query params into QueryOptions, applying this generator's
+     * list-pagination bounds (default page size + hard max limit) so no read
+     * path can be tricked into buffering an entire table into memory.
+     */
+    private parseQuery(queryDict: Record<string, unknown>): QueryOptions {
+        return parseQueryOptions(queryDict, this.listLimits);
     }
 
 
@@ -130,7 +145,7 @@ export class RestApiGenerator {
         this.router.get(`${basePath}/count`, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.queries();
-            const queryOptions = parseQueryOptions(queryDict);
+            const queryOptions = this.parseQuery(queryDict);
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
             const driver = this.getScopedDriver(c);
 
@@ -142,7 +157,7 @@ export class RestApiGenerator {
         this.router.get(basePath, async (c) => {
             this.enforceApiKeyPermission(c, collection.slug);
             const queryDict = c.req.queries();
-            const queryOptions = parseQueryOptions(queryDict);
+            const queryOptions = this.parseQuery(queryDict);
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
 
             const driver = this.getScopedDriver(c);
@@ -183,7 +198,7 @@ export class RestApiGenerator {
             this.enforceApiKeyPermission(c, collection.slug);
             const id = c.req.param("id");
             const queryDict = c.req.queries();
-            const queryOptions = parseQueryOptions(queryDict);
+            const queryOptions = this.parseQuery(queryDict);
             const driver = this.getScopedDriver(c);
             const fetchService = driver.restFetchService;
 
@@ -521,7 +536,7 @@ id };
             if (parsed.id === "count") {
                 // GET /parent/:parentId/child/count — count child entities
                 const queryDict = c.req.queries();
-                const queryOptions = parseQueryOptions(queryDict);
+                const queryOptions = this.parseQuery(queryDict);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
 
                 const total = driver.count ? await driver.count({
@@ -543,7 +558,7 @@ id };
             } else {
                 // GET /parent/:parentId/child — list entities
                 const queryDict = c.req.queries();
-                const queryOptions = parseQueryOptions(queryDict);
+                const queryOptions = this.parseQuery(queryDict);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
                 const entities = await driver.fetchCollection({
                     path: parsed.collectionPath,

@@ -40,6 +40,62 @@ export interface VectorSearchParams {
     threshold?: number;
 }
 
+// ── List pagination bounds ────────────────────────────────────────────────
+//
+// Client-driven list reads (REST `GET /<collection>` and the WebSocket
+// `subscribe_collection` message) accept a client-supplied `limit`. Without
+// bounds, an ABSENT limit streams the entire table into memory — a trivial
+// OOM/DoS — and `limit=100000000` (or `limit=0`, historically an unlimited
+// bypass) is honoured verbatim. `resolveClientListLimit` is the single shared
+// enforcement point so every untrusted ingress behaves identically. Trusted
+// server-side callers build fetch options directly and are intentionally NOT
+// bounded here (migrations, admin exports, and CDC refetches may need the full
+// set).
+
+/** Rows returned for a plain / text-search list read when the client sends no `limit`. */
+export const DEFAULT_LIST_LIMIT = 50;
+/** Rows returned for a vector-search list read when the client sends no `limit`. */
+export const DEFAULT_VECTOR_LIST_LIMIT = 10;
+/** Hard ceiling clamped onto any client-supplied `limit`, on every surface. */
+export const MAX_LIST_LIMIT = 1000;
+
+/** Overridable bounds for {@link resolveClientListLimit}. */
+export interface ListLimitBounds {
+    /** Default page size for plain and text-search reads. */
+    defaultLimit?: number;
+    /** Default page size for vector-search reads. */
+    vectorDefaultLimit?: number;
+    /** Upper bound clamped onto any client-supplied limit. */
+    maxLimit?: number;
+}
+
+/**
+ * Resolve a client-supplied list `limit` into a safe, always-defined value.
+ *
+ * - A provided limit is coerced to an integer and clamped to `[1, maxLimit]`,
+ *   so `0`, negatives, and absurd values can never bypass the cap.
+ * - An absent / blank / non-numeric limit falls back to the mode default:
+ *   `vectorDefaultLimit` for a vector search, otherwise `defaultLimit`.
+ *
+ * The return is never `undefined` — no ingress that routes its client limit
+ * through this can produce an unbounded read.
+ */
+export function resolveClientListLimit(
+    rawLimit: number | string | null | undefined,
+    opts: ListLimitBounds & { vectorSearch?: boolean } = {}
+): number {
+    const maxLimit = opts.maxLimit ?? MAX_LIST_LIMIT;
+    if (rawLimit != null && String(rawLimit).trim() !== "") {
+        const parsed = typeof rawLimit === "number" ? rawLimit : parseInt(String(rawLimit), 10);
+        if (Number.isFinite(parsed)) {
+            return Math.min(Math.max(1, Math.floor(parsed)), maxLimit);
+        }
+    }
+    return opts.vectorSearch
+        ? (opts.vectorDefaultLimit ?? DEFAULT_VECTOR_LIST_LIMIT)
+        : (opts.defaultLimit ?? DEFAULT_LIST_LIMIT);
+}
+
 /**
  * @internal
  */

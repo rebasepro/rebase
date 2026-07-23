@@ -1,7 +1,7 @@
 import { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 
 const mockFetchCollection = jest.fn().mockResolvedValue([{ id: 1,
 path: "posts",
@@ -108,6 +108,44 @@ subscriptionId: "sub-1" }
             expect(realtimeService.subscriptions.has("sub-1")).toBe(true);
             realtimeService.removeClient("client-1");
             expect(realtimeService.subscriptions.has("sub-1")).toBe(false);
+        });
+    });
+
+    describe("Subscription limit bounds", () => {
+        it("clamps an over-large client limit to the hard maximum on subscribe", async () => {
+            const ws = new MockWebSocket() as any;
+            realtimeService.addClient("client-1", ws);
+
+            await realtimeService.handleClientMessage("client-1", {
+                type: "subscribe_collection",
+                payload: { path: "posts", subscriptionId: "sub-1", limit: 100000000 }
+            });
+
+            // Initial fetch must go out with the clamped limit, never 100000000.
+            expect(mockFetchCollection).toHaveBeenCalledWith(
+                "posts",
+                expect.objectContaining({ limit: MAX_LIST_LIMIT })
+            );
+            // The stored subscription (reused for every refetch) is bounded too.
+            const stored = realtimeService.subscriptions.get("sub-1");
+            expect(stored.collectionRequest.limit).toBe(MAX_LIST_LIMIT);
+        });
+
+        it("defaults an absent client limit instead of fetching the whole table", async () => {
+            const ws = new MockWebSocket() as any;
+            realtimeService.addClient("client-1", ws);
+
+            await realtimeService.handleClientMessage("client-1", {
+                type: "subscribe_collection",
+                payload: { path: "posts", subscriptionId: "sub-1" }
+            });
+
+            expect(mockFetchCollection).toHaveBeenCalledWith(
+                "posts",
+                expect.objectContaining({ limit: DEFAULT_LIST_LIMIT })
+            );
+            const stored = realtimeService.subscriptions.get("sub-1");
+            expect(stored.collectionRequest.limit).toBe(DEFAULT_LIST_LIMIT);
         });
     });
 
