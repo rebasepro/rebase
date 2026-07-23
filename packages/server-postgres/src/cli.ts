@@ -230,6 +230,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             logger.info("");
             
             if (databaseUrl) {
+                await ensureAuthTables(databaseUrl, collectionsPath);
                 await applyPolicies(databaseUrl);
                 await reconcilePolicies(databaseUrl, collectionsPath);
                 await ensureRlsUserRole(databaseUrl);
@@ -270,6 +271,43 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
         }
     } catch (err) {
         logger.warn(chalk.yellow(`  ⚠️  Failed to bootstrap auth schema and helper functions: ${err instanceof Error ? err.message : String(err)}`));
+    }
+}
+
+/**
+ * Create the framework auth tables (e.g. `rebase.users`) that the generated RLS
+ * policies reference, before `applyPolicies` runs. Mirrors what the server does
+ * at boot (`PostgresBootstrapper.initializeAuth` → `ensureAuthTablesExist`).
+ *
+ * Without this, `rebase db push` against a database that has never booted the
+ * server fails while applying policies with `relation "rebase.users" does not
+ * exist` — the documented first-run does `db push` *before* the first `dev`.
+ * `ensureAuthTablesExist` is idempotent (CREATE TABLE IF NOT EXISTS), so it is
+ * safe to run on every push and harmless once the server has also created them.
+ */
+async function ensureAuthTables(databaseUrl: string, collectionsPath: string): Promise<void> {
+    try {
+        const { drizzle } = await import("drizzle-orm/node-postgres");
+        const { ensureAuthTablesExist } = await import("./auth/ensure-tables");
+        const { loadCollections } = await import("./schema/doctor");
+        const { Client } = await import("pg");
+
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        // The auth collection is flagged with `auth: true` or `auth: { enabled: true }`.
+        const authCollection = collections.find((c) => {
+            const a = c.auth;
+            return a === true || (typeof a === "object" && a !== null && a.enabled === true);
+        });
+
+        const client = new Client({ connectionString: databaseUrl });
+        await client.connect();
+        try {
+            await ensureAuthTablesExist(drizzle(client), authCollection);
+        } finally {
+            await client.end();
+        }
+    } catch (err) {
+        logger.warn(chalk.yellow(`  ⚠️  Failed to ensure framework auth tables: ${err instanceof Error ? err.message : String(err)}`));
     }
 }
 
