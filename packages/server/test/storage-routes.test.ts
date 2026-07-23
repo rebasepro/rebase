@@ -254,6 +254,51 @@ key: "photos/deleteme.txt" });
             expect(res.status).toBe(200);
         });
     });
+
+    describe("path traversal", () => {
+        // A file sitting next to the bucket directory (tempDir/default), so a
+        // successful `../` escape would expose or destroy it.
+        const plantSecret = async () => {
+            const secretPath = path.join(tempDir, "secret.txt");
+            await fs.promises.writeFile(secretPath, "top secret");
+            return secretPath;
+        };
+
+        it("does not serve a sibling file via ..%2f on the read route", async () => {
+            const secretPath = await plantSecret();
+
+            const res = await app.fetch(
+                new Request("http://localhost/api/storage/file/..%2fsecret.txt")
+            );
+
+            expect(res.status).not.toBe(200);
+            expect(await fs.promises.readFile(secretPath, "utf-8")).toBe("top secret");
+        });
+
+        it("does not serve a sibling file via a default-prefixed ..%2f read", async () => {
+            const secretPath = await plantSecret();
+
+            const res = await app.fetch(
+                new Request("http://localhost/api/storage/file/default/..%2f..%2fsecret.txt")
+            );
+
+            expect(res.status).not.toBe(200);
+            expect(await fs.promises.readFile(secretPath, "utf-8")).toBe("top secret");
+        });
+
+        it("does not delete a sibling file via ..%2f on the delete route", async () => {
+            const secretPath = await plantSecret();
+
+            await app.fetch(
+                new Request("http://localhost/api/storage/file/..%2fsecret.txt", { method: "DELETE" })
+            );
+
+            // The traversal is neutralized before it reaches the filesystem, so
+            // the out-of-bucket file is untouched.
+            const stillThere = await fs.promises.access(secretPath).then(() => true).catch(() => false);
+            expect(stillThere).toBe(true);
+        });
+    });
 });
 
 // ──────────────────────────────────────────────────────────────────────

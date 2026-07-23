@@ -66,3 +66,57 @@ export async function initializeStorage(
 
     return {};
 }
+
+/** Inputs that decide whether storage has an access-control model at all. */
+export interface StorageAccessControlState {
+    /** A `storageAuthorize` hook was configured (per-object access control). */
+    hasAuthorize: boolean;
+    /** Reads are deliberately public (`storagePublicRead: true`). */
+    publicRead: boolean;
+    /** The legacy "any authenticated user may touch any key" behaviour was
+     *  explicitly acknowledged (`storageInsecureAllowAnyAuthenticated: true`). */
+    allowAnyAuthenticated: boolean;
+}
+
+/**
+ * The one message the boot guard emits, factored out so the production throw
+ * and the development warning say exactly the same thing.
+ */
+const STORAGE_NO_ACCESS_CONTROL_MESSAGE =
+    "Storage is configured WITHOUT any access-control model. Keys share one flat " +
+    "namespace and no `storageAuthorize` hook is set, so any authenticated user can " +
+    "list every key (GET /storage/list?prefix=) and then read, overwrite or delete " +
+    "any other user's files. Fix one of:\n" +
+    "  • add a `storageAuthorize` hook that scopes access per user/tenant (recommended), or\n" +
+    "  • set `storagePublicRead: true` if this bucket is genuinely a public read-only CDN, or\n" +
+    "  • set `storageInsecureAllowAnyAuthenticated: true` to keep the legacy shared-namespace\n" +
+    "    behaviour on purpose (single-tenant apps where every signed-in user is trusted).";
+
+/**
+ * Refuse to boot storage in production with no access-control model.
+ *
+ * Storage is not under RLS and its keys share one flat namespace, so with no
+ * `storageAuthorize` hook the only thing separating two users' files is key
+ * unguessability — which a `GET /list` defeats. This is the storage analogue of
+ * the locked-by-default RLS on collections: rather than ship an allow-all
+ * default silently, make the deployment state its intent.
+ *
+ * In production a bare allow-all config is refused (throws, so the rollout
+ * fails loudly instead of serving everyone's files to everyone). Outside
+ * production it is a loud warning, so local development is not blocked.
+ *
+ * Any one of the three explicit choices — a hook, public-read, or the insecure
+ * opt-out — satisfies the guard.
+ */
+export function assertStorageAccessControlConfigured(
+    state: StorageAccessControlState,
+    isProduction: boolean
+): void {
+    if (state.hasAuthorize || state.publicRead || state.allowAnyAuthenticated) {
+        return;
+    }
+    if (isProduction) {
+        throw new Error(STORAGE_NO_ACCESS_CONTROL_MESSAGE);
+    }
+    logger.warn(STORAGE_NO_ACCESS_CONTROL_MESSAGE);
+}

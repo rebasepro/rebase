@@ -246,6 +246,16 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
     /**
      * Parse bucket and path from a combined file path.
+     *
+     * The resolved path is run through `sanitizeStorageKey` here — the same
+     * function the upload route applies to incoming keys — so that read,
+     * delete, metadata and folder routes strip `../`, null bytes and leading
+     * slashes before the path reaches the controller, the authorize hook, or
+     * the download-token it mints. The `LocalStorageController` traversal guard
+     * (`getFullPath`) remains the load-bearing defence; this is the same
+     * normalization on the write and read sides so a `..%2f` read/delete cannot
+     * even reach it as a raw traversal string (it 404s as a normal miss instead
+     * of throwing, and never leaks whether an escape was attempted).
      */
     const parseBucketAndPath = (filePath: string): { bucket: string; resolvedPath: string } => {
         const parts = filePath.split("/");
@@ -254,14 +264,14 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         if (parts.length > 1 && parts[0].toLowerCase() === "default") {
             return {
                 bucket: "default",
-                resolvedPath: parts.slice(1).join("/")
+                resolvedPath: sanitizeStorageKey(parts.slice(1).join("/"))
             };
         }
 
         // All other paths use 'default' bucket with the full path
         return {
             bucket: "default",
-            resolvedPath: filePath
+            resolvedPath: sanitizeStorageKey(filePath)
         };
     };
 
@@ -487,8 +497,10 @@ message: "No file to delete" });
      * GET /list - List files in a path
      */
     router.get("/list", writeAuthMiddleware, async (c) => {
-        // Fallback to path for backward compatibility
-        const storagePrefix = c.req.query("prefix") || c.req.query("path") || "";
+        // Fallback to path for backward compatibility. Sanitize the prefix the
+        // same way object keys are sanitized elsewhere, so a listing cannot be
+        // steered out of the bucket with `../` before it hits the controller.
+        const storagePrefix = sanitizeStorageKey(c.req.query("prefix") || c.req.query("path") || "");
         const bucket = c.req.query("bucket");
         const maxResults = c.req.query("maxResults");
         const pageToken = c.req.query("pageToken");

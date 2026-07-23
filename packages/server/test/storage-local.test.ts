@@ -118,6 +118,14 @@ force: true });
             const result = await controller.getObject("local://default/nonexistent/file.txt");
             expect(result).toBeNull();
         });
+
+        it("refuses to read outside the bucket via a ../ key", async () => {
+            // The load-bearing traversal guard: even a key the route-level
+            // sanitizer never saw (a raw `..`) cannot escape the bucket.
+            await fs.promises.writeFile(path.join(tempDir, "secret.txt"), "top secret");
+
+            await expect(controller.getObject("../secret.txt")).rejects.toThrow(/traversal/i);
+        });
     });
 
     describe("deleteObject", () => {
@@ -145,6 +153,15 @@ force: true });
 
         it("should not throw when deleting non-existent file", async () => {
             await expect(controller.deleteObject("local://default/nonexistent/file.txt")).resolves.not.toThrow();
+        });
+
+        it("refuses to delete outside the bucket via a ../ key", async () => {
+            const secretPath = path.join(tempDir, "secret.txt");
+            await fs.promises.writeFile(secretPath, "top secret");
+
+            await expect(controller.deleteObject("../secret.txt")).rejects.toThrow(/traversal/i);
+            const stillThere = await fs.promises.access(secretPath).then(() => true).catch(() => false);
+            expect(stillThere).toBe(true);
         });
 
         it("should also delete metadata file", async () => {

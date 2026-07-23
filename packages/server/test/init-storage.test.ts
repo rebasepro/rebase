@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-import { initializeStorage } from "../src/init/storage";
+import { initializeStorage, assertStorageAccessControlConfigured } from "../src/init/storage";
 
 describe("initializeStorage", () => {
     let tempDir: string;
@@ -67,5 +67,40 @@ describe("initializeStorage", () => {
         const { storageController } = await initializeStorage(controller, true);
 
         expect(storageController).toBe(controller);
+    });
+});
+
+describe("assertStorageAccessControlConfigured", () => {
+    const none = { hasAuthorize: false, publicRead: false, allowAnyAuthenticated: false };
+
+    it("refuses to boot in production with no access-control model", () => {
+        // The default-config hole: no hook, keys in one flat namespace, so any
+        // authenticated user can enumerate and touch anyone's files.
+        expect(() => assertStorageAccessControlConfigured(none, true)).toThrow(
+            /WITHOUT any access-control model/
+        );
+    });
+
+    it("does not throw in production when an authorize hook is configured", () => {
+        expect(() =>
+            assertStorageAccessControlConfigured({ ...none, hasAuthorize: true }, true)
+        ).not.toThrow();
+    });
+
+    it("does not throw in production when reads are explicitly public", () => {
+        expect(() =>
+            assertStorageAccessControlConfigured({ ...none, publicRead: true }, true)
+        ).not.toThrow();
+    });
+
+    it("does not throw in production with the explicit insecure opt-out", () => {
+        expect(() =>
+            assertStorageAccessControlConfigured({ ...none, allowAnyAuthenticated: true }, true)
+        ).not.toThrow();
+    });
+
+    it("only warns (never throws) outside production, even with no model", () => {
+        // Local development must not be blocked; the warning is the nudge.
+        expect(() => assertStorageAccessControlConfigured(none, false)).not.toThrow();
     });
 });

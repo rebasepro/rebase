@@ -35,7 +35,7 @@ import { HonoEnv } from "./api/types";
 import { configureLogLevel } from "./utils/logging";
 import { logger } from "./utils/logger";
 import { configureMiddlewares } from "./init/middlewares";
-import { initializeStorage } from "./init/storage";
+import { initializeStorage, assertStorageAccessControlConfigured } from "./init/storage";
 import { mountOpenApiDocs } from "./init/docs";
 import { createHealthCheck } from "./init/health";
 import { createShutdown } from "./init/shutdown";
@@ -342,8 +342,34 @@ export interface RebaseBackendConfig {
      *
      * Without it, any authenticated caller may read any key they can name, so
      * multi-tenant apps should treat this as required rather than optional.
+     *
+     * In production, storage refuses to boot unless one of `storageAuthorize`,
+     * {@link storagePublicRead}, or {@link storageInsecureAllowAnyAuthenticated}
+     * is set — see `assertStorageAccessControlConfigured`.
      */
     storageAuthorize?: import("./storage/types").StorageAuthorize;
+
+    /**
+     * Allow unauthenticated read access to stored files (default: false).
+     *
+     * Set this only when the bucket is genuinely a public, read-only CDN.
+     * Writes, deletes and listing still require authentication. Because it is a
+     * deliberate statement that reads are public, it also satisfies the
+     * production storage boot guard (see {@link storageAuthorize}).
+     */
+    storagePublicRead?: boolean;
+
+    /**
+     * Opt out of the storage access-control boot guard, keeping the legacy
+     * behaviour where **any** authenticated user can read, overwrite, delete or
+     * list **any** key (storage keys share one flat namespace and are not under
+     * RLS).
+     *
+     * Only safe for single-tenant apps where every signed-in user is trusted
+     * with every file. Multi-tenant apps must use `storageAuthorize` instead.
+     * Without one of these, storage refuses to boot in production.
+     */
+    storageInsecureAllowAnyAuthenticated?: boolean;
 
     /**
      * Entity history / audit-log configuration.
@@ -1052,11 +1078,26 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 : undefined
         ) ?? 50 * 1024 * 1024;
 
+        // Storage is not under RLS and its keys share one flat namespace, so an
+        // allow-all default is a cross-user read/write/delete hole. Refuse to
+        // boot in production unless the deployment has stated an access-control
+        // intent (a hook, public-read, or the explicit insecure opt-out); warn
+        // loudly in development.
+        assertStorageAccessControlConfigured(
+            {
+                hasAuthorize: !!config.storageAuthorize,
+                publicRead: config.storagePublicRead === true,
+                allowAnyAuthenticated: config.storageInsecureAllowAnyAuthenticated === true
+            },
+            isProduction
+        );
+
         const storageRoutes = createStorageRoutes({
             controller: storageController,
             registry: storageRegistry,
             sources: config.storageSources,
             requireAuth: resolveRequireAuth(config.auth),
+            publicRead: config.storagePublicRead === true,
             authAdapter,
             authorize: config.storageAuthorize
         });
