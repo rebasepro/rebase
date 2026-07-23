@@ -164,7 +164,7 @@ function SideDialogView({
                     scrollable={false}
                 >
                     {panel && (
-                        <div className="flex flex-col h-[75vh] min-h-[500px] min-w-[55vw] max-w-full overflow-hidden">
+                        <div className="flex flex-col h-[75vh] min-h-[500px] w-full min-w-0 max-w-full overflow-hidden">
                             <ErrorBoundary>
                                 {panel.component}
                             </ErrorBoundary>
