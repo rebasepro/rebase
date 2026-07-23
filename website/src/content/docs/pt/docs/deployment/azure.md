@@ -27,9 +27,9 @@ Os Aplicativos de Contêiner do Azure puxarão sua imagem Docker do ACR.
    ```bash
    az acr login --name YourRegistryName
    ```
-3. Compile e envie a imagem Rebase do seu repositório local:
+3. Compile e envie a imagem Rebase a partir da raiz do projeto — o Dockerfile do backend precisa de todo o workspace como contexto de build (ele copia `pnpm-workspace.yaml`, `backend/` e `config/`), por isso o contexto é `.` e não `./backend`:
    ```bash
-   docker build -t yourregistryname.azurecr.io/rebase-backend:latest ./backend
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f backend/Dockerfile .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
 
@@ -51,3 +51,17 @@ O Azure Container Apps fornece um ambiente de contêiner sem servidor com ingres
 5. Na guia **Ingresso**, habilite explicitamente o Ingresso.
 6. Defina a Porta de Destino para **3001**.
 7. Conclua a criação. O Azure provisionará automaticamente o contêiner e fornecerá uma URL de aplicativo protegida com TLS!
+
+## 4. Criar o Esquema do Banco de Dados
+
+Ao iniciar, o Rebase cria automaticamente **apenas as tabelas de autenticação**. As tabelas das suas próprias coleções **não** são criadas automaticamente. A aplicação sobe normalmente e o login funciona — por isso a armadilha passa despercebida —, mas toda coleção retorna um erro de tabela ausente ("missing table") até você aplicar o esquema.
+
+Execute `pnpm run db:push` **uma vez** contra o banco de dados de produção:
+
+```bash
+DATABASE_URL="<sua string de conexão do Azure Postgres>" pnpm run db:push
+```
+
+Rode isso a partir de um checkout do projeto ou da sua CI, com a `DATABASE_URL` apontando para produção — **não** dentro do contêiner, pois a imagem de produção não inclui a CLI. Se o seu Flexible Server restringe o acesso público, adicione uma regra de firewall temporária para o seu IP no portal do Azure antes de executar o comando.
+
+Para migrações versionadas, use `pnpm run db:generate` seguido de `pnpm run db:migrate` em vez de `db:push`.

@@ -98,4 +98,14 @@ systemctl restart caddy
 
 Et voilà ! Votre plateforme Rebase est hébergée en toute sécurité entièrement au sein de l'UE.
 
+## 6. Créer le schéma de base de données
+
+La pile est en cours d'exécution, mais Rebase ne crée automatiquement que les tables d'**authentification** au démarrage — les tables de vos propres collections ne sont **pas** créées automatiquement. Exécutez cette commande une fois sur la base de données de production, sinon chaque collection renverra une erreur « missing table ». Depuis le checkout de votre projet sur le serveur (avec les dépendances installées), faites pointer `DATABASE_URL` vers le conteneur Postgres et poussez le schéma :
+
+```bash
+pnpm run db:push
+```
+
+Pour des migrations versionnées, validez les fichiers de migration avec `pnpm run db:generate` et exécutez `pnpm run db:migrate` à la place. Au démarrage, le serveur affiche un avertissement encadré indiquant exactement quelles tables sont manquantes et la commande à exécuter.
+
 ---

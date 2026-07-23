@@ -28,8 +28,15 @@ Assicurati di avere la CLI `gcloud` installata e autenticata:
 # Set your active GCP project
 gcloud config set project YOUR_PROJECT_ID
 
-# Submit the build to Cloud Build, which automatically creates the container image and stores it in Google Container Registry (GCR)
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/rebase-backend ./backend
+# Authenticate Docker against the registry host (one-time)
+gcloud auth configure-docker gcr.io
+
+# Build the image from the project root — the backend Dockerfile needs the whole
+# workspace as its build context (it copies pnpm-workspace.yaml, backend/, and config/)
+docker build -f backend/Dockerfile -t gcr.io/YOUR_PROJECT_ID/rebase-backend .
+
+# Push the image
+docker push gcr.io/YOUR_PROJECT_ID/rebase-backend
 
 # Deploy the newly built image to Cloud Run
 gcloud run deploy rebase-backend \
@@ -40,7 +47,21 @@ gcloud run deploy rebase-backend \
   --allow-unauthenticated
 ```
 
-## 3. Gestione dello Storage dei File
+## 3. Crea lo Schema del Database
+
+All'avvio Rebase crea automaticamente **solo le tabelle di autenticazione**. Le tabelle per le tue collezioni **non** vengono create automaticamente: l'app si avvia comunque e il login funziona, quindi è facile non accorgersene, finché ogni collezione non restituisce un errore "missing table".
+
+Esegui la sincronizzazione dello schema una volta contro il database di produzione:
+
+```bash
+pnpm run db:push
+```
+
+Eseguilo da un checkout del progetto o dalla CI con `DATABASE_URL` che punta alla produzione, **non** dall'interno del container: l'immagine di produzione non include la CLI. Cloud SQL non è raggiungibile direttamente: avvia il Cloud SQL Auth Proxy in locale (`cloud-sql-proxy YOUR_INSTANCE_CONNECTION_NAME`) e imposta `DATABASE_URL` in modo che punti a `localhost` mentre esegui il comando.
+
+Se preferisci migrazioni versionate a una sincronizzazione diretta, usa invece `pnpm run db:generate` seguito da `pnpm run db:migrate`.
+
+## 4. Gestione dello Storage dei File
 
 Poiché le istanze di Cloud Run sono strettamente stateless ed effimere, non è possibile utilizzare lo storage su disco locale per gli upload di file di Rebase.
 

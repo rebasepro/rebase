@@ -41,7 +41,9 @@ services:
       - "5432:5432"
 
   app:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "3001:3001"
     environment:
@@ -62,6 +64,18 @@ volumes:
 docker compose up -d
 ```
 
+Das oben gezeigte YAML ist illustrativ — die im Projekt generierte `docker-compose.yml` ist die maßgebliche Quelle und verwendet bereits `context: .` mit `dockerfile: backend/Dockerfile` (das Backend-`Dockerfile` benötigt den gesamten Workspace als Build-Kontext).
+
+## Datenbankschema erstellen
+
+Beim Start erstellt Rebase automatisch **nur die Auth-Tabellen**. Die Tabellen für Ihre eigenen Collections werden **nicht** automatisch angelegt. Führen Sie daher nach dem ersten Start einmalig gegen die Produktionsdatenbank aus:
+
+```bash
+pnpm run db:push
+```
+
+Andernfalls gibt jede Collection einen `missing table`-Fehler zurück — die Falle dabei: Die App startet trotzdem und die Anmeldung funktioniert (die Auth-Tabellen existieren), sodass die Bereitstellung zunächst gesund wirkt. Führen Sie den Befehl aus einem Projekt-Checkout oder aus CI aus, wobei `DATABASE_URL` auf die Produktionsdatenbank zeigt — **nicht** im Container, da das Produktions-Image ohne die CLI ausgeliefert wird. Für versionierte Migrationen verwenden Sie stattdessen `pnpm run db:generate` und `pnpm run db:migrate`.
+
 ## Produktions-Checkliste
 
 Bevor Sie in die Produktion bereitstellen, stellen Sie sicher:
@@ -70,6 +84,7 @@ Bevor Sie in die Produktion bereitstellen, stellen Sie sicher:
 |------|---------|
 | **JWT_SECRET** | Verwenden Sie eine kryptografisch starke Zufallszeichenkette (≥ 32 Zeichen). Niemals über Umgebungen hinweg wiederverwenden. |
 | **DATABASE_URL** | Verwenden Sie eine verwaltete Postgres-Instanz (Neon, Supabase, RDS) mit aktiviertem TLS |
+| **Datenbankschema** | Führen Sie `pnpm run db:push` einmal gegen die Produktionsdatenbank aus, damit die Tabellen Ihrer Collections angelegt werden — beim Start werden automatisch nur die Auth-Tabellen erstellt |
 | **CORS** | Konfigurieren Sie erlaubte Origins auf Ihrem Backend, wenn Frontend und Backend auf verschiedenen Domains liegen |
 | **Speicher-Volumes** | Binden Sie persistente Volumes für Datei-Uploads ein. Oder wechseln Sie für die Produktion zu S3. |
 | **HTTPS** | Terminieren Sie TLS an Ihrem Reverse-Proxy (nginx, Cloudflare, Load Balancer) |

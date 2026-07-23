@@ -25,36 +25,34 @@ Lors de la première visite de l'administration d'un déploiement neuf, Rebase a
 
 ## Docker Compose (Recommandé)
 
-Le projet généré inclut un `Dockerfile` et un `docker-compose.yml`. C'est la façon la plus simple de déployer :
+Le projet généré inclut déjà un `docker-compose.yml` fonctionnel (Postgres + backend + frontend) ainsi que les Dockerfiles `backend/`/`frontend/` — ce fichier généré est la source de vérité ; utilisez-le tel quel plutôt que d'en écrire un à la main. Voici sa structure :
 
-```yaml title="docker-compose.yml"
+```yaml title="docker-compose.yml (généré — abrégé)"
 services:
-  postgres:
+  db:
     image: postgres:18-alpine
     environment:
       POSTGRES_USER: rebase
-      POSTGRES_PASSWORD: rebase
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
       POSTGRES_DB: rebase
-    volumes:
-      - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
-  app:
-    build: ./backend
+  backend:
+    build:
+      # Context is the PROJECT ROOT so the image can copy
+      # pnpm-workspace.yaml, backend/, and config/. A `./backend`
+      # context would fail — the Dockerfile lives at backend/Dockerfile.
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "3001:3001"
-    environment:
-      DATABASE_URL: postgresql://rebase:rebase@postgres:5432/rebase
-      JWT_SECRET: ${JWT_SECRET}
-      NODE_ENV: production
+    env_file: .env
     depends_on:
-      - postgres
-    volumes:
-      - uploads:/app/uploads
+      - db
 
 volumes:
-  pgdata:
+  postgres_data:
   uploads:
 ```
 
@@ -62,12 +60,39 @@ volumes:
 docker compose up -d
 ```
 
+### Créer le schéma de base de données
+
+Démarrer la pile ne suffit **pas à lui seul.** Le backend démarre et
+crée automatiquement les tables d'**authentification**, mais il ne crée **pas** les tables de
+vos propres collections — vous exécutez cela une fois, explicitement, sur la base de
+données de production. Depuis un checkout de votre projet (avec les dépendances installées), définissez
+`DATABASE_URL` sur votre base de données de production et poussez le schéma :
+
+```bash
+pnpm run db:push
+```
+
+:::caution[Obligatoire — sinon chaque collection renvoie des erreurs]
+Si vous ignorez cette étape, l'application démarre quand même et vous pouvez vous connecter, mais chacune de
+vos collections est vide et ses appels d'API échouent avec une erreur « missing table » tant que
+le schéma n'existe pas. Au démarrage, le serveur affiche un avertissement encadré indiquant exactement
+quelles tables sont manquantes et la commande à exécuter.
+:::
+
+`db:push` est l'option rapide — elle applique le schéma directement, sans
+fichiers de migration. Pour un **workflow versionné et en équipe**, validez les fichiers de migration
+avec `pnpm run db:generate` et exécutez `pnpm run db:migrate` comme étape de release
+à la place. Quelle que soit l'option choisie, elle s'exécute sur le `DATABASE_URL` de production
+depuis un checkout du projet (ou votre job CI), et non à l'intérieur du conteneur en cours d'exécution —
+l'image de production est livrée sans la CLI.
+
 ## Liste de contrôle pour la production
 
 Avant de déployer en production, assurez-vous de :
 
 | Élément | Détails |
 |------|---------|
+| **Schéma de base de données** | Exécutez `pnpm run db:push` (ou `pnpm run db:migrate` pour des migrations versionnées) une fois sur la base de données de production. L'application démarre sans vos tables de collections, mais chaque collection échoue tant qu'elles n'existent pas. |
 | **JWT_SECRET** | Utilisez une chaîne aléatoire cryptographiquement forte (≥ 32 caractères). Ne la réutilisez jamais entre environnements. |
 | **DATABASE_URL** | Utilisez une instance Postgres gérée (Neon, Supabase, RDS) avec TLS activé |
 | **CORS** | Configurez les origines autorisées sur votre backend si le frontend et le backend sont sur des domaines différents |

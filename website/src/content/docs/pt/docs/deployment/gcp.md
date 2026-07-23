@@ -28,8 +28,16 @@ Certifique-se de ter o CLI `gcloud` instalado e autenticado:
 # Set your active GCP project
 gcloud config set project YOUR_PROJECT_ID
 
-# Submit the build to Cloud Build, which automatically creates the container image and stores it in Google Container Registry (GCR)
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/rebase-backend ./backend
+# Authenticate Docker against the registry host (one-time)
+gcloud auth configure-docker gcr.io
+
+# Build from the project root: the backend Dockerfile needs the whole workspace as
+# its build context (it copies pnpm-workspace.yaml, backend/ and config/), so the
+# context is "." and not "./backend"
+docker build -f backend/Dockerfile -t gcr.io/YOUR_PROJECT_ID/rebase-backend .
+
+# Push the image to the registry
+docker push gcr.io/YOUR_PROJECT_ID/rebase-backend
 
 # Deploy the newly built image to Cloud Run
 gcloud run deploy rebase-backend \
@@ -40,7 +48,21 @@ gcloud run deploy rebase-backend \
   --allow-unauthenticated
 ```
 
-## 3. Gerenciar Armazenamento de Arquivos
+## 3. Criar o Esquema do Banco de Dados
+
+Ao iniciar, o Rebase cria automaticamente **apenas as tabelas de autenticação**. As tabelas das suas próprias coleções **não** são criadas automaticamente. A aplicação sobe normalmente e o login funciona — por isso a armadilha passa despercebida —, mas toda coleção retorna um erro de tabela ausente ("missing table") até você aplicar o esquema.
+
+Execute `pnpm run db:push` **uma vez** contra o banco de dados de produção:
+
+```bash
+DATABASE_URL="postgresql://postgres:...@localhost:5432/postgres" pnpm run db:push
+```
+
+Rode isso a partir de um checkout do projeto ou da sua CI, com a `DATABASE_URL` apontando para produção — **não** dentro do contêiner, pois a imagem de produção não inclui a CLI. Como o Cloud SQL normalmente não fica exposto publicamente, execute o [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/connect-auth-proxy) localmente e aponte a `DATABASE_URL` para `localhost`.
+
+Para migrações versionadas, use `pnpm run db:generate` seguido de `pnpm run db:migrate` em vez de `db:push`.
+
+## 4. Gerenciar Armazenamento de Arquivos
 Como as instâncias do Cloud Run são estritamente sem estado e efêmeras, você não pode usar armazenamento em disco local para uploads de arquivos do Rebase.
 
 1. Navegue até o **Google Cloud Storage** e crie um novo bucket privado na região da UE escolhida.

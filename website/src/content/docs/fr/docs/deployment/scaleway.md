@@ -26,10 +26,10 @@ Les Conteneurs Serverless de Scaleway exécutent des images Docker standard. Com
 
 1. Allez dans **Container Registry** dans la Console Scaleway et créez un Namespace (par exemple, `rebase-apps`).
 2. Connectez-vous au registre depuis votre terminal local en utilisant les instructions fournies.
-3. Construisez votre application Rebase en utilisant le `Dockerfile` généré :
+3. Construisez votre application Rebase en utilisant le `Dockerfile` généré, **depuis la racine du projet** — le Dockerfile du backend a besoin de l'ensemble du workspace comme contexte de build (il copie `pnpm-workspace.yaml`, `backend/` et `config/`), donc utiliser `./backend` comme contexte échouera :
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest ./backend
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
 ```
 
 4. Poussez l'image :
@@ -59,5 +59,15 @@ Déployez maintenant l'image de manière entièrement serverless sans gérer l'i
 Scaleway provisionnera immédiatement le conteneur et vous fournira une URL de point d'accès public (par exemple, `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`).
 
 *Remarque : Pour une conformité stricte des données, vérifiez que les détails de votre organisation Scaleway reflètent votre entité juridique européenne.*
+
+## 4. Créer le schéma de base de données
+
+Le conteneur est en cours d'exécution, mais Rebase ne crée automatiquement que les tables d'**authentification** au démarrage — les tables de vos propres collections ne sont **pas** créées automatiquement. Exécutez cette commande une fois sur la base de données de production, sinon chaque collection renverra une erreur « missing table » :
+
+```bash
+pnpm run db:push
+```
+
+Exécutez-la depuis un checkout de votre projet (ou depuis votre job CI) avec `DATABASE_URL` pointant vers la chaîne de connexion de votre Base de Données Managée Scaleway. L'image déployée n'inclut pas la CLI, cette commande ne s'exécute donc pas à l'intérieur du conteneur. Pour des migrations versionnées, validez les fichiers de migration avec `pnpm run db:generate` et exécutez `pnpm run db:migrate` à la place.
 
 ---

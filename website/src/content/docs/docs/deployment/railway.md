@@ -23,6 +23,10 @@ Additionally, Railway fully supports European deployment regions (Amsterdam), me
 2. Select your Rebase repository.
 3. Railway will immediately detect the repository and look for a `Dockerfile`. Wait for the initial build to begin.
 
+:::caution[Point Railway at the backend Dockerfile]
+The scaffold's Dockerfile lives at `backend/Dockerfile`, not the repo root, and its build context must be the **repo root** (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`). In the service's **Settings → Build**, set the **Dockerfile Path** to `backend/Dockerfile` and leave the **Root Directory** at the repository root. Otherwise Railway won't find a Dockerfile — or will build with the wrong context and fail.
+:::
+
 ## 4. Set Environment Variables
 The initial build might fail because it is entirely missing configuration. Let's fix that.
 
@@ -43,3 +47,13 @@ The initial build might fail because it is entirely missing configuration. Let's
 3. Under **Public Networking**, click **Generate Domain**. Railway will provide a `.up.railway.app` testing URL. You can also securely attach a Custom Domain here.
 
 Railway will automatically rebuild safely. Your EU-hosted platform is now entirely live!
+
+## 6. Create the Database Schema
+
+The app is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Postgres service's **public** connection string (found under the Postgres widget → **Connect**; the referenced internal `DATABASE_URL` is only reachable from inside Railway). The deployed image doesn't include the CLI, so this doesn't run inside the container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.

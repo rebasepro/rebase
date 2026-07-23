@@ -27,9 +27,9 @@ Azure Container Apps zieht Ihr Docker-Image aus ACR.
    ```bash
    az acr login --name YourRegistryName
    ```
-3. Erstellen und pushen Sie das Rebase-Image aus Ihrem lokalen Repository:
+3. Erstellen und pushen Sie das Rebase-Image aus Ihrem lokalen Repository — aus dem Projekt-Stammverzeichnis, da das Backend-`Dockerfile` den gesamten Workspace als Build-Kontext benötigt (es kopiert `pnpm-workspace.yaml`, `backend/` und `config/`):
    ```bash
-   docker build -t yourregistryname.azurecr.io/rebase-backend:latest ./backend
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f backend/Dockerfile .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
 
@@ -51,5 +51,19 @@ Azure Container Apps bietet eine serverlose Container-Umgebung mit integriertem 
 5. Aktivieren Sie unter der Registerkarte **Ingress** explizit den Ingress.
 6. Stellen Sie den Zielport auf **3001** ein.
 7. Schließen Sie die Erstellung ab. Azure stellt den Container automatisch bereit und liefert Ihnen eine mit TLS gesicherte Anwendungs-URL!
+
+## 4. Datenbankschema erstellen
+
+Beim Start erstellt Rebase automatisch **nur die Auth-Tabellen**. Die Tabellen für Ihre eigenen Collections werden **nicht** automatisch angelegt — Sie müssen das Schema einmalig gegen die Produktionsdatenbank pushen:
+
+```bash
+pnpm run db:push
+```
+
+Ohne diesen Schritt gibt jede Collection einen `missing table`-Fehler zurück. Die Falle dabei: Die App startet trotzdem und die Anmeldung funktioniert (die Auth-Tabellen existieren), sodass die Bereitstellung zunächst gesund aussieht.
+
+Führen Sie den Befehl aus einem Projekt-Checkout oder aus CI aus, wobei `DATABASE_URL` auf die Produktionsdatenbank zeigt — **nicht** im Container, da das Produktions-Image ohne die CLI ausgeliefert wird. Fügen Sie in Azure Database for PostgreSQL vorübergehend eine Firewall-Regel für Ihre IP-Adresse hinzu, damit Sie die Produktionsdatenbank von Ihrem Rechner aus erreichen können.
+
+Für versionierte Migrationen verwenden Sie stattdessen `pnpm run db:generate` und `pnpm run db:migrate`.
 
 ---

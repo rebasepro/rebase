@@ -24,6 +24,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { typecheckSnippets } from "./docs-verify/typecheck-snippets.mjs";
 import { checkApiNames } from "./docs-verify/check-api-names.mjs";
+import { checkDeployBuildContext } from "./docs-verify/check-deploy-build-context.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -45,7 +46,10 @@ let findings = 0;
 // annotation pass) can consume them without scraping the pretty output.
 if (asJson) {
     const out = {};
-    if (only !== "snippets") out.names = (await checkApiNames(ROOT)).unknown;
+    if (only !== "snippets") {
+        out.names = (await checkApiNames(ROOT)).unknown;
+        out.deployBuildContext = checkDeployBuildContext(ROOT).findings;
+    }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
         out.snippets = r.failures.map((f) => ({
@@ -78,6 +82,23 @@ if (only === "both" || only === "names") {
             if (u.locations.length > 6) {
                 console.log(`      ${DIM}… and ${u.locations.length - 6} more${NC}`);
             }
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Deploy-doc build context (all locales) ━━━${NC}`);
+    const { findings: bad, scanned } = checkDeployBuildContext(ROOT);
+    console.log(`${DIM}Scanned ${scanned} deployment docs.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ No build instruction uses ./backend or ./frontend as its context.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} bad build-context reference(s) — context must be the project root:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC} ${DIM}[${b.rule}]${NC}`);
+            console.log(`      ${DIM}${b.text}${NC}`);
+            console.log(`      ${DIM}→ ${b.hint}${NC}`);
         }
     }
 }

@@ -25,9 +25,9 @@ AWS App Runner tire directement les images d'ECR. Créez votre image Docker loca
 
 1. Naviguez vers **Elastic Container Registry** et créez un nouveau dépôt privé nommé `rebase-backend`.
 2. Récupérez les commandes de push fournies par AWS dans la console (qui gèrent l'authentification Docker).
-3. Créez votre image localement depuis le dossier racine :
+3. Créez votre image localement **depuis la racine du projet** — le Dockerfile du backend a besoin de l'ensemble du workspace comme contexte de build (il copie `pnpm-workspace.yaml`, `backend/` et `config/`), donc utiliser `./backend` comme contexte échouera :
    ```bash
-   docker build -t rebase-backend ./backend
+   docker build -t rebase-backend -f backend/Dockerfile .
    ```
 4. Balisez et poussez-la vers votre dépôt ECR nouvellement créé.
 
@@ -51,5 +51,15 @@ App Runner est le moyen le plus simple d'exécuter des conteneurs sur AWS sans g
 7. Cliquez sur **Créer et déployer**.
 
 AWS gérera la terminaison TLS (fournissant une URL `https` prête à l'emploi) et démarrera le serveur Rebase.
+
+## Créer le schéma de base de données
+
+Le service est en cours d'exécution, mais Rebase ne crée automatiquement que les tables d'**authentification** au démarrage — les tables de vos propres collections ne sont **pas** créées automatiquement. Exécutez cette commande une fois sur la base de données de production, sinon chaque collection renverra une erreur « missing table » :
+
+```bash
+pnpm run db:push
+```
+
+Exécutez-la depuis un checkout de votre projet (ou depuis votre job CI) avec `DATABASE_URL` pointant vers votre endpoint RDS. Si l'instance est privée, exécutez-la depuis la CI ou depuis un hôte bastion situé dans le même VPC. L'image déployée n'inclut pas la CLI, cette commande ne s'exécute donc pas à l'intérieur du conteneur App Runner. Pour des migrations versionnées, validez les fichiers de migration avec `pnpm run db:generate` et exécutez `pnpm run db:migrate` à la place.
 
 ---

@@ -26,10 +26,10 @@ I Serverless Containers di Scaleway eseguono immagini Docker standard. Per prima
 
 1. Vai a **Container Registry** nella Console Scaleway e crea un Namespace (es. `rebase-apps`).
 2. Effettua l'accesso al registry dal tuo terminale locale utilizzando le istruzioni fornite.
-3. Crea la tua app Rebase utilizzando il `Dockerfile` generato:
+3. Crea la tua app Rebase dalla radice del progetto — il Dockerfile del backend ha bisogno dell'intero workspace come contesto di build (copia `pnpm-workspace.yaml`, `backend/` e `config/`):
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest ./backend
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
 ```
 
 4. Carica l'immagine:
@@ -57,6 +57,20 @@ Ora distribuisci l'immagine completamente serverless senza gestire l'infrastrutt
 6. Clicca su **Distribuisci Container**.
 
 Scaleway effettuerà immediatamente il provisioning del container e ti fornirà un URL di endpoint pubblico (es. `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`).
+
+## 4. Crea lo Schema del Database
+
+All'avvio Rebase crea automaticamente **solo le tabelle di autenticazione**. Le tabelle per le tue collezioni **non** vengono create automaticamente: l'app si avvia comunque e il login funziona, quindi è facile non accorgersene, finché ogni collezione non restituisce un errore "missing table".
+
+Esegui la sincronizzazione dello schema una volta contro il database di produzione:
+
+```bash
+pnpm run db:push
+```
+
+Eseguilo da un checkout del progetto o dalla CI con `DATABASE_URL` che punta alla produzione, **non** dall'interno del container: l'immagine di produzione non include la CLI. Usa la stringa di connessione pubblica del tuo Managed Database (quella annotata durante il provisioning) come `DATABASE_URL` quando esegui il comando dalla tua macchina locale o dalla CI.
+
+Se preferisci migrazioni versionate a una sincronizzazione diretta, usa invece `pnpm run db:generate` seguito da `pnpm run db:migrate`.
 
 *Nota: Per una rigorosa conformità dei dati, verifica che i dettagli della tua Organizzazione Scaleway riflettano la tua entità aziendale europea.*
 

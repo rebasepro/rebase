@@ -25,10 +25,11 @@ AWS App Runner extrae directamente de ECR. Compile su imagen Docker localmente y
 
 1. Navegue a **Elastic Container Registry** y cree un nuevo repositorio privado llamado `rebase-backend`.
 2. Obtenga los comandos de envío proporcionados por AWS en la consola (que gestionan la autenticación de Docker).
-3. Compile su imagen localmente desde la carpeta raíz:
+3. Compile su imagen localmente desde la raíz del proyecto:
    ```bash
-   docker build -t rebase-backend ./backend
+   docker build -t rebase-backend -f backend/Dockerfile .
    ```
+   Compile desde la raíz del proyecto — el Dockerfile del backend necesita todo el workspace como contexto de compilación (copia `pnpm-workspace.yaml`, `backend/` y `config/`), por lo que usar `./backend` como contexto falla.
 4. Etiquétela y envíela a su repositorio ECR recién creado.
 
 ## 3. Desplegar a través de AWS App Runner
@@ -51,5 +52,19 @@ App Runner es la forma más sencilla de ejecutar contenedores en AWS sin gestion
 7. Haga clic en **Crear y desplegar**.
 
 AWS gestionará la terminación TLS (proporcionando una URL `https` lista para usar) y pondrá en marcha el servidor Rebase.
+
+## 4. Crear el Esquema de la Base de Datos
+
+Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de sus propias colecciones **no se crean automáticamente**. Debe aplicar el esquema una vez contra la base de datos de producción:
+
+```bash
+pnpm run db:push
+```
+
+Si omite este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta.
+
+Ejecútelo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a la base de datos de producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Como RDS suele residir en una VPC privada, ejecute el comando desde una máquina con acceso a esa VPC (por ejemplo, un host bastión) o abra temporalmente el acceso al endpoint de RDS a su IP.
+
+Para migraciones versionadas, use `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
 
 ---

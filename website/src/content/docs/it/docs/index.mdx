@@ -53,28 +53,17 @@ pnpm dlx @rebasepro/cli init my-app
 cd my-app
 ```
 
-Configura il tuo database in `.env`:
+`init` genera per te un file `.env` pronto all'uso (segreti, password del database, una porta locale libera) — non serve modificare nulla per iniziare. Avvia il container PostgreSQL incluso, crea le tabelle, poi avvia i server di sviluppo:
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/mydb
-JWT_SECRET=your-secret-key
+docker compose up -d db   # avvia il database
+pnpm run db:push          # crea le tabelle dalle tue collezioni
+pnpm dev                  # avvia backend + frontend
 ```
 
-Se ti stai connettendo a un database esistente, puoi eseguirne l'introspezione per generare automaticamente i file delle collezioni:
+Il tuo pannello di amministrazione è in esecuzione su `http://localhost:5173` e l'API su `http://localhost:3001`. Il primo account che registri diventa l'amministratore.
 
-```bash
-pnpm rebase schema introspect
-```
-
-Avvia tutto:
-
-```bash
-pnpm dev
-```
-
-Questo è tutto. Il tuo pannello di amministrazione è in esecuzione su `http://localhost:5173` e l'API su `http://localhost:3001`.
-
-→ Segui la [Guida rapida](/docs/getting-started/quickstart) completa per un tutorial dettagliato.
+→ Segui la [Guida rapida](/docs/getting-started/quickstart) completa per un tutorial dettagliato, incluso come connettere il tuo database.
 
 ## Funzionalità Principali
 

@@ -25,7 +25,7 @@ Na primeira visita ao admin de uma implantação nova, a Rebase mostra uma tela 
 
 ## Docker Compose (Recomendado)
 
-O projeto gerado inclui um `Dockerfile` e um `docker-compose.yml`. Esta é a forma mais simples de implantar:
+O projeto gerado inclui um `Dockerfile` e um `docker-compose.yml`. Use o `docker-compose.yml` gerado como fonte da verdade — o exemplo abaixo mostra apenas os campos essenciais. Esta é a forma mais simples de implantar:
 
 ```yaml title="docker-compose.yml"
 services:
@@ -41,7 +41,9 @@ services:
       - "5432:5432"
 
   app:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "3001:3001"
     environment:
@@ -62,6 +64,16 @@ volumes:
 docker compose up -d
 ```
 
+## Criar o Esquema do Banco de Dados
+
+Ao iniciar, o Rebase cria automaticamente **apenas as tabelas de autenticação** — as tabelas das suas próprias coleções não são criadas sozinhas. Execute `pnpm run db:push` **uma vez** contra o banco de dados de produção; caso contrário, a aplicação sobe e o login funciona normalmente, mas toda coleção retorna um erro de tabela ausente ("missing table"):
+
+```bash
+DATABASE_URL="<sua string de conexão de produção>" pnpm run db:push
+```
+
+Rode isso a partir de um checkout do projeto ou da sua CI, com a `DATABASE_URL` apontando para produção — **não** dentro do contêiner, pois a imagem de produção não inclui a CLI. Para migrações versionadas, use `pnpm run db:generate` e depois `pnpm run db:migrate`.
+
 ## Lista de Verificação para Produção
 
 Antes de implantar em produção, garanta:
@@ -70,6 +82,7 @@ Antes de implantar em produção, garanta:
 |------|---------|
 | **JWT_SECRET** | Use uma string aleatória criptograficamente forte (≥ 32 caracteres). Nunca reutilize entre ambientes. |
 | **DATABASE_URL** | Use uma instância Postgres gerenciada (Neon, Supabase, RDS) com TLS habilitado |
+| **Esquema do banco de dados** | Execute `pnpm run db:push` uma vez contra o banco de produção — o boot cria apenas as tabelas de autenticação, não as das suas coleções |
 | **CORS** | Configure as origens permitidas no seu backend se o frontend e o backend estiverem em domínios diferentes |
 | **Volumes de armazenamento** | Monte volumes persistentes para os uploads de arquivos. Ou mude para S3 na produção. |
 | **HTTPS** | Termine TLS no seu proxy reverso (nginx, Cloudflare, balanceador de carga) |

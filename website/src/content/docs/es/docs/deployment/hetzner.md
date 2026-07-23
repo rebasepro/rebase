@@ -66,7 +66,21 @@ docker compose --env-file .env.production up -d --build
 
 Docker construirá su backend de Node.js desde el `Dockerfile` local y pondrá en marcha el contenedor de Postgres. Una vez completado, su aplicación estará funcionando en `http://localhost:3001` (interno al servidor).
 
-## 5. Exponer a través de Caddy o Nginx
+## 5. Crear el Esquema de la Base de Datos
+
+Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de sus propias colecciones **no se crean automáticamente**. Debe aplicar el esquema una vez contra la base de datos de producción:
+
+```bash
+pnpm run db:push
+```
+
+Si omite este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta.
+
+En Hetzner ya dispone de un checkout del proyecto en el propio servidor (`/opt/rebase`), así que ejecútelo allí directamente con `DATABASE_URL` apuntando a la base de datos de producción; use `localhost:5432` como host, ya que el contenedor de Postgres expone ese puerto. Ejecútelo desde el checkout del proyecto, **no dentro del contenedor de la aplicación**: la imagen de producción se distribuye sin la CLI.
+
+Para migraciones versionadas, use `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
+
+## 6. Exponer a través de Caddy o Nginx
 
 Nunca debe exponer el puerto 3001 directamente a internet sin SSL. Recomendamos colocar **Caddy** delante de su instancia de Rebase para aprovisionar automáticamente certificados Let's Encrypt.
 

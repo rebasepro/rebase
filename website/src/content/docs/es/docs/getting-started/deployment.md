@@ -41,7 +41,9 @@ services:
       - "5432:5432"
 
   app:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "3001:3001"
     environment:
@@ -62,6 +64,20 @@ volumes:
 docker compose up -d
 ```
 
+:::note
+El `docker-compose.yml` generado por Rebase es la fuente de verdad y ya usa este contexto de compilación (la raíz del proyecto con `dockerfile: backend/Dockerfile`); el ejemplo anterior solo lo reproduce. El Dockerfile del backend necesita todo el workspace como contexto (`pnpm-workspace.yaml`, `backend/`, `config/`), por lo que `build: ./backend` fallaría.
+:::
+
+## Crear el Esquema de la Base de Datos
+
+Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de tus propias colecciones **no se crean automáticamente**. Aplica el esquema una vez contra la base de datos de producción:
+
+```bash
+pnpm run db:push
+```
+
+Si omites este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta. Ejecútalo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Para migraciones versionadas, usa `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
+
 ## Lista de Verificación para Producción
 
 Antes de desplegar en producción, asegúrate de:
@@ -70,6 +86,7 @@ Antes de desplegar en producción, asegúrate de:
 |------|---------|
 | **JWT_SECRET** | Usa una cadena aleatoria criptográficamente fuerte (≥ 32 caracteres). Nunca la reutilices entre entornos. |
 | **DATABASE_URL** | Usa una instancia de Postgres gestionada (Neon, Supabase, RDS) con TLS habilitado |
+| **Esquema de la base de datos** | Ejecuta `pnpm run db:push` una vez contra la base de datos de producción para crear las tablas de tus colecciones (al arrancar, Rebase solo crea las tablas de autenticación) |
 | **CORS** | Configura los orígenes permitidos en tu backend si el frontend y el backend están en dominios diferentes |
 | **Volúmenes de almacenamiento** | Monta volúmenes persistentes para las subidas de archivos. O cambia a S3 para producción. |
 | **HTTPS** | Termina TLS en tu proxy inverso (nginx, Cloudflare, balanceador de carga) |

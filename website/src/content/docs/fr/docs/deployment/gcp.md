@@ -28,8 +28,14 @@ Assurez-vous d'avoir l'interface de ligne de commande `gcloud` installée et aut
 # Set your active GCP project
 gcloud config set project YOUR_PROJECT_ID
 
-# Submit the build to Cloud Build, which automatically creates the container image and stores it in Google Container Registry (GCR)
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/rebase-backend ./backend
+# Authenticate Docker to the registry (one-time)
+gcloud auth configure-docker gcr.io
+
+# Build from the PROJECT ROOT — the backend Dockerfile needs the whole
+# workspace as its build context (pnpm-workspace.yaml, backend/, config/),
+# so a ./backend context will fail. Then push.
+docker build -f backend/Dockerfile -t gcr.io/YOUR_PROJECT_ID/rebase-backend .
+docker push gcr.io/YOUR_PROJECT_ID/rebase-backend
 
 # Deploy the newly built image to Cloud Run
 gcloud run deploy rebase-backend \
@@ -47,5 +53,15 @@ gcloud run deploy rebase-backend \
 2. Suivez la [Documentation de stockage de Rebase](/docs/storage) pour configurer Rebase afin d'utiliser l'API compatible S3 fournie par Google Cloud Storage au lieu du système de fichiers local.
 
 Votre instance Rebase est maintenant entièrement sans serveur et hautement évolutive nativement au sein de l'UE !
+
+## Créer le schéma de base de données
+
+Le service est en cours d'exécution, mais Rebase ne crée automatiquement que les tables d'**authentification** au démarrage — les tables de vos propres collections ne sont **pas** créées automatiquement. Exécutez cette commande une fois sur la base de données de production, sinon chaque collection renverra une erreur « missing table » :
+
+```bash
+pnpm run db:push
+```
+
+Exécutez-la depuis un checkout de votre projet (ou depuis votre job CI) avec `DATABASE_URL` pointant vers votre instance Cloud SQL. Depuis votre machine, connectez-vous via le [proxy d'authentification Cloud SQL](https://cloud.google.com/sql/docs/postgres/sql-proxy) et faites pointer `DATABASE_URL` vers `localhost`. L'image déployée n'inclut pas la CLI, cette commande ne s'exécute donc pas à l'intérieur du conteneur Cloud Run. Pour des migrations versionnées, validez les fichiers de migration avec `pnpm run db:generate` et exécutez `pnpm run db:migrate` à la place.
 
 ---

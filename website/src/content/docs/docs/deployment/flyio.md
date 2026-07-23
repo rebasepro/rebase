@@ -46,7 +46,11 @@ app = "my-rebase-app"
 primary_region = "fra"
 
 [build]
-  dockerfile = "Dockerfile"
+  # The scaffold's Dockerfile lives at backend/Dockerfile, and its build
+  # context is the project root (where fly.toml sits) so it can copy
+  # pnpm-workspace.yaml, backend/, and config/. Pointing this at a bare
+  # "Dockerfile" (repo root) will fail — there is none there.
+  dockerfile = "backend/Dockerfile"
 
 [http_service]
   internal_port = 3001 # Make sure this matches your Hono app port
@@ -65,3 +69,13 @@ fly deploy
 ```
 
 Once parsing and uploading completes, your application will come online automatically. Run `fly open` to view your deployed app in the browser!
+
+## 5. Create the Database Schema
+
+The app is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Postgres connection string. For a private Fly Postgres, open a tunnel first with `fly proxy 5432 -a <your-db-app>` and point `DATABASE_URL` at `localhost:5432`. The deployed image doesn't include the CLI, so this doesn't run inside the machine and a `release_command` can't call it either. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.

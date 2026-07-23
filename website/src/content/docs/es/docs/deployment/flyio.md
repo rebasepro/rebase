@@ -40,7 +40,7 @@ app = "my-rebase-app"
 primary_region = "fra"
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "backend/Dockerfile" # El Dockerfile del backend necesita todo el workspace como contexto de compilación
 
 [http_service]
   internal_port = 3001 # Make sure this matches your Hono app port
@@ -59,4 +59,18 @@ fly deploy
 ```
 
 Una vez que el análisis y la carga se completen, tu aplicación estará en línea automáticamente. ¡Ejecuta `fly open` para ver tu aplicación desplegada en el navegador!
+
+## 5. Crear el Esquema de la Base de Datos
+
+Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de tus propias colecciones **no se crean automáticamente**. Debes aplicar el esquema una vez contra la base de datos de producción:
+
+```bash
+pnpm run db:push
+```
+
+Si omites este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta.
+
+Ejecútalo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a la base de datos de producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Como la base de datos de Fly no está expuesta públicamente, abre un túnel local con `fly proxy 5432 -a my-rebase-app-db` y apunta `DATABASE_URL` a `localhost:5432` mientras lo ejecutas.
+
+Para migraciones versionadas, usa `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
 ---

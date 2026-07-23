@@ -26,10 +26,10 @@ Scaleway Serverless Containers führen Standard-Docker-Images aus. Erstellen Sie
 
 1. Gehen Sie in der Scaleway Konsole zu **Container Registry** und erstellen Sie einen Namespace (z.B. `rebase-apps`).
 2. Melden Sie sich vom lokalen Terminal aus mit den bereitgestellten Anweisungen bei der Registry an.
-3. Erstellen Sie Ihre Rebase-App mit dem generierten `Dockerfile`:
+3. Erstellen Sie Ihre Rebase-App mit dem generierten `Dockerfile` — aus dem Projekt-Stammverzeichnis, da das Backend-`Dockerfile` den gesamten Workspace als Build-Kontext benötigt (es kopiert `pnpm-workspace.yaml`, `backend/` und `config/`):
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest ./backend
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
 ```
 
 4. Pushen Sie das Image:
@@ -59,4 +59,18 @@ Stellen Sie das Image nun vollständig serverless bereit, ohne Infrastruktur ver
 Scaleway wird den Container sofort bereitstellen und Ihnen eine öffentliche Endpunkt-URL zur Verfügung stellen (z.B. `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`).
 
 *Hinweis: Zur strikten Einhaltung der Datenvorschriften stellen Sie sicher, dass Ihre Scaleway Organisationsdetails Ihrer europäischen Unternehmenseinheit entsprechen.*
+
+## 4. Datenbankschema erstellen
+
+Beim Start erstellt Rebase automatisch **nur die Auth-Tabellen**. Die Tabellen für Ihre eigenen Collections werden **nicht** automatisch angelegt — Sie müssen das Schema einmalig gegen die Produktionsdatenbank pushen:
+
+```bash
+pnpm run db:push
+```
+
+Ohne diesen Schritt gibt jede Collection einen `missing table`-Fehler zurück. Die Falle dabei: Die App startet trotzdem und die Anmeldung funktioniert (die Auth-Tabellen existieren), sodass die Bereitstellung zunächst gesund aussieht.
+
+Führen Sie den Befehl aus einem Projekt-Checkout oder aus CI aus, wobei `DATABASE_URL` auf die Produktionsdatenbank zeigt — **nicht** im Container, da das Produktions-Image ohne die CLI ausgeliefert wird. Die Managed Database von Scaleway ist über ihre öffentliche Verbindungszeichenfolge erreichbar; verwenden Sie diese URI (idealerweise mit einer auf Ihre IP beschränkten ACL), um die Datenbank von Ihrem Rechner aus zu erreichen.
+
+Für versionierte Migrationen verwenden Sie stattdessen `pnpm run db:generate` und `pnpm run db:migrate`.
 ---

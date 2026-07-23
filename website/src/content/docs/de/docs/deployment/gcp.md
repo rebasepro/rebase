@@ -28,8 +28,15 @@ Stellen Sie sicher, dass die `gcloud`-CLI installiert und authentifiziert ist:
 # Set your active GCP project
 gcloud config set project YOUR_PROJECT_ID
 
-# Submit the build to Cloud Build, which automatically creates the container image and stores it in Google Container Registry (GCR)
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/rebase-backend ./backend
+# Authenticate Docker against the registry host (one-time)
+gcloud auth configure-docker gcr.io
+
+# Build from the project root — the backend Dockerfile needs the whole workspace
+# as its build context (pnpm-workspace.yaml, backend/, config/)
+docker build -f backend/Dockerfile -t gcr.io/YOUR_PROJECT_ID/rebase-backend .
+
+# Push the image to the registry
+docker push gcr.io/YOUR_PROJECT_ID/rebase-backend
 
 # Deploy the newly built image to Cloud Run
 gcloud run deploy rebase-backend \
@@ -47,5 +54,19 @@ Da Cloud Run-Instanzen streng zustandslos und kurzlebig sind, können Sie keinen
 2. Befolgen Sie die [Rebase Speicher-Dokumentation](/docs/storage), um Rebase so zu konfigurieren, dass es die von Google Cloud Storage bereitgestellte S3-kompatible API anstelle des lokalen Dateisystems verwendet.
 
 Ihre Rebase-Instanz ist jetzt vollständig serverlos und nativ in der EU hochskalierbar!
+
+## 4. Datenbankschema erstellen
+
+Beim Start erstellt Rebase automatisch **nur die Auth-Tabellen**. Die Tabellen für Ihre eigenen Collections werden **nicht** automatisch angelegt — Sie müssen das Schema einmalig gegen die Produktionsdatenbank pushen:
+
+```bash
+pnpm run db:push
+```
+
+Ohne diesen Schritt gibt jede Collection einen `missing table`-Fehler zurück. Die Falle dabei: Die App startet trotzdem und die Anmeldung funktioniert (die Auth-Tabellen existieren), sodass die Bereitstellung zunächst gesund aussieht.
+
+Führen Sie den Befehl aus einem Projekt-Checkout oder aus CI aus, wobei `DATABASE_URL` auf die Produktionsdatenbank zeigt — **nicht** im Container, da das Produktions-Image ohne die CLI ausgeliefert wird. Starten Sie den Cloud SQL Auth Proxy lokal und richten Sie `DATABASE_URL` auf `127.0.0.1`, um die Cloud SQL-Instanz sicher zu erreichen.
+
+Für versionierte Migrationen verwenden Sie stattdessen `pnpm run db:generate` und `pnpm run db:migrate`.
 
 ---

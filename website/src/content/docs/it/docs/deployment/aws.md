@@ -25,9 +25,9 @@ AWS App Runner preleva direttamente da ECR. Costruisci la tua immagine Docker lo
 
 1. Naviga su **Elastic Container Registry** e crea un nuovo repository privato chiamato `rebase-backend`.
 2. Recupera i comandi di push forniti da AWS nella console (che gestiscono l'autenticazione Docker).
-3. Costruisci la tua immagine localmente dalla cartella principale:
+3. Costruisci la tua immagine localmente dalla radice del progetto — il Dockerfile del backend ha bisogno dell'intero workspace come contesto di build (copia `pnpm-workspace.yaml`, `backend/` e `config/`):
    ```bash
-   docker build -t rebase-backend ./backend
+   docker build -t rebase-backend -f backend/Dockerfile .
    ```
 4. Tagga e caricala nel tuo repository ECR appena creato.
 
@@ -51,5 +51,19 @@ App Runner è il modo più semplice per eseguire container su AWS senza gestire 
 7. Clicca su **Crea e implementa**.
 
 AWS gestirà la terminazione TLS (fornendo un URL `https` pronto all'uso) e avvierà il server Rebase.
+
+## 4. Crea lo Schema del Database
+
+All'avvio Rebase crea automaticamente **solo le tabelle di autenticazione**. Le tabelle per le tue collezioni **non** vengono create automaticamente: l'app si avvia comunque e il login funziona, quindi è facile non accorgersene, finché ogni collezione non restituisce un errore "missing table".
+
+Esegui la sincronizzazione dello schema una volta contro il database di produzione:
+
+```bash
+pnpm run db:push
+```
+
+Eseguilo da un checkout del progetto o dalla CI con `DATABASE_URL` che punta alla produzione, **non** dall'interno del container: l'immagine di produzione non include la CLI. Poiché l'istanza RDS di solito vive in una VPC privata, esegui il comando da un host che può raggiungerla — ad esempio un bastion nella stessa VPC o un job CI con accesso di rete al database.
+
+Se preferisci migrazioni versionate a una sincronizzazione diretta, usa invece `pnpm run db:generate` seguito da `pnpm run db:migrate`.
 
 ---

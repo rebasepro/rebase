@@ -40,7 +40,9 @@ app = "my-rebase-app"
 primary_region = "fra"
 
 [build]
-  dockerfile = "Dockerfile"
+  # Il contesto di build è la radice del progetto: il Dockerfile del backend
+  # ha bisogno dell'intero workspace (pnpm-workspace.yaml, backend/, config/)
+  dockerfile = "backend/Dockerfile"
 
 [http_service]
   internal_port = 3001 # Assicurati che questo corrisponda alla porta della tua app Hono
@@ -59,5 +61,19 @@ fly deploy
 ```
 
 Una volta completati il parsing e l'upload, la tua applicazione sarà online automaticamente. Esegui `fly open` per visualizzare la tua app deployata nel browser!
+
+## 5. Crea lo Schema del Database
+
+All'avvio Rebase crea automaticamente **solo le tabelle di autenticazione**. Le tabelle per le tue collezioni **non** vengono create automaticamente: l'app si avvia comunque e il login funziona, quindi è facile non accorgersene, finché ogni collezione non restituisce un errore "missing table".
+
+Esegui la sincronizzazione dello schema una volta contro il database di produzione:
+
+```bash
+pnpm run db:push
+```
+
+Eseguilo da un checkout del progetto o dalla CI con `DATABASE_URL` che punta alla produzione, **non** dall'interno del container: l'immagine di produzione non include la CLI. Il database Fly Postgres non è esposto pubblicamente: apri un tunnel locale con `fly proxy 5432 -a my-rebase-app-db` e imposta `DATABASE_URL` in modo che punti a `localhost:5432` mentre esegui il comando.
+
+Se preferisci migrazioni versionate a una sincronizzazione diretta, usa invece `pnpm run db:generate` seguito da `pnpm run db:migrate`.
 
 ---

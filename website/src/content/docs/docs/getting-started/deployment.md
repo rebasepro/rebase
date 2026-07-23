@@ -25,36 +25,34 @@ On the first visit to a fresh deployment's admin, Rebase shows a bootstrap scree
 
 ## Docker Compose (Recommended)
 
-The generated project includes a `Dockerfile` and `docker-compose.yml`. This is the simplest way to deploy:
+The generated project already includes a working `docker-compose.yml` (Postgres + backend + frontend) and the `backend/`/`frontend/` Dockerfiles — that generated file is the source of truth; use it as-is rather than hand-writing one. The shape is:
 
-```yaml title="docker-compose.yml"
+```yaml title="docker-compose.yml (generated — abridged)"
 services:
-  postgres:
+  db:
     image: postgres:18-alpine
     environment:
       POSTGRES_USER: rebase
-      POSTGRES_PASSWORD: rebase
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
       POSTGRES_DB: rebase
-    volumes:
-      - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
-  app:
-    build: ./backend
+  backend:
+    build:
+      # Context is the PROJECT ROOT so the image can copy
+      # pnpm-workspace.yaml, backend/, and config/. A `./backend`
+      # context would fail — the Dockerfile lives at backend/Dockerfile.
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "3001:3001"
-    environment:
-      DATABASE_URL: postgresql://rebase:rebase@postgres:5432/rebase
-      JWT_SECRET: ${JWT_SECRET}
-      NODE_ENV: production
+    env_file: .env
     depends_on:
-      - postgres
-    volumes:
-      - uploads:/app/uploads
+      - db
 
 volumes:
-  pgdata:
+  postgres_data:
   uploads:
 ```
 
@@ -62,12 +60,39 @@ volumes:
 docker compose up -d
 ```
 
+### Create the database schema
+
+Bringing the stack up is **not enough on its own.** The backend boots and
+auto-creates the **auth** tables, but it does **not** create the tables for
+your own collections — you run that once, explicitly, against the production
+database. From a checkout of your project (with dependencies installed), set
+`DATABASE_URL` to your production database and push the schema:
+
+```bash
+pnpm run db:push
+```
+
+:::caution[Required — or every collection returns errors]
+Skip this step and the app still starts and you can log in, but each of your
+collections is empty and its API calls fail with a "missing table" error until
+the schema exists. On startup the server logs a boxed warning naming exactly
+which tables are missing and the command to run.
+:::
+
+`db:push` is the fast option — it applies the schema directly, with no
+migration files. For a **versioned, team workflow**, commit migration files
+with `pnpm run db:generate` and run `pnpm run db:migrate` as a release step
+instead. Whichever you choose, it runs against the production `DATABASE_URL`
+from a project checkout (or your CI job), not inside the running container —
+the production image ships without the CLI.
+
 ## Production Checklist
 
 Before deploying to production, ensure:
 
 | Item | Details |
 |------|---------|
+| **Database schema** | Run `pnpm run db:push` (or `pnpm run db:migrate` for versioned migrations) against the production database once. The app boots without your collection tables, but every collection errors until they exist. |
 | **JWT_SECRET** | Use a cryptographically strong random string (≥ 32 chars). Never reuse across environments. |
 | **DATABASE_URL** | Use a managed Postgres instance (Neon, Supabase, RDS) with TLS enabled |
 | **CORS** | Configure allowed origins on your backend if frontend and backend are on different domains |

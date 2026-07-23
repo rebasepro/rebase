@@ -26,10 +26,10 @@ Scaleway Serverless Containers run standard Docker images. First, build the Reba
 
 1. Go to **Container Registry** in the Scaleway Console and create a Namespace (e.g., `rebase-apps`).
 2. Log in to the registry from your local terminal using the provided instructions.
-3. Build your Rebase app using the generated `Dockerfile`:
+3. Build your Rebase app using the generated `Dockerfile`, **from the project root** — the backend Dockerfile needs the whole workspace as its build context (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`), so `./backend` as the context will fail:
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest ./backend
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
 ```
 
 4. Push the image:
@@ -63,3 +63,13 @@ Now deploy the image completely serverless without managing infrastructure.
 Scaleway will immediately provision the container and provide you with a public endpoint URL (e.g., `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`). 
 
 *Note: For strict data compliance, verify that your Scaleway Organization details reflect your European corporate entity.*
+
+## 4. Create the Database Schema
+
+The container is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Scaleway Managed Database connection string. The deployed image doesn't include the CLI, so this doesn't run inside the container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.

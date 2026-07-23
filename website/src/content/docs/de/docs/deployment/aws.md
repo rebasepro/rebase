@@ -25,9 +25,9 @@ AWS App Runner zieht direkt von ECR. Erstellen Sie Ihr Docker-Image lokal und pu
 
 1. Navigieren Sie zu **Elastic Container Registry** und erstellen Sie ein neues privates Repository namens `rebase-backend`.
 2. Rufen Sie die von AWS in der Konsole bereitgestellten Push-Befehle ab (die die Docker-Authentifizierung handhaben).
-3. Erstellen Sie Ihr Image lokal aus dem Stammordner:
+3. Erstellen Sie Ihr Image lokal aus dem Projekt-Stammverzeichnis — das Backend-`Dockerfile` benötigt den gesamten Workspace als Build-Kontext (es kopiert `pnpm-workspace.yaml`, `backend/` und `config/`):
    ```bash
-   docker build -t rebase-backend ./backend
+   docker build -t rebase-backend -f backend/Dockerfile .
    ```
 4. Taggen Sie es und pushen Sie es in Ihr neu erstelltes ECR-Repository.
 
@@ -51,4 +51,18 @@ App Runner ist der einfachste Weg, Container auf AWS auszuführen, ohne Orchestr
 7. Klicken Sie auf **Erstellen & bereitstellen**.
 
 AWS übernimmt die TLS-Terminierung (stellt standardmäßig eine `https`-URL bereit) und startet den Rebase-Server.
+
+## 4. Datenbankschema erstellen
+
+Beim Start erstellt Rebase automatisch **nur die Auth-Tabellen**. Die Tabellen für Ihre eigenen Collections werden **nicht** automatisch angelegt — Sie müssen das Schema einmalig gegen die Produktionsdatenbank pushen:
+
+```bash
+pnpm run db:push
+```
+
+Ohne diesen Schritt gibt jede Collection einen `missing table`-Fehler zurück. Die Falle dabei: Die App startet trotzdem und die Anmeldung funktioniert (die Auth-Tabellen existieren), sodass die Bereitstellung zunächst gesund aussieht.
+
+Führen Sie den Befehl aus einem Projekt-Checkout oder aus CI aus, wobei `DATABASE_URL` auf die Produktionsdatenbank zeigt — **nicht** im Container, da das Produktions-Image ohne die CLI ausgeliefert wird. Da RDS in der Regel innerhalb einer VPC liegt, verbinden Sie sich über einen Bastion-Host (oder eine vorübergehend autorisierte öffentliche IP), um die Produktionsdatenbank von Ihrem Rechner aus zu erreichen.
+
+Für versionierte Migrationen verwenden Sie stattdessen `pnpm run db:generate` und `pnpm run db:migrate`.
 ---

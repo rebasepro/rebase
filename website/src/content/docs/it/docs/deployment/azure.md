@@ -27,9 +27,9 @@ Azure Container Apps estrarrà la tua immagine Docker da ACR.
    ```bash
    az acr login --name YourRegistryName
    ```
-3. Compila ed esegui il push dell'immagine Rebase dal tuo repository locale:
+3. Compila ed esegui il push dell'immagine Rebase dalla radice del progetto — il Dockerfile del backend ha bisogno dell'intero workspace come contesto di build (copia `pnpm-workspace.yaml`, `backend/` e `config/`):
    ```bash
-   docker build -t yourregistryname.azurecr.io/rebase-backend:latest ./backend
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f backend/Dockerfile .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
 
@@ -51,5 +51,19 @@ Azure Container Apps fornisce un ambiente container serverless con ingresso HTTP
 5. Sotto la scheda **Ingresso**, abilita esplicitamente l'Ingresso.
 6. Imposta la Porta Target su **3001**.
 7. Completa la creazione. Azure effettuerà automaticamente il provisioning del container e ti fornirà un URL dell'applicazione protetto con TLS!
+
+## 4. Crea lo Schema del Database
+
+All'avvio Rebase crea automaticamente **solo le tabelle di autenticazione**. Le tabelle per le tue collezioni **non** vengono create automaticamente: l'app si avvia comunque e il login funziona, quindi è facile non accorgersene, finché ogni collezione non restituisce un errore "missing table".
+
+Esegui la sincronizzazione dello schema una volta contro il database di produzione:
+
+```bash
+pnpm run db:push
+```
+
+Eseguilo da un checkout del progetto o dalla CI con `DATABASE_URL` che punta alla produzione, **non** dall'interno del container: l'immagine di produzione non include la CLI. Assicurati che una regola del firewall del Flexible Server consenta l'IP da cui esegui il comando (o che sia abilitata l'opzione "Consenti l'accesso pubblico dai servizi di Azure"), altrimenti la connessione verrà rifiutata.
+
+Se preferisci migrazioni versionate a una sincronizzazione diretta, usa invece `pnpm run db:generate` seguito da `pnpm run db:migrate`.
 
 ---

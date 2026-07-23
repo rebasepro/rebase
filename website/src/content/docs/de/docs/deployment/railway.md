@@ -23,6 +23,10 @@ Zusätzlich unterstützt Railway vollständig europäische Bereitstellungsregion
 2. Wählen Sie Ihr Rebase-Repository aus.
 3. Railway erkennt das Repository sofort und sucht nach einer `Dockerfile`. Warten Sie, bis der erste Build beginnt.
 
+:::caution
+Setzen Sie unter **Settings → Build** den **Dockerfile Path** auf `backend/Dockerfile` und belassen Sie das **Root Directory** im Repository-Stammverzeichnis. Das Backend-`Dockerfile` benötigt den gesamten Workspace als Build-Kontext (es kopiert `pnpm-workspace.yaml`, `backend/` und `config/`) — zeigt das Root Directory auf `backend/`, schlägt der Build beim ersten `COPY` fehl.
+:::
+
 ## 4. Umgebungsvariablen festlegen
 Der erste Build könnte fehlschlagen, da die Konfiguration vollständig fehlt. Lassen Sie uns das beheben.
 
@@ -39,5 +43,19 @@ Der erste Build könnte fehlschlagen, da die Konfiguration vollständig fehlt. L
 3. Unter **Öffentliches Netzwerk** klicken Sie auf **Domain generieren**. Railway stellt eine Test-URL der Form `.up.railway.app` bereit. Sie können hier auch sicher eine benutzerdefinierte Domain anhängen.
 
 Railway wird automatisch und sicher neu aufbauen. Ihre in der EU gehostete Plattform ist nun vollständig live!
+
+## 6. Datenbankschema erstellen
+
+Beim Start erstellt Rebase automatisch **nur die Auth-Tabellen**. Die Tabellen für Ihre eigenen Collections werden **nicht** automatisch angelegt — Sie müssen das Schema einmalig gegen die Produktionsdatenbank pushen:
+
+```bash
+pnpm run db:push
+```
+
+Ohne diesen Schritt gibt jede Collection einen `missing table`-Fehler zurück. Die Falle dabei: Die App startet trotzdem und die Anmeldung funktioniert (die Auth-Tabellen existieren), sodass die Bereitstellung zunächst gesund aussieht.
+
+Führen Sie den Befehl aus einem Projekt-Checkout oder aus CI aus, wobei `DATABASE_URL` auf die Produktionsdatenbank zeigt — **nicht** im Container, da das Produktions-Image ohne die CLI ausgeliefert wird. Verwenden Sie die öffentliche Verbindungszeichenfolge Ihres Railway-Postgres-Dienstes (Postgres-Widget → **Variablen** → **Public Networking**), um die Datenbank von Ihrem Rechner aus zu erreichen.
+
+Für versionierte Migrationen verwenden Sie stattdessen `pnpm run db:generate` und `pnpm run db:migrate`.
 
 ---

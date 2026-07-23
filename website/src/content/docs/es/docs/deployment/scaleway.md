@@ -29,8 +29,10 @@ Los Contenedores Serverless de Scaleway ejecutan imágenes Docker estándar. Pri
 3. Construye tu aplicación Rebase usando el `Dockerfile` generado:
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest ./backend
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
 ```
+
+Construye desde la raíz del proyecto — el Dockerfile del backend necesita todo el workspace como contexto de compilación (copia `pnpm-workspace.yaml`, `backend/` y `config/`), por lo que usar `./backend` como contexto falla.
 
 4. Empuja la imagen:
 
@@ -57,6 +59,20 @@ Ahora despliega la imagen completamente serverless sin gestionar infraestructura
 6. Haz clic en **Desplegar Contenedor**.
 
 Scaleway aprovisionará inmediatamente el contenedor y te proporcionará una URL de endpoint público (ej., `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`).
+
+## 4. Crear el Esquema de la Base de Datos
+
+Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de tus propias colecciones **no se crean automáticamente**. Debes aplicar el esquema una vez contra la base de datos de producción:
+
+```bash
+pnpm run db:push
+```
+
+Si omites este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta.
+
+Ejecútalo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a la base de datos de producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Usa la cadena de conexión (URI) de tu instancia de Base de Datos Gestionada y asegúrate de que tu IP esté permitida en las ACL de la base de datos mientras ejecutas el comando.
+
+Para migraciones versionadas, usa `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
 
 *Nota: Para un cumplimiento estricto de los datos, verifica que los detalles de tu Organización de Scaleway reflejen tu entidad corporativa europea.*
 

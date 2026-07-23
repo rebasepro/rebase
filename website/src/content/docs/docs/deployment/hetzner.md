@@ -101,3 +101,13 @@ systemctl restart caddy
 ```
 
 That's it! Your Rebase platform is securely hosted entirely within the EU.
+
+## 6. Create the Database Schema
+
+The stack is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error. From your project checkout on the server (with dependencies installed), point `DATABASE_URL` at the Postgres container and push the schema:
+
+```bash
+pnpm run db:push
+```
+
+For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead. On startup the server logs a boxed warning naming exactly which tables are missing and the command to run.

@@ -31,8 +31,14 @@ gcloud config set project YOUR_PROJECT_ID
 # Create an Artifact Registry repository (one-time)
 gcloud artifacts repositories create rebase --repository-format=docker --location=europe-west3
 
-# Build and push using Cloud Build
-gcloud builds submit --tag europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest ./backend
+# Authenticate Docker to Artifact Registry (one-time)
+gcloud auth configure-docker europe-west3-docker.pkg.dev
+
+# Build from the PROJECT ROOT — the backend Dockerfile needs the whole
+# workspace as its build context (pnpm-workspace.yaml, backend/, config/),
+# so a ./backend context will fail. Then push.
+docker build -f backend/Dockerfile -t europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest .
+docker push europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest
 
 # Deploy the image to Cloud Run
 gcloud run deploy rebase-backend \
@@ -50,3 +56,13 @@ Since Cloud Run instances are strictly stateless and ephemeral, you cannot use l
 2. Follow the [Rebase Storage Documentation](/docs/storage) to configure Rebase to use the S3-compatible API provided by Google Cloud Storage instead of the local filesystem.
 
 Your Rebase instance is now fully serverless and highly scalable natively inside the EU!
+
+## Create the Database Schema
+
+The service is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Cloud SQL instance. From your machine, connect through the [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) and point `DATABASE_URL` at `localhost`. The deployed image doesn't include the CLI, so this doesn't run inside the Cloud Run container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.

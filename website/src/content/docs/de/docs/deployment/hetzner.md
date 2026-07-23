@@ -66,7 +66,21 @@ docker compose --env-file .env.production up -d --build
 
 Docker erstellt Ihr Node.js-Backend aus dem lokalen `Dockerfile` und startet den Postgres-Container. Nach Abschluss läuft Ihre App auf `http://localhost:3001` (intern auf dem Server).
 
-## 5. Über Caddy oder Nginx verfügbar machen
+## 5. Datenbankschema erstellen
+
+Beim Start erstellt Rebase automatisch **nur die Auth-Tabellen**. Die Tabellen für Ihre eigenen Collections werden **nicht** automatisch angelegt — Sie müssen das Schema einmalig gegen die Produktionsdatenbank pushen:
+
+```bash
+pnpm run db:push
+```
+
+Ohne diesen Schritt gibt jede Collection einen `missing table`-Fehler zurück. Die Falle dabei: Die App startet trotzdem und die Anmeldung funktioniert (die Auth-Tabellen existieren), sodass die Bereitstellung zunächst gesund aussieht.
+
+Führen Sie den Befehl aus einem Projekt-Checkout aus, wobei `DATABASE_URL` auf die Produktionsdatenbank zeigt — **nicht** im App-Container, da das Produktions-Image ohne die CLI ausgeliefert wird. Da Sie das Projekt bereits nach `/opt/rebase` geklont haben, führen Sie ihn direkt auf dem Server aus diesem Checkout aus (mit `DATABASE_URL`, das auf den Postgres-Container zeigt).
+
+Für versionierte Migrationen verwenden Sie stattdessen `pnpm run db:generate` und `pnpm run db:migrate`.
+
+## 6. Über Caddy oder Nginx verfügbar machen
 
 Sie sollten Port 3001 niemals direkt und ohne SSL dem Internet aussetzen. Wir empfehlen, **Caddy** vor Ihre Rebase-Instanz zu stellen, um Let's Encrypt-Zertifikate automatisch bereitzustellen.
 

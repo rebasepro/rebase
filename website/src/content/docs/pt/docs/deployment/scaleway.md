@@ -26,10 +26,10 @@ Os Scaleway Serverless Containers executam imagens Docker padrão. Primeiro, con
 
 1. Vá para **Container Registry** no Console Scaleway e crie um Namespace (ex: `rebase-apps`).
 2. Faça login no registro a partir do seu terminal local usando as instruções fornecidas.
-3. Construa sua aplicação Rebase usando o `Dockerfile` gerado:
+3. Construa sua aplicação Rebase a partir da raiz do projeto — o Dockerfile do backend precisa de todo o workspace como contexto de build (ele copia `pnpm-workspace.yaml`, `backend/` e `config/`), por isso o contexto é `.` e não `./backend`:
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest ./backend
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
 ```
 
 4. Envie a imagem:
@@ -57,5 +57,19 @@ Agora implemente a imagem de forma totalmente serverless sem gerenciar infraestr
 6. Clique em **Implementar Contêiner**.
 
 A Scaleway provisionará imediatamente o contêiner e fornecerá um URL de endpoint público (ex: `https://rebase-backend-xxxx.functions.fnc.fr-par.scw.cloud`).
+
+## 4. Criar o Esquema do Banco de Dados
+
+Ao iniciar, o Rebase cria automaticamente **apenas as tabelas de autenticação**. As tabelas das suas próprias coleções **não** são criadas automaticamente. A aplicação sobe normalmente e o login funciona — por isso a armadilha passa despercebida —, mas toda coleção retorna um erro de tabela ausente ("missing table") até você aplicar o esquema.
+
+Execute `pnpm run db:push` **uma vez** contra o banco de dados de produção:
+
+```bash
+DATABASE_URL="<o URI do seu Postgres Gerenciado>" pnpm run db:push
+```
+
+Rode isso a partir de um checkout do projeto ou da sua CI, com a `DATABASE_URL` apontando para produção — **não** dentro do contêiner, pois a imagem de produção não inclui a CLI. O Managed Database da Scaleway expõe um endpoint público, então use a mesma string de conexão do passo do Postgres Gerenciado para executar o comando a partir da sua máquina.
+
+Para migrações versionadas, use `pnpm run db:generate` seguido de `pnpm run db:migrate` em vez de `db:push`.
 
 *Nota: Para conformidade de dados rigorosa, verifique se os detalhes da sua Organização Scaleway refletem sua entidade corporativa europeia.*

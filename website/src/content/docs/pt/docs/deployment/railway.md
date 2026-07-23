@@ -23,6 +23,10 @@ Além disso, o Railway oferece suporte total a regiões de implantação europei
 2. Selecione seu repositório Rebase.
 3. O Railway detectará imediatamente o repositório e procurará por um `Dockerfile`. Espere o início da construção inicial.
 
+:::caution
+O Dockerfile do backend precisa do repositório inteiro como contexto de build (ele copia `pnpm-workspace.yaml`, `backend/` e `config/`). Vá em **Settings → Build** e defina o **Dockerfile Path** como `backend/Dockerfile`, mantendo o **Root Directory** na raiz do repositório. Se você apontar o Root Directory para `backend/`, o build falha porque o restante do workspace fica fora do contexto.
+:::
+
 ## 4. Defina as Variáveis de Ambiente
 A construção inicial pode falhar porque está completamente sem configuração. Vamos corrigir isso.
 
@@ -39,5 +43,19 @@ A construção inicial pode falhar porque está completamente sem configuração
 3. Em **Public Networking**, clique em **Generate Domain**. O Railway fornecerá uma URL de teste `.up.railway.app`. Você também pode anexar com segurança um Domínio Personalizado aqui.
 
 O Railway reconstruirá automaticamente com segurança. Sua plataforma hospedada na UE agora está totalmente ativa!
+
+## 6. Criar o Esquema do Banco de Dados
+
+Ao iniciar, o Rebase cria automaticamente **apenas as tabelas de autenticação**. As tabelas das suas próprias coleções **não** são criadas automaticamente. A aplicação sobe normalmente e o login funciona — por isso a armadilha passa despercebida —, mas toda coleção retorna um erro de tabela ausente ("missing table") até você aplicar o esquema.
+
+Execute `pnpm run db:push` **uma vez** contra o banco de dados de produção:
+
+```bash
+DATABASE_URL="<string de conexão pública do Postgres>" pnpm run db:push
+```
+
+Rode isso a partir de um checkout do projeto ou da sua CI, com a `DATABASE_URL` apontando para produção — **não** dentro do contêiner, pois a imagem de produção não inclui a CLI. Use a string de conexão pública do serviço PostgreSQL do Railway (a aba **Variables** também expõe uma variável `DATABASE_PUBLIC_URL`) para alcançar o banco a partir da sua máquina.
+
+Para migrações versionadas, use `pnpm run db:generate` seguido de `pnpm run db:migrate` em vez de `db:push`.
 
 ---

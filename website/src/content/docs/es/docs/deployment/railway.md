@@ -23,6 +23,10 @@ Además, Railway es totalmente compatible con las regiones de despliegue europea
 2. Seleccione su repositorio de Rebase.
 3. Railway detectará inmediatamente el repositorio y buscará un `Dockerfile`. Espere a que comience la construcción inicial.
 
+:::caution
+Por defecto, Railway busca el `Dockerfile` en la raíz del repositorio. Vaya a **Settings -> Build** y establezca la **Dockerfile Path** en `backend/Dockerfile`, dejando el **Root Directory** en la raíz del repositorio. El Dockerfile del backend necesita todo el workspace como contexto de compilación (copia `pnpm-workspace.yaml`, `backend/` y `config/`), así que el contexto de compilación debe ser la raíz del repositorio, no `backend/`.
+:::
+
 ## 4. Establecer Variables de Entorno
 La construcción inicial podría fallar porque le falta completamente la configuración. Vamos a solucionar eso.
 
@@ -33,7 +37,21 @@ La construcción inicial podría fallar porque le falta completamente la configu
    - `NODE_ENV`: Establezca en `production`
 4. Haga clic en **Referenciar Variable** y seleccione `DATABASE_URL` del servicio PostgreSQL que aprovisionó. Railway inyectará de forma segura la URL interna de Postgres en tiempo de ejecución.
 
-## 5. Exponer el Dominio
+## 5. Crear el Esquema de la Base de Datos
+
+Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de sus propias colecciones **no se crean automáticamente**. Debe aplicar el esquema una vez contra la base de datos de producción:
+
+```bash
+pnpm run db:push
+```
+
+Si omite este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta.
+
+Ejecútelo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a la base de datos de producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Use la cadena de conexión pública de su servicio de PostgreSQL en Railway (la variable `DATABASE_PUBLIC_URL`, en la pestaña **Variables**) para poder ejecutarlo desde su máquina local; la `DATABASE_URL` interna solo es accesible dentro de la red de Railway.
+
+Para migraciones versionadas, use `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
+
+## 6. Exponer el Dominio
 1. En la tarjeta de servicio de Rebase, navegue hasta la pestaña **Configuración**.
 2. Desplácese hasta **Redes**.
 3. En **Redes Públicas**, haga clic en **Generar Dominio**. Railway proporcionará una URL de prueba `.up.railway.app`. También puede adjuntar de forma segura un Dominio Personalizado aquí.

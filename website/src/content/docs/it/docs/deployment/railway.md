@@ -23,6 +23,10 @@ Inoltre, Railway supporta pienamente le regioni di deployment europee (Amsterdam
 2. Seleziona il tuo repository Rebase.
 3. Railway rileverà immediatamente il repository e cercherà un `Dockerfile`. Attendi l'inizio della build iniziale.
 
+:::caution
+Railway per impostazione predefinita cerca un `Dockerfile` nella radice del repository, ma il Dockerfile del backend di Rebase si trova in `backend/`. Vai su **Settings → Build** e imposta **Dockerfile Path** su `backend/Dockerfile`, lasciando la **Root Directory** alla radice del repository. Il Dockerfile del backend ha bisogno dell'intero workspace come contesto di build (copia `pnpm-workspace.yaml`, `backend/` e `config/`), quindi la Root Directory non deve essere impostata su `backend`.
+:::
+
 ## 4. Impostare le Variabili d'Ambiente
 La build iniziale potrebbe fallire perché manca completamente la configurazione. Risolviamo il problema.
 
@@ -39,5 +43,19 @@ La build iniziale potrebbe fallire perché manca completamente la configurazione
 3. Sotto **Public Networking**, clicca su **Genera Dominio**. Railway fornirà un URL di testing `.up.railway.app`. Qui puoi anche allegare in modo sicuro un Dominio Personalizzato.
 
 Railway ricostruirà automaticamente in modo sicuro. La tua piattaforma ospitata nell'UE è ora completamente attiva!
+
+## 6. Crea lo Schema del Database
+
+All'avvio Rebase crea automaticamente **solo le tabelle di autenticazione**. Le tabelle per le tue collezioni **non** vengono create automaticamente: l'app si avvia comunque e il login funziona, quindi è facile non accorgersene, finché ogni collezione non restituisce un errore "missing table".
+
+Esegui la sincronizzazione dello schema una volta contro il database di produzione:
+
+```bash
+pnpm run db:push
+```
+
+Eseguilo da un checkout del progetto o dalla CI con `DATABASE_URL` che punta alla produzione, **non** dall'interno del container: l'immagine di produzione non include la CLI. Railway espone una stringa di connessione pubblica per il database Postgres (nella scheda **Variabili** del servizio Postgres): usala come `DATABASE_URL` quando esegui il comando dalla tua macchina locale o dalla CI.
+
+Se preferisci migrazioni versionate a una sincronizzazione diretta, usa invece `pnpm run db:generate` seguito da `pnpm run db:migrate`.
 
 ---

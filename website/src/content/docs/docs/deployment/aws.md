@@ -25,9 +25,9 @@ AWS App Runner pulls directly from ECR. Build your Docker image locally and push
 
 1. Navigate to **Elastic Container Registry** and create a new private repository called `rebase-backend`.
 2. Grab the push commands provided by AWS in the console (which handle Docker authentication).
-3. Build your image locally from the root folder:
+3. Build your image locally **from the project root** — the backend Dockerfile needs the whole workspace as its build context (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`), so `./backend` as the context will fail:
    ```bash
-   docker build -t rebase-backend ./backend
+   docker build -t rebase-backend -f backend/Dockerfile .
    ```
 4. Tag and push it to your newly created ECR repository.
 
@@ -55,3 +55,13 @@ App Runner is the simplest way to run containers on AWS without managing orchest
 7. Click **Create & deploy**.
 
 AWS will handle TLS termination (providing an `https` URL out of the box) and spin up the Rebase server.
+
+## Create the Database Schema
+
+The service is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your RDS endpoint. If the instance is private, run it from CI or a bastion host inside the same VPC. The deployed image doesn't include the CLI, so this doesn't run inside the App Runner container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.

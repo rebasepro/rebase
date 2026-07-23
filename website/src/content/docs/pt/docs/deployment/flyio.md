@@ -40,7 +40,7 @@ app = "my-rebase-app"
 primary_region = "fra"
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "backend/Dockerfile" # relative to the build context (project root): the backend image needs the whole workspace, not just ./backend
 
 [http_service]
   internal_port = 3001 # Make sure this matches your Hono app port
@@ -59,5 +59,19 @@ fly deploy
 ```
 
 Assim que a análise e o upload forem concluídos, sua aplicação ficará online automaticamente. Execute `fly open` para visualizar sua aplicação implementada no navegador!
+
+## 5. Criar o Esquema do Banco de Dados
+
+Ao iniciar, o Rebase cria automaticamente **apenas as tabelas de autenticação**. As tabelas das suas próprias coleções **não** são criadas automaticamente. A aplicação sobe normalmente e o login funciona — por isso a armadilha passa despercebida —, mas toda coleção retorna um erro de tabela ausente ("missing table") até você aplicar o esquema.
+
+Execute `pnpm run db:push` **uma vez** contra o banco de dados de produção:
+
+```bash
+DATABASE_URL="postgres://...@localhost:5432/..." pnpm run db:push
+```
+
+Rode isso a partir de um checkout do projeto ou da sua CI, com a `DATABASE_URL` apontando para produção — **não** dentro do contêiner, pois a imagem de produção não inclui a CLI. Como o Postgres do Fly não fica exposto publicamente, abra primeiro um túnel local com `fly proxy 5432 -a <seu-app-db>` e aponte a `DATABASE_URL` para `localhost:5432`.
+
+Para migrações versionadas, use `pnpm run db:generate` seguido de `pnpm run db:migrate` em vez de `db:push`.
 
 ---

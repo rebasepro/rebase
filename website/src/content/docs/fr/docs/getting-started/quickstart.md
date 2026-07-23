@@ -21,44 +21,42 @@ Ceci échafaude un projet avec trois packages :
 ## Prérequis
 
 - **Node.js** 18+
-- **PostgreSQL** — installation locale, Docker, ou toute base de données gérée (Neon, Supabase, etc.)
+- **Docker** — pour exécuter le conteneur PostgreSQL inclus. (Ou apportez votre propre PostgreSQL : installation locale, Neon, Supabase, etc.)
 - **pnpm** (recommandé) ou npm
 
-## Configurer votre environnement
+## Votre environnement est déjà configuré
 
-Après l'échafaudage, modifiez le fichier `.env` à la racine du projet :
+`init` génère à la racine du projet un fichier `.env` prêt à l'emploi, avec un vrai `JWT_SECRET`, un mot de passe de base de données et un port de base de données local libre. Vous n'avez rien à créer ni à modifier pour commencer.
+
+:::caution
+N'exécutez pas `cp .env.example .env`. `.env.example` est une référence des variables disponibles — le copier par-dessus votre `.env` supprime les secrets générés et fait pointer `DATABASE_URL` vers une base de données qui n'existe pas. Modifiez directement `.env` si vous voulez changer une valeur.
+:::
+
+Si vous préférez pointer vers votre propre PostgreSQL plutôt que vers le conteneur inclus, modifiez `DATABASE_URL` dans `.env` :
 
 ```bash
-# PostgreSQL connection string
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
-
-# JWT secret for authentication (generate a strong random string)
-JWT_SECRET=change-me-to-a-random-secret
-
-# Frontend URL for CORS
-VITE_API_URL=http://localhost:3001
-
-# Optional: Google OAuth client ID
-# VITE_GOOGLE_CLIENT_ID=your-google-client-id
 ```
 
-## Démarrer les serveurs de développement
+## Démarrer la base de données
+
+L'échafaudage fournit un `docker-compose.yml` avec un service PostgreSQL. Démarrez-le :
 
 ```bash
-pnpm dev
+docker compose up -d db
 ```
 
-Ceci démarre :
-- **Backend** à `http://localhost:3001` — API REST, authentification, stockage, WebSocket
-- **Frontend** à `http://localhost:5173` — Panneau d'administration Rebase
-- **Hot reload** pour les deux — les changements prennent effet instantanément
+(Ignorez cette étape si vous avez fait pointer `DATABASE_URL` vers votre propre base de données.)
 
-Vous pouvez également les démarrer individuellement :
+## Créer les tables
+
+Poussez vos collections vers la base de données. Ceci crée les tables pour les collections d'exemple `posts`, `authors` et `tags` :
 
 ```bash
-pnpm dev:backend   # Backend only
-pnpm dev:frontend  # Frontend only
+pnpm run db:push
 ```
+
+Sans cette étape, le panneau d'administration s'ouvre quand même, mais chaque collection est vide et ses appels API échouent tant que les tables n'existent pas.
 
 ## Introspection d'une Base de Données Existante (Optionnel)
 
@@ -70,6 +68,17 @@ pnpm rebase schema introspect
 
 Cela analysera les tables, enums et relations de votre base de données et créera les fichiers de collection correspondants dans `config/collections/`.
 
+## Démarrer les serveurs de développement
+
+```bash
+pnpm dev
+```
+
+Ceci démarre les deux ensemble :
+- **Backend** à `http://localhost:3001` — API REST, authentification, stockage, WebSocket
+- **Frontend** à `http://localhost:5173` — Panneau d'administration Rebase
+- **Hot reload** pour les deux — les changements prennent effet instantanément
+
 ## Première connexion
 
 Lorsque vous ouvrez `http://localhost:5173`, vous verrez l'écran de connexion. Le **premier utilisateur** à s'inscrire devient automatiquement un administrateur — c'est le flux d'amorçage.
@@ -80,12 +89,12 @@ Lorsque vous ouvrez `http://localhost:5173`, vous verrez l'écran de connexion. 
 
 ## Définir votre première collection
 
-Ouvrez `config/collections/` et créez un nouveau fichier :
+Ouvrez `config/collections/` et créez un nouveau fichier. Exportez la collection en tant qu'**export par défaut** — c'est ainsi que le registre la détecte :
 
 ```typescript title="config/collections/products.ts"
 import { CollectionConfig } from "@rebasepro/types";
 
-export const productsCollection: CollectionConfig = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -118,16 +127,30 @@ export const productsCollection: CollectionConfig = {
         }
     }
 };
+
+export default productsCollection;
 ```
 
-## Générer le schéma de la base de données
+Ensuite, enregistrez-la dans `config/collections/index.ts` pour que le backend et le panneau d'administration la connaissent :
+
+```typescript title="config/collections/index.ts" {2,5}
+// ...imports existants
+import productsCollection from "./products.js";
+
+export const collections = [
+    postsCollection, authorsCollection, tagsCollection, usersCollection, productsCollection
+];
+```
+
+## Créer la table
+
+Poussez la nouvelle collection vers la base de données :
 
 ```bash
-rebase schema generate   # Generate Drizzle schema from your collections
-rebase db push           # Push the schema to your database
+pnpm run db:push
 ```
 
-Redémarrez les serveurs de développement et votre nouvelle collection **Produits** apparaîtra dans la navigation.
+Ceci régénère le schéma à partir de vos collections et l'applique. Redémarrez les serveurs de développement et votre nouvelle collection **Products** apparaîtra dans la navigation.
 
 ## Référence des commandes de base de données
 

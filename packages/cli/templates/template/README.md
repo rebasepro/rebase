@@ -4,57 +4,53 @@ A [Rebase](https://rebase.pro) project with a PostgreSQL backend.
 
 ## Quick Start
 
-### Option 1: Docker (recommended for production)
+`rebase init` already generated a `.env` for you with a real `JWT_SECRET`, a
+database password, and a free local database port. **Don't run
+`cp .env.example .env`** — that would overwrite those generated values.
+`.env.example` is a reference for the variables you can set, not a starting
+point for this project.
 
-```bash
-cp .env.example .env
-# Edit .env — set JWT_SECRET and DATABASE_URL (see comments for generators)
-
-docker compose up -d
-```
-
-That's it. Your app is running:
-- **Frontend**: http://localhost (port 80)
-- **Backend API**: http://localhost:3001
-- **PostgreSQL**: localhost:5432
-
-### Option 2: Local Development
-
-#### Prerequisites
+### Prerequisites
 
 - [Node.js](https://nodejs.org) >= 18
 - [pnpm](https://pnpm.io) or [npm](https://www.npmjs.com) (v7+)
-- A PostgreSQL database (you can start the included database container via `docker compose up -d db`)
+- [Docker](https://www.docker.com) (to run the included PostgreSQL container),
+  or your own PostgreSQL database
 
-#### Setup
+### Run it
 
-1. Install dependencies:
+1. Install dependencies (skip if `init` already did this):
 
 ```bash
 pnpm install   # or: npm install
 ```
 
-2. Configure environment:
+2. Start the PostgreSQL database container:
 
 ```bash
-cp .env.example .env
-# Edit .env — set DATABASE_URL, JWT_SECRET
+docker compose up -d db
 ```
 
-3. Generate schema and push to database:
+3. Create the database tables from your collections:
 
 ```bash
-pnpm run schema:generate   # or: npm run schema:generate
-pnpm run db:push            # or: npm run db:push
+pnpm run db:push   # or: npm run db:push
 ```
 
-4. Start the dev server:
+4. Start the dev servers:
 
 ```bash
 pnpm dev   # or: npm run dev
 ```
 
-Backend (Hono + PostgreSQL) on port 3001, frontend (Vite + React) on port 5173.
+Open **http://localhost:5173** — the admin panel. The first account you
+register becomes the admin. The backend API (Hono + PostgreSQL) runs on
+port 3001; the frontend (Vite + React) on port 5173.
+
+> The `db:push` step is what creates the tables for the example `posts`,
+> `authors`, and `tags` collections. Skip it and the admin panel still opens,
+> but those collections will be empty and their API calls will fail until the
+> tables exist.
 
 ## Project Structure
 
@@ -102,12 +98,21 @@ All configuration is managed through a single `.env` file in the project root. B
 - **Frontend**: Vite reads `VITE_*` variables via `envDir` pointing to the project root
 - **Scripts**: load via `dotenv` from the project root
 
-Copy `.env.example` to `.env` to get started. See the comments in `.env.example` for details on each variable.
+`init` already generated your `.env`. See the comments in `.env.example` for details on each variable, and edit `.env` directly to change any of them.
 
 ## Production Deployment
 
+The full stack — PostgreSQL, backend, and frontend — runs from
+`docker compose`. The backend image builds and boots, but it does **not**
+create your collection tables on its own, so push the schema once the
+database is up before (or right after) starting the rest of the stack.
+
 ```bash
-# Build and start
+# 1. Start the database and create the tables from your collections
+docker compose up -d db
+pnpm run db:push        # or: npm run db:push
+
+# 2. Build and start the backend + frontend
 docker compose up -d --build
 
 # View logs
@@ -119,6 +124,11 @@ docker compose down
 # Stop and remove data
 docker compose down -v
 ```
+
+> `docker compose` reads the generated `.env` as-is. Set production values
+> (a strong `DATABASE_PASSWORD`, `JWT_SECRET`, storage credentials, …) by
+> editing `.env` directly — see `.env.example` for the full list. Do not
+> `cp .env.example .env`; that discards the values `init` generated.
 
 ## Documentation
 

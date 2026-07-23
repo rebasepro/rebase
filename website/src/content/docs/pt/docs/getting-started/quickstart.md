@@ -21,44 +21,42 @@ Isso estrutura um projeto com três pacotes:
 ## Pré-requisitos
 
 - **Node.js** 18+
-- **PostgreSQL** — instalação local, Docker, ou qualquer banco de dados gerenciado (Neon, Supabase, etc.)
+- **Docker** — para executar o contêiner PostgreSQL incluído. (Ou traga seu próprio PostgreSQL: instalação local, Neon, Supabase, etc.)
 - **pnpm** (recomendado) ou npm
 
-## Configure Seu Ambiente
+## Seu Ambiente Já Está Configurado
 
-Após a estruturação, edite o arquivo `.env` na raiz do projeto:
+O `init` gera um arquivo `.env` pronto para uso na raiz do projeto, com um `JWT_SECRET` real, uma senha de banco de dados e uma porta de banco de dados local livre. Você não precisa criar nem editar nada para começar.
+
+:::caution
+Não execute `cp .env.example .env`. O `.env.example` é uma referência das variáveis disponíveis — copiá-lo sobre o seu `.env` descarta os segredos gerados e faz o `DATABASE_URL` apontar para um banco de dados que não existe. Edite o `.env` diretamente se quiser alterar algum valor.
+:::
+
+Se preferir apontar para o seu próprio PostgreSQL em vez do contêiner incluído, edite o `DATABASE_URL` no `.env`:
 
 ```bash
-# PostgreSQL connection string
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
-
-# JWT secret for authentication (generate a strong random string)
-JWT_SECRET=change-me-to-a-random-secret
-
-# Frontend URL for CORS
-VITE_API_URL=http://localhost:3001
-
-# Optional: Google OAuth client ID
-# VITE_GOOGLE_CLIENT_ID=your-google-client-id
 ```
 
-## Inicie os Servidores de Desenvolvimento
+## Inicie o Banco de Dados
+
+A estrutura gerada inclui um `docker-compose.yml` com um serviço PostgreSQL. Inicie-o:
 
 ```bash
-pnpm dev
+docker compose up -d db
 ```
 
-Isso inicia:
-- **Backend** em `http://localhost:3001` — REST API, autenticação, armazenamento, WebSocket
-- **Frontend** em `http://localhost:5173` — painel de administração Rebase
-- **Recarregamento rápido** para ambos — as alterações entram em vigor instantaneamente
+(Pule esta etapa se você apontou o `DATABASE_URL` para o seu próprio banco de dados.)
 
-Você também pode iniciá-los individualmente:
+## Crie as Tabelas
+
+Envie suas coleções para o banco de dados. Isso cria as tabelas para as coleções de exemplo `posts`, `authors` e `tags`:
 
 ```bash
-pnpm dev:backend   # Backend only
-pnpm dev:frontend  # Frontend only
+pnpm run db:push
 ```
+
+Sem esta etapa o painel de administração ainda abre, mas todas as coleções ficam vazias e suas chamadas de API falham até que as tabelas existam.
 
 ## Introspecção de um Banco de Dados Existente (Opcional)
 
@@ -68,7 +66,18 @@ Se você estiver se conectando a um banco de dados existente com tabelas pré-ex
 pnpm rebase schema introspect
 ```
 
-Isso analisará as tabelas, enums e relações do seu banco de dados e gravará os arquivos de coleção correspondentes em `config/collections/`.
+Isso analisará as tabelas do seu banco de dados e gerará os arquivos TypeScript correspondentes em `config/collections/`, para que você não precise escrevê-los manualmente.
+
+## Inicie os Servidores de Desenvolvimento
+
+```bash
+pnpm dev
+```
+
+Isso inicia ambos juntos:
+- **Backend** em `http://localhost:3001` — REST API, autenticação, armazenamento, WebSocket
+- **Frontend** em `http://localhost:5173` — painel de administração Rebase
+- **Recarregamento rápido** para ambos — as alterações entram em vigor instantaneamente
 
 ## Primeiro Login
 
@@ -80,12 +89,12 @@ Ao abrir `http://localhost:5173`, você verá a tela de login. O **primeiro usu�
 
 ## Defina Sua Primeira Coleção
 
-Abra `config/collections/` e crie um novo arquivo:
+Abra `config/collections/` e crie um novo arquivo. Exporte a coleção como **exportação padrão** (`default export`) — é assim que o registro a reconhece:
 
 ```typescript title="config/collections/products.ts"
 import { CollectionConfig } from "@rebasepro/types";
 
-export const productsCollection: CollectionConfig = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -118,16 +127,30 @@ export const productsCollection: CollectionConfig = {
         }
     }
 };
+
+export default productsCollection;
 ```
 
-## Gere o Esquema do Banco de Dados
+Em seguida, registre-a em `config/collections/index.ts` para que tanto o backend quanto o painel de administração a conheçam:
+
+```typescript title="config/collections/index.ts" {2,5}
+// ...existing imports
+import productsCollection from "./products.js";
+
+export const collections = [
+    postsCollection, authorsCollection, tagsCollection, usersCollection, productsCollection
+];
+```
+
+## Crie a Tabela
+
+Envie a nova coleção para o banco de dados:
 
 ```bash
-rebase schema generate   # Generate Drizzle schema from your collections
-rebase db push           # Push the schema to your database
+pnpm run db:push
 ```
 
-Reinicie os servidores de desenvolvimento e sua nova coleção de **Produtos** aparecerá na navegação.
+Isso regenera o esquema a partir das suas coleções e o aplica. Reinicie os servidores de desenvolvimento e sua nova coleção de **Produtos** aparecerá na navegação.
 
 ## Referência de Comandos do Banco de Dados
 

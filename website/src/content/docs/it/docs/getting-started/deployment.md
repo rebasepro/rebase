@@ -25,7 +25,7 @@ Alla prima visita all'amministrazione di una nuova distribuzione, Rebase mostra 
 
 ## Docker Compose (Consigliato)
 
-Il progetto generato include un `Dockerfile` e un `docker-compose.yml`. Questo è il modo più semplice per distribuire:
+Il progetto generato include un `Dockerfile` e un `docker-compose.yml`. Questo è il modo più semplice per distribuire. L'estratto qui sotto è illustrativo: il `docker-compose.yml` generato nel tuo progetto è la fonte di verità, quindi preferiscilo a questo esempio.
 
 ```yaml title="docker-compose.yml"
 services:
@@ -41,7 +41,9 @@ services:
       - "5432:5432"
 
   app:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "3001:3001"
     environment:
@@ -62,12 +64,25 @@ volumes:
 docker compose up -d
 ```
 
+## Crea lo Schema del Database
+
+All'avvio Rebase crea automaticamente **solo le tabelle di autenticazione**. Le tabelle per le tue collezioni **non** vengono create automaticamente: l'app si avvia comunque e il login funziona, quindi è facile non accorgersene, finché ogni collezione non restituisce un errore "missing table".
+
+Esegui la sincronizzazione dello schema una volta, con `DATABASE_URL` che punta al database di produzione:
+
+```bash
+pnpm run db:push
+```
+
+Eseguilo da un checkout del progetto o dalla CI, **non** dall'interno del container: l'immagine di produzione non include la CLI. Se preferisci migrazioni versionate a una sincronizzazione diretta, usa invece `pnpm run db:generate` seguito da `pnpm run db:migrate`.
+
 ## Lista di Controllo per la Produzione
 
 Prima di distribuire in produzione, assicurati di:
 
 | Elemento | Dettagli |
 |------|---------|
+| **Schema del database** | Esegui `pnpm run db:push` (oppure `pnpm run db:generate` + `pnpm run db:migrate`) con `DATABASE_URL` puntato alla produzione. All'avvio Rebase crea solo le tabelle di autenticazione, non quelle delle tue collezioni. |
 | **JWT_SECRET** | Usa una stringa casuale crittograficamente forte (≥ 32 caratteri). Non riutilizzarla mai tra ambienti. |
 | **DATABASE_URL** | Usa un'istanza Postgres gestita (Neon, Supabase, RDS) con TLS abilitato |
 | **CORS** | Configura le origini consentite sul tuo backend se frontend e backend sono su domini diversi |

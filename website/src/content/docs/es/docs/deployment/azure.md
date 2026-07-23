@@ -29,9 +29,10 @@ Azure Container Apps extraerá su imagen de Docker desde ACR.
    ```
 3. Compile y envíe la imagen de Rebase desde su repositorio local:
    ```bash
-   docker build -t yourregistryname.azurecr.io/rebase-backend:latest ./backend
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f backend/Dockerfile .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
+   Compile desde la raíz del proyecto — el Dockerfile del backend necesita todo el workspace como contexto de compilación (copia `pnpm-workspace.yaml`, `backend/` y `config/`), por lo que usar `./backend` como contexto falla.
 
 ## 3. Implementar Azure Container App
 
@@ -51,5 +52,19 @@ Azure Container Apps proporciona un entorno de contenedores sin servidor con ent
 5. En la pestaña **Ingreso**, habilite explícitamente el Ingreso.
 6. Establezca el Puerto de Destino en **3001**.
 7. Complete la creación. ¡Azure aprovisionará automáticamente el contenedor y le proporcionará una URL de Aplicación asegurada con TLS!
+
+## 4. Crear el Esquema de la Base de Datos
+
+Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de sus propias colecciones **no se crean automáticamente**. Debe aplicar el esquema una vez contra la base de datos de producción:
+
+```bash
+pnpm run db:push
+```
+
+Si omite este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta.
+
+Ejecútelo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a la base de datos de producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Añada temporalmente una regla de firewall en su Servidor Flexible de PostgreSQL que permita su IP (o el acceso desde servicios de Azure) mientras ejecuta el comando.
+
+Para migraciones versionadas, use `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
 
 ---

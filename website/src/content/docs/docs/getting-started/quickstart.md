@@ -21,26 +21,42 @@ This scaffolds a project with three packages:
 ## Prerequisites
 
 - **Node.js** 18+
-- **PostgreSQL** — local install, Docker, or any managed database (Neon, Supabase, etc.)
+- **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
 
-## Configure Your Environment
+## Your Environment Is Already Configured
 
-After scaffolding, edit the `.env` file at the project root:
+`init` generates a ready-to-run `.env` at the project root with a real `JWT_SECRET`, a database password, and a free local database port. You don't need to create or edit anything to get started.
+
+:::caution
+Don't run `cp .env.example .env`. `.env.example` is a reference for the available variables — copying it over your `.env` discards the generated secrets and points `DATABASE_URL` at a database that doesn't exist. Edit `.env` directly if you want to change a value.
+:::
+
+If you'd rather point at your own PostgreSQL instead of the bundled container, edit `DATABASE_URL` in `.env`:
 
 ```bash
-# PostgreSQL connection string
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
-
-# JWT secret for authentication (auto-generated in development if omitted)
-JWT_SECRET=change-me-to-a-random-secret
-
-# Frontend URL for CORS
-VITE_API_URL=http://localhost:3001
-
-# Optional: Google OAuth client ID
-# VITE_GOOGLE_CLIENT_ID=your-google-client-id
 ```
+
+## Start the Database
+
+The scaffold ships a `docker-compose.yml` with a PostgreSQL service. Start it:
+
+```bash
+docker compose up -d db
+```
+
+(Skip this if you pointed `DATABASE_URL` at your own database.)
+
+## Create the Tables
+
+Push your collections to the database. This creates the tables for the example `posts`, `authors`, and `tags` collections:
+
+```bash
+pnpm run db:push
+```
+
+Without this step the admin panel still opens, but every collection is empty and its API calls fail until the tables exist.
 
 ## Introspect an Existing Database (Optional)
 
@@ -58,17 +74,10 @@ This will analyze your database tables and generate corresponding TypeScript fil
 pnpm dev
 ```
 
-This starts:
+This starts both together:
 - **Backend** at `http://localhost:3001` — REST API, auth, storage, WebSocket
 - **Frontend** at `http://localhost:5173` — Rebase admin panel
 - **Hot reload** for both — changes take effect instantly
-
-You can also start them individually:
-
-```bash
-pnpm dev:backend   # Backend only
-pnpm dev:frontend  # Frontend only
-```
 
 ## First Login
 
@@ -80,12 +89,12 @@ When you open `http://localhost:5173`, you'll see the login screen. The **first 
 
 ## Define Your First Collection
 
-Open `config/collections/` and create a new file:
+Open `config/collections/` and create a new file. Export the collection as the **default export** — that's how the registry picks it up:
 
 ```typescript title="config/collections/products.ts"
 import { CollectionConfig } from "@rebasepro/types";
 
-export const productsCollection: CollectionConfig = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -118,16 +127,30 @@ export const productsCollection: CollectionConfig = {
         }
     }
 };
+
+export default productsCollection;
 ```
 
-## Generate the Database Schema
+Then register it in `config/collections/index.ts` so both the backend and the admin panel know about it:
+
+```typescript title="config/collections/index.ts" {2,5}
+// ...existing imports
+import productsCollection from "./products.js";
+
+export const collections = [
+    postsCollection, authorsCollection, tagsCollection, usersCollection, productsCollection
+];
+```
+
+## Create the Table
+
+Push the new collection to the database:
 
 ```bash
-rebase schema generate   # Generate Drizzle schema from your collections
-rebase db push           # Push the schema to your database
+pnpm run db:push
 ```
 
-Restart the dev servers and your new **Products** collection appears in the navigation.
+This regenerates the schema from your collections and applies it. Restart the dev servers and your new **Products** collection appears in the navigation.
 
 ## Database Commands Reference
 

@@ -27,9 +27,9 @@ Azure Container Apps will pull your Docker image from ACR.
    ```bash
    az acr login --name YourRegistryName
    ```
-3. Build and push the Rebase image from your local repository:
+3. Build and push the Rebase image **from the project root** — the backend Dockerfile needs the whole workspace as its build context (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`), so `./backend` as the context will fail:
    ```bash
-   docker build -t yourregistryname.azurecr.io/rebase-backend:latest ./backend
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f backend/Dockerfile .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
 
@@ -55,3 +55,13 @@ Azure Container Apps provides a serverless container environment with built-in H
 5. Under the **Ingress** tab, explicitly Enable Ingress.
 6. Set the Target Port to **3001**.
 7. Complete the creation. Azure will automatically provision the container and provide you an Application URL secured with TLS!
+
+## Create the Database Schema
+
+The container is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Azure Database for PostgreSQL connection string (add a firewall rule allowing your client IP if needed). The deployed image doesn't include the CLI, so this doesn't run inside the container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.

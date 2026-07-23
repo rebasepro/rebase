@@ -28,8 +28,14 @@ Asegúrate de tener la CLI de `gcloud` instalada y autenticada:
 # Set your active GCP project
 gcloud config set project YOUR_PROJECT_ID
 
-# Submit the build to Cloud Build, which automatically creates the container image and stores it in Google Container Registry (GCR)
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/rebase-backend ./backend
+# Authenticate Docker against the registry (one-time)
+gcloud auth configure-docker gcr.io
+
+# Build from the project root — the backend Dockerfile needs the whole workspace as its build context (pnpm-workspace.yaml, backend/, config/)
+docker build -f backend/Dockerfile -t gcr.io/YOUR_PROJECT_ID/rebase-backend .
+
+# Push the image
+docker push gcr.io/YOUR_PROJECT_ID/rebase-backend
 
 # Deploy the newly built image to Cloud Run
 gcloud run deploy rebase-backend \
@@ -40,7 +46,21 @@ gcloud run deploy rebase-backend \
   --allow-unauthenticated
 ```
 
-## 3. Gestionar Almacenamiento de Archivos
+## 3. Crear el Esquema de la Base de Datos
+
+Al arrancar, Rebase crea automáticamente **solo las tablas de autenticación**. Las tablas de tus propias colecciones **no se crean automáticamente**. Debes aplicar el esquema una vez contra la base de datos de producción:
+
+```bash
+pnpm run db:push
+```
+
+Si omites este paso, la aplicación arranca con normalidad y el inicio de sesión funciona —esa es la trampa—, pero cada colección devuelve un error de «tabla inexistente» (*missing table*) en su primera consulta.
+
+Ejecútalo desde un checkout del proyecto o desde CI con `DATABASE_URL` apuntando a la base de datos de producción, **no dentro del contenedor**: la imagen de producción se distribuye sin la CLI. Como Cloud SQL no está expuesto públicamente, ejecuta el Cloud SQL Auth Proxy en local y apunta `DATABASE_URL` a `127.0.0.1:5432` mientras lo ejecutas.
+
+Para migraciones versionadas, usa `pnpm run db:generate` + `pnpm run db:migrate` en lugar de `pnpm run db:push`.
+
+## 4. Gestionar Almacenamiento de Archivos
 Dado que las instancias de Cloud Run son estrictamente sin estado y efímeras, no puedes usar el almacenamiento en disco local para las cargas de archivos de Rebase.
 
 1. Navega a **Google Cloud Storage** y crea un nuevo bucket privado en tu región de la UE elegida.
