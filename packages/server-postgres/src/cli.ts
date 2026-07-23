@@ -10,10 +10,13 @@ import {
     getTableIncludes,
     getDevDatabaseUrl,
     ensureDevDatabaseExists,
-    getTableExcludes
+    getTableExcludes,
+    ExcludeIntrospectionError
 } from "./cli-helpers";
 import { checkDatabaseConnectivity, diagnoseDbError } from "./cli-errors";
 import { AUTH_BOOTSTRAP_SQL } from "./schema/auth-bootstrap-sql";
+import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
+import readline from "readline";
 
 const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -87,7 +90,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     const argsList = arg(
         {
             "--collections": String,
-            "-c": "--collections"
+            "--allow-destructive": Boolean,
+            "--yes": Boolean,
+            "-c": "--collections",
+            "-y": "--yes"
         },
         {
             argv: rawArgs.slice(2),
@@ -171,6 +177,55 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             if (databaseUrl) {
                 await ensureAuthSchemaAndFunctions(databaseUrl);
             }
+
+            // Preview the plan before touching data. `atlas schema apply` with
+            // --auto-approve will silently DROP COLUMN on a field removal and
+            // drop+add on a rename, so we first dry-run to obtain the planned
+            // SQL and gate anything destructive.
+            const plan = await runAtlas(
+                "schema",
+                ["apply", "--to", "file://drizzle/schema.sql", "--dry-run"],
+                collectionsPath,
+                { captureStdout: true }
+            );
+            const destructive = detectDestructiveStatements(plan);
+            const allowDestructive = argsList["--allow-destructive"] === true || argsList["--yes"] === true;
+            const decision = decidePushSafety({
+                destructiveCount: destructive.length,
+                allowDestructive,
+                interactive: process.stdin.isTTY === true
+            });
+
+            if (destructive.length > 0) {
+                logger.warn(chalk.yellow(`  ⚠️  This push includes ${destructive.length} destructive change(s) that will DESTROY data:`));
+                logger.warn("");
+                for (const d of destructive) {
+                    logger.warn(chalk.red(`       ${d.kind}: `) + chalk.gray(d.statement.replace(/\s+/g, " ")));
+                }
+                logger.warn("");
+                logger.warn(chalk.yellow("  Full planned changes:"));
+                logger.warn(chalk.gray(plan.trim().split("\n").map((l) => `       ${l}`).join("\n")));
+                logger.warn("");
+
+                if (decision === "refuse") {
+                    logger.error(chalk.red("  ✗ Aborting: destructive changes require confirmation."));
+                    logger.error(chalk.gray("    Re-run interactively, or pass --allow-destructive to proceed. Back up first: rebase db backup"));
+                    process.exit(1);
+                }
+                if (decision === "confirm") {
+                    const confirmed = await promptConfirm(
+                        chalk.yellow("  Type 'yes' to apply these destructive changes (this cannot be undone): ")
+                    );
+                    if (!confirmed) {
+                        logger.info(chalk.gray("  Aborted. No changes were made."));
+                        process.exit(1);
+                    }
+                } else {
+                    // decision === "apply" via --allow-destructive
+                    logger.warn(chalk.yellow("  Proceeding because --allow-destructive was passed."));
+                }
+            }
+
             await runAtlas("schema", ["apply", "--to", "file://drizzle/schema.sql", "--auto-approve"], collectionsPath);
             logger.info("");
             
@@ -517,7 +572,29 @@ function timeAgo(date: Date): string {
 
 
 
-async function runAtlas(domain: "schema" | "migrate", args: string[], collectionsPath?: string): Promise<void> {
+/**
+ * Ask a yes/no question on an interactive terminal. Non-interactive shells
+ * (CI, pipes, agents) can't answer, so this must only be reached after
+ * {@link decidePushSafety} has already ruled that interactive confirmation is
+ * possible.
+ */
+async function promptConfirm(question: string): Promise<boolean> {
+    if (!process.stdin.isTTY) return false;
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    try {
+        const answer: string = await new Promise((resolve) => rl.question(question, resolve));
+        return /^y(es)?$/i.test(answer.trim());
+    } finally {
+        rl.close();
+    }
+}
+
+async function runAtlas(
+    domain: "schema" | "migrate",
+    args: string[],
+    collectionsPath?: string,
+    opts: { captureStdout?: boolean } = {}
+): Promise<string> {
     const atlasBin = resolveLocalBin("atlas");
     if (!atlasBin) {
         logger.error(chalk.red("✗ Could not find atlas binary."));
@@ -587,7 +664,24 @@ async function runAtlas(domain: "schema" | "migrate", args: string[], collection
     }
 
     if (domain === "schema" && args.includes("apply") && collectionsPath) {
-        const excludes = await getTableExcludes(databaseUrl, collectionsPath);
+        // Fail CLOSED: the exclude list is the only thing shielding
+        // non-collection tables from the auto-approved apply. If we can't
+        // introspect the database to build it, abort rather than proceed with
+        // a partial list that would let Atlas drop unmanaged tables.
+        let excludes: string[];
+        try {
+            excludes = await getTableExcludes(databaseUrl, collectionsPath);
+        } catch (err) {
+            if (err instanceof ExcludeIntrospectionError) {
+                logger.error(chalk.red("\n✗ Aborting push: could not determine which tables to protect."));
+                logger.error(chalk.gray(`  ${err.message}`));
+                logger.error(chalk.gray("  Refusing to apply — a partial exclude list could drop tables Rebase does not manage."));
+                const hint = diagnoseDbError(err.cause ?? err, databaseUrl);
+                if (hint) logger.error(hint);
+                process.exit(1);
+            }
+            throw err;
+        }
         for (const exc of excludes) {
             atlasArgs.push("--exclude", exc);
         }
@@ -595,13 +689,20 @@ async function runAtlas(domain: "schema" | "migrate", args: string[], collection
 
     // Stream stdout live but tee stderr so we can inspect Atlas's error text
     // for known, actionable failure modes (e.g. a dependency-drop that leaves
-    // the schema half-applied) after the process exits.
+    // the schema half-applied) after the process exits. When capturing (used
+    // for the destructive-change dry-run), pipe stdout and collect it instead.
     const subprocess = execa(atlasBin, atlasArgs, {
         cwd: process.cwd(),
-        stdout: "inherit",
+        stdout: opts.captureStdout ? "pipe" : "inherit",
         stderr: "pipe",
         env
     });
+    let stdoutText = "";
+    if (opts.captureStdout) {
+        subprocess.stdout?.on("data", (chunk: Buffer) => {
+            stdoutText += chunk.toString();
+        });
+    }
     let stderrText = "";
     subprocess.stderr?.on("data", (chunk: Buffer) => {
         const text = chunk.toString();
@@ -619,6 +720,13 @@ async function runAtlas(domain: "schema" | "migrate", args: string[], collection
         }
         process.exit(1);
     }
+    // Atlas prints the plan to stdout, but fall back to stderr so the
+    // destructive-change detector never misses a plan on a version/build that
+    // routes it differently.
+    if (opts.captureStdout) {
+        return stdoutText.trim().length > 0 ? stdoutText : stderrText;
+    }
+    return "";
 }
 
 async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {

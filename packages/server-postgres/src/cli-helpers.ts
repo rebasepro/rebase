@@ -143,36 +143,91 @@ export async function ensureDevDatabaseExists(databaseUrl: string, devDatabaseUr
     }
 }
 
-export async function getTableExcludes(databaseUrl: string, collectionsPath: string): Promise<string[]> {
-    const includes = await getTableIncludes(collectionsPath);
-    const excludes: string[] = ["atlas_schema_revisions.*", "auth.*"];
-    
+/**
+ * Query the live database for every user table/view outside the system
+ * catalogs. Separated from {@link getTableExcludes} so its failure mode can
+ * be handled explicitly (fail closed) and so tests can inject a stub.
+ */
+export async function queryExistingTables(databaseUrl: string): Promise<string[]> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString: databaseUrl });
+    await client.connect();
     try {
-        const { Client } = await import("pg");
-        const client = new Client({ connectionString: databaseUrl });
-        await client.connect();
-        try {
-            const res = await client.query(`
-                SELECT table_schema || '.' || table_name AS full_name
-                FROM information_schema.tables
-                WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                  AND table_type IN ('BASE TABLE', 'VIEW');
-            `);
-            
-            const existingTables = res.rows.map((row: { full_name: string }) => row.full_name);
-            
-            for (const table of existingTables) {
-                if (!includes.includes(table)) {
-                    excludes.push(table);
-                }
-            }
-        } finally {
-            await client.end();
-        }
-    } catch (err) {
-        logger.warn(chalk.yellow(`  ⚠️  Failed to query database for unmapped tables: ${err instanceof Error ? err.message : String(err)}`));
+        const res = await client.query(`
+            SELECT table_schema || '.' || table_name AS full_name
+            FROM information_schema.tables
+            WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+              AND table_type IN ('BASE TABLE', 'VIEW');
+        `);
+        return res.rows.map((row: { full_name: string }) => row.full_name);
+    } finally {
+        await client.end();
     }
-    
+}
+
+/**
+ * Raised when the exclude list could not be built. `db push` MUST abort on
+ * this rather than continue: the exclude list is the only thing shielding
+ * non-collection (user/system) tables from the auto-approved declarative
+ * apply. A partial list — the old fail-open behaviour — meant a transient
+ * introspection hiccup dropped every table not present in `schema.sql`.
+ */
+export class ExcludeIntrospectionError extends Error {
+    constructor(message: string, readonly cause?: unknown) {
+        super(message);
+        this.name = "ExcludeIntrospectionError";
+    }
+}
+
+/**
+ * Build the `--exclude` list that protects tables Rebase doesn't manage from
+ * the declarative apply. Anything not backing a collection (or its M2M
+ * junctions) is excluded so Atlas never drops it.
+ *
+ * Fails **closed**: if the database can't be introspected we cannot know
+ * which tables to protect, so we throw {@link ExcludeIntrospectionError}
+ * instead of returning a near-empty list and letting the caller drop
+ * everything.
+ *
+ * `deps` is injectable for tests; production uses the real pg-backed queries.
+ */
+export async function getTableExcludes(
+    databaseUrl: string,
+    collectionsPath: string,
+    deps: {
+        queryExistingTables?: (databaseUrl: string) => Promise<string[]>;
+        getIncludes?: (collectionsPath: string) => Promise<string[]>;
+    } = {}
+): Promise<string[]> {
+    const getIncludes = deps.getIncludes ?? getTableIncludes;
+    const queryTables = deps.queryExistingTables ?? queryExistingTables;
+
+    const includes = await getIncludes(collectionsPath);
+    // Framework-owned schemas Rebase manages itself — the declarative apply
+    // must never touch them. `auth` holds the helper functions; `rebase` holds
+    // the auth tables (users, refresh_tokens, …) and Atlas's own revision
+    // table. Excluding both the schema object AND its contents keeps Atlas
+    // from planning a `DROP SCHEMA … CASCADE` — which on a live database would
+    // take the user/auth tables with it. `atlas_schema_revisions.*` is kept
+    // for backwards-compatibility with any external revision schema.
+    const excludes: string[] = ["atlas_schema_revisions.*", "auth", "auth.*", "rebase", "rebase.*"];
+
+    let existingTables: string[];
+    try {
+        existingTables = await queryTables(databaseUrl);
+    } catch (err) {
+        throw new ExcludeIntrospectionError(
+            `Failed to introspect the database for unmapped tables: ${err instanceof Error ? err.message : String(err)}`,
+            err
+        );
+    }
+
+    for (const table of existingTables) {
+        if (!includes.includes(table)) {
+            excludes.push(table);
+        }
+    }
+
     return excludes;
 }
 

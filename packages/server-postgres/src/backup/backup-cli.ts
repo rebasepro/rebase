@@ -13,19 +13,22 @@ import { logger } from "@rebasepro/server";
 import type { StorageController } from "@rebasepro/server";
 import {
     BackupDestination,
+    globalsFileForDump,
     parseBackupDestination,
     parseDbNameFromUrl,
     resolveConnectionString,
     withDatabaseName
 } from "./pg-tools";
 import {
+    applyGlobals,
     BackupToolError,
     createDump,
     ensureDatabaseExists,
     listBackups,
     preflight,
     restoreDump,
-    uploadBackup
+    uploadBackup,
+    validateDump
 } from "./backup-service";
 
 function formatBytes(bytes: number): string {
@@ -140,8 +143,12 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
                 noOwner: args["--no-owner"],
                 inheritStdio: true
             });
+            await assertDumpValid(dump.localFile);
             logger.info("");
             logger.info(chalk.green(`  ✓ Backup written to ${dump.localFile} (${formatBytes(dump.sizeBytes)})`));
+            if (dump.globalsFile) {
+                logger.info(chalk.gray(`    ✓ Roles captured to ${dump.globalsFile} (needed so RLS survives a restore).`));
+            }
         } else {
             const storage = await resolveStorageForDestination(dest, process.env);
             const dump = await createDump({
@@ -152,12 +159,20 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
                 inheritStdio: true
             });
             try {
+                await assertDumpValid(dump.localFile);
                 const uploaded = await uploadBackup(storage!, dump.localFile, dest);
                 logger.info("");
                 logger.info(chalk.green(`  ✓ Backup uploaded to ${uploaded.storageUrl} (${formatBytes(dump.sizeBytes)})`));
+                // Upload the roles sidecar next to the dump so a restore can
+                // recreate roles the dump's GRANT/RLS statements depend on.
+                if (dump.globalsFile && fs.existsSync(dump.globalsFile)) {
+                    const globalsUpload = await uploadBackup(storage!, dump.globalsFile, dest);
+                    logger.info(chalk.gray(`    ✓ Roles uploaded to ${globalsUpload.storageUrl} (needed so RLS survives a restore).`));
+                }
                 logger.info(chalk.gray("    Ensure this bucket is private — backups may contain secrets and PII."));
             } finally {
                 if (fs.existsSync(dump.localFile)) fs.unlinkSync(dump.localFile);
+                if (dump.globalsFile && fs.existsSync(dump.globalsFile)) fs.unlinkSync(dump.globalsFile);
             }
         }
         logger.info("");
@@ -177,6 +192,7 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
             "--create-db": Boolean,
             "--clean": Boolean,
             "--no-owner": Boolean,
+            "--continue-on-error": Boolean,
             "--yes": Boolean,
             "-y": "--yes"
         },
@@ -206,7 +222,11 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
     logger.info("");
 
     // Resolve the local file to restore from (download object-storage keys).
+    // Also resolve the `.globals.sql` roles sidecar so cluster roles can be
+    // recreated before the restore — without them the dump's GRANT/RLS
+    // statements fail and RLS is silently lost.
     let localFile: string;
+    let globalsSql: string | null = null;
     let cleanupTemp = false;
     try {
         if (/^(s3|gs):\/\//.test(backupArg)) {
@@ -221,12 +241,16 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
             localFile = path.join(tmpDir, path.basename(key));
             fs.writeFileSync(localFile, Buffer.from(await file.arrayBuffer()));
             cleanupTemp = true;
+            const globalsObj = await storage.getObject(globalsFileForDump(key), bucket);
+            if (globalsObj) globalsSql = Buffer.from(await globalsObj.arrayBuffer()).toString("utf-8");
         } else {
             localFile = path.resolve(backupArg);
             if (!fs.existsSync(localFile)) {
                 logger.error(chalk.red(`  ✗ Backup file not found: ${localFile}`));
                 process.exit(1);
             }
+            const globalsPath = globalsFileForDump(localFile);
+            if (fs.existsSync(globalsPath)) globalsSql = fs.readFileSync(globalsPath, "utf-8");
         }
 
         // Version pre-flight. Check against the base connection — the server
@@ -261,11 +285,29 @@ export async function restoreCommand(rawArgs: string[]): Promise<void> {
             }
         }
 
+        // Recreate cluster roles before restoring so GRANT/RLS statements in
+        // the dump apply. Best-effort and idempotent (see applyGlobals).
+        if (globalsSql) {
+            logger.info(chalk.gray("  Recreating cluster roles from the backup's roles sidecar…"));
+            const { applied, skipped } = await applyGlobals(
+                targetConnection,
+                globalsSql,
+                (m) => logger.info(chalk.gray(m))
+            );
+            logger.info(chalk.gray(`  ✓ Roles: ${applied} applied, ${skipped} skipped (already present or not permitted).`));
+        } else {
+            logger.warn(chalk.yellow("  ⚠️  No roles sidecar (.globals.sql) accompanies this backup."));
+            logger.warn(chalk.yellow("     If the dump grants to roles that don't exist (e.g. rebase_user), the restore"));
+            logger.warn(chalk.yellow("     will fail — recreate those roles first, or use a backup that includes its globals."));
+        }
+
         await restoreDump({
             connectionString: targetConnection,
             inputFile: localFile,
             clean: args["--clean"],
             noOwner: args["--no-owner"],
+            // Fail loudly by default so a skipped GRANT never leaves RLS off.
+            exitOnError: !args["--continue-on-error"],
             inheritStdio: true
         });
 
@@ -322,6 +364,17 @@ export async function backupsCommand(rawArgs: string[]): Promise<void> {
     }
 }
 
+/** Verify a freshly written dump; abort the command if it looks corrupt. */
+async function assertDumpValid(localFile: string): Promise<void> {
+    const check = await validateDump(localFile);
+    if (!check.ok) {
+        throw new BackupToolError(
+            `The backup failed validation and was not trusted: ${check.reason}`,
+            "The dump may be corrupt or truncated. Investigate before relying on it."
+        );
+    }
+}
+
 function reportError(err: unknown): void {
     if (err instanceof BackupToolError) {
         logger.error(chalk.red(`  ✗ ${err.message}`));
@@ -364,12 +417,18 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--create-db")}             Create the target database first if it doesn't exist
   ${chalk.blue("--clean")}                 Drop existing objects before recreating them
   ${chalk.blue("--no-owner")}              Ignore ownership from the dump
+  ${chalk.blue("--continue-on-error")}     Log and continue past errors ${chalk.red("(may leave RLS un-enforced!)")}
   ${chalk.blue("--yes, -y")}               Skip the interactive confirmation ${chalk.red("(destructive!)")}
 
 ${chalk.red.bold("Warning")}
   Restore is destructive and never runs automatically. Without --yes it
   requires an interactive 'yes'. Prefer --create-db/--target-db to restore
   into a fresh database rather than overwriting a live one.
+
+  By default the restore aborts on the first error (--exit-on-error) so a
+  skipped GRANT never silently leaves RLS un-enforced. Roles are recreated
+  from the backup's .globals.sql sidecar first; keep that file next to the
+  dump. Use --continue-on-error only when you understand the consequences.
 `);
 }
 

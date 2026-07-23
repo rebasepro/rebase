@@ -17,7 +17,9 @@ import {
     BackupDestination,
     buildBackupFilename,
     buildPgDumpArgs,
+    buildPgDumpallGlobalsArgs,
     buildPgRestoreArgs,
+    buildPgRestoreListArgs,
     checkToolServerCompatibility,
     joinStorageKey,
     parsePgToolMajor,
@@ -26,6 +28,7 @@ import {
     VersionCompatibility
 } from "./pg-tools";
 import { BackupObject, RetentionOptions, selectBackupsToPrune } from "./retention";
+import { applyGlobalsWith, pruneWith } from "./backup-logic";
 
 export class BackupToolError extends Error {
     constructor(message: string, readonly hint?: string) {
@@ -34,13 +37,16 @@ export class BackupToolError extends Error {
     }
 }
 
-/** Locate `pg_dump` / `pg_restore`, honouring an env override. */
+/** Locate `pg_dump` / `pg_restore` / `pg_dumpall`, honouring an env override. */
 export function resolvePgBinary(
-    tool: "pg_dump" | "pg_restore",
+    tool: "pg_dump" | "pg_restore" | "pg_dumpall",
     env: Record<string, string | undefined> = process.env
 ): string | null {
-    const override = tool === "pg_dump" ? env.PG_DUMP_PATH : env.PG_RESTORE_PATH;
-    if (override && fs.existsSync(override)) return override;
+    const overrideVar =
+        tool === "pg_dump" ? env.PG_DUMP_PATH
+        : tool === "pg_restore" ? env.PG_RESTORE_PATH
+        : env.PG_DUMPALL_PATH;
+    if (overrideVar && fs.existsSync(overrideVar)) return overrideVar;
     return resolveLocalBin(tool);
 }
 
@@ -105,12 +111,23 @@ export interface BackupResult {
     localFile: string;
     fileName: string;
     sizeBytes: number;
+    /**
+     * Absolute path of the `.globals.sql` sidecar holding cluster-wide roles
+     * (present unless globals capture was disabled or unavailable).
+     */
+    globalsFile?: string;
+    globalsSizeBytes?: number;
 }
 
 /**
  * Produce a custom-format dump on local disk. When `outDir` is omitted the
  * file is written to the OS temp directory (used by the upload path, which
  * cleans it up afterwards).
+ *
+ * Alongside the `-Fc` dump it writes a `<name>.globals.sql` sidecar via
+ * `pg_dumpall --globals-only` so the roles the dump's GRANT/RLS statements
+ * depend on can be recreated on restore. Set `includeGlobals: false` to skip
+ * it (e.g. when the caller has no privilege to read cluster globals).
  */
 export async function createDump(opts: {
     connectionString: string;
@@ -120,6 +137,7 @@ export async function createDump(opts: {
     excludeSchemas?: string[];
     noOwner?: boolean;
     inheritStdio?: boolean;
+    includeGlobals?: boolean;
     env?: Record<string, string | undefined>;
 }): Promise<BackupResult> {
     const env = opts.env ?? process.env;
@@ -149,7 +167,91 @@ export async function createDump(opts: {
     });
 
     const sizeBytes = fs.existsSync(localFile) ? fs.statSync(localFile).size : 0;
-    return { localFile, fileName, sizeBytes };
+
+    const result: BackupResult = { localFile, fileName, sizeBytes };
+
+    if (opts.includeGlobals !== false) {
+        const dumpallBin = resolvePgBinary("pg_dumpall", env);
+        if (!dumpallBin) {
+            throw new BackupToolError(
+                "Could not find the 'pg_dumpall' binary needed to capture cluster roles.",
+                "Install the PostgreSQL client tools or set PG_DUMPALL_PATH. " +
+                "To take a role-incomplete backup anyway, pass includeGlobals: false."
+            );
+        }
+        const globalsFile = globalsFileForDump(localFile);
+        await execa(
+            dumpallBin,
+            buildPgDumpallGlobalsArgs({ connectionString: opts.connectionString, outFile: globalsFile }),
+            { stdio: opts.inheritStdio ? "inherit" : "pipe", env: { ...(env as Record<string, string>) } }
+        );
+        result.globalsFile = globalsFile;
+        result.globalsSizeBytes = fs.existsSync(globalsFile) ? fs.statSync(globalsFile).size : 0;
+    }
+
+    return result;
+}
+
+/**
+ * Cheap integrity check on a freshly written dump: it must be non-empty and
+ * `pg_restore --list` must parse its table of contents without error. Used
+ * before pruning older backups so a corrupt-but-exit-0 dump never becomes
+ * the reason the last good backup is deleted.
+ */
+export async function validateDump(
+    localFile: string,
+    env: Record<string, string | undefined> = process.env
+): Promise<{ ok: boolean; reason?: string }> {
+    if (!fs.existsSync(localFile)) {
+        return { ok: false, reason: `Dump file does not exist: ${localFile}` };
+    }
+    if (fs.statSync(localFile).size === 0) {
+        return { ok: false, reason: "Dump file is empty (0 bytes)." };
+    }
+    const bin = resolvePgBinary("pg_restore", env);
+    if (!bin) {
+        // Can't verify without pg_restore; treat as inconclusive-but-fail so
+        // pruning doesn't proceed on an unverified dump.
+        return { ok: false, reason: "Could not find 'pg_restore' to verify the dump." };
+    }
+    try {
+        await execa(bin, buildPgRestoreListArgs(localFile), {
+            stdio: "pipe",
+            env: { ...(env as Record<string, string>) }
+        });
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, reason: `pg_restore --list failed: ${err instanceof Error ? err.message : String(err)}` };
+    }
+}
+
+/**
+ * Replay a `pg_dumpall --globals-only` script to recreate cluster roles
+ * before a restore, so the dump's GRANT/RLS statements (which reference
+ * `rebase_user` and any owner roles) actually apply. Runs statement by
+ * statement and tolerates per-statement failures — on a same-cluster restore
+ * the roles usually already exist (`CREATE ROLE` → "already exists"), and on
+ * a managed provider an `ALTER ROLE <superuser>` may be refused; neither
+ * should abort role recreation. Returns how many statements applied vs were
+ * skipped.
+ */
+export async function applyGlobals(
+    connectionString: string,
+    globalsSql: string,
+    log: (message: string) => void = () => {}
+): Promise<{ applied: number; skipped: number }> {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString });
+    await client.connect();
+    try {
+        return await applyGlobalsWith(
+            async (sql) => { await client.query(sql); },
+            globalsSql,
+            log
+        );
+    } finally {
+        await client.end();
+    }
 }
 
 /**
@@ -157,12 +259,18 @@ export async function createDump(opts: {
  * `connectionString`. Destructive when `clean` is set (drops objects
  * first). Never called automatically — the CLI gates it behind explicit
  * confirmation.
+ *
+ * Runs with `--exit-on-error` by default: a restore that logs-and-continues
+ * past a failed GRANT (because a role was missing) reports success with RLS
+ * un-enforced. Callers should recreate roles first (see {@link applyGlobals})
+ * and only set `exitOnError: false` deliberately.
  */
 export async function restoreDump(opts: {
     connectionString: string;
     inputFile: string;
     clean?: boolean;
     noOwner?: boolean;
+    exitOnError?: boolean;
     inheritStdio?: boolean;
     env?: Record<string, string | undefined>;
 }): Promise<void> {
@@ -178,7 +286,8 @@ export async function restoreDump(opts: {
         connectionString: opts.connectionString,
         inputFile: opts.inputFile,
         clean: opts.clean,
-        noOwner: opts.noOwner
+        noOwner: opts.noOwner,
+        exitOnError: opts.exitOnError
     });
     await execa(bin, args, {
         stdio: opts.inheritStdio ? "inherit" : "pipe",
@@ -288,12 +397,21 @@ export async function pruneBackups(
 ): Promise<string[]> {
     const backups = await listBackups(dest, storage);
     const toDelete = selectBackupsToPrune(backups, options);
-    for (const key of toDelete) {
-        if (dest.kind === "local") {
-            if (fs.existsSync(key)) fs.unlinkSync(key);
-        } else if (storage) {
-            await storage.deleteObject(key, dest.bucket);
-        }
-    }
+
+    // Delete each dump together with its `.globals.sql` sidecar (pruneWith
+    // handles the pairing + best-effort sidecar). The deleter rejects on a
+    // missing key so pruneWith can swallow an absent sidecar.
+    const deleteObject =
+        dest.kind === "local"
+            ? async (key: string) => {
+                if (!fs.existsSync(key)) throw new Error(`not found: ${key}`);
+                fs.unlinkSync(key);
+            }
+            : async (key: string) => {
+                if (!storage) throw new BackupToolError("Storage backend required to prune object backups.");
+                await storage.deleteObject(key, dest.bucket);
+            };
+
+    await pruneWith(toDelete, deleteObject);
     return toDelete;
 }

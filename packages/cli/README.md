@@ -20,7 +20,7 @@ The CLI is also bundled with every Rebase project as a local dependency.
 | `rebase start` | Start the backend server (production) |
 | `rebase schema generate` | Generate Drizzle schema from collection definitions |
 | `rebase schema introspect` | Introspect an existing database → Rebase collections |
-| `rebase db push` | Apply schema directly to database (dev) |
+| `rebase db push` | Apply schema directly to database (dev). Previews the plan and refuses destructive changes (e.g. dropped columns) unless confirmed interactively or run with `--allow-destructive`. |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending migrations |
 | `rebase generate-sdk` | Generate a typed TypeScript SDK from collections |

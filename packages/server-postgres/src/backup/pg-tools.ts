@@ -202,7 +202,12 @@ export function buildPgRestoreArgs(opts: {
     inputFile: string;
     /** Drop objects before recreating them (destructive but idempotent). */
     clean?: boolean;
-    /** Continue past individual errors instead of aborting. */
+    /**
+     * Abort on the first error instead of logging and continuing. Defaults
+     * ON: a restore that silently skips failed GRANT/RLS statements (because
+     * a role is missing) "succeeds" with RLS un-enforced — a security hole.
+     * Fail loudly instead so the operator knows the restore is incomplete.
+     */
     exitOnError?: boolean;
     noOwner?: boolean;
 }): string[] {
@@ -213,11 +218,74 @@ export function buildPgRestoreArgs(opts: {
     if (opts.noOwner) {
         args.push("--no-owner");
     }
-    if (opts.exitOnError) {
+    // Default to --exit-on-error unless explicitly disabled.
+    if (opts.exitOnError !== false) {
         args.push("--exit-on-error");
     }
     args.push(opts.inputFile);
     return args;
+}
+
+/**
+ * Assemble the `pg_restore --list` argument vector. Reading a dump's table
+ * of contents parses the whole archive without touching a database, so it is
+ * a cheap integrity check that the file isn't truncated or corrupt.
+ */
+export function buildPgRestoreListArgs(inputFile: string): string[] {
+    return ["--list", inputFile];
+}
+
+/**
+ * Assemble the `pg_dumpall --globals-only` argument vector. Roles (and other
+ * cluster-wide objects) live outside any single database, so a per-database
+ * `pg_dump` omits them. Without the `rebase_user` role the RLS GRANT
+ * statements in the main dump fail on restore and RLS is silently lost — so
+ * every backup captures the globals into a sidecar `.globals.sql`.
+ *
+ * `--no-role-passwords` keeps role secrets out of the artifact (backups may
+ * be shipped off-box); roles are recreated password-less and re-secured by
+ * the operator.
+ */
+export function buildPgDumpallGlobalsArgs(opts: {
+    connectionString: string;
+    outFile: string;
+}): string[] {
+    return [
+        "--globals-only",
+        "--no-role-passwords",
+        "--no-password",
+        `--file=${opts.outFile}`,
+        `--dbname=${opts.connectionString}`
+    ];
+}
+
+/**
+ * Derive the globals sidecar path/key for a given `.dump` file. Keeps the
+ * two artifacts adjacent so listing, uploading and pruning can find one from
+ * the other. A name that doesn't end in `.dump` is returned unchanged with a
+ * `.globals.sql` suffix appended.
+ */
+export function globalsFileForDump(dumpPath: string): string {
+    return dumpPath.endsWith(".dump")
+        ? dumpPath.slice(0, -".dump".length) + ".globals.sql"
+        : dumpPath + ".globals.sql";
+}
+
+/**
+ * Split a `pg_dumpall --globals-only` script into individual statements.
+ * Used when replaying globals on restore so each `CREATE ROLE` / `GRANT`
+ * can run independently and a benign "role already exists" on one doesn't
+ * abort the rest. Drops `--` comment lines and blank statements.
+ */
+export function splitGlobalsStatements(sql: string): string[] {
+    const withoutComments = sql
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("--"))
+        .join("\n");
+    return withoutComments
+        .split(";")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
 }
 
 /**

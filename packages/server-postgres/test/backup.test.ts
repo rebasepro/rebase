@@ -1,8 +1,11 @@
 import {
     buildBackupFilename,
     buildPgDumpArgs,
+    buildPgDumpallGlobalsArgs,
     buildPgRestoreArgs,
+    buildPgRestoreListArgs,
     checkToolServerCompatibility,
+    globalsFileForDump,
     joinStorageKey,
     parseBackupDestination,
     parseBackupTimestamp,
@@ -10,6 +13,7 @@ import {
     parsePgToolMajor,
     resolveConnectionString,
     serverVersionNumToMajor,
+    splitGlobalsStatements,
     withDatabaseName
 } from "../src/backup/pg-tools";
 import { selectBackupsToPrune } from "../src/backup/retention";
@@ -162,6 +166,67 @@ describe("backup pg-tools", () => {
         it("omits --clean by default", () => {
             const args = buildPgRestoreArgs({ connectionString: "postgres://x/db", inputFile: "/tmp/a.dump" });
             expect(args).not.toContain("--clean");
+        });
+        it("adds --exit-on-error by default so a skipped GRANT never leaves RLS off", () => {
+            const args = buildPgRestoreArgs({ connectionString: "postgres://x/db", inputFile: "/tmp/a.dump" });
+            expect(args).toContain("--exit-on-error");
+        });
+        it("omits --exit-on-error only when explicitly disabled", () => {
+            const args = buildPgRestoreArgs({
+                connectionString: "postgres://x/db",
+                inputFile: "/tmp/a.dump",
+                exitOnError: false
+            });
+            expect(args).not.toContain("--exit-on-error");
+        });
+    });
+
+    describe("buildPgRestoreListArgs", () => {
+        it("lists the archive TOC without touching a database", () => {
+            expect(buildPgRestoreListArgs("/tmp/a.dump")).toEqual(["--list", "/tmp/a.dump"]);
+        });
+    });
+
+    describe("buildPgDumpallGlobalsArgs", () => {
+        it("captures cluster roles without passwords into the sidecar", () => {
+            const args = buildPgDumpallGlobalsArgs({
+                connectionString: "postgres://u:p@h/db",
+                outFile: "/tmp/a.globals.sql"
+            });
+            expect(args).toContain("--globals-only");
+            expect(args).toContain("--no-role-passwords");
+            expect(args).toContain("--file=/tmp/a.globals.sql");
+            expect(args).toContain("--dbname=postgres://u:p@h/db");
+        });
+    });
+
+    describe("globalsFileForDump", () => {
+        it("swaps a .dump suffix for .globals.sql", () => {
+            expect(globalsFileForDump("/b/rebase-app-20260714T030000Z.dump"))
+                .toBe("/b/rebase-app-20260714T030000Z.globals.sql");
+        });
+        it("keeps storage keys adjacent", () => {
+            expect(globalsFileForDump("nightly/rebase-app-20260714T030000Z.dump"))
+                .toBe("nightly/rebase-app-20260714T030000Z.globals.sql");
+        });
+        it("appends when the name does not end in .dump", () => {
+            expect(globalsFileForDump("weird")).toBe("weird.globals.sql");
+        });
+    });
+
+    describe("splitGlobalsStatements", () => {
+        it("splits statements and drops comment lines so each role runs independently", () => {
+            const sql = [
+                "-- roles",
+                "CREATE ROLE rebase_user NOLOGIN;",
+                "ALTER ROLE rebase_user WITH NOSUPERUSER;",
+                "GRANT rebase_user TO postgres;"
+            ].join("\n");
+            expect(splitGlobalsStatements(sql)).toEqual([
+                "CREATE ROLE rebase_user NOLOGIN",
+                "ALTER ROLE rebase_user WITH NOSUPERUSER",
+                "GRANT rebase_user TO postgres"
+            ]);
         });
     });
 

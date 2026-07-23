@@ -125,7 +125,7 @@ export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
         // Backups of a large database can take a while; allow up to an hour.
         timeoutSeconds: 3600,
         async handler({ log }) {
-            const { createDump, pruneBackups, uploadBackup } = await import("./backup-service");
+            const { createDump, pruneBackups, uploadBackup, validateDump } = await import("./backup-service");
             const { destination } = config;
 
             if (destination.kind !== "local" && !config.storage) {
@@ -145,18 +145,41 @@ export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
             });
             log(`Dump created: ${dump.fileName} (${formatBytes(dump.sizeBytes)})`);
 
+            // Validate BEFORE pruning: a corrupt-but-exit-0 dump must never be
+            // the reason the last good backup gets deleted.
+            const check = await validateDump(dump.localFile);
+            if (!check.ok) {
+                // Clean up the bad temp file for object destinations.
+                if (destination.kind !== "local" && fs.existsSync(dump.localFile)) {
+                    fs.unlinkSync(dump.localFile);
+                }
+                if (dump.globalsFile && destination.kind !== "local" && fs.existsSync(dump.globalsFile)) {
+                    fs.unlinkSync(dump.globalsFile);
+                }
+                throw new Error(`New backup failed validation — skipping upload and pruning to protect existing backups. ${check.reason}`);
+            }
+
             let storedKey = dump.localFile;
             try {
                 if (destination.kind !== "local") {
                     const uploaded = await uploadBackup(config.storage!, dump.localFile, destination);
                     storedKey = uploaded.storageUrl;
                     log(`Uploaded to ${uploaded.storageUrl}`);
+                    // Upload the roles sidecar so a restore can recreate the
+                    // roles the dump's GRANT/RLS statements depend on.
+                    if (dump.globalsFile && fs.existsSync(dump.globalsFile)) {
+                        const g = await uploadBackup(config.storage!, dump.globalsFile, destination);
+                        log(`Uploaded roles sidecar to ${g.storageUrl}`);
+                    }
                 }
             } finally {
                 // For object-storage destinations the local dump was a temp
                 // file — remove it once uploaded (or on failure).
                 if (destination.kind !== "local" && fs.existsSync(dump.localFile)) {
                     fs.unlinkSync(dump.localFile);
+                }
+                if (dump.globalsFile && destination.kind !== "local" && fs.existsSync(dump.globalsFile)) {
+                    fs.unlinkSync(dump.globalsFile);
                 }
             }
 

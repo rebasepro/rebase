@@ -45,6 +45,22 @@ like the other `rebase db` commands (`DATABASE_URL`, falling back to
 Backup files are named `rebase-<db>-<YYYYMMDD>T<HHMMSS>Z.dump`. The UTC
 timestamp is embedded so retention can be computed from the filename alone.
 
+Every backup also writes a **roles sidecar** next to the dump —
+`rebase-<db>-<…>Z.globals.sql`, produced by `pg_dumpall --globals-only
+--no-role-passwords`. A per-database `pg_dump` cannot include cluster-wide
+roles, so without this file the `rebase_user` role (and the RLS `GRANT`s that
+reference it) would be missing on restore and **row-level security would be
+silently lost**. Keep the `.globals.sql` file alongside its `.dump`; the CLI
+uploads, lists, prunes and restores them as a pair. (Pass `PG_DUMPALL_PATH` to
+point at a specific `pg_dumpall` binary. To take a role-incomplete backup on
+purpose, the programmatic `createDump({ includeGlobals: false })` opt-out
+exists — the CLI always captures globals.)
+
+Freshly written dumps are validated (`pg_restore --list` must parse the
+archive) before the command reports success, and — for scheduled backups —
+**before any older backup is pruned**, so a corrupt-but-exit-0 dump can never
+be the reason your last good backup is deleted.
+
 For `s3://` destinations the CLI builds a storage client from the same `S3_*`
 variables your backend uses (`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
 `S3_REGION`, `S3_ENDPOINT`, `S3_FORCE_PATH_STYLE`).
@@ -55,16 +71,26 @@ Runs `pg_restore`. **Destructive and never automatic** — without `--yes` it
 requires an interactive `yes`. In non-interactive shells (CI, pipes) it aborts
 unless `--yes` is passed.
 
+Before restoring, the CLI recreates cluster roles from the backup's
+`.globals.sql` sidecar (best-effort and idempotent — an already-present role is
+skipped, not fatal) so the dump's `GRANT`/RLS statements apply. The restore
+then runs with **`--exit-on-error` by default**: a `pg_restore` that logs and
+continues past a failed `GRANT` would "succeed" with RLS un-enforced, so it
+fails loudly instead. If no `.globals.sql` accompanies the backup, the CLI
+warns that roles may be missing.
+
 | Option | Description |
 |--------|-------------|
 | `--target-db <name>` | Restore into this database instead of the one in `DATABASE_URL`. |
 | `--create-db` | Create the target database first if it doesn't exist. |
 | `--clean` | Drop existing objects before recreating them (`--clean --if-exists`). |
 | `--no-owner` | Ignore ownership recorded in the dump. |
+| `--continue-on-error` | Log and continue past errors instead of aborting. **May leave RLS un-enforced** — use only when you understand the consequences. |
 | `--yes`, `-y` | Skip the interactive confirmation. |
 
 `<backup>` may be a local `.dump` file or an `s3://…` / `gs://…` object key
-(downloaded to a temp file first).
+(downloaded to a temp file first). Its `.globals.sql` sidecar is resolved from
+the same directory/prefix.
 
 **Recommended:** restore into a fresh database with `--create-db --target-db`,
 verify it, then repoint your app — rather than clobbering the live database.
@@ -89,7 +115,7 @@ clear, doctor-style message if they're incompatible or the binary is missing:
 
 Install the client tools with e.g. `brew install libpq` or
 `apt-get install postgresql-client-16`. You can point the CLI at a specific
-binary with `PG_DUMP_PATH` / `PG_RESTORE_PATH`.
+binary with `PG_DUMP_PATH` / `PG_RESTORE_PATH` / `PG_DUMPALL_PATH`.
 
 ## Scheduled backups
 
