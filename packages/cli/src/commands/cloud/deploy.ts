@@ -202,16 +202,21 @@ async function deployBundle(opts: {
             log: (m: string) => console.log(chalk.gray(m))
         });
         bundleDir = result.outDir;
-        if (result.manifest.hooks.native) {
-            const names = (result.manifest.hooks.nativeModules ?? []).map(m => m.name).join(", ");
-            fail(
-                `This bundle depends on native modules (${names}), which the managed runtime cannot run.`,
-                "Remove the native dependency, or deploy on the custom runtime."
-            );
-        }
     }
 
     const manifest = readBundleManifest(bundleDir);
+
+    // Native modules cannot run on the managed runtime — the server rejects them
+    // at intake anyway, but catching it here saves a pointless upload of a bundle
+    // that cannot be deployed. Checked against the manifest, so it covers a
+    // prebuilt `--bundle-dir` bundle just as much as one we just built.
+    if (manifest.hooks?.native) {
+        const names = (manifest.hooks.nativeModules ?? []).map(m => m.name).join(", ");
+        fail(
+            `This bundle depends on native modules${names ? ` (${names})` : ""}, which the managed runtime cannot run.`,
+            "Remove the native dependency, or deploy on the custom runtime."
+        );
+    }
 
     // Pack + upload.
     const tarPath = path.join(os.tmpdir(), `rebase-bundle-${Date.now()}.tar.gz`);
