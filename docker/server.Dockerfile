@@ -61,8 +61,10 @@ RUN mkdir -p /runtime \
         "zod@^4.4.3" \
         "pg@^8.21.0" \
     && mkdir -p node_modules/@rebasepro
-COPY --from=build /src/packages/types/dist /runtime/node_modules/@rebasepro/types/dist
-COPY --from=build /src/packages/types/package.json /runtime/node_modules/@rebasepro/types/
+
+# The workspace packages are copied into the runtime stage below, one by one, so
+# that only built output ships. (They are deliberately NOT copied here: a
+# `COPY --from=build` inside the `build` stage itself is self-referential.)
 
 # ── Stage 2: the runtime ─────────────────────────────────────────────────────
 FROM node:22-slim AS runtime

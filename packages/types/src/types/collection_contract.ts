@@ -67,14 +67,21 @@ function refFor(collection: CollectionConfig | undefined): string | undefined {
 interface WalkState {
     memo: WeakMap<object, unknown>;
     /**
-     * How many times the depth cap has truncated a subtree.
+     * How many times the walk has truncated a subtree — by hitting the depth
+     * cap, or by cutting a cycle.
      *
-     * A result produced under truncation is only valid at the depth it was
-     * produced at — reusing it higher up would silently drop content that would
-     * have fit. Comparing this counter before and after a node's children tells
-     * us whether its result is depth-independent and therefore safe to memoize.
+     * Either kind of truncation makes a result valid only at the *position* it
+     * was produced at, so caching it and serving it elsewhere silently drops
+     * content that would have been included. Comparing this counter before and
+     * after a node's children tells us whether its result is position-
+     * independent and therefore safe to memoize.
+     *
+     * The cycle case is the subtle one: with `a.b = b` and `b.a = a`, serializing
+     * `{ first: b, second: a }` visits `a` beneath `b` — where the cycle back to
+     * `b` is cut — and would then reuse that truncated `a` for `second`, where
+     * nothing needed cutting.
      */
-    capHits: number;
+    truncations: number;
 }
 
 function toSerializable(
@@ -85,7 +92,7 @@ function toSerializable(
     key?: string
 ): unknown {
     if (depth > MAX_DEPTH) {
-        state.capHits++;
+        state.truncations++;
         return undefined;
     }
 
@@ -113,7 +120,10 @@ function toSerializable(
     if (value instanceof Date) return value.toISOString();
     if (value instanceof RegExp) return value.source;
 
-    if (seen.has(value as object)) return undefined;
+    if (seen.has(value as object)) {
+        state.truncations++;
+        return undefined;
+    }
 
     // A shared (non-cyclic) subgraph is reachable by many paths, and `seen` is a
     // *path* set — released in the `finally` below so a node referenced twice in
@@ -126,10 +136,10 @@ function toSerializable(
     if (cached !== undefined) return cached;
 
     seen.add(value as object);
-    const capHitsBefore = state.capHits;
+    const truncationsBefore = state.truncations;
     const memoize = (result: unknown): unknown => {
-        // Only cache a result no depth cap interfered with.
-        if (result !== undefined && state.capHits === capHitsBefore) {
+        // Only cache a result that nothing was cut from.
+        if (result !== undefined && state.truncations === truncationsBefore) {
             state.memo.set(value as object, result);
         }
         return result;
@@ -187,7 +197,7 @@ export function serializeCollections(collections: CollectionConfig[]): unknown[]
         .sort((a, b) => String(a.slug ?? "").localeCompare(String(b.slug ?? "")))
         .map(collection => toSerializable(collection, new WeakSet(), 0, {
             memo: new WeakMap(),
-            capHits: 0
+            truncations: 0
         }))
         .filter((c): c is Record<string, unknown> => c !== undefined);
 }

@@ -5,7 +5,9 @@
 # same published image every Rebase deployment runs, and your project travels as
 # a bundle.
 #
-#   rebase build                 # produces ./dist-bundle
+#   rebase build                          # produces ./dist-bundle
+#   docker compose -f docker/docker-compose.selfhost.yml up -d db
+#   rebase db push                        # create the collection tables, once
 #   docker compose -f docker/docker-compose.selfhost.yml up
 #
 # To upgrade Rebase, change the image tag and restart. Your bundle is untouched.
@@ -30,8 +32,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
-    # Not published to the host by default. Add a `ports:` mapping only if you
-    # genuinely need to reach the database from outside this compose network.
+    # Published so `rebase db push` can reach it from the host. Remove this
+    # mapping once the schema is in place if the database should not be
+    # reachable from outside the compose network.
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
 
   api:
     image: rebasepro/server:${REBASE_VERSION:-latest}
@@ -46,11 +51,10 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origins your frontend is served from}
       PORT: 8080
 
-      # Create collection tables on first boot. Convenient for getting started
-      # and wrong for a database you care about: it lets a restart change the
-      # schema. Switch to "none" and run `rebase db push` deliberately once this
-      # is more than a trial.
-      REBASE_MIGRATE_ON_BOOT: ${REBASE_MIGRATE_ON_BOOT:-push}
+      # Auth tables are created at boot. Collection tables are not: run
+      # `rebase db push` once, against the database below. A container restart
+      # must not be able to change a schema as a side effect.
+      REBASE_MIGRATE_ON_BOOT: ${REBASE_MIGRATE_ON_BOOT:-ensure}
 
       # File storage is off unless a bucket is configured. It is not a default
       # because the alternative — the container filesystem — silently loses every

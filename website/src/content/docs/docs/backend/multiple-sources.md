@@ -116,11 +116,45 @@ Sources declared with `transport: "direct"` are skipped entirely: the client
 talks to those itself, so the backend holds no connection and demands no
 configuration for them.
 
+## Storage access control
+
+Storage keys share one flat namespace and are not under row-level security, so
+without an explicit access-control model the default would be "any signed-in user
+may read, overwrite, delete or list any object". Production refuses to boot
+rather than assume that.
+
+The way to say what access means for your project is a `storageAuthorize` export
+from the config package — a function, because no environment variable can express
+"this user may read this key":
+
+```ts
+// config/index.ts
+import type { StorageAuthorize } from "@rebasepro/types";
+
+export const storageAuthorize: StorageAuthorize = async ({ key, user, operation }) => {
+    if (!user) return false;
+    const [ownerId] = key.split("/");
+    return ownerId === user.uid || operation === "read";
+};
+```
+
+Two environment escapes exist for the cases where that really is the model:
+
+- `STORAGE_PUBLIC_READ=true` — the bucket is a public, read-only CDN. Writes,
+  deletes and listing still require authentication.
+- `STORAGE_ALLOW_ANY_AUTHENTICATED=true` — every signed-in user is trusted with
+  every file. Defensible for a single-tenant app, never for a multi-tenant one.
+
 ## Storage in production
 
-Unchanged by any of this, and worth repeating: with no bucket configured, storage
-is **off** in production and uploads answer `501`. Local disk is the container
-filesystem, so files written there vanish on the next restart — an upload that
-fails loudly can be retried, one that succeeded into a disk about to be wiped
-cannot. Set `FORCE_LOCAL_STORAGE=true` only when a durable volume really is
-mounted.
+With no bucket configured, storage is **off** in production and uploads answer
+`501`. Local disk is the container filesystem, so files written there vanish on
+the next restart — an upload that fails loudly can be retried, one that succeeded
+into a disk about to be wiped cannot. Set `FORCE_LOCAL_STORAGE=true` only when a
+durable volume really is mounted.
+
+One consequence worth knowing if you declare storage sources explicitly: no
+default bucket is invented for you. Declaring only a `media` source means there
+is no `(default)` source, and a property that does not name one has nowhere to
+go — deliberately, and identically in development and production. Declare
+`(default)` too if you want one.

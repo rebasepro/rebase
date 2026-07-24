@@ -129,6 +129,7 @@ message: "must be an object" });
             checkRelativePath(raw.functions, `${base}.functions`, issues, { required: false });
             checkRelativePath(raw.crons, `${base}.crons`, issues, { required: false });
             checkRelativePath(raw.schema, `${base}.schema`, issues, { required: false });
+            checkRelativePath(raw.usersCollection, `${base}.usersCollection`, issues, { required: false });
             if (raw.mode !== undefined && raw.mode !== "cms" && raw.mode !== "baas") {
                 issues.push({ path: `${base}.mode`,
 message: 'must be "cms" or "baas"' });

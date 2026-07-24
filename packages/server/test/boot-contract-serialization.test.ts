@@ -105,6 +105,52 @@ describe("collection contract serialization", () => {
         expect(JSON.stringify(serialized)).toContain("nodes");
     });
 
+    it("does not let a cycle cut in one branch truncate a shared node in another", () => {
+        // Memoizing the walk made it linear instead of exponential, but a result
+        // produced where a cycle had to be cut is only valid at that position.
+        // Serializing `first: b` visits `a` beneath `b`, cutting the edge back to
+        // `b`; reusing that truncated `a` for `second` would silently drop `b`
+        // from a branch where nothing needed cutting.
+        const a: Record<string, unknown> = { name: "a" };
+        const b: Record<string, unknown> = { name: "b",
+            a };
+        a.b = b;
+
+        const [serialized] = serializeCollections([{
+            name: "Things",
+            slug: "things",
+            properties: {},
+            first: b,
+            second: a
+        } as unknown as CollectionConfig]) as Record<string, unknown>[];
+
+        const second = serialized.second as Record<string, unknown>;
+        expect(second.name).toBe("a");
+        expect(second.b).toBeDefined();
+        expect((second.b as Record<string, unknown>).name).toBe("b");
+    });
+
+    it("serializes a widely shared subtree without exploding", () => {
+        // A diamond graph is reachable by exponentially many paths. Before
+        // memoization a 20-deep one took ~400ms and each further level doubled.
+        let node: Record<string, unknown> = { leaf: true };
+        for (let i = 0; i < 20; i++) {
+            node = { left: node,
+                right: node };
+        }
+
+        const started = Date.now();
+        const result = serializeCollections([{
+            name: "Deep",
+            slug: "deep",
+            properties: {},
+            graph: node
+        } as unknown as CollectionConfig]);
+
+        expect(result).toHaveLength(1);
+        expect(Date.now() - started).toBeLessThan(2000);
+    });
+
     it("sorts by slug so the payload does not depend on input order", () => {
         const authors = authorsCollection();
         const posts = postsCollection(authors);

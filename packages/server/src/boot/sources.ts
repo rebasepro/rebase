@@ -186,15 +186,24 @@ engine: "postgres" }, ...serverSide];
         });
     }
 
-    // A declared-but-direct default is legitimate: the backend holds no
-    // connection for it, and demanding one would be wrong.
-    const defaultIsDirect = declared.some(
-        d => d.key === DEFAULT_DATA_SOURCE_KEY && (d.transport ?? "server") !== "server"
-    );
-    if (!defaultIsDirect && !resolved.some(r => r.isDefault)) {
+    if (!resolved.some(r => r.isDefault)) {
+        // A default declared as `direct` still fails here, and must: the driver
+        // registry promotes whatever driver it has to be the default, so a
+        // project in that shape would route every collection that names no data
+        // source into some *other* project database. Refusing is the only
+        // outcome that cannot silently write to the wrong place.
+        const directDefault = declared.some(
+            d => d.key === DEFAULT_DATA_SOURCE_KEY && (d.transport ?? "server") !== "server"
+        );
         throw new BundleError(
-            "No default data source is configured.",
-            `Declare a data source with key "${DEFAULT_DATA_SOURCE_KEY}", or set DATABASE_URL.`
+            directDefault
+                ? `The default data source is declared with a non-server transport, so the backend ` +
+                  "holds no connection for it — but collections that name no data source still need one."
+                : "No default data source is configured.",
+            directDefault
+                ? `Give "${DEFAULT_DATA_SOURCE_KEY}" a server transport and set DATABASE_URL, or point ` +
+                  "every collection at an explicit dataSource."
+                : `Declare a data source with key "${DEFAULT_DATA_SOURCE_KEY}", or set DATABASE_URL.`
         );
     }
 

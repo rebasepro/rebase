@@ -244,7 +244,9 @@ function mayUseAmbientKey(target: string, cwd: string): boolean {
     const link = readLink(findProjectRoot(cwd) ?? cwd);
     if (!link?.apiUrl) return false;
     try {
-        return new URL(link.apiUrl).host === new URL(target).host;
+        // Origin, not host: with a link recorded as https, an `http://` target
+        // for the same host would otherwise pass and send the key in cleartext.
+        return new URL(link.apiUrl).origin === new URL(target).origin;
     } catch {
         return false;
     }

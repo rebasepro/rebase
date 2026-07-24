@@ -8,7 +8,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
 
 const BUNDLE = process.env.REBASE_BUNDLE || "/bundle";
 
@@ -62,108 +61,32 @@ if (fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModules)) {
     }
 }
 
-// ── 3. Schema reconciliation ─────────────────────────────────────────────────
+// ── 3. Schema ────────────────────────────────────────────────────────────────
 //
-// Defaults to `none` in production. A container restart must not be able to
-// rewrite a production schema as a side effect — that is a deliberate,
-// reviewable step, so it has to be asked for by name.
-const DEFAULT_MODE = process.env.NODE_ENV === "production" ? "none" : "ensure";
-const migrateMode = process.env.REBASE_MIGRATE_ON_BOOT || DEFAULT_MODE;
+// The runtime creates its own auth tables at boot. Collection tables are a
+// separate, deliberate step, and this image does not do it.
+//
+// It briefly tried to: `REBASE_MIGRATE_ON_BOOT=push` shelled out to the driver's
+// schema CLI. That CLI is TypeScript and is not exported as a subpath, so it was
+// never reachable from here — the container simply crash-looped, and with a
+// restart policy in front it did so forever. Worse, making it work would mean a
+// container restart could run `DROP COLUMN` against a production database as a
+// side effect of a deploy.
+//
+// So schema changes belong where they can be reviewed: `rebase db push` from a
+// checkout or a CI job, with the destructive-change gate and a backup in reach.
+const migrateMode = process.env.REBASE_MIGRATE_ON_BOOT || "ensure";
 
-if (!["none", "ensure", "push"].includes(migrateMode)) {
-    fail(`REBASE_MIGRATE_ON_BOOT must be none, ensure or push (got "${migrateMode}").`);
-}
-
-if (migrateMode === "push") {
-    // `push` reconciles collection tables, which means DDL. With more than one
-    // replica starting at once that is concurrent DDL against one database, so
-    // it runs under a Postgres advisory lock: the first instance migrates, the
-    // rest wait and then find nothing to do.
-    const databaseUrl = process.env.DATABASE_URL;
-    if (!databaseUrl) fail("REBASE_MIGRATE_ON_BOOT=push requires DATABASE_URL.");
-
-    // Resolve from the bundle first (the project's own driver), then from the
-    // image's own tree — the runtime image ships a driver too, and a bundle that
-    // has not installed one should still find it.
-    let driverCli;
-    for (const base of [BUNDLE, "/app"]) {
-        try {
-            driverCli = createRequire(path.join(base, "package.json"))
-                .resolve("@rebasepro/server-postgres/src/cli.ts");
-            break;
-        } catch {
-            driverCli = undefined;
-        }
-    }
-
-    if (!driverCli) {
+if (!["none", "ensure"].includes(migrateMode)) {
+    if (migrateMode === "push") {
         fail(
-            "REBASE_MIGRATE_ON_BOOT=push needs the schema tooling, which is not in this image.",
-            "Run `rebase db push` from a checkout or a CI job instead — that is the supported " +
-            "path for production schema changes. Set REBASE_MIGRATE_ON_BOOT=ensure to boot without it."
+            "REBASE_MIGRATE_ON_BOOT=push is not supported by the runtime image.",
+            "Run `rebase db push` from a checkout or CI instead — it dry-runs the change, refuses " +
+            "destructive ones without confirmation, and can take a backup first. " +
+            "Set REBASE_MIGRATE_ON_BOOT=ensure (the default) to boot."
         );
     }
-
-    const { default: pg } = await import("pg");
-    const client = new pg.Client({ connectionString: databaseUrl });
-    // A constant, arbitrary key. Any value works as long as every instance of
-    // this entrypoint uses the same one.
-    const LOCK_KEY = 8_427_113;
-
-    await client.connect();
-    try {
-        // Bounded, so a wedged migration in one replica fails the others fast
-        // instead of blocking every boot in the deployment indefinitely.
-        log("waiting for the schema lock…");
-        await client.query("SET lock_timeout = '120s'");
-        try {
-            await client.query("SELECT pg_advisory_lock($1)", [LOCK_KEY]);
-        } catch (err) {
-            fail(
-                "Timed out waiting for the schema lock — another instance is still migrating.",
-                `Detail: ${err instanceof Error ? err.message : String(err)}`
-            );
-        }
-
-        log("pushing schema…");
-
-        // The driver CLI is TypeScript, so it needs tsx — plain `node` cannot
-        // execute it.
-        let runner;
-        try {
-            runner = createRequire(path.join(BUNDLE, "package.json")).resolve("tsx/cli");
-        } catch {
-            runner = undefined;
-        }
-
-        // Deliberately no `--yes`. That flag is treated as
-        // `--allow-destructive`, which would let a container restart run
-        // `DROP COLUMN` / `DROP TABLE` with no dry run, no confirmation and no
-        // backup. Without it a destructive plan refuses non-interactively and
-        // says so; an additive one (creating tables on first boot) still applies,
-        // which is the case this exists for.
-        const result = runner
-            ? spawnSync("node", [runner, driverCli, "db", "push"], {
-                cwd: BUNDLE,
-                stdio: "inherit",
-                env: process.env
-            })
-            : spawnSync("node", [driverCli, "db", "push"], {
-                cwd: BUNDLE,
-                stdio: "inherit",
-                env: process.env
-            });
-        if (result.status !== 0) {
-            fail(
-                "Schema push failed — refusing to start against an unknown schema.",
-                "Destructive changes are refused here on purpose. Apply them deliberately with " +
-                "`rebase db push` from a checkout or CI, after taking a backup."
-            );
-        }
-    } finally {
-        await client.query("SELECT pg_advisory_unlock($1)", [LOCK_KEY]).catch(() => {});
-        await client.end().catch(() => {});
-    }
+    fail(`REBASE_MIGRATE_ON_BOOT must be "none" or "ensure" (got "${migrateMode}").`);
 }
 
 // ── 4. Run ───────────────────────────────────────────────────────────────────

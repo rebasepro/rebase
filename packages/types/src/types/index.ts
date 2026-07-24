@@ -37,4 +37,5 @@ export * from "./api_keys";
 export * from "./project_manifest";
 export * from "./collection_contract";
 export * from "./schema_version";
+export * from "./storage_authorize";
 

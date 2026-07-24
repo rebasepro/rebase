@@ -102,8 +102,15 @@ export class MetricsRegistry {
         let key = MetricsRegistry.labelKey(labels);
 
         if (!this.requests.has(key) && this.requests.size >= MAX_SERIES) {
-            key = MetricsRegistry.labelKey({ ...labels,
-                collection: "(other)" });
+            // Only the collection label can grow without bound, so only it is
+            // collapsed — rewriting a request that never had one would invent a
+            // `collection="(other)"` on, say, an auth request and make the
+            // output misleading rather than merely coarser.
+            const { collection: _dropped, ...rest } = labels;
+            key = MetricsRegistry.labelKey(
+                "collection" in labels ? { ...rest,
+                    collection: "(other)" } : rest
+            );
         }
 
         this.requests.set(key, (this.requests.get(key) ?? 0) + 1);
@@ -124,11 +131,16 @@ total: 0 };
 
     incrementCounter(name: string, labels: Record<string, string> = {}, by = 1): void {
         const key = MetricsRegistry.namedKey(name, labels);
+        // Capped for the same reason request series are: whatever calls this
+        // next may well pass something request-derived.
+        if (!this.counters.has(key) && this.counters.size >= MAX_SERIES) return;
         this.counters.set(key, (this.counters.get(key) ?? 0) + by);
     }
 
     setGauge(name: string, value: number, labels: Record<string, string> = {}): void {
-        this.gauges.set(MetricsRegistry.namedKey(name, labels), value);
+        const key = MetricsRegistry.namedKey(name, labels);
+        if (!this.gauges.has(key) && this.gauges.size >= MAX_SERIES) return;
+        this.gauges.set(key, value);
     }
 
     /** Prometheus escaping: backslash, quote and newline, in that order. */

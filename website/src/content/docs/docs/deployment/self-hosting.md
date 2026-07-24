@@ -17,11 +17,13 @@ why it is split that way.
 ## Docker Compose
 
 ```bash
-rebase build
-docker compose -f docker/docker-compose.selfhost.yml up
+rebase build                     # produces ./dist-bundle
+docker compose up -d db          # start Postgres
+rebase db push                   # create the collection tables, once
+docker compose up                # start the runtime
 ```
 
-A minimal compose file:
+A minimal `docker-compose.yml`:
 
 ```yaml
 services:
@@ -47,9 +49,10 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
       CORS_ORIGINS: ${CORS_ORIGINS}
-      REBASE_MIGRATE_ON_BOOT: push
     volumes:
-      - ./dist-bundle:/bundle:ro
+      # Writable: the container installs the bundle's declared dependencies into
+      # it on first start. See "Dependencies" below for the read-only variant.
+      - ./dist-bundle:/bundle
     ports:
       - "8080:8080"
 
@@ -57,38 +60,56 @@ volumes:
   db-data:
 ```
 
-Mounting the bundle read-only is deliberate: the runtime never writes to it, and
-a compromised hook then cannot rewrite the code that runs after the next restart.
+## Dependencies
+
+`rebase build` writes a `package.json` next to your bundle listing the
+dependencies your project declared. The container installs them on first start,
+which is why the mount above is writable.
+
+To mount read-only instead — worth doing, because a compromised hook then cannot
+rewrite the code that runs after the next restart — install them first:
+
+```bash
+npm install --omit=dev --prefix dist-bundle
+```
+
+```yaml
+    volumes:
+      - ./dist-bundle:/bundle:ro
+```
+
+For a real deployment, prefer baking both into an image, which also pins exactly
+what runs:
+
+```dockerfile
+FROM rebasepro/server:0.11.0
+COPY dist-bundle /bundle
+```
 
 ## Creating the schema
 
-The runtime creates its own auth tables on first boot. **Collection tables are a
-separate, deliberate step** — a container restart must not be able to rewrite a
-production schema as a side effect.
-
-- `REBASE_MIGRATE_ON_BOOT=push` reconciles collection tables at boot. Convenient
-  for a trial; wrong for a database you care about. It runs under a Postgres
-  advisory lock, so several replicas starting at once will not race.
-- `REBASE_MIGRATE_ON_BOOT=none` (the production default) touches nothing. Run
-  schema changes deliberately:
+The runtime creates its own **auth** tables at boot. **Collection tables are a
+separate, deliberate step**, and the runtime image does not do it — a container
+restart must not be able to change a schema as a side effect of a deploy.
 
 ```bash
 rebase db push
 ```
+
+Run it from a checkout or a CI job, pointed at the deployment's database. It
+dry-runs the change first, refuses destructive ones without explicit
+confirmation, and can take a backup before applying.
+
+`REBASE_MIGRATE_ON_BOOT` accepts `ensure` (the default — auth tables only) and
+`none`.
 
 ## Other platforms
 
 The runtime is an ordinary container listening on `$PORT`, so anything that runs
 containers works. Two things to get right everywhere:
 
-1. The bundle must be present at `/bundle` (or wherever `REBASE_BUNDLE` points).
-   Either mount it, or build a small derived image:
-
-   ```dockerfile
-   FROM rebasepro/server:0.11.0
-   COPY dist-bundle /bundle
-   ```
-
+1. The bundle must be present at `/bundle` (or wherever `REBASE_BUNDLE` points),
+   with its dependencies installed beside it — see [Dependencies](#dependencies).
 2. Set `CORS_ORIGINS`, `JWT_SECRET` and `DATABASE_URL`. The runtime refuses to
    start in production without them rather than guessing.
 

@@ -59,6 +59,14 @@ function stripNonClientFields(collection: unknown): unknown {
         callbacks: _callbacks,
         ...rest
     } = collection as Record<string, unknown>;
+
+    // Subcollections are collections, and carry their own rules. Stripping only
+    // the top level published every nested policy — the leak this exists to
+    // prevent, just one level down.
+    if (Array.isArray(rest.subcollections)) {
+        rest.subcollections = rest.subcollections.map(stripNonClientFields);
+    }
+
     return rest;
 }
 
