@@ -706,7 +706,12 @@ stdio: "inherit" });
             builtAgainst: resolveServerVersion(projectRoot),
             contract: RUNTIME_CONTRACT_VERSION
         },
-        schemaVersion: computeSchemaVersion(collections),
+        // A `baas` build genuinely does not know the schema — collections are
+        // introspected from the live database at boot. Recording a version here
+        // would stamp the hash of an empty list, and the runtime would then
+        // serve that as the identity of whatever it actually found. Empty means
+        // "ask the runtime", which is the honest answer.
+        schemaVersion: paths.mode === "baas" ? "" : computeSchemaVersion(collections),
         app: appName,
         mode: paths.mode,
         entry: {
