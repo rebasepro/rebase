@@ -39,9 +39,40 @@ type DriverAdapterFactory = (config: Record<string, unknown>) => DatabaseAdapter
 /** The connection handle a driver hands back. */
 export interface DatabaseConnection {
     db: unknown;
-    /** Present for pool-based drivers; closed during shutdown when it is. */
-    pool?: { end: () => Promise<void> };
+    /**
+     * Present for pool-based drivers. Closed during shutdown, and used to probe
+     * the source for health — `query` lives here, not on the connection itself.
+     */
+    pool?: {
+        end: () => Promise<void>;
+        query?: (sql: string) => Promise<unknown>;
+    };
+    /** Some drivers expose a query directly instead of via a pool. */
+    query?: (sql: string) => Promise<unknown>;
     connectionString?: string;
+}
+
+/**
+ * Run a trivial query against a source, to see whether it answers.
+ *
+ * Returns `undefined` when the driver exposes no way to ask — a driver that
+ * cannot be probed must not be reported as unhealthy, only as unknown.
+ */
+export async function probeDataSource(
+    source: InitializedDataSource
+): Promise<{ healthy: boolean; error?: string } | undefined> {
+    const query = source.connection.query ?? source.connection.pool?.query;
+    if (typeof query !== "function") return undefined;
+
+    try {
+        await query.call(source.connection.pool ?? source.connection, "SELECT 1");
+        return { healthy: true };
+    } catch (err) {
+        return {
+            healthy: false,
+            error: err instanceof Error ? err.message : String(err)
+        };
+    }
 }
 
 /** One initialized data source: its bootstrapper plus the handle to close. */

@@ -27,7 +27,7 @@ import {
     type LoadedBundle
 } from "./bundle";
 import { resolveDataSources, resolveStorageSources } from "./sources";
-import { initializeDataSources, type InitializedDataSource } from "./driver";
+import { initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveAuthOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
 
@@ -214,28 +214,16 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         const secondaries = await Promise.all(
             dataSources
                 .filter(source => source.key !== DEFAULT_DATA_SOURCE_KEY)
-                .map(async source => {
-                    const probe = source.connection as { query?: (sql: string) => Promise<unknown> };
-                    if (typeof probe.query !== "function") {
-                        return { key: source.key,
-healthy: true,
-skipped: true };
-                    }
-                    try {
-                        await probe.query("SELECT 1");
-                        return { key: source.key,
-healthy: true };
-                    } catch (err) {
-                        return {
-                            key: source.key,
-                            healthy: false,
-                            error: err instanceof Error ? err.message : String(err)
-                        };
-                    }
-                })
+                .map(async source => ({
+                    key: source.key,
+                    result: await probeDataSource(source)
+                }))
         );
 
-        const unhealthy = secondaries.filter(source => !source.healthy);
+        const unhealthy = secondaries
+            .filter(source => source.result && !source.result.healthy)
+            .map(source => ({ key: source.key,
+                error: source.result?.error }));
         const healthy = result.healthy && unhealthy.length === 0;
 
         return c.json({
