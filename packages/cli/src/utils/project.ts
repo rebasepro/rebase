@@ -9,18 +9,31 @@ import path from "path";
 import { execSync } from "child_process";
 import chalk from "chalk";
 
+/** The authored project manifest. Its presence alone marks a project root. */
+export const MANIFEST_FILENAME = "rebase.json";
+
 /**
  * Walk up from `startDir` to find the Rebase project root.
  *
- * The root is identified by a `package.json` that either:
- * - has `workspaces` containing "backend" or "frontend", OR
- * - has a sibling `backend/` directory
+ * A directory is the root when it holds a `rebase.json`, or when it holds a
+ * `package.json` that either lists `backend` as a workspace or sits beside both
+ * `backend/` and `config/`.
+ *
+ * `rebase.json` is checked first and needs no `package.json` beside it, because
+ * the conventions below all describe a repository that *contains the backend*.
+ * A repository holding only a frontend — the normal shape once a project's apps
+ * live in separate repositories — matches none of them, so without this the
+ * tooling could not run there at all.
  */
 export function findProjectRoot(startDir: string = process.cwd()): string | null {
     let dir = path.resolve(startDir);
     const root = path.parse(dir).root;
 
     while (dir !== root) {
+        if (fs.existsSync(path.join(dir, MANIFEST_FILENAME))) {
+            return dir;
+        }
+
         const pkgPath = path.join(dir, "package.json");
 
         if (fs.existsSync(pkgPath)) {

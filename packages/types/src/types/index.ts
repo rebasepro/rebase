@@ -34,4 +34,7 @@ export * from "./database_adapter";
 export * from "./breadcrumbs";
 export * from "./component_overrides";
 export * from "./api_keys";
+export * from "./project_manifest";
+export * from "./collection_contract";
+export * from "./schema_version";
 

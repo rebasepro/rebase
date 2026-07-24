@@ -19,6 +19,8 @@ import chalk from "chalk";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
+import { findBackendApp, loadManifest, resolveBackendPaths } from "../manifest";
 import {
     requireProjectRoot,
     findBackendDir,
@@ -30,6 +32,71 @@ import {
     resolvePluginCliScript
 } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+
+/**
+ * Locate the dev runtime shim shipped with the CLI.
+ *
+ * Published under `runtime/` in the package rather than compiled into `dist/`,
+ * because tsx executes it as a file and it must exist on disk at a stable path.
+ */
+function resolveDevRuntimeEntry(): string {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    // Walk up from wherever this module ended up (src/ in development, dist/ in
+    // a published install) until the package root with `runtime/` is found.
+    let dir = here;
+    for (let i = 0; i < 5; i++) {
+        const candidate = path.join(dir, "runtime", "dev-server.mjs");
+        if (fs.existsSync(candidate)) return candidate;
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    throw new Error(
+        "Could not find the Rebase dev runtime (runtime/dev-server.mjs). " +
+        "Reinstall @rebasepro/cli, or add a backend/src/index.ts to run your own entrypoint."
+    );
+}
+
+/**
+ * Tell the dev runtime where this project keeps its parts.
+ *
+ * Read from `rebase.json` when there is one, so a project that moved its config
+ * directory is honoured; otherwise the conventional layout.
+ */
+function devRuntimeEnv(projectRoot: string): Record<string, string> {
+    const result: Record<string, string> = {
+        REBASE_DEV_PROJECT_ROOT: projectRoot,
+        REBASE_DEV_CONFIG: "config",
+        REBASE_DEV_FUNCTIONS: "backend/functions",
+        REBASE_DEV_CRONS: "backend/crons",
+        REBASE_DEV_SCHEMA: "backend/src/schema.generated.ts",
+        REBASE_DEV_MODE: "cms"
+    };
+
+    try {
+        const loaded = loadManifest(projectRoot);
+        const backend = findBackendApp(loaded.manifest);
+        if (backend) {
+            const paths = resolveBackendPaths(backend.app);
+            result.REBASE_DEV_CONFIG = paths.config;
+            result.REBASE_DEV_FUNCTIONS = paths.functions;
+            result.REBASE_DEV_CRONS = paths.crons;
+            result.REBASE_DEV_SCHEMA = paths.schema;
+            result.REBASE_DEV_MODE = paths.mode;
+            result.REBASE_DEV_APP = backend.name;
+        }
+    } catch {
+        // An invalid manifest is reported by `rebase build`; dev falls back to
+        // the conventional layout rather than refusing to start.
+    }
+
+    // A project with no config package is serving an introspected database.
+    if (!fs.existsSync(path.join(projectRoot, result.REBASE_DEV_CONFIG))) {
+        result.REBASE_DEV_MODE = "baas";
+    }
+
+    return result;
+}
 
 /** Well-known filename the backend writes its actual port to. */
 const DEV_PORT_FILENAME = ".rebase-dev-port";
@@ -364,7 +431,20 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             }
         }
 
-        const watchArgs = ["watch", "--conditions", "development", "src/index.ts"];
+        // A project with its own `backend/src/index.ts` runs it, exactly as
+        // before. Without one, dev boots the stock runtime over the project's
+        // TypeScript source — the same boot path a deployment takes, so what runs
+        // locally is what will run deployed. This is what makes the hand-written
+        // entrypoint optional instead of something every project must carry.
+        const ejectedEntry = path.join(backendDir, "src", "index.ts");
+        const usesStockRuntime = !fs.existsSync(ejectedEntry);
+        const entryTarget = usesStockRuntime ? resolveDevRuntimeEntry() : "src/index.ts";
+
+        if (usesStockRuntime) {
+            Object.assign(env, devRuntimeEnv(projectRoot));
+        }
+
+        const watchArgs = ["watch", "--conditions", "development", `"${entryTarget}"`];
         if (!shouldGenerate) {
             // When auto-generation is disabled, watch the config/collections dir directly so the dev server
             // still reloads automatically when files there are edited/updated manually.

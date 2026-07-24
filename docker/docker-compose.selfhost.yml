@@ -1,0 +1,83 @@
+# Self-hosting Rebase.
+#
+# Two containers: Postgres, and the Rebase runtime with your project's bundle
+# mounted into it. There is no application image to build — the runtime is the
+# same published image every Rebase deployment runs, and your project travels as
+# a bundle.
+#
+#   rebase build                 # produces ./dist-bundle
+#   docker compose -f docker/docker-compose.selfhost.yml up
+#
+# To upgrade Rebase, change the image tag and restart. Your bundle is untouched.
+
+name: rebase
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rebase
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: rebase
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # The runtime must not start before the database can answer, or its first
+      # boot fails on a connection refused and the container restarts for no
+      # reason a reader would understand.
+      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # Not published to the host by default. Add a `ports:` mapping only if you
+    # genuinely need to reach the database from outside this compose network.
+
+  api:
+    image: rebasepro/server:${REBASE_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET to a random string of at least 32 characters}
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY:?set REBASE_SERVICE_KEY to a random string of at least 32 characters}
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origins your frontend is served from}
+      PORT: 8080
+
+      # Create collection tables on first boot. Convenient for getting started
+      # and wrong for a database you care about: it lets a restart change the
+      # schema. Switch to "none" and run `rebase db push` deliberately once this
+      # is more than a trial.
+      REBASE_MIGRATE_ON_BOOT: ${REBASE_MIGRATE_ON_BOOT:-push}
+
+      # File storage is off unless a bucket is configured. It is not a default
+      # because the alternative — the container filesystem — silently loses every
+      # uploaded file on the next restart.
+      # STORAGE_TYPE: s3
+      # S3_BUCKET: my-bucket
+      # S3_REGION: eu-central-1
+      # S3_ACCESS_KEY_ID: ...
+      # S3_SECRET_ACCESS_KEY: ...
+
+      # A second bucket, reachable from collections as storageSource "media":
+      # STORAGE_TYPE__MEDIA: s3
+      # S3_BUCKET__MEDIA: my-media-bucket
+
+      # A second database, reachable from collections as dataSource "analytics":
+      # DATABASE_URL__ANALYTICS: postgres://…
+
+      # Prometheus metrics at /metrics, behind a bearer token.
+      # REBASE_METRICS: "true"
+      # REBASE_METRICS_TOKEN: ${REBASE_METRICS_TOKEN:-}
+    volumes:
+      # Your built project. Read-only: the runtime never writes to its bundle,
+      # and mounting it read-only means a compromised hook cannot rewrite the
+      # code that will run on the next restart.
+      - ../dist-bundle:/bundle:ro
+    ports:
+      - "${PORT:-8080}:8080"
+
+volumes:
+  db-data:

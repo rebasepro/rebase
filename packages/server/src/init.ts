@@ -444,6 +444,20 @@ export interface RebaseBackendConfig {
      * ```
      */
     callbacks?: CollectionCallbacks;
+
+    /**
+     * The schema version this deployment serves, as recorded when it was built.
+     *
+     * Published by the contract endpoint so a client generated elsewhere can
+     * tell whether it is current. Leave unset and the runtime computes one from
+     * the live collections — correct, but it means the value moves whenever the
+     * collections do, which is exactly right for `baas` mode and slightly less
+     * useful for a built bundle that already knows its own answer.
+     */
+    schemaVersion?: string;
+
+    /** Runtime version reported by the contract endpoint. Informational. */
+    runtimeVersion?: string;
 }
 
 /**
@@ -1508,6 +1522,49 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         logsRouter.route("/", logsRoutes);
         config.app.route(`${basePath}/logs`, logsRouter);
         logger.info("Logs routes mounted", { path: `${basePath}/logs` });
+    }
+
+    // 6d. Mount the project contract — what lets a repository that does *not*
+    // contain the collections still generate a typed client against them. This
+    // is the backbone of frontends, second web apps and mobile apps living in
+    // their own repositories.
+    //
+    // Mounted here rather than by the bundle runtime so a project with a
+    // hand-written entrypoint gets it too: ejecting should cost you the stock
+    // runtime, not the API surface.
+    {
+        const { createContractRoutes } = await import("./api/contract-routes");
+        const contractRouter = new Hono<HonoEnv>();
+
+        // Only `/contract` is gated: it is a full map of the schema, including
+        // tables no security rule would ever expose. Its sibling
+        // `/schema-version` returns a bare version string that stands for the
+        // schema without describing it, and is deliberately reachable by a CI
+        // job holding no credentials.
+        if (adminSurfacesGated) {
+            if (apiKeyPreAuth) contractRouter.use("/contract", apiKeyPreAuth);
+            contractRouter.use(
+                "/contract",
+                createRequireAuth({ serviceKey: internalServiceKey }),
+                requireAdmin
+            );
+        } else {
+            logger.warn(
+                "Contract routes are mounted WITHOUT an auth gate " +
+                "(no auth configured, requireAuth: false, or no jwtSecret) — " +
+                "anyone who can reach the server can read the full collection schema."
+            );
+        }
+
+        contractRouter.route("/", createContractRoutes({
+            collectionRegistry,
+            schemaVersion: config.schemaVersion,
+            mode,
+            runtimeVersion: config.runtimeVersion
+        }));
+
+        config.app.route(`${basePath}/meta`, contractRouter);
+        logger.info("Contract routes mounted", { path: `${basePath}/meta` });
     }
 
     // With multiple realtime-capable engines, route subscriptions to the

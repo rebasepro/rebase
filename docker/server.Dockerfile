@@ -1,0 +1,118 @@
+# The official Rebase runtime image.
+#
+# It contains the engine and nothing of any particular project. A project is
+# supplied as a **bundle** mounted at /bundle, which is what makes the two
+# separable: the image can be rebuilt for a security patch and every project
+# running on it picks that up on restart, without anyone rebuilding an app.
+#
+#   docker run -v ./dist-bundle:/bundle -e DATABASE_URL=... rebasepro/server
+#
+# Build from the repository root:
+#   docker build -f docker/server.Dockerfile -t rebasepro/server:0.11.0 .
+
+# ── Stage 1: build the workspace packages ────────────────────────────────────
+FROM node:22-slim AS build
+
+RUN corepack enable
+
+WORKDIR /src
+
+# Manifests first so the dependency layer survives source edits.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/types/package.json packages/types/
+COPY packages/utils/package.json packages/utils/
+COPY packages/common/package.json packages/common/
+COPY packages/client/package.json packages/client/
+COPY packages/codegen/package.json packages/codegen/
+COPY packages/server/package.json packages/server/
+COPY packages/server-postgres/package.json packages/server-postgres/
+
+RUN pnpm install --frozen-lockfile --filter @rebasepro/server... --filter @rebasepro/server-postgres...
+
+COPY packages/types packages/types
+COPY packages/utils packages/utils
+COPY packages/common packages/common
+COPY packages/client packages/client
+COPY packages/codegen packages/codegen
+COPY packages/server packages/server
+COPY packages/server-postgres packages/server-postgres
+COPY scripts scripts
+
+RUN pnpm --filter @rebasepro/types build \
+    && pnpm --filter @rebasepro/utils build \
+    && pnpm --filter @rebasepro/common build \
+    && pnpm --filter @rebasepro/client build \
+    && pnpm --filter @rebasepro/codegen build \
+    && pnpm --filter @rebasepro/server build \
+    && pnpm --filter @rebasepro/server-postgres build
+
+# Assemble a plain, hoisted node_modules the runtime image can use directly.
+# pnpm's symlinked store does not survive a COPY between stages intact, and the
+# runtime has no package manager to repair it with.
+RUN mkdir -p /runtime \
+    && cd /runtime \
+    && npm init -y > /dev/null \
+    && npm install --omit=dev --no-audit --no-fund \
+        "hono@^4.12.25" \
+        "@hono/node-server@^2.0.4" \
+        "drizzle-orm@^0.45.2" \
+        "jsonwebtoken@^9.0.3" \
+        "ws@^8.21.0" \
+        "zod@^4.4.3" \
+        "pg@^8.21.0" \
+    && mkdir -p node_modules/@rebasepro
+COPY --from=build /src/packages/types/dist /runtime/node_modules/@rebasepro/types/dist
+COPY --from=build /src/packages/types/package.json /runtime/node_modules/@rebasepro/types/
+
+# ── Stage 2: the runtime ─────────────────────────────────────────────────────
+FROM node:22-slim AS runtime
+
+# tini reaps zombies and forwards signals, so SIGTERM reaches the process and
+# graceful shutdown actually runs instead of being killed after the grace period.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tini ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV NODE_ENV=production \
+    REBASE_BUNDLE=/bundle \
+    PORT=8080
+
+WORKDIR /app
+
+COPY --from=build /runtime/node_modules ./node_modules
+COPY --from=build /src/packages/types/dist ./node_modules/@rebasepro/types/dist
+COPY --from=build /src/packages/types/package.json ./node_modules/@rebasepro/types/package.json
+COPY --from=build /src/packages/utils/dist ./node_modules/@rebasepro/utils/dist
+COPY --from=build /src/packages/utils/package.json ./node_modules/@rebasepro/utils/package.json
+COPY --from=build /src/packages/common/dist ./node_modules/@rebasepro/common/dist
+COPY --from=build /src/packages/common/package.json ./node_modules/@rebasepro/common/package.json
+COPY --from=build /src/packages/client/dist ./node_modules/@rebasepro/client/dist
+COPY --from=build /src/packages/client/package.json ./node_modules/@rebasepro/client/package.json
+COPY --from=build /src/packages/codegen/dist ./node_modules/@rebasepro/codegen/dist
+COPY --from=build /src/packages/codegen/package.json ./node_modules/@rebasepro/codegen/package.json
+COPY --from=build /src/packages/server/dist ./node_modules/@rebasepro/server/dist
+COPY --from=build /src/packages/server/bin ./node_modules/@rebasepro/server/bin
+COPY --from=build /src/packages/server/package.json ./node_modules/@rebasepro/server/package.json
+COPY --from=build /src/packages/server-postgres/dist ./node_modules/@rebasepro/server-postgres/dist
+COPY --from=build /src/packages/server-postgres/src ./node_modules/@rebasepro/server-postgres/src
+COPY --from=build /src/packages/server-postgres/package.json ./node_modules/@rebasepro/server-postgres/package.json
+
+COPY docker/entrypoint.mjs ./entrypoint.mjs
+
+# An empty mount point, so `docker run` without a volume fails with the runtime's
+# own "no bundle here" message rather than an ENOENT from the loader.
+RUN mkdir -p /bundle && chown -R node:node /app /bundle
+
+# Unprivileged: nothing here needs root, and a compromised hook should not be
+# able to write to the image.
+USER node
+
+EXPOSE 8080
+
+# Readiness is a database round-trip; liveness deliberately is not, so a database
+# blip cannot make an orchestrator kill an otherwise healthy process.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/livez').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "./entrypoint.mjs"]

@@ -331,6 +331,24 @@ export interface ProjectLink {
     slug?: string;
     projectName?: string;
     orgId?: string;
+    /**
+     * Base URL of the project's own API.
+     *
+     * For a cloud project this is a convenience derived from the subdomain. For
+     * a **self-hosted** project it is the entire link: there is no control plane
+     * to look anything up in, so `projectId` is empty and this is what commands
+     * resolve against.
+     *
+     * Keeping both kinds of link in one file is deliberate. A second link file
+     * for self-hosting would fork every command that reads one, and the tooling
+     * would drift into being cloud-only by accident.
+     */
+    apiUrl?: string;
+    /**
+     * How this checkout is linked. Absent means `cloud` — which is every link
+     * written before this field existed.
+     */
+    mode?: "cloud" | "direct";
 }
 
 export function readLink(cwd: string = process.cwd()): ProjectLink | null {
