@@ -1,0 +1,144 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://rebase.pro/schemas/rebase.json",
+    "title": "Rebase project manifest",
+    "description": "Declares which runtime major a project targets and which apps this repository contributes to it. Topology only — collections, security rules, hooks and functions stay in TypeScript.",
+    "type": "object",
+    "required": ["runtime", "apps"],
+    "additionalProperties": false,
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "description": "URL of this schema, for editor completion."
+        },
+        "runtime": {
+            "type": "string",
+            "description": "Runtime major this project targets, as a semver range (e.g. \"^1\"). The platform upgrades patches and minors underneath a project; it never crosses a major.",
+            "minLength": 1,
+            "examples": ["^1", "~1.4", "1.4.2"]
+        },
+        "apps": {
+            "type": "object",
+            "description": "Apps this repository contributes, keyed by name. The key is the app's identity within the project.",
+            "propertyNames": {
+                "pattern": "^[a-z0-9][a-z0-9-]*$",
+                "description": "Lowercase alphanumeric with dashes — the name appears in URLs."
+            },
+            "additionalProperties": {
+                "oneOf": [
+                    { "$ref": "#/$defs/backendApp" },
+                    { "$ref": "#/$defs/staticApp" },
+                    { "$ref": "#/$defs/adminApp" },
+                    { "$ref": "#/$defs/mobileApp" },
+                    { "$ref": "#/$defs/customApp" }
+                ]
+            }
+        }
+    },
+    "$defs": {
+        "relativePath": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!\\.\\./).*",
+            "description": "A path relative to the directory holding rebase.json."
+        },
+        "backendApp": {
+            "type": "object",
+            "description": "The collections, hooks and functions that define the project's API. Exactly one per project.",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+                "type": { "const": "backend" },
+                "config": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Directory of the config package. Default \"config\"."
+                },
+                "functions": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Directory of server functions. Default \"backend/functions\"."
+                },
+                "crons": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Directory of cron job definitions. Default \"backend/crons\"."
+                },
+                "schema": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Generated Drizzle schema module. Default \"backend/src/schema.generated.ts\"."
+                },
+                "mode": {
+                    "enum": ["cms", "baas"],
+                    "default": "cms",
+                    "description": "\"cms\" reads collections from the config package; \"baas\" introspects them from the live database at boot."
+                },
+                "usersCollection": {
+                    "type": "string",
+                    "description": "Module path (relative to config) exporting the auth users collection. Default \"collections/users\"."
+                }
+            }
+        },
+        "staticApp": {
+            "type": "object",
+            "description": "A pre-built client bundle — an SPA or static site — served from CDN.",
+            "required": ["type", "root", "output"],
+            "additionalProperties": false,
+            "properties": {
+                "type": { "const": "static" },
+                "root": { "$ref": "#/$defs/relativePath" },
+                "build": {
+                    "type": "string",
+                    "description": "Command producing `output`. Run from the repository root."
+                },
+                "output": { "$ref": "#/$defs/relativePath" },
+                "spa": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Serve index.html for unmatched paths (client-side routing)."
+                }
+            }
+        },
+        "adminApp": {
+            "type": "object",
+            "description": "The Rebase admin panel, hosted by the platform or built into this repository.",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+                "type": { "const": "admin" },
+                "mode": {
+                    "enum": ["hosted", "bundled"],
+                    "default": "hosted"
+                },
+                "root": { "$ref": "#/$defs/relativePath" },
+                "build": { "type": "string" },
+                "output": { "$ref": "#/$defs/relativePath" }
+            },
+            "allOf": [
+                {
+                    "if": { "properties": { "mode": { "const": "bundled" } }, "required": ["mode"] },
+                    "then": { "required": ["root", "output"] }
+                }
+            ]
+        },
+        "mobileApp": {
+            "type": "object",
+            "description": "A native app. Registered for credentials and configuration; never built or hosted here.",
+            "required": ["type", "platform"],
+            "additionalProperties": false,
+            "properties": {
+                "type": { "const": "mobile" },
+                "platform": { "enum": ["ios", "android", "other"] }
+            }
+        },
+        "customApp": {
+            "type": "object",
+            "description": "An app built from your own Dockerfile. Deploys, but is not eligible for the managed runtime.",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+                "type": { "const": "custom" },
+                "dockerfile": { "$ref": "#/$defs/relativePath" },
+                "context": { "$ref": "#/$defs/relativePath" },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+            }
+        }
+    }
+}
