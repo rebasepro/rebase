@@ -820,6 +820,81 @@ collectionCount: collections.length };
 }
 
 /**
+ * Package a built static app (a `static` or bundled-`admin` app) into a bundle.
+ *
+ * A static bundle is the counterpart to a backend bundle: the same shape, the
+ * same runtime image runs it, but its manifest says `mode: "static"` and it
+ * carries only the built assets under `static/`. That is what lets a frontend or
+ * admin app be its own deployable, scalable unit rather than something baked into
+ * the backend container.
+ *
+ * `assetsDir` is the app's built output (e.g. `frontend/dist`), already produced
+ * by its own build command. This copies it into the bundle and writes the
+ * manifest — no compilation, no dependency closure (a static bundle installs
+ * nothing at boot).
+ */
+export function buildStaticBundle(options: {
+    projectRoot: string;
+    appName: string;
+    assetsDir: string;
+    outDir: string;
+    runtimeRange: string;
+}): { outDir: string; manifest: RebaseBundleManifest; fileCount: number } {
+    const { projectRoot, appName, assetsDir, outDir, runtimeRange } = options;
+
+    cleanOutDir(projectRoot, outDir);
+
+    const staticOut = path.join(outDir, "static");
+    fs.mkdirSync(staticOut, { recursive: true });
+    fs.cpSync(assetsDir, staticOut, { recursive: true });
+
+    let fileCount = 0;
+    const count = (dir: string): void => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.isDirectory()) count(path.join(dir, entry.name));
+            else fileCount++;
+        }
+    };
+    count(staticOut);
+
+    const manifest: RebaseBundleManifest = {
+        bundleFormat: BUNDLE_FORMAT_VERSION,
+        runtime: {
+            range: runtimeRange,
+            builtAgainst: resolveServerVersion(projectRoot),
+            contract: RUNTIME_CONTRACT_VERSION
+        },
+        // A static app has no collections and therefore no schema contract.
+        schemaVersion: "",
+        app: appName,
+        mode: "static",
+        entry: { static: "static" },
+        hooks: { native: false },
+        // Nothing to install beside a static bundle — it is just files.
+        deps: { declared: {} },
+        build: {
+            cli: resolveCliVersion(),
+            node: process.versions.node.split(".")[0],
+            createdAt: new Date().toISOString()
+        }
+    };
+
+    fs.writeFileSync(
+        path.join(outDir, "manifest.json"),
+        `${JSON.stringify(manifest, null, 2)}\n`,
+        "utf8"
+    );
+    // An empty package.json keeps the runtime's boot-time install a clean no-op.
+    fs.writeFileSync(
+        path.join(outDir, "package.json"),
+        `${JSON.stringify({ name: "rebase-bundle", private: true, type: "module", dependencies: {} }, null, 2)}\n`,
+        "utf8"
+    );
+
+    return { outDir, manifest, fileCount };
+}
+
+/**
  * Which files in a collections directory are collections.
  *
  * Mirrors the runtime loader's rules exactly, and must keep mirroring them: the

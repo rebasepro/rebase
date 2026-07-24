@@ -32,7 +32,7 @@ Key environment variables:
   PORT                  Port to bind (default 3001)
   CORS_ORIGINS          Comma-separated allowed origins (required in production)
   REBASE_METRICS        "true" to expose Prometheus metrics at /metrics
-  REBASE_MIGRATE_ON_BOOT  none | ensure  (collection tables: `rebase db push`)
+  REBASE_MIGRATE_ON_BOOT  none | ensure  (collection tables: run 'rebase db push')
 
 Additional databases and buckets are configured by suffixing the variable with
 the source key, e.g. DATABASE_URL__ANALYTICS or S3_BUCKET__MEDIA.

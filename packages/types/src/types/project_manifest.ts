@@ -284,7 +284,18 @@ export interface RebaseBundleManifest {
     schemaVersion: string;
     /** Which app in `rebase.json` this bundle was built from. */
     app: string;
-    mode: "cms" | "baas";
+    /**
+     * What the runtime does with this bundle.
+     *
+     * - `cms` — a backend with declared collections; the runtime provisions their
+     *   tables and serves the data API.
+     * - `baas` — a backend that introspects an existing database rather than
+     *   declaring collections.
+     * - `static` — no backend at all: the bundle is a built SPA (`entry.static`),
+     *   and the runtime only serves those assets. No database, no data sources —
+     *   this is how a `static`/`admin` app runs on the same image as the backend.
+     */
+    mode: "cms" | "baas" | "static";
     entry: RebaseBundleEntrypoints;
     /** Collection slugs contained in the bundle, for quick inspection. */
     collections?: string[];

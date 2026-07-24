@@ -224,7 +224,7 @@ export function createSourceBundle(options: {
     functions?: string;
     crons?: string;
     schema?: string;
-    mode?: "cms" | "baas";
+    mode?: "cms" | "baas" | "static";
     app?: string;
 }): LoadedBundle {
     const dir = path.resolve(options.projectRoot);

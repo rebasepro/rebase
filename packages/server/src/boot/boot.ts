@@ -87,9 +87,6 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // been set up yet.
     const bundle = options.bundle ?? loadBundle(bundleDir);
 
-    const env = loadBootEnv();
-    const isProduction = env.NODE_ENV === "production";
-
     // Where dev-only state (the port file, the MCP discovery file) lives. A
     // source boot runs from the project root; a built bundle sits inside it.
     const devRoot = process.env.REBASE_DEV_PROJECT_ROOT || process.cwd();
@@ -99,6 +96,19 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         schemaVersion: bundle.manifest.schemaVersion,
         builtAgainst: bundle.manifest.runtime?.builtAgainst
     });
+
+    // A `static` bundle is a built SPA and nothing else — no collections, no data
+    // sources, no database. It runs on this same image so a project's frontend
+    // and admin apps are just more bundles, deployed and scaled independently of
+    // the backend. Handled BEFORE `loadBootEnv`, which requires DATABASE_URL and
+    // JWT_SECRET — a static app needs neither, and demanding them would be the
+    // one thing that could stop a folder of assets from being served.
+    if (bundle.manifest.mode === "static") {
+        return bootStaticApp(bundle, devRoot, options);
+    }
+
+    const env = loadBootEnv();
+    const isProduction = env.NODE_ENV === "production";
 
     // ── Declarations ─────────────────────────────────────────────────────────
     const configExports = await loadBundleConfigExports(bundle);
@@ -323,6 +333,123 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         shutdown: async () => {
             await backend.shutdown();
             await closeConnections();
+        }
+    };
+}
+
+/**
+ * Boot a `static` bundle: serve its built SPA and nothing else.
+ *
+ * No database, no data sources, no backend — a static app is a folder of assets
+ * plus an `index.html`. Kept deliberately minimal so it is cheap to run and
+ * cannot fail for a reason a static site never should (a database blip, a
+ * missing collection). Exposes the same `/livez` and `/health` the orchestrator
+ * probes, so a static app is provisioned by the exact same deployment path as a
+ * backend — the only difference is what the bundle contains.
+ */
+async function bootStaticApp(
+    bundle: LoadedBundle,
+    devRoot: string,
+    options: BootOptions
+): Promise<BootedRuntime> {
+    const staticRoot = bundle.staticDir ?? bundle.adminDir;
+    if (!staticRoot) {
+        throw new BundleError(
+            "A static bundle declares no assets to serve.",
+            "Its manifest has `mode: \"static\"` but no `entry.static` — rebuild the app with `rebase build`."
+        );
+    }
+
+    // Read only the handful of variables a static server uses, directly — the
+    // full env schema requires a database and a JWT secret, which this path
+    // deliberately does not.
+    const isProduction = process.env.NODE_ENV === "production";
+    const requestedPort = Number(process.env.PORT ?? "3001") || 3001;
+    const basePath = process.env.REBASE_BASE_PATH || "/api";
+    const metricsEnabled = process.env.REBASE_METRICS === "true";
+    const metricsToken = process.env.REBASE_METRICS_TOKEN;
+
+    const app = new Hono<HonoEnv>();
+
+    // Assets must be loadable from other origins (a custom domain, the console),
+    // so the same cross-origin relaxation the API path makes applies here.
+    app.use("/*", secureHeaders({
+        crossOriginResourcePolicy: "cross-origin",
+        crossOriginOpenerPolicy: "same-origin-allow-popups"
+    }));
+
+    const metrics = metricsEnabled ? createMetricsMiddleware(basePath) : undefined;
+    if (metrics) app.use("/*", metrics.middleware);
+
+    const server = createServer(getRequestListener(app.fetch));
+
+    // Liveness and readiness are the same for a static app: it is ready the
+    // moment it can serve, and there is no database to make readiness lie.
+    app.get("/livez", (c) => c.json({ status: "ok" }));
+    app.get("/health", (c) => c.json({ status: "ok", latencyMs: 0 }));
+
+    if (metrics) {
+        app.route("/metrics", createMetricsRoutes(metrics.registry, metricsToken));
+    }
+
+    // Mounted last: serveSPA's catch-all claims `/*`.
+    logger.info("Serving static app", { app: bundle.manifest.app, path: staticRoot });
+    serveSPA(app, {
+        frontendPath: staticRoot,
+        apiBasePath: basePath,
+        excludePaths: ["/health", "/livez", "/metrics"]
+    });
+
+    let port = requestedPort;
+    if (options.listen !== false) {
+        if (isProduction) {
+            await new Promise<void>((resolve, reject) => {
+                server.once("error", reject);
+                server.listen(requestedPort, () => {
+                    server.removeListener("error", reject);
+                    resolve();
+                });
+            });
+            logger.info(`Rebase static runtime listening on port ${requestedPort}`);
+        } else {
+            port = await listenWithPortRetry(server, requestedPort, { portFileDir: devRoot });
+            logger.info(`Server running at http://localhost:${port}`);
+        }
+    }
+
+    // No backend and no data sources exist for a static app; the stub keeps the
+    // returned shape uniform so callers (and shutdown) do not special-case it.
+    const noopBackend = { shutdown: async () => {} } as unknown as RebaseBackendInstance;
+
+    if (options.handleSignals !== false) {
+        installShutdownHandlers(noopBackend, {
+            onCleanup: async () => { if (!isProduction) cleanupDevPortFile(devRoot); }
+        });
+        if (!isProduction) process.on("exit", () => cleanupDevPortFile(devRoot));
+    }
+
+    // A static app runs on a deliberately reduced env — only the fields it read
+    // above are meaningful. Surfaced for callers/tests without pretending the
+    // database-shaped fields exist.
+    const env = {
+        NODE_ENV: (process.env.NODE_ENV ?? "development"),
+        PORT: requestedPort,
+        REBASE_BASE_PATH: basePath,
+        REBASE_METRICS: metricsEnabled,
+        REBASE_METRICS_TOKEN: metricsToken
+    } as unknown as RebaseBootEnv;
+
+    return {
+        app,
+        server,
+        backend: noopBackend,
+        bundle,
+        env,
+        port,
+        dataSources: [],
+        shutdown: async () => {
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+            if (!isProduction) cleanupDevPortFile(devRoot);
         }
     };
 }

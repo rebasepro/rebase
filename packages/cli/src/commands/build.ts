@@ -21,7 +21,7 @@ import type { RebaseAppConfig, RebaseStaticAppConfig, RebaseAdminAppConfig } fro
 import { requireProjectRoot } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { buildableApps, findBackendApp, loadManifest, ManifestError } from "../manifest";
-import { buildBundle, DEFAULT_BUNDLE_DIR } from "../bundle";
+import { buildBundle, buildStaticBundle, DEFAULT_BUNDLE_DIR } from "../bundle";
 
 function printHelp(): void {
     console.log(`
@@ -136,7 +136,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 console.log(chalk.dim("      These cannot run on the managed runtime. See `rebase doctor`."));
             }
         } else if (app.type === "static" || app.type === "admin") {
-            await buildAssetApp(projectRoot, name, app);
+            await buildAssetApp(projectRoot, name, app, manifest.runtime, args["--out"]);
         } else if (app.type === "custom") {
             console.log(chalk.dim("  custom container — built at deploy time from its Dockerfile"));
         }
@@ -147,11 +147,20 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
     console.log(chalk.green("✓ Build complete."));
 }
 
-/** Run a static or bundled-admin app's own build command and verify its output. */
+/**
+ * Build a static or bundled-admin app and package it into a static bundle.
+ *
+ * Runs the app's own build command, checks it produced the declared output, then
+ * packages that output into a `static`-mode bundle — the same deployable shape as
+ * a backend bundle, so a frontend or admin app deploys through the identical
+ * path and runs on the identical image, just serving files instead of an API.
+ */
 async function buildAssetApp(
     projectRoot: string,
     name: string,
-    app: RebaseAppConfig
+    app: RebaseAppConfig,
+    runtimeRange: string,
+    outOverride?: string
 ): Promise<void> {
     const asset = app as RebaseStaticAppConfig | RebaseAdminAppConfig;
 
@@ -176,16 +185,27 @@ async function buildAssetApp(
         process.exit(1);
     }
 
-    if (asset.output) {
-        const outputPath = path.join(projectRoot, asset.output);
-        if (!fs.existsSync(outputPath)) {
-            // The command exited 0 but produced nothing where the manifest says
-            // it should. Deploying that would upload an empty site.
-            console.error(chalk.red(`  ✗ declared output "${asset.output}" does not exist after building`));
-            process.exit(1);
-        }
-        console.log(chalk.green(`  ✓ assets → ${asset.output}/`));
+    if (!asset.output) {
+        console.log(chalk.yellow("  no output directory declared — built, but nothing to bundle"));
+        return;
     }
+
+    const outputPath = path.join(projectRoot, asset.output);
+    if (!fs.existsSync(outputPath)) {
+        // The command exited 0 but produced nothing where the manifest says it
+        // should. Bundling that would ship an empty site.
+        console.error(chalk.red(`  ✗ declared output "${asset.output}" does not exist after building`));
+        process.exit(1);
+    }
+
+    // Per-app bundle directory, so a project's several static apps do not clobber
+    // one another or the backend's `dist-bundle`.
+    const outDir = outOverride
+        ? path.resolve(process.cwd(), outOverride)
+        : path.join(projectRoot, `dist-bundle-${name}`);
+    const result = buildStaticBundle({ projectRoot, appName: name, assetsDir: outputPath, outDir, runtimeRange });
+    const rel = path.relative(projectRoot, result.outDir);
+    console.log(chalk.green(`  ✓ static bundle → ${rel}/`) + chalk.dim(` (${result.fileCount} file(s))`));
 }
 
 /** The pre-manifest behaviour: build every workspace package. */
