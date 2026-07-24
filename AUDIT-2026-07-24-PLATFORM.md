@@ -6,11 +6,22 @@
 > **both rollout criticals** (C1 vacuous health gate, M2 wave-plan shape), plus H6 `--ignore-scripts`, M5
 > dead drift badge, and M6 static-bundle rejection. Migrations 0027 and 0028 added.
 >
-> **Still open — do not onboard a managed tenant until these land:** chain item #5 (**no schema apply** —
-> collection tables are never created, so `/api/data/*` 500s), C2 (image provenance: `0.10.0` still names two
-> different artifacts, no CI publish, mutable tag), H1/H2 (bundle upload buffers 100MB through the control
-> plane; no GC or quota), M3/M4 (no deploy heartbeat, no controller lease), and the bundle-corpus
-> conformance CI. See "Recommended order" — items 1(e), 3, 4.
+> **Update 2 (2026-07-25).** Chain item #5 is now **fixed**: `REBASE_MIGRATE_ON_BOOT=ensure` additively
+> creates missing collection tables/columns/enum types at boot (`server-postgres/src/schema/
+> ensure-collection-tables.ts`, wired through an optional `ensureCollectionSchema` on the bootstrapper
+> contract). Additive-only by construction and tested as such — it can never emit DROP/TRUNCATE/ALTER
+> COLUMN. C2 half-closed: prod's release row is digest-pinned, and the runtime image build is now a
+> committed `cloudbuild-runtime.yaml` requiring a commit-tagged `_TAG`.
+>
+> Also fixed, found while doing it: **the console had no project home** (opening a project landed in the
+> SQL editor) and **Apps and Activity rendered nothing at all** — both components were built, tested,
+> deployed, and mounted by no branch in `ProjectDetails.tsx` in any commit, so the Activity charts were
+> unreachable. New Overview destination + render branches + a regression guard asserting every nav
+> destination has a renderer.
+>
+> **Still open:** H1/H2 (bundle upload buffers 100MB through the control plane; no GC or quota), M3/M4 (no
+> deploy heartbeat, no controller lease), the bundle-corpus conformance CI, and publishing the OSS npm
+> release so `@rebasepro/server` on npm matches the image. See "Recommended order" items 2–4.
 
 **Scope:** the platform-rethink implementation (PLATFORM-PLAN-2026-07.md) across both halves — OSS
 `feat/platform-runtime-bundle` (merged to main `865062639` today) and cloud `feat/managed-runtime-bundle`
