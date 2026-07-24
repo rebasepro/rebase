@@ -314,6 +314,52 @@ paths: kept };
 }
 
 /**
+ * Whether the compiled config package exports a `storageAuthorize` hook.
+ *
+ * Recorded in the manifest so a host can refuse a deploy that would enable file
+ * storage with no access model, rather than let the runtime's boot guard turn it
+ * into a crash loop the developer cannot read.
+ *
+ * Read from the *compiled* index, deliberately: that is the exact module the
+ * runtime imports and reads the export off, so this cannot disagree with what
+ * actually happens at boot. It is a textual check rather than an import because
+ * a freshly built bundle cannot resolve its own dependencies until it is
+ * deployed — the same reason schema hashing reads source.
+ *
+ * Errs toward `false`: a missed detection costs a deploy rejection whose message
+ * says exactly how to proceed, while a false positive would hand back the crash
+ * loop this exists to prevent.
+ */
+export function detectStorageAuthorize(compiledConfigDir: string): boolean {
+    const indexPath = [".js", ".mjs", ".ts"]
+        .map(ext => path.join(compiledConfigDir, `index${ext}`))
+        .find(candidate => fs.existsSync(candidate));
+    if (!indexPath) return false;
+
+    let source: string;
+    try {
+        source = fs.readFileSync(indexPath, "utf8");
+    } catch {
+        return false;
+    }
+
+    // `export const/let/var/function/async function storageAuthorize`
+    if (/\bexport\s+(?:async\s+)?(?:const|let|var|function)\s+storageAuthorize\b/.test(source)) {
+        return true;
+    }
+    // `export { storageAuthorize }` / `export { x as storageAuthorize }`,
+    // including re-export forms (`export { storageAuthorize } from "./storage"`).
+    for (const clause of source.matchAll(/\bexport\s*\{([^}]*)\}/g)) {
+        const names = clause[1].split(",").map(entry => {
+            const parts = entry.split(/\bas\b/);
+            return parts[parts.length - 1].trim();
+        });
+        if (names.includes("storageAuthorize")) return true;
+    }
+    return false;
+}
+
+/**
  * Detect native code in the dependency closure.
  *
  * Walks declared runtime dependencies breadth-first through `node_modules`,
@@ -749,6 +795,7 @@ stdio: "inherit" });
 
     const declared = collectDeclaredDependencies(projectRoot);
     const nativeModules = detectNativeDependencies(projectRoot, declared);
+    const declaresStorageAuthorize = detectStorageAuthorize(path.join(outDir, paths.config));
 
     const schemaOut = paths.schema.replace(/\.ts$/, ".js");
     const relative = (target: string): string | undefined =>
@@ -787,6 +834,7 @@ stdio: "inherit" });
             native: nativeModules.length > 0,
             nativeModules: nativeModules.length > 0 ? nativeModules : undefined
         },
+        storage: { authorize: declaresStorageAuthorize },
         deps: { declared },
         build: {
             cli: resolveCliVersion(),

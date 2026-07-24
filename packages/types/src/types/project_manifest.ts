@@ -310,6 +310,23 @@ export interface RebaseBundleManifest {
         native: boolean;
         nativeModules?: NativeDependency[];
     };
+    /**
+     * What the bundle's config says about storage access control.
+     *
+     * Storage is not under RLS and its keys share one flat namespace, so a
+     * deployment with file storage enabled and no access model serves every
+     * user's files to every signed-in user. The runtime refuses to boot in that
+     * state — which, on a hosted platform that enables storage from the *console*
+     * rather than from the bundle, surfaces as a crash loop the developer cannot
+     * read.
+     *
+     * Recording it here lets a host reject the deploy with the reason instead.
+     * Absent on bundles built before this field existed.
+     */
+    storage?: {
+        /** Whether the config package exports a `storageAuthorize` hook. */
+        authorize: boolean;
+    };
     deps: {
         /** Runtime dependencies of user code, as declared. */
         declared: Record<string, string>;

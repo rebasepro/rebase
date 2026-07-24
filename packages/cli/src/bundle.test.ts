@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     collectDeclaredDependencies,
     detectNativeDependencies,
+    detectStorageAuthorize,
     normalizeEsmSpecifiers
 } from "./bundle";
 
@@ -238,5 +239,37 @@ describe("detectNativeDependencies", () => {
         write("node_modules/b/package.json", JSON.stringify({ name: "b", dependencies: { a: "1" } }));
 
         expect(detectNativeDependencies(scratch, { a: "^1.0.0" })).toEqual([]);
+    });
+});
+
+describe("storage access-control detection", () => {
+    const write = (contents: string): string => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-storage-detect-"));
+        fs.writeFileSync(path.join(dir, "index.js"), contents);
+        return dir;
+    };
+
+    it("finds a directly exported hook", () => {
+        expect(detectStorageAuthorize(write("export const storageAuthorize = () => true;"))).toBe(true);
+        expect(detectStorageAuthorize(write("export function storageAuthorize() {}"))).toBe(true);
+        expect(detectStorageAuthorize(write("export async function storageAuthorize() {}"))).toBe(true);
+    });
+
+    it("finds it in an export clause, renamed or re-exported", () => {
+        expect(detectStorageAuthorize(write("export { storageAuthorize };"))).toBe(true);
+        expect(detectStorageAuthorize(write('export { authz as storageAuthorize } from "./storage.js";'))).toBe(true);
+        expect(detectStorageAuthorize(write("export { collections, storageAuthorize, callbacks };"))).toBe(true);
+    });
+
+    it("does not claim a hook that is only mentioned", () => {
+        // The failure that matters: reporting `true` for a bundle without a hook
+        // hands back the crash loop this field exists to prevent.
+        expect(detectStorageAuthorize(write("// TODO: add storageAuthorize\nexport const collections = [];"))).toBe(false);
+        expect(detectStorageAuthorize(write("const storageAuthorize = () => true;"))).toBe(false);
+        expect(detectStorageAuthorize(write('export { storageAuthorizeHelper } from "./x.js";'))).toBe(false);
+    });
+
+    it("reports false when there is no config index at all", () => {
+        expect(detectStorageAuthorize(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-empty-")))).toBe(false);
     });
 });
