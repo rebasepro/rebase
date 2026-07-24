@@ -49,7 +49,11 @@ export function packBundle(bundleDir: string, outPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
         const child = spawn(
             "tar",
-            ["-czf", outPath, "--exclude", "node_modules", "-C", bundleDir, "."],
+            // `--no-xattrs` (plus COPYFILE_DISABLE) keeps macOS from writing
+            // `LIBARCHIVE.xattr.com.apple.provenance` headers into the archive,
+            // which GNU tar on the runtime image then warns about once per file.
+            // Harmless, but it buries real extraction errors in noise.
+            ["-czf", outPath, "--no-xattrs", "--exclude", "node_modules", "-C", bundleDir, "."],
             { stdio: "inherit", env: { ...process.env, COPYFILE_DISABLE: "1" } }
         );
         child.on("error", reject);
