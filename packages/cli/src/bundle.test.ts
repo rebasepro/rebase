@@ -143,6 +143,33 @@ describe("collectDeclaredDependencies", () => {
         expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0" });
     });
 
+    it("omits a plain-range dep that resolves to an in-repo workspace package", () => {
+        // The standard case: the backend depends on the `config` package by name
+        // with a plain `"*"` (not `workspace:`), symlinked to `../config`. It
+        // travels *inside* the bundle, so declaring it would make the runtime
+        // try — and fail — to `npm install` it from the registry.
+        write("config/package.json", JSON.stringify({ name: "dadaki-config" }));
+        write("backend/package.json", JSON.stringify({
+            dependencies: { "dadaki-config": "*", pg: "^8.0.0" }
+        }));
+        fs.mkdirSync(path.join(scratch, "backend/node_modules"), { recursive: true });
+        fs.symlinkSync(
+            path.join("..", "..", "config"),
+            path.join(scratch, "backend/node_modules/dadaki-config")
+        );
+
+        expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0" });
+    });
+
+    it("keeps a plain-range dep that resolves to a real registry install", () => {
+        // A registry package's node_modules entry is a real directory, not a link
+        // back into the repo — it must stay in the declared set.
+        write("backend/package.json", JSON.stringify({ dependencies: { leftpad: "^1.0.0" } }));
+        write("backend/node_modules/leftpad/package.json", JSON.stringify({ name: "leftpad" }));
+
+        expect(collectDeclaredDependencies(scratch)).toEqual({ leftpad: "^1.0.0" });
+    });
+
     it("ignores an unparseable package.json rather than failing the build", () => {
         write("backend/package.json", "{ broken");
         write("config/package.json", JSON.stringify({ dependencies: { zod: "^4.0.0" } }));

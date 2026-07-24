@@ -416,11 +416,62 @@ function hasNodeBinary(dir: string, depth = 0): boolean {
 }
 
 /**
+ * Whether a dependency name resolves to a package *inside this repository* — a
+ * workspace package rather than a registry one.
+ *
+ * The bundle's declared deps are installed with `npm install` from the public
+ * registry beside the bundle at boot. A workspace package is not there, so
+ * declaring it guarantees a boot-time install failure. The most common case is
+ * the standard `config` package: the backend depends on it by name, but it is
+ * *carried in the bundle* (as `entry.config`), so it must never also be an npm
+ * dependency. Projects often express this as a `workspace:` range — caught
+ * separately — but a plain `"*"` against a workspace symlink is just as common
+ * and looks like a registry range, so the symlink is what actually settles it.
+ *
+ * Detection: the installed `node_modules/<name>` is a symlink whose real path is
+ * inside the project and not within a pnpm virtual store (`.pnpm`). That is
+ * exactly a workspace link and nothing else.
+ */
+function resolvesToWorkspacePackage(projectRoot: string, name: string): boolean {
+    // Resolve the root's own symlinks too: on macOS a temp/checkout path under
+    // `/var/...` realpaths to `/private/var/...`, so comparing a realpath'd link
+    // target against a non-realpath'd root would never match.
+    let realRoot: string;
+    try {
+        realRoot = fs.realpathSync(projectRoot);
+    } catch {
+        realRoot = projectRoot;
+    }
+
+    for (const base of [projectRoot, path.join(projectRoot, "backend"), path.join(projectRoot, "config")]) {
+        const link = path.join(base, "node_modules", name);
+        try {
+            // A workspace link is a *symlink*; a normal (non-pnpm) registry
+            // install is a real directory inside node_modules, which would also
+            // sit "inside the repo" — so the symlink is what separates the two.
+            if (!fs.lstatSync(link).isSymbolicLink()) continue;
+            const real = fs.realpathSync(link);
+            const insideRepo = real.startsWith(realRoot + path.sep);
+            // pnpm links registry packages into its virtual store; those live
+            // under node_modules/.pnpm and are not workspace packages.
+            const inStore = real.includes(`${path.sep}.pnpm${path.sep}`)
+                || real.includes(`${path.sep}node_modules${path.sep}`);
+            if (insideRepo && !inStore) return true;
+        } catch {
+            // No such entry, broken link, or race: let it be declared.
+        }
+    }
+    return false;
+}
+
+/**
  * Collect the runtime dependencies a bundle needs installed beside it.
  *
  * Packages the runtime image already provides are excluded — reinstalling a
  * second copy of the server next to the one running the process is at best
- * wasted space and at worst a version conflict.
+ * wasted space and at worst a version conflict. Workspace packages are excluded
+ * too: they are not on the registry the runtime installs from, and the project's
+ * own config package already travels inside the bundle.
  */
 export function collectDeclaredDependencies(projectRoot: string): Record<string, string> {
     const declared: Record<string, string> = {};
@@ -436,6 +487,10 @@ export function collectDeclaredDependencies(projectRoot: string): Record<string,
                 if (RUNTIME_PROVIDED.has(name)) continue;
                 // A workspace protocol means nothing outside this repository.
                 if (typeof version === "string" && version.startsWith("workspace:")) continue;
+                // A plain range that nonetheless resolves to an in-repo workspace
+                // package (e.g. `"config": "*"` symlinked to `../../config`) —
+                // the runtime cannot install it from the registry.
+                if (resolvesToWorkspacePackage(projectRoot, name)) continue;
                 declared[name] = version;
             }
         } catch {

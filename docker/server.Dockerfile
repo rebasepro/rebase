@@ -27,6 +27,17 @@ COPY packages/codegen/package.json packages/codegen/
 COPY packages/server/package.json packages/server/
 COPY packages/server-postgres/package.json packages/server-postgres/
 
+# The runtime never runs atlas — it is imported only by server-postgres's CLI
+# (migration authoring), never on the boot path, and the image only supports
+# REBASE_MIGRATE_ON_BOOT=ensure|none, neither of which shells out to it. Its
+# install script downloads a binary from a third-party host (atlasbinaries.com),
+# so building it here adds a network dependency and a supply-chain surface for a
+# tool the runtime cannot use. Mark it explicitly not-built so pnpm skips the
+# download AND does not fail asking for a decision (pnpm 11 errors on an
+# undecided ignored build). The package still installs, it just has no binary —
+# exactly right, because nothing in the runtime invokes one.
+RUN sed -i "s#'@ariga/atlas': true#'@ariga/atlas': false#" pnpm-workspace.yaml
+
 RUN pnpm install --frozen-lockfile --filter @rebasepro/server... --filter @rebasepro/server-postgres...
 
 COPY packages/types packages/types

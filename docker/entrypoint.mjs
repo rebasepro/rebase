@@ -47,9 +47,19 @@ if (fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModules)) {
 
     if (Object.keys(declared).length > 0) {
         log(`installing ${Object.keys(declared).length} bundle dependencies…`);
+        // `--ignore-scripts` is deliberate. A managed bundle has already passed
+        // intake, which REJECTS native dependencies — so nothing here legitimately
+        // needs a compile or install step. What install scripts remain are
+        // third-party binary downloaders (e.g. `@ariga/atlas`, pulled in only by
+        // the driver's *CLI*, never used by the runtime) and the occasional
+        // postinstall — both pure liability at boot: they make a tenant start
+        // depend on some external binary host being up and having a build for this
+        // arch, and they are exactly where a malicious transitive dep would run.
+        // Skipping them makes the boot hermetic, and is safe precisely because the
+        // no-native-deps rule guarantees nothing needs them.
         const result = spawnSync(
             "npm",
-            ["install", "--omit=dev", "--no-audit", "--no-fund", "--prefer-offline"],
+            ["install", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"],
             { cwd: BUNDLE, stdio: "inherit" }
         );
         if (result.status !== 0) {
