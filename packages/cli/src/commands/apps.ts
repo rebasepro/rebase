@@ -51,7 +51,8 @@ export async function appsCommand(subcommand: string | undefined, rawArgs: strin
             "--help": Boolean,
             "-h": "--help"
         },
-        { argv: rawArgs.slice(3), permissive: true }
+        { argv: rawArgs.slice(3),
+permissive: true }
     );
 
     if (args["--help"] || !subcommand || subcommand === "--help") {

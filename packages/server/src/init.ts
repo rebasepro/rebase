@@ -446,6 +446,14 @@ export interface RebaseBackendConfig {
     callbacks?: CollectionCallbacks;
 
     /**
+     * Declare that this application installs its own CORS middleware.
+     *
+     * Suppresses the "no CORS configuration detected" warning, which exists for
+     * hand-wired backends that genuinely have no origin policy.
+     */
+    corsHandled?: boolean;
+
+    /**
      * The schema version this deployment serves, as recorded when it was built.
      *
      * Published by the contract endpoint so a client generated elsewhere can

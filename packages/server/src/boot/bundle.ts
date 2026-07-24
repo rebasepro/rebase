@@ -239,7 +239,9 @@ export function createSourceBundle(options: {
         },
         hooks: { native: false },
         deps: { declared: {} },
-        build: { cli: "source", node: process.versions.node.split(".")[0], createdAt: new Date().toISOString() }
+        build: { cli: "source",
+node: process.versions.node.split(".")[0],
+createdAt: new Date().toISOString() }
     };
 
     return {

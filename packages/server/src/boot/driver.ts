@@ -164,7 +164,8 @@ async function importDriver(packageName: string, resolveFrom: string[] = []): Pr
         );
     }
 
-    return { createConnection, createAdapter };
+    return { createConnection,
+createAdapter };
 }
 
 /**

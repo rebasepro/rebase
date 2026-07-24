@@ -174,9 +174,17 @@ export const posts = pgTable("posts", {
 export const postsTags = pgTable("posts_tags", {
     post_id: uuid("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
     tag_id: uuid("tag_id").notNull().references(() => tags.id, { onDelete: "cascade" }),
-}, (table) => ({
-    pk: primaryKey({ columns: [table.post_id, table.tag_id] })
-}));
+}, (table) => ([
+    primaryKey({ columns: [table.post_id, table.tag_id] }),
+    pgPolicy("posts_tags_default_admin_read", { as: "permissive", for: "select", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("posts_tags_default_admin_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("posts_tags_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("posts_tags_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
+    pgPolicy("posts_tags_default_edge_read", { as: "permissive", for: "select", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE "_ex0".id = "public"."posts_tags".post_id)) AND (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE "_ex1".id = "public"."posts_tags".tag_id))` }),
+    pgPolicy("posts_tags_default_edge_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))` }),
+    pgPolicy("posts_tags_default_edge_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))`, withCheck: sql`EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))` }),
+    pgPolicy("posts_tags_default_edge_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))` }),
+])).enableRLS();
 
 export const productLocales = pgTable("product_locales", {
     id: uuid("id").primaryKey().defaultRandom().notNull(),

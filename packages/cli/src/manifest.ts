@@ -78,20 +78,24 @@ function checkRelativePath(
     { required }: { required: boolean }
 ): string | undefined {
     if (value === undefined) {
-        if (required) issues.push({ path: fieldPath, message: "is required" });
+        if (required) issues.push({ path: fieldPath,
+message: "is required" });
         return undefined;
     }
     if (typeof value !== "string" || value.trim() === "") {
-        issues.push({ path: fieldPath, message: "must be a non-empty string" });
+        issues.push({ path: fieldPath,
+message: "must be a non-empty string" });
         return undefined;
     }
     if (path.isAbsolute(value)) {
-        issues.push({ path: fieldPath, message: "must be a relative path, not absolute" });
+        issues.push({ path: fieldPath,
+message: "must be a relative path, not absolute" });
         return undefined;
     }
     const normalized = path.normalize(value);
     if (normalized === ".." || normalized.startsWith(`..${path.sep}`)) {
-        issues.push({ path: fieldPath, message: "must stay inside the project directory" });
+        issues.push({ path: fieldPath,
+message: "must stay inside the project directory" });
         return undefined;
     }
     return value;
@@ -105,7 +109,8 @@ function validateApp(
     const base = `apps.${name}`;
 
     if (!isRecord(raw)) {
-        issues.push({ path: base, message: "must be an object" });
+        issues.push({ path: base,
+message: "must be an object" });
         return undefined;
     }
 
@@ -125,7 +130,8 @@ function validateApp(
             checkRelativePath(raw.crons, `${base}.crons`, issues, { required: false });
             checkRelativePath(raw.schema, `${base}.schema`, issues, { required: false });
             if (raw.mode !== undefined && raw.mode !== "cms" && raw.mode !== "baas") {
-                issues.push({ path: `${base}.mode`, message: 'must be "cms" or "baas"' });
+                issues.push({ path: `${base}.mode`,
+message: 'must be "cms" or "baas"' });
             }
             return raw as unknown as RebaseAppConfig;
         }
@@ -133,17 +139,20 @@ function validateApp(
             checkRelativePath(raw.root, `${base}.root`, issues, { required: true });
             checkRelativePath(raw.output, `${base}.output`, issues, { required: true });
             if (raw.build !== undefined && typeof raw.build !== "string") {
-                issues.push({ path: `${base}.build`, message: "must be a string command" });
+                issues.push({ path: `${base}.build`,
+message: "must be a string command" });
             }
             if (raw.spa !== undefined && typeof raw.spa !== "boolean") {
-                issues.push({ path: `${base}.spa`, message: "must be a boolean" });
+                issues.push({ path: `${base}.spa`,
+message: "must be a boolean" });
             }
             return raw as unknown as RebaseAppConfig;
         }
         case "admin": {
             const mode = raw.mode ?? "hosted";
             if (mode !== "hosted" && mode !== "bundled") {
-                issues.push({ path: `${base}.mode`, message: 'must be "hosted" or "bundled"' });
+                issues.push({ path: `${base}.mode`,
+message: 'must be "hosted" or "bundled"' });
                 return undefined;
             }
             if (mode === "bundled") {
@@ -169,7 +178,8 @@ function validateApp(
             checkRelativePath(raw.dockerfile, `${base}.dockerfile`, issues, { required: false });
             checkRelativePath(raw.context, `${base}.context`, issues, { required: false });
             if (raw.port !== undefined && (typeof raw.port !== "number" || !Number.isInteger(raw.port))) {
-                issues.push({ path: `${base}.port`, message: "must be an integer" });
+                issues.push({ path: `${base}.port`,
+message: "must be an integer" });
             }
             return raw as unknown as RebaseAppConfig;
         }
@@ -188,7 +198,8 @@ export function validateManifest(raw: unknown): {
     const issues: ManifestValidationIssue[] = [];
 
     if (!isRecord(raw)) {
-        return { issues: [{ path: "", message: `${MANIFEST_FILENAME} must contain a JSON object` }] };
+        return { issues: [{ path: "",
+message: `${MANIFEST_FILENAME} must contain a JSON object` }] };
     }
 
     if (typeof raw.runtime !== "string" || raw.runtime.trim() === "") {
@@ -199,7 +210,8 @@ export function validateManifest(raw: unknown): {
     }
 
     if (!isRecord(raw.apps)) {
-        issues.push({ path: "apps", message: "is required and must be an object" });
+        issues.push({ path: "apps",
+message: "is required and must be an object" });
         return { issues };
     }
 
@@ -215,7 +227,8 @@ export function validateManifest(raw: unknown): {
             continue;
         }
         if (RESERVED_APP_NAMES.has(name)) {
-            issues.push({ path: `apps.${name}`, message: "name is reserved" });
+            issues.push({ path: `apps.${name}`,
+message: "name is reserved" });
             continue;
         }
 
@@ -290,7 +303,8 @@ export function synthesizeManifest(projectRoot: string): RebaseProjectManifest {
         };
     }
 
-    return { runtime: CURRENT_RUNTIME_RANGE, apps };
+    return { runtime: CURRENT_RUNTIME_RANGE,
+apps };
 }
 
 export function manifestPath(projectRoot: string): string {
@@ -312,7 +326,8 @@ export function loadManifest(projectRoot: string): LoadedManifest {
     const filePath = manifestPath(projectRoot);
 
     if (!fs.existsSync(filePath)) {
-        return { manifest: synthesizeManifest(projectRoot), source: "synthesized" };
+        return { manifest: synthesizeManifest(projectRoot),
+source: "synthesized" };
     }
 
     let parsed: unknown;
@@ -329,7 +344,9 @@ export function loadManifest(projectRoot: string): LoadedManifest {
         throw new ManifestError(`${MANIFEST_FILENAME} is invalid`, issues);
     }
 
-    return { manifest, source: "file", filePath };
+    return { manifest,
+source: "file",
+filePath };
 }
 
 /** Write a manifest, with a trailing newline so it plays well with other tools. */
@@ -353,7 +370,8 @@ export function findBackendApp(
     manifest: RebaseProjectManifest
 ): { name: string; app: RebaseBackendAppConfig } | undefined {
     for (const [name, app] of Object.entries(manifest.apps)) {
-        if (app.type === "backend") return { name, app: app as RebaseBackendAppConfig };
+        if (app.type === "backend") return { name,
+app: app as RebaseBackendAppConfig };
     }
     return undefined;
 }
@@ -364,7 +382,8 @@ export function buildableApps(
 ): { name: string; app: RebaseAppConfig }[] {
     // Backend first: a static app's build may consume an SDK generated from the
     // backend's collections, so building it second is the order that works.
-    const entries = Object.entries(manifest.apps).map(([name, app]) => ({ name, app }));
+    const entries = Object.entries(manifest.apps).map(([name, app]) => ({ name,
+app }));
     const rank = (app: RebaseAppConfig): number => {
         if (app.type === "backend") return 0;
         if (app.type === "admin") return 1;
@@ -411,7 +430,8 @@ export function assessManagedCompatibility(
         }
     }
 
-    return { eligible: reasons.length === 0 && Boolean(backend), reasons };
+    return { eligible: reasons.length === 0 && Boolean(backend),
+reasons };
 }
 
 /** Resolve a backend app's directories against the conventions it omits. */

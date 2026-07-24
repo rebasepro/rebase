@@ -151,6 +151,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
             ? Number(env.REBASE_MAX_BODY_SIZE)
             : undefined,
         logging: env.LOG_LEVEL ? { level: env.LOG_LEVEL } : undefined,
+        // CORS is installed above, before this call.
+        corsHandled: true,
         // Published by the contract endpoint, so a client generated in another
         // repository can tell whether it is built against this schema.
         // Empty for a source boot: nothing was built, so the runtime computes a

@@ -11,6 +11,15 @@ import { logMiddleware } from "../api/logs-routes";
 interface MiddlewareConfig {
     maxBodySize?: number;
     compression?: boolean;
+    /**
+     * The caller already installed a CORS middleware.
+     *
+     * The framework does not install one itself, so it warns when it sees no
+     * sign of an origin policy. The bundle runtime always installs one, and a
+     * warning that is wrong in the common case is worse than no warning — it
+     * teaches people to skim past the ones that matter.
+     */
+    corsHandled?: boolean;
     csrf?: {
         origin: string | string[] | ((origin: string) => boolean);
     };
@@ -66,7 +75,7 @@ export function configureMiddlewares(
     // backend wired up by hand can therefore end up with no origin restriction
     // at all, which is most dangerous in production, so warn there too rather
     // than only in development.
-    if (!process.env.CORS_ORIGINS && !process.env.FRONTEND_URL) {
+    if (!config.corsHandled && !process.env.CORS_ORIGINS && !process.env.FRONTEND_URL) {
         logger.warn(
             (isProduction ? "[PRODUCTION] " : "") +
             "No CORS configuration detected (CORS_ORIGINS / FRONTEND_URL not set). " +

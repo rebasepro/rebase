@@ -93,7 +93,9 @@ export class MetricsRegistry {
 
         let hist = this.latency.get(key);
         if (!hist) {
-            hist = { counts: new Array(LATENCY_BUCKETS_MS.length + 1).fill(0), sum: 0, total: 0 };
+            hist = { counts: new Array(LATENCY_BUCKETS_MS.length + 1).fill(0),
+sum: 0,
+total: 0 };
             this.latency.set(key, hist);
         }
         hist.sum += durationMs;
@@ -114,7 +116,8 @@ export class MetricsRegistry {
 
     /** Prometheus escaping: backslash, quote and newline, in that order. */
     private static formatLabels(labels: Record<string, string>, extra?: Record<string, string>): string {
-        const all = { ...labels, ...extra };
+        const all = { ...labels,
+...extra };
         const entries = Object.entries(all).filter(([, v]) => v !== undefined && v !== "");
         if (entries.length === 0) return "";
         const body = entries
@@ -211,13 +214,15 @@ export function classifySurface(pathname: string, basePath = "/api"): {
 
     switch (head) {
         case "data":
-            return { surface: "data", collection: second || undefined };
+            return { surface: "data",
+collection: second || undefined };
         case "auth":
             return { surface: "auth" };
         case "storage":
             return { surface: "storage" };
         case "functions":
-            return { surface: "functions", collection: second || undefined };
+            return { surface: "functions",
+collection: second || undefined };
         case "admin":
             return { surface: "admin" };
         case "meta":
@@ -260,7 +265,8 @@ export function createMetricsMiddleware(basePath = "/api"): MetricsHandle {
         }
     };
 
-    return { registry, middleware };
+    return { registry,
+middleware };
 }
 
 /**

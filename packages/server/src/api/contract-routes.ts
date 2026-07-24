@@ -85,7 +85,8 @@ export function createContractRoutes(config: ContractRoutesConfig): Hono<HonoEnv
         const collections = config.collectionRegistry.getRawCollections();
         const schemaVersion = config.schemaVersion || computeSchemaVersion(collections);
         c.header(SCHEMA_VERSION_HEADER, schemaVersion);
-        return c.json({ schemaVersion, mode: config.mode });
+        return c.json({ schemaVersion,
+mode: config.mode });
     });
 
     logger.debug("Contract routes mounted");

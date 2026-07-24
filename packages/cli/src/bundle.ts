@@ -205,7 +205,8 @@ function filterProjectPaths(
         }
     }
 
-    return { kept, dropped };
+    return { kept,
+dropped };
 }
 
 /**
@@ -252,7 +253,8 @@ async function writeBundleTsconfig(
             baseOptions.paths as Record<string, string[]>,
             baseUrl
         );
-        pathOverrides = { baseUrl: fromTsconfig("."), paths: kept };
+        pathOverrides = { baseUrl: fromTsconfig("."),
+paths: kept };
         if (dropped.length > 0) {
             console.log(chalk.dim(
                 `    ignoring ${dropped.length} path alias(es) pointing outside the project ` +
@@ -346,7 +348,8 @@ export function detectNativeDependencies(
         visited++;
 
         if (KNOWN_NATIVE_PACKAGES.has(name)) {
-            found.push({ name, reason: "known native module" });
+            found.push({ name,
+reason: "known native module" });
             continue;
         }
 
@@ -368,18 +371,21 @@ export function detectNativeDependencies(
         }
 
         if (pkg.gypfile || fs.existsSync(path.join(packageDir, "binding.gyp"))) {
-            found.push({ name, reason: "builds a native addon (binding.gyp)" });
+            found.push({ name,
+reason: "builds a native addon (binding.gyp)" });
             continue;
         }
 
         const install = `${pkg.scripts?.install ?? ""} ${pkg.scripts?.preinstall ?? ""} ${pkg.scripts?.postinstall ?? ""}`;
         if (/node-gyp|prebuild|node-pre-gyp|cmake-js/.test(install)) {
-            found.push({ name, reason: "install script compiles native code" });
+            found.push({ name,
+reason: "install script compiles native code" });
             continue;
         }
 
         if (hasNodeBinary(packageDir)) {
-            found.push({ name, reason: "ships a prebuilt .node binary" });
+            found.push({ name,
+reason: "ships a prebuilt .node binary" });
             continue;
         }
 
@@ -511,13 +517,15 @@ export function normalizeEsmSpecifiers(outDir: string): { rewritten: number; unr
     };
 
     if (fs.existsSync(outDir)) walk(outDir);
-    return { rewritten, unresolved };
+    return { rewritten,
+unresolved };
 }
 
 /** Remove a previous build so stale output cannot masquerade as current. */
 function cleanOutDir(outDir: string): void {
     if (fs.existsSync(outDir)) {
-        fs.rmSync(outDir, { recursive: true, force: true });
+        fs.rmSync(outDir, { recursive: true,
+force: true });
     }
     fs.mkdirSync(outDir, { recursive: true });
 }
@@ -557,7 +565,8 @@ async function regenerateSchema(
         await execa(
             runner,
             [script, "schema", "generate", "--collections", collectionsPath],
-            { cwd: backendDir, stdio: "pipe" }
+            { cwd: backendDir,
+stdio: "pipe" }
         );
         log(options, chalk.dim("  regenerated database schema from collections"));
     } catch (err) {
@@ -624,7 +633,8 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
     }
 
     try {
-        await execa(tsc, ["-p", tsconfigPath], { cwd: projectRoot, stdio: "inherit" });
+        await execa(tsc, ["-p", tsconfigPath], { cwd: projectRoot,
+stdio: "inherit" });
     } catch {
         throw new Error("TypeScript compilation failed — the bundle was not written.");
     }
@@ -730,7 +740,9 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
         "utf8"
     );
 
-    return { outDir, manifest, collectionCount: collections.length };
+    return { outDir,
+manifest,
+collectionCount: collections.length };
 }
 
 /**

@@ -19,7 +19,8 @@ export function resolveEmailOptions(env: RebaseBootEnv): EmailConfig | undefined
             port: env.SMTP_PORT,
             secure: env.SMTP_SECURE,
             auth: env.SMTP_USER
-                ? { user: env.SMTP_USER, pass: env.SMTP_PASS ?? "" }
+                ? { user: env.SMTP_USER,
+pass: env.SMTP_PASS ?? "" }
                 : undefined,
             name: env.SMTP_NAME
         },

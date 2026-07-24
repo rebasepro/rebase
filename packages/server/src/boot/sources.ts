@@ -142,7 +142,8 @@ export function resolveDataSources(
     const serverSide = declared.filter(d => (d.transport ?? "server") === "server");
     const effective: DataSourceDefinition[] = hasDefault
         ? serverSide
-        : [{ key: DEFAULT_DATA_SOURCE_KEY, engine: "postgres" }, ...serverSide];
+        : [{ key: DEFAULT_DATA_SOURCE_KEY,
+engine: "postgres" }, ...serverSide];
 
     const resolved: ResolvedDataSourceConfig[] = [];
 
@@ -304,7 +305,8 @@ export function resolveStorageSources(
 
     const effective: { key: string; engine?: string }[] = hasDefault
         ? serverSide
-        : [{ key: DEFAULT_STORAGE_SOURCE_KEY, engine: undefined }, ...serverSide];
+        : [{ key: DEFAULT_STORAGE_SOURCE_KEY,
+engine: undefined }, ...serverSide];
 
     const result: Record<string, BackendStorageConfig> = {};
     for (const definition of effective) {
