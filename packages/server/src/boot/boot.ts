@@ -76,14 +76,19 @@ export interface BootOptions {
  * rebuilt, which is the precondition for patching a fleet.
  */
 export async function bootFromBundle(options: BootOptions = {}): Promise<BootedRuntime> {
-    const env = loadBootEnv();
-    const isProduction = env.NODE_ENV === "production";
-
     const bundleDir = options.bundleDir
         || process.env.REBASE_BUNDLE
         || path.resolve(process.cwd(), "dist-bundle");
 
+    // The bundle is located before the environment is validated, because
+    // pointing at the wrong directory is the likeliest first-run mistake, and
+    // "no bundle here, build one" is far more useful than being told
+    // DATABASE_URL is missing — which it also is, but only because nothing has
+    // been set up yet.
     const bundle = options.bundle ?? loadBundle(bundleDir);
+
+    const env = loadBootEnv();
+    const isProduction = env.NODE_ENV === "production";
 
     // Where dev-only state (the port file, the MCP discovery file) lives. A
     // source boot runs from the project root; a built bundle sits inside it.

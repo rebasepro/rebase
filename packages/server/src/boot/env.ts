@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { loadEnv, type RebaseEnv } from "../env";
+import { BundleError } from "./bundle";
 
 /**
  * The environment a bundle-booted runtime understands.
@@ -106,7 +107,26 @@ export type RebaseBootEnv = RebaseEnv & z.infer<typeof bootEnvExtension>;
  * calling in).
  */
 export function loadBootEnv(): RebaseBootEnv {
-    return loadEnv({ extend: bootEnvExtension }) as RebaseBootEnv;
+    try {
+        return loadEnv({ extend: bootEnvExtension }) as RebaseBootEnv;
+    } catch (err) {
+        // A raw ZodError prints a JSON dump and a stack trace through the
+        // validator — several screens of noise whose actual content is "you did
+        // not set DATABASE_URL". Restate it as the list of variables to fix.
+        const issues = (err as { issues?: { path?: (string | number)[]; message?: string }[] }).issues;
+        if (!Array.isArray(issues)) throw err;
+
+        const lines = issues.map(issue => {
+            const name = Array.isArray(issue.path) ? issue.path.join(".") : "";
+            const detail = issue.message === "Invalid input" ? "is required" : issue.message;
+            return name ? `  ${name}: ${detail}` : `  ${detail}`;
+        });
+
+        throw new BundleError(
+            `The environment is not valid:\n${lines.join("\n")}`,
+            "See https://rebase.pro/docs/deployment/self-hosting/ for the variables a deployment needs."
+        );
+    }
 }
 
 /**
