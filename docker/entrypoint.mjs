@@ -73,27 +73,31 @@ if (fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModules)) {
 
 // ── 3. Schema ────────────────────────────────────────────────────────────────
 //
-// The runtime creates its own auth tables at boot. Collection tables are a
-// separate, deliberate step, and this image does not do it.
+// The runtime creates its auth tables at boot and, on `ensure`, additively
+// creates any collection tables, columns and enum types the database is missing.
+// Additive means additive: it never drops, narrows or rewrites anything, so it
+// is safe to run unattended on every start and re-running it is a no-op.
 //
-// It briefly tried to: `REBASE_MIGRATE_ON_BOOT=push` shelled out to the driver's
-// schema CLI. That CLI is TypeScript and is not exported as a subpath, so it was
-// never reachable from here — the container simply crash-looped, and with a
-// restart policy in front it did so forever. Worse, making it work would mean a
-// container restart could run `DROP COLUMN` against a production database as a
-// side effect of a deploy.
+// `push` remains unsupported here, deliberately. It once shelled out to the
+// driver's schema CLI — TypeScript, not exported as a subpath, so it was never
+// reachable and the container crash-looped forever behind a restart policy. But
+// the real objection outlived the bug: a full push computes a diff and will
+// happily `DROP COLUMN`, and a container restart must never be able to destroy a
+// production column as a side effect of rescheduling.
 //
-// So schema changes belong where they can be reviewed: `rebase db push` from a
-// checkout or a CI job, with the destructive-change gate and a backup in reach.
+// So destructive schema changes stay where they can be reviewed: `rebase db
+// push` from a checkout or CI, with the destructive-change gate and a backup in
+// reach. `none` opts out of even the additive step.
 const migrateMode = process.env.REBASE_MIGRATE_ON_BOOT || "ensure";
 
 if (!["none", "ensure"].includes(migrateMode)) {
     if (migrateMode === "push") {
         fail(
             "REBASE_MIGRATE_ON_BOOT=push is not supported by the runtime image.",
-            "Run `rebase db push` from a checkout or CI instead — it dry-runs the change, refuses " +
-            "destructive ones without confirmation, and can take a backup first. " +
-            "Set REBASE_MIGRATE_ON_BOOT=ensure (the default) to boot."
+            "The default, `ensure`, already creates missing tables, columns and enum types " +
+            "additively. For a change that DROPS or rewrites something, run `rebase db push` from " +
+            "a checkout or CI — it dry-runs the change, refuses destructive ones without " +
+            "confirmation, and can take a backup first. Set REBASE_MIGRATE_ON_BOOT=ensure to boot."
         );
     }
     fail(`REBASE_MIGRATE_ON_BOOT must be "none" or "ensure" (got "${migrateMode}").`);

@@ -11,6 +11,7 @@ import {
 } from "@rebasepro/types";
 
 import { initializeRebaseBackend, type RebaseBackendInstance } from "../init";
+import { loadCollectionsFromDirectory } from "../collections/loader";
 import type { HonoEnv } from "../api/types";
 import { logger } from "../utils/logger";
 import { serveSPA } from "../serve-spa";
@@ -170,6 +171,21 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         storageSourceDefs,
         path.join(bundle.dir, "uploads")
     );
+
+    // ── Schema ───────────────────────────────────────────────────────────────
+    //
+    // Create any collection tables the database is missing, before the backend
+    // starts serving. `initializeRebaseBackend` ensures AUTH tables; nothing
+    // ensured collection tables, so a runtime booted against a fresh database
+    // came up with working sign-in and a 500 on every `/api/data/*` route — the
+    // state every managed tenant would have launched in.
+    //
+    // Additive only: the driver may create missing tables, columns and enum
+    // types, and may never drop or rewrite. Destructive changes stay a
+    // deliberate migration, because this runs unattended with nobody reading a
+    // diff. `REBASE_MIGRATE_ON_BOOT=none` opts out entirely for a deployment
+    // that manages its own schema.
+    await ensureCollectionSchema(bundle, dataSources, env);
 
     const backend = await initializeRebaseBackend({
         server,
@@ -476,4 +492,50 @@ export async function runFromBundle(options: BootOptions = {}): Promise<BootedRu
         }
         process.exit(1);
     }
+}
+
+
+/**
+ * Bring the database's collection tables up to date before serving.
+ *
+ * Delegates to whichever driver bootstrapped the default data source; a driver
+ * without `ensureCollectionSchema` (a schemaless one, or an older build) simply
+ * skips, which is why this cannot break an existing deployment.
+ *
+ * Failure is fatal on purpose. Booting anyway would produce exactly the state
+ * this exists to prevent — an app that answers sign-in and 500s every data
+ * request — and a crash-looping pod with the DDL error in its logs is a far
+ * better signal than a running one that silently cannot serve.
+ */
+async function ensureCollectionSchema(
+    bundle: LoadedBundle,
+    dataSources: InitializedDataSource[],
+    env: RebaseBootEnv
+): Promise<void> {
+    const mode = env.REBASE_MIGRATE_ON_BOOT || "ensure";
+    if (mode === "none") {
+        logger.info("REBASE_MIGRATE_ON_BOOT=none — leaving the database schema untouched.");
+        return;
+    }
+    // `baas` introspects its collections FROM the database, so there is nothing
+    // to create; a `static` bundle has no database at all.
+    if ((bundle.manifest.mode ?? "cms") !== "cms") return;
+    if (!bundle.collectionsDir) return;
+
+    const primary = dataSources[0];
+    if (!primary?.bootstrapper.ensureCollectionSchema) return;
+
+    const collections = await loadCollectionsFromDirectory(bundle.collectionsDir);
+    if (collections.length === 0) return;
+
+    const { applied } = await primary.bootstrapper.ensureCollectionSchema(
+        collections,
+        primary.connection as never,
+        message => logger.info(`schema: ${message}`)
+    );
+    logger.info(
+        applied > 0
+            ? `Applied ${applied} additive schema change(s) before boot.`
+            : "Collection schema is up to date."
+    );
 }

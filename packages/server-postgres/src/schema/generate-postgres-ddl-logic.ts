@@ -4,7 +4,7 @@ import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
 
 // --- Helper Functions ---
 
-const resolveColumnName = (propName: string, prop?: Property | null): string => {
+export const resolveColumnName = (propName: string, prop?: Property | null): string => {
     if (prop && "columnName" in prop && typeof prop.columnName === "string") {
         return prop.columnName;
     }
@@ -36,7 +36,7 @@ const getPrimaryKeyName = (collection: CollectionConfig): string => {
     return getPrimaryKeyProp(collection).name;
 };
 
-const isIdProperty = (propName: string, prop: Property, collection: CollectionConfig): boolean => {
+export const isIdProperty = (propName: string, prop: Property, collection: CollectionConfig): boolean => {
     if ("isId" in prop && Boolean(prop.isId)) return true;
     const hasExplicitId = Object.values(collection.properties ?? {}).some(p => "isId" in (p as unknown as object) && Boolean((p as unknown as Record<string, unknown>).isId));
     return !hasExplicitId && propName === "id";
@@ -90,7 +90,7 @@ const generateSinglePolicyDdl = (collection: CollectionConfig, rule: SecurityRul
     return `${ddl};\n`;
 };
 
-const getSqlColumnType = (propName: string, prop: Property, collection: CollectionConfig, collections: CollectionConfig[]): string => {
+export const getSqlColumnType = (propName: string, prop: Property, collection: CollectionConfig, collections: CollectionConfig[]): string => {
     switch (prop.type) {
         case "string": {
             const stringProp = prop as StringProperty;

@@ -778,6 +778,27 @@ export interface BackendBootstrapper {
     getAdmin?(driverResult: InitializedDriver): DatabaseAdmin | undefined;
 
     /**
+     * Bring the database's collection tables up to date, additively.
+     *
+     * Optional because it is only meaningful for schema-ful drivers. A managed
+     * runtime boots a compiled project against a database it has never seen; auth
+     * tables are ensured on boot but collection tables were created by nothing,
+     * so every data request answered 500 on a missing relation. The CLI's `db
+     * push` cannot fill the gap — it needs Atlas, and the runtime image ships no
+     * CLI.
+     *
+     * Implementations MUST be additive-only: create missing tables, columns and
+     * enum types, and never drop, narrow or rewrite anything. This runs
+     * unattended against live customer data with nobody reading a diff, so the
+     * destructive half stays a deliberate migration.
+     */
+    ensureCollectionSchema?(
+        collections: unknown[],
+        driverResult: InitializedDriver,
+        log?: (message: string) => void
+    ): Promise<{ applied: number }>;
+
+    /**
      * Initialize WebSocket server for realtime operations.
      */
     initializeWebsockets?(server: unknown, realtimeService: RealtimeProvider, driver: import("../controllers/data_driver").DataDriver, config?: unknown, authAdapter?: AuthAdapter): Promise<void> | void;

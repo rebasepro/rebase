@@ -644,6 +644,46 @@ authRepository };
             return internals.realtimeService;
         },
 
+        /**
+         * Create any collection tables, columns and enum types the database is
+         * missing — additively, never destructively.
+         *
+         * This is what lets the managed runtime boot a project against a fresh
+         * database and actually serve it. Before this, only auth tables were
+         * ensured, so a managed tenant came up with working sign-in and a 500 on
+         * every data route.
+         *
+         * Runs through the drizzle handle's underlying session so it uses the
+         * same connection (and therefore the same privileges) the driver already
+         * proved it can bootstrap with.
+         */
+        async ensureCollectionSchema(
+            collections: unknown[],
+            driverResult: InitializedDriver,
+            log?: (message: string) => void
+        ): Promise<{ applied: number }> {
+            const internals = driverResult.internals as PostgresDriverInternals;
+            const { ensureCollectionTables } = await import("./schema/ensure-collection-tables");
+            // Runs through the drizzle handle the driver already bootstrapped
+            // with, so it uses exactly the connection and privileges that were
+            // proven to work. Every statement is DDL or a catalogue read with no
+            // bindable values (schema names are identifiers), and the module
+            // validates them before they reach a string.
+            const queryable = {
+                async query<T>(text: string): Promise<{ rows: T[] }> {
+                    const result = await internals.db.execute(sql.raw(text));
+                    const rows = (result as unknown as { rows?: T[] }).rows;
+                    return { rows: rows ?? (Array.isArray(result) ? (result as T[]) : []) };
+                }
+            };
+            const plan = await ensureCollectionTables(
+                queryable,
+                collections as Parameters<typeof ensureCollectionTables>[1],
+                log
+            );
+            return { applied: plan.actions.length };
+        },
+
         getAdmin(driverResult: InitializedDriver): DatabaseAdmin | undefined {
             const internals = driverResult.internals as PostgresDriverInternals;
             return internals.driver.admin;
