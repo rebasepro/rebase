@@ -51,12 +51,22 @@ function projectForCodegen(collection: CollectionConfig): Record<string, unknown
         relations?: unknown;
         subcollections?: CollectionConfig[];
         path?: string;
+        engine?: unknown;
+        dataSource?: unknown;
     };
 
     return {
         slug: collection.slug ?? source.path,
         properties: collection.properties,
         relations: source.relations,
+        // The engine decides whether relations are resolved at all: codegen asks
+        // `getDataSourceCapabilities(collection.engine).supportsRelations`, and an
+        // engine that answers no drops every foreign-key column from the
+        // generated Row/Insert/Update types. Moving a collection to such an
+        // engine is a real change to the generated types, so it has to move the
+        // version. `dataSource` is what resolves to `engine`, so it counts too.
+        engine: source.engine,
+        dataSource: source.dataSource,
         subcollections: source.subcollections?.map(projectForCodegen)
     };
 }

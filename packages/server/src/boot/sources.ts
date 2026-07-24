@@ -186,7 +186,12 @@ engine: "postgres" }, ...serverSide];
         });
     }
 
-    if (!resolved.some(r => r.isDefault)) {
+    // A declared-but-direct default is legitimate: the backend holds no
+    // connection for it, and demanding one would be wrong.
+    const defaultIsDirect = declared.some(
+        d => d.key === DEFAULT_DATA_SOURCE_KEY && (d.transport ?? "server") !== "server"
+    );
+    if (!defaultIsDirect && !resolved.some(r => r.isDefault)) {
         throw new BundleError(
             "No default data source is configured.",
             `Declare a data source with key "${DEFAULT_DATA_SOURCE_KEY}", or set DATABASE_URL.`
@@ -301,12 +306,21 @@ export function resolveStorageSources(
     assertDistinctSuffixes(declared, DEFAULT_STORAGE_SOURCE_KEY, "Storage source");
 
     const serverSide = declared.filter(d => (d.transport ?? "server") === "server");
-    const hasDefault = serverSide.some(d => d.key === DEFAULT_STORAGE_SOURCE_KEY);
 
-    const effective: { key: string; engine?: string }[] = hasDefault
-        ? serverSide
-        : [{ key: DEFAULT_STORAGE_SOURCE_KEY,
-engine: undefined }, ...serverSide];
+    // Synthesize the default bucket only when the project declared *nothing*.
+    //
+    // Inventing one alongside explicitly declared sources is actively harmful.
+    // The synthesized default falls through to local disk; production drops local
+    // backends (files written there die with the container); the storage registry
+    // then promotes whichever backend remains to be the default. So a project
+    // declaring only a "media" bucket would put its default uploads on local disk
+    // in development and in the media bucket in production. Two different
+    // destinations either side of a deploy is worse than having no default
+    // bucket, which at least fails the same way in both.
+    const effective: { key: string; engine?: string }[] = declared.length === 0
+        ? [{ key: DEFAULT_STORAGE_SOURCE_KEY,
+engine: undefined }]
+        : serverSide;
 
     const result: Record<string, BackendStorageConfig> = {};
     for (const definition of effective) {

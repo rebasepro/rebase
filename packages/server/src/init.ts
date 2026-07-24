@@ -1549,6 +1549,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // `/schema-version` returns a bare version string that stands for the
         // schema without describing it, and is deliberately reachable by a CI
         // job holding no credentials.
+        //
+        // With no way to gate it, `/contract` is not served at all. The other
+        // admin surfaces mount ungated-with-a-warning because each is behind its
+        // own opt-in, so someone chose to enable it; this one appears on every
+        // deployment that upgrades. Serving the entire schema to anonymous
+        // callers is not a reasonable thing to switch on for people by default,
+        // and a 404 is recoverable — configure auth and it returns.
         if (adminSurfacesGated) {
             if (apiKeyPreAuth) contractRouter.use("/contract", apiKeyPreAuth);
             contractRouter.use(
@@ -1557,10 +1564,17 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 requireAdmin
             );
         } else {
+            contractRouter.all("/contract", (c) => c.json({
+                error: {
+                    code: "CONTRACT_UNAVAILABLE",
+                    message: "The project contract is only served when authentication is configured, " +
+                        "because it describes every table and relation in the project."
+                }
+            }, 404));
             logger.warn(
-                "Contract routes are mounted WITHOUT an auth gate " +
-                "(no auth configured, requireAuth: false, or no jwtSecret) — " +
-                "anyone who can reach the server can read the full collection schema."
+                "Contract endpoint disabled: no auth is configured (no adapter, requireAuth: false, " +
+                "or no jwtSecret), and it would otherwise expose the full collection schema to anyone. " +
+                "`/api/meta/schema-version` is still served."
             );
         }
 

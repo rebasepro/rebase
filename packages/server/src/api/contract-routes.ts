@@ -42,17 +42,49 @@ export interface ContractRoutesConfig {
     runtimeVersion?: string;
 }
 
+/**
+ * Strip everything a client does not need from a serialized collection.
+ *
+ * The generator reads the slug, the properties and the relations. It never reads
+ * a security rule — but `securityRules` carries the raw SQL of every RLS
+ * predicate guarding the project, which is a description of the authorization
+ * model rather than of the data shape. Publishing it to anyone who can generate
+ * an SDK gives away more than the endpoint is for, so it is removed here rather
+ * than trusted not to matter.
+ */
+function stripNonClientFields(collection: unknown): unknown {
+    if (!collection || typeof collection !== "object") return collection;
+    const {
+        securityRules: _securityRules,
+        callbacks: _callbacks,
+        ...rest
+    } = collection as Record<string, unknown>;
+    return rest;
+}
+
 export function createContractRoutes(config: ContractRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
 
+    // Computing a version walks and canonicalizes every collection, and
+    // `/schema-version` is deliberately unauthenticated and meant to be polled.
+    // Recomputing per request would make a CI convenience into a CPU
+    // amplification anyone could aim at the server. Collections do not change
+    // after boot, so once is enough.
+    let cachedVersion: string | undefined;
+    const schemaVersionOf = (collections: CollectionConfig[]): string => {
+        if (config.schemaVersion) return config.schemaVersion;
+        if (cachedVersion === undefined) cachedVersion = computeSchemaVersion(collections);
+        return cachedVersion;
+    };
+
     router.get("/contract", (c) => {
         const collections = config.collectionRegistry.getRawCollections();
-        const serialized = serializeCollections(collections);
+        const serialized = serializeCollections(collections).map(stripNonClientFields);
 
         // In `baas` mode the collections are whatever introspection found at
         // boot, so the version has to be computed from them rather than taken
         // from a build that never saw them.
-        const schemaVersion = config.schemaVersion || computeSchemaVersion(collections);
+        const schemaVersion = schemaVersionOf(collections);
 
         const contract: RebaseProjectContract = {
             schemaVersion,
@@ -82,8 +114,7 @@ export function createContractRoutes(config: ContractRoutesConfig): Hono<HonoEnv
      * stamp reveals nothing about the schema it stands for.
      */
     router.get("/schema-version", (c) => {
-        const collections = config.collectionRegistry.getRawCollections();
-        const schemaVersion = config.schemaVersion || computeSchemaVersion(collections);
+        const schemaVersion = schemaVersionOf(config.collectionRegistry.getRawCollections());
         c.header(SCHEMA_VERSION_HEADER, schemaVersion);
         return c.json({ schemaVersion,
 mode: config.mode });

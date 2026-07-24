@@ -521,8 +521,22 @@ export function normalizeEsmSpecifiers(outDir: string): { rewritten: number; unr
 unresolved };
 }
 
-/** Remove a previous build so stale output cannot masquerade as current. */
-function cleanOutDir(outDir: string): void {
+/**
+ * Remove a previous build so stale output cannot masquerade as current.
+ *
+ * The containment check matters because this is a recursive force-delete of a
+ * path that came from a command-line flag: `rebase build --out ../..` would
+ * otherwise erase the parent of the project. The manifest's own paths are
+ * checked the same way; a flag deserves no less.
+ */
+function cleanOutDir(projectRoot: string, outDir: string): void {
+    const relative = path.relative(projectRoot, outDir);
+    if (relative === "" || relative.startsWith("..") || path.isAbsolute(relative)) {
+        throw new Error(
+            `Refusing to build into "${outDir}": the output directory must be inside the project.`
+        );
+    }
+
     if (fs.existsSync(outDir)) {
         fs.rmSync(outDir, { recursive: true,
 force: true });
@@ -622,7 +636,7 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
 
     log(options, chalk.dim(`  compiling ${includes.length} source group(s) → ${path.relative(projectRoot, outDir)}/`));
 
-    cleanOutDir(outDir);
+    cleanOutDir(projectRoot, outDir);
     const tsconfigPath = await writeBundleTsconfig(projectRoot, outDir, includes, options.skipTypeCheck === true);
 
     const tsc = resolveLocalBin(projectRoot, "tsc");

@@ -45,6 +45,18 @@ interface HistogramState {
  * expects — it handles resets natively, and a restart is a real event a
  * dashboard should be able to see.
  */
+/**
+ * Ceiling on distinct label combinations per metric family.
+ *
+ * Label values that vary without bound are the classic way to take down a
+ * Prometheus — and, before that, the process emitting them, since every distinct
+ * combination allocates a permanent series. The label set here is derived partly
+ * from request paths, so it is reachable by anyone who can send a request.
+ * Beyond the cap, series collapse into a single `(other)` bucket: the totals stay
+ * correct and memory stops growing.
+ */
+const MAX_SERIES = 512;
+
 export class MetricsRegistry {
     private requests = new Map<string, number>();
     private latency = new Map<string, HistogramState>();
@@ -87,7 +99,12 @@ export class MetricsRegistry {
     }
 
     recordRequest(labels: Record<string, string>, durationMs: number): void {
-        const key = MetricsRegistry.labelKey(labels);
+        let key = MetricsRegistry.labelKey(labels);
+
+        if (!this.requests.has(key) && this.requests.size >= MAX_SERIES) {
+            key = MetricsRegistry.labelKey({ ...labels,
+                collection: "(other)" });
+        }
 
         this.requests.set(key, (this.requests.get(key) ?? 0) + 1);
 
@@ -235,6 +252,15 @@ collection: second || undefined };
 export interface MetricsHandle {
     registry: MetricsRegistry;
     middleware: MiddlewareHandler<HonoEnv>;
+    /**
+     * Restrict the `collection` label to names that actually exist.
+     *
+     * Called once the collections are known — the middleware has to be installed
+     * before them, since it must wrap every request. Until it is called, and for
+     * any name not in the set, the label is dropped: a path segment is attacker-
+     * controlled, and one series per value invented is unbounded memory.
+     */
+    setKnownCollections(slugs: Iterable<string>): void;
 }
 
 /**
@@ -246,6 +272,7 @@ export interface MetricsHandle {
  */
 export function createMetricsMiddleware(basePath = "/api"): MetricsHandle {
     const registry = new MetricsRegistry();
+    let known: Set<string> | undefined;
 
     const middleware: MiddlewareHandler<HonoEnv> = async (c, next) => {
         const started = performance.now();
@@ -260,13 +287,21 @@ export function createMetricsMiddleware(basePath = "/api"): MetricsHandle {
                 method: c.req.method,
                 status: String(c.res?.status ?? 0)
             };
-            if (collection) labels.collection = collection;
+            // Only a name the schema knows about becomes a label. A request for
+            // `/api/data/<random>` is a 404, and recording it by name would let
+            // anyone mint unlimited time series just by sending requests.
+            if (collection && known?.has(collection)) labels.collection = collection;
             registry.recordRequest(labels, duration);
         }
     };
 
-    return { registry,
-middleware };
+    return {
+        registry,
+        middleware,
+        setKnownCollections(slugs: Iterable<string>) {
+            known = new Set(slugs);
+        }
+    };
 }
 
 /**

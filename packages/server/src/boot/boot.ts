@@ -4,7 +4,11 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { getRequestListener } from "@hono/node-server";
-import type { DataSourceDefinition, StorageSourceDefinition } from "@rebasepro/types";
+import {
+    DEFAULT_DATA_SOURCE_KEY,
+    type DataSourceDefinition,
+    type StorageSourceDefinition
+} from "@rebasepro/types";
 
 import { initializeRebaseBackend, type RebaseBackendInstance } from "../init";
 import type { HonoEnv } from "../api/types";
@@ -80,6 +84,10 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         || path.resolve(process.cwd(), "dist-bundle");
 
     const bundle = options.bundle ?? loadBundle(bundleDir);
+
+    // Where dev-only state (the port file, the MCP discovery file) lives. A
+    // source boot runs from the project root; a built bundle sits inside it.
+    const devRoot = process.env.REBASE_DEV_PROJECT_ROOT || process.cwd();
     logger.info("Loaded bundle", {
         app: bundle.manifest.app,
         mode: bundle.manifest.mode,
@@ -112,9 +120,28 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         origin: resolveCorsOrigin(env),
         credentials: true
     }));
-    app.use("/*", secureHeaders());
+    app.use("/*", secureHeaders({
+        // An API serves assets and tokens to origins other than its own, so the
+        // browser defaults are wrong here in two specific ways:
+        //
+        // - `crossOriginResourcePolicy` defaults to `same-origin`, which blocks a
+        //   frontend on another origin from loading anything this server serves.
+        // - `crossOriginOpenerPolicy` defaults to `same-origin`, which severs
+        //   `window.opener` and breaks the OAuth popup sign-in that
+        //   `resolveAuthOptions` configures whenever GOOGLE_CLIENT_ID is set.
+        //
+        // Cross-origin access is still governed by CORS; these only stop the
+        // browser from refusing before CORS is consulted.
+        crossOriginResourcePolicy: "cross-origin",
+        crossOriginOpenerPolicy: "same-origin-allow-popups"
+    }));
 
-    const metrics = env.REBASE_METRICS ? createMetricsMiddleware() : undefined;
+    // Classified against the configured base path, not a hardcoded "/api" — a
+    // project on a different base path would otherwise label every request
+    // "other" and the per-surface breakdown would silently be empty.
+    const metrics = env.REBASE_METRICS
+        ? createMetricsMiddleware(env.REBASE_BASE_PATH)
+        : undefined;
     if (metrics) {
         app.use("/*", metrics.middleware);
     }
@@ -141,15 +168,17 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         dataSources: dataSourceDefs,
         storage,
         storageSources: storageSourceDefs,
+        // Per-object access control comes from the project's own code — no
+        // environment variable can express "this user may read this key".
+        storageAuthorize: configExports.storageAuthorize,
         storagePublicRead: env.STORAGE_PUBLIC_READ,
         storageInsecureAllowAnyAuthenticated: env.STORAGE_ALLOW_ANY_AUTHENTICATED,
+        callbacks: configExports.callbacks,
         auth: resolveAuthOptions(env, usersCollection),
         history: env.REBASE_HISTORY,
         enableSwagger: env.REBASE_ENABLE_SWAGGER,
         compression: env.REBASE_COMPRESSION,
-        maxBodySize: env.REBASE_MAX_BODY_SIZE !== undefined
-            ? Number(env.REBASE_MAX_BODY_SIZE)
-            : undefined,
+        maxBodySize: env.REBASE_MAX_BODY_SIZE,
         logging: env.LOG_LEVEL ? { level: env.LOG_LEVEL } : undefined,
         // CORS is installed above, before this call.
         corsHandled: true,
@@ -165,16 +194,56 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         schemaEditor: false
     });
 
+    // Restrict metric labels to collections that exist, now that they do.
+    metrics?.setKnownCollections(
+        backend.collectionRegistry.getCollections()
+            .map(collection => collection.slug)
+            .filter((slug): slug is string => Boolean(slug))
+    );
+
     // ── Health ───────────────────────────────────────────────────────────────
     // Not part of `initializeRebaseBackend` because it sits outside `basePath`:
     // orchestrators probe `/health`, not `/api/health`.
     app.get("/health", async (c) => {
         const result = await backend.healthCheck();
+
+        // `backend.healthCheck()` probes the default driver only. With several
+        // databases configured, that would report a healthy server while every
+        // collection routed to an unreachable secondary returns 500 — an
+        // orchestrator would keep sending it traffic.
+        const secondaries = await Promise.all(
+            dataSources
+                .filter(source => source.key !== DEFAULT_DATA_SOURCE_KEY)
+                .map(async source => {
+                    const probe = source.connection as { query?: (sql: string) => Promise<unknown> };
+                    if (typeof probe.query !== "function") {
+                        return { key: source.key,
+healthy: true,
+skipped: true };
+                    }
+                    try {
+                        await probe.query("SELECT 1");
+                        return { key: source.key,
+healthy: true };
+                    } catch (err) {
+                        return {
+                            key: source.key,
+                            healthy: false,
+                            error: err instanceof Error ? err.message : String(err)
+                        };
+                    }
+                })
+        );
+
+        const unhealthy = secondaries.filter(source => !source.healthy);
+        const healthy = result.healthy && unhealthy.length === 0;
+
         return c.json({
-            status: result.healthy ? "ok" : "degraded",
+            status: healthy ? "ok" : "degraded",
             latencyMs: result.latencyMs,
-            ...(result.details ? { details: result.details } : {})
-        }, result.healthy ? 200 : 503);
+            ...(result.details ? { details: result.details } : {}),
+            ...(unhealthy.length > 0 ? { dataSources: unhealthy } : {})
+        }, healthy ? 200 : 503);
     });
 
     // Liveness vs readiness: `/health` touches the database, so a database blip
@@ -222,9 +291,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
             });
             logger.info(`Rebase runtime listening on port ${env.PORT}`);
         } else {
-            const projectRoot = process.cwd();
             port = await listenWithPortRetry(server, env.PORT, {
-                portFileDir: projectRoot,
+                portFileDir: devRoot,
                 serviceKey: env.REBASE_SERVICE_KEY
             });
             // Phrased to match what `rebase dev` watches for before it starts
@@ -238,11 +306,17 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         await Promise.allSettled(
             dataSources.map(source => source.connection.pool?.end())
         );
-        if (!isProduction) cleanupDevPortFile(process.cwd());
+        if (!isProduction) cleanupDevPortFile(devRoot);
     };
 
     if (options.handleSignals !== false) {
         installShutdownHandlers(backend, { onCleanup: closeConnections });
+        // The graceful path is not the only way a dev server ends. Without this,
+        // a crash or a force-exit leaves `.rebase-dev-port` behind and the next
+        // run inherits a port nothing is listening on.
+        if (!isProduction) {
+            process.on("exit", () => cleanupDevPortFile(devRoot));
+        }
     }
 
     return {

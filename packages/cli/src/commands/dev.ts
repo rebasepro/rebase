@@ -34,6 +34,20 @@ import {
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 
 /**
+ * Quote a path for the shell `execa` runs the backend through.
+ *
+ * The dev runtime's path is absolute and therefore contains whatever the
+ * developer's directories are called. Double quotes do not neutralize `$`,
+ * backticks or backslashes in a POSIX shell, so a checkout under a directory
+ * named `$(...)` would execute it. Single quotes disable all expansion; on
+ * Windows, `cmd.exe` performs no such expansion and wants double quotes.
+ */
+function quoteForShell(value: string): string {
+    if (process.platform === "win32") return `"${value.replace(/"/g, "\\\"")}"`;
+    return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+/**
  * Locate the dev runtime shim shipped with the CLI.
  *
  * Published under `runtime/` in the package rather than compiled into `dist/`,
@@ -444,7 +458,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             Object.assign(env, devRuntimeEnv(projectRoot));
         }
 
-        const watchArgs = ["watch", "--conditions", "development", `"${entryTarget}"`];
+        const watchArgs = ["watch", "--conditions", "development", quoteForShell(entryTarget)];
         if (!shouldGenerate) {
             // When auto-generation is disabled, watch the config/collections dir directly so the dev server
             // still reloads automatically when files there are edited/updated manually.

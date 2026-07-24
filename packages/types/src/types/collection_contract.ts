@@ -63,8 +63,31 @@ function refFor(collection: CollectionConfig | undefined): string | undefined {
  * `target` keys are special-cased into refs. Other functions vanish, cycles are
  * cut, and everything else is copied structurally.
  */
-function toSerializable(value: unknown, seen: WeakSet<object>, depth: number, key?: string): unknown {
-    if (depth > MAX_DEPTH) return undefined;
+/** Shared walk state: the memo, plus a count of depth-cap hits. */
+interface WalkState {
+    memo: WeakMap<object, unknown>;
+    /**
+     * How many times the depth cap has truncated a subtree.
+     *
+     * A result produced under truncation is only valid at the depth it was
+     * produced at — reusing it higher up would silently drop content that would
+     * have fit. Comparing this counter before and after a node's children tells
+     * us whether its result is depth-independent and therefore safe to memoize.
+     */
+    capHits: number;
+}
+
+function toSerializable(
+    value: unknown,
+    seen: WeakSet<object>,
+    depth: number,
+    state: WalkState,
+    key?: string
+): unknown {
+    if (depth > MAX_DEPTH) {
+        state.capHits++;
+        return undefined;
+    }
 
     if (typeof value === "function") {
         // Only a relation target carries information a client needs. Calling it
@@ -91,16 +114,35 @@ function toSerializable(value: unknown, seen: WeakSet<object>, depth: number, ke
     if (value instanceof RegExp) return value.source;
 
     if (seen.has(value as object)) return undefined;
+
+    // A shared (non-cyclic) subgraph is reachable by many paths, and `seen` is a
+    // *path* set — released in the `finally` below so a node referenced twice in
+    // different branches is emitted twice rather than dropped as a false cycle.
+    // Without memoization that makes the walk exponential in depth: a diamond
+    // graph 20 levels deep took ~400ms, and each further level doubled it. The
+    // result is a plain data tree, so handing back the same converted object for
+    // a repeat visit is indistinguishable after JSON.stringify.
+    const cached = state.memo.get(value as object);
+    if (cached !== undefined) return cached;
+
     seen.add(value as object);
+    const capHitsBefore = state.capHits;
+    const memoize = (result: unknown): unknown => {
+        // Only cache a result no depth cap interfered with.
+        if (result !== undefined && state.capHits === capHitsBefore) {
+            state.memo.set(value as object, result);
+        }
+        return result;
+    };
 
     try {
         if (Array.isArray(value)) {
             const items = value
-                .map(item => toSerializable(item, seen, depth + 1))
+                .map(item => toSerializable(item, seen, depth + 1, state))
                 .filter(item => item !== undefined);
             // A container that had content, none of which can be represented, is
             // itself unrepresentable — see the note below.
-            return value.length > 0 && items.length === 0 ? undefined : items;
+            return memoize(value.length > 0 && items.length === 0 ? undefined : items);
         }
 
         // A React element or component reference has no meaning to a client and
@@ -110,7 +152,7 @@ function toSerializable(value: unknown, seen: WeakSet<object>, depth: number, ke
         const entries = Object.entries(value as Record<string, unknown>);
         const out: Record<string, unknown> = {};
         for (const [k, v] of entries) {
-            const converted = toSerializable(v, seen, depth + 1, k);
+            const converted = toSerializable(v, seen, depth + 1, state, k);
             if (converted !== undefined) out[k] = converted;
         }
 
@@ -126,7 +168,7 @@ function toSerializable(value: unknown, seen: WeakSet<object>, depth: number, ke
         // deliberate statement, not a casualty.
         if (entries.length > 0 && Object.keys(out).length === 0) return undefined;
 
-        return out;
+        return memoize(out);
     } finally {
         // Released so a collection referenced twice in different branches is
         // emitted twice rather than being dropped as a false cycle.
@@ -143,7 +185,10 @@ function toSerializable(value: unknown, seen: WeakSet<object>, depth: number, ke
 export function serializeCollections(collections: CollectionConfig[]): unknown[] {
     return [...collections]
         .sort((a, b) => String(a.slug ?? "").localeCompare(String(b.slug ?? "")))
-        .map(collection => toSerializable(collection, new WeakSet(), 0))
+        .map(collection => toSerializable(collection, new WeakSet(), 0, {
+            memo: new WeakMap(),
+            capHits: 0
+        }))
         .filter((c): c is Record<string, unknown> => c !== undefined);
 }
 

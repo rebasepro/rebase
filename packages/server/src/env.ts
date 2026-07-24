@@ -220,7 +220,11 @@ export function loadEnv(options?: { extend?: z.ZodObject<z.ZodRawShape> }): Reco
                 if (typeof value === "string" && isLocalhostOrLoopback(value)) {
                     ctx.addIssue({
                         code: z.ZodIssueCode.custom,
-                        message: `Environment variable ${key} contains a local/loopback URL or host "${value}". Deployed instances must not connect to localhost.`,
+                        // The value is deliberately not echoed: these variables
+                        // routinely carry credentials (DATABASE_URL, SMTP_PASS,
+                        // OAuth secrets), and a failed production boot is logged
+                        // wherever the container's stdout goes.
+                        message: `Environment variable ${key} points at a local/loopback host. Deployed instances must not connect to localhost.`,
                         path: [key]
                     });
                 }

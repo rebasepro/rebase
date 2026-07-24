@@ -82,13 +82,18 @@ if (migrateMode === "push") {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) fail("REBASE_MIGRATE_ON_BOOT=push requires DATABASE_URL.");
 
-    const require = createRequire(path.join(BUNDLE, "package.json"));
-
+    // Resolve from the bundle first (the project's own driver), then from the
+    // image's own tree — the runtime image ships a driver too, and a bundle that
+    // has not installed one should still find it.
     let driverCli;
-    try {
-        driverCli = require.resolve("@rebasepro/server-postgres/src/cli.ts");
-    } catch {
-        driverCli = undefined;
+    for (const base of [BUNDLE, "/app"]) {
+        try {
+            driverCli = createRequire(path.join(base, "package.json"))
+                .resolve("@rebasepro/server-postgres/src/cli.ts");
+            break;
+        } catch {
+            driverCli = undefined;
+        }
     }
 
     if (!driverCli) {
@@ -107,17 +112,53 @@ if (migrateMode === "push") {
 
     await client.connect();
     try {
+        // Bounded, so a wedged migration in one replica fails the others fast
+        // instead of blocking every boot in the deployment indefinitely.
         log("waiting for the schema lock…");
-        await client.query("SELECT pg_advisory_lock($1)", [LOCK_KEY]);
+        await client.query("SET lock_timeout = '120s'");
+        try {
+            await client.query("SELECT pg_advisory_lock($1)", [LOCK_KEY]);
+        } catch (err) {
+            fail(
+                "Timed out waiting for the schema lock — another instance is still migrating.",
+                `Detail: ${err instanceof Error ? err.message : String(err)}`
+            );
+        }
 
         log("pushing schema…");
-        const result = spawnSync("node", [driverCli, "db", "push", "--yes"], {
-            cwd: BUNDLE,
-            stdio: "inherit",
-            env: process.env
-        });
+
+        // The driver CLI is TypeScript, so it needs tsx — plain `node` cannot
+        // execute it.
+        let runner;
+        try {
+            runner = createRequire(path.join(BUNDLE, "package.json")).resolve("tsx/cli");
+        } catch {
+            runner = undefined;
+        }
+
+        // Deliberately no `--yes`. That flag is treated as
+        // `--allow-destructive`, which would let a container restart run
+        // `DROP COLUMN` / `DROP TABLE` with no dry run, no confirmation and no
+        // backup. Without it a destructive plan refuses non-interactively and
+        // says so; an additive one (creating tables on first boot) still applies,
+        // which is the case this exists for.
+        const result = runner
+            ? spawnSync("node", [runner, driverCli, "db", "push"], {
+                cwd: BUNDLE,
+                stdio: "inherit",
+                env: process.env
+            })
+            : spawnSync("node", [driverCli, "db", "push"], {
+                cwd: BUNDLE,
+                stdio: "inherit",
+                env: process.env
+            });
         if (result.status !== 0) {
-            fail("Schema push failed — refusing to start against an unknown schema.");
+            fail(
+                "Schema push failed — refusing to start against an unknown schema.",
+                "Destructive changes are refused here on purpose. Apply them deliberately with " +
+                "`rebase db push` from a checkout or CI, after taking a backup."
+            );
         }
     } finally {
         await client.query("SELECT pg_advisory_unlock($1)", [LOCK_KEY]).catch(() => {});

@@ -231,9 +231,44 @@ async function fetchRemoteCollections(
     };
 }
 
+/**
+ * Decide whether the ambient service key may be sent to this host.
+ *
+ * `REBASE_SERVICE_KEY` grants full admin bypass. Attaching it to whatever URL
+ * happened to be passed — or, worse, to whatever a committed `.rebase/cloud.json`
+ * points at — would hand the project's most powerful credential to a host nobody
+ * vetted. An explicit `--token` is a decision the caller made; the ambient
+ * variable is not, so it only travels to the project this checkout is linked to.
+ */
+function mayUseAmbientKey(target: string, cwd: string): boolean {
+    const link = readLink(findProjectRoot(cwd) ?? cwd);
+    if (!link?.apiUrl) return false;
+    try {
+        return new URL(link.apiUrl).host === new URL(target).host;
+    } catch {
+        return false;
+    }
+}
+
 /** Resolve `--from` into a base URL, following the link file when asked. */
 function resolveSchemaSource(from: string, cwd: string): string {
-    if (from !== "link") return from;
+    if (from !== "link") {
+        // A bare hostname or a typo would otherwise be handed to `fetch` and fail
+        // with something unhelpful; a non-http scheme has no business here at all.
+        let parsed: URL;
+        try {
+            parsed = new URL(from);
+        } catch {
+            console.log(chalk.red(`  ✗ "${from}" is not a valid URL.`));
+            console.log(chalk.gray("    Pass a full URL, e.g. https://api.example.com, or \"link\"."));
+            process.exit(1);
+        }
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            console.log(chalk.red("  ✗ The project URL must be http or https."));
+            process.exit(1);
+        }
+        return from;
+    }
 
     const projectRoot = findProjectRoot(cwd) ?? cwd;
     const link = readLink(projectRoot);
@@ -287,10 +322,17 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
         console.log("");
         console.log(chalk.cyan("  → Fetching the project contract..."));
 
-        const remote = await fetchRemoteCollections(
-            baseUrl,
-            args.token || process.env.REBASE_SERVICE_KEY
-        );
+        const ambient = mayUseAmbientKey(baseUrl, cwd)
+            ? process.env.REBASE_SERVICE_KEY
+            : undefined;
+
+        if (!args.token && !ambient && process.env.REBASE_SERVICE_KEY) {
+            console.log(chalk.dim(
+                "  (not sending REBASE_SERVICE_KEY — this host is not the linked project; pass --token to override)"
+            ));
+        }
+
+        const remote = await fetchRemoteCollections(baseUrl, args.token || ambient);
         collections = remote.collections;
         remoteSchemaVersion = remote.schemaVersion;
     } else {

@@ -1,6 +1,26 @@
 import { loadEnv } from "../src/env";
 import { z } from "zod";
 
+/**
+ * Assert that a loopback URL is rejected, and that the error names the variable
+ * **without echoing its value**.
+ *
+ * These variables routinely carry credentials (`DATABASE_URL`, `SMTP_PASS`,
+ * OAuth secrets), and a failed production boot is written to wherever the
+ * container's stdout goes. Naming the variable is enough to fix the problem;
+ * printing the value hands the password to the log aggregator.
+ */
+function expectRedactedLoopbackError(load: () => unknown, variable: string, value: string): void {
+    expect(load).toThrow(new RegExp(`${variable}.*local/loopback host`));
+    let message = "";
+    try {
+        load();
+    } catch (err) {
+        message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).not.toContain(value);
+}
+
 describe("env configuration and localhost validation", () => {
     const originalEnv = { ...process.env };
 
@@ -42,7 +62,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrow(/postgresql:\/\/localhost:5432\/rebase/);
+        expectRedactedLoopbackError(() => loadEnv(), "DATABASE_URL", "postgresql://localhost:5432/rebase");
     });
 
     it("should fail validation in production if DATABASE_URL contains 127.0.0.1", () => {
@@ -51,7 +71,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrow(/postgresql:\/\/127\.0\.0\.1:5432\/rebase/);
+        expectRedactedLoopbackError(() => loadEnv(), "DATABASE_URL", "postgresql://127.0.0.1:5432/rebase");
     });
 
     it("should fail validation in production if DATABASE_URL contains an IPv6 loopback [::1]", () => {
@@ -60,7 +80,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrow(/postgresql:\/\/\[::1\]:5432\/rebase/);
+        expectRedactedLoopbackError(() => loadEnv(), "DATABASE_URL", "postgresql://[::1]:5432/rebase");
     });
 
     it("should fail validation in production if DATABASE_URL contains a loopback in the 127.x.x.x range", () => {
@@ -69,7 +89,7 @@ describe("env configuration and localhost validation", () => {
         process.env.JWT_SECRET = "12345678901234567890123456789012";
         process.env.FRONTEND_URL = "https://my-app.com";
 
-        expect(() => loadEnv()).toThrow(/postgresql:\/\/127\.0\.0\.2:5432\/rebase/);
+        expectRedactedLoopbackError(() => loadEnv(), "DATABASE_URL", "postgresql://127.0.0.2:5432/rebase");
     });
 
     it("should succeed validation in production with a non-localhost DATABASE_URL", () => {
@@ -121,7 +141,7 @@ describe("env configuration and localhost validation", () => {
             })
         };
 
-        expect(() => loadEnv(extension)).toThrow(/https:\/\/localhost:8080\/api/);
+        expectRedactedLoopbackError(() => loadEnv(extension), "EXTERNAL_SERVICE_URL", "https://localhost:8080/api");
     });
 
     it("should validate and block plain host string matching localhost", () => {

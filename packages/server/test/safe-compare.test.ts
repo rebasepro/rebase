@@ -1,26 +1,14 @@
 /**
- * Tests for the safeCompare function used in auth middleware.
+ * Tests for `safeCompare`, the constant-time comparison guarding the service
+ * key, API keys and the metrics token. A wrong answer here is an authentication
+ * bypass, not a cosmetic bug.
  *
- * Since safeCompare is not exported, we test it indirectly through
- * the createAuthMiddleware behavior with service keys. However, for
- * unit-level verification we replicate the logic here.
+ * This file used to define its own copy of the implementation and test that.
+ * A test of a copy passes no matter what the real function does — which is
+ * precisely how the multi-byte truncation below survived. It imports the real
+ * one now.
  */
-import { timingSafeEqual } from "crypto";
-
-// Replicate the safeCompare implementation to test in isolation
-function safeCompare(a: string, b: string): boolean {
-    const maxLen = Math.max(a.length, b.length);
-    const bufA = Buffer.alloc(maxLen);
-    const bufB = Buffer.alloc(maxLen);
-    bufA.write(a);
-    bufB.write(b);
-    try {
-        const isEqual = timingSafeEqual(bufA, bufB);
-        return isEqual && a.length === b.length;
-    } catch {
-        return false;
-    }
-}
+import { safeCompare } from "../src/auth/crypto-utils";
 
 describe("safeCompare", () => {
     it("should return true for identical strings", () => {
@@ -36,9 +24,11 @@ describe("safeCompare", () => {
     });
 
     it("should return false when one string is a prefix of the other", () => {
-        // This is the critical case: "abc" vs "abc\0\0\0" would match
-        // without the length check, since Buffer.alloc zero-fills
+        // Buffer.alloc zero-fills, so without a length check "abc" would match
+        // "abc\0\0\0".
         expect(safeCompare("abc", "abc\0\0\0")).toBe(false);
+        expect(safeCompare("abc", "abcdef")).toBe(false);
+        expect(safeCompare("abcdef", "abc")).toBe(false);
     });
 
     it("should return false for empty string vs non-empty", () => {
@@ -54,13 +44,28 @@ describe("safeCompare", () => {
         expect(safeCompare("café", "cafe")).toBe(false);
     });
 
+    it("compares the whole of a multi-byte secret", () => {
+        // Sizing the comparison buffer by character count while writing UTF-8
+        // truncated the tail: every character past the byte budget went
+        // unexamined, so a guess differing only in the final character compared
+        // equal. One non-ASCII character in a secret was enough.
+        const real = `é${"a".repeat(30)}X`;
+        const guess = `é${"a".repeat(30)}Q`;
+
+        expect(guess.length).toBe(real.length);
+        expect(safeCompare(guess, real)).toBe(false);
+        expect(safeCompare(real, real)).toBe(true);
+    });
+
+    it("handles characters outside the basic multilingual plane", () => {
+        expect(safeCompare("🔑secret", "🔑secret")).toBe(true);
+        expect(safeCompare("🔑secret", "🔑secreT")).toBe(false);
+    });
+
     it("should not leak length information via early return", () => {
-        // Both comparisons should take similar time (constant-time)
-        // We can't easily assert timing, but we verify they both
-        // go through the same code path
-        const result1 = safeCompare("a", "bb");
-        const result2 = safeCompare("aa", "bb");
-        expect(result1).toBe(false);
-        expect(result2).toBe(false);
+        // Both comparisons go through the same code path; the length check is
+        // folded in after the constant-time compare rather than short-circuiting.
+        expect(safeCompare("a", "bb")).toBe(false);
+        expect(safeCompare("aa", "bb")).toBe(false);
     });
 });

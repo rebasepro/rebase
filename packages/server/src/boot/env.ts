@@ -52,8 +52,6 @@ const bootEnvExtension = z.object({
      */
     REBASE_METRICS_TOKEN: z.string().optional(),
     LOG_LEVEL: z.enum(["error", "warn", "info", "debug", ""]).optional(),
-    /** Trust `X-Forwarded-*`. Set when behind a load balancer or ingress. */
-    REBASE_TRUST_PROXY: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
 
     // ── Storage access control ───────────────────────────────────────────────
     /** Serve stored objects to unauthenticated readers. */
@@ -78,7 +76,20 @@ const bootEnvExtension = z.object({
     // ── API surface ──────────────────────────────────────────────────────────
     REBASE_BASE_PATH: z.string().default("/api"),
     REBASE_ENABLE_SWAGGER: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
-    REBASE_MAX_BODY_SIZE: z.string().optional(),
+    /**
+     * Maximum request body size, in **bytes**.
+     *
+     * Validated as a number rather than coerced loosely: `Number("10MB")` is
+     * `NaN`, which is not nullish, so it would slip past the downstream default
+     * and then fail a `> 0` check — silently removing every body limit from the
+     * API. A boot failure naming the variable is the only safe reading of a
+     * value nobody can interpret.
+     */
+    REBASE_MAX_BODY_SIZE: z.coerce
+        .number({ message: "REBASE_MAX_BODY_SIZE must be a number of bytes (e.g. 10485760)" })
+        .int()
+        .nonnegative()
+        .optional(),
     REBASE_COMPRESSION: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
     REBASE_HISTORY: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
     /** Comma-separated origins allowed to make credentialed cross-origin calls. */

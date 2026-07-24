@@ -72,10 +72,22 @@ services:
       # REBASE_METRICS: "true"
       # REBASE_METRICS_TOKEN: ${REBASE_METRICS_TOKEN:-}
     volumes:
-      # Your built project. Read-only: the runtime never writes to its bundle,
-      # and mounting it read-only means a compromised hook cannot rewrite the
-      # code that will run on the next restart.
-      - ../dist-bundle:/bundle:ro
+      # Your built project.
+      #
+      # Writable, because the container installs the bundle's declared
+      # dependencies into it on first start — `rebase build` emits a
+      # `package.json` but not a `node_modules`. Mounting read-only is better
+      # (a compromised hook then cannot rewrite the code that runs after the
+      # next restart), and you can do it once the dependencies are already
+      # there:
+      #
+      #     npm install --omit=dev --prefix dist-bundle
+      #     # then change this line to: ../dist-bundle:/bundle:ro
+      #
+      # For a real deployment, prefer baking both into an image:
+      #     FROM rebasepro/server:0.11.0
+      #     COPY dist-bundle /bundle
+      - ../dist-bundle:/bundle
     ports:
       - "${PORT:-8080}:8080"
 

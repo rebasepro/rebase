@@ -5,10 +5,12 @@ import {
     BUNDLE_FORMAT_VERSION,
     RUNTIME_CONTRACT_VERSION,
     type CollectionConfig,
+    type CollectionCallbacks,
     type DataSourceDefinition,
     type RebaseBundleManifest,
     type StorageSourceDefinition
 } from "@rebasepro/types";
+import type { StorageAuthorize } from "../storage/types";
 import { logger } from "../utils/logger";
 
 /** Thrown when a bundle cannot be read, or claims a contract this runtime cannot honour. */
@@ -99,6 +101,30 @@ export function readBundleManifest(bundleDir: string): RebaseBundleManifest {
  * `functions/` is a perfectly ordinary project, and refusing to start over one
  * would be the runtime inventing a requirement the developer never stated.
  */
+/**
+ * Resolve a bundle-relative entry, refusing anything that escapes the bundle.
+ *
+ * Applied to the entries that are `import()`ed — the schema, the config index,
+ * the users collection — and not only to the ones that are merely scanned. Those
+ * three *execute code*, so they are precisely the ones a malformed or hostile
+ * manifest would target, and leaving them unchecked while guarding the read-only
+ * paths would be defending the wrong door.
+ */
+export function resolveBundlePath(
+    bundleDir: string,
+    entry: string,
+    label: string
+): string {
+    const resolved = path.resolve(bundleDir, entry);
+    const relative = path.relative(bundleDir, resolved);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+        throw new BundleError(
+            `Bundle entry "${label}" points outside the bundle: ${entry}`
+        );
+    }
+    return resolved;
+}
+
 export function loadBundle(bundleDir: string): LoadedBundle {
     const dir = path.resolve(bundleDir);
 
@@ -113,16 +139,10 @@ export function loadBundle(bundleDir: string): LoadedBundle {
 
     const resolveEntry = (entry: string | undefined, label: string): string | undefined => {
         if (!entry) return undefined;
-        const resolved = path.resolve(dir, entry);
-        // A manifest is a build artifact, not user input, but it is also a file
-        // on disk that a deploy pipeline moves around — keep it inside the bundle
-        // so a malformed one cannot make the runtime read arbitrary paths.
-        const relative = path.relative(dir, resolved);
-        if (relative.startsWith("..") || path.isAbsolute(relative)) {
-            throw new BundleError(
-                `Bundle entry "${label}" points outside the bundle: ${entry}`
-            );
-        }
+        // A manifest is a build artifact, but it is also a file a deploy
+        // pipeline moves around — keep every entry inside the bundle so a
+        // malformed one cannot point the runtime at arbitrary paths.
+        const resolved = resolveBundlePath(dir, entry, label);
         if (!fs.existsSync(resolved)) {
             logger.warn(`Bundle declares ${label} at "${entry}", but that path does not exist — skipping.`);
             return undefined;
@@ -170,7 +190,7 @@ export async function loadBundleSchema(bundle: LoadedBundle): Promise<BundleSche
     const entry = bundle.manifest.entry?.schema;
     if (!entry) return undefined;
 
-    const schemaPath = path.resolve(bundle.dir, entry);
+    const schemaPath = resolveBundlePath(bundle.dir, entry, "schema");
     if (!fs.existsSync(schemaPath)) {
         logger.warn(`Bundle declares a schema at "${entry}", but that file does not exist — continuing without it.`);
         return undefined;
@@ -267,6 +287,20 @@ createdAt: new Date().toISOString() }
 export interface BundleConfigExports {
     dataSources?: DataSourceDefinition[];
     storageSources?: StorageSourceDefinition[];
+    /**
+     * Per-object storage access control.
+     *
+     * A function, so it can only come from the project's own code — there is no
+     * environment variable that could express "this user may read this key".
+     * Without a way to supply it, a production deployment with a bucket would be
+     * forced to choose between `STORAGE_PUBLIC_READ` (world-readable) and
+     * `STORAGE_ALLOW_ANY_AUTHENTICATED` (every signed-in user can read, overwrite
+     * and delete every other user's files) — the runtime would be making an
+     * insecure choice on the developer's behalf.
+     */
+    storageAuthorize?: StorageAuthorize;
+    /** Lifecycle callbacks applied to every collection. */
+    callbacks?: CollectionCallbacks;
 }
 
 /**
@@ -282,9 +316,13 @@ export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<Bun
     const configEntry = bundle.manifest.entry?.config;
     if (!configEntry) return {};
 
-    const configDir = path.resolve(bundle.dir, configEntry);
-    const indexPath = path.join(configDir, "index.js");
-    if (!fs.existsSync(indexPath)) return {};
+    const configDir = resolveBundlePath(bundle.dir, configEntry, "config");
+    // `.ts` for a source boot (`rebase dev` runs under tsx, which imports
+    // TypeScript directly); `.js` for a built bundle.
+    const indexPath = [".js", ".ts"]
+        .map(ext => path.join(configDir, `index${ext}`))
+        .find(candidate => fs.existsSync(candidate));
+    if (!indexPath) return {};
 
     let mod: Record<string, unknown>;
     try {
@@ -308,9 +346,25 @@ export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<Bun
         return value as T[];
     };
 
+    const readFunction = <T>(name: string): T | undefined => {
+        const value = mod[name];
+        if (value === undefined) return undefined;
+        if (typeof value !== "function") {
+            logger.warn(`Config exports "${name}" but it is not a function — ignoring.`);
+            return undefined;
+        }
+        return value as T;
+    };
+
+    const callbacks = mod.callbacks;
+
     return {
         dataSources: readArray<DataSourceDefinition>("dataSources"),
-        storageSources: readArray<StorageSourceDefinition>("storageSources")
+        storageSources: readArray<StorageSourceDefinition>("storageSources"),
+        storageAuthorize: readFunction<StorageAuthorize>("storageAuthorize"),
+        callbacks: callbacks && typeof callbacks === "object"
+            ? callbacks as CollectionCallbacks
+            : undefined
     };
 }
 
@@ -324,22 +378,22 @@ export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<Bun
  */
 export async function loadUsersCollection(bundle: LoadedBundle): Promise<CollectionConfig | undefined> {
     const entry = bundle.manifest.entry;
-    const configDir = entry?.config ? path.resolve(bundle.dir, entry.config) : undefined;
+    const configDir = entry?.config
+        ? resolveBundlePath(bundle.dir, entry.config, "config")
+        : undefined;
 
     const candidates: string[] = [];
     if (entry?.usersCollection) {
-        const declared = path.resolve(bundle.dir, entry.usersCollection);
-        candidates.push(declared, `${declared}.js`);
+        const declared = resolveBundlePath(bundle.dir, entry.usersCollection, "usersCollection");
+        candidates.push(declared, `${declared}.js`, `${declared}.ts`);
     }
-    if (configDir) {
-        candidates.push(path.join(configDir, "collections", "users.js"));
-    }
-    if (bundle.collectionsDir) {
-        candidates.push(path.join(bundle.collectionsDir, "users.js"));
+    for (const dir of [configDir && path.join(configDir, "collections"), bundle.collectionsDir]) {
+        if (!dir) continue;
+        candidates.push(path.join(dir, "users.js"), path.join(dir, "users.ts"));
     }
 
     for (const candidate of candidates) {
-        if (!candidate.endsWith(".js") || !fs.existsSync(candidate)) continue;
+        if (!/\.(js|ts)$/.test(candidate) || !fs.existsSync(candidate)) continue;
         try {
             const mod = await import(pathToFileURL(candidate).href) as { default?: CollectionConfig };
             if (mod.default) return mod.default;
