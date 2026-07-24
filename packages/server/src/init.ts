@@ -1091,6 +1091,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         }
     }
 
+    // Filled in once the native data plane exists (below). The storage
+    // authorize hook needs trusted reads to answer "who owns this object?", and
+    // it cannot import the server itself — it is declared in the project's
+    // config package, which depends on `@rebasepro/types` alone.
+    const storageAuthorizeData: { current?: import("@rebasepro/types").StorageAuthorizeData } = {};
+
     if (storageController) {
         // Storage uploads get their own body limit, derived from the storage config's
         // maxFileSize (default 50MB), which overrides the global API body limit.
@@ -1121,7 +1127,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             requireAuth: resolveRequireAuth(config.auth),
             publicRead: config.storagePublicRead === true,
             authAdapter,
-            authorize: config.storageAuthorize
+            authorize: config.storageAuthorize,
+            // Resolved lazily: the admin data plane is built further down, well
+            // after these routes are mounted, but always before a request runs.
+            authorizeData: () => storageAuthorizeData.current
         });
 
         // Wrapper router: middleware must be registered BEFORE the routes it
@@ -1296,6 +1305,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     const scopedDefaultDriver = await scopeDataDriver(defaultDriver, serviceIdentity);
     const defaultData = buildSdkData(scopedDefaultDriver);
+
+    // Hand the storage authorize hook its trusted reader. Scoped as the service
+    // identity, so an ownership lookup is not itself filtered by the caller's
+    // permissions — the hook IS the permission decision.
+    storageAuthorizeData.current = defaultData as unknown as import("@rebasepro/types").StorageAuthorizeData;
 
     // Multi-engine: scope and wrap each non-default delegate so
     // rebase.data on a non-default-engine collection reaches the correct driver.

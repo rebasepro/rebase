@@ -85,6 +85,7 @@ export type {
     StorageOperation,
     StorageAuthorizeUser,
     StorageAuthorizeContext,
+    StorageAuthorizeData,
     StorageAuthorize
 } from "@rebasepro/types";
 

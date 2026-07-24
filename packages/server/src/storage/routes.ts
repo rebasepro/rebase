@@ -10,7 +10,7 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
-import { StorageController, type StorageAuthorize, type StorageOperation } from "./types";
+import { StorageController, type StorageAuthorize, type StorageAuthorizeData, type StorageOperation } from "./types";
 import { LocalStorageController } from "./LocalStorageController";
 import type { StorageRegistry } from "./storage-registry";
 import { DEFAULT_STORAGE_SOURCE_KEY, isPublicStoragePath, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
@@ -65,6 +65,14 @@ export interface StorageRoutesConfig {
      * Omitted, storage behaves as before: authenticated means allowed.
      */
     authorize?: StorageAuthorize;
+    /**
+     * Trusted data access handed to {@link authorize} on every call.
+     *
+     * A function rather than a value because the admin data plane is built after
+     * the storage routes are mounted; by the time a request runs it is always
+     * resolved.
+     */
+    authorizeData?: () => StorageAuthorizeData | undefined;
 }
 
 /**
@@ -168,7 +176,7 @@ function buildAdapterAuthMiddleware(
 export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
-    const { controller, registry, sources: declaredSources, requireAuth = true, publicRead = false, authAdapter, authorize } = config;
+    const { controller, registry, sources: declaredSources, requireAuth = true, publicRead = false, authAdapter, authorize, authorizeData } = config;
 
     /**
      * Run the per-object authorization hook, if one is configured.
@@ -201,7 +209,14 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
 
         let allowed: boolean;
         try {
-            allowed = await authorize({ key, bucket, operation, user, storageId: storageId ?? undefined });
+            allowed = await authorize({
+                key,
+                bucket,
+                operation,
+                user,
+                storageId: storageId ?? undefined,
+                data: authorizeData?.()
+            });
         } catch {
             allowed = false;
         }

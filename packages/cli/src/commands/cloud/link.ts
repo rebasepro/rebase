@@ -128,7 +128,7 @@ permissive: true });
 
             const { picked } = await inquirer.prompt([
                 {
-                    type: "list",
+                    type: "select",
                     name: "picked",
                     message: "Select a project to link:",
                     choices: projects.map((p) => ({
@@ -191,7 +191,7 @@ export async function selectOrgCommand(rawArgs: string[]): Promise<void> {
         if (!chosen && !target) {
             const { picked } = await inquirer.prompt([
                 {
-                    type: "list",
+                    type: "select",
                     name: "picked",
                     message: "Select the active organization:",
                     choices: orgs.map((o) => ({

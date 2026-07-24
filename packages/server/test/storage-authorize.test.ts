@@ -31,13 +31,17 @@ describe("storage per-object authorization", () => {
         return ctx.key.split("/")[0] === "alice";
     };
 
-    async function mount(authorize?: (ctx: StorageAuthorizeContext) => Promise<boolean>) {
+    async function mount(
+        authorize?: (ctx: StorageAuthorizeContext) => Promise<boolean>,
+        authorizeData?: () => unknown
+    ) {
         app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.route("/api/storage", createStorageRoutes({
             controller,
             requireAuth: false,
-            authorize
+            authorize,
+            authorizeData: authorizeData as never
         }));
     }
 
@@ -270,6 +274,56 @@ describe("storage per-object authorization", () => {
             const res = await app.fetch(new Request("http://localhost/api/storage/file/bob/notes.txt"));
 
             expect(res.status).toBe(200);
+        });
+    });
+
+    describe("the hook can look up ownership", () => {
+        /**
+         * Prefix arithmetic on the key is not an access-control model — ownership
+         * lives in a row. And the hook cannot fetch that row itself: a project
+         * declares it from its config package, which depends on
+         * `@rebasepro/types` alone and cannot resolve `@rebasepro/server` at
+         * runtime. So the trusted reader is handed in, and this pins that it
+         * arrives and works.
+         */
+        it("hands the hook a trusted reader it can query", async () => {
+            const seen: unknown[] = [];
+            // A membership table, as a real project would consult.
+            const members = [{ teamId: "t1", userId: "alice" }];
+            const data = {
+                collection: () => ({
+                    find: async (q?: Record<string, unknown>) => {
+                        seen.push(q);
+                        return { data: members as Record<string, unknown>[] };
+                    },
+                    findById: async () => null
+                })
+            };
+
+            let received: unknown;
+            await mount(async ctx => {
+                received = ctx.data;
+                const rows = await ctx.data!.collection("team_members").find({ where: { userId: ["==", "alice"] } });
+                return rows.data.length > 0;
+            }, () => data);
+
+            const res = await app.request("/api/storage/file/alice/notes.txt");
+            expect(res.status).toBe(200);
+            expect(received).toBeDefined();
+            expect(seen.length).toBe(1);
+        });
+
+        it("leaves `data` undefined when the host supplies none", async () => {
+            // Backwards compatible: an older embedder that never passes a reader
+            // still gets a working hook, it simply cannot do lookups.
+            let received: unknown = "unset";
+            await mount(async ctx => {
+                received = ctx.data;
+                return true;
+            });
+
+            await app.request("/api/storage/file/alice/notes.txt");
+            expect(received).toBeUndefined();
         });
     });
 });

@@ -115,7 +115,7 @@ permissive: true }
     if (!type) {
         const { picked } = await inquirer.prompt([
             {
-                type: "list",
+                type: "select",
                 name: "picked",
                 message: "Database type:",
                 choices: [
