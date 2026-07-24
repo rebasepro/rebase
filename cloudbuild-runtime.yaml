@@ -1,0 +1,46 @@
+# Build and push the platform runtime image — `rebasepro/server`.
+#
+# This is the image every managed tenant runs and every self-hoster can run: the
+# server package plus an entrypoint that boots a project bundle. It is the
+# artifact the whole managed tier is defined against, which is why the build for
+# it belongs in the repository rather than in someone's shell history.
+#
+# It was previously an untracked file with the tag hardcoded, and the tag was
+# re-pushed at least once. That is the worst property an image can have here: the
+# control plane resolves releases by name, so re-pushing a tag silently changes
+# what the fleet is running with no version anywhere changing. Two things fix it:
+#
+#   1. `_TAG` is required and should identify the COMMIT, not a marketing
+#      version — `0.10.0-a1b2c3d`. Two builds of different source can then never
+#      collide on one name.
+#   2. Register the release by DIGEST (`runtime_releases.image_digest`), which
+#      the deploy path prefers over the tag. Then even a re-pushed tag cannot
+#      move a running fleet.
+#
+# Usage:
+#   gcloud builds submit --config cloudbuild-runtime.yaml \
+#     --substitutions=_TAG="0.10.0-$(git rev-parse --short HEAD)" .
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    env: ['DOCKER_BUILDKIT=1']
+    args:
+      - 'build'
+      - '-t'
+      - '$_REPO:$_TAG'
+      - '--build-arg=BUILDKIT_INLINE_CACHE=1'
+      - '-f'
+      - 'docker/server.Dockerfile'
+      - '.'
+
+images:
+  - '$_REPO:$_TAG'
+
+substitutions:
+  _REPO: 'europe-west1-docker.pkg.dev/rebase-578f2/rebase-saas-images/rebasepro/server'
+  # No default: a build that does not say what it is producing should fail rather
+  # than quietly overwrite whatever the last one produced.
+  _TAG: ''
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+timeout: '1800s'
