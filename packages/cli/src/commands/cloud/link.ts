@@ -31,10 +31,78 @@ interface ProjectRow {
     status?: string;
 }
 
+/**
+ * Link this checkout straight at a running backend.
+ *
+ * No control plane, no authentication, no project id — just the URL of a Rebase
+ * API. This is what makes the multi-repo workflow available to self-hosters: a
+ * frontend repository links to `https://api.example.com` and then generates its
+ * typed SDK from that project exactly as a cloud-linked repository would.
+ *
+ * The URL is verified before it is written. Recording an unreachable address and
+ * failing later, in a different command, would be a worse experience than
+ * failing here where the user can see what they typed.
+ */
+async function linkDirect(target: string, rawArgs: string[]): Promise<void> {
+    let base: URL;
+    try {
+        base = new URL(target);
+    } catch {
+        fail(`"${target}" is not a valid URL.`);
+        return;
+    }
+
+    if (base.protocol !== "http:" && base.protocol !== "https:") {
+        fail("A project URL must be http or https.");
+    }
+
+    const apiUrl = base.toString().replace(/\/+$/, "");
+    const probe = `${apiUrl}/api/meta/schema-version`;
+
+    let reachable = false;
+    let detail = "";
+    try {
+        const response = await fetch(probe, { headers: { accept: "application/json" } });
+        reachable = response.ok;
+        if (!response.ok) detail = `responded ${response.status}`;
+    } catch (err) {
+        detail = err instanceof Error ? err.message : String(err);
+    }
+
+    if (!reachable) {
+        console.log(chalk.yellow(`⚠ Could not reach ${probe}${detail ? ` (${detail})` : ""}.`));
+        console.log(chalk.dim("  Linking anyway — the server may not be running yet."));
+        console.log(chalk.dim("  It must be a Rebase backend of version 0.11 or newer."));
+    }
+
+    writeLink({
+        url: apiUrl,
+        projectId: "",
+        apiUrl,
+        mode: "direct",
+        projectName: base.host
+    });
+
+    success(`Linked to ${apiUrl}`);
+    console.log(chalk.dim(`  Written to ${projectLinkPath()}`));
+    console.log("");
+    console.log(`Next: ${chalk.cyan("rebase generate-sdk --from link")}`);
+    void rawArgs;
+}
+
 export async function linkCommand(rawArgs: string[]): Promise<void> {
     const args = arg({ "--project": String,
 "-p": "--project" }, { argv: rawArgs.slice(3),
 permissive: true });
+
+    // A positional URL means "this exact backend", which needs no login and no
+    // control plane. `rebase link https://api.example.com`
+    const positional = args._.find(value => /^https?:\/\//i.test(value));
+    if (positional) {
+        await linkDirect(positional, rawArgs);
+        return;
+    }
+
     const { client, url } = await requireClient(rawArgs);
 
     try {

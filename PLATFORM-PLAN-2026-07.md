@@ -1,5 +1,24 @@
 # Platform Rethink — Implementation Plan (2026-07)
 
+> **Status (2026-07-24).** Phases 1 and 2 are implemented on
+> `feat/platform-runtime-bundle`: the three contracts, multi-source configuration,
+> the contract endpoint and remote SDK generation, `/metrics`, the official image
+> and compose quickstart, and the app-aware CLI. Verified against the demo app end
+> to end — build, boot, and a typed client generated over HTTP from a separate
+> directory that is byte-identical to the locally generated one. Phases 3–6 (the
+> cloud control plane, release channels, shared Postgres, the apps registry and
+> hosting, the console) remain, and all of them consume rather than change the
+> contracts below.
+>
+> Two deliberate deviations from this plan, both found while building:
+> - The project link reuses the existing `.rebase/cloud.json` instead of adding a
+>   competing `.rebase/project.json`. A second link file would fork every command
+>   that reads one, and the tooling would drift into being cloud-only by accident.
+> - `schemaVersion` hashes a *projection* of each collection (slug, properties,
+>   relations) rather than the whole thing. Hashing everything meant a hook edit
+>   invalidated every SDK — and worse, the runtime applies default security rules
+>   at load time, so a build-time stamp could never match the server serving it.
+
 **Goal:** evolve rebase from "monorepo template you build and we (or you) run as a monolith container" into a
 Firebase/Supabase-class platform: a **platform-versioned runtime** that loads a **validated project bundle**,
 a **project = backend + N registered apps** model that works across repos, an **autopilot managed tier**

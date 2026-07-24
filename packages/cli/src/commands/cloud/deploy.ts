@@ -23,6 +23,10 @@ import {
     type CloudClient
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
+import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody } from "./bundle-deploy";
+import { buildBundle } from "../../bundle";
+import { loadManifest, findBackendApp } from "../../manifest";
+import { requireProjectRoot } from "../../utils/project";
 
 interface Deployment {
     id: string | number;
@@ -157,17 +161,136 @@ async function uploadSource(url: string, token: string, projectId: string, tarPa
     return data.source;
 }
 
+/**
+ * Build, upload and deploy a project as a managed bundle.
+ *
+ * Builds the backend app into `dist-bundle` (unless one is pointed at with
+ * `--bundle-dir`), packs it without `node_modules`, uploads it, and triggers a
+ * deploy carrying the manifest so the control plane can validate intake fast.
+ */
+async function deployBundle(opts: {
+    client: CloudClient;
+    url: string;
+    projectId: string;
+    projectRef: string;
+    bundleDir?: string;
+    message?: string;
+}): Promise<void> {
+    const { client, url, projectId, projectRef } = opts;
+    const projectRoot = requireProjectRoot();
+
+    let bundleDir = opts.bundleDir
+        ? path.resolve(process.cwd(), opts.bundleDir)
+        : path.join(projectRoot, "dist-bundle");
+
+    // Build the bundle unless the caller pointed at a prebuilt one.
+    if (!opts.bundleDir) {
+        const loaded = loadManifest(projectRoot);
+        const backend = findBackendApp(loaded.manifest);
+        if (!backend) {
+            fail(
+                "This repository declares no backend app to deploy as a bundle.",
+                "A managed deploy runs the backend; declare one in rebase.json, or deploy from the backend's repository."
+            );
+        }
+        console.log(chalk.gray("  Building bundle..."));
+        const result = await buildBundle({
+            projectRoot,
+            appName: backend!.name,
+            app: backend!.app,
+            runtimeRange: loaded.manifest.runtime,
+            log: (m: string) => console.log(chalk.gray(m))
+        });
+        bundleDir = result.outDir;
+    }
+
+    const manifest = readBundleManifest(bundleDir);
+
+    // Native modules cannot run on the managed runtime — the server rejects them
+    // at intake anyway, but catching it here saves a pointless upload of a bundle
+    // that cannot be deployed. Checked against the manifest, so it covers a
+    // prebuilt `--bundle-dir` bundle just as much as one we just built.
+    if (manifest.hooks?.native) {
+        const names = (manifest.hooks.nativeModules ?? []).map(m => m.name).join(", ");
+        fail(
+            `This bundle depends on native modules${names ? ` (${names})` : ""}, which the managed runtime cannot run.`,
+            "Remove the native dependency, or deploy on the custom runtime."
+        );
+    }
+
+    // Pack + upload.
+    const tarPath = path.join(os.tmpdir(), `rebase-bundle-${Date.now()}.tar.gz`);
+    const token = client.auth.getSession()?.accessToken;
+    if (!token) fail("Not authenticated.", "Run `rebase cloud login`.");
+
+    let bundleId: string;
+    try {
+        await packBundle(bundleDir, tarPath);
+        const sizeMb = (fs.statSync(tarPath).size / 1024 / 1024).toFixed(1);
+        console.log(chalk.gray(`  Uploading bundle (${sizeMb} MB)...`));
+        bundleId = await uploadBundle(url, token!, projectId, tarPath);
+    } catch (e) {
+        fail(e instanceof Error ? e.message : String(e));
+        return;
+    } finally {
+        fs.rmSync(tarPath, { force: true });
+    }
+
+    console.log("");
+    console.log(`  🚀 Triggering managed deployment for ${chalk.bold(projectRef)} (schema ${manifest.schemaVersion})...`);
+
+    const body = bundleDeployBody({ projectId, bundleId, manifest, message: opts.message });
+
+    try {
+        const res = await client.functions.invoke<{
+            success: boolean;
+            deployment: { id: string | number };
+            managed?: boolean;
+        }>("deploy", body);
+        if (!res?.deployment?.id) fail("Control plane did not return a deployment id.");
+        if (isJsonMode()) {
+            printJson({ success: true, deploymentId: String(res.deployment.id), managed: res.managed === true });
+        } else {
+            console.log(chalk.green(`  ✓ Managed deploy started (deployment ${res.deployment.id}).`));
+            console.log(chalk.gray("    Track it with `rebase cloud logs` or in the console."));
+        }
+    } catch (e) {
+        reportError(e, "Managed deploy failed to start");
+    }
+}
+
 export async function deployCommand(rawArgs: string[], projectRef: string): Promise<void> {
     const args = arg(
         { "--no-follow": Boolean,
 "--source": String,
 "--message": String,
+"--bundle": Boolean,
+"--bundle-dir": String,
 "-m": "--message" },
         { argv: rawArgs.slice(2),
 permissive: true }
     );
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
+
+    // Managed bundle deploy: `deploy --bundle`. Builds the project into a bundle,
+    // uploads it, and lets the control plane run the platform runtime with it —
+    // the managed path. Mutually exclusive with `--source` (one is a source
+    // build, the other is not).
+    if (args["--bundle"]) {
+        if (args["--source"]) {
+            fail("--bundle and --source cannot be combined: one is a managed bundle, the other a source build.");
+        }
+        await deployBundle({
+            client,
+            url,
+            projectId,
+            projectRef,
+            bundleDir: args["--bundle-dir"],
+            message: args["--message"]
+        });
+        return;
+    }
 
     // Optional fly-style local source upload: `deploy --source .`
     let source: string | undefined;

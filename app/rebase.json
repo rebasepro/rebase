@@ -1,0 +1,24 @@
+{
+    "$schema": "https://rebase.pro/schemas/rebase.json",
+    "runtime": "^1",
+    "apps": {
+        "backend": {
+            "type": "backend",
+            "config": "config",
+            "functions": "backend/functions",
+            "crons": "backend/crons",
+            "schema": "backend/src/schema.generated.ts"
+        },
+        "web": {
+            "type": "static",
+            "root": "frontend",
+            "build": "pnpm --filter ./frontend build",
+            "output": "frontend/dist",
+            "spa": true
+        },
+        "admin": {
+            "type": "admin",
+            "mode": "hosted"
+        }
+    }
+}

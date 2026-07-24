@@ -198,3 +198,48 @@ export { serveSPA } from "./serve-spa";
 export { installShutdownHandlers } from "./init/shutdown";
 export type { ShutdownHandlerOptions } from "./init/shutdown";
 
+// =============================================================================
+// Bundle runtime
+//
+// The entrypoint the official `rebasepro/server` image runs, and the same one a
+// self-hosted deployment uses. `bootFromBundle` subsumes what every project
+// used to hand-write in `backend/src/index.ts`.
+// =============================================================================
+export { bootFromBundle, runFromBundle } from "./boot/boot";
+export type { BootedRuntime, BootOptions } from "./boot/boot";
+export {
+    BundleError,
+    loadBundle,
+    readBundleManifest,
+    loadBundleConfigExports,
+    createSourceBundle,
+    loadBundleSchema,
+    loadUsersCollection
+} from "./boot/bundle";
+export type { LoadedBundle, BundleConfigExports } from "./boot/bundle";
+export { loadBootEnv, resolveCorsOrigin, isLocalhostOrigin } from "./boot/env";
+export type { RebaseBootEnv, CorsOriginResolver } from "./boot/env";
+export { resolveAuthOptions, resolveEmailOptions } from "./boot/options";
+export {
+    envSuffixForKey,
+    resolveDataSources,
+    resolveStorageSources,
+    resolveStorageBackend
+} from "./boot/sources";
+export type { ResolvedDataSourceConfig, EnvBag } from "./boot/sources";
+export { initializeDataSource, initializeDataSources } from "./boot/driver";
+export type { InitializedDataSource, DatabaseConnection, BundleSchema } from "./boot/driver";
+
+// =============================================================================
+// Metrics + project contract
+// =============================================================================
+export {
+    MetricsRegistry,
+    createMetricsMiddleware,
+    createMetricsRoutes,
+    classifySurface
+} from "./metrics";
+export type { MetricSurface, MetricsHandle } from "./metrics";
+export { createContractRoutes } from "./api/contract-routes";
+export type { ContractRoutesConfig } from "./api/contract-routes";
+

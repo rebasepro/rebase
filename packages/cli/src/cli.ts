@@ -12,6 +12,7 @@ import { doctorCommand } from "./commands/doctor";
 import { skillsCommand } from "./commands/skills";
 import { apiKeysCommand } from "./commands/api-keys";
 import { cloudCommand } from "./commands/cloud";
+import { appsCommand } from "./commands/apps";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -55,7 +56,7 @@ export async function entry(args: string[]) {
     const subcommand = parsedArgs._[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud"];
+    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "generate-sdk"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;
@@ -74,8 +75,12 @@ export async function entry(args: string[]) {
                 {
                     "--collections-dir": String,
                     "--output": String,
+                    "--from": String,
+                    "--token": String,
+                    "--help": Boolean,
                     "-c": "--collections-dir",
-                    "-o": "--output"
+                    "-o": "--output",
+                    "-h": "--help"
                 },
                 {
                     argv: args.slice(3),
@@ -85,6 +90,9 @@ export async function entry(args: string[]) {
             await generateSdkCommand({
                 collectionsDir: sdkArgs["--collections-dir"] || "./config/collections",
                 output: sdkArgs["--output"] || "./generated/sdk",
+                from: sdkArgs["--from"],
+                token: sdkArgs["--token"],
+                help: sdkArgs["--help"],
                 cwd: process.cwd()
             });
             break;
@@ -103,11 +111,15 @@ export async function entry(args: string[]) {
             break;
 
         case "build":
-            await buildCommand();
+            await buildCommand(args);
             break;
 
         case "start":
-            await startCommand();
+            await startCommand(args);
+            break;
+
+        case "apps":
+            await appsCommand(effectiveSubcommand, args);
             break;
 
         case "auth":

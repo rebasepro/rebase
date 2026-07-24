@@ -444,6 +444,28 @@ export interface RebaseBackendConfig {
      * ```
      */
     callbacks?: CollectionCallbacks;
+
+    /**
+     * Declare that this application installs its own CORS middleware.
+     *
+     * Suppresses the "no CORS configuration detected" warning, which exists for
+     * hand-wired backends that genuinely have no origin policy.
+     */
+    corsHandled?: boolean;
+
+    /**
+     * The schema version this deployment serves, as recorded when it was built.
+     *
+     * Published by the contract endpoint so a client generated elsewhere can
+     * tell whether it is current. Leave unset and the runtime computes one from
+     * the live collections — correct, but it means the value moves whenever the
+     * collections do, which is exactly right for `baas` mode and slightly less
+     * useful for a built bundle that already knows its own answer.
+     */
+    schemaVersion?: string;
+
+    /** Runtime version reported by the contract endpoint. Informational. */
+    runtimeVersion?: string;
 }
 
 /**
@@ -1508,6 +1530,63 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         logsRouter.route("/", logsRoutes);
         config.app.route(`${basePath}/logs`, logsRouter);
         logger.info("Logs routes mounted", { path: `${basePath}/logs` });
+    }
+
+    // 6d. Mount the project contract — what lets a repository that does *not*
+    // contain the collections still generate a typed client against them. This
+    // is the backbone of frontends, second web apps and mobile apps living in
+    // their own repositories.
+    //
+    // Mounted here rather than by the bundle runtime so a project with a
+    // hand-written entrypoint gets it too: ejecting should cost you the stock
+    // runtime, not the API surface.
+    {
+        const { createContractRoutes } = await import("./api/contract-routes");
+        const contractRouter = new Hono<HonoEnv>();
+
+        // Only `/contract` is gated: it is a full map of the schema, including
+        // tables no security rule would ever expose. Its sibling
+        // `/schema-version` returns a bare version string that stands for the
+        // schema without describing it, and is deliberately reachable by a CI
+        // job holding no credentials.
+        //
+        // With no way to gate it, `/contract` is not served at all. The other
+        // admin surfaces mount ungated-with-a-warning because each is behind its
+        // own opt-in, so someone chose to enable it; this one appears on every
+        // deployment that upgrades. Serving the entire schema to anonymous
+        // callers is not a reasonable thing to switch on for people by default,
+        // and a 404 is recoverable — configure auth and it returns.
+        if (adminSurfacesGated) {
+            if (apiKeyPreAuth) contractRouter.use("/contract", apiKeyPreAuth);
+            contractRouter.use(
+                "/contract",
+                createRequireAuth({ serviceKey: internalServiceKey }),
+                requireAdmin
+            );
+        } else {
+            contractRouter.all("/contract", (c) => c.json({
+                error: {
+                    code: "CONTRACT_UNAVAILABLE",
+                    message: "The project contract is only served when authentication is configured, " +
+                        "because it describes every table and relation in the project."
+                }
+            }, 404));
+            logger.warn(
+                "Contract endpoint disabled: no auth is configured (no adapter, requireAuth: false, " +
+                "or no jwtSecret), and it would otherwise expose the full collection schema to anyone. " +
+                "`/api/meta/schema-version` is still served."
+            );
+        }
+
+        contractRouter.route("/", createContractRoutes({
+            collectionRegistry,
+            schemaVersion: config.schemaVersion,
+            mode,
+            runtimeVersion: config.runtimeVersion
+        }));
+
+        config.app.route(`${basePath}/meta`, contractRouter);
+        logger.info("Contract routes mounted", { path: `${basePath}/meta` });
     }
 
     // With multiple realtime-capable engines, route subscriptions to the

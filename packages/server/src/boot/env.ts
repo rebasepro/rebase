@@ -1,0 +1,196 @@
+import { z } from "zod";
+import { loadEnv, type RebaseEnv } from "../env";
+import { BundleError } from "./bundle";
+
+/**
+ * The environment a bundle-booted runtime understands.
+ *
+ * This extends the base {@link loadEnv} schema with the variables an application
+ * used to declare for itself in its own `env.ts`. They live here now because the
+ * runtime, not the application, is what reads them: a project ships a bundle and
+ * a set of environment variables, and everything either side needs to agree on
+ * has to be part of the contract rather than a convention each project reinvents.
+ */
+const bootEnvExtension = z.object({
+    // ── Email ────────────────────────────────────────────────────────────────
+    SMTP_HOST: z.string().optional(),
+    SMTP_PORT: z.string().default("587").transform(Number),
+    SMTP_SECURE: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASS: z.string().optional(),
+    SMTP_FROM: z.string().optional(),
+    SMTP_NAME: z.string().optional(),
+    APP_NAME: z.string().default("Rebase"),
+
+    // ── Runtime behaviour ────────────────────────────────────────────────────
+    /**
+     * Serve the bundle's static/admin assets from this process.
+     *
+     * Default on, because a self-hosted single-container deployment is the case
+     * that needs it and the assets are simply absent when there is nothing to
+     * serve. A platform putting a CDN in front turns it off.
+     */
+    REBASE_SERVE_STATIC: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
+    /**
+     * What the runtime may do to the database schema at boot.
+     *
+     * - `none` (default in production) — touch nothing. Schema changes are a
+     *   deliberate, reviewable step, not a side effect of a restart.
+     * - `ensure` — create the auth/system tables if missing, never touch
+     *   collection tables. The default outside production.
+     * - `push` — reconcile collection tables with the bundle's schema. Convenient
+     *   for a local compose stack; in production it means a container restart can
+     *   rewrite the schema, so it must be asked for explicitly.
+     */
+    REBASE_MIGRATE_ON_BOOT: z.enum(["none", "ensure", "push", ""]).optional(),
+    /** Expose Prometheus metrics at `/metrics`. Off unless asked for. */
+    REBASE_METRICS: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /**
+     * Bearer token guarding `/metrics`. When unset the endpoint is open to
+     * anyone who can reach the port, which is fine on a private network and not
+     * fine on a public one — hence the boot-time warning rather than a silent
+     * default.
+     */
+    REBASE_METRICS_TOKEN: z.string().optional(),
+    LOG_LEVEL: z.enum(["error", "warn", "info", "debug", ""]).optional(),
+
+    // ── Storage access control ───────────────────────────────────────────────
+    /** Serve stored objects to unauthenticated readers. */
+    STORAGE_PUBLIC_READ: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /**
+     * Opt out of the storage access-control boot guard, restoring the behaviour
+     * where any authenticated user may read, overwrite, delete or list any key.
+     * Only defensible when every signed-in user is trusted with every file.
+     */
+    STORAGE_ALLOW_ANY_AUTHENTICATED: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+
+    // ── Auth ─────────────────────────────────────────────────────────────────
+    AUTH_REQUIRE: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
+    AUTH_ALLOW_USER_LOOKUP: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    AUTH_COOKIE_SAME_SITE: z.enum(["Strict", "Lax", "None", ""]).optional(),
+    AUTH_DEFAULT_ROLE: z.string().optional(),
+    GITHUB_CLIENT_ID: z.string().optional(),
+    GITHUB_CLIENT_SECRET: z.string().optional(),
+    MICROSOFT_CLIENT_ID: z.string().optional(),
+    MICROSOFT_CLIENT_SECRET: z.string().optional(),
+
+    // ── API surface ──────────────────────────────────────────────────────────
+    REBASE_BASE_PATH: z.string().default("/api"),
+    REBASE_ENABLE_SWAGGER: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /**
+     * Maximum request body size, in **bytes**.
+     *
+     * Validated as a number rather than coerced loosely: `Number("10MB")` is
+     * `NaN`, which is not nullish, so it would slip past the downstream default
+     * and then fail a `> 0` check — silently removing every body limit from the
+     * API. A boot failure naming the variable is the only safe reading of a
+     * value nobody can interpret.
+     */
+    REBASE_MAX_BODY_SIZE: z.coerce
+        .number({ message: "REBASE_MAX_BODY_SIZE must be a number of bytes (e.g. 10485760)" })
+        .int()
+        .nonnegative()
+        .optional(),
+    REBASE_COMPRESSION: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
+    REBASE_HISTORY: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
+    /** Comma-separated origins allowed to make credentialed cross-origin calls. */
+    CORS_ORIGINS: z.string().optional()
+});
+
+export type RebaseBootEnv = RebaseEnv & z.infer<typeof bootEnvExtension>;
+
+/**
+ * Load and validate the environment for a bundle boot.
+ *
+ * Does not read `.env` files — that is the deployment's job (a container gets
+ * real environment variables; `rebase dev` and `rebase start` load dotenv before
+ * calling in).
+ */
+export function loadBootEnv(): RebaseBootEnv {
+    try {
+        return loadEnv({ extend: bootEnvExtension }) as RebaseBootEnv;
+    } catch (err) {
+        // A raw ZodError prints a JSON dump and a stack trace through the
+        // validator — several screens of noise whose actual content is "you did
+        // not set DATABASE_URL". Restate it as the list of variables to fix.
+        const issues = (err as { issues?: { path?: (string | number)[]; message?: string }[] }).issues;
+        if (!Array.isArray(issues)) throw err;
+
+        const lines = issues.map(issue => {
+            const name = Array.isArray(issue.path) ? issue.path.join(".") : "";
+            const detail = issue.message === "Invalid input" ? "is required" : issue.message;
+            return name ? `  ${name}: ${detail}` : `  ${detail}`;
+        });
+
+        throw new BundleError(
+            `The environment is not valid:\n${lines.join("\n")}`,
+            "See https://rebase.pro/docs/deployment/self-hosting/ for the variables a deployment needs."
+        );
+    }
+}
+
+/**
+ * Whether an origin is a loopback address.
+ *
+ * In development the runtime reflects only localhost origins. It cannot reflect
+ * an arbitrary `Origin`, because credentials are enabled: any site the developer
+ * happened to visit could otherwise make credentialed requests against the dev
+ * server with the developer's session and read the responses.
+ */
+export function isLocalhostOrigin(origin: string): boolean {
+    try {
+        const { hostname } = new URL(origin);
+        return hostname === "localhost" ||
+            hostname === "127.0.0.1" ||
+            hostname === "::1" ||
+            hostname === "[::1]";
+    } catch {
+        return false;
+    }
+}
+
+/** A CORS origin resolver of the shape Hono's `cors()` middleware expects. */
+export type CorsOriginResolver = (origin: string) => string | null;
+
+/**
+ * Build the CORS origin policy.
+ *
+ * Production serves an explicit allow-list and nothing else. `loadEnv` already
+ * refuses to start a production process with neither `CORS_ORIGINS` nor
+ * `FRONTEND_URL`, so an empty list here can only mean the values were blank
+ * strings — still worth failing on, because the alternative is an API that
+ * quietly rejects its own frontend.
+ */
+export function resolveCorsOrigin(env: RebaseBootEnv): CorsOriginResolver {
+    const isProduction = env.NODE_ENV === "production";
+
+    if (!isProduction) {
+        return (origin: string) => {
+            if (!origin) return "*";
+            return isLocalhostOrigin(origin) ? origin : null;
+        };
+    }
+
+    const raw = env.CORS_ORIGINS || env.FRONTEND_URL || "";
+    const allowed = raw.split(",").map(s => s.trim()).filter(Boolean);
+
+    if (allowed.length === 0) {
+        throw new Error(
+            "CORS_ORIGINS or FRONTEND_URL must be set in production. " +
+            "Example: CORS_ORIGINS=https://yourdomain.com"
+        );
+    }
+
+    const wildcard = allowed.includes("*");
+    if (wildcard) {
+        // `*` with credentials is rejected by every browser, so a config that
+        // asks for it is a misconfiguration that would present as an opaque CORS
+        // failure at runtime. Say so at boot instead.
+        throw new Error(
+            "CORS_ORIGINS cannot be \"*\" — the API sends credentials, and browsers " +
+            "refuse a wildcard origin on credentialed requests. List the exact origins."
+        );
+    }
+
+    return (origin: string) => (allowed.includes(origin) ? origin : null);
+}
