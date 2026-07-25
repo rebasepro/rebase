@@ -115,6 +115,14 @@ The scoped driver is placed into `c.set("driver", scopedDriver)`. The raw, unsco
 
 ```typescript
 // From packages/server/src/auth/rls-scope.ts
+type RLSScopedDriver = DataDriver & {
+    withAuth(user: { uid: string; roles?: string[] }): Promise<DataDriver>;
+};
+
+function isRLSScopedDriver(driver: DataDriver): driver is RLSScopedDriver {
+    return "withAuth" in driver && typeof (driver as Record<string, unknown>).withAuth === "function";
+}
+
 export async function scopeDataDriver(
     driver: DataDriver,
     user: { uid: string; roles?: string[] }
@@ -216,7 +224,9 @@ await initializeRebaseBackend({
 ### CollectionCallbacks Interface
 
 ```typescript
-type CollectionCallbacks<M, USER> = {
+import type { User } from "@rebasepro/types";
+
+type CollectionCallbacks<M extends Record<string, unknown>, USER extends User> = {
     afterRead?(props: AfterReadProps<M, USER>):
         Promise<Record<string, unknown>> | Record<string, unknown>;
 
@@ -229,7 +239,7 @@ type CollectionCallbacks<M, USER> = {
     afterDelete?(props: AfterDeleteProps<M, USER>): Promise<void> | void;
 };
 
-interface AfterReadProps<M, USER> {
+interface AfterReadProps<M extends Record<string, unknown>, USER extends User> {
     collection: CollectionConfig<M>;
     path: string;
     row: Record<string, unknown>;
@@ -283,7 +293,10 @@ PostgreSQL RLS policies use `auth.uid()`, `auth.roles()`, and `auth.jwt()` to re
 Collection callbacks are per-collection lifecycle hooks that run **inside** the DataDriver, close to the database. They provide collection-specific security enforcement:
 
 ```typescript
-const ordersCollection: PostgresCollectionConfig = {
+// Row shape, so `values.total` below is a number rather than `unknown`.
+type Order = { total: number; status: string };
+
+const ordersCollection: PostgresCollectionConfig<Order> = {
     name: "Orders",
     slug: "orders",
     table: "orders",

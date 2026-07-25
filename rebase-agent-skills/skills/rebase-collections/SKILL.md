@@ -215,7 +215,7 @@ A collection lives in a **data source** identified by `collection.dataSource`
 Register the non-default (direct/custom) sources once; server engines ride the
 client and only need a backend bootstrapper.
 
-```tsx
+```tsx no-verify
 // Frontend — register direct/custom sources (Postgres rides the client)
 <Rebase
   client={rebaseClient}
@@ -228,7 +228,7 @@ client and only need a backend bootstrapper.
 { slug: "events", dataSource: "analytics", properties: { /* … */ } }
 ```
 
-```ts
+```ts no-verify
 // Backend — multiple engines in one instance (Postgres + MongoDB)
 initializeRebaseBackend({
   bootstrappers: [pgBootstrapper /* isDefault */, mongoBootstrapper],
@@ -891,12 +891,14 @@ customer: {
 ```typescript
 import { PostgresCollectionConfig, CollectionCallbacks } from "@rebasepro/types";
 
-interface Product {
+// A `type`, not an `interface`: only a type alias gets the implicit index
+// signature that satisfies `Record<string, unknown>`.
+type Product = {
     name: string;
     price: number;
     slug: string;
     status: string;
-}
+};
 
 const callbacks: CollectionCallbacks<Product> = {
     beforeSave: async ({ values, status }) => {
@@ -949,7 +951,14 @@ The `context.user` object is populated by the auth middleware. In server-side ca
 ### Callback Example
 
 ```typescript
-const jobSubmissionsCollection: PostgresCollectionConfig = {
+const jobSubmissionsCollection: PostgresCollectionConfig<{
+    title: string;
+    slug: string;
+    status: string;
+    description: string;
+    company_id: string;
+    created_at: string;
+}> = {
     name: "Job Submissions",
     slug: "job_submissions",
     table: "job_submissions",
@@ -960,7 +969,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
                 values.slug = values.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
             }
             if (status === "new") {
-                values.created_at = new Date();
+                values.created_at = new Date().toISOString();
             }
             return values;
         },
@@ -968,7 +977,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
         // Runs AFTER saving — trigger side effects, sync other collections
         afterSave: async ({ values, id, previousValues, context }) => {
             if (values.status === "approved" && previousValues?.status !== "approved") {
-                await context.data.jobs.create({
+                await context.data.collection("jobs").create({
                     title: values.title,
                     description: values.description,
                     company_id: values.company_id,
@@ -1099,7 +1108,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
                 isEnabled: ({ entity }) => entity?.values.status === "pending",
                 onClick: async ({ entity, context, onCollectionChange }) => {
                     if (!entity) return;
-                    await context.data.job_submissions.update(entity.id, {
+                    await context.data.collection("job_submissions").update(entity.id, {
                         status: "approved"
                     });
                     context.snackbarController?.open({
@@ -1203,8 +1212,11 @@ Under strict TypeScript checks (`strictNullChecks: true`), since `entity` is typ
 
 Always add a guard clause at the very beginning of your custom view component to handle the undefined state:
 ```typescript
-if (!entity) {
-    return null; // or show a loading/error state
+function MyCustomView({ entity }: { entity?: { id: string; values: Record<string, unknown> } }) {
+    if (!entity) {
+        return null; // or show a loading/error state
+    }
+    // …`entity` is narrowed from here on
 }
 ```
 This narrows the type of `entity` for the remainder of the component, allowing safe property access (e.g. `entity.id`, `entity.values.field`).
@@ -1244,12 +1256,16 @@ const productsCollection: PostgresCollectionConfig = {
         
             // Wrap Mode: Wrap the built-in form, augmenting it
             "Entity.Form": {
-                Component: ({ OriginalComponent, ...props }) => (
+                // `OriginalComponent` is injected at runtime when `wrap: true`; the
+                // override slot's type does not model it, hence the cast.
+                Component: (({ OriginalComponent, ...props }: {
+                    OriginalComponent: React.ComponentType<Record<string, unknown>>
+                }) => (
                     <div>
                         <div className="bg-amber-100 p-2 text-amber-800 text-sm">Editing Product</div>
                         <OriginalComponent {...props} />
                     </div>
-                ),
+                )) as unknown as React.ComponentType<Record<string, unknown>>,
                 wrap: true
             }
         }
