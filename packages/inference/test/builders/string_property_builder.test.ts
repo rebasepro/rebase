@@ -72,15 +72,22 @@ describe("buildStringProperty", () => {
         expect(result.email).toBe(true);
     });
 
-    it("detects user IDs (28-char no-space strings)", () => {
-        // Generate 28-char strings without spaces
+    it("does not infer an enum from user-ID-looking values", () => {
+        // 28-char no-space strings. Ten identical values would otherwise look like a
+        // one-member enum, since the enum heuristic only counts distinct values.
+        //
+        // This used to assert `admin.readOnly`, which inference no longer sets: this is
+        // a core package and `admin` is declared by @rebasepro/admin-types, so the field
+        // does not exist here. Suppressing the enum is what the detection actually does,
+        // and unlike a readOnly hint it affects the generated schema.
         const userIds = Array(10).fill("ABCDEFGHIJKLMNOPQRSTUVWXYZ12");
         const result = buildStringProperty({
             name: "userId",
             totalDocsCount: 10,
             valuesResult: makeValuesResult(userIds)
         }) as StringProperty;
-        expect(result.admin?.readOnly).toBe(true);
+        expect(result.enum).toBeUndefined();
+        expect(result.type).toBe("string");
     });
 
     it("infers enum when few unique values", () => {
