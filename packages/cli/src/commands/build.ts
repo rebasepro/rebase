@@ -21,7 +21,8 @@ import type { RebaseAppConfig, RebaseStaticAppConfig, RebaseAdminAppConfig } fro
 import { requireProjectRoot } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { buildableApps, findBackendApp, loadManifest, ManifestError } from "../manifest";
-import { buildBundle, buildStaticBundle, foldStaticIntoBundle, DEFAULT_BUNDLE_DIR } from "../bundle";
+import { buildBundle, buildStaticBundle, DEFAULT_BUNDLE_DIR } from "../bundle";
+import { foldFrontendIntoBundle } from "../fold-static";
 
 function printHelp(): void {
     console.log(`
@@ -158,12 +159,16 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                `--no-static` opts out, for a project that publishes its frontend
                somewhere else and does not want the assets in its bundle. */
             if (!args["--no-static"]) {
-                const folded = await foldPrimaryStaticApp(
+                const folded = await foldFrontendIntoBundle({
                     projectRoot,
                     manifest,
-                    result.outDir,
-                    args["--skip-static-build"] === true
-                );
+                    bundleDir: result.outDir,
+                    skipBuild: args["--skip-static-build"] === true,
+                    log: (m) => console.log(m)
+                }).catch((err: unknown) => {
+                    console.error(chalk.red(`    ✗ ${err instanceof Error ? err.message : String(err)}`));
+                    process.exit(1);
+                });
                 if (folded) {
                     console.log(
                         chalk.green(`    ✓ ${folded.appName} folded in`) +
@@ -242,63 +247,6 @@ async function buildAssetApp(
     const result = buildStaticBundle({ projectRoot, appName: name, assetsDir: outputPath, outDir, runtimeRange });
     const rel = path.relative(projectRoot, result.outDir);
     console.log(chalk.green(`  ✓ static bundle → ${rel}/`) + chalk.dim(` (${result.fileCount} file(s))`));
-}
-
-/**
- * Build the project's primary static app and fold it into the backend bundle.
- *
- * "Primary" is the single `static` app when there is exactly one. With several,
- * folding would have to pick, and a silent choice between two websites is worse
- * than doing nothing — so it declines and says which apps it saw.
- *
- * Returns null when there is nothing to fold, which is the common case for a
- * backend-only project and is not a problem worth reporting.
- */
-async function foldPrimaryStaticApp(
-    projectRoot: string,
-    manifest: { apps?: Record<string, { type?: string; build?: string; output?: string }> },
-    bundleDir: string,
-    skipBuild: boolean
-): Promise<{ appName: string; fileCount: number } | null> {
-    const statics = Object.entries(manifest.apps ?? {})
-        .filter(([, app]) => app?.type === "static")
-        .map(([name, app]) => ({ name, app }));
-
-    if (statics.length === 0) return null;
-    if (statics.length > 1) {
-        console.log(chalk.yellow(
-            `    ⚠ ${statics.length} static apps (${statics.map(s => s.name).join(", ")}) — none folded in.`
-        ));
-        console.log(chalk.dim("      Pick one to serve from the backend, or host them separately."));
-        return null;
-    }
-
-    const { name, app } = statics[0];
-    if (!app.output) {
-        console.log(chalk.yellow(`    ⚠ "${name}" declares no output directory — not folded in.`));
-        return null;
-    }
-
-    if (app.build && !skipBuild) {
-        try {
-            await execa(app.build, { cwd: projectRoot, stdio: "inherit", shell: true });
-        } catch {
-            console.error(chalk.red(`    ✗ build command failed for "${name}" — bundle left without a frontend`));
-            process.exit(1);
-        }
-    }
-
-    const assetsDir = path.join(projectRoot, app.output);
-    if (!fs.existsSync(assetsDir)) {
-        // Exited 0 and produced nothing where the manifest says it should.
-        // Folding that would ship an empty site, which looks identical to a
-        // broken deploy from the outside.
-        console.error(chalk.red(`    ✗ "${name}" declared output "${app.output}" does not exist — not folded in`));
-        process.exit(1);
-    }
-
-    const { fileCount } = foldStaticIntoBundle({ bundleDir, assetsDir });
-    return { appName: name, fileCount };
 }
 
 /** The pre-manifest behaviour: build every workspace package. */

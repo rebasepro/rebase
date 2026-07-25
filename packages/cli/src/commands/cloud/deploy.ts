@@ -25,6 +25,7 @@ import {
 import { latestDeployment, fmtDate } from "./projects";
 import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, declaredAppsFrom } from "./bundle-deploy";
 import { buildBundle } from "../../bundle";
+import { foldFrontendIntoBundle } from "../../fold-static";
 import { loadManifest, findBackendApp } from "../../manifest";
 import { requireProjectRoot } from "../../utils/project";
 
@@ -202,6 +203,29 @@ async function deployBundle(opts: {
             log: (m: string) => console.log(chalk.gray(m))
         });
         bundleDir = result.outDir;
+
+        /* Fold the frontend in, exactly as `rebase build` does. This path builds
+           its own bundle, so without the same step a deploy shipped a bundle with
+           no site in it — the managed pod then served the API perfectly and 404'd
+           every page, which is precisely the failure folding exists to prevent.
+           Two callers producing the same artefact have to share the step that
+           completes it. */
+        try {
+            const folded = await foldFrontendIntoBundle({
+                projectRoot,
+                manifest: loaded.manifest as never,
+                bundleDir,
+                log: (m: string) => console.log(m)
+            });
+            if (folded) {
+                console.log(chalk.gray(`  folded ${folded.appName} in (${folded.fileCount} file(s), served at /)`));
+            }
+        } catch (err) {
+            fail(
+                err instanceof Error ? err.message : String(err),
+                "Fix the frontend build, or pass --no-static to deploy the API alone."
+            );
+        }
     }
 
     const manifest = readBundleManifest(bundleDir);
