@@ -26,7 +26,7 @@ const postsCollection: CollectionConfig = {
     table: "posts",
     properties: {
         title: { type: "string", name: "Title" },
-        content: { type: "string", name: "Content", multiline: true },
+        content: { type: "string", name: "Content", admin: { multiline: true } },
         author: { 
             type: "relation", 
             name: "Author", 
@@ -50,7 +50,7 @@ const postsCollection: CollectionConfig = {
     table: "posts",
     properties: {
         title: { type: "string", name: "Title" },
-        content: { type: "string", name: "Content", multiline: true },
+        content: { type: "string", name: "Content", admin: { multiline: true } },
         author: { type: "relation", name: "Author", relationName: "author" }
     },
     relations: [

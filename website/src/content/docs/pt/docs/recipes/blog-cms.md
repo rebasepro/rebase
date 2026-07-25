@@ -47,7 +47,7 @@ export const authorsCollection: CollectionConfig = {
         bio: {
             type: "string",
             name: "Biografia",
-            multiline: true
+            admin: { multiline: true }
         }
     },
     admin: {
@@ -140,12 +140,12 @@ export const articlesCollection: CollectionConfig = {
         content: {
             type: "string",
             name: "Conteúdo",
-            markdown: true
+            admin: { markdown: true }
         },
         excerpt: {
             type: "string",
             name: "Excerto",
-            multiline: true,
+            admin: { multiline: true },
             validation: { max: 300 }
         },
         published_at: {

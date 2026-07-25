@@ -86,7 +86,7 @@ const productsCollection: PostgresCollectionConfig = {
         description: {
             name: "Description",
             type: "string",
-            multiline: true
+            admin: { multiline: true }
         },
         published: {
             name: "Published",
@@ -625,7 +625,7 @@ content: {
             text: {
                 name: "Text Block",
                 type: "string",
-                markdown: true
+                admin: { markdown: true }
             },
             image: {
                 name: "Image",

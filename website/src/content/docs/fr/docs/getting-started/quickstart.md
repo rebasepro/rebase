@@ -113,7 +113,7 @@ const productsCollection: CollectionConfig = {
         description: {
             type: "string",
             name: "Description",
-            multiline: true
+            admin: { multiline: true }
         },
         active: {
             type: "boolean",
