@@ -23,11 +23,16 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const templateConfig = path.join(repoRoot, "packages/cli/templates/template/config");
+const templateRoot = path.join(repoRoot, "packages/cli/templates/template");
+const templateConfig = path.join(templateRoot, "config");
+const baasOverlay = path.join(repoRoot, "packages/cli/templates/overlays/baas");
 const tsc = path.join(repoRoot, "node_modules/.bin/tsc");
 
 /** Presets offered by `rebase init`, from TemplatePreset. */
 const PRESETS = ["blog", "ecommerce", "blank"];
+
+/** The `--flavor baas` scaffold, checked as its own variant. */
+const BAAS = "baas";
 
 /** Files the blog preset owns; other presets replace them. Mirrors applyPreset. */
 const BLOG_FILES = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
@@ -62,6 +67,25 @@ function materialize(preset, into) {
     fs.rmSync(presets, { recursive: true, force: true });
 }
 
+/**
+ * Lay out the BaaS flavour the way `applyFlavor` does: drop `frontend/`, `config/`
+ * and the generated schema, then copy the overlay over the top.
+ *
+ * This is the only template *backend* that can be typechecked standalone — the CMS
+ * one imports `./schema.generated.js`, which does not exist until `db generate` runs.
+ * It is also the flavour with no Docker coverage at all: `cli-init-baas-e2e.ts` boots
+ * the project directly and never runs `docker compose up`, so a boot-time config
+ * mistake here would only ever be found by a user.
+ */
+function materializeBaas(into) {
+    copyDir(templateRoot, into);
+    for (const dir of ["frontend", "config"]) {
+        fs.rmSync(path.join(into, dir), { recursive: true, force: true });
+    }
+    fs.rmSync(path.join(into, "backend/src/schema.generated.ts"), { force: true });
+    copyDir(baasOverlay, into);
+}
+
 const TSCONFIG = {
     compilerOptions: {
         noEmit: true,
@@ -84,7 +108,12 @@ const TSCONFIG = {
             "@rebasepro/admin-types": [`${repoRoot}/packages/admin-types/src`],
             "@rebasepro/common": [`${repoRoot}/packages/common/src`],
             "@rebasepro/utils": [`${repoRoot}/packages/utils/src`],
-            "@rebasepro/client": [`${repoRoot}/packages/client/src`]
+            "@rebasepro/client": [`${repoRoot}/packages/client/src`],
+            "@rebasepro/server": [`${repoRoot}/packages/server/src`],
+            "@rebasepro/server-postgres": [`${repoRoot}/packages/server-postgres/src`]
+            // Third-party deps (hono, zod, dotenv) resolve through a node_modules
+            // symlink rather than `paths`: `hono/cors` is an exports-map subpath, and
+            // a path mapping would point at a file that does not exist on disk.
         },
         typeRoots: [
             `${repoRoot}/node_modules/.pnpm/node_modules/@types`,
@@ -98,12 +127,27 @@ let failed = 0;
 const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-template-check-"));
 
 try {
-    for (const preset of PRESETS) {
+    for (const preset of [...PRESETS, BAAS]) {
         const dir = path.join(workRoot, preset);
-        materialize(preset, dir);
+        if (preset === BAAS) materializeBaas(dir);
+        else materialize(preset, dir);
+
+        // Real resolution for third-party specifiers, exports maps included.
+        fs.symlinkSync(
+            path.join(repoRoot, "node_modules/.pnpm/node_modules"),
+            path.join(dir, "node_modules"),
+            "dir"
+        );
         fs.writeFileSync(
             path.join(dir, "tsconfig.check.json"),
-            JSON.stringify(TSCONFIG, null, 4)
+            JSON.stringify(
+                preset === BAAS
+                    // The BaaS flavour has no config/; check its backend instead.
+                    ? { ...TSCONFIG, include: ["backend/src/**/*.ts"] }
+                    : TSCONFIG,
+                null,
+                4
+            )
         );
 
         try {
@@ -128,7 +172,11 @@ try {
                 output
                     .split("\n")
                     .filter(Boolean)
-                    .map((line) => `    ${line.replace(/^(collections\/)/, `${templateRel}/$1`)}`)
+                    .map((line) => `    ${line
+                        .replace(/^(collections\/)/, `${templateRel}/$1`)
+                        .replace(/^(backend\/src\/)/, preset === BAAS
+                            ? "packages/cli/templates/overlays/baas/$1"
+                            : `packages/cli/templates/template/$1`)}`)
                     .join("\n")
             );
         }
@@ -139,7 +187,7 @@ try {
 
 if (failed > 0) {
     console.error(
-        `\n${failed} preset(s) do not compile. These are the files every new project ` +
+        `\n${failed} variant(s) do not compile. These are the files every new project ` +
             `starts from, so this fails the build.\n` +
             `Presentation fields belong under \`admin\` — see ` +
             `scripts/codemod/collections-admin-block.mjs.`
@@ -147,4 +195,4 @@ if (failed > 0) {
     process.exit(1);
 }
 
-console.log(`\nAll ${PRESETS.length} init presets compile.`);
+console.log(`\nAll ${PRESETS.length} init presets compile, and the baas backend.`);

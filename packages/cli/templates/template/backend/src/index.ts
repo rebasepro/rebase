@@ -16,6 +16,7 @@ import {
 } from "@rebasepro/server";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
 import { enums, relations, tables } from "./schema.generated.js";
+import { storageAuthorize } from "../../config/storage.js";
 import { env } from "./env.js";
 import usersCollection from "../../config/collections/users.js";
 
@@ -154,6 +155,12 @@ pass: env.SMTP_PASS! }
                         type: "local",
                         basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
                     },
+        // Storage is not under row-level security, so this hook IS its access
+        // model — the server refuses to boot in production without one, because
+        // "signed in" would otherwise be the only thing between a visitor and
+        // every file in the bucket. See config/storage.ts, which also shows the
+        // multi-tenant (per-owner) shape and the two escape hatches.
+        storageAuthorize,
         history: true
     });
 

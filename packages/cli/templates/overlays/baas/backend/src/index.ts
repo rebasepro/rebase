@@ -15,6 +15,7 @@ import {
 } from "@rebasepro/server";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
 import { env } from "./env.js";
+import { storageAuthorize } from "./storage.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -153,6 +154,12 @@ pass: env.SMTP_PASS! }
                         type: "local",
                         basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
                     },
+        // Storage is not under row-level security, so this hook IS its access
+        // model — the server refuses to boot in production without one, because
+        // "signed in" would otherwise be the only thing between a caller and every
+        // file in the bucket. See storage.ts; the default scopes each caller to
+        // `users/<uid>/` and is meant to be replaced with your own rule.
+        storageAuthorize,
         history: true,
         enableSwagger: true
     });

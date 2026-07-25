@@ -196,11 +196,29 @@ Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really is mounted at `ST
 - Mount a **persistent volume** if using local storage on Docker/Kubernetes, and set `FORCE_LOCAL_STORAGE=true`
 - Use **S3** or compatible (R2, MinIO), or **GCS**, for production deployments
 - Configure a **CDN** (CloudFront, Cloudflare) in front of your bucket for performance
-- **Multi-tenant apps must set `storageAuthorize`** — see below
+- **Any app with storage in production must declare an access model** — see below.
+  Not just multi-tenant ones: the server *refuses to boot* without one.
 
 ## Per-Object Authorization
 
-`requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an authorization hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model.
+`requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an authorization hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model. Worse, they can `GET /storage/list?prefix=` first, so the keys do not even have to be guessed.
+
+:::caution[Storage will not boot in production without one]
+Collections are protected by row-level security; storage is not. There is no
+per-object equivalent in the bucket, so this hook *is* the model — and
+`initializeRebaseBackend` **throws at startup** under `NODE_ENV=production` when
+storage is configured and none of these is set:
+
+- `storageAuthorize` — a hook, per object. Recommended.
+- `storagePublicRead: true` — the bucket genuinely is a public read-only CDN.
+- `storageInsecureAllowAnyAuthenticated: true` — a single-tenant app where every
+  signed-in user is trusted with every file. Named to be read twice.
+
+In development it logs a warning instead, so a project can be wrong about this and
+work fine locally right up until it is deployed. A scaffolded project ships a hook in
+`config/storage.ts` already — read it before you replace it, and note that it models
+a CMS's *shared content library*, which is not the same shape as per-user files.
+:::
 
 `storageAuthorize` is the storage analogue of a collection's security rules, and runs after authentication on every storage route:
 
