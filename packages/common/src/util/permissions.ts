@@ -1,4 +1,4 @@
-import { Entity, CollectionConfig, getDataSourceCapabilities, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
+import { AuthState, Entity, CollectionConfig, getDataSourceCapabilities, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
 import { securityRuleToConditions } from "./policy/securityRuleToConditions";
 import { evaluatePolicy, PolicyEvalContext, TriState } from "./policy/evaluatePolicy";
 
@@ -6,10 +6,13 @@ import { evaluatePolicy, PolicyEvalContext, TriState } from "./policy/evaluatePo
  * Minimal auth context for permission checking.
  * Only requires the user object — avoids forcing callers to construct
  * a full AuthController just to check permissions.
+ *
+ * An alias, not a second definition: {@link AuthState} in `@rebasepro/types` is
+ * the same shape and is what `dynamicProps` and the JSON-Logic condition context
+ * now take, so declaring it twice would be the `WhereFilterOp` mistake again —
+ * two copies that agree only by luck.
  */
-export interface AuthContext<USER extends User = User> {
-    user: USER | null;
-}
+export type AuthContext<USER extends User = User> = AuthState<USER>;
 
 /**
  * How to resolve a policy result that cannot be decided client-side (a raw-SQL

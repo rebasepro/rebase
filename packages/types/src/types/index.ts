@@ -6,6 +6,7 @@ export * from "./properties";
 export * from "./collections";
 export * from "./relations";
 export * from "./policy";
+export * from "./security_rules";
 
 export * from "./locales";
 export * from "./entity_link_builder";

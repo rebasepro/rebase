@@ -185,6 +185,10 @@
   "exclude": [
     "**/node_modules",
     "**/dist",
+    // baas-typecheck is its own program: it maps react onto an absence stub and
+    // resolves deps from the pnpm store, which is the whole point of it.
+    // Run it with `pnpm check:baas-types`.
+    "e2e/baas-typecheck",
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/__tests__",

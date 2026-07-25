@@ -1,7 +1,7 @@
 import type { CollectionConfig } from "./collections";
 import type { EntityStatus, EntityValues } from "./entities";
 import type { User } from "../users";
-import type { RebaseCallContext } from "../rebase_context";
+import type { RebaseCallContext } from "../call_context";
 
 /**
  * Lifecycle callbacks for entity CRUD operations.

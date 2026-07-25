@@ -1,6 +1,6 @@
 import {
     ArrayProperty,
-    AuthController,
+    AuthState,
     CollectionConfig,
     EnumValueConfig,
     EnumValues,
@@ -36,7 +36,7 @@ export type ResolvePropertyProps<M extends Record<string, unknown> = Record<stri
     index?: number,
     propertyConfigs?: Record<string, PropertyConfig>;
     ignoreMissingFields?: boolean;
-    authController: AuthController;
+    authController: AuthState;
 }
 
 export function resolveProperty<M extends Record<string, unknown> = Record<string, unknown>>(props: ResolvePropertyProps<M>): Property | null {
@@ -191,7 +191,7 @@ export function resolveProperties<M extends Record<string, unknown>>({
     index?: number,
     propertyConfigs?: Record<string, PropertyConfig>;
     ignoreMissingFields?: boolean;
-    authController: AuthController;
+    authController: AuthState;
 }): Properties {
     return Object.entries<Property>(properties as Record<string, Property>)
         .map(([key, property]) => {
@@ -226,7 +226,7 @@ export function resolveArrayProperties<M>({
     index?: number,
     propertyConfigs?: Record<string, PropertyConfig>;
     ignoreMissingFields?: boolean;
-    authController: AuthController;
+    authController: AuthState;
 }): Property[] {
     const propertyValue = propertyKey ? getIn(props.values, propertyKey) : undefined;
 
@@ -304,7 +304,7 @@ export function getArrayResolvedProperties({
     entityId?: string | number;
     index?: number;
     propertyConfigs?: Record<string, PropertyConfig>;
-    authController: AuthController;
+    authController: AuthState;
 }) {
 
     const of = property.of;

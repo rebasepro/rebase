@@ -1,6 +1,7 @@
 export * from "./collection_registry";
 export * from "./analytics_controller";
 export * from "./auth";
+export * from "./auth_state";
 
 export * from "./data";
 export * from "./database_admin";

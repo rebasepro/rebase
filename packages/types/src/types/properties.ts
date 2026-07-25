@@ -4,7 +4,7 @@ import type { Entity, EntityReference, EntityRelation, EntityValues, GeoPoint, V
 import type { JoinStep, OnAction, Relation } from "./relations";
 import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
 import type { ColorKey, ColorScheme } from "./chips";
-import type { AuthController } from "../controllers/auth";
+import type { AuthState } from "../controllers/auth_state";
 import type { AfterReadProps, BeforeSaveProps } from "./entity_callbacks";
 import type { User } from "../users";
 
@@ -887,7 +887,7 @@ export type PropertyBuilderProps<M extends Record<string, unknown> = Record<stri
     index?: number;
     path: string;
     entityId?: string | number;
-    authController: AuthController;
+    authController: AuthState;
 };
 
 /**
