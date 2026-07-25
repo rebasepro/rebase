@@ -12,12 +12,12 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1068.0",
-    "@hono/node-server": "^2.0.4",
+    "@hono/node-server": "^2.0.11",
     "@rebasepro/server": "workspace:*",
     "@rebasepro/server-postgres": "workspace:*",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.25",
+    "hono": "^4.12.27",
     "zod": "^4.4.3"
   },
   "devDependencies": {

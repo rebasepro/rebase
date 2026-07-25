@@ -64,13 +64,13 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@hono/node-server": "^2.0.9",
+    "@hono/node-server": "^2.0.11",
     "@jest/globals": "^30.4.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.9.3",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
-    "hono": "^4.12.25",
+    "hono": "^4.12.27",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.11",
     "typescript": "^6.0.3",

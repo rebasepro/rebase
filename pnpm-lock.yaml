@@ -85,8 +85,8 @@ importers:
         specifier: ^3.1068.0
         version: 3.1068.0
       '@hono/node-server':
-        specifier: ^2.0.4
-        version: 2.0.4(hono@4.12.25)
+        specifier: ^2.0.11
+        version: 2.0.11(hono@4.12.32)
       '@rebasepro/server':
         specifier: workspace:*
         version: link:../../packages/server
@@ -100,8 +100,8 @@ importers:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.20.0)(pg@8.21.0)
       hono:
-        specifier: ^4.12.25
-        version: 4.12.25
+        specifier: ^4.12.27
+        version: 4.12.32
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -587,8 +587,8 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2(babel-plugin-react-compiler@19.0.0-beta-ebf51a3-20250411)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
       hono:
-        specifier: ^4.12.25
-        version: 4.12.25
+        specifier: ^4.12.27
+        version: 4.12.32
       jest:
         specifier: ^30.4.2
         version: 30.4.2(@types/node@25.9.3)
@@ -1297,8 +1297,8 @@ importers:
         specifier: ^7.0.0
         version: 7.21.0
       '@hono/node-server':
-        specifier: 2.0.4
-        version: 2.0.4(hono@4.12.25)
+        specifier: ^2.0.11
+        version: 2.0.11(hono@4.12.32)
       '@rebasepro/client':
         specifier: workspace:*
         version: link:../client
@@ -1358,8 +1358,8 @@ importers:
         specifier: ^10.1.0
         version: 10.1.0
       hono:
-        specifier: ^4.12.25
-        version: 4.12.25
+        specifier: ^4.12.27
+        version: 4.12.32
       jest:
         specifier: ^30.4.2
         version: 30.4.2(@types/node@25.9.3)
@@ -1465,8 +1465,8 @@ importers:
         version: 8.21.0
     devDependencies:
       '@hono/node-server':
-        specifier: ^2.0.9
-        version: 2.0.9(hono@4.12.25)
+        specifier: ^2.0.11
+        version: 2.0.11(hono@4.12.32)
       '@jest/globals':
         specifier: ^30.4.1
         version: 30.4.1
@@ -1483,8 +1483,8 @@ importers:
         specifier: ^8.18.1
         version: 8.18.1
       hono:
-        specifier: ^4.12.25
-        version: 4.12.25
+        specifier: ^4.12.27
+        version: 4.12.32
       jest:
         specifier: ^30.4.2
         version: 30.4.2(@types/node@25.9.3)
@@ -1619,8 +1619,8 @@ importers:
         specifier: ^2.0.12
         version: 2.0.12
       hono:
-        specifier: ^4.12.25
-        version: 4.12.25
+        specifier: ^4.12.27
+        version: 4.12.32
       jest:
         specifier: ^30.4.2
         version: 30.4.2(@types/node@25.9.3)
@@ -1866,8 +1866,8 @@ importers:
         specifier: ^7.0.0
         version: 7.21.0
       '@hono/node-server':
-        specifier: ^2.0.4
-        version: 2.0.4(hono@4.12.25)
+        specifier: ^2.0.11
+        version: 2.0.11(hono@4.12.32)
       '@kubernetes/client-node':
         specifier: ^1.4.0
         version: 1.4.0
@@ -1887,8 +1887,8 @@ importers:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.20.0)(pg@8.21.0)
       hono:
-        specifier: ^4.12.25
-        version: 4.12.25
+        specifier: ^4.12.27
+        version: 4.12.32
       ssh2:
         specifier: ^1.17.0
         version: 1.17.0
@@ -3153,14 +3153,8 @@ packages:
     peerDependencies:
       hono: ^4
 
-  '@hono/node-server@2.0.4':
-    resolution: {integrity: sha512-Ut3y0dMMPWy6bZ2kVfx25EOVbZlm15dhF4mOsezMlhpNHy+4MkU1qN9Y6lnruYi4wPmFzimGX2X7LF/FwHli4A==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      hono: ^4
-
-  '@hono/node-server@2.0.9':
-    resolution: {integrity: sha512-cNMw3ziCdDcx0+ldta60zvUL5XO0OLt521n2hjPp0PB0ugczDCEczXsf33qQbkKIXWGFQ03f0LC85u6YK8pCLA==}
+  '@hono/node-server@2.0.11':
+    resolution: {integrity: sha512-bjD221KPLoJTWUwso1J6fGKiTXEUFedG/s0visavY4zakFPkeGURMRNly+FhBHs7T8Dz4qHaZIMX9ZoJHSJtKA==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4
@@ -7612,8 +7606,8 @@ packages:
   highlightjs-vue@1.0.0:
     resolution: {integrity: sha512-PDEfEF102G23vHmPhLyPboFCD+BkMGu+GuJe2d9/eH4FsCwvgBpnc9n0pGE+ffKdph38s6foEZiEjdgHdzp+IA==}
 
-  hono@4.12.25:
-    resolution: {integrity: sha512-2NFaIyNVgJmBs/ecmtGzlmluTFs5cHEWGTdu0t1HBwYzoGXOL5nUQBRMXsXWla5i4KkG//QMzVP88m1+I3fdAQ==}
+  hono@4.12.32:
+    resolution: {integrity: sha512-XcuyW9qE2kJn07PkecMOBd5Vq/hMy7mmGw+idz1yblbg9N17ijJODrvPkn7/dwL3Kulj8LcRJ69DLOWf91dRUg==}
     engines: {node: '>=16.9.0'}
 
   hosted-git-info@2.8.9:
@@ -12617,17 +12611,13 @@ snapshots:
       protobufjs: 7.6.4
       yargs: 17.7.2
 
-  '@hono/node-server@1.19.14(hono@4.12.25)':
+  '@hono/node-server@1.19.14(hono@4.12.32)':
     dependencies:
-      hono: 4.12.25
+      hono: 4.12.32
 
-  '@hono/node-server@2.0.4(hono@4.12.25)':
+  '@hono/node-server@2.0.11(hono@4.12.32)':
     dependencies:
-      hono: 4.12.25
-
-  '@hono/node-server@2.0.9(hono@4.12.25)':
-    dependencies:
-      hono: 4.12.25
+      hono: 4.12.32
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -13279,7 +13269,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
     dependencies:
-      '@hono/node-server': 1.19.14(hono@4.12.25)
+      '@hono/node-server': 1.19.14(hono@4.12.32)
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
@@ -13289,7 +13279,7 @@ snapshots:
       eventsource-parser: 3.1.0
       express: 5.2.1
       express-rate-limit: 8.5.2(express@5.2.1)
-      hono: 4.12.25
+      hono: 4.12.32
       jose: 6.2.3
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -17604,7 +17594,7 @@ snapshots:
 
   highlightjs-vue@1.0.0: {}
 
-  hono@4.12.25: {}
+  hono@4.12.32: {}
 
   hosted-git-info@2.8.9: {}
 
