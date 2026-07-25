@@ -1,102 +1,102 @@
 {
-    "name": "@rebasepro/plugin-ai",
-    "type": "module",
-    "version": "0.10.0",
-    "main": "./dist/index.es.js",
-    "module": "./dist/index.es.js",
-    "types": "./dist/index.d.ts",
-    "source": "src/index.ts",
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "development": "./dist/index.es.js",
-            "import": "./dist/index.es.js"
-        },
-        "./package.json": "./package.json"
+  "name": "@rebasepro/plugin-ai",
+  "type": "module",
+  "version": "0.10.0",
+  "main": "./dist/index.es.js",
+  "module": "./dist/index.es.js",
+  "types": "./dist/index.d.ts",
+  "source": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./dist/index.es.js",
+      "import": "./dist/index.es.js"
     },
-    "dependencies": {
-        "@rebasepro/admin": "workspace:*",
-        "@rebasepro/admin-types": "workspace:*",
-        "@rebasepro/app": "workspace:*",
-        "@rebasepro/common": "workspace:*",
-        "@rebasepro/types": "workspace:*",
-        "@rebasepro/ui": "workspace:*",
-        "@rebasepro/utils": "workspace:*"
-    },
-    "peerDependencies": {
-        "react": ">=19.0.0",
-        "react-dom": ">=19.0.0",
-        "react-router": ">=6.28.0",
-        "react-router-dom": ">=6.28.0"
-    },
-    "scripts": {
-        "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
-        "dev": "vite",
-        "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../scripts/assert-build-output.mjs",
-        "test": "jest --passWithNoTests"
-    },
-    "browserslist": {
-        "production": [
-            ">0.2%",
-            "not dead",
-            "not op_mini all"
-        ],
-        "development": [
-            "last 1 chrome version",
-            "last 1 firefox version",
-            "last 1 safari version"
-        ]
-    },
-    "devDependencies": {
-        "@testing-library/jest-dom": "^6.9.1",
-        "@testing-library/react": "^16.3.2",
-        "@types/jest": "^30.0.0",
-        "@types/node": "^25.9.3",
-        "@types/react": "^19.2.17",
-        "@types/react-dom": "^19.2.3",
-        "@vitejs/plugin-react": "^6.0.2",
-        "babel-jest": "^30.4.1",
-        "babel-plugin-react-compiler": "19.0.0-beta-ebf51a3-20250411",
-        "jest": "^30.4.2",
-        "ts-jest": "^29.4.11",
-        "typescript": "^6.0.3",
-        "vite": "^8.0.16"
-    },
-    "jest": {
-        "transform": {
-            "^.+\\.tsx?$": "ts-jest"
-        },
-        "testEnvironment": "jsdom",
-        "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
-        "moduleFileExtensions": [
-            "ts",
-            "tsx",
-            "js",
-            "jsx",
-            "json",
-            "node"
-        ],
-        "moduleNameMapper": {
-            "^@rebasepro/admin$": "<rootDir>/../admin/src/index.ts",
-            "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts",
-            "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
-            "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
-            "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
-            "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts",
-            "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
-        }
-    },
-    "files": [
-        "dist",
-        "src"
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@rebasepro/admin": "workspace:*",
+    "@rebasepro/admin-types": "workspace:*",
+    "@rebasepro/app": "workspace:*",
+    "@rebasepro/common": "workspace:*",
+    "@rebasepro/types": "workspace:*",
+    "@rebasepro/ui": "workspace:*",
+    "@rebasepro/utils": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0",
+    "react-router": ">=6.28.0",
+    "react-router-dom": ">=6.28.0"
+  },
+  "scripts": {
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "dev": "vite",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../scripts/assert-build-output.mjs",
+    "test": "jest --passWithNoTests"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
     ],
-    "publishConfig": {
-        "access": "public"
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.9.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "babel-jest": "^30.4.1",
+    "babel-plugin-react-compiler": "19.0.0-beta-ebf51a3-20250411",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
     },
-    "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/rebasepro/rebase.git",
-        "directory": "packages/plugin-ai"
+    "testEnvironment": "jsdom",
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
+    ],
+    "moduleNameMapper": {
+      "^@rebasepro/admin$": "<rootDir>/../admin/src/index.ts",
+      "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts",
+      "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
+      "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
+      "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
+      "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts",
+      "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
     }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/plugin-ai"
+  }
 }

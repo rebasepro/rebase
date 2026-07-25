@@ -1,97 +1,97 @@
 {
-    "name": "@rebasepro/types",
-    "type": "module",
-    "version": "0.10.0",
-    "description": "Rebase type definitions \u2014 shared interfaces and controller types",
-    "funding": {
-        "url": "https://github.com/sponsors/rebaseco"
+  "name": "@rebasepro/types",
+  "type": "module",
+  "version": "0.10.0",
+  "description": "Rebase type definitions — shared interfaces and controller types",
+  "funding": {
+    "url": "https://github.com/sponsors/rebaseco"
+  },
+  "author": "Rebase",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/types"
+  },
+  "main": "./dist/index.es.js",
+  "module": "./dist/index.es.js",
+  "types": "./dist/index.d.ts",
+  "source": "src/index.ts",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "rebase",
+    "cms",
+    "admin",
+    "typescript",
+    "headless",
+    "headless cms",
+    "content manager"
+  ],
+  "scripts": {
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "watch": "vite build --watch",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../scripts/assert-build-output.mjs",
+    "test:lint": "eslint \"src/**\" --quiet",
+    "test": "jest --passWithNoTests",
+    "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./dist/index.es.js",
+      "import": "./dist/index.es.js"
     },
-    "author": "Rebase",
-    "license": "MIT",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/rebasepro/rebase.git",
-        "directory": "packages/types"
+    "./package.json": "./package.json"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.9.3",
+    "@types/object-hash": "^3.0.6",
+    "@types/react-measure": "^2.0.12",
+    "hono": "^4.12.25",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  },
+  "peerDependencies": {
+    "hono": "^4.12.21"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
+  "publishConfig": {
+    "access": "public"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": "ts-jest"
     },
-    "main": "./dist/index.es.js",
-    "module": "./dist/index.es.js",
-    "types": "./dist/index.d.ts",
-    "source": "src/index.ts",
-    "engines": {
-        "node": ">=20"
-    },
-    "keywords": [
-        "rebase",
-        "cms",
-        "admin",
-        "typescript",
-        "headless",
-        "headless cms",
-        "content manager"
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx",
+      "json",
+      "node"
     ],
-    "scripts": {
-        "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found \u2014 use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
-        "watch": "vite build --watch",
-        "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../scripts/assert-build-output.mjs",
-        "test:lint": "eslint \"src/**\" --quiet",
-        "test": "jest --passWithNoTests",
-        "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f"
-    },
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "development": "./dist/index.es.js",
-            "import": "./dist/index.es.js"
-        },
-        "./package.json": "./package.json"
-    },
-    "devDependencies": {
-        "@types/jest": "^30.0.0",
-        "@types/node": "^25.9.3",
-        "@types/object-hash": "^3.0.6",
-        "@types/react-measure": "^2.0.12",
-        "hono": "^4.12.25",
-        "jest": "^30.4.2",
-        "ts-jest": "^29.4.11",
-        "typescript": "^6.0.3",
-        "vite": "^8.0.16"
-    },
-    "peerDependencies": {
-        "hono": "^4.12.21"
-    },
-    "files": [
-        "dist",
-        "src"
+    "testEnvironment": "node",
+    "testPathIgnorePatterns": [
+      "/bivariance/"
     ],
-    "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
-    "publishConfig": {
-        "access": "public"
-    },
-    "eslintConfig": {
-        "extends": [
-            "react-app",
-            "react-app/jest"
-        ]
-    },
-    "jest": {
-        "transform": {
-            "^.+\\.tsx?$": "ts-jest"
-        },
-        "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
-        "moduleFileExtensions": [
-            "ts",
-            "tsx",
-            "js",
-            "jsx",
-            "json",
-            "node"
-        ],
-        "testEnvironment": "node",
-        "testPathIgnorePatterns": [
-            "/bivariance/"
-        ],
-        "moduleNameMapper": {
-            "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js"
-        }
+    "moduleNameMapper": {
+      "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js"
     }
+  }
 }

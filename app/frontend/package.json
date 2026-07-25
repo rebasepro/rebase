@@ -1,62 +1,62 @@
 {
-    "name": "rebase-app-frontend",
-    "version": "0.8.0",
-    "private": true,
-    "type": "module",
-    "dependencies": {
-        "@fontsource/jetbrains-mono": "^5.2.8",
-        "@fontsource/rubik": "^5.2.8",
-        "@rebasepro/admin": "workspace:*",
-        "@rebasepro/admin-types": "workspace:*",
-        "@rebasepro/app": "workspace:*",
-        "@rebasepro/client": "workspace:*",
-        "@rebasepro/plugin-ai": "workspace:*",
-        "@rebasepro/plugin-insights": "workspace:*",
-        "@rebasepro/studio": "workspace:*",
-        "@rebasepro/types": "workspace:*",
-        "@rebasepro/ui": "workspace:*",
-        "@tailwindcss/typography": "^0.5.20",
-        "lucide-react": "1.18.0",
-        "react": "^19.2.7",
-        "react-dom": "^19.2.7",
-        "react-router-dom": "^7.17.0"
-    },
-    "scripts": {
-        "login": "rebase login",
-        "logout": "rebase logout",
-        "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
-        "dev": "vite --mode development",
-        "build": "vite build && tsc",
-        "preview": "vite build && vite preview"
-    },
-    "browserslist": {
-        "production": [
-            ">0.2%",
-            "not dead",
-            "not op_mini all"
-        ],
-        "development": [
-            "last 1 chrome version",
-            "last 1 firefox version",
-            "last 1 safari version"
-        ]
-    },
-    "devDependencies": {
-        "@tailwindcss/vite": "^4.3.1",
-        "@types/jest": "^30.0.0",
-        "@types/node": "^25.9.3",
-        "@types/react": "^19.2.17",
-        "@types/react-dom": "^19.2.3",
-        "@vitejs/plugin-react": "^6.0.2",
-        "eslint-plugin-import": "^2.32.0",
-        "eslint-plugin-n": "^18.1.0",
-        "eslint-plugin-promise": "^7.3.0",
-        "eslint-plugin-react": "^7.37.5",
-        "eslint-plugin-react-hooks": "^7.1.1",
-        "eslint-plugin-react-refresh": "^0.5.3",
-        "rollup-plugin-visualizer": "7.0.1",
-        "typescript": "^6.0.3",
-        "vite": "^8.0.16",
-        "vite-plugin-svgr": "^5.2.0"
-    }
+  "name": "rebase-app-frontend",
+  "version": "0.8.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/rubik": "^5.2.8",
+    "@rebasepro/admin": "workspace:*",
+    "@rebasepro/admin-types": "workspace:*",
+    "@rebasepro/app": "workspace:*",
+    "@rebasepro/client": "workspace:*",
+    "@rebasepro/plugin-ai": "workspace:*",
+    "@rebasepro/plugin-insights": "workspace:*",
+    "@rebasepro/studio": "workspace:*",
+    "@rebasepro/types": "workspace:*",
+    "@rebasepro/ui": "workspace:*",
+    "@tailwindcss/typography": "^0.5.20",
+    "lucide-react": "1.18.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.17.0"
+  },
+  "scripts": {
+    "login": "rebase login",
+    "logout": "rebase logout",
+    "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
+    "dev": "vite --mode development",
+    "build": "vite build && tsc",
+    "preview": "vite build && vite preview"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.9.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-n": "^18.1.0",
+    "eslint-plugin-promise": "^7.3.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "rollup-plugin-visualizer": "7.0.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-svgr": "^5.2.0"
+  }
 }
