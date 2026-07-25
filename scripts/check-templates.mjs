@@ -149,7 +149,49 @@ function checkAdminTypesDeclared() {
     return problems;
 }
 
+/**
+ * The other direction, which nothing asserted: the BaaS flavour must not carry the
+ * admin layer at all.
+ *
+ * A typecheck cannot show this. `materializeBaas` symlinks `node_modules` at the pnpm
+ * store, so `@rebasepro/admin-types` resolves there no matter what `paths` says —
+ * dropping the mapping and importing the package anyway still compiled cleanly. And
+ * one import is enough to matter: the package index side-effect-imports `augment.ts`,
+ * which declares `admin` for the whole program, so a single stray import in the
+ * backend would hand a BaaS project the admin surface it is defined by not having.
+ *
+ * So assert it on the files instead. Cheap, and it cannot be fooled by resolution.
+ */
+function checkBaasHasNoAdminTypes() {
+    const problems = [];
+    const walk = (dir) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                if (entry.name !== "node_modules") walk(full);
+                continue;
+            }
+            if (!/\.(ts|tsx|json|mjs|js)$/.test(entry.name)) continue;
+            const source = fs.readFileSync(full, "utf8");
+            if (source.includes("@rebasepro/admin-types")) {
+                problems.push(`${path.relative(repoRoot, full)} references @rebasepro/admin-types`);
+            }
+        }
+    };
+    walk(baasOverlay);
+    return problems;
+}
+
 let failed = 0;
+const baasProblems = checkBaasHasNoAdminTypes();
+if (baasProblems.length > 0) {
+    failed++;
+    console.log("  FAIL baas has no admin layer");
+    for (const p of baasProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   baas has no admin layer");
+}
+
 const declarationProblems = checkAdminTypesDeclared();
 if (declarationProblems.length > 0) {
     failed++;
@@ -178,6 +220,13 @@ try {
             JSON.stringify(
                 preset === BAAS
                     // The BaaS flavour has no config/; check its backend instead.
+                    // Note this program can still *resolve* @rebasepro/admin-types,
+                    // and deliberately so — dropping the `paths` entry changes
+                    // nothing, because resolution falls through to the pnpm store
+                    // that `node_modules` is symlinked to. What keeps the admin layer
+                    // out of this flavour is `checkBaasHasNoAdminTypes` below, and
+                    // the guarantee that writing `admin` is an error is asserted by
+                    // its own program in `e2e/baas-typecheck`.
                     ? { ...TSCONFIG, include: ["backend/src/**/*.ts"] }
                     : TSCONFIG,
                 null,
