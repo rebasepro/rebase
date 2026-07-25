@@ -94,6 +94,51 @@ export function killTree(cp: { pid?: number | undefined; kill?: (signal?: any) =
     }
 }
 
+/** PIDs listening on a specific TCP port. */
+export function listenersOn(port: number): Set<number> {
+    try {
+        const out = execSync(`lsof -nP -iTCP:${port} -sTCP:LISTEN -t`, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+        return new Set(out.split("\n").map(l => parseInt(l.trim(), 10)).filter(n => Number.isInteger(n)));
+    } catch {
+        // lsof exits non-zero when nothing matches.
+        return new Set();
+    }
+}
+
+/**
+ * Kill whatever is still holding the dev server's own ports.
+ *
+ * `killTree` signals the process group, which is right and still not enough:
+ * `rebase dev` supervises a Vite that ends up outside that group, so a frontend
+ * survived every run of this suite. One of them held port 5173 for hours with its
+ * project directory already deleted, and the next thing to want 5173 — the
+ * Playwright suite, or another `rebase dev` — either failed or, worse, talked to
+ * it and reported someone else's app as the result.
+ *
+ * Two conditions must both hold before this sends SIGKILL, and the second one is
+ * not optional: the process listens on a port **this run** told the dev server to
+ * use, and it was not already listening there beforehand.
+ *
+ * Filtering on "any new listener" is the obvious version and it is wrong. A
+ * developer's `rebase dev` runs `tsx watch`, so editing a watched file restarts it
+ * under a *new pid* — which, mid-run, is indistinguishable from a leak by pid
+ * alone. That happened while this was being written: a demo server picked up a new
+ * pid on its own unrelated port. Matching the port as well means the only
+ * processes in scope are the ones this suite asked for.
+ */
+export function reapDevPorts(ports: Array<number | undefined>, before: Set<number>) {
+    for (const port of ports) {
+        if (!port) continue;
+        for (const pid of listenersOn(port)) {
+            if (before.has(pid) || pid === process.pid) continue;
+            try {
+                process.kill(pid, "SIGKILL");
+                console.log(`  Reaped leaked listener on port ${port} (pid ${pid})`);
+            } catch { /* already gone */ }
+        }
+    }
+}
+
 process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
 
 export const rootDir = process.env.REBASE_ROOT_DIR || process.cwd();
@@ -731,6 +776,15 @@ force: true });
         // 7. Start the local dev server using 'rebase dev'
         console.log("\n🖥️ Step 7: Starting local development server...");
         await assertPortFree(backendPort);
+        // Captured before anything of ours listens, so teardown can tell our
+        // leftovers apart from servers that were already running on those ports.
+        // Vite is not told a port, so it takes 5173 or the next free one — the whole
+        // range has to be covered here, because which one it lands on is not known
+        // until it announces itself.
+        const listenersBeforeDev = new Set<number>([
+            ...listenersOn(backendPort),
+            ...[5173, 5174, 5175, 5176, 5177, 5178, 5179].flatMap(p => [...listenersOn(p)])
+        ]);
         const devProcess = execa("node", [
             cliBin,
             "dev",
@@ -914,6 +968,10 @@ timeout: 10000 });
             console.log("Stopping dev server process...");
             killTree(devProcess, "SIGKILL");
             await new Promise(resolve => setTimeout(resolve, 2000));
+            // …and then whatever the process group did not cover. Vite is the one
+            // that gets away; see reapDevPorts.
+            const frontendPort = Number(frontendUrl.match(/:(\d+)/)?.[1]);
+            reapDevPorts([backendPort, frontendPort], listenersBeforeDev);
         }
 
         // 9. Docker Deployment Verification
