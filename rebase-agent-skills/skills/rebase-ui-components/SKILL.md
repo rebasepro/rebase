@@ -9,6 +9,8 @@ description: Guide for using the @rebasepro/ui component library. Use this skill
 
 > **IMPORTANT FOR AGENTS:** Always import components, hooks, utilities, icons, and style mixins from `@rebasepro/ui`. **Never** add direct `@radix-ui/*` or `lucide-react` dependencies — the UI package re-exports everything you need.
 
+> **This skill covers component APIs — not how to compose them into a view.** Before building an admin view, page, or dashboard, read the **`rebase-design-language`** skill: it holds the design rules and copy-paste whole-view skeletons, and points at the live UI reference that ships in every Rebase project (`node_modules/@rebasepro/app/src/components/Debug/UIReferenceView.tsx`, rendered at `/debug/ui`). Knowing the props is not enough to make a view that looks right.
+
 ## Installation
 
 ```bash

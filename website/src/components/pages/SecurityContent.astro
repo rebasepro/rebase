@@ -18,15 +18,15 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
 
             <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
                 <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
-                    <span class="text-sm font-medium">Open Source · Self-Hosted · Rebase Cloud</span>
+                    <span class="text-sm font-medium">Open Source · Self-Hosted · Rebase Cloud (coming soon)</span>
                 </div>
                 <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
                     Secured by the database.<br/>Not by middleware.
                 </h1>
                 <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
                     Authorization in Rebase is Postgres row-level security, enforced by the database itself —
-                    and it fails closed: a table without RLS is <b>refused</b>, never leaked. That holds whether
-                    you self-host the open-source stack or run on Rebase Cloud.
+                    and it fails closed: a table without RLS is <b>refused</b>, never leaked. That holds today when
+                    you self-host the open-source stack, and it will hold on Rebase Cloud when it launches.
                 </p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
                     <a href="/docs"
@@ -51,7 +51,9 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                     <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Two deployment models, two security stories</h2>
                     <p class="mt-4 text-lg leading-8 text-surface-400">
                         Read this first — almost every claim on this page depends on which one you run.
-                        Self-hosted, we never see your data. On Rebase Cloud, we host it, and we say exactly how.
+                        Self-hosted, we never see your data. Rebase Cloud, where we would host it for you,
+                        <b class="text-white">has not launched yet</b> — everything below describes how it is being
+                        built, so you can evaluate it before you join the waitlist.
                     </p>
                 </div>
                 <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -73,14 +75,14 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
                             <svg class="lucide lucide-cloud" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9" /></svg>
-                            Rebase Cloud
+                            Rebase Cloud · Not launched yet
                         </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">We run it for you</h3>
+                        <h3 class="text-2xl font-semibold text-white mb-4">We would run it for you</h3>
                         <p class="text-surface-400 mb-4">
-                            On Rebase Cloud (<span class="font-mono text-surface-300">app.rebase.pro</span>) we host your
-                            database and your application on our infrastructure. That means <b class="text-white">Rebase
-                            acts as a data processor</b> on your behalf, and Google Cloud, our hosting provider, is a
-                            sub-processor. Nothing on this page pretends otherwise.
+                            Rebase Cloud is our managed hosting, still in development and not yet open to customers.
+                            When it launches we will host your database and your application on our infrastructure,
+                            which means <b class="text-white">Rebase would act as a data processor</b> on your behalf,
+                            with Google Cloud as a sub-processor. Nothing on this page pretends otherwise.
                         </p>
                         <p class="text-surface-500 text-sm">
                             The Rebase&nbsp;Cloud section below describes exactly where that data lives and how it is isolated.
@@ -108,7 +110,7 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                             </div>
                         </div>
                         <h3 class="text-2xl font-semibold text-white mb-4">One Database, No Copies</h3>
-                        <p class="text-surface-400">Rebase talks to a PostgreSQL database directly — it never ingests a second copy of your data into a proprietary store. Self-hosted, that database is yours and never leaves your infrastructure. On Rebase Cloud, it is a dedicated Postgres cluster we run for you and nobody else.</p>
+                        <p class="text-surface-400">Rebase talks to a PostgreSQL database directly — it never ingests a second copy of your data into a proprietary store. Self-hosted, that database is yours and never leaves your infrastructure. On Rebase Cloud, once it launches, it will be a dedicated Postgres cluster we run for you and nobody else.</p>
                     </div>
                     <!-- Pillar 2: Enforced at Database Level -->
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
@@ -152,8 +154,9 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                         <p class="text-lg text-surface-300 mb-8">
                             This section describes the <b>self-hosted</b> model. Unlike SaaS platforms that ingest and
                             control your data, the open-source Rebase server connects directly to <b>your own</b>
-                            PostgreSQL database, on infrastructure you operate. If you are evaluating
-                            <b>Rebase Cloud</b> instead, skip to the Rebase Cloud section below.
+                            PostgreSQL database, on infrastructure you operate. It is the only model available
+                            today. If you are waiting on <b>Rebase Cloud</b> instead, skip to the Rebase Cloud
+                            section below.
                         </p>
                         <div class="space-y-6">
                             <div class="flex items-start gap-3">
@@ -328,12 +331,14 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                 <div class="mx-auto max-w-3xl text-center mb-16">
                     <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium mx-auto">
                         <svg class="lucide lucide-cloud" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9" /></svg>
-                        Rebase Cloud
+                        Rebase Cloud · Not launched yet
                     </div>
                     <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">When we host it, here is what that means</h2>
                     <p class="mt-4 text-lg leading-8 text-surface-400">
-                        Rebase Cloud runs your database and your application on infrastructure we operate.
-                        We are a data processor for the data you put in it; you remain the controller.
+                        Rebase Cloud is not open to customers yet — we are running our own products on it while we
+                        build it. This is the architecture it is being built on: your database and your application
+                        on infrastructure we operate, with Rebase as a data processor for the data you put in it and
+                        you as the controller. Join the waitlist in the footer for early access.
                     </p>
                 </div>
 
@@ -413,9 +418,9 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                 </div>
 
                 <p class="mx-auto max-w-3xl mt-10 text-center text-sm text-surface-500">
-                    Rebase Cloud can also connect to a PostgreSQL database you already own instead of provisioning one.
-                    In that case the database stays entirely under your control and the notes above about the managed
-                    database — isolation, backups, retention — do not apply to it.
+                    Rebase Cloud will also be able to connect to a PostgreSQL database you already own instead of
+                    provisioning one. In that case the database stays entirely under your control and the notes above
+                    about the managed database — isolation, backups, retention — do not apply to it.
                 </p>
             </div>
         </section>
@@ -443,13 +448,13 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                     </div>
                     <div class="p-8 rounded-2xl border bg-surface-900/50 border-surface-800">
                         <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
-                            Rebase Cloud
+                            Rebase Cloud · Not launched yet
                         </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">You are the controller, we are your processor</h3>
+                        <h3 class="text-xl font-semibold text-white mb-4">You would be the controller, we your processor</h3>
                         <ul class="space-y-3 text-surface-400 text-sm">
-                            <li><b class="text-white">Rebase processes on your instructions.</b> You stay the controller for your end users' data.</li>
+                            <li><b class="text-white">Rebase would process on your instructions.</b> You stay the controller for your end users' data.</li>
                             <li><b class="text-white">Google Cloud is a sub-processor</b>, providing the compute, storage and network in europe-west1 (Belgium).</li>
-                            <li><b class="text-white">Data stays in the EU by default</b>, because that is the only region Rebase Cloud provisions into today.</li>
+                            <li><b class="text-white">Data stays in the EU by default</b>, because that is the only region Rebase Cloud provisions into.</li>
                         </ul>
                         <p class="mt-5 text-surface-500 text-xs">
                             Need a signed data processing agreement or a formal sub-processor list before you can buy?

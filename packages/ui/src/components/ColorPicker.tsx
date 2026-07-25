@@ -61,8 +61,8 @@ export function ColorPicker({
                     disabled={disabled}
                     onClick={() => onChange(undefined)}
                     className={cls(
-                        "flex items-center gap-2 px-2 py-1 rounded text-sm transition-colors",
-                        "hover:bg-surface-accent-100 dark:hover:bg-surface-accent-800",
+                        "flex items-center gap-2 px-2 py-1 rounded-lg text-sm transition-colors duration-150",
+                        "hover:bg-surface-accent-100 dark:hover:bg-surface-accent-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                         disabled && "opacity-50 cursor-not-allowed",
                         !value && "bg-surface-accent-100 dark:bg-surface-accent-800 font-medium"
                     )}
@@ -101,7 +101,7 @@ export function ColorPicker({
                                     swatchSize,
                                     "rounded-full transition-all flex items-center justify-center",
                                     "hover:scale-110 hover:shadow-md",
-                                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
+                                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
                                     disabled && "opacity-50 cursor-not-allowed hover:scale-100",
                                     isSelected && "ring-2 ring-primary ring-offset-1"
                                 )}

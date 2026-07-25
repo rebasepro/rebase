@@ -10,21 +10,15 @@ import {
     Separator,
     TextField,
     Select,
-    SelectItem
-} from "@rebasepro/ui";
-import {
-    RefreshCw,
+    SelectItem,
+    RefreshCwIcon,
     UserPlus,
-    X,
-    Check,
-    Briefcase,
-    Mail,
-    Phone,
-    User,
-    Calendar,
-    AlertTriangle,
-    Plus
-} from "lucide-react";
+    XIcon,
+    CheckIcon,
+    MailIcon,
+    PhoneIcon,
+    CalendarIcon
+} from "@rebasepro/ui";
 
 import { DashboardMetrics } from "./DashboardMetrics";
 import { PipelineOverview } from "./PipelineOverview";
@@ -688,7 +682,7 @@ export function CrmDashboardDemo() {
                     <div>
                         <Typography variant="caption" color="secondary" className="uppercase text-[9px] tracking-wider block">Due Date</Typography>
                         <Typography variant="body2" className="font-medium mt-0.5 inline-flex items-center gap-1">
-                            <Calendar className="h-3.5 w-3.5 text-surface-400" />
+                            <CalendarIcon className="h-3.5 w-3.5 text-surface-400" />
                             {task.values.dueDate || "No due date"}
                         </Typography>
                     </div>
@@ -778,11 +772,11 @@ export function CrmDashboardDemo() {
 
                 <div className="space-y-2.5 py-3 border-y border-surface-200 dark:border-surface-700">
                     <div className="flex items-center gap-2 text-surface-600 dark:text-surface-300">
-                        <Mail className="h-4 w-4 text-surface-400" />
+                        <MailIcon className="h-4 w-4 text-surface-400" />
                         <Typography variant="body2">{client.email}</Typography>
                     </div>
                     <div className="flex items-center gap-2 text-surface-600 dark:text-surface-300">
-                        <Phone className="h-4 w-4 text-surface-400" />
+                        <PhoneIcon className="h-4 w-4 text-surface-400" />
                         <Typography variant="body2">{client.phone}</Typography>
                     </div>
                 </div>
@@ -971,7 +965,7 @@ export function CrmDashboardDemo() {
                                 }, 300);
                             }}
                             disabled={loading}
-                            startIcon={<RefreshCw className={cls("h-4 w-4", loading && "animate-spin")} />}
+                            startIcon={<RefreshCwIcon className={cls("h-4 w-4", loading && "animate-spin")} />}
                         >
                             Refresh
                         </Button>
@@ -1067,7 +1061,7 @@ export function CrmDashboardDemo() {
                         onClick={() => setActiveSideEntity(null)}
                         className="p-1 rounded-md text-surface-400 hover:text-surface-700 hover:bg-surface-100 dark:hover:bg-surface-800 focus:outline-none"
                     >
-                        <X className="h-4 w-4" />
+                        <XIcon className="h-4 w-4" />
                     </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-5 flex flex-col">
@@ -1092,7 +1086,7 @@ export function CrmDashboardDemo() {
             )}>
                 {toastMessage && (
                     <div className="px-4 py-3 bg-surface-900 dark:bg-surface-50 text-white dark:text-surface-900 text-xs font-medium rounded-lg shadow-lg flex items-center gap-2 border border-surface-800 dark:border-surface-200">
-                        <Check className="h-4 w-4 text-green-500" />
+                        <CheckIcon className="h-4 w-4 text-green-500" />
                         <span>{toastMessage}</span>
                     </div>
                 )}

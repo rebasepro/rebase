@@ -337,9 +337,9 @@ export const MultiSelect = React.forwardRef<
                                                     "cursor-pointer",
                                                     "m-1",
                                                     "ring-offset-transparent",
-                                                    "p-1 rounded aria-[selected=true]:outline-none aria-[selected=true]:ring-2 aria-[selected=true]:ring-primary aria-[selected=true]:ring-opacity-75 aria-[selected=true]:ring-primary/75 aria-[selected=true]:ring-offset-2",
+                                                    "p-1 rounded-md aria-[selected=true]:outline-none aria-[selected=true]:ring-2 aria-[selected=true]:ring-primary aria-[selected=true]:ring-opacity-75 aria-[selected=true]:ring-primary/75 aria-[selected=true]:ring-offset-2",
                                                     "aria-[selected=true]:bg-surface-accent-100 aria-[selected=true]:dark:bg-surface-accent-900",
-                                                    "cursor-pointer p-2 rounded aria-[selected=true]:bg-surface-accent-100 aria-[selected=true]:dark:bg-surface-accent-900"
+                                                    "cursor-pointer p-2 rounded-md aria-[selected=true]:bg-surface-accent-100 aria-[selected=true]:dark:bg-surface-accent-900"
                                                 )
                                             }
                                         >
@@ -394,9 +394,9 @@ export const MultiSelectItem = React.memo(function MultiSelectItem<T extends Mul
             "cursor-pointer",
             "m-1",
             "ring-offset-transparent",
-            "p-1 rounded aria-[selected=true]:outline-none aria-[selected=true]:ring-2 aria-[selected=true]:ring-primary aria-[selected=true]:ring-opacity-75 aria-[selected=true]:ring-primary/75 aria-[selected=true]:ring-offset-2",
+            "p-1 rounded-md aria-[selected=true]:outline-none aria-[selected=true]:ring-2 aria-[selected=true]:ring-primary aria-[selected=true]:ring-opacity-75 aria-[selected=true]:ring-primary/75 aria-[selected=true]:ring-offset-2",
             "aria-[selected=true]:bg-surface-accent-100 aria-[selected=true]:dark:bg-surface-accent-900",
-            "cursor-pointer p-2 rounded aria-[selected=true]:bg-surface-accent-100 aria-[selected=true]:dark:bg-surface-accent-900",
+            "cursor-pointer p-2 rounded-md aria-[selected=true]:bg-surface-accent-100 aria-[selected=true]:dark:bg-surface-accent-900",
             "text-surface-accent-700 dark:text-surface-accent-300",
             className
         )}
@@ -415,7 +415,7 @@ const InnerCheckBox = React.memo(function InnerCheckBox({ checked }: { checked: 
         <div
             className={cls(
                 "border-2 relative transition-colors ease-in-out duration-150",
-                "w-4 h-4 rounded flex items-center justify-center",
+                "w-4 h-4 rounded-sm flex items-center justify-center",
                 (checked ? "bg-primary" : "bg-white dark:bg-surface-accent-900"),
                 (checked) ? "text-surface-accent-100 dark:text-surface-accent-900" : "",
                 (checked ? "border-transparent" : "border-surface-accent-800 dark:border-surface-accent-200")

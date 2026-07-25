@@ -21,8 +21,35 @@ import { createRequire } from "module";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const UPLOADS_DIR = path.resolve(__dirname, "../../uploads/default");
-const SEED_ASSETS_DIR = path.resolve(__dirname, "../../seed-assets");
+
+/**
+ * Locate the `app/` project root — the directory that actually contains the
+ * `seed-assets/` and `uploads/` folders (siblings of `backend/`). This must
+ * work in two very different layouts:
+ *   - source / manual run (`npx tsx src/seed.ts`): __dirname = app/backend/src
+ *   - compiled container run (cron): __dirname = app/backend/dist/backend/src
+ * Anchoring paths off __dirname directly breaks in the compiled layout because
+ * tsc nests the output under dist/backend/ and never copies the data files.
+ * Walking up to the nearest ancestor that has `seed-assets/` resolves both.
+ */
+function findAppRoot(start: string): string {
+    let dir = start;
+    for (let i = 0; i < 8; i++) {
+        if (fs.existsSync(path.join(dir, "seed-assets"))) return dir;
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    return path.resolve(start, "../.."); // fallback: original source-layout assumption
+}
+const APP_ROOT = findAppRoot(__dirname);
+// Local-storage upload dir: prefer the server's configured STORAGE_PATH (set in
+// the container) so seeded assets land where the running server actually serves
+// them; fall back to the in-repo uploads dir for local/manual runs.
+const UPLOADS_DIR = process.env.STORAGE_PATH
+    ? path.join(process.env.STORAGE_PATH, "default")
+    : path.join(APP_ROOT, "uploads/default");
+const SEED_ASSETS_DIR = path.join(APP_ROOT, "seed-assets");
 
 // ── S3 helpers (lazy-loaded only when STORAGE_TYPE=s3) ────────────────
 const isS3 = env.STORAGE_TYPE === "s3";
@@ -325,7 +352,11 @@ export async function runSeed() {
     _seed = 1337;
 
     console.log("🌱 Connecting to database...");
-    const { db, pool } = createPostgresDatabaseConnection(env.DATABASE_URL, undefined, { max: 1 });
+    // Seeding truncates + rewrites every table, so connect with the owner/admin
+    // connection (bypasses RLS) — the same one the backend uses for admin ops.
+    // Falls back to DATABASE_URL for local/manual runs where it is the owner.
+    const seedConnectionString = env.ADMIN_CONNECTION_STRING || env.DATABASE_URL;
+    const { db, pool } = createPostgresDatabaseConnection(seedConnectionString, undefined, { max: 1 });
 
     const NUM_AUTHORS = 20;
     const NUM_TAGS = 30;
@@ -350,7 +381,9 @@ export async function runSeed() {
         // ── Clear existing data ───────────────────────────────────────
 
         const require = createRequire(import.meta.url);
-        const demoProductsRaw = require("./demo-products.json");
+        // Absolute path off the app root — `./demo-products.json` fails in the
+        // compiled container layout (the JSON is not emitted into dist/).
+        const demoProductsRaw = require(path.join(APP_ROOT, "backend/src/demo-products.json"));
 
         type ProductCategory = (typeof productsCategory.enumValues)[number];
         const validCategories: ProductCategory[] = ["electronics", "clothing", "home_garden", "sports", "books", "toys", "health_beauty"];
@@ -1207,4 +1240,8 @@ tag_id: tagIds[t - 1] });
     }
 }
 
-runSeed();
+// Only self-invoke when executed directly as a CLI (`npx tsx src/seed.ts`),
+// NOT when imported — the reset-demo cron imports runSeed and calls it itself.
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+    runSeed();
+}

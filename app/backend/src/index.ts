@@ -119,6 +119,12 @@ pass: env.SMTP_PASS! }
                 type: "local",
                 basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
             },
+        // This is the public demo: every visitor signs in with the same shared
+        // account (demo@rebase.pro), so there is no tenant boundary for a
+        // `storageAuthorize` hook to enforce — signed-in users already share all
+        // the seeded rows. Storage is ephemeral local disk holding demo images.
+        // Real apps should scope access per user instead of setting this.
+        storageInsecureAllowAnyAuthenticated: true,
         history: true,
         csrf: isProduction
             ? { origin: allowedOrigins }

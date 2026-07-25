@@ -8,36 +8,34 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    Button
+    Button,
+    CircleDotIcon,
+    ArrowRightLeftIcon,
+    MailIcon,
+    FileTextIcon,
+    PenLineIcon,
+    VideoIcon,
+    MessageCircleIcon,
+    StickyNoteIcon,
+    ListPlusIcon,
+    CheckCircle2Icon,
+    WrenchIcon,
+    PinIcon
 } from "@rebasepro/ui";
-import {
-    CircleDot,
-    ArrowRightLeft,
-    Mail,
-    FileText,
-    PenLine,
-    Video,
-    MessageCircle,
-    StickyNote,
-    ListPlus,
-    CheckCircle2,
-    Wrench,
-    Pin
-} from "lucide-react";
 
 /* ── Activity type → icon mapping ─────────────────── */
 const ACTIVITY_ICONS: Record<string, React.ReactNode> = {
-    incoming:          <CircleDot className="h-4 w-4 text-blue-500" />,
-    status_changed:    <ArrowRightLeft className="h-4 w-4 text-violet-500" />,
-    email_sent:        <Mail className="h-4 w-4 text-sky-500" />,
-    agreements_sent:   <FileText className="h-4 w-4 text-amber-500" />,
-    agreements_signed: <PenLine className="h-4 w-4 text-emerald-500" />,
-    zoom_setup:        <Video className="h-4 w-4 text-blue-600" />,
-    whatsapp_setup:    <MessageCircle className="h-4 w-4 text-green-500" />,
-    note:              <StickyNote className="h-4 w-4 text-yellow-500" />,
-    task_created:      <ListPlus className="h-4 w-4 text-teal-500" />,
-    task_completed:    <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
-    manual_action:     <Wrench className="h-4 w-4 text-orange-500" />
+    incoming:          <CircleDotIcon className="h-4 w-4 text-blue-500" />,
+    status_changed:    <ArrowRightLeftIcon className="h-4 w-4 text-violet-500" />,
+    email_sent:        <MailIcon className="h-4 w-4 text-sky-500" />,
+    agreements_sent:   <FileTextIcon className="h-4 w-4 text-amber-500" />,
+    agreements_signed: <PenLineIcon className="h-4 w-4 text-emerald-500" />,
+    zoom_setup:        <VideoIcon className="h-4 w-4 text-blue-600" />,
+    whatsapp_setup:    <MessageCircleIcon className="h-4 w-4 text-green-500" />,
+    note:              <StickyNoteIcon className="h-4 w-4 text-yellow-500" />,
+    task_created:      <ListPlusIcon className="h-4 w-4 text-teal-500" />,
+    task_completed:    <CheckCircle2Icon className="h-4 w-4 text-emerald-500" />,
+    manual_action:     <WrenchIcon className="h-4 w-4 text-orange-500" />
 };
 
 /* ── Relative time helper ──────────────────────────── */
@@ -116,7 +114,7 @@ export function RecentActivity({
                                     {idx > 0 && <Separator orientation="horizontal" className="my-0" />}
                                     <div className="flex items-start gap-2.5 py-2.5">
                                         <span className="shrink-0 mt-0.5 flex items-center">
-                                            {ACTIVITY_ICONS[actType] ?? <Pin className="h-4 w-4 text-surface-400 dark:text-surface-500" />}
+                                            {ACTIVITY_ICONS[actType] ?? <PinIcon className="h-4 w-4 text-surface-400 dark:text-surface-500" />}
                                         </span>
                                         <div className="flex-1 min-w-0">
                                             <Typography variant="body2" className="truncate leading-snug">

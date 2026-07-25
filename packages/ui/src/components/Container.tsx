@@ -38,7 +38,7 @@ const ContainerInner: ForwardRefRenderFunction<HTMLDivElement, ContainerProps> =
     return (
         <div
             ref={ref}
-            className={cls("mx-auto px-3 md:px-4 lg-px-6",
+            className={cls("mx-auto px-3 md:px-4 lg:px-6",
                 classForMaxWidth,
                 className)}
             style={style}>

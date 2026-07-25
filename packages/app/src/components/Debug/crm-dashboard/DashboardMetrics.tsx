@@ -3,14 +3,12 @@ import {
     Typography,
     cls,
     Card,
-    Skeleton
+    Skeleton,
+    UsersIcon,
+    DollarSignIcon,
+    AlertTriangleIcon,
+    TrendingUpIcon
 } from "@rebasepro/ui";
-import {
-    Users as UsersIcon,
-    DollarSign as DollarSignIcon,
-    AlertTriangle,
-    TrendingUp
-} from "lucide-react";
 
 /* ── Types ────────────────────────────────────────────── */
 
@@ -61,7 +59,7 @@ export function DashboardMetrics({
             <Card className="p-4">
                 <div className="flex items-center gap-3">
                     <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500">
-                        <TrendingUp className="h-4 w-4" />
+                        <TrendingUpIcon className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                         <Typography variant="caption" color="secondary" className="uppercase tracking-[0.05em] text-[10px]">Active Clients</Typography>
@@ -111,7 +109,7 @@ export function DashboardMetrics({
                             ? "text-red-500"
                             : "text-surface-400 dark:text-surface-500"
                     )}>
-                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTriangleIcon className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                         <Typography variant="caption" color="secondary" className="uppercase tracking-[0.05em] text-[10px]">Overdue Tasks</Typography>

@@ -89,7 +89,7 @@ showDetails: false });
         return (
             <div className="flex flex-col m-2">
                 <div className="flex items-center m-2">
-                    <AlertCircleIcon className={"text-red-500"} size={iconSize.small}/>
+                    <AlertCircleIcon className={"text-red-500 dark:text-red-400"} size={iconSize.small}/>
                     <div className="ml-4">Error</div>
                 </div>
                 <Typography variant={"caption"}>
@@ -118,7 +118,7 @@ showDetails: false });
             )}>
                 <div className="flex flex-col items-center max-w-md px-6 py-10 text-center">
                     <div className={cls(
-                        "flex items-center justify-center w-14 h-14 rounded-2xl mb-6",
+                        "flex items-center justify-center w-14 h-14 rounded-xl mb-6",
                         isPermission
                             ? "bg-amber-100 dark:bg-amber-900/30"
                             : "bg-red-100 dark:bg-red-900/30"
@@ -181,7 +181,7 @@ showDetails: false });
                             {showDetails && (
                                 <div className={cls(
                                     "mt-3 p-3 rounded-lg text-left text-xs",
-                                    "bg-surface-100 dark:bg-surface-800",
+                                    "bg-surface-100 dark:bg-surface-800/50",
                                     "text-text-secondary dark:text-text-secondary-dark",
                                     "font-mono break-all"
                                 )}>

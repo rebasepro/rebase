@@ -6,13 +6,11 @@ import {
     Select,
     SelectItem,
     Typography,
-    Button
+    Button,
+    AlertTriangleIcon,
+    ListTodoIcon,
+    XIcon
 } from "@rebasepro/ui";
-import {
-    AlertTriangle,
-    ListTodo,
-    X
-} from "lucide-react";
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -65,7 +63,7 @@ export function TaskFilters({
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                     <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500">
-                        <ListTodo className="h-4 w-4" />
+                        <ListTodoIcon className="h-4 w-4" />
                     </div>
                     <Typography variant="subtitle1">Tasks</Typography>
                     {pendingTasks.length > 0 && (
@@ -96,7 +94,7 @@ export function TaskFilters({
                         active={quickFilter === "overdue"}
                         onClick={() => { onQuickFilterChange(quickFilter === "overdue" ? "all" : "overdue"); }}
                         size="small"
-                        icon={<AlertTriangle className="h-3 w-3" />}
+                        icon={<AlertTriangleIcon className="h-3 w-3" />}
                     >
                         Overdue{overdueTasks.length > 0 ? ` (${overdueTasks.length})` : ""}
                     </FilterChip>
@@ -109,7 +107,7 @@ export function TaskFilters({
                             color="neutral"
                             className="p-0 h-auto min-w-0 text-xs text-text-secondary dark:text-text-secondary-dark hover:text-primary dark:hover:text-primary-light"
                             onClick={onClearAllFilters}
-                            startIcon={<X className="h-3 w-3" />}
+                            startIcon={<XIcon className="h-3 w-3" />}
                         >
                             Clear
                         </Button>

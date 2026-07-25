@@ -3,9 +3,9 @@ import {
     Typography, Chip, cls, defaultBorderMixin,
     Table, TableHeader, TableBody, TableRow, TableCell,
     SearchBar, IconButton, Tooltip, Checkbox, iconSize,
-    Select, SelectItem
+    Select, SelectItem,
+    Trash2Icon, PencilIcon, ArrowUpDownIcon, ArrowUpIcon, ArrowDownIcon
 } from "@rebasepro/ui";
-import { Trash2Icon, PencilIcon, ArrowUpDownIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
 import { SAMPLE_PROJECTS, STATUS_CONFIG, PRIORITY_CONFIG } from "./sample_data";
 import type { ProjectStatus } from "./sample_data";
 

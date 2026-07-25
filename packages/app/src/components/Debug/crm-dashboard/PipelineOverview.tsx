@@ -7,13 +7,11 @@ import {
     Skeleton,
     Tooltip,
     Select,
-    SelectItem
+    SelectItem,
+    UsersIcon,
+    ChevronRightIcon,
+    SettingsIcon
 } from "@rebasepro/ui";
-import {
-    Users as UsersIcon,
-    ChevronRight,
-    Settings
-} from "lucide-react";
 
 /* ── Types ────────────────────────────────────────────── */
 
@@ -100,7 +98,7 @@ export function PipelineOverview({
                     variant="text"
                     size="small"
                     onClick={() => { onNavigate('/c/engagements'); }}
-                    endIcon={<ChevronRight className="h-4 w-4" />}
+                    endIcon={<ChevronRightIcon className="h-4 w-4" />}
                 >
                     View All
                 </Button>
@@ -112,7 +110,7 @@ export function PipelineOverview({
                 /* No stages configured */
                 <div className="flex flex-col items-center justify-center py-8">
                     <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500 mb-3">
-                        <Settings className="h-4 w-4" />
+                        <SettingsIcon className="h-4 w-4" />
                     </div>
                     <Typography variant="body2" color="secondary" className="mb-1">
                         No pipeline stages configured
@@ -167,7 +165,7 @@ export function PipelineOverview({
                                 <React.Fragment key={stage.stageKey}>
                                     {idx > 0 && (
                                         <div className="flex items-center shrink-0 text-surface-300 dark:text-surface-600 -mx-0.5">
-                                            <ChevronRight className="h-4 w-4" />
+                                            <ChevronRightIcon className="h-4 w-4" />
                                         </div>
                                     )}
                                     <Tooltip title={`${stage.label} — ${stage.count} client${stage.count !== 1 ? "s" : ""}`}>
@@ -233,7 +231,7 @@ export function PipelineOverview({
                                 <React.Fragment key={stage.stageKey}>
                                     {idx > 0 && (
                                         <div className="flex items-center shrink-0 text-surface-300 dark:text-surface-600 -mx-0.5">
-                                            <ChevronRight className="h-4 w-4" />
+                                            <ChevronRightIcon className="h-4 w-4" />
                                         </div>
                                     )}
                                     <Tooltip title={`${stage.label} — ${stage.count} client${stage.count !== 1 ? "s" : ""}`}>

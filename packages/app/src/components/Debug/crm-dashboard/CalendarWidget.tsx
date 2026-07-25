@@ -6,12 +6,10 @@ import {
     Skeleton,
     IconButton,
     Separator,
-    Button
+    Button,
+    ChevronLeftIcon,
+    ChevronRightIcon
 } from "@rebasepro/ui";
-import {
-    ChevronLeft,
-    ChevronRight
-} from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────── */
 
@@ -210,7 +208,7 @@ export function CalendarWidget({ loading, tasks, onOpenTask }: CalendarWidgetPro
                     aria-label="Previous month"
                     onClick={goToPrevMonth}
                 >
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeftIcon className="h-4 w-4" />
                 </IconButton>
                 <Typography variant="body2" className="font-semibold">
                     {MONTH_NAMES[viewDate.getMonth()]} {viewDate.getFullYear()}
@@ -220,7 +218,7 @@ export function CalendarWidget({ loading, tasks, onOpenTask }: CalendarWidgetPro
                     aria-label="Next month"
                     onClick={goToNextMonth}
                 >
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRightIcon className="h-4 w-4" />
                 </IconButton>
             </div>
 

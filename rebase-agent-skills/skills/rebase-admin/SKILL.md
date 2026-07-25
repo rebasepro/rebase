@@ -9,6 +9,8 @@ The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles col
 
 > **IMPORTANT FOR AGENTS:** All hooks in this skill must be called **inside** the `<RebaseShell>` component tree. They rely on React contexts provided by `<RebaseNavigation>`, `<SideEntityProvider>`, and `<RebaseRouteDefs>`.
 
+> **Building the view itself?** This skill covers navigation and CMS plumbing. For what the view should *look* like, read the **`rebase-design-language`** skill first — custom views render inside the admin shell and must match it. It ships whole-view skeletons and points at the live UI reference at `/debug/ui`.
+
 ## Quick Reference — Common Tasks
 
 | Task | Hook / Component | Package |

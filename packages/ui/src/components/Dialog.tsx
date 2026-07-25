@@ -125,7 +125,7 @@ export const Dialog = ({
                                 "outline-none focus:outline-none",
                                 fullWidth && !fullScreen ? "w-11/12" : undefined,
                                 fullHeight && !fullScreen ? "h-full" : undefined,
-                                "text-surface-accent-900 dark:text-white",
+                                "text-text-primary dark:text-text-primary-dark",
                                 "justify-center items-center",
                                 fullScreen ? "h-screen w-screen" : "max-h-[90vh] shadow-lg",
                                 "ease-in-out duration-200",

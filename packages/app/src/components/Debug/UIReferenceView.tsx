@@ -3,12 +3,19 @@
  * UIReferenceView — hidden debug route at /debug/ui
  *
  * This file is a STATIC reference of the real UI patterns used across the app.
- * All markup / styles are copied verbatim from source files.
- * DO NOT add invented styles. Only copy from actual source files.
+ * Markup / styles are copied from source files where a section mirrors a real
+ * screen. DO NOT add invented styles — copy from actual source files, or from
+ * the components in @rebasepro/ui.
+ *
+ * Sections named after a component mirror that component. Sections named after
+ * a pattern (e.g. "Management Screen", "Form Dialog") are illustrative
+ * compositions of kit components and are not tied to a specific screen.
+ *
+ * Do not cite source line numbers here — they rot silently. Name the file only.
  *
  * Sources:
  *   DefaultDrawer.tsx, DefaultAppBar.tsx, DrawerNavigationItem.tsx,
- *   DrawerNavigationGroup.tsx, UsersView.tsx, RolesView.tsx
+ *   DrawerNavigationGroup.tsx
  */
 import React, { useState } from "react";
 import {
@@ -85,8 +92,8 @@ const SECTIONS = [
     { id: "buttons", label: "Buttons", icon: PlusIcon },
     { id: "inputs", label: "Form Inputs", icon: FileTextIcon },
     { id: "chips-alerts", label: "Chips & Alerts", icon: AlertCircleIcon },
-    { id: "users", label: "Users View", icon: UserIcon },
-    { id: "user-dialog", label: "User Dialog", icon: CircleUserIcon },
+    { id: "users", label: "Management", icon: UserIcon },
+    { id: "user-dialog", label: "Form Dialog", icon: CircleUserIcon },
     { id: "crm-dashboard", label: "CRM Dashboard", icon: LayoutGridIcon },
     { id: "collection-table", label: "Collection Table", icon: ListIcon },
     { id: "card-view", label: "Card View", icon: LayoutGridIcon },
@@ -297,9 +304,9 @@ active: false }
                         Fixed at top (<code className="font-mono text-xs">h-16 absolute top-0</code>). Contains breadcrumbs (caption + body2), Content/Studio pill toggle,
                         theme menu, and user avatar menu via <code className="font-mono text-xs">Menu</code>.
                     </Typography>
-                    {/* Exact classes from DefaultAppBar line 121-130 */}
+                    {/* Exact classes from DefaultAppBar */}
                     <div className={cls("w-full h-16 flex flex-row gap-2 px-4 items-center border rounded-lg relative", defaultBorderMixin)}>
-                        {/* Breadcrumbs — from DefaultAppBar line 157-188 */}
+                        {/* Breadcrumbs — from DefaultAppBar */}
                         <div className="mr-8 hidden lg:block">
                             <div className="flex flex-row gap-2 items-center">
                                 <Typography variant="caption" color="secondary">/</Typography>
@@ -314,7 +321,7 @@ active: false }
                             </div>
                         </div>
                         <div className="grow"/>
-                        {/* Content/Studio toggle — from DefaultAppBar line 204-225 */}
+                        {/* Content/Studio toggle — from DefaultAppBar */}
                         <div className={cls("mr-2 hidden sm:flex bg-surface-100 dark:bg-surface-950 rounded-lg p-0.5 border", defaultBorderMixin)}>
                             <button className={cls("px-3 py-1 text-xs font-semibold rounded-md transition-all", "bg-white dark:bg-surface-900 shadow-sm text-primary dark:text-primary-400")}>
                                 Content
@@ -323,7 +330,7 @@ active: false }
                                 Studio
                             </button>
                         </div>
-                        {/* Theme menu — from DefaultAppBar line 227-241 */}
+                        {/* Theme menu — from DefaultAppBar */}
                         <Menu trigger={
                             <IconButton color="inherit">
                                 <MoonIcon/>
@@ -333,7 +340,7 @@ active: false }
                             <MenuItem><SunIcon size={iconSize.smallest}/> Light</MenuItem>
                             <MenuItem><SunMoonIcon size={iconSize.smallest}/> System</MenuItem>
                         </Menu>
-                        {/* Avatar menu — from DefaultAppBar line 243-270 */}
+                        {/* Avatar menu — from DefaultAppBar */}
                         <Menu trigger={<Avatar>A</Avatar>}>
                             <div className="px-4 py-2 mb-2">
                                 <Typography variant="body1" color="secondary">Alice Johnson</Typography>
@@ -788,27 +795,24 @@ selected: true }, { name: "Tags" }].map(c => (
                 </SectionBlock>
 
                 {/* ═══════════════════════════════════════════════
-                    SECTION: Users View
+                    SECTION: Management Screen
                 ═══════════════════════════════════════════════ */}
-                <SectionBlock id="users" title="Users View — UsersView.tsx">
+                <SectionBlock id="users" title="Management Screen — Alert + Table + Chip">
                     <Typography variant="body2" color="secondary" className="mb-4">
-                        Layout from <code className="font-mono text-xs">UsersView</code>: <code className="font-mono text-xs">Container maxWidth=&quot;6xl&quot;</code>, header row, and table with <code className="font-mono text-xs">RoleChip</code>s.
+                        Canonical layout for an admin management screen: an <code className="font-mono text-xs">Alert</code> with an <code className="font-mono text-xs">action</code>, a header row, and a plain <code className="font-mono text-xs">Table</code> with <code className="font-mono text-xs">Chip</code>s. Illustrative mock — not tied to a specific screen.
                     </Typography>
-                    {/* Bootstrap warning — from UsersView line 105-119 */}
-                    <div className="bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-700 rounded p-4 flex items-center justify-between mb-4">
-                        <div>
-                            <Typography variant="label" className="text-yellow-800 dark:text-yellow-200">
-                                No admin users exist. You can make yourself an admin.
-                            </Typography>
-                        </div>
-                        <Button>Make me admin</Button>
-                    </div>
-                    {/* Header — from UsersView line 121-128 */}
+                    {/* Alert with an action button */}
+                    <Alert color="warning"
+                           outerClassName="mb-4"
+                           action={<Button>Make me admin</Button>}>
+                        No admin users exist. You can make yourself an admin.
+                    </Alert>
+                    {/* Header row: title + primary action */}
                     <div className="flex items-center mt-12">
                         <Typography gutterBottom variant="h4" className="grow" component="h4">Users</Typography>
                         <Button startIcon={<PlusIcon/>}>Add user</Button>
                     </div>
-                    {/* Table — from UsersView line 130-182 */}
+                    {/* Table */}
                     <div className="overflow-auto">
                         <Table className="w-full">
                             <TableHeader>
@@ -861,11 +865,11 @@ roles: [] }
                 </SectionBlock>
 
                 {/* ═══════════════════════════════════════════════
-                    SECTION: User Dialog
+                    SECTION: Form Dialog
                 ═══════════════════════════════════════════════ */}
-                <SectionBlock id="user-dialog" title="User Dialog — UserDetailsForm">
+                <SectionBlock id="user-dialog" title="Form Dialog — grid + MultiSelect + LoadingButton">
                     <Typography variant="body2" color="secondary" className="mb-4">
-                        Exact structure of <code className="font-mono text-xs">UserDetailsForm</code>: <code className="font-mono text-xs">grid grid-cols-12 gap-4</code>, <code className="font-mono text-xs">MultiSelect</code> for roles, <code className="font-mono text-xs">LoadingButton</code> to submit.
+                        Canonical form-in-a-card layout: <code className="font-mono text-xs">grid grid-cols-12 gap-4</code> for the fields, a <code className="font-mono text-xs">MultiSelect</code>, and a <code className="font-mono text-xs">LoadingButton</code> to submit. Illustrative mock — not tied to a specific screen.
                     </Typography>
                     <div className={`rounded-lg border w-full max-w-xl ${defaultBorderMixin}`}>
                         <div className="px-6 pt-6 pb-2">

@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
-import { Typography, Chip, cls, defaultBorderMixin, KanbanView, Alert } from "@rebasepro/ui";
+import { Typography, Chip, cls, defaultBorderMixin, KanbanView, Alert, FolderKanbanIcon } from "@rebasepro/ui";
 import type { BoardItem, BoardItemViewProps } from "@rebasepro/ui";
-import { FolderKanbanIcon } from "lucide-react";
 import { SAMPLE_PROJECTS, PRIORITY_CONFIG } from "./sample_data";
 import type { SampleProject, ProjectStatus } from "./sample_data";
 

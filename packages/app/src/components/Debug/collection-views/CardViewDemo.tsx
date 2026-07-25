@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from "react";
-import { Card, Typography, Chip, cls, defaultBorderMixin, SearchBar, ToggleButtonGroup } from "@rebasepro/ui";
-import { LayoutGridIcon, ListIcon, FolderKanbanIcon } from "lucide-react";
+import {
+    Card, Typography, Chip, cls, defaultBorderMixin, SearchBar, ToggleButtonGroup,
+    LayoutGridIcon, ListIcon, FolderKanbanIcon
+} from "@rebasepro/ui";
 import { SAMPLE_PROJECTS, STATUS_CONFIG, PRIORITY_CONFIG } from "./sample_data";
 import type { SampleProject } from "./sample_data";
 

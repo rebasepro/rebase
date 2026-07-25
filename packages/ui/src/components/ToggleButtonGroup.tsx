@@ -53,10 +53,10 @@ export function ToggleButtonGroup<T extends string = string>({
                     aria-pressed={value === option.value}
                     aria-disabled={option.disabled || undefined}
                     className={cls(
-                        "flex flex-row items-center justify-center gap-2 py-3 px-4 rounded-md transition-colors",
+                        "flex flex-row items-center justify-center gap-2 py-3 px-4 rounded-md transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                         value === option.value
-                            ? "bg-white dark:bg-surface-900 text-primary dark:text-primary-300 shadow-sm"
-                            : "text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700",
+                            ? "bg-white dark:bg-surface-700 text-primary dark:text-primary-300 shadow-sm"
+                            : "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-200 dark:hover:bg-surface-800",
                         option.disabled && "opacity-50 cursor-not-allowed"
                     )}
                 >

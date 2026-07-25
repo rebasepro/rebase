@@ -73,7 +73,7 @@ export const BooleanSwitch = React.forwardRef(function BooleanSwitch({
                 key={"knob"}
                 className={cls(
                     "block rounded-full transition-transform duration-100 ease-out transform will-change-auto shadow-sm",
-                    disabled ? "bg-surface-accent-300 dark:bg-surface-700" : (value ? "bg-white shadow" : "bg-surface-accent-600 dark:bg-surface-accent-400"),
+                    disabled ? "bg-surface-accent-300 dark:bg-surface-accent-700" : (value ? "bg-white shadow" : "bg-surface-accent-600 dark:bg-surface-accent-400"),
                     {
                         "w-[21px] h-[21px]": size === "medium" || size === "large",
                         "w-[19px] h-[19px]": size === "small",

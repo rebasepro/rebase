@@ -92,7 +92,7 @@ export function Tabs({
                     className={cls(
                         "absolute left-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center rounded-md transition-all h-8 w-6",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-400",
-                        !showLeftScroll ? "pointer-events-none opacity-0" : "text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-800",
+                        !showLeftScroll ? "pointer-events-none opacity-0" : "text-surface-600 dark:text-surface-400 hover:bg-surface-accent-200 dark:hover:bg-surface-accent-800",
                         "bg-surface-50 dark:bg-surface-900 border shadow-sm", defaultBorderMixin
                     )}
                 >
@@ -125,7 +125,7 @@ msOverflowStyle: "none" }}
                     className={cls(
                         "absolute right-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center rounded-md transition-all h-8 w-6",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-400",
-                        !showRightScroll ? "pointer-events-none opacity-0" : "text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-800",
+                        !showRightScroll ? "pointer-events-none opacity-0" : "text-surface-600 dark:text-surface-400 hover:bg-surface-accent-200 dark:hover:bg-surface-accent-800",
                         "bg-surface-50 dark:bg-surface-900 border shadow-sm", defaultBorderMixin
                     )}
                 >
@@ -161,9 +161,9 @@ export function Tab({
                 "inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-white transition-all",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-surface-400 focus-visible:ring-offset-2",
                 "disabled:pointer-events-none disabled:opacity-50",
-                variant === "standard" && "rounded-sm px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-surface-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-surface-900 dark:data-[state=active]:text-surface-50",
+                variant === "standard" && "rounded-md px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-surface-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-surface-900 dark:data-[state=active]:text-surface-50",
                 variant === "boxy" && cls(
-                    "flex-shrink-0 flex items-center gap-1.5 px-3.5 h-9 border-r border-surface-200 dark:border-surface-800 cursor-pointer text-[12px] font-medium transition-colors group relative box-border overflow-hidden",
+                    "flex-shrink-0 flex items-center gap-1.5 px-3.5 h-9 border-r border-surface-200 dark:border-surface-800 cursor-pointer text-xs font-medium transition-colors group relative box-border overflow-hidden",
                     "border-b-2 border-b-transparent",
                     "data-[state=active]:bg-surface-50 dark:data-[state=active]:bg-surface-900",
                     "data-[state=active]:text-text-primary dark:data-[state=active]:text-text-primary-dark",
@@ -171,8 +171,8 @@ export function Tab({
                     "text-text-secondary dark:text-text-secondary-dark hover:bg-surface-100 dark:hover:bg-surface-800"
                 ),
                 variant === "pill" && cls(
-                    "px-2 py-0.5 rounded text-[10px] font-medium transition-colors",
-                    "data-[state=active]:bg-primary/10 data-[state=active]:text-primary dark:data-[state=active]:bg-primary/20 dark:data-[state=active]:text-blue-400",
+                    "px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors",
+                    "data-[state=active]:bg-primary/10 data-[state=active]:text-primary dark:data-[state=active]:bg-primary/20 dark:data-[state=active]:text-primary",
                     "text-text-disabled dark:text-text-disabled-dark hover:text-text-secondary dark:hover:text-text-secondary-dark"
                 ),
                 className,

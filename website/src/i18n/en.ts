@@ -62,16 +62,16 @@ export const en = {
   "showcase.case0.badge": "Vector Design Tool · Built by the Rebase team",
   "showcase.case0.title": "Dadaki",
   "showcase.case0.desc":
-    "Our own product: a fast, in-browser vector editor with cloud sync. Dadaki runs on a completely standard Rebase backend — the same auth, storage, and generated APIs every project gets — deployed on Rebase Cloud.",
+    "Our own product: a fast, in-browser vector editor with cloud sync. Dadaki runs on a completely standard Rebase backend — the same auth, storage, and generated APIs every project gets.",
   "showcase.case0.feat1.title": "Cloud-synced design files",
   "showcase.case0.feat1.desc":
     "Documents live in Postgres and assets in Rebase storage. Sign in on any device and your artwork is there — no sync service was written.",
   "showcase.case0.feat2.title": "Auth without an auth project",
   "showcase.case0.feat2.desc":
     "Sign-in and sessions come straight from Rebase auth. The editor stays a pure frontend talking to generated, typed APIs.",
-  "showcase.case0.feat3.title": "Deployed on Rebase Cloud",
+  "showcase.case0.feat3.title": "Dogfooding Rebase Cloud",
   "showcase.case0.feat3.desc":
-    "Live on Rebase Cloud behind a custom domain — we ship our own products on the same infrastructure we sell.",
+    "Rebase Cloud — our managed hosting — has not launched yet. We run our own products on it first. Join the waitlist below for early access.",
   "showcase.case.badge": "Marketplace & Job Portal",
   "showcase.case.title": "SustenTalent",
   "showcase.case.desc":
@@ -132,7 +132,7 @@ export const en = {
   "faq.title": "Frequently asked questions",
   "faq.q1": "What database does Rebase support?",
   "faq.a1":
-    '<strong class="text-white font-medium">PostgreSQL</strong> is the primary focus — Rebase goes deep on Postgres so every feature (RLS, enums, constraints, relations) works natively. That said, the architecture is database-agnostic and can be adapted to other databases. You bring your own database instance; Rebase never hosts or copies your data.',
+    '<strong class="text-white font-medium">PostgreSQL</strong> is the primary focus — Rebase goes deep on Postgres so every feature (RLS, enums, constraints, relations) works natively. That said, the architecture is database-agnostic and can be adapted to other databases. You bring your own database instance; self-hosted Rebase never sees or copies your data.',
   "faq.q2": "How is Rebase different from Retool or Supabase?",
   "faq.a2":
     "Unlike <a class=\"text-primary hover:underline\" href=\"/rebase-vs-retool\">Retool</a>, Rebase is open-source with no per-seat pricing lock-in, and it's a real React framework you can extend with your own code. Unlike <a class=\"text-primary hover:underline\" href=\"/rebase-vs-supabase\">Supabase</a>, Rebase connects directly to your <em class=\"text-white\">existing</em> Postgres database — no new infrastructure to manage, no vendor-managed instance. Your schema, your data, your rules.",

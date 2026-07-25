@@ -6,14 +6,12 @@ import {
     Chip,
     Skeleton,
     Checkbox,
-    Button
+    Button,
+    CalendarIcon,
+    AlertTriangleIcon,
+    ListTodoIcon,
+    CheckCircle2Icon
 } from "@rebasepro/ui";
-import {
-    Calendar,
-    AlertTriangle,
-    ListTodo,
-    CheckCircle2
-} from "lucide-react";
 
 /* ── Types ──────────────────────────────────────────────────── */
 
@@ -211,9 +209,9 @@ export function TaskTable({
                                 !overdue && !soon && "text-text-secondary dark:text-text-secondary-dark"
                             )}>
                                 {overdue ? (
-                                    <AlertTriangle className="h-3 w-3" />
+                                    <AlertTriangleIcon className="h-3 w-3" />
                                 ) : (
-                                    <Calendar className="h-3 w-3" />
+                                    <CalendarIcon className="h-3 w-3" />
                                 )}
                                 {dueLabel}
                             </span>
@@ -290,7 +288,7 @@ export function TaskTable({
             {tasks.length === 0 ? (
                 <Card className="flex flex-col items-center justify-center py-10 px-6 text-center mt-2 border-dashed">
                     <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500 mb-3">
-                        <CheckCircle2 className="h-4 w-4" />
+                        <CheckCircle2Icon className="h-4 w-4" />
                     </div>
                     <Typography variant="subtitle2" className="mb-1">
                         All clear!

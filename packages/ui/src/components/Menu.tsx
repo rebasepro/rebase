@@ -87,7 +87,7 @@ export const MenuItem = React.memo(({
     const classNames = cls(
         onClick && !disabled && "cursor-pointer",
         disabled && "opacity-50 cursor-not-allowed",
-        "rounded-md text-sm font-medium text-surface-accent-700 dark:text-surface-accent-300 flex items-center gap-4",
+        "rounded-md text-sm font-medium text-surface-accent-700 dark:text-surface-accent-300 flex items-center gap-4 transition-colors duration-150",
         !disabled && "hover:bg-surface-accent-100 dark:hover:bg-surface-accent-900",
         dense ? "px-4 py-1.5" : "px-4 py-2",
         className

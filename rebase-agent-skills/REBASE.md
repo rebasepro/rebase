@@ -53,20 +53,36 @@ Relations are defined **directly on the property** using `type: "relation"` with
 | `rebase login` | Authenticate with Rebase Cloud |
 | `rebase deploy` | Deploy to Rebase Cloud |
 
+## Building UI — read this first
+
+**Before writing or modifying any admin view, custom page, or dashboard, read `rebase-design-language`.** Rebase has a specific, opinionated visual language (data-dense, monochromatic, near-zero chrome), and UI that ignores it looks broken next to the rest of the panel.
+
+That skill also points you at the **live UI reference** that ships inside every Rebase project — readable source at `node_modules/@rebasepro/app/src/components/Debug/UIReferenceView.tsx`, rendered at the hidden route `/debug/ui`. Copy from it; don't invent layouts.
+
+- `rebase-design-language` — **Design rules + whole-view skeletons. Mandatory for any UI work.**
+- `rebase-ui-components` — `@rebasepro/ui` component API reference (props, variants)
+- `rebase-admin` — Admin CMS APIs: navigation, side drawers, embedding collections, custom views
+
 ## Detailed Skills
 
 For specific topics, see:
 - `rebase-basics` — Setup, CLI, MCP tools, project structure
+- `rebase-local-env-setup` — First-time setup only: Node.js, pnpm, PostgreSQL, Docker
 - `rebase-sdk` — The client SDK: CRUD, filtering, live queries, offline / local-first sync
 - `rebase-realtime` — WebSocket engine, broadcast channels, presence
 - `rebase-collections` — Collection schemas, properties, relations, callbacks, entity actions
 - `rebase-backend-postgres` — PostgreSQL setup, Drizzle, migrations, bootstrapper protocol
 - `rebase-auth` — Authentication, roles, RLS policies
+- `rebase-security` — Backend security architecture, RLS, API keys, threat model
+- `rebase-api` — Auto-generated REST and GraphQL APIs
 - `rebase-studio` — Visual admin panel, collection editor, custom views
 - `rebase-deployment` — Rebase Cloud, Docker, Firebase Hosting
 - `rebase-storage` — File uploads, S3, local storage
 - `rebase-custom-functions` — Custom Hono API routes + frontend invocation via `client.functions.invoke()`
 - `rebase-cron-jobs` — Scheduled background jobs
+- `rebase-webhooks` — Outbound HTTP webhooks on entity changes
+- `rebase-email` — SMTP setup, email templates, custom providers
+- `rebase-entity-history` — Entity versioning, audit log, reverting changes
 
 ## References
 

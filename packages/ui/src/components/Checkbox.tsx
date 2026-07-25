@@ -18,10 +18,10 @@ export interface CheckboxProps {
 }
 
 const sizeClasses = {
-    large: "w-6 h-6 rounded flex items-center justify-center",
-    medium: "w-5 h-5 rounded flex items-center justify-center",
-    small: "w-4 h-4 rounded flex items-center justify-center",
-    smallest: "w-4 h-4 rounded flex items-center justify-center"
+    large: "w-6 h-6 rounded-md flex items-center justify-center",
+    medium: "w-5 h-5 rounded-md flex items-center justify-center",
+    small: "w-4 h-4 rounded-md flex items-center justify-center",
+    smallest: "w-4 h-4 rounded-md flex items-center justify-center"
 };
 
 const outerSizeClasses = {
@@ -70,6 +70,7 @@ export const Checkbox = React.memo(({
             disabled={disabled}
             aria-label={ariaLabel}
             aria-checked={indeterminate ? "mixed" : isChecked}
+            className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             onCheckedChange={disabled ? undefined : onCheckedChange}>
 
             <div className={cls(
