@@ -18,12 +18,13 @@ import { useRebaseContext } from "@rebasepro/app";
 function MyComponent() {
     const context = useRebaseContext();
 
-    context.dataSource          // Data operations
-    context.storageSource       // File operations
-    context.authController      // Auth state
-    context.navigation          // Navigation state
-    context.sideEntityController // Side panel control
-    context.snackbarController  // Toast notifications
+    context.data                      // Data operations (flat rows)
+    context.client                    // The full SDK client
+    context.storageSource             // File operations
+    context.authController            // Auth state
+    context.navigationStateController // Navigation state
+    context.sidePanelController       // Side panel control
+    context.snackbarController        // Toast notifications
 }
 ```
 
@@ -109,12 +110,11 @@ function FileUploader() {
     const storage = useStorageSource();
 
     const upload = async (file: File) => {
-        const result = await storage.uploadFile({
+        const result = await storage.putObject({
             file,
-            fileName: file.name,
-            path: "documents"
+            key: `documents/${file.name}`
         });
-        const url = await storage.getDownloadURL(result.path);
+        const { url } = await storage.getSignedUrl(result.key);
         return url;
     };
 }
@@ -131,7 +131,7 @@ function ThemeToggle() {
     const mode = useModeController();
 
     return (
-        <button onClick={mode.toggleMode}>
+        <button onClick={() => mode.setMode(mode.mode === "dark" ? "light" : "dark")}>
             Aktuell: {mode.mode} {/* "light" | "dark" */}
         </button>
     );
@@ -168,10 +168,9 @@ import { useNavigationStateController } from "@rebasepro/admin";
 function MyComponent() {
     const navigation = useNavigationStateController();
 
-    navigation.collections     // All registered collections
-    navigation.views           // Custom views
-    navigation.adminViews      // Admin-mode views
-    navigation.getCollection(path) // Get collection for a path
+    navigation.views              // Custom views
+    navigation.adminViews         // Admin-mode views
+    navigation.topLevelNavigation // Resolved top-level entries
 }
 ```
 

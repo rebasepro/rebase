@@ -80,10 +80,10 @@ export const categoriesCollection: CollectionConfig = {
             type: "string",
             name: "Cor",
             enum: [
-                { id: "blue", label: "Azul", color: "blueDark" },
-                { id: "green", label: "Verde", color: "greenDark" },
-                { id: "red", label: "Vermelho", color: "pinkDark" },
-                { id: "orange", label: "Laranja", color: "orangeDark" }
+                { id: "blue", label: "Azul", color: "blue" },
+                { id: "green", label: "Verde", color: "green" },
+                { id: "red", label: "Vermelho", color: "pink" },
+                { id: "orange", label: "Laranja", color: "orange" }
             ]
         }
     },
@@ -97,7 +97,15 @@ export const categoriesCollection: CollectionConfig = {
 ### Artigos
 
 ```typescript
-export const articlesCollection: CollectionConfig = {
+// The row shape, so callbacks below see typed `values` instead of `unknown`.
+type Article = {
+    title: string;
+    slug: string;
+    status: string;
+    published_at?: string | null;
+};
+
+export const articlesCollection: CollectionConfig<Article> = {
     slug: "articles",
     name: "Artigos",
     singularName: "Artigo",
@@ -123,9 +131,9 @@ export const articlesCollection: CollectionConfig = {
             type: "string",
             name: "Status",
             enum: [
-                { id: "draft", label: "Rascunho", color: "grayDark" },
-                { id: "review", label: "Em Revisão", color: "orangeDark" },
-                { id: "published", label: "Publicado", color: "greenDark" }
+                { id: "draft", label: "Rascunho", color: "gray" },
+                { id: "review", label: "Em Revisão", color: "orange" },
+                { id: "published", label: "Publicado", color: "green" }
             ],
             defaultValue: "draft"
         },
@@ -187,13 +195,13 @@ export const articlesCollection: CollectionConfig = {
             }
             // Definir published_at ao publicar
             if (values.status === "published" && !values.published_at) {
-                values.published_at = new Date();
+                values.published_at = new Date().toISOString();
             }
             return values;
         }
     },
     securityRules: [
-        { operation: "select", access: "public", using: "{status} = 'published'" },
+        { operation: "select", using: "{status} = 'published'" },
         { operation: "select", ownerField: "author_id" },
         { operations: ["insert", "update"], ownerField: "author_id" },
         { operation: "delete", roles: ["admin"] }

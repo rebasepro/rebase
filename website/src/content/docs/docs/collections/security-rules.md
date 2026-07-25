@@ -208,7 +208,7 @@ interface SecurityRule {
 ```typescript
 securityRules: [
     // Anyone can read published posts
-    { operation: "select", access: "public", using: "{status} = 'published'" },
+    { operation: "select", using: "{status} = 'published'" },
     // Authors can see their own drafts
     { operation: "select", ownerField: "author_id" },
     // Authors can create and edit their own posts

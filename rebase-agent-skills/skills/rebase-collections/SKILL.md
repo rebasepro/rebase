@@ -1353,7 +1353,7 @@ const postsCollection: PostgresCollectionConfig = {
     table: "posts",
     securityRules: [
         // Anyone can read published posts
-        { operation: "select", access: "public", using: "{status} = 'published'" },
+        { operation: "select", using: "{status} = 'published'" },
         // Authors can see/edit their own
         { operations: ["select", "insert", "update"], ownerField: "author_id" },
         // Only admins can delete

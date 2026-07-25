@@ -174,7 +174,7 @@ interface SecurityRule {
 ```typescript
 securityRules: [
     // Tout le monde peut lire les publications publiées
-    { operation: "select", access: "public", using: "{status} = 'published'" },
+    { operation: "select", using: "{status} = 'published'" },
     // Les auteurs peuvent voir leurs propres brouillons
     { operation: "select", ownerField: "author_id" },
     // Les auteurs peuvent créer et modifier leurs propres publications

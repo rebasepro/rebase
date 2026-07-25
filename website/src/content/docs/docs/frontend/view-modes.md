@@ -78,10 +78,10 @@ const tasksCollection: CollectionConfig = {
             type: "string",
             name: "Status",
             enum: [
-                { id: "backlog", label: "Backlog", color: "grayDark" },
-                { id: "in_progress", label: "In Progress", color: "blueDark" },
-                { id: "review", label: "Review", color: "orangeDark" },
-                { id: "done", label: "Done", color: "greenDark" }
+                { id: "backlog", label: "Backlog", color: "gray" },
+                { id: "in_progress", label: "In Progress", color: "blue" },
+                { id: "review", label: "Review", color: "orange" },
+                { id: "done", label: "Done", color: "green" }
             ]
         },
         sort_order: { type: "number", name: "Sort Order" }

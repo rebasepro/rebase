@@ -109,12 +109,11 @@ function FileUploader() {
     const storage = useStorageSource();
 
     const upload = async (file: File) => {
-        const result = await storage.uploadFile({
+        const result = await storage.putObject({
             file,
-            fileName: file.name,
-            path: "documents"
+            key: `documents/${file.name}`
         });
-        const url = await storage.getDownloadURL(result.path);
+        const { url } = await storage.getSignedUrl(result.key);
         return url;
     };
 }
@@ -131,7 +130,7 @@ function ThemeToggle() {
     const mode = useModeController();
 
     return (
-        <button onClick={mode.toggleMode}>
+        <button onClick={() => mode.setMode(mode.mode === "dark" ? "light" : "dark")}>
             Atual: {mode.mode} {/* "light" | "dark" */}
         </button>
     );

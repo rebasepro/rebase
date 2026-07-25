@@ -80,10 +80,10 @@ export const categoriesCollection: CollectionConfig = {
             type: "string",
             name: "Color",
             enum: [
-                { id: "blue", label: "Blue", color: "blueDark" },
-                { id: "green", label: "Green", color: "greenDark" },
-                { id: "red", label: "Red", color: "pinkDark" },
-                { id: "orange", label: "Orange", color: "orangeDark" }
+                { id: "blue", label: "Blue", color: "blue" },
+                { id: "green", label: "Green", color: "green" },
+                { id: "red", label: "Red", color: "pink" },
+                { id: "orange", label: "Orange", color: "orange" }
             ]
         }
     },
@@ -97,7 +97,15 @@ export const categoriesCollection: CollectionConfig = {
 ### Articles
 
 ```typescript
-export const articlesCollection: CollectionConfig = {
+// The row shape, so callbacks below see typed `values` instead of `unknown`.
+type Article = {
+    title: string;
+    slug: string;
+    status: string;
+    published_at?: string | null;
+};
+
+export const articlesCollection: CollectionConfig<Article> = {
     slug: "articles",
     name: "Articles",
     singularName: "Article",
@@ -123,9 +131,9 @@ export const articlesCollection: CollectionConfig = {
             type: "string",
             name: "Status",
             enum: [
-                { id: "draft", label: "Draft", color: "grayDark" },
-                { id: "review", label: "In Review", color: "orangeDark" },
-                { id: "published", label: "Published", color: "greenDark" }
+                { id: "draft", label: "Draft", color: "gray" },
+                { id: "review", label: "In Review", color: "orange" },
+                { id: "published", label: "Published", color: "green" }
             ],
             defaultValue: "draft"
         },
@@ -187,13 +195,13 @@ export const articlesCollection: CollectionConfig = {
             }
             // Set published_at when publishing
             if (values.status === "published" && !values.published_at) {
-                values.published_at = new Date();
+                values.published_at = new Date().toISOString();
             }
             return values;
         }
     },
     securityRules: [
-        { operation: "select", access: "public", using: "{status} = 'published'" },
+        { operation: "select", using: "{status} = 'published'" },
         { operation: "select", ownerField: "author_id" },
         { operations: ["insert", "update"], ownerField: "author_id" },
         { operation: "delete", roles: ["admin"] }
@@ -227,19 +235,31 @@ You now have a fully functional blog CMS with:
 Use the client SDK to fetch articles with their relations:
 
 ```typescript
+// The row shape you expect back — without it every field arrives as `unknown`.
+type Article = {
+    title: string;
+    status: string;
+    published_at?: string | null;
+    author_id: string;
+    author?: { name: string };
+    categories?: { name: string }[];
+};
+
 // Fetch published articles with author and categories included
-const { data: articles } = await client.data.articles
+const { data: articles } = await client.data
+    .collection<Article>("articles")
     .where("status", "==", "published")
     .include("author", "categories")
     .orderBy("published_at", "desc")
     .limit(10)
     .find();
 
+// Rows come back flat — there is no `values` wrapper on the SDK.
 for (const article of articles) {
-    console.log(article.values.title);
-    console.log(article.values.author?.name);    // Hydrated relation
-    console.log(article.values.author_id);       // Scalar FK
-    console.log(article.values.categories);      // Array of related entities
+    console.log(article.title);
+    console.log(article.author?.name);    // Hydrated relation
+    console.log(article.author_id);       // Scalar FK
+    console.log(article.categories);      // Array of related entities
 }
 ```
 

@@ -174,7 +174,7 @@ interface SecurityRule {
 ```typescript
 securityRules: [
     // Cualquiera puede leer publicaciones publicadas
-    { operation: "select", access: "public", using: "{status} = 'published'" },
+    { operation: "select", using: "{status} = 'published'" },
     // Los autores pueden ver sus propios borradores
     { operation: "select", ownerField: "author_id" },
     // Los autores pueden crear y editar sus propias publicaciones

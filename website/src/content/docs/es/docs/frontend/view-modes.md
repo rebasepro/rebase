@@ -78,10 +78,10 @@ const tasksCollection: CollectionConfig = {
             type: "string",
             name: "Estado",
             enum: [
-                { id: "backlog", label: "Pendientes", color: "grayDark" },
-                { id: "in_progress", label: "En Progreso", color: "blueDark" },
-                { id: "review", label: "Revisión", color: "orangeDark" },
-                { id: "done", label: "Hecho", color: "greenDark" }
+                { id: "backlog", label: "Pendientes", color: "gray" },
+                { id: "in_progress", label: "En Progreso", color: "blue" },
+                { id: "review", label: "Revisión", color: "orange" },
+                { id: "done", label: "Hecho", color: "green" }
             ]
         },
         sort_order: { type: "number", name: "Orden de Clasificación" }

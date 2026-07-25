@@ -38,9 +38,9 @@ export const productsCollection: CollectionConfig = {
             type: "string",
             name: "Category",
             enum: [
-                { id: "electronics", label: "Electronics", color: "blueDark" },
+                { id: "electronics", label: "Electronics", color: "blue" },
                 { id: "clothing", label: "Clothing", color: "pinkLight" },
-                { id: "books", label: "Books", color: "orangeDark" }
+                { id: "books", label: "Books", color: "orange" }
             ]
         },
         description: {

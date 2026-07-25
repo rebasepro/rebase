@@ -174,7 +174,7 @@ interface SecurityRule {
 ```typescript
 securityRules: [
     // Jeder kann veröffentlichte Beiträge lesen
-    { operation: "select", access: "public", using: "{status} = 'published'" },
+    { operation: "select", using: "{status} = 'published'" },
     // Autoren können ihre eigenen Entwürfe sehen
     { operation: "select", ownerField: "author_id" },
     // Autoren können ihre eigenen Beiträge erstellen und bearbeiten
