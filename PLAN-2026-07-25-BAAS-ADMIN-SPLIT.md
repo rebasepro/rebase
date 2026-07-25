@@ -1,5 +1,9 @@
 # Plan — separating the BaaS from the admin panel
 
+> **Status: implemented, 2026-07-25.** Commits `e102bc11` → `04e02ece` on
+> `feat/baas-admin-types-split`. See "What the plan got wrong" at the bottom — five
+> things, all of which would have made the split look impossible if hit blind.
+
 **Date:** 2026-07-25
 **Goal:** Rebase must read, install and typecheck as a backend-as-a-service on its own.
 Today the BaaS contract and the admin panel's view model live in one type package and one
@@ -429,3 +433,74 @@ verified, with only the authoring ergonomics left undone.
 - Runtime behaviour of the admin panel. Every phase is type-level and mechanical; a
   visible admin regression means something went wrong, not something changed.
 - Making BaaS mode's DB introspection richer. Separate concern, already documented.
+
+
+---
+
+## What the plan got wrong
+
+Recorded because each of these is a trap the next person would fall into.
+
+**1. `AdminCollectionOptions` cannot be an `interface`.** The plan specified one.
+TypeScript gives an implicit index signature to an object *type alias* but not to an
+interface, so as an interface it is not assignable to `AdminBlock`, and every
+collection authored with a typed block is rejected wherever a plain
+`CollectionConfig` is expected. That single change cleared 60 of 119 remaining type
+errors. This is the one that would most likely be read as "the opaque-block approach
+doesn't work".
+
+**2. `Omit<CollectionConfig, "admin">` collapses the union.** `CollectionConfig` is
+discriminated on `engine`, and a non-distributive `Omit` widens the discriminant, so
+the result stops being assignable back to `CollectionConfig` — breaking every call
+that hands a resolved collection to a core function. Both mappings need
+`C extends unknown ? … : never`.
+
+**3. The panel needed a flat view model, not 350 rewritten call sites.** The plan
+implied `collection.admin?.propertiesOrder` everywhere. The right answer was
+`AdminCollection` — flat — resolved once at the registry funnel, because the panel
+never reads a raw collection: by then the declared config has been merged with the
+user's local overrides. Same split `Entity` already has against flat rows.
+
+**4. `ADMIN_COLLECTION_KEYS` has to live in core, not `admin-types`.** The plan put it
+in `admin-types`. The ts-morph schema editor is in `@rebasepro/server`, which the
+guard forbids from importing an admin package. The list is plain data, so core owns it
+and `admin-types` re-exports it through a `satisfies` clause that is the agreement
+check.
+
+**5. `icon` is not read server-side.** The plan claimed the OpenAPI generator and the
+console render it, and kept it in core on that basis. Checked: nothing reads it.
+`name`, `singularName` and `description` *are* read by the OpenAPI generator, so those
+stayed. Measuring all 38 candidate fields against the backend packages before moving
+any of them is what made the partition defensible — the answer was zero reads for all
+38.
+
+Also worth knowing:
+
+- **Annotation, not `satisfies`, for collection files.** `satisfies` keeps the literal
+  type, which then stops matching `CollectionConfig` where a relation's
+  `target: () => otherCollection` thunk needs it. The annotation checks the same
+  excess properties and widens.
+- **The typed block must be a *type-only* import.** `defineCollection` from
+  `admin-types` is a value, so it would put an admin package in the backend's module
+  graph and fail `check:headless`. `import type { AdminCollectionConfig }` is erased
+  and still gives excess-property checking.
+- **The core type guards narrowed by replacement**, discarding the caller's type.
+  Generic-over-input with intersection narrowing is strictly better and was required.
+- **`CollectionRegistryController.collections` was hardcoded** to `CollectionConfig`
+  while `getCollection` honoured the `EC` parameter.
+
+## What is still open
+
+- `packages/cli/test/e2e/templates.test.ts` has 6 pre-existing failures
+  (`REGISTRATION_DISABLED` — `ALLOW_REGISTRATION` defaults to `false` and the
+  scaffolded `.env` does not set it). Failing in CI before this work; spun off.
+- `pnpm verify:docs` still reports 253 findings, warn-only and almost all
+  pre-existing (256 before this work). Syntax findings are identical at 11, which is
+  what proves the fence codemod broke nothing.
+- `saas/config` is migrated but **uncommitted** — that checkout had another session's
+  work in it, so the migration was left in the working tree rather than mixed into
+  someone else's change.
+- The CMS init e2e (`cli-init-e2e.ts`) verified scaffold → install → build →
+  `db generate`/`db push` → dev boot → API reads, then stalled on step 9 pulling
+  `node:22-alpine`. A bare `docker pull node:22-alpine` hangs the same way here, so
+  that is Docker Hub, not the code.
