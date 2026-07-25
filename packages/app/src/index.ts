@@ -14,6 +14,11 @@ export { useRestoreScroll } from "./internal/useRestoreScroll";
 export { useUnsavedChangesDialog } from "./hooks/useUnsavedChangesDialog";
 export { NavigationBlockerProvider, useNavigationBlocker } from "./hooks/useNavigationBlocker";
 export type { UnsavedChangesDialogProps } from "./components/UnsavedChangesDialog";
+// The element type of the `storageSources` prop on `<Rebase>`. Anyone registering a
+// direct-transport backend writes this shape by hand, and the docs have always told
+// them to import it from here — it was simply never exported. Type-only, so it adds
+// nothing to the bundle.
+export type { RebaseStorageSource } from "./core/RebaseProps";
 export { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
 export * from "./i18n/RebaseI18nProvider";
 export * from "./locales/en";

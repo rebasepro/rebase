@@ -1165,7 +1165,8 @@ import { iconKeys, coolIconKeys, lucideIcons } from "@rebasepro/ui";
 Converts a snake_case icon key to a PascalCase component name with `Icon` suffix:
 
 ```tsx
-import { keyToIconComponent } from "@rebasepro/ui";
+// Internal plumbing: `@rebasepro/ui` does not re-export this from its entry point.
+import { keyToIconComponent } from "@rebasepro/ui/util/key_to_icon_component";
 
 keyToIconComponent("arrow_right"); // "ArrowRightIcon"
 keyToIconComponent("database");    // "DatabaseIcon"

@@ -971,22 +971,26 @@ API keys have their own per-key rate limiter. The `rate_limit` on each key speci
 }
 ```
 
-### Custom Rate Limiter
+### Rate limiting
 
-```typescript
-import { createRateLimiter } from "@rebasepro/server";
+Configure it on the backend, with `rateLimit`. `createRateLimiter` and friends are
+internal plumbing — `@rebasepro/server` deliberately does not republish them at the
+package root, because the limits a backend author actually wants are these:
 
-const myLimiter = createRateLimiter({
-  windowMs: 60 * 1000,         // 1 minute
-  limit: 10,                   // 10 requests per minute
-  message: "Slow down!",
-  keyGenerator: (c) => {
-    // Custom keying (e.g., by user ID)
-    const user = c.get("user");
-    return user?.userId || c.req.header("x-forwarded-for") || "unknown";
-  },
+```typescript no-verify
+const backend = await initializeRebaseBackend({
+    // ... server, app, database, auth
+    rateLimit: {
+        windowMs: 60 * 1000,   // the window every count below is measured in
+        user: 1000,            // per signed-in user
+        apiKey: 1000,          // fallback for a key with no `rate_limit` of its own
+        anonymous: 100,        // per IP for unauthenticated callers; null disables
+        // enabled: false      // for a deployment whose proxy already rate-limits
+        // store: myStore      // share counts across replicas (defaults to this process)
+    }
 });
 ```
+
 
 ---
 

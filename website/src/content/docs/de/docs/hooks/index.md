@@ -163,10 +163,10 @@ function SelectProduct() {
 Zugriff auf Navigationszustand und aufgelöste Sammlungen:
 
 ```typescript
-import { useNavigationController } from "@rebasepro/app";
+import { useNavigationStateController } from "@rebasepro/admin";
 
 function MyComponent() {
-    const navigation = useNavigationController();
+    const navigation = useNavigationStateController();
 
     navigation.collections     // All registered collections
     navigation.views           // Custom views

@@ -34,45 +34,17 @@ import { RebaseAdmin } from "@rebasepro/admin";
 />
 ```
 
-### Console SQL
+### Outils intégrés
 
-Exécutez des requêtes SQL brutes sur votre base de données PostgreSQL et visualisez les résultats dans un tableau :
+Ils sont fournis avec Studio et **chargés à la demande par `RebaseStudio`** — chacun forme un chunk distinct, récupéré à la première ouverture. Ils ne sont pas importables séparément : `@rebasepro/studio` n'exporte délibérément que l'orchestrateur, si bien qu'une console jamais ouverte ne coûte rien.
 
-```tsx
-import { SQLEditor } from "@rebasepro/studio";
+| Onglet | Slug | Rôle |
+|--------|------|------|
+| Console SQL | `sql` | Exécuter du SQL brut sur votre base PostgreSQL et lire les résultats dans un tableau |
+| Console JS | `js` | Écrire et exécuter du JavaScript via le SDK Rebase |
+| Éditeur de politiques RLS | `rls` | Inspecter et gérer les politiques Row Level Security de vos tables |
+| Navigateur de stockage | `storage` | Parcourir, téléverser et gérer les fichiers de vos backends de stockage |
 
-{ slug: "sql", name: "SQL Console", view: <SQLEditor /> }
-```
-
-### Console JS
-
-Écrivez et exécutez du JavaScript en utilisant le SDK Rebase :
-
-```tsx
-import { JSEditor } from "@rebasepro/studio";
-
-{ slug: "js", name: "JS Console", view: <JSEditor /> }
-```
-
-### Éditeur de politiques RLS
-
-Visualisez et gérez les politiques de sécurité au niveau des lignes (Row Level Security) pour vos tables PostgreSQL :
-
-```tsx
-import { RLSEditor } from "@rebasepro/studio";
-
-{ slug: "rls", name: "RLS Policies", view: <RLSEditor /> }
-```
-
-### Navigateur de stockage
-
-Parcourez, téléchargez et gérez les fichiers dans vos backends de stockage :
-
-```tsx
-import { StorageView } from "@rebasepro/studio";
-
-{ slug: "storage", name: "Storage", view: <StorageView /> }
-```
 
 ## Ajout de vues Studio
 

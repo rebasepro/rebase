@@ -163,10 +163,10 @@ function SelectProduct() {
 Acceder al estado de navegación y colecciones resueltas:
 
 ```typescript
-import { useNavigationController } from "@rebasepro/app";
+import { useNavigationStateController } from "@rebasepro/admin";
 
 function MyComponent() {
-    const navigation = useNavigationController();
+    const navigation = useNavigationStateController();
 
     navigation.collections     // Todas las colecciones registradas
     navigation.views           // Vistas personalizadas
