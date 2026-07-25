@@ -2,7 +2,51 @@
 
 ## [Unreleased]
 
+### Breaking
+
+- **Admin-panel presentation moved into an `admin` block** — a collection carried two unrelated concerns in one flat object: what the data *is* (table, schema, properties, relations, validation, security rules, callbacks) and how an admin panel should *draw* it (`icon`, `group`, `listProperties`, `kanban`, entity views, selection controllers, …). Ninety-five fields of the second kind sat beside the first, and twelve React view-model types were exported from `collections.ts` — so a backend that never renders anything still pulled the React layer into its type graph, and `@rebasepro/types` could not be a backend contract while it depended on React.
+
+  `@rebasepro/types` is now the React-free BaaS contract; the presentation layer lives in a new `@rebasepro/admin-types` that depends on it, and nothing in core depends back. `pnpm check:baas-types` typechecks a full BaaS project — backend, driver, collection file, SDK reads and writes — with `react` mapped to a stub, which is the invariant that keeps it that way.
+
+  **What to change.** Move presentation fields into `admin`:
+
+  ```diff
+   export default {
+       slug: "posts",
+       table: "posts",
+  -    icon: "FileText",
+  -    group: "Content",
+  -    propertiesOrder: ["id", "title"],
+  -    sort: ["updatedAt", "desc"],
+       properties: { /* … */ },
+  +    admin: {
+  +        icon: "FileText",
+  +        group: "Content",
+  +        propertiesOrder: ["id", "title"],
+  +        sort: ["updatedAt", "desc"]
+  +    }
+   };
+  ```
+
+  The backend loads the block and never reads inside it, so a project with no admin panel can drop these fields entirely. For completion and checking inside `admin`, author with `defineCollection` from `@rebasepro/admin-types` — it captures the property literals, so `admin.titleProperty`, `admin.sort` and `admin.propertiesOrder` complete over your own property keys instead of `string`.
+
 ### Added
+
+- **A project is a bundle, and the runtime is the platform's** — `rebase build` now emits `dist-bundle/`: compiled collections, functions, crons and schema plus a generated `manifest.json` recording the runtime range it needs, a `schemaVersion` hash, its declared dependencies, and whether it uses native modules. `@rebasepro/server` boots it (`bootFromBundle`, bin `rebase-server`), and `docker/server.Dockerfile` publishes that as an image. The consequence is the point: **the engine can be replaced under a project without rebuilding it** — upgrading is a new image tag against the same bundle — and self-hosting becomes "run the image with your bundle" rather than "build and maintain your own container". `docker/docker-compose.selfhost.yml` is that, ready to run.
+
+  A repo-root `rebase.json` declares topology only — the runtime compatibility range and the apps this repository contributes (`backend`, `static`, `admin`, `mobile`). Schema, rules, hooks and functions stay TypeScript in `config/`, which is the point of the product and does not move into JSON. `rebase link` accepts a self-hosted base URL wherever it accepts a cloud project, and writes an uncommitted `.rebase/cloud.json`, because a project reference is per-checkout.
+
+- **Remote SDK generation from a running project** — `GET /api/meta/contract` (admin, service-key or admin API-key gated; fail-closed 404 when no auth is configured) serves the collection contract, and `rebase generate-sdk --from <link|url>` reads it instead of importing local `config/`. A second repository can therefore build a typed client against a backend it does not contain, which is what makes the multi-repo case work at all. The SDK records the `schemaVersion` it was generated against so drift is detectable; `GET /api/meta/schema-version` is deliberately unauthenticated and returns only that hash.
+
+- **Collection tables are created at boot, additively** — the runtime ensured its auth tables and nothing ensured the project's, so a backend booted against a fresh database answered sign-in and then `500` on every data route. `REBASE_MIGRATE_ON_BOOT=ensure` (the default) now creates missing tables, columns and enum types before serving. **Additive only, permanently**: it never drops, narrows or rewrites, so it is safe to run unattended on every start and re-running is a no-op. A removed field leaves its column behind and a rename reads as an addition — destructive changes stay a deliberate `rebase db push`, with its dry-run and confirmation gate. `none` opts out.
+
+- **Storage authorization can look up ownership** — `storageAuthorize` received a key, a bucket, an operation and a user, and no way to answer the only question that matters: *who owns this object?* Ownership lives in a row, so a hook limited to prefix arithmetic on the key expresses no real multi-tenant rule — and it could not fetch that row itself, because the hook is declared in the project's `config` package, which depends on `@rebasepro/types` alone and cannot resolve `@rebasepro/server` at runtime. The context now carries a trusted, read-only, RLS-bypassing reader (`ctx.data`). It bypasses RLS deliberately: the hook *is* the authorization decision, so making it decide through a reader already narrowed by the caller's permissions is circular.
+
+- **Multiple data and storage sources** — declare `dataSources` / `storageSources` as exports of the config package and configure each by suffixing its env var with the source key: `DATABASE_URL__ANALYTICS`, `S3_BUCKET__MEDIA`. Two underscores, because one collides with real variable names (`S3_BUCKET_NAME`). A source that is declared but not configured fails boot rather than silently falling through to the default database.
+
+- **Prometheus metrics** — `/metrics` in Prometheus text format, off unless `REBASE_METRICS=true` and gated by `REBASE_METRICS_TOKEN`: request counts and latency histograms per surface, plus process heap, RSS and uptime. Self-hosters can scrape it directly.
+
+- **`rebase build` folds a single static app into the backend bundle** — the runtime already served a SPA from `entry.static`; nothing put the assets there. So a project whose container served its site at `/` and its API at `/api` lost the site when it moved to a platform-run runtime: the API answered and every page 404'd. The frontend now travels in the bundle and one runtime serves both, which is the shape the scaffolded template produces. `--no-static` opts out.
 
 - **Local-first sync in the client SDK (`offline: true`)** — the data layer keeps a normalized local database of rows rather than a cache of responses, and answers queries against it. A row written offline therefore appears in *every* filtered list it belongs to (filters, sorting and pagination are evaluated locally), a row edited in one view updates in all of them, and `findById` answers for a row only ever seen inside a `find`. Server responses merge into that database instead of replacing it, so a row carrying unsynced local writes keeps them — the user's own change never flickers away underneath them.
 
@@ -17,6 +61,12 @@
 - **No bucket means no file storage, rather than a crash or a disappearing disk** — 0.10.0 made a production backend *refuse to boot* on `type: "local"`, which stopped the silent data loss but replaced it with a crash-looping rollout for anyone who simply had not configured storage — a project that never uploads a file was taken down by a feature it does not use. Storage is now opt-in instead: with no bucket configured in production, no storage backend is registered, `/api/storage/*` answers `501 STORAGE_NOT_CONFIGURED` with the fix in the message, and everything else — data, auth, realtime — keeps serving. `501` and not `503`, so the client's offline queue does not retry uploads that can never land.
 
   The scaffolded backend matches: it configures S3 for `STORAGE_TYPE=s3` and now GCS for `STORAGE_TYPE=gcs`, and falls back to local disk only outside production (or with `FORCE_LOCAL_STORAGE=true`, for a deployment with a real volume mounted). A named backend that is local-in-production is dropped from a multi-backend map without taking the durable ones with it.
+
+### Fixed
+
+- **`rebase cloud link` was broken from a fresh checkout** — three prompts still used inquirer's removed `list` type, so running it interactively died with `Prompt type "list" is not registered`. Prompts are only constructed when a command actually asks something, so every non-interactive test passed and CI stayed green while the first command anyone runs did not work.
+
+- **`rebase build` produced bundles that could not boot** — TypeScript emits import specifiers untouched, so a project on `moduleResolution: "bundler"` compiled `from "./posts"` and Node ESM refused it. Specifiers are rewritten after compilation. Bundle tarballs no longer carry macOS extended-attribute headers, which GNU tar warned about once per file on extraction and which buried real errors.
 
 ## [0.10.0] - 2026-07-20
 
