@@ -18,7 +18,7 @@ import { useSearchParams } from "react-router-dom";
 import { deepEqual as equal } from "fast-equals"
 import { CollectionRowActions, CollectionTableBinding } from "../CollectionTableBinding";
 import { CollectionTableToolbar } from "../CollectionTableBinding/internal/CollectionTableToolbar";
-import { getSubcollections } from "@rebasepro/common";
+import { getEntityChildViews } from "@rebasepro/common";
 import { useCollectionInlineEditor } from "./hooks/useCollectionInlineEditor";
 import { navigateToEntity } from "../../util/navigation_utils";
 import { mergeEntityActions } from "../../util/entity_actions";
@@ -65,7 +65,7 @@ import {
     VirtualTableColumn
 } from "@rebasepro/ui";
 import { getSubcollectionColumnId } from "../CollectionTableBinding/internal/common";
-import { copyEntityAction, deleteEntityAction, editEntityAction } from "../common/default_entity_actions";
+import { copyEntityAction, deleteEntityAction, editEntityAction, unlinkEntityAction } from "../common/default_entity_actions";
 import { PopupFormField } from "../CollectionTableBinding/internal/popup_field/PopupFormField";
 import { GetPropertyForProps } from "../CollectionTableBinding/CollectionTableBindingProps";
 import { DeleteEntityDialog } from "../DeleteEntityDialog";
@@ -79,6 +79,7 @@ import { useCMSContext } from "../../hooks/useCMSContext";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../../hooks/useSidePanel";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
+import { useChildViewSource } from "../../hooks/useChildViewSource";
 
 const EMPTY_ARRAY: never[] = [];
 
@@ -176,6 +177,15 @@ const CollectionViewBindingInner = React.memo(
         const analyticsController = useAnalyticsController();
         const customizationController = useCustomizationController();
         const { canCreate, canEdit, canDelete } = usePermissions();
+
+
+        /**
+         * Rows shared with other parents through a junction. The parent owns
+         * the link, not the row — so the destructive action is a removal from
+         * this record, which is what the server performs for such a path.
+         */
+        const childViewSource = useChildViewSource(path);
+        const isLinkedChildView = childViewSource?.kind === "relation" && childViewSource.mode === "linked";
 
         const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -622,8 +632,10 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         const displayedColumnIds = useColumnIds(collectionWithLocalOrder, true);
 
         const additionalFields = useMemo(() => {
-            // v4: use getSubcollections helper to access subcollections
-            const subcollectionsList = getSubcollections(collection);
+            // Each child view gets a column that jumps to its tab. Keyed by the
+            // view's collection slug, which is the relation key — two relations
+            // to the same target used to collapse onto one column id here.
+            const subcollectionsList = getEntityChildViews(collection).map(v => v.collection as AdminCollection);
             const subcollectionColumns: AdditionalFieldDelegate<M, any>[] = subcollectionsList.map((subcollection: AdminCollection) => {
                 return {
                     key: getSubcollectionColumnId(subcollection),
@@ -683,12 +695,16 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             }
             if (createEnabled && !disableActions.includes("copy"))
                 actions.push(copyEntityAction);
-            if (deleteEnabled && !disableActions.includes("delete"))
-                actions.push(deleteEntityAction);
+            if (deleteEnabled && !disableActions.includes("delete")) {
+                // On a junction-backed tab the server removes the link, not the
+                // row. Same request either way — this is the button telling the
+                // truth about what it will do.
+                actions.push(isLinkedChildView ? unlinkEntityAction : deleteEntityAction);
+            }
             if (customEntityActions)
                 return mergeEntityActions(actions, customEntityActions);
             return actions;
-        }, [canDelete, collection, path, createEnabled]);
+        }, [canDelete, collection, path, createEnabled, isLinkedChildView]);
 
         const getIdColumnWidth = useCallback(() => {
             const entityActions = getActionsForEntity({});

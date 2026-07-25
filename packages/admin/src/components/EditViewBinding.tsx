@@ -4,7 +4,7 @@ import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/admin-types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, getCollectionDataPath } from "@rebasepro/types";
-import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider, getAdminSubcollections } from "@rebasepro/app";
+import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider, getAdminEntityChildViews } from "@rebasepro/app";
 
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { EntityViewBinding } from "./EntityViewBinding";
@@ -258,7 +258,8 @@ parentEntityIds,
         }
     }, [selectedTabProp, defaultSelectedView]);
 
-    const subcollections = getAdminSubcollections(collection).filter(c => !c.hideFromNavigation);
+    const childViews = getAdminEntityChildViews(collection).filter(v => !v.collection.hideFromNavigation);
+    const subcollections = childViews.map(v => v.collection);
     const subcollectionsCount = subcollections?.length ?? 0;
     const customViews = collection.entityViews ?? [];
     const customViewsCount = customViews?.length ?? 0;
@@ -410,7 +411,7 @@ parentEntityIds,
         </ErrorBoundary>
     </div> : null;
 
-    const subCollectionsViews = subcollections && subcollections.map((subcollection) => {
+    const subCollectionsViews = childViews && childViews.map(({ collection: subcollection }) => {
         const subcollectionId = subcollection.slug;
         const newFullPath = usedEntity ? `${path}/${usedEntity?.id}/${removeInitialAndTrailingSlashes(getCollectionDataPath(subcollection))}` : undefined;
 

@@ -2,6 +2,27 @@ import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+
+/**
+ * A query chain that resolves to `rows` however it is continued.
+ *
+ * These mocks used to stop at `.where()` — the shape the old nested-path
+ * builder happened to produce, which honoured `limit` and nothing else. A
+ * nested listing is now the ordinary collection query with one more condition,
+ * so it continues into `orderBy`/`limit`/`offset` like any other. Modelling the
+ * whole chain keeps these tests about behaviour rather than about which builder
+ * ran.
+ */
+function resolvesTo(rows: unknown[]) {
+    const chain: Record<string, unknown> = {
+        then: (resolve: Function) => resolve(rows)
+    };
+    for (const method of ["limit", "offset", "orderBy", "where", "innerJoin", "$dynamic"]) {
+        chain[method] = jest.fn(() => chain);
+    }
+    return chain;
+}
+
 const collectionRegistry = new PostgresCollectionRegistry();
 
 describe("DataService - Relation Types Tests", () => {
@@ -208,12 +229,7 @@ total: 200,
 customer_id: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
-            db.where.mockReturnValue({
-                then: (resolve: Function) => resolve(mockOrders),
-                limit: jest.fn().mockReturnValue({
-                    then: (resolve: Function) => resolve(mockOrders)
-                })
-            });
+            db.where.mockReturnValue(resolvesTo(mockOrders) as never);
 
             const entities = await dataService.fetchCollection("customers/1/orders", {});
 
@@ -289,20 +305,17 @@ price: 10 },
 name: "Product 2",
 price: 20 }
             ];
-            // For many-to-many with through table, the query uses innerJoin and ends with where()
-            db.where.mockReturnValue({
-                then: (resolve: Function) => resolve(mockProducts),
-                limit: jest.fn().mockReturnValue({
-                    then: (resolve: Function) => resolve(mockProducts)
-                })
-            });
+            db.where.mockReturnValue(resolvesTo(mockProducts) as never);
 
             const entities = await dataService.fetchCollection("orders/1/products", {});
 
             expect(entities).toHaveLength(2);
             expect(entities[0].name).toBe("Product 1");
-            // Should use JOIN for many-to-many relations
-            expect(db.innerJoin).toHaveBeenCalled();
+            // The junction is reached with a correlated EXISTS, not an INNER
+            // JOIN. A join through a junction multiplies the target rows by the
+            // number of matching links, which silently breaks `limit`/`offset`
+            // — the whole reason a related listing can now paginate at all.
+            expect(db.innerJoin).not.toHaveBeenCalled();
         });
 
         it("should create many-to-many relations correctly", async () => {
@@ -337,12 +350,7 @@ bio: "User bio",
 user_id: 1 }
             ];
             // RelationService ends query chain with where()
-            db.where.mockReturnValue({
-                then: (resolve: Function) => resolve(mockProfile),
-                limit: jest.fn().mockReturnValue({
-                    then: (resolve: Function) => resolve(mockProfile)
-                })
-            });
+            db.where.mockReturnValue(resolvesTo(mockProfile) as never);
 
             const entities = await dataService.fetchCollection("customers/1/profile", {});
 
@@ -410,12 +418,7 @@ __type: "relation" }
 name: "Product 1" }
             ];
             // RelationService ends query chain with where()
-            db.where.mockReturnValue({
-                then: (resolve: Function) => resolve(mockProducts),
-                limit: jest.fn().mockReturnValue({
-                    then: (resolve: Function) => resolve(mockProducts)
-                })
-            });
+            db.where.mockReturnValue(resolvesTo(mockProducts) as never);
 
             const entities = await dataService.fetchCollection("customers/1/orders/1/products", {});
 
@@ -430,12 +433,7 @@ total: 100,
 customer_id: 1 }
             ];
             // RelationService ends query chain with where()
-            db.where.mockReturnValue({
-                then: (resolve: Function) => resolve(mockOrders),
-                limit: jest.fn().mockReturnValue({
-                    then: (resolve: Function) => resolve(mockOrders)
-                })
-            });
+            db.where.mockReturnValue(resolvesTo(mockOrders) as never);
 
             const entities = await dataService.fetchCollection("customers/1/orders", {
                 filter: { total: [">=", 100] }
@@ -455,12 +453,7 @@ total: 100,
 customer_id: 1 }
             ];
             // RelationService ends query chain with where()
-            db.where.mockReturnValue({
-                then: (resolve: Function) => resolve(mockOrders),
-                limit: jest.fn().mockReturnValue({
-                    then: (resolve: Function) => resolve(mockOrders)
-                })
-            });
+            db.where.mockReturnValue(resolvesTo(mockOrders) as never);
 
             const entities = await dataService.fetchCollection("customers/1/orders", {
                 orderBy: "total",

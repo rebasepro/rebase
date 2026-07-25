@@ -9,9 +9,9 @@
  * (`DefaultSelectedViewBuilder`), which was the last UI symbol any core package
  * imported.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { ChildViewSource, CollectionConfig } from "@rebasepro/types";
 import { type AdminCollection, type DefaultSelectedViewBuilder, type DefaultSelectedViewParams, resolveAdminCollection } from "@rebasepro/admin-types";
-import { getSubcollections } from "@rebasepro/common";
+import { getEntityChildViews } from "@rebasepro/common";
 
 export function resolveDefaultSelectedView(
     defaultSelectedView: string | DefaultSelectedViewBuilder | undefined,
@@ -53,5 +53,24 @@ export function getLocalChangesBackup(collection: AdminCollection) {
 export function getAdminSubcollections(
     collection: AdminCollection | CollectionConfig
 ): AdminCollection[] {
-    return (getSubcollections(collection as CollectionConfig) ?? []).map(resolveAdminCollection);
+    return getAdminEntityChildViews(collection).map(view => view.collection);
+}
+
+/**
+ * A collection's child views as the panel's view model, keeping the `source`
+ * that says what kind of list each one is.
+ *
+ * The tabs need it: on a junction-backed relation the parent owns the *link*,
+ * so the destructive action is a removal from this record, not a delete. Every
+ * caller that renders a tab should prefer this over
+ * {@link getAdminSubcollections}, which flattens that distinction away.
+ */
+export function getAdminEntityChildViews(
+    collection: AdminCollection | CollectionConfig
+): { key: string; collection: AdminCollection; source: ChildViewSource }[] {
+    return (getEntityChildViews(collection as CollectionConfig) ?? []).map(view => ({
+        key: view.key,
+        collection: resolveAdminCollection(view.collection),
+        source: view.source
+    }));
 }

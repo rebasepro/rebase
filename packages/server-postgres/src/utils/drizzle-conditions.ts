@@ -39,6 +39,149 @@ export interface DrizzleDynamicQuery {
 export class DrizzleConditionBuilder {
 
     /**
+     * Express "reachable from this parent through this relation" as a plain
+     * `WHERE` condition on the target table.
+     *
+     * This is the primitive that lets a relation be a *filter* rather than an
+     * addressing scheme. A nested listing used to be served by its own query
+     * builder — `fetchEntitiesUsingJoins`, which grew joins the root pipeline
+     * did not have and lost the options the root pipeline did have (offset,
+     * filter, orderBy, include). Reduced to a condition, the same listing runs
+     * through the ordinary collection query, so it inherits all of them and
+     * there is one read path instead of two.
+     *
+     * The shapes:
+     *   - inverse FK  → `target.<fk> = :parentId`, a column comparison.
+     *   - `through`   → `EXISTS (SELECT 1 FROM junction …)`, correlated on the
+     *                   target's key, so the junction never multiplies rows the
+     *                   way an `INNER JOIN` would.
+     *   - `joinPath`  → the same `EXISTS`, with the path's steps joined inside
+     *                   it and the final step correlating to the outer row.
+     */
+    static buildRelationScopeCondition(
+        relation: Relation,
+        /**
+         * Lazy: only `joinPath` and `localKey` relations need the parent's own
+         * table. An inverse foreign key and a junction are both expressible
+         * from the parent's *id* alone, and requiring the table for them would
+         * make a child listing fail on a parent whose table isn't registered.
+         */
+        parent: () => { table: PgTable<any>; idColumn: AnyPgColumn },
+        parentId: string | number,
+        targetTable: PgTable<any>,
+        targetIdColumn: AnyPgColumn,
+        registry: PostgresCollectionRegistry
+    ): SQL {
+        if (relation.joinPath && relation.joinPath.length > 0) {
+            const { table, idColumn } = parent();
+            return this.buildJoinPathScopeCondition(
+                relation.joinPath, table, idColumn, parentId, targetIdColumn, registry
+            );
+        }
+
+        if (relation.through) {
+            const junctionTable = registry.getTable(relation.through.table);
+            if (!junctionTable) {
+                throw new Error(`Junction table not found: ${relation.through.table}`);
+            }
+            const sourceCol = junctionTable[relation.through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
+            const targetCol = junctionTable[relation.through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
+            if (!sourceCol || !targetCol) {
+                throw new Error(
+                    `Junction columns '${relation.through.sourceColumn}'/'${relation.through.targetColumn}' not found in '${relation.through.table}'`
+                );
+            }
+            return sql`EXISTS (SELECT 1 FROM ${junctionTable} WHERE ${targetCol} = ${targetIdColumn} AND ${sourceCol} = ${parentId})`;
+        }
+
+        if (relation.foreignKeyOnTarget) {
+            const fkColumn = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
+            if (!fkColumn) {
+                throw new Error(
+                    `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of relation ` +
+                    `'${relation.relationName}'. A many-to-many relation needs \`through\` instead.`
+                );
+            }
+            return eq(fkColumn, parentId);
+        }
+
+        if (relation.localKey) {
+            // A to-one owning relation read as a scope: the single target row is
+            // the one the parent's foreign key points at.
+            const { table, idColumn } = parent();
+            return sql`${targetIdColumn} = (SELECT ${sql.identifier(relation.localKey)} FROM ${table} WHERE ${idColumn} = ${parentId})`;
+        }
+
+        throw new Error(
+            `Relation '${relation.relationName}' declares no \`foreignKeyOnTarget\`, \`through\`, \`joinPath\` or ` +
+            "`localKey`, so there is no way to tell which target rows belong to a parent."
+        );
+    }
+
+    /**
+     * `EXISTS` for an explicit `joinPath`.
+     *
+     * The path is declared source → target. The subquery replays every step but
+     * the last from inside, and turns the last one into the correlation with the
+     * outer target row — so the target table is never named twice and needs no
+     * alias. Each intermediate table is aliased positionally, which keeps a path
+     * that revisits a table (a self-referencing many-to-many) unambiguous.
+     */
+    private static buildJoinPathScopeCondition(
+        joinPath: JoinStep[],
+        parentTable: PgTable<any>,
+        parentIdColumn: AnyPgColumn,
+        parentId: string | number,
+        targetIdColumn: AnyPgColumn,
+        registry: PostgresCollectionRegistry
+    ): SQL {
+        const sourceAlias = "__rel_src";
+        const aliasFor = (index: number) => `__rel_j${index}`;
+
+        // Column reference against the previous hop: the aliased source for the
+        // first step, the previous aliased join table after that.
+        const fromRef = (stepIndex: number, column: string) =>
+            sql`${sql.identifier(stepIndex === 0 ? sourceAlias : aliasFor(stepIndex - 1))}.${sql.identifier(getColumnName(column))}`;
+
+        const pairs = (step: JoinStep): { from: string; to: string }[] => {
+            const from = Array.isArray(step.on.from) ? step.on.from : [step.on.from];
+            const to = Array.isArray(step.on.to) ? step.on.to : [step.on.to];
+            if (from.length !== to.length) {
+                throw new Error(`Join step on '${step.table}' has ${from.length} \`from\` columns and ${to.length} \`to\` columns`);
+            }
+            return from.map((f, i) => ({ from: f, to: to[i] }));
+        };
+
+        const inner = joinPath.slice(0, -1);
+        const last = joinPath[joinPath.length - 1];
+
+        const joins: SQL[] = inner.map((step, index) => {
+            const table = registry.getTable(step.table);
+            if (!table) throw new Error(`Join table not found: ${step.table}`);
+            const on = pairs(step).map(({ from, to }) =>
+                sql`${fromRef(index, from)} = ${sql.identifier(aliasFor(index))}.${sql.identifier(getColumnName(to))}`
+            );
+            return sql`JOIN ${table} AS ${sql.identifier(aliasFor(index))} ON ${sql.join(on, sql` AND `)}`;
+        });
+
+        // The last step correlates to the outer row instead of joining the
+        // target table into the subquery.
+        const lastPairs = pairs(last);
+        const correlation = lastPairs.length === 1
+            ? sql`${fromRef(inner.length, lastPairs[0].from)} = ${targetIdColumn}`
+            : sql.join(
+                lastPairs.map(({ from, to }) =>
+                    sql`${fromRef(inner.length, from)} = ${sql.identifier(getColumnName(to))}`
+                ),
+                sql` AND `
+            );
+
+        const joinsSql = joins.length > 0 ? sql` ${sql.join(joins, sql` `)}` : sql``;
+
+        return sql`EXISTS (SELECT 1 FROM ${parentTable} AS ${sql.identifier(sourceAlias)}${joinsSql} WHERE ${sql.identifier(sourceAlias)}.${sql.identifier(parentIdColumn.name)} = ${parentId} AND ${correlation})`;
+    }
+
+    /**
      * Build filter conditions from FilterValues
      */
     static buildFilterConditions<M extends Record<string, unknown>>(

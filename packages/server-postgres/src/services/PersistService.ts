@@ -217,25 +217,32 @@ export class PersistService {
                 return parseIdValues(hop.parentId, parentPks)[parentPks[0].fieldName];
             };
 
-            if (id !== undefined) {
-                // Updating an existing row *through* a parent. The parent segment
-                // is an assertion about where the row already lives, not an
-                // instruction to move it there: injecting the FK here silently
-                // reparented whatever id was named, so `PUT authors/1/posts/43`
-                // stole post 43 from its real author. Check membership instead,
-                // and leave the FK to an explicit value in the body.
-                if (!await this.relationService.isRelated(hop, id)) {
-                    throw ApiError.notFound(`No row "${id}" in "${collectionPath}" to update.`);
-                }
-            } else if (hop.relation.through) {
-                // Many-to-many create: the new row is linked to the parent by a
-                // junction row written after the insert, below.
+            if (hop.relation.through) {
+                // A junction path addresses set membership, so a write through it
+                // asserts "this row is in this parent's set" — on create *and* on
+                // update. The junction row is written after the main write below,
+                // idempotently, which is what makes `PUT parent/id/child/childId`
+                // able to attach a row that already exists.
+                //
+                // Unlike an owning foreign key, this takes the row from nobody:
+                // its other parents keep it. That is why linking is safe here
+                // where reparenting (below) is not.
                 junctionTableInfo = {
                     parentCollection: hop.parentCollection,
                     parentId: parentIdForWrite(),
                     relation: hop.relation,
                     relationKey: hop.relationKey
                 };
+            } else if (id !== undefined) {
+                // Updating an existing row *through* an owning parent. The parent
+                // segment is an assertion about where the row already lives, not
+                // an instruction to move it there: injecting the FK here silently
+                // reparented whatever id was named, so `PUT authors/1/posts/43`
+                // stole post 43 from its real author. Check membership instead,
+                // and leave the FK to an explicit value in the body.
+                if (!await this.relationService.isRelated(hop, id)) {
+                    throw ApiError.notFound(`No row "${id}" in "${collectionPath}" to update.`);
+                }
             } else {
                 // One-to-many create: stamp the parent's id onto the child's FK.
                 const targetColumnName = this.resolveParentForeignKeyColumn(hop);

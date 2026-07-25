@@ -56,7 +56,18 @@ const tagsCollection: CollectionConfig = {
     properties: {
         id: { name: "ID", type: "string", isId: true },
         label: { name: "Label", type: "string" }
-    }
+    },
+    relations: [
+        // The other side of the junction, so a listing can be exercised through
+        // one. Named differently from its target's slug on purpose.
+        {
+            relationName: "posts_via_tag",
+            target: () => postsCollection,
+            cardinality: "many",
+            direction: "inverse",
+            through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" }
+        }
+    ]
 } as unknown as CollectionConfig;
 
 const authorsCollection: CollectionConfig = {
@@ -279,5 +290,69 @@ describe("Nested path writes (E2E)", () => {
     it("does not serve a row through a parent that does not own it", async () => {
         expect(await driver.fetchOne({ path: "authors/a-1/posts", id: "p-2" } as never)).toBeUndefined();
         expect(await driver.fetchOne({ path: "authors/a-1/posts", id: "p-1" } as never)).toBeDefined();
+    });
+
+    // ── 6. A child listing is the root listing, narrowed ─────────────────────
+    //
+    // These are the options the old nested-path builder accepted and silently
+    // dropped. They work now because there is no nested-path builder: a related
+    // listing is the ordinary collection query with one more condition.
+
+    describe("a related listing carries the root pipeline's query options", () => {
+        beforeEach(async () => {
+            await admin.query(`
+                INSERT INTO public.posts (id, title, author_id) VALUES
+                    ('p-3', 'Ada 2', 'a-1'),
+                    ('p-4', 'Ada 3', 'a-1'),
+                    ('p-5', 'Ada 4', 'a-1');
+                INSERT INTO public.posts_tags (post_id, tag_id) VALUES
+                    ('p-3', 't-1'), ('p-4', 't-1'), ('p-5', 't-2');
+            `);
+        });
+
+        const titles = (rows: Record<string, unknown>[]) => rows.map(r => r.title);
+
+        it("scopes to the parent at all", async () => {
+            const rows = await driver.fetchCollection({ path: "authors/a-1/posts" } as never);
+            expect(titles(rows).sort()).toEqual(["Ada 2", "Ada 3", "Ada 4", "Ada post"]);
+        });
+
+        it("applies filter", async () => {
+            const rows = await driver.fetchCollection({
+                path: "authors/a-1/posts",
+                filter: { title: ["==", "Ada 2"] }
+            } as never);
+            expect(titles(rows)).toEqual(["Ada 2"]);
+        });
+
+        it("applies orderBy and paginates with limit + offset", async () => {
+            const page1 = await driver.fetchCollection({
+                path: "authors/a-1/posts", orderBy: "title", order: "asc", limit: 2, offset: 0
+            } as never);
+            const page2 = await driver.fetchCollection({
+                path: "authors/a-1/posts", orderBy: "title", order: "asc", limit: 2, offset: 2
+            } as never);
+
+            expect(titles(page1)).toEqual(["Ada 2", "Ada 3"]);
+            // The bug this pins: page 2 used to be page 1 again.
+            expect(titles(page2)).toEqual(["Ada 4", "Ada post"]);
+        });
+
+        it("counts the rows the filter actually leaves", async () => {
+            expect(await driver.count!({ path: "authors/a-1/posts" } as never)).toBe(4);
+            expect(await driver.count!({
+                path: "authors/a-1/posts",
+                filter: { title: ["==", "Ada 2"] }
+            } as never)).toBe(1);
+        });
+
+        it("does the same through a junction, without the join multiplying rows", async () => {
+            const rows = await driver.fetchCollection({
+                path: "tags/t-1/posts_via_tag", orderBy: "title", order: "asc", limit: 2, offset: 1
+            } as never);
+
+            expect(titles(rows)).toEqual(["Ada 3", "Ada post"]);
+            expect(await driver.count!({ path: "tags/t-1/posts_via_tag" } as never)).toBe(4);
+        });
     });
 });

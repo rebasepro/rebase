@@ -1433,15 +1433,19 @@ parentSourceColName };
             const parsedNewEntityIdObj = parseIdValues(newEntityId, targetPks);
             const parsedNewEntityId = parsedNewEntityIdObj[targetIdInfo.fieldName];
 
-            // Create the junction table entry linking parent to the new row
+            // Create the junction table entry linking parent to the target row.
             const junctionData = {
                 [sourceJunctionColumn.name]: parentId,
                 [targetJunctionColumn.name]: parsedNewEntityId
             };
 
-            await tx.insert(junctionTable).values(junctionData);
+            // Idempotent: a link either exists or it does not, so asking for one
+            // twice is not an error. This is what lets `PUT parent/id/child/childId`
+            // mean "this row belongs to this parent's set" — the only way to
+            // attach an *existing* row, which previously had none.
+            await tx.insert(junctionTable).values(junctionData).onConflictDoNothing();
 
-            logger.info(`Created junction table entry for many-to-many relation '${relationKey}': ${JSON.stringify(junctionData)}`);
+            logger.info(`Linked '${relationKey}' ${parsedNewEntityId} to ${parentId}`);
         } catch (error) {
             logger.error(`Failed to create junction table entry for relation '${relationKey}'`, { error: error });
             throw error;

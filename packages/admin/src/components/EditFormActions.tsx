@@ -6,7 +6,7 @@ import React, { useMemo } from "react";
 import { Entity, getCollectionDataPath } from "@rebasepro/types";
 import { RebaseContext } from "@rebasepro/admin-types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
-import { copyEntityAction, deleteEntityAction } from "./common/default_entity_actions";
+import { copyEntityAction, deleteEntityAction, unlinkEntityAction } from "./common/default_entity_actions";
 import { mergeEntityActions } from "../util/entity_actions";
 import { resolveEntityAction } from "../util/resolutions";
 import { Button, CircularProgress, cls, defaultBorderMixin, DialogActions, IconButton, LoadingButton, Tooltip, Typography } from "@rebasepro/ui";
@@ -21,6 +21,7 @@ import { FormexController } from "@rebasepro/forms";
 import { ErrorTooltip } from "@rebasepro/app";
 import { usePermissions } from "@rebasepro/app";
 import { useCMSContext } from "../hooks/useCMSContext";
+import { useChildViewSource } from "../hooks/useChildViewSource";
 
 export function EditFormActions({
     collection,
@@ -45,6 +46,11 @@ export function EditFormActions({
     const customizationController = useCustomizationController();
     const { t } = useTranslation();
 
+    // Rows shared through a junction: the delete button here removes the
+    // link, because that is what the server does for this path.
+    const childViewSource = useChildViewSource(path);
+    const isLinkedChildView = childViewSource?.kind === "relation" && childViewSource.mode === "linked";
+
     const entityActions = useMemo((): EntityAction[] => {
         const customEntityActions = (collection.entityActions ?? [])
             .map(action => resolveEntityAction(action, customizationController.entityActions))
@@ -56,11 +62,11 @@ export function EditFormActions({
         if (createEnabled && !disableActions.includes("copy"))
             actions.push(copyEntityAction);
         if (deleteEnabled && !disableActions.includes("delete"))
-            actions.push(deleteEntityAction);
+            actions.push(isLinkedChildView ? unlinkEntityAction : deleteEntityAction);
         if (customEntityActions)
             return mergeEntityActions(actions, customEntityActions);
         return actions;
-    }, [canCreate, canDelete, collection, path, customizationController.entityActions?.length, entity, collection.disableDefaultActions]);
+    }, [canCreate, canDelete, collection, path, customizationController.entityActions?.length, entity, collection.disableDefaultActions, isLinkedChildView]);
 
     const formActions = showDefaultActions ? entityActions.filter(a => a.includeInForm === undefined || a.includeInForm) : [];
 

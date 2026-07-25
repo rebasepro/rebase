@@ -11,7 +11,8 @@ import {
     RelationProperty,
     StringProperty,
     getDataSourceCapabilities,
-    getDeclaredSubcollections
+    getDeclaredSubcollections,
+    type EntityChildView
 } from "@rebasepro/types";
 
 type PropertyConfig = { property: unknown; [key: string]: unknown };
@@ -20,7 +21,7 @@ import { enumToObjectEntries } from "./enums";
 import { DEFAULT_ONE_OF_TYPE } from "./common";
 import { isDefaultFieldConfigId } from "@rebasepro/utils";
 import { getIn, mergeDeep } from "@rebasepro/utils";
-import { resolveCollectionRelations } from "./relations";
+import { isJunctionBackedRelation, resolveCollectionRelations } from "./relations";
 
 /**
  * Resolve property builders, enums and arrays.
@@ -349,47 +350,152 @@ export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefi
 }
 
 
-export function getSubcollections<M extends Record<string, unknown> = Record<string, unknown>>(collection: CollectionConfig<M>): CollectionConfig<Record<string, unknown>>[] {
+/**
+ * Relation identities that only ever appear *below* the top level of
+ * `properties` — inside a `map`, an `array`, or a `oneOf` branch.
+ *
+ * A relation declared at the top level is a list hanging off the record and
+ * earns a tab. One declared inside a map is a field of that map. Both end up in
+ * the collection's flat `relations` array after normalization, so the shape of
+ * `properties` is the only remaining evidence of which is which.
+ *
+ * An identity declared in both places is *not* nested-only, and keeps its tab.
+ */
+function getNestedRelationIdentities(properties: Properties | undefined): Set<string> {
+    const topLevel = new Set<string>();
+    const nested = new Set<string>();
+
+    const walk = (props: Properties | undefined, depth: number): void => {
+        if (!props) return;
+        for (const [key, property] of Object.entries(props as Record<string, Property>)) {
+            if (!property) continue;
+            if (property.type === "relation") {
+                const relProp = property as RelationProperty;
+                (depth === 0 ? topLevel : nested).add(relProp.relationName ?? key);
+            } else if (property.type === "map") {
+                walk(property.properties, depth + 1);
+            } else if (property.type === "array") {
+                const arrayProp = property as ArrayProperty;
+                if (Array.isArray(arrayProp.of)) {
+                    arrayProp.of.forEach(p => walk({ entry: p } as Properties, depth + 1));
+                } else if (arrayProp.of) {
+                    walk({ entry: arrayProp.of } as Properties, depth + 1);
+                }
+                if (arrayProp.oneOf?.properties) walk(arrayProp.oneOf.properties, depth + 1);
+            }
+        }
+    };
+
+    walk(properties, 0);
+
+    for (const identity of topLevel) nested.delete(identity);
+    return nested;
+}
+
+/**
+ * The lists rendered inside an entity view of `collection` — its tabs.
+ *
+ * The single derivation. There used to be two that disagreed: this one, and a
+ * copy in `CollectionRegistry.normalizeCollection` that stamped each child with
+ * the *target collection's* slug instead of the relation key. Since the
+ * registry ran first and cached its answer onto `childCollections`, its version
+ * was the one that won, and the frontend addressed child listings by a segment
+ * the backend could not resolve.
+ *
+ * Order of precedence:
+ *   1. `childCollections` — the explicit escape hatch for custom drivers.
+ *   2. `subcollections` on an engine that has real containment (Firestore).
+ *   3. many-relations on an engine that has relations (SQL).
+ */
+export function getEntityChildViews<M extends Record<string, unknown> = Record<string, unknown>>(
+    collection: CollectionConfig<M>
+): EntityChildView[] {
+    const asSubcollections = (collections: CollectionConfig<Record<string, unknown>>[]): EntityChildView[] =>
+        collections.filter(Boolean).map(child => ({
+            key: child.slug,
+            collection: child,
+            source: { kind: "subcollection" as const }
+        }));
+
     if (collection.childCollections) {
-        return collection.childCollections() ?? [];
+        return asSubcollections(collection.childCollections() ?? []);
     }
+
+    const capabilities = getDataSourceCapabilities(collection.engine);
 
     const declaredSubcollections = getDeclaredSubcollections(collection);
-    if (getDataSourceCapabilities(collection.engine).supportsSubcollections && declaredSubcollections) {
-        return declaredSubcollections() ?? [];
+    if (capabilities.supportsSubcollections && declaredSubcollections) {
+        return asSubcollections(declaredSubcollections() ?? []);
     }
 
-    if (getDataSourceCapabilities(collection.engine).supportsRelations) {
-        const resolvedRelations = resolveCollectionRelations(collection);
-        const manyRelations = Object.values(resolvedRelations).filter((r: Relation) => r.cardinality === "many");
+    if (!capabilities.supportsRelations) return [];
 
-        return manyRelations.map((r: Relation) => {
-            const target = r.target();
-            if (!target) return undefined;
-            const relationKey = r.relationName || target.slug;
+    const resolvedRelations = resolveCollectionRelations(collection);
+    const nestedOnly = getNestedRelationIdentities(collection.properties);
+    const views: EntityChildView[] = [];
+    const seen = new Set<string>();
 
-            // Try to find corresponding property to get custom name
-            let customName: string | undefined;
-            if (collection.properties) {
-                const prop = Object.entries(collection.properties as Record<string, Property>).find(
-                    ([_, p]) => p.type === "relation" && p.relationName === relationKey
-                );
-                if (prop && prop[1].name) {
-                    customName = prop[1].name;
-                }
+    // Keyed by the map key, not by `relationName`: the map key is what
+    // `findRelation` matches a path segment against, so it is the only one that
+    // addresses the same relation on both sides of the wire. The map registers
+    // some relations twice — once canonically, once under the declaring
+    // property key — so dedupe on the underlying relation.
+    for (const [relationKey, relation] of Object.entries(resolvedRelations)) {
+        if (relation.cardinality !== "many") continue;
+
+        const identity = relation.relationName ?? relationKey;
+        if (seen.has(identity)) continue;
+
+        // A relation declared inside a `map` is a field of that map, not a list
+        // hanging off the record. `extractRelationsFromProperties` hoists it to
+        // the collection's `relations` so the nested property can be stamped —
+        // which had the side effect of giving it a tab of its own, keyed by the
+        // inner property key.
+        if (nestedOnly.has(identity)) continue;
+
+        let target: CollectionConfig | undefined;
+        try {
+            target = relation.target();
+        } catch {
+            continue;
+        }
+        if (!target) continue;
+        seen.add(identity);
+
+        // A name given to the declaring property is the author naming the tab.
+        const declaringProperty = Object.entries((collection.properties ?? {}) as Record<string, Property>)
+            .find(([propKey, p]) => p.type === "relation" && (p.relationName ?? propKey) === identity);
+        const customName = declaringProperty?.[1]?.name;
+
+        const base: CollectionConfig<Record<string, unknown>> = {
+            ...target,
+            slug: relationKey,
+            ...(customName ? { name: customName,
+singularName: customName } : {})
+        } as CollectionConfig<Record<string, unknown>>;
+
+        views.push({
+            key: relationKey,
+            collection: (relation.overrides ? mergeDeep(base, relation.overrides) : base) as CollectionConfig<Record<string, unknown>>,
+            source: {
+                kind: "relation",
+                relationKey,
+                mode: isJunctionBackedRelation(relation) ? "linked" : "owned"
             }
-
-            const baseOverrides: Partial<CollectionConfig> = { slug: relationKey };
-            if (customName) {
-                baseOverrides.name = customName;
-                baseOverrides.singularName = customName;
-            }
-
-            const targetWithOverrides = { ...target,
-...baseOverrides };
-            return (r.overrides ? mergeDeep(targetWithOverrides, r.overrides) : targetWithOverrides) as CollectionConfig<Record<string, unknown>>;
-        }).filter((c: CollectionConfig<Record<string, unknown>> | undefined): c is CollectionConfig<Record<string, unknown>> => Boolean(c));
+        });
     }
 
-    return [];
+    return views;
+}
+
+/**
+ * The child views of `collection` as bare collections.
+ *
+ * The flattened view of {@link getEntityChildViews}, for navigation code that
+ * only needs to match a path segment against a slug. Anything that cares *what
+ * kind* of list it is showing — chiefly the admin, which must not offer a
+ * global delete on a shared row — should read the views instead.
+ */
+export function getSubcollections<M extends Record<string, unknown> = Record<string, unknown>>(collection: CollectionConfig<M>): CollectionConfig<Record<string, unknown>>[] {
+    return getEntityChildViews(collection).map(view => view.collection);
 }

@@ -15,6 +15,7 @@ import {
     RadioGroupItem,
     TextField,
     Trash2Icon,
+    Unlink2Icon,
     Typography
 } from "@rebasepro/ui";
 import type { User } from "@rebasepro/types";
@@ -142,59 +143,99 @@ export const copyEntityAction: EntityAction = {
     }
 }
 
-export const deleteEntityAction: EntityAction = {
-    icon: <Trash2Icon size={iconSize.smallest}/>,
-    name: "Delete",
-    key: "delete",
-    isEnabled: ({ entity }) => Boolean(entity),
-    onClick({
-        entity,
-        path,
-        collection,
-        context,
-        selectionController,
-        onCollectionChange,
-        navigateBack,
-        openEntityMode
-    }): Promise<void> {
-        if (!entity) {
-            throw new Error("INTERNAL: deleteEntityAction: Entity is undefined");
-        }
-        if (!context?.dialogsController) {
-            throw new Error("INTERNAL: deleteEntityAction: context.dialogsController is undefined");
-        }
-        const { closeDialog } = context.dialogsController.open({
-            key: "delete_entity_dialog_" + entity.id,
-            Component: ({ open }) => {
-                if (!collection || !path)
-                    throw new Error("deleteEntityAction: Collection is undefined");
-                return <DeleteEntityDialog
-                    entityOrEntitiesToDelete={entity}
-                    path={path}
-                    collection={collection}
-                    callbacks={collection.callbacks}
-                    open={open}
-                    onEntityDelete={() => {
-                        context?.analyticsController?.onAnalyticsEvent?.("single_entity_deleted", {
-                            path
-                        });
-                        selectionController?.setSelectedEntities(selectionController.selectedEntities.filter(e => e.id !== entity.id));
-                        onCollectionChange?.();
-                        // In full-screen mode, navigateBack would go to the deleted entity's
-                        // detail URL, which no longer exists. Navigate to the parent collection instead.
-                        if (openEntityMode === "full_screen" && context?.urlController) {
-                            const collectionUrl = context.urlController.buildUrlCollectionPath(path);
-                            context.urlController.navigate(collectionUrl, { replace: true });
-                        } else {
-                            navigateBack?.();
-                        }
-                    }}
-                    onClose={closeDialog}/>;
+/**
+ * The destructive row action, in its two readings.
+ *
+ * The mechanics are identical — both issue a DELETE at the row's path — but
+ * what that *does* is not. On a many-to-many tab the path is
+ * `posts/1/tags/5`, and the backend removes the junction row: tag 5 keeps
+ * existing, and every other post keeps it. Labelling that "Delete" and warning
+ * about permanent removal describes an operation the server will not perform.
+ */
+function buildRemoveEntityAction({
+    key,
+    name,
+    icon,
+    variant
+}: {
+    key: string;
+    name: string;
+    icon: React.ReactElement;
+    variant: "delete" | "unlink";
+}): EntityAction {
+    return {
+        icon,
+        name,
+        key,
+        isEnabled: ({ entity }) => Boolean(entity),
+        onClick({
+            entity,
+            path,
+            collection,
+            context,
+            selectionController,
+            onCollectionChange,
+            navigateBack,
+            openEntityMode
+        }): Promise<void> {
+            if (!entity) {
+                throw new Error(`INTERNAL: ${key}EntityAction: Entity is undefined`);
             }
-        });
-        return Promise.resolve(undefined);
-    }
+            if (!context?.dialogsController) {
+                throw new Error(`INTERNAL: ${key}EntityAction: context.dialogsController is undefined`);
+            }
+            const { closeDialog } = context.dialogsController.open({
+                key: `${key}_entity_dialog_` + entity.id,
+                Component: ({ open }) => {
+                    if (!collection || !path)
+                        throw new Error(`${key}EntityAction: Collection is undefined`);
+                    return <DeleteEntityDialog
+                        entityOrEntitiesToDelete={entity}
+                        path={path}
+                        collection={collection}
+                        callbacks={collection.callbacks}
+                        variant={variant}
+                        open={open}
+                        onEntityDelete={() => {
+                            context?.analyticsController?.onAnalyticsEvent?.("single_entity_deleted", {
+                                path
+                            });
+                            selectionController?.setSelectedEntities(selectionController.selectedEntities.filter(e => e.id !== entity.id));
+                            onCollectionChange?.();
+                            // In full-screen mode, navigateBack would go to the deleted entity's
+                            // detail URL, which no longer exists. Navigate to the parent collection instead.
+                            if (openEntityMode === "full_screen" && context?.urlController) {
+                                const collectionUrl = context.urlController.buildUrlCollectionPath(path);
+                                context.urlController.navigate(collectionUrl, { replace: true });
+                            } else {
+                                navigateBack?.();
+                            }
+                        }}
+                        onClose={closeDialog}/>;
+                }
+            });
+            return Promise.resolve(undefined);
+        }
+    };
 }
+
+export const deleteEntityAction: EntityAction = buildRemoveEntityAction({
+    key: "delete",
+    name: "Delete",
+    icon: <Trash2Icon size={iconSize.smallest}/>,
+    variant: "delete"
+});
+
+/**
+ * The destructive action on a tab whose rows are shared through a junction.
+ * Removes the row from *this* parent; the row itself is untouched.
+ */
+export const unlinkEntityAction: EntityAction = buildRemoveEntityAction({
+    key: "unlink",
+    name: "Remove",
+    icon: <Unlink2Icon size={iconSize.smallest}/>,
+    variant: "unlink"
+});
 
 export function ResetPasswordActionDialog({
     user,

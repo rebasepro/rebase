@@ -454,6 +454,54 @@ export function getDeclaredSubcollections<M extends Record<string, unknown> = Re
     return (collection as FirebaseCollectionConfig<M, USER>).subcollections;
 }
 
+/**
+ * Where the rows in an {@link EntityChildView} come from.
+ *
+ * The two are not the same thing, and conflating them is what made a Postgres
+ * relation borrow Firestore's addressing:
+ *
+ * - `subcollection` is **containment**. The rows live under the parent; the
+ *   path is their identity, and they cannot exist without it. This is what
+ *   Firestore has natively.
+ * - `relation` is a **link**. The rows are an ordinary collection, narrowed to
+ *   those the parent reaches. `owned` means the child carries the parent's
+ *   foreign key and belongs to it alone; `linked` means the row is shared
+ *   through a junction, so what the parent controls is the link, not the row.
+ *
+ * @group Models
+ */
+export type ChildViewSource =
+    | { kind: "subcollection" }
+    | { kind: "relation"; relationKey: string; mode: "owned" | "linked" };
+
+/**
+ * A list of rows rendered inside an entity view — the tab under a record.
+ *
+ * This is a *presentation* descriptor, which is the whole point: rendering a
+ * related list as a tab used to require minting a child `CollectionConfig` with
+ * its own slug, which dragged a URL grammar, a path resolver and a second
+ * read/write pipeline along with it. A tab needs a key, a collection to list,
+ * and to know where its rows come from.
+ *
+ * @group Models
+ */
+export interface EntityChildView<M extends Record<string, unknown> = Record<string, unknown>> {
+    /**
+     * Stable identifier for this view: the tab id and the path segment.
+     *
+     * For a relation this is the **relation key** — the name the backend
+     * resolves a nested path segment by — not the target collection's slug.
+     * Those differ whenever a relation is named, which is every inline relation
+     * property, and the mismatch is why such a tab used to open onto an error.
+     */
+    key: string;
+
+    /** The collection whose rows this view lists, with any overrides applied. */
+    collection: CollectionConfig<M>;
+
+    source: ChildViewSource;
+}
+
 
 export type { WhereFilterOp, FilterValues, WireFilterValues, FilterPreset } from "./filter-operators";
 

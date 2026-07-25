@@ -2,6 +2,27 @@ import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+
+/**
+ * A query chain that resolves to `rows` however it is continued.
+ *
+ * These mocks used to stop at `.where()` — the shape the old nested-path
+ * builder happened to produce, which honoured `limit` and nothing else. A
+ * nested listing is now the ordinary collection query with one more condition,
+ * so it continues into `orderBy`/`limit`/`offset` like any other. Modelling the
+ * whole chain keeps these tests about behaviour rather than about which builder
+ * ran.
+ */
+function resolvesTo(rows: unknown[]) {
+    const chain: Record<string, unknown> = {
+        then: (resolve: Function) => resolve(rows)
+    };
+    for (const method of ["limit", "offset", "orderBy", "where", "innerJoin", "$dynamic"]) {
+        chain[method] = jest.fn(() => chain);
+    }
+    return chain;
+}
+
 const collectionRegistry = new PostgresCollectionRegistry();
 
 // --- Mock Drizzle ORM table definitions ---
@@ -342,12 +363,7 @@ author_id: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             // Make where() awaitable by returning a promise-like object
-            db.where.mockReturnValue({
-                then: (resolve: Function) => resolve(mockRelatedPosts),
-                limit: jest.fn().mockReturnValue({
-                    then: (resolve: Function) => resolve(mockRelatedPosts)
-                })
-            });
+            db.where.mockReturnValue(resolvesTo(mockRelatedPosts) as never);
 
             const entities = await dataService.fetchCollection("authors/1/posts", {});
 
@@ -805,12 +821,7 @@ project_id: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
             // Make where() awaitable by returning a promise-like object
-            db.where.mockReturnValue({
-                then: (resolve: Function) => resolve(mockTasks),
-                limit: jest.fn().mockReturnValue({
-                    then: (resolve: Function) => resolve(mockTasks)
-                })
-            });
+            db.where.mockReturnValue(resolvesTo(mockTasks) as never);
 
             const entities = await dataService.fetchCollection("users/1/companies/1/projects/1/tasks", {});
 
@@ -828,12 +839,7 @@ name: "Subcategory 2",
 parent_id: 1 }
             ];
             // RelationService.fetchEntitiesUsingJoins ends query chain with where(), not orderBy()
-            db.where.mockReturnValue({
-                then: (resolve: Function) => resolve(mockCategories),
-                limit: jest.fn().mockReturnValue({
-                    then: (resolve: Function) => resolve(mockCategories)
-                })
-            });
+            db.where.mockReturnValue(resolvesTo(mockCategories) as never);
 
             const entities = await dataService.fetchCollection("categories/1/children", {});
 

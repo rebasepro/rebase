@@ -275,23 +275,14 @@ export class CollectionRegistry {
         const properties: Properties = this.normalizeProperties(result.properties, mergedRelations);
         result.properties = properties as EngineProperties;
 
-        // Populate childCollections from driver-specific fields
-        if (!result.childCollections) {
-            const capabilities = getDataSourceCapabilities(result.engine);
-            const declaredSubcollections = getDeclaredSubcollections(result);
-            if (capabilities.supportsSubcollections && declaredSubcollections) {
-                result.childCollections = declaredSubcollections;
-            } else if (capabilities.supportsRelations && relResult.relations) {
-                const manyRelations = relResult.relations.filter((r: Relation) => r.cardinality === "many");
-                if (manyRelations.length > 0) {
-                    result.childCollections = () => manyRelations.map((r: Relation) => {
-                        const target = r.target();
-                        return r.overrides ? mergeDeep(target, r.overrides) : target;
-                    });
-                }
-            }
-        }
-
+        // `childCollections` is deliberately NOT populated here.
+        //
+        // It used to be, from the same many-relations `getEntityChildViews`
+        // reads — but stamped with the *target's* slug rather than the relation
+        // key, and then cached onto the collection, so the registry's version
+        // shadowed the correct one for every consumer downstream. Deriving on
+        // read leaves one implementation and keeps `childCollections` meaning
+        // what it documents: a custom driver's explicit override.
         return result;
     }
 
@@ -452,11 +443,18 @@ export class CollectionRegistry {
                 throw new Error(`Relation '${relationKey}' not found in collection '${currentCollection.slug}'`);
             }
 
-            // Move to the target collection
+            // Move to the target collection.
+            //
+            // By the relation's own target, never by a slug lookup on its
+            // *name*: `this.get(relation.relationName)` searches the global slug
+            // map, so a relation named `people` that targets `notes` resolved to
+            // an unrelated root collection called `people` — and a nested write
+            // then ran that collection's callbacks against its properties.
+            // The registered instance is preferred, matched by table, to pick up
+            // whatever normalization and injection it received.
             const target = relation.target();
-            const targetRelationKey = relation.relationName || target.slug;
-            const targetSlug = relation.overrides?.slug ?? targetRelationKey;
-            currentCollection = this.get(targetSlug) || this.normalizeCollection(target);
+            currentCollection = this.collectionsByTableName.get(getTableName(target))
+                ?? this.normalizeCollection(target);
 
             // If there are more segments, continue navigation
             if (i + 1 < pathSegments.length) {
@@ -528,7 +526,11 @@ export class CollectionRegistry {
                 if (!subcollection) {
                     throw new Error(`Subcollection '${subcollectionSlug}' not found in ${currentCollection.slug}`);
                 }
-                currentCollection = this.get(subcollection.slug) || this.normalizeCollection(subcollection);
+                // The child as resolved, not whatever root collection happens to
+                // share its slug. Re-looking it up globally both risked the wrong
+                // collection and discarded the relation's `overrides`, which are
+                // applied when the child view is built.
+                currentCollection = this.normalizeCollection(subcollection);
                 collections.push(currentCollection);
             }
         }

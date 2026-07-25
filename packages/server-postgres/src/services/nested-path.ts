@@ -26,9 +26,17 @@ export interface NestedPathHop {
     targetCollection: CollectionConfig;
 }
 
-/** True when `path` addresses rows through a relation rather than a root collection. */
+/**
+ * True when `path` addresses rows through a relation rather than a root
+ * collection.
+ *
+ * Any separator at all counts — a root collection slug never contains one — so
+ * a malformed path like `collection/id` is a *broken* nested path and gets
+ * reported as one by {@link resolveNestedPath}, rather than being looked up as
+ * a root collection whose slug happens to contain a slash.
+ */
 export function isNestedPath(path: string): boolean {
-    return splitPathSegments(path).length >= 3;
+    return path.includes("/");
 }
 
 export function splitPathSegments(path: string): string[] {
@@ -39,17 +47,18 @@ export function splitPathSegments(path: string): string[] {
  * Walk a nested collection path down to the relation it ends in.
  *
  * Returns `undefined` for a plain root-collection path so callers can keep the
- * root case on its existing code path. Throws when a segment names a relation
- * that does not exist — the same error the individual walks used to raise,
- * with the available names attached.
+ * root case on its existing code path. Throws when the path is malformed, or
+ * when a segment names a relation that does not exist — the same errors the
+ * individual walks used to raise, with the available names attached.
  */
 export function resolveNestedPath(
     path: string,
     registry: PostgresCollectionRegistry
 ): NestedPathHop | undefined {
+    if (!isNestedPath(path)) return undefined;
+
     const segments = splitPathSegments(path);
-    if (segments.length < 3) return undefined;
-    if (segments.length % 2 === 0) {
+    if (segments.length < 3 || segments.length % 2 === 0) {
         throw new Error(`Invalid relation path: ${path}. Expected format: collection/id/relation`);
     }
 

@@ -83,6 +83,7 @@ export {
     LayoutGridIcon,
     LinkIcon,
     Link2Icon,
+    Unlink2Icon,
     ListIcon,
     LockIcon,
     ListOrderedIcon,

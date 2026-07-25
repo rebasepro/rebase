@@ -197,6 +197,20 @@ name: evaluated } as CollectionConfig;
     return newRelation as Relation;
 }
 
+/**
+ * Whether the target rows of this relation are reached through a junction — a
+ * many-to-many, or a multi-hop `joinPath`.
+ *
+ * The distinction decides what a write "through" the relation may touch: a
+ * junction-backed target is shared with other parents, so the parent owns the
+ * *link* and not the row. The backend enforces that (an unlink rather than a
+ * delete) and the admin renders it (remove-from-parent rather than delete), so
+ * the predicate lives here rather than once per side.
+ */
+export function isJunctionBackedRelation(relation: Relation): boolean {
+    return Boolean(relation.through) || Boolean(relation.joinPath && relation.joinPath.length > 1);
+}
+
 /** WeakMap cache — same collection instance always yields the same relation map. */
 const _resolvedRelationsCache = new WeakMap<CollectionConfig, Record<string, Relation>>();
 

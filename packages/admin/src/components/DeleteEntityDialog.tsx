@@ -1,7 +1,7 @@
 
 import { Entity, CollectionCallbacks } from "@rebasepro/types";
 import React, { useCallback, useMemo, useState } from "react";
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from "@rebasepro/ui";
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import {
     deleteEntityWithCallbacks,
     useAuthController,
@@ -25,6 +25,15 @@ export interface DeleteEntityDialogProps<M extends Record<string, unknown>> {
     onEntityDelete?(path: string, entity: Entity<M>): void;
 
     onMultipleEntitiesDelete?(path: string, entities: Entity<M>[]): void;
+
+    /**
+     * What the DELETE at this path actually does.
+     *
+     * `"unlink"` when the rows are shared through a junction: the server removes
+     * the link and leaves the row alone, so a dialog promising deletion would be
+     * describing something else.
+     */
+    variant?: "delete" | "unlink";
 }
 
 export function DeleteEntityDialog<M extends Record<string, unknown>>({
@@ -35,7 +44,8 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
     callbacks,
     onEntityDelete,
     onMultipleEntitiesDelete,
-    path
+    path,
+    variant = "delete"
 }: DeleteEntityDialogProps<M>) {
     const authController = useAuthController();
     const dataClient = useData();
@@ -143,9 +153,15 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             : <></>;
     }
 
-    const dialogTitle = multipleEntities
-        ? <><b>{collection.name}</b>: {t("confirm_multiple_delete")}</>
-        : t("delete_entity_confirm_title", { entityName: collection.singularName ?? collection.name });
+    const entityName = collection.singularName ?? collection.name;
+
+    const dialogTitle = variant === "unlink"
+        ? (multipleEntities
+            ? <><b>{collection.name}</b>: {t("confirm_multiple_unlink") ?? "Remove these from this record?"}</>
+            : (t("unlink_entity_confirm_title", { entityName }) ?? `Remove this ${entityName} from this record?`))
+        : (multipleEntities
+            ? <><b>{collection.name}</b>: {t("confirm_multiple_delete")}</>
+            : t("delete_entity_confirm_title", { entityName }));
 
     return (
         <Dialog
@@ -158,6 +174,12 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
                 {dialogTitle}
             </DialogTitle>
             <DialogContent fullHeight={true}>
+                {variant === "unlink" && <div className={"px-4 pt-4"}>
+                    <Typography variant={"body2"} color={"secondary"}>
+                        {t("unlink_entity_confirm_body", { collectionName: collection.name })
+                            ?? `It stays in ${collection.name} and remains available to other records.`}
+                    </Typography>
+                </div>}
                 {!multipleEntities && <div className={"p-4"}>{content}</div>}
             </DialogContent>
             <DialogActions>

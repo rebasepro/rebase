@@ -26,7 +26,7 @@ pipeline that was built as an afterthought to the root-collection one.
 
 ---
 
-## A. Root cause: the child collection is stamped with the target's slug
+## A. Root cause: the child collection is stamped with the target's slug — **FIXED**
 
 `CollectionRegistry.normalizeCollection` builds `childCollections` from many-relations at
 [CollectionRegistry.ts:287](packages/common/src/collections/CollectionRegistry.ts:287):
@@ -73,6 +73,12 @@ Exactly one of the two resolves any given URL. The admin builds
 opening the subcollection tab produces a request the backend rejects with
 *"Relation 'tags' not found in collection 'posts'"*.
 
+**Fixed.** The duplicated projection in `normalizeCollection` is gone; `getEntityChildViews`
+in [resolutions.ts](packages/common/src/util/resolutions.ts) is the single derivation, and it
+keys each child by the **relation key** — the name `findRelation` matches a path segment
+against. `resolvePathToCollections` and `getCollectionByPath` now accept and reject the same
+paths by construction.
+
 **This is not an exotic config.** `extractRelationsFromProperties`
 ([CollectionRegistry.ts:312](packages/common/src/collections/CollectionRegistry.ts:312))
 defaults `relationName` to the property key, so the idiomatic
@@ -87,7 +93,7 @@ produces relation `featuredTags` → child slug `tags` → broken.
 
 ---
 
-## B. Two relations to the same target collapse into one
+## B. Two relations to the same target collapse into one — **FIXED**
 
 Same probe with `featured_tags` and `archived_tags`, both targeting `tags`:
 
@@ -104,9 +110,12 @@ Consequences:
 
 There is no way to express two named links to the same collection.
 
+**Fixed.** Each view is keyed by its own relation, so two relations to one target are two
+tabs, two column ids and two distinct URLs.
+
 ---
 
-## C. A relation name that collides with a root slug resolves to the wrong collection
+## C. A relation name that collides with a root slug resolves to the wrong collection — **FIXED**
 
 [CollectionRegistry.ts:454-458](packages/common/src/collections/CollectionRegistry.ts:454):
 
@@ -129,9 +138,12 @@ the write path via `PostgresBackendDriver.resolveCollectionCallbacks`
 so a nested write can run **the wrong collection's `beforeSave`/`afterSave` and property
 callbacks**, against the wrong `properties` schema.
 
+**Fixed.** The walk follows `relation.target()` and looks the registered instance up by
+*table name*, never by the relation's name.
+
 ---
 
-## D. `relation.overrides` are dropped by path resolution
+## D. `relation.overrides` are dropped by path resolution — **FIXED**
 
 `resolvePathToCollections` finds the merged child, then throws it away:
 
@@ -151,9 +163,12 @@ So `overrides` works for rendering the tab list and silently stops working once 
 into it. Anything security- or presentation-relevant put in `overrides` (a narrowed
 `properties` set, a filter preset, a different name) does not survive.
 
+**Fixed.** The resolved child is normalized as-is rather than re-looked-up in the global slug
+map, so the merge survives the navigation.
+
 ---
 
-## E. The nested read pipeline silently discards almost every query option
+## E. The nested read pipeline silently discards almost every query option — **FIXED**
 
 Compare the root list route ([api-generator.ts:167](packages/server/src/api/rest/api-generator.ts:167))
 with the nested one ([api-generator.ts:563](packages/server/src/api/rest/api-generator.ts:563)):
@@ -178,9 +193,18 @@ with the nested one ([api-generator.ts:563](packages/server/src/api/rest/api-gen
 
 All of this fails **silently** — the caller gets 200 with wrong data, not a 400.
 
+**Fixed, by deleting the second pipeline.** `DrizzleConditionBuilder.buildRelationScopeCondition`
+expresses "reachable from this parent" as a plain `WHERE` condition on the target table — an
+inverse FK becomes a column comparison, a junction or a `joinPath` becomes a correlated
+`EXISTS`. A nested listing is now the ordinary collection query with one more condition, so it
+inherits `offset`, `filter`, `orderBy`, `include` and a `count` that agrees with it, and
+`fetchCollectionFromPath` / `countEntitiesFromPath` / `fetchEntitiesUsingJoins` are gone from
+the listing path. The junction is reached with `EXISTS` rather than the old `INNER JOIN`
+precisely so it cannot multiply rows and break `limit`/`offset`.
+
 ---
 
-## F. Nested writes skip write validation
+## F. Nested writes skip write validation — **FIXED**
 
 `assertKnownWriteFields` is called at lines 270, 308, 312 and 405 — all inside
 `createCollectionRoutes` (140-470). `createSubcollectionRoutes` (490-684) never calls it.
@@ -189,6 +213,10 @@ All of this fails **silently** — the caller gets 200 with wrong data, not a 40
 [collections.ts:196](packages/types/src/types/collections.ts:196)) is **not enforced on any
 nested path**. `POST /authors/1/posts {"tiitle": "x"}` bypasses the guard that
 `POST /posts` applies.
+
+**Fixed.** `RestApiGenerator.resolveNestedWriteCollection` walks the path to the collection the
+write lands in, and the nested `POST`/`PUT` routes check the body against it, as the root ones
+do.
 
 ---
 
@@ -265,7 +293,7 @@ path are unaffected.
 
 ---
 
-## J. The Firestore/Postgres asymmetry is unmodelled
+## J. The Firestore/Postgres asymmetry is unmodelled — **FIXED**
 
 `childCollections` carries two different meanings with no discriminant:
 
@@ -277,6 +305,13 @@ path are unaffected.
 `getDeclaredSubcollections` ([collections.ts:451](packages/types/src/types/collections.ts:451))
 reads `subcollections` off *any* collection via a cast, gated only by a capability lookup at
 each call site — so the gate is re-implemented per caller rather than enforced by the type.
+
+**Fixed, by naming the distinction instead of erasing it.** `ChildViewSource` in
+[collections.ts](packages/types/src/types/collections.ts) discriminates `subcollection`
+(containment — what Firestore has, unchanged) from `relation`, and a relation carries
+`mode: "owned" | "linked"`. The admin reads it through `useChildViewSource`, derived from the
+path so it reaches the collection view, the entity form and a deep link alike: a junction-backed
+tab offers "Remove from this record", not "Delete".
 
 Minor, related: `extractRelationsFromProperties` recurses into `map` properties
 ([CollectionRegistry.ts:328](packages/common/src/collections/CollectionRegistry.ts:328)) and
@@ -296,31 +331,37 @@ as an engine-capability axis.
 
 ## Recommendations, in order
 
-1. **Pick one grammar: the relation key.** It is what every backend consumer already uses,
-   and it is the only one that can express two relations to the same target. Delete the
-   duplicated projection in `normalizeCollection` (CollectionRegistry.ts:279-293) and route
-   it through the `resolutions.ts` implementation, which already stamps
-   `slug = relationKey`. That single change fixes A, B and D, and makes
-   `resolvePathToCollections` and `getCollectionByPath` agree by construction.
-2. **Stop resolving relation targets by global slug lookup** (C). Use `relation.target()`;
-   fall back to the registry only to pick up the registered/normalized instance of *that*
-   collection, matched by table name, never by relation name.
-3. **Make the nested read pipeline reuse the root one** (E). Thread `offset`, `filter`,
-   `orderBy`/`order` and `include` through `fetchRelatedEntities`/`countRelatedEntities`, or
-   — better — rewrite a nested list as a root list on the target collection plus a
-   parent-derived filter, so there is one query path instead of two.
-4. **Call `assertKnownWriteFields` in the subcollection routes** (F). One-line parity fix.
-5. ~~Scope nested `fetchOne`/`update`/`delete` by the parent (G)~~ — **done**.
-6. ~~Split the m2m case: unlink instead of delete (H)~~ — **delete done**; link-an-existing-row
-   still open.
-7. ~~Reject non-many relations as write path segments (I)~~ — **done**.
-8. Document the projection and the path grammar (K).
+### Done
 
-Items 5, 6 and 7 were the ones that could lose data; they are fixed and covered by
-[test/e2e/nested-path-writes.test.ts](packages/server-postgres/test/e2e/nested-path-writes.test.ts)
-(10 cases — 6 assert the new behaviour and fail against the pre-fix code, 4 are regression
-guards for create-under-parent, own-child update/delete, and m2m create+link, which pass on
-both). Items 1–3 (the path-grammar split) are untouched and remain the largest defect.
+- ~~Scope nested `fetchOne`/`update`/`delete` by the parent (G)~~
+- ~~Unlink instead of delete for many-to-many (H)~~ — link-an-existing-row still open
+- ~~Reject non-many relations as write path segments (I)~~
+- ~~Make the nested read pipeline reuse the root one (E)~~ — via the relation-scope condition
+- ~~Call `assertKnownWriteFields` in the subcollection routes (F)~~
+
+Covered by [test/e2e/nested-path-writes.test.ts](packages/server-postgres/test/e2e/nested-path-writes.test.ts)
+— 15 cases against a real Postgres. Ten assert new behaviour and fail against the pre-fix
+code; five are regression guards (create-under-parent, own-child update/delete, m2m
+create+link) that pass on both.
+
+- ~~Pick one grammar: the relation key (A, B, D)~~
+- ~~Stop resolving relation targets by global slug lookup (C)~~
+- ~~Split the config concept: `ChildViewSource` (J)~~
+- ~~Give the admin mode-aware affordances (J)~~
+
+Also covered by [entity_child_views.test.ts](packages/common/test/entity_child_views.test.ts)
+— 7 cases pinning the key, the two grammars agreeing, overrides surviving, two relations to
+one target staying apart, the target-not-name lookup, `owned` vs `linked`, and a Firestore
+subcollection staying containment.
+
+### Still open
+
+1. **Link an existing row through a many-to-many tab.** `POST` creates-and-links; there is
+   still no add-existing. The mode is now in the UI's hands, so the affordance has somewhere
+   to live.
+2. **`extractRelationsFromProperties` hoists relations declared inside `map` properties** to
+   the collection's top level, so one becomes a tab keyed by the inner property key.
+3. Document the projection and the path grammar (K).
 
 ---
 

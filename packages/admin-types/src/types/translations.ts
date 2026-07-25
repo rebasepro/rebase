@@ -487,6 +487,14 @@ export interface RebaseTranslations {
     initialize: string;
     confirm_multiple_delete: string;
     delete_entity_confirm_title: string;
+    /**
+     * Confirmation for the destructive action on a tab whose rows are shared
+     * through a junction. The row is not deleted — the parent's link to it is —
+     * so this copy must not promise deletion.
+     */
+    unlink_entity_confirm_title: string;
+    unlink_entity_confirm_body: string;
+    confirm_multiple_unlink: string;
 
     no_filter: string;
     is_true: string;

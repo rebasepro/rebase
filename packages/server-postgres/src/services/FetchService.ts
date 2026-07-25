@@ -19,7 +19,7 @@ import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { toCmsRow, toRestRow, isJunctionRelation } from "./row-pipeline";
-import { isNestedPath, resolveNestedPath } from "./nested-path";
+import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 import { logger } from "@rebasepro/server";
 
 /** Type-safe accessor for Drizzle's relational query API via dynamic table name */
@@ -280,7 +280,8 @@ export class FetchService {
             logical?: LogicalCondition;
         },
         collectionPath: string,
-        withConfig?: Record<string, unknown>
+        withConfig?: Record<string, unknown>,
+        scopeCondition?: SQL
     ): Record<string, unknown> {
         const queryOpts: Record<string, unknown> = {};
 
@@ -288,6 +289,8 @@ export class FetchService {
 
         // Build where conditions
         const allConditions: SQL[] = [];
+
+        if (scopeCondition) allConditions.push(scopeCondition);
 
         if (options.searchString) {
             const collection = getCollectionByPath(collectionPath, this.registry);
@@ -390,6 +393,42 @@ export class FetchService {
         }
 
         return [];
+    }
+
+    /**
+     * Compile "rows reachable from this parent" into a `WHERE` condition on the
+     * target table, so a nested listing can run as an ordinary collection query.
+     */
+    private buildRelationScope(hop: NestedPathHop): SQL {
+        const parentPks = requirePrimaryKeys(hop.parentCollection, this.registry);
+        const parentIdInfo = parentPks[0];
+        const parsedParentId = parseIdValues(hop.parentId, parentPks)[parentIdInfo.fieldName];
+
+        const parent = () => {
+            const table = getTableForCollection(hop.parentCollection, this.registry);
+            const idColumn = table[parentIdInfo.fieldName as keyof typeof table] as AnyPgColumn;
+            if (!idColumn) {
+                throw new Error(`ID field '${parentIdInfo.fieldName}' not found in table for collection '${hop.parentCollection.slug}'`);
+            }
+            return { table,
+idColumn };
+        };
+
+        const targetTable = getTableForCollection(hop.targetCollection, this.registry);
+        const targetPks = requirePrimaryKeys(hop.targetCollection, this.registry);
+        const targetIdColumn = targetTable[targetPks[0].fieldName as keyof typeof targetTable] as AnyPgColumn;
+        if (!targetIdColumn) {
+            throw new Error(`ID field '${targetPks[0].fieldName}' not found in table for collection '${hop.targetCollection.slug}'`);
+        }
+
+        return DrizzleConditionBuilder.buildRelationScopeCondition(
+            hop.relation,
+            parent,
+            parsedParentId as string | number,
+            targetTable,
+            targetIdColumn,
+            this.registry
+        );
     }
 
     /**
@@ -536,8 +575,11 @@ export class FetchService {
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
             logical?: LogicalCondition;
+            /** Narrow to the rows reachable from a parent through a relation. */
+            relatedTo?: NestedPathHop;
         } = {}
     ): Promise<Record<string, unknown>[]> {
+        const scopeCondition = options.relatedTo ? this.buildRelationScope(options.relatedTo) : undefined;
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
@@ -565,7 +607,7 @@ export class FetchService {
         if (qb && !options.searchString && !hasRelations && !options.vectorSearch) {
             try {
                 const queryOpts = this.buildDrizzleQueryOptions<M>(
-                    table, idField, idInfo, options, collectionPath, undefined
+                    table, idField, idInfo, options, collectionPath, undefined, scopeCondition
                 );
 
 
@@ -597,6 +639,8 @@ export class FetchService {
 _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             : this.db.select().from(table).$dynamic();
         const allConditions: SQL[] = [];
+
+        if (scopeCondition) allConditions.push(scopeCondition);
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
@@ -791,9 +835,13 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             vectorSearch?: VectorSearchParams;
         } = {}
     ): Promise<Record<string, unknown>[]> {
-        // Handle multi-segment paths by resolving through relations
-        if (collectionPath.includes("/")) {
-            return this.fetchCollectionFromPath<M>(collectionPath, options);
+        // A nested path is the target collection narrowed by a relation — the
+        // same query, one condition heavier. It used to be a separate builder
+        // that honoured `limit` and nothing else.
+        const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
+        if (hop) {
+            return this.fetchRowsWithConditions<M>(hop.targetCollection.slug, { ...options,
+relatedTo: hop });
         }
 
         return this.fetchRowsWithConditions<M>(collectionPath, options);
@@ -820,65 +868,6 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
     }
 
     /**
-     * Fetch collection from multi-segment path
-     */
-    private async fetchCollectionFromPath<M extends Record<string, unknown>>(
-        path: string,
-        options: {
-            filter?: FilterValues<Extract<keyof M, string>>;
-            orderBy?: string;
-            order?: "desc" | "asc";
-            limit?: number;
-            startAfter?: Record<string, unknown>;
-            searchString?: string;
-            databaseId?: string;
-        } = {}
-    ): Promise<Record<string, unknown>[]> {
-        const pathSegments = path.split("/").filter(p => p && p !== "undefined");
-
-        if (pathSegments.length < 3 || pathSegments.length % 2 === 0) {
-            throw new Error(`Invalid relation path: ${path}. Expected format: collection/id/relation`);
-        }
-
-        const rootCollectionPath = pathSegments[0];
-        let currentCollection = getCollectionByPath(rootCollectionPath, this.registry);
-        let currentId: string | number = pathSegments[1];
-
-        for (let i = 2; i < pathSegments.length; i += 2) {
-            const relationKey = pathSegments[i];
-            const resolvedRelations = resolveCollectionRelations(currentCollection);
-            const relation = findRelation(resolvedRelations, relationKey);
-
-            if (!relation) {
-                throw new Error(`Relation '${relationKey}' not found in collection '${currentCollection.slug}'`);
-            }
-
-            if (i === pathSegments.length - 1) {
-                const rows = await this.relationService.fetchRelatedEntities<M>(
-                    currentCollection.slug,
-                    currentId,
-                    relationKey,
-                    options
-                );
-                // Flatten RelatedRow[] to rows: the target's columns, and only
-                // those. Merging `row.id` in last overwrote a real `id` column,
-                // and the address is derivable without it — a consumer resolves
-                // this path ("posts/1/comments") to the target collection and
-                // reads the key columns, which `values` carries.
-                return rows.map(row => ({ ...row.values as Record<string, unknown> }));
-            }
-
-            if (i + 1 < pathSegments.length) {
-                const nextEntityId = pathSegments[i + 1];
-                currentCollection = relation.target();
-                currentId = nextEntityId;
-            }
-        }
-
-        throw new Error(`Unable to resolve path: ${path}`);
-    }
-
-    /**
      * Count rows in a collection
      */
     async count<M extends Record<string, unknown>>(
@@ -889,15 +878,19 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             databaseId?: string;
         } = {}
     ): Promise<number> {
-        if (collectionPath.includes("/")) {
-            return this.countEntitiesFromPath<M>(collectionPath, options);
-        }
+        // Same narrowing as the listing — and, unlike the count it replaces,
+        // the same `filter` and `searchString` too, so `total` describes the
+        // rows that were actually served.
+        const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
+        const effectivePath = hop ? hop.targetCollection.slug : collectionPath;
 
-        const collection = getCollectionByPath(collectionPath, this.registry);
+        const collection = getCollectionByPath(effectivePath, this.registry);
         const table = getTableForCollection(collection, this.registry);
 
         let query = this.db.select({ count: count() }).from(table).$dynamic();
         const allConditions: SQL[] = [];
+
+        if (hop) allConditions.push(this.buildRelationScope(hop));
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
@@ -908,7 +901,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         }
 
         if (options.filter) {
-            const filterConditions = this.buildFilterConditions(options.filter, table, collectionPath);
+            const filterConditions = this.buildFilterConditions(options.filter, table, effectivePath);
             if (filterConditions.length > 0) allConditions.push(...filterConditions);
         }
 
@@ -919,50 +912,6 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
 
         const result = await query;
         return Number(result[0]?.count || 0);
-    }
-
-    /**
-     * Count rows from multi-segment path
-     */
-    private async countEntitiesFromPath<M extends Record<string, unknown>>(
-        path: string,
-        options: { filter?: FilterValues<Extract<keyof M, string>>; databaseId?: string } = {}
-    ): Promise<number> {
-        const pathSegments = path.split("/").filter(p => p && p !== "undefined");
-
-        if (pathSegments.length < 3 || pathSegments.length % 2 === 0) {
-            throw new Error(`Invalid relation path: ${path}`);
-        }
-
-        const rootCollectionPath = pathSegments[0];
-        let currentCollection = getCollectionByPath(rootCollectionPath, this.registry);
-        let currentId: string | number = pathSegments[1];
-
-        for (let i = 2; i < pathSegments.length; i += 2) {
-            const relationKey = pathSegments[i];
-            const resolvedRelations = resolveCollectionRelations(currentCollection);
-            const relation = findRelation(resolvedRelations, relationKey);
-
-            if (!relation) {
-                throw new Error(`Relation '${relationKey}' not found`);
-            }
-
-            if (i === pathSegments.length - 1) {
-                return this.relationService.countRelatedEntities(
-                    currentCollection.slug,
-                    currentId,
-                    relationKey,
-                    options
-                );
-            }
-
-            if (i + 1 < pathSegments.length) {
-                currentCollection = relation.target();
-                currentId = pathSegments[i + 1];
-            }
-        }
-
-        throw new Error(`Unable to count for path: ${path}`);
     }
 
     /**
@@ -1034,9 +983,25 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             searchString?: string;
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
+            /** Narrow to the rows reachable from a parent through a relation. */
+            relatedTo?: NestedPathHop;
         } = {},
         include?: string[]
     ): Promise<Record<string, unknown>[]> {
+        // Resolve a nested path here rather than at the route, so `include`,
+        // `offset` and the rest reach a child listing by the same route they
+        // reach a root one.
+        if (isNestedPath(collectionPath)) {
+            const hop = resolveNestedPath(collectionPath, this.registry);
+            if (hop) {
+                return this.fetchCollectionForRest<M>(
+                    hop.targetCollection.slug, { ...options,
+relatedTo: hop }, include
+                );
+            }
+        }
+
+        const scopeCondition = options.relatedTo ? this.buildRelationScope(options.relatedTo) : undefined;
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
@@ -1059,7 +1024,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                     : undefined;
 
                 const queryOpts = this.buildDrizzleQueryOptions<M>(
-                    table, idField, idInfo, options, collectionPath, withConfig
+                    table, idField, idInfo, options, collectionPath, withConfig, scopeCondition
                 );
 
 
@@ -1251,6 +1216,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             startAfter?: Record<string, unknown>;
             searchString?: string;
             vectorSearch?: VectorSearchParams;
+            relatedTo?: NestedPathHop;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         const collection = getCollectionByPath(collectionPath, this.registry);
@@ -1269,6 +1235,8 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
 _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             : this.db.select().from(table).$dynamic();
         const allConditions: SQL[] = [];
+
+        if (options.relatedTo) allConditions.push(this.buildRelationScope(options.relatedTo));
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(

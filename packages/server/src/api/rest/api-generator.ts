@@ -6,6 +6,7 @@ import { parseQueryOptions, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOp
 import { assertKnownWriteFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
+import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
 
 /**
  * Parse a JSON request body for a create/update. An empty body yields `{}`
@@ -120,6 +121,37 @@ export class RestApiGenerator {
         collectionPath: string
     ): void {
         this.enforceApiKeyPermission(c, collectionPath.split("/").pop()!);
+    }
+
+    /**
+     * The collection a nested path writes into — the target of the relation its
+     * last segment names.
+     *
+     * Needed so a nested write can be checked against a schema at all. Without
+     * it these routes skipped `assertKnownWriteFields` entirely, which is why a
+     * typo `POST /posts` rejected with a 400 while the same typo on
+     * `POST /authors/1/posts` reached the database.
+     *
+     * Returns `undefined` rather than throwing when the path cannot be walked:
+     * the driver raises the authoritative error a moment later, and duplicating
+     * it here would report a resolution failure as a validation failure.
+     */
+    private resolveNestedWriteCollection(collectionPath: string): CollectionConfig | undefined {
+        const segments = collectionPath.split("/").filter(s => s && s !== "undefined");
+        let current = this.collections.find(c => c.slug === segments[0]);
+
+        for (let i = 2; i < segments.length && current; i += 2) {
+            const relation = findRelation(resolveCollectionRelations(current), segments[i]);
+            if (!relation) return undefined;
+            try {
+                const target = relation.target();
+                current = this.collections.find(c => c.slug === target?.slug) ?? target;
+            } catch {
+                return undefined;
+            }
+        }
+
+        return current;
     }
 
     /**
@@ -548,26 +580,39 @@ id };
                 return c.json({ count: total });
             } else if (parsed.id) {
                 // GET /parent/:parentId/child/:id — single entity
-                const entity = await driver.fetchOne({
-                    path: parsed.collectionPath,
-                    id: parsed.id
-                });
+                const queryOptions = this.parseQuery(c.req.queries());
+                const fetchService = driver.restFetchService;
+                const entity = fetchService
+                    ? await fetchService.fetchOneForRest(parsed.collectionPath, parsed.id, queryOptions.include)
+                    : await driver.fetchOne({ path: parsed.collectionPath,
+id: parsed.id });
                 if (!entity) throw ApiError.notFound("Entity not found");
 
                 return c.json(entity);
             } else {
-                // GET /parent/:parentId/child — list entities
+                // GET /parent/:parentId/child — list entities.
+                //
+                // Same call the root list route makes. A child listing used to
+                // be served by a second, thinner pipeline that accepted these
+                // options and applied only `limit` — so `offset`, `orderBy` and
+                // `include` were dropped without a word, and `total` counted
+                // rows the filter would have excluded.
                 const queryDict = c.req.queries();
                 const queryOptions = this.parseQuery(queryDict);
                 const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-                const entities = await driver.fetchCollection({
-                    path: parsed.collectionPath,
+                const fetchService = driver.restFetchService;
+                const listOptions = {
                     filter: queryOptions.where,
                     limit: queryOptions.limit,
+                    offset: queryOptions.offset,
                     orderBy: queryOptions.orderBy?.[0]?.field,
-                    order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
+                    order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" as const : "asc" as const,
                     searchString
-                });
+                };
+                const entities = fetchService
+                    ? await fetchService.fetchCollectionForRest(parsed.collectionPath, listOptions, queryOptions.include)
+                    : await driver.fetchCollection({ path: parsed.collectionPath,
+...listOptions });
 
                 const total = driver.count ? await driver.count({
                     path: parsed.collectionPath,
@@ -601,7 +646,8 @@ id };
             this.enforceSubcollectionApiKeyPermission(c, parsed.collectionPath);
             const body = await parseJsonBody(c);
 
-
+            const targetCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
+            if (targetCollection) assertKnownWriteFields(body, targetCollection);
 
             const entity = await driver.save({
                 path: parsed.collectionPath,
@@ -631,7 +677,8 @@ id };
 
             const body = await parseJsonBody(c);
 
-
+            const targetCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
+            if (targetCollection) assertKnownWriteFields(body, targetCollection);
 
             const entity = await driver.save({
                 path: parsed.collectionPath,
