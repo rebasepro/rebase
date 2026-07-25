@@ -5,7 +5,7 @@ import {
 } from "@rebasepro/app";
 import { CircularProgressCenter } from "@rebasepro/ui";
 import { LoginView } from "@rebasepro/app";
-import type { AuthControllerExtended } from "@rebasepro/types";
+import type { AuthControllerExtended } from "@rebasepro/admin-types";
 
 /**
  * Auth gate component that handles the authentication flow.

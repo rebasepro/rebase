@@ -5,7 +5,8 @@ import {
     useCustomizationController
 } from "@rebasepro/app";
 import { resolveEntityView } from "../../_cms_internals";
-import { CollectionConfig, EntityCustomView, User } from "@rebasepro/types";
+import { User } from "@rebasepro/types";
+import { EntityCustomView, AdminCollection } from "@rebasepro/admin-types";
 import { getSubcollections } from "@rebasepro/common";
 import {
     Alert,
@@ -37,8 +38,8 @@ export function SubcollectionsEditTab({
     getUser,
     parentCollectionSlugs
 }: {
-    collection: CollectionConfig,
-    parentCollection?: CollectionConfig,
+    collection: AdminCollection,
+    parentCollection?: AdminCollection,
     configController: CollectionsConfigController;
     collectionInference?: CollectionInference;
     getUser?: (uid: string) => User | null;
@@ -59,9 +60,9 @@ export function SubcollectionsEditTab({
     const {
         values,
         setFieldValue
-    } = useFormex<CollectionConfig>();
+    } = useFormex<AdminCollection>();
 
-    const [subcollections, setSubcollections] = React.useState<CollectionConfig[]>(getSubcollections(collection) ?? []);
+    const [subcollections, setSubcollections] = React.useState<AdminCollection[]>(getSubcollections(collection) ?? []);
     const resolvedEntityViews = values.entityViews?.filter(e => typeof e === "string")
         .map(e => resolveEntityView(e, contextEntityViews))
         .filter(Boolean) as EntityCustomView[] ?? [];

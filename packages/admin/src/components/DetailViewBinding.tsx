@@ -1,9 +1,10 @@
-import type { ComponentRef, CollectionConfig, EntityCustomViewParams, FormViewConfig } from "@rebasepro/types";
+import type { ComponentRef } from "@rebasepro/types";
+import type { EntityCustomViewParams, FormViewConfig, AdminCollection } from "@rebasepro/admin-types";
 import type { FormContext } from "../types/fields";
-import type { PluginFormActionProps } from "@rebasepro/types";
+import type { PluginFormActionProps } from "@rebasepro/admin-types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, getCollectionDataPath, Property } from "@rebasepro/types";
-import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
+import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider, getAdminSubcollections } from "@rebasepro/app";
 
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { EntityViewBinding } from "./EntityViewBinding";
@@ -27,11 +28,8 @@ import {
 } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView, createFormexStub, usePermissions, useTranslation, getIcon } from "@rebasepro/app";
-import {
-    getSubcollections,
-    removeInitialAndTrailingSlashes,
-    resolveDefaultSelectedView
-} from "@rebasepro/common";
+
+import { removeInitialAndTrailingSlashes, resolveDefaultSelectedView } from "@rebasepro/app";
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import {
     useCustomizationController,
@@ -63,12 +61,12 @@ export type OnTabChangeParams<M extends Record<string, unknown>> = {
     path: string;
     entityId?: string | number;
     selectedTab?: string;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
 };
 
 export interface DetailViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> {
     path: string;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     entityId: string | number;
     selectedTab?: string;
     parentCollectionSlugs: string[];
@@ -183,7 +181,7 @@ entityId }
         }
     }, [selectedTabProp, defaultSelectedView]);
 
-    const subcollections = getSubcollections(collection).filter(c => !c.hideFromNavigation);
+    const subcollections = getAdminSubcollections(collection).filter(c => !c.hideFromNavigation);
     const subcollectionsCount = subcollections?.length ?? 0;
     const customViews = collection.entityViews ?? [];
     const customViewsCount = customViews?.length ?? 0;
@@ -264,7 +262,7 @@ entityId }
     const pluginActionsTop = useSlot("form.actions.top", formActionTopProps);
 
     // Resolve formView.Builder if provided
-    const formViewConfig = (collection as CollectionConfig<M> & { formView?: FormViewConfig<M> }).formView;
+    const formViewConfig = (collection as AdminCollection<M> & { formView?: FormViewConfig<M> }).formView;
     const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<EntityCustomViewParams>(formViewConfig.Builder as ComponentRef<EntityCustomViewParams>) : null;
 
     // Title resolution
@@ -645,7 +643,7 @@ entityId }
     return result;
 }
 
-function DetailViewSkeleton({ collection }: { collection: CollectionConfig<Record<string, unknown>> }) {
+function DetailViewSkeleton({ collection }: { collection: AdminCollection<Record<string, unknown>> }) {
     return (
         <div className="flex-1 flex flex-row w-full overflow-y-auto justify-center">
             <div className="relative flex flex-row max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit">

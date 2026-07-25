@@ -1,4 +1,4 @@
-import { RebaseTranslations } from "@rebasepro/types";
+import { RebaseTranslations } from "@rebasepro/admin-types";
 
 /**
  * Portuguese (pt) translations for @rebasepro/app.

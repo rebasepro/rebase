@@ -117,11 +117,14 @@ Remplace l'intégralité du formulaire d'entité par défaut par un composant pe
 ```typescript
 const collection = {
     slug: "products",
-    formView: {
-        Builder: MyCustomProductForm,
-        includeActions: true  // show save/delete bar (default: true)
+    admin: {
+        formView: {
+            Builder: MyCustomProductForm,
+            includeActions: true  // show save/delete bar (default: true)
+        }
     }
 };
+
 ```
 
 Utilisez-le lorsque vous avez besoin d'une mise en page entièrement personnalisée pour l'expérience d'édition d'entités d'une collection. Pour des ajustements plus petits, préférez plutôt `collection.components` avec la surcharge `Entity.Form`.

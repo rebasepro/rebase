@@ -1,7 +1,7 @@
 import type { CollectionRegistryController } from "./collection_registry";
 import type { EntityStatus, EntityValues } from "../types/entities";
 import type { CollectionConfig, FilterValues } from "../types/collections";
-import type { RebaseContext } from "../rebase_context";
+import type { RebaseCallContext } from "../call_context";
 
 
 /**
@@ -302,7 +302,7 @@ export interface DataDriver {
     cmsToDelegateModel?: (data: unknown) => unknown;
 
     initTextSearch?: (props: {
-        context: RebaseContext,
+        context: RebaseCallContext,
         path: string,
         databaseId?: string,
         collection: CollectionConfig,

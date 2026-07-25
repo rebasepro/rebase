@@ -1,6 +1,6 @@
 import { useUrlController } from "./_cms_internals";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Entity, CollectionConfig, Property, TableMetadata, User } from "@rebasepro/types";
+import { Entity, Property, TableMetadata, User } from "@rebasepro/types";
 import { deepEqual as equal } from "fast-equals";
 
 import { CollectionsConfigController } from "./types/config_controller";
@@ -11,6 +11,7 @@ import { CollectionEditorController } from "./types/collection_editor_controller
 import { CollectionInference } from "./types/collection_inference";
 import { CollectionGenerationCallback } from "./api/generateCollectionApi";
 import { CollectionEditorDialogsContext, CollectionEditorDialogsState } from "./CollectionEditorDialogsContext";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export const ConfigControllerContext = React.createContext<CollectionsConfigController>({} as CollectionsConfigController);
 export const CollectionEditorContext = React.createContext<CollectionEditorController>({} as CollectionEditorController);
@@ -25,7 +26,6 @@ export interface ConfigControllerProviderProps {
      * Callback used to infer the schema from the data.
      */
     collectionInference?: CollectionInference;
-
 
     extraView?: {
         View: React.ComponentType<{
@@ -87,7 +87,7 @@ export const ConfigControllerProvider = React.memo(
 
         const [currentDialog, setCurrentDialog] = React.useState<{
             isNewCollection: boolean,
-            parentCollection?: CollectionConfig,
+            parentCollection?: AdminCollection,
             editedCollectionId?: string,
             path?: string,
             parentCollectionSlugs: string[], parentEntityIds: string[],
@@ -95,7 +95,7 @@ export const ConfigControllerProvider = React.memo(
                 path?: string,
                 name?: string
             },
-            copyFrom?: CollectionConfig,
+            copyFrom?: AdminCollection,
             redirect: boolean,
             existingEntities?: Entity[],
             pathSuggestions?: string[];
@@ -107,16 +107,15 @@ export const ConfigControllerProvider = React.memo(
             propertyKey?: string,
             property?: Property,
             namespace?: string,
-            parentCollection?: CollectionConfig,
+            parentCollection?: AdminCollection,
             currentPropertiesOrder?: string[],
             editedCollectionId: string,
             path?: string,
             parentCollectionSlugs: string[], parentEntityIds: string[],
 
             existingEntities?: Entity[];
-            collection?: CollectionConfig;
+            collection?: AdminCollection;
         }>();
-
 
         const editCollection = useCallback(({
             id,
@@ -130,7 +129,7 @@ export const ConfigControllerProvider = React.memo(
             id?: string,
             path?: string,
             parentCollectionSlugs: string[], parentEntityIds: string[],
-            parentCollection?: CollectionConfig,
+            parentCollection?: AdminCollection,
             existingEntities?: Entity[],
             initialView?: "general" | "display" | "properties",
             expandKanban?: boolean
@@ -169,7 +168,7 @@ parentEntityIds,
             currentPropertiesOrder?: string[],
             editedCollectionId: string,
             parentCollectionSlugs: string[], parentEntityIds: string[],
-            collection: CollectionConfig,
+            collection: AdminCollection,
             existingEntities?: Entity[]
         }) => {
             console.debug("Edit property", propertyKey, property, editedCollectionId, currentPropertiesOrder, parentCollectionSlugs, parentEntityIds, collection);
@@ -207,12 +206,12 @@ parentEntityIds,
             sourceClick
         }: {
             parentCollectionSlugs: string[], parentEntityIds: string[],
-            parentCollection?: CollectionConfig
+            parentCollection?: AdminCollection
             initialValues?: {
                 path?: string,
                 name?: string
             },
-            copyFrom?: CollectionConfig,
+            copyFrom?: AdminCollection,
             redirect: boolean,
             sourceClick?: string
         }) => {
@@ -262,7 +261,7 @@ parentEntityIds,
                 onAnalyticsEvent,
                 unmappedTables,
                 onFetchTableMetadata,
-                handleClose: (collection?: CollectionConfig) => {
+                handleClose: (collection?: AdminCollection) => {
                     if (currentDialog?.redirect) {
                         if (collection && currentDialog?.isNewCollection && !currentDialog.parentCollectionSlugs.length) {
                             const url = urlController.buildUrlCollectionPath(collection.slug);

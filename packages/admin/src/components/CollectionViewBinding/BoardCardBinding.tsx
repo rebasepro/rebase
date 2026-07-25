@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { memo, useCallback, useMemo } from "react";
 import { Entity } from "@rebasepro/types";
 import { Checkbox, Chip, cls, defaultBorderMixin, Markdown } from "@rebasepro/ui";
@@ -7,9 +7,10 @@ import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { BoardItemViewProps } from "@rebasepro/ui";
 import { useCollectionSlotKeys, resolveEntitySlots } from "./usePreviewSlots";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type BoardCardBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = BoardItemViewProps<Entity<M>> & {
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
@@ -40,7 +41,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
     const customizationController = useCustomizationController();
 
     const slotKeys = useCollectionSlotKeys(
-        collection as CollectionConfig<Record<string, unknown>>,
+        collection as AdminCollection<Record<string, unknown>>,
         authController,
         customizationController.propertyConfigs
     );
@@ -48,7 +49,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
     const slots = useMemo(
         () => resolveEntitySlots(
             entity as Entity<Record<string, unknown>>,
-            collection as CollectionConfig<Record<string, unknown>>,
+            collection as AdminCollection<Record<string, unknown>>,
             slotKeys
         ),
         [entity, collection, slotKeys]
@@ -240,7 +241,7 @@ export const BoardCardBinding = memo(BoardCardBindingInner) as typeof BoardCardB
  * Wrapper component that adapts BoardCardBinding to BoardItemViewProps interface
  */
 export function createBoardCardBindingComponent<M extends Record<string, unknown>>(
-    collection: CollectionConfig<M>,
+    collection: AdminCollection<M>,
     options: {
         onClick?: (entity: Entity<M>) => void;
         isEntitySelected?: (entity: Entity<M>) => boolean;

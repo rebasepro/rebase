@@ -1,9 +1,10 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { useEffect, useState, useCallback } from "react";
 ;
 import { useApiConfig } from "@rebasepro/app";
 import { useAuthController } from "@rebasepro/app";
 import { HistoryEntryData } from "../../hooks";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 function getRelativeTimeString(date: Date): string {
     const now = new Date();
@@ -31,7 +32,7 @@ export function LastEditedByIndicator({
 }: {
     path: string;
     entityId: string;
-    collection: CollectionConfig;
+    collection: AdminCollection;
 }) {
     const apiConfig = useApiConfig();
     const authController = useAuthController();

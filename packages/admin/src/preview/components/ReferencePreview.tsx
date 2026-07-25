@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import * as React from "react";
 
 import { Entity, EntityReference } from "@rebasepro/types";
@@ -11,6 +11,7 @@ import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/E
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { getEntityTitlePropertyKeyForEntity } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type ReferencePreviewProps = {
     disabled?: boolean;
@@ -59,7 +60,7 @@ function ReferencePreviewInternalInner({
     includeId = true,
     textOnly,
     collection
-}: ReferencePreviewProps & { collection?: CollectionConfig }) {
+}: ReferencePreviewProps & { collection?: AdminCollection }) {
     const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
 
     if (!collection) {
@@ -124,7 +125,7 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     hover,
     textOnly
 }: ReferencePreviewProps & {
-    collection: CollectionConfig<M>
+    collection: AdminCollection<M>
 }) {
 
     const ResolvedEntityPreview = useComponentOverride("EntityPreview", EntityPreviewBinding);

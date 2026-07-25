@@ -1,4 +1,5 @@
-import { CollectionConfig, RebaseContext, User } from "@rebasepro/types";
+import { CollectionConfig, User } from "@rebasepro/types";
+import { RebaseContext } from "@rebasepro/admin-types";
 import { resolveNavigationFrom } from "../src/hooks/useResolvedNavigationFrom";
 
 /**

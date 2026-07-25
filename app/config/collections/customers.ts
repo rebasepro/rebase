@@ -1,18 +1,15 @@
-import { defineCollection } from "@rebasepro/common";
 // Mutually recursive by design; the reference is only dereferenced inside the
 // `target: () =>` thunk below, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import ordersCollection from "./orders";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const customersCollection = defineCollection({
+const customersCollection: AdminCollectionConfig = {
     name: "Customers",
     singularName: "Customer",
     slug: "customers",
     table: "customers",
-    icon: "Users",
-    group: "E-Commerce",
     history: true,
-    defaultEntityAction: "view",
     properties: {
         id: {
             name: "ID",
@@ -95,33 +92,21 @@ const customersCollection = defineCollection({
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: {
+                readOnly: true,
+                hideFromCollection: true
+            }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: {
+                readOnly: true,
+                hideFromCollection: true
+            }
         }
     },
-    propertiesOrder: [
-        "first_name",
-        "last_name",
-        "email",
-        "phone",
-        "avatar",
-        "company",
-        "is_vip",
-        "lifetime_value",
-        "total_orders",
-        "shipping_address",
-        "billing_address",
-        "notes",
-        "created_at",
-        "updated_at"
-    ],
     relations: [
         {
             relationName: "orders",
@@ -131,7 +116,28 @@ hideFromCollection: true }
             inverseRelationName: "customer"
         }
     ],
-});
+    admin: {
+        icon: "Users",
+        group: "E-Commerce",
+        defaultEntityAction: "view",
+        propertiesOrder: [
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "avatar",
+            "company",
+            "is_vip",
+            "lifetime_value",
+            "total_orders",
+            "shipping_address",
+            "billing_address",
+            "notes",
+            "created_at",
+            "updated_at"
+        ]
+    }
+};
 
 
 export default customersCollection;

@@ -1,4 +1,4 @@
-import type { SidePanelController } from "@rebasepro/types";
+import type { SidePanelController } from "@rebasepro/admin-types";
 import React from "react";
 import { useBuildSidePanel } from "../hooks/useBuildSidePanel";
 import { useBuildSideDialogsController } from "../hooks/useBuildSideDialogsController";

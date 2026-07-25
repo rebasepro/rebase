@@ -1,14 +1,14 @@
-import { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export interface GenerateCollectionRequest {
     /** User's natural language description of what they want */
     prompt: string;
 
     /** Other collections in the project (for context/relationships). Limit to 30. */
-    existingCollections: Partial<CollectionConfig>[];
+    existingCollections: Partial<AdminCollection>[];
 
     /** Optional for generate, required for modifications. If provided, modifies this collection */
-    existingCollection?: Partial<CollectionConfig>;
+    existingCollection?: Partial<AdminCollection>;
 }
 
 /** Operation types for modifying a collection */
@@ -23,7 +23,7 @@ export interface CollectionOperation {
 
 /** Result from collection generation, including optional delta operations */
 export interface GenerateCollectionResult {
-    collection: CollectionConfig;
+    collection: AdminCollection;
     operations?: CollectionOperation[];
 }
 

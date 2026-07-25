@@ -1,17 +1,13 @@
-import { defineCollection } from "@rebasepro/common";
 import ordersCollection from "./orders";
 import productLocalesCollection from "./product_locales";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const productsCollection = defineCollection({
+const productsCollection: AdminCollectionConfig = {
     name: "Products",
     singularName: "Product",
     slug: "products",
     table: "products",
-    icon: "Package",
-    group: "E-Commerce",
     history: true,
-    defaultViewMode: "cards",
-    enabledViews: ["table", "cards"],
     properties: {
         id: {
             name: "ID",
@@ -71,30 +67,46 @@ const productsCollection = defineCollection({
                 required: true
             },
             enum: [
-                { id: "electronics",
-label: "Electronics",
-color: "blue" },
-                { id: "clothing",
-label: "Clothing",
-color: "pink" },
-                { id: "home_garden",
-label: "Home & Garden",
-color: "green" },
-                { id: "sports",
-label: "Sports & Outdoors",
-color: "orange" },
-                { id: "books",
-label: "Books & Media",
-color: "purple" },
-                { id: "food_beverage",
-label: "Food & Beverage",
-color: "yellow" },
-                { id: "health_beauty",
-label: "Health & Beauty",
-color: "red" },
-                { id: "toys",
-label: "Toys & Games",
-color: "cyan" }
+                {
+                    id: "electronics",
+                    label: "Electronics",
+                    color: "blue"
+                },
+                {
+                    id: "clothing",
+                    label: "Clothing",
+                    color: "pink"
+                },
+                {
+                    id: "home_garden",
+                    label: "Home & Garden",
+                    color: "green"
+                },
+                {
+                    id: "sports",
+                    label: "Sports & Outdoors",
+                    color: "orange"
+                },
+                {
+                    id: "books",
+                    label: "Books & Media",
+                    color: "purple"
+                },
+                {
+                    id: "food_beverage",
+                    label: "Food & Beverage",
+                    color: "yellow"
+                },
+                {
+                    id: "health_beauty",
+                    label: "Health & Beauty",
+                    color: "red"
+                },
+                {
+                    id: "toys",
+                    label: "Toys & Games",
+                    color: "cyan"
+                }
             ]
         },
         price: {
@@ -154,15 +166,21 @@ color: "cyan" }
             },
             defaultValue: "draft",
             enum: [
-                { id: "draft",
-label: "Draft",
-color: "gray" },
-                { id: "active",
-label: "Active",
-color: "green" },
-                { id: "archived",
-label: "Archived",
-color: "red" }
+                {
+                    id: "draft",
+                    label: "Draft",
+                    color: "gray"
+                },
+                {
+                    id: "active",
+                    label: "Active",
+                    color: "green"
+                },
+                {
+                    id: "archived",
+                    label: "Archived",
+                    color: "red"
+                }
             ]
         },
         is_featured: {
@@ -174,38 +192,21 @@ color: "red" }
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: {
+                readOnly: true,
+                hideFromCollection: true
+            }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: {
+                readOnly: true,
+                hideFromCollection: true
+            }
         }
     },
-    propertiesOrder: [
-        "name",
-        "sku",
-        "images",
-        "brand",
-        "status",
-        "category",
-        "price",
-        "compare_at_price",
-        "cost",
-        "rating",
-        "review_count",
-        "stock_quantity",
-        "low_stock_threshold",
-        "weight_grams",
-        "is_featured",
-        "description",
-        "available_locales",
-        "created_at",
-        "updated_at"
-    ],
     // Headless relation: shows related orders (through order_items) as a subcollection tab
     relations: [
         {
@@ -237,40 +238,67 @@ hideFromCollection: true }
             direction: "inverse",
             inverseRelationName: "product",
             overrides: {
-                hideFromNavigation: false
+                admin: { hideFromNavigation: false }
             }
         }
     ],
-    filterPresets: [
-        {
-            label: "Active products",
-            filterValues: {
-                status: ["==", "active"]
-            }
-        },
-        {
-            label: "Low stock (< 10)",
-            filterValues: {
-                stock_quantity: ["<", 10],
-                status: ["==", "active"]
+    admin: {
+        icon: "Package",
+        group: "E-Commerce",
+        defaultViewMode: "cards",
+        enabledViews: ["table", "cards"],
+        propertiesOrder: [
+            "name",
+            "sku",
+            "images",
+            "brand",
+            "status",
+            "category",
+            "price",
+            "compare_at_price",
+            "cost",
+            "rating",
+            "review_count",
+            "stock_quantity",
+            "low_stock_threshold",
+            "weight_grams",
+            "is_featured",
+            "description",
+            "available_locales",
+            "created_at",
+            "updated_at"
+        ],
+        filterPresets: [
+            {
+                label: "Active products",
+                filterValues: {
+                    status: ["==", "active"]
+                }
             },
-            sort: ["stock_quantity", "asc"]
-        },
-        {
-            label: "Featured items",
-            filterValues: {
-                is_featured: ["==", true]
-            }
-        },
-        {
-            label: "Top rated (4+)",
-            filterValues: {
-                rating: [">=", 4]
+            {
+                label: "Low stock (< 10)",
+                filterValues: {
+                    stock_quantity: ["<", 10],
+                    status: ["==", "active"]
+                },
+                sort: ["stock_quantity", "asc"]
             },
-            sort: ["rating", "desc"]
-        }
-    ],
-});
+            {
+                label: "Featured items",
+                filterValues: {
+                    is_featured: ["==", true]
+                }
+            },
+            {
+                label: "Top rated (4+)",
+                filterValues: {
+                    rating: [">=", 4]
+                },
+                sort: ["rating", "desc"]
+            }
+        ]
+    }
+};
 
 
 export default productsCollection;

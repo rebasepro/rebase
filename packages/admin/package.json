@@ -64,8 +64,9 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@floating-ui/dom": "^1.7.6",
-    "@rebasepro/common": "workspace:*",
+    "@rebasepro/admin-types": "workspace:*",
     "@rebasepro/app": "workspace:*",
+    "@rebasepro/common": "workspace:*",
     "@rebasepro/forms": "workspace:*",
     "@rebasepro/inference": "workspace:*",
     "@rebasepro/types": "workspace:*",
@@ -162,7 +163,8 @@
     ],
     "moduleNameMapper": {
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
-      "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts"
+      "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
+      "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts"
     }
   }
 }

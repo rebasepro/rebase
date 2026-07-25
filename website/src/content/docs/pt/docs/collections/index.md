@@ -22,7 +22,6 @@ export const productsCollection: CollectionConfig = {
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
     table: "products",            // PostgreSQL table name
-    icon: "inventory_2",           // Material icon key
 
     properties: {
         name: {
@@ -60,8 +59,12 @@ export const productsCollection: CollectionConfig = {
             autoValue: "on_create",
             readOnly: true
         }
+    },
+    admin: {
+        icon: "inventory_2"           // Material icon key
     }
 };
+
 ```
 
 ## Propriedades Chave
@@ -74,7 +77,7 @@ export const productsCollection: CollectionConfig = {
 | `name` | `string` | **Obrigatório.** Nome de exibição (plural). Mostrado na navegação e nos cabeçalhos das páginas. |
 | `singularName` | `string` | Nome de exibição para uma única entidade. Usado em "Novo Produto", "Editar Produto", etc. |
 | `table` | `string` | **Obrigatório.** Nome da tabela PostgreSQL. Se diferente de `slug`, permite desacoplar URLs dos nomes das tabelas. |
-| `icon` | `string` | Chave do ícone Material. Veja [Google Fonts Icons](https://fonts.google.com/icons). |
+| `admin.icon` | `string` | Chave do ícone Material. Veja [Google Fonts Icons](https://fonts.google.com/icons). |
 
 ### Esquema
 
@@ -85,6 +88,8 @@ export const productsCollection: CollectionConfig = {
 | `securityRules` | `SecurityRule[]` | Políticas de Segurança em Nível de Linha. Veja [Regras de Segurança](/docs/collections/security-rules). |
 
 ### Configuração da UI
+
+Todos os campos seguintes ficam dentro de `admin`.
 
 | Propriedade | Tipo | Padrão | Descrição |
 |----------|------|---------|-------------|
@@ -103,6 +108,8 @@ export const productsCollection: CollectionConfig = {
 | `defaultSelectedView` | `string \| function` | — | Visualização padrão ou subcoleção a ser aberta |
 
 ### Opções de Entidade
+
+Dentro de `admin`, exceto `history`, que é um recurso do backend e permanece no nível superior.
 
 | Propriedade | Tipo | Padrão | Descrição |
 |----------|------|---------|-------------|

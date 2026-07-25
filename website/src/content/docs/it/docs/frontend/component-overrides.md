@@ -62,25 +62,28 @@ const productsCollection: PostgresCollectionConfig = {
     name: "Products",
     slug: "products",
     table: "products",
-    components: {
-        // Eject Mode: Replace the default entity form view
-        "Entity.Form": { Component: ProductCustomForm },
+    properties: { /* ... */ },
+    admin: {
+        components: {
+            // Eject Mode: Replace the default entity form view
+            "Entity.Form": { Component: ProductCustomForm },
 
-        // Wrap Mode: Wrap the empty state to add quick links
-        "Collection.EmptyState": {
-            Component: ({ OriginalComponent, ...props }) => (
-                <div className="empty-state-wrapper">
-                    <OriginalComponent {...props} />
-                    <button onClick={() => importDemoProducts()}>
-                        Load Demo Products
-                    </button>
-                </div>
-            ),
-            wrap: true
+            // Wrap Mode: Wrap the empty state to add quick links
+            "Collection.EmptyState": {
+                Component: ({ OriginalComponent, ...props }) => (
+                    <div className="empty-state-wrapper">
+                        <OriginalComponent {...props} />
+                        <button onClick={() => importDemoProducts()}>
+                            Load Demo Products
+                        </button>
+                    </div>
+                ),
+                wrap: true
+            }
         }
-    },
-    properties: { /* ... */ }
+    }
 };
+
 ```
 
 ---

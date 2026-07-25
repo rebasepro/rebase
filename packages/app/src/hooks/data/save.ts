@@ -1,5 +1,6 @@
-import type { CollectionConfig } from "@rebasepro/types";
-import { Entity, EntityStatus, EntityValues, RebaseContext } from "@rebasepro/types";
+
+import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import { RebaseContext, AdminCollection } from "@rebasepro/admin-types";
 import { RebaseData } from "@rebasepro/types";
 
 /**
@@ -10,7 +11,7 @@ export type SaveEntityWithCallbacksProps<M extends Record<string, unknown>> = {
     values: Partial<EntityValues<M>>;
     entityId?: string | number;
     previousValues?: Partial<EntityValues<M>>;
-    collection?: CollectionConfig<M>;
+    collection?: AdminCollection<M>;
     status: EntityStatus;
     afterSave?: (updatedEntity: Entity<M>) => void,
     afterSaveError?: (e: Error) => void
@@ -46,8 +47,8 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
     context,
     afterSave,
     afterSaveError
-}: SaveEntityWithCallbacksProps<M> & {
-    collection: CollectionConfig,
+}: Omit<SaveEntityWithCallbacksProps<M>, "collection"> & {
+    collection: AdminCollection<M>,
     data: RebaseData,
     context: RebaseContext,
 }

@@ -132,18 +132,21 @@ const views: CMSView[] = [
     {
         slug: "dashboard",
         name: "Tableau de bord",
-        icon: "dashboard",
-        group: "Analyse",
         view: <MyDashboard />
     },
     {
         slug: "settings",
         name: "Paramètres de l'application",
-        icon: "settings",
         view: <AppSettings />,
-        nestedRoutes: true  // Prend en charge les sous-chemins
+        nestedRoutes: true  // Prend en charge les sous-chemins,
+        admin: {
+            icon: "dashboard",
+            group: "Analyse",
+            icon: "settings"
+        }
     }
 ];
+
 ```
 
 ## Style

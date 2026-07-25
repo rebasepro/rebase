@@ -1,6 +1,6 @@
 import { HistoryIcon } from "@rebasepro/ui";
 import React from "react";
-import type { CustomizationController, EntityAction, EntityCustomView } from "@rebasepro/types";
+import type { CustomizationController, EntityAction, EntityCustomView } from "@rebasepro/admin-types";
 
 /**
  * Built-in entity views that are resolved by token name.

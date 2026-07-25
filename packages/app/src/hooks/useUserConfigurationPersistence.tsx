@@ -1,4 +1,4 @@
-import { UserConfigurationPersistence } from "@rebasepro/types";
+import { UserConfigurationPersistence } from "@rebasepro/admin-types";
 import { useContext } from "react";
 import { UserConfigurationPersistenceContext } from "../contexts/UserConfigurationPersistenceContext";
 

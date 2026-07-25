@@ -2,7 +2,7 @@ import {
     useAuthController,
     useTranslation
 } from "@rebasepro/app";
-import { PluginHomePageAdditionalCardsProps } from "@rebasepro/types";
+import { PluginHomePageAdditionalCardsProps } from "@rebasepro/admin-types";
 import { Card, cls, PlusIcon, Typography } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 

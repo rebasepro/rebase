@@ -1,12 +1,14 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import type {
-    CollectionRegistryController,
+    CollectionRegistryController
+} from "@rebasepro/types";
+import type {
     SidePanelController,
     UrlController,
     NavigationStateController,
     BreadcrumbEntry,
     BreadcrumbsController
-} from "@rebasepro/types";
+} from "@rebasepro/admin-types";
 
 export type { BreadcrumbEntry, BreadcrumbsController };
 

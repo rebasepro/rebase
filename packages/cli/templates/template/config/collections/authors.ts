@@ -1,11 +1,10 @@
-import { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const authorsCollection: CollectionConfig = {
+const authorsCollection: AdminCollectionConfig = {
     name: "Authors",
     singularName: "Author",
     slug: "authors",
     table: "authors",
-    icon: "Person",
     properties: {
         id: {
             name: "ID",
@@ -34,12 +33,15 @@ const authorsCollection: CollectionConfig = {
             }
         }
     },
-    propertiesOrder: [
-        "id",
-        "name",
-        "email",
-        "picture"
-    ]
+    admin: {
+        icon: "Person",
+        propertiesOrder: [
+            "id",
+            "name",
+            "email",
+            "picture"
+        ]
+    }
 };
 
 export default authorsCollection;

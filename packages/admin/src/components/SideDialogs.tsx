@@ -4,7 +4,7 @@ import { useSideDialogsController } from "../hooks";
 import { Sheet, Dialog } from "@rebasepro/ui";
 import { useUnsavedChangesDialog, UnsavedChangesDialog } from "@rebasepro/app";
 import { ErrorBoundary } from "@rebasepro/ui";
-import type { SidePanelBindingProps } from "@rebasepro/types";
+import type { SidePanelBindingProps } from "@rebasepro/admin-types";
 
 
 export type SideDialogController = {

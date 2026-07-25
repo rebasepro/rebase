@@ -8,7 +8,8 @@ import {
     useTranslation
 } from "@rebasepro/app";
 import { useCMSContext } from "../../hooks";
-import { CollectionActionsProps, Entity, CollectionConfig, ExportConfig, RebaseContext, User } from "@rebasepro/types";
+import { Entity, User } from "@rebasepro/types";
+import { CollectionActionsProps, ExportConfig, RebaseContext, AdminCollection } from "@rebasepro/admin-types";
 import { getDefaultValuesFor } from "@rebasepro/common";
 import {
     Alert,
@@ -38,8 +39,8 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     onAnalyticsEvent,
     exportAllowed,
     notAllowedView
-}: CollectionActionsProps<M, USER, CollectionConfig<M>> & {
-    exportAllowed?: (props: { collectionEntitiesCount: number, path: string, collection: CollectionConfig }) => boolean;
+}: CollectionActionsProps<M, USER, AdminCollection<M>> & {
+    exportAllowed?: (props: { collectionEntitiesCount: number, path: string, collection: AdminCollection }) => boolean;
     notAllowedView?: React.ReactNode;
     onAnalyticsEvent?: (event: string, params?: any) => void;
 }) {
@@ -115,7 +116,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         return [...resolvedExportColumnsValues, ...resolvedColumnsValues];
     }, [exportConfig?.additionalFields]);
 
-    const doDownload = useCallback(async (collection: CollectionConfig<M>,
+    const doDownload = useCallback(async (collection: AdminCollection<M>,
         exportConfig: ExportConfig<any> | undefined) => {
 
         onAnalyticsEvent?.("export_collection", {

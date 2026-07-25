@@ -1,6 +1,7 @@
 import React from "react";
 
-import { AnalyticsEvent, AppView, AppViewsBuilder, CollectionConfig, CollectionConfigsBuilder, RebasePlugin, Locale, PropertyConfig } from "@rebasepro/types";
+import { CollectionConfig } from "@rebasepro/types";
+import { AnalyticsEvent, AppView, AppViewsBuilder, CollectionConfigsBuilder, RebasePlugin, Locale, PropertyConfig } from "@rebasepro/admin-types";
 import { FirebaseAccessGate } from "../hooks/useFirebaseAccessGate";
 
 import { FirebaseApp } from "@firebase/app";

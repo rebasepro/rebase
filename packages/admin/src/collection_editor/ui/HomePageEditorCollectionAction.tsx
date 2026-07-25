@@ -4,7 +4,7 @@ import {
     useSnackbarController,
     useTranslation
 } from "@rebasepro/app";
-import { PluginHomePageActionsProps } from "@rebasepro/types";
+import { PluginHomePageActionsProps } from "@rebasepro/admin-types";
 import { CopyIcon, IconButton, Menu, MenuItem, MoreVerticalIcon, SettingsIcon, Trash2Icon } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { useState } from "react";

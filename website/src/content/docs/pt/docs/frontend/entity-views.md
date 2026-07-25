@@ -19,20 +19,23 @@ As vistas de entidade permitem adicionar **abas** personalizadas à página de d
 const articlesCollection: CollectionConfig = {
     slug: "articles",
     name: "Articles",
-    entityViews: [
-        {
-            key: "preview",
-            name: "Preview",
-            Builder: ArticlePreview
-        },
-        {
-            key: "related",
-            name: "Related Articles",
-            Builder: RelatedArticlesView
-        }
-    ],
-    properties: { /* ... */ }
+    properties: { /* ... */ },
+    admin: {
+        entityViews: [
+            {
+                key: "preview",
+                name: "Preview",
+                Builder: ArticlePreview
+            },
+            {
+                key: "related",
+                name: "Related Articles",
+                Builder: RelatedArticlesView
+            }
+        ]
+    }
 };
+
 ```
 
 ## Construir uma Vista de Entidade

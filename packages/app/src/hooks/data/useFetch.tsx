@@ -1,6 +1,7 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { useEffect, useState, useMemo } from "react";
-import { Entity, RebaseContext, User } from "@rebasepro/types";
+import { Entity, User } from "@rebasepro/types";
+import { RebaseContext, AdminCollection } from "@rebasepro/admin-types";
 import { useData } from "./useData";
 import { useRebaseContext } from "../useRebaseContext";
 
@@ -11,7 +12,7 @@ export interface FetchProps<M extends Record<string, any>, USER extends User = U
     path: string;
     entityId?: string | number;
     databaseId?: string;
-    collection: CollectionConfig<M, USER>;
+    collection: AdminCollection<M, USER>;
     useCache?: boolean;
 }
 

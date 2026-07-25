@@ -4,7 +4,8 @@ import {
     canCreateEntity,
     canDeleteEntity
 } from "../src/util/permissions";
-import { AuthController, Entity, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
+import { Entity, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
+import { AuthController } from "@rebasepro/admin-types";
 
 // ── Helpers ──────────────────────────────────────────────────
 

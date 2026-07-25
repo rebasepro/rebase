@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import type { Property } from "@rebasepro/types";
 import * as React from "react";
 import { useEffect, useMemo } from "react";
@@ -29,11 +29,12 @@ import { getEntityPreviewKeys, getEntityTitlePropertyKeyForEntity } from "../uti
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type EntityPreviewBindingProps = {
     size?: PreviewSize,
     actions?: React.ReactNode,
-    collection?: CollectionConfig,
+    collection?: AdminCollection,
     hover?: boolean;
     previewKeys?: string[],
     disabled?: boolean,
@@ -49,7 +50,7 @@ export type EntityPreviewBindingProps = {
 export type EntityPreviewBindingDataProps = {
     size?: "smallest" | "small" | "medium" | "large",
     actions?: React.ReactNode,
-    collection?: CollectionConfig,
+    collection?: AdminCollection,
     previewKeys?: string[],
     entity: Entity<any>,
     onSidePanelClick?: (entity: Entity) => void,

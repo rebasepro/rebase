@@ -1,6 +1,7 @@
-import type { CollectionConfig, EntityCustomViewParams, AdditionalFieldDelegateProps } from "@rebasepro/types";
+
+import type { EntityCustomViewParams, AdditionalFieldDelegateProps, AdminCollection } from "@rebasepro/admin-types";
 import type { FormContext, PropertyFieldBindingProps } from "../types/fields";
-import type { PropertyConfig } from "@rebasepro/types";
+import type { PropertyConfig } from "@rebasepro/admin-types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";

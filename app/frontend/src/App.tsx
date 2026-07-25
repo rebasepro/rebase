@@ -1,7 +1,7 @@
 import React from "react";
 import "@fontsource/jetbrains-mono";
 import "@fontsource/rubik";
-import type { AnalyticsEvent } from "@rebasepro/types";
+import type { AnalyticsEvent } from "@rebasepro/admin-types";
 
 // Global gtag function injected by the GA4 script in index.html
 declare function gtag(...args: unknown[]): void;
@@ -9,7 +9,7 @@ declare function gtag(...args: unknown[]): void;
 import { useRebaseAuthController } from "@rebasepro/app";
 import { Rebase, RebaseAuth, UIReferenceView } from "@rebasepro/app";
 import { RebaseAdmin, RebaseShell } from "@rebasepro/admin";
-import type { RebasePlugin } from "@rebasepro/types";
+import type { RebasePlugin } from "@rebasepro/admin-types";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 import { useAppInsightsPlugin } from "./useAppInsightsPlugin";
 import { RebaseStudio } from "@rebasepro/studio";

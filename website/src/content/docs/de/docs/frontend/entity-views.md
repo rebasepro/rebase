@@ -19,20 +19,23 @@ Entitätsansichten ermöglichen es Ihnen, benutzerdefinierte **Tabs** zur Entit�
 const articlesCollection: CollectionConfig = {
     slug: "articles",
     name: "Articles",
-    entityViews: [
-        {
-            key: "preview",
-            name: "Preview",
-            Builder: ArticlePreview
-        },
-        {
-            key: "related",
-            name: "Related Articles",
-            Builder: RelatedArticlesView
-        }
-    ],
-    properties: { /* ... */ }
+    properties: { /* ... */ },
+    admin: {
+        entityViews: [
+            {
+                key: "preview",
+                name: "Preview",
+                Builder: ArticlePreview
+            },
+            {
+                key: "related",
+                name: "Related Articles",
+                Builder: RelatedArticlesView
+            }
+        ]
+    }
 };
+
 ```
 
 ## Eine Entitätsansicht erstellen

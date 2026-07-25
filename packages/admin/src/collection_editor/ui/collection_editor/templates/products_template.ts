@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export const productsCollectionTemplate = {
     slug: "products",
@@ -85,4 +85,4 @@ export const productsCollectionTemplate = {
             autoValue: "on_create"
         }
     }
-} as unknown as CollectionConfig;
+} as unknown as AdminCollection;

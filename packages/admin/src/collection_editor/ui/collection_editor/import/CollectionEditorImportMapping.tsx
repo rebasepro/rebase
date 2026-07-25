@@ -6,7 +6,8 @@ import { getIn, useFormex } from "@rebasepro/forms";
 
 import { getFieldConfig, getFieldId } from "../../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../../components/PropertyConfigBadge";
-import { CollectionConfig, Properties, Property, PropertyConfig } from "@rebasepro/types";
+import { Properties, Property } from "@rebasepro/types";
+import { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
 import { cls, Container, Select, SelectItem, Tooltip, Typography } from "@rebasepro/ui";
 import React, { useState } from "react";
 import { OnPropertyChangedParams, PropertyFormDialog, PropertyWithId } from "../PropertyEditView";
@@ -36,7 +37,7 @@ export function CollectionEditorImportMapping({
         setFieldValue,
         setFieldTouched,
         values
-    } = useFormex<CollectionConfig>();
+    } = useFormex<AdminCollection>();
     const [selectedProperty, setSelectedProperty] = useState<PropertyWithId | undefined>(undefined);
 
     const currentPropertiesOrderRef = React.useRef<{

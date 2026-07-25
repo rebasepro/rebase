@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import type { Property } from "@rebasepro/types";
 import * as React from "react";
 
@@ -11,6 +11,7 @@ import { useAuthController } from "@rebasepro/app";
 import { UserChip } from "./UserChip";
 import { HistoryEntryData } from "../../hooks";
 import { getValueInPath } from "@rebasepro/utils";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Recursive deep equality for primitives, arrays and plain objects.
@@ -39,7 +40,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
 export type EntityHistoryEntryProps = {
     size: PreviewSize;
     actions?: React.ReactNode;
-    collection?: CollectionConfig;
+    collection?: AdminCollection;
     hover?: boolean;
     entry: HistoryEntryData;
     onClick?: (e: React.SyntheticEvent) => void;

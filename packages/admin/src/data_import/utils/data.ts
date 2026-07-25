@@ -1,5 +1,6 @@
 import { getPropertyInPath } from "../../util";
-import { AuthController, Entity, CollectionConfig, EntityReference, CollectionRegistryController, Properties, Property, Vector } from "@rebasepro/types";
+import { Entity, EntityReference, CollectionRegistryController, Properties, Property, Vector } from "@rebasepro/types";
+import { AuthController, AdminCollection } from "@rebasepro/admin-types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import { unflattenObject } from "./file_to_json";
 import { getIn } from "@rebasepro/forms";
@@ -148,7 +149,7 @@ export function processValueMapping(authController: AuthController, value: any, 
 
         // If no explicit database was provided in the string, try to get it from the collection
         if (databaseId === undefined) {
-            const targetCollection: CollectionConfig<any> | undefined = navigation.getCollection(path);
+            const targetCollection: AdminCollection<any> | undefined = navigation.getCollection(path);
             databaseId = targetCollection?.databaseId;
         }
 

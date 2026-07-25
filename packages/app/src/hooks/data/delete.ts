@@ -1,5 +1,6 @@
-import type { CollectionConfig } from "@rebasepro/types";
-import { Entity, CollectionCallbacks, RebaseContext, User } from "@rebasepro/types";
+
+import { Entity, CollectionCallbacks, User } from "@rebasepro/types";
+import { RebaseContext, AdminCollection } from "@rebasepro/admin-types";
 import { RebaseData } from "@rebasepro/types";
 
 /**
@@ -7,7 +8,7 @@ import { RebaseData } from "@rebasepro/types";
  */
 export type DeleteEntityWithCallbacksProps<M extends Record<string, any>, USER extends User = User> = {
     entity: Entity<M>;
-    collection?: CollectionConfig<M>;
+    collection?: AdminCollection<M>;
     callbacks?: CollectionCallbacks<M, USER>;
     onDeleteSuccess?: (entity: Entity<M>) => void;
     onDeleteFailure?: (entity: Entity<M>, e: Error) => void;
@@ -37,7 +38,7 @@ export async function deleteEntityWithCallbacks<M extends Record<string, any>, U
     onDeleteFailure,
     context
 }: DeleteEntityWithCallbacksProps<M> & {
-    collection: CollectionConfig<M>,
+    collection: AdminCollection<M>,
     data: RebaseData,
     context: RebaseContext<USER>
 }

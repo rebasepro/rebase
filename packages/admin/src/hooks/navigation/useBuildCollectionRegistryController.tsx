@@ -1,7 +1,9 @@
-import type { CollectionConfig, DataSourceDefinition } from "@rebasepro/types";
+import type { DataSourceDefinition } from "@rebasepro/types";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { CollectionRegistry, getParentReferencesFromPath as commonGetParentReferencesFromPath, removeInitialAndTrailingSlashes, getSubcollections } from "@rebasepro/common";
-import { EntityReference, UserConfigurationPersistence, CollectionRegistryController } from "@rebasepro/types";
+import { CollectionRegistry, getSubcollections } from "@rebasepro/common";
+import { getParentReferencesFromPath as commonGetParentReferencesFromPath, removeInitialAndTrailingSlashes } from "@rebasepro/app";
+import { EntityReference, CollectionRegistryController } from "@rebasepro/types";
+import { UserConfigurationPersistence, resolveAdminCollection, AdminCollection } from "@rebasepro/admin-types";
 import { mergeDeep } from "@rebasepro/utils";
 
 export function useBuildCollectionRegistryController(props: {
@@ -21,7 +23,7 @@ export function useBuildCollectionRegistryController(props: {
     const getCollection = useCallback((
         slugOrPath: string,
         includeUserOverride = false
-    ): CollectionConfig | undefined => {
+    ): AdminCollection | undefined => {
 
         const registry = collectionRegistryRef.current;
 
@@ -38,7 +40,7 @@ export function useBuildCollectionRegistryController(props: {
 
         if (!collectionPath) return undefined;
 
-        let collection: CollectionConfig | undefined;
+        let collection: AdminCollection | undefined;
         try {
             collection = registry.resolvePathToCollections(collectionPath).finalCollection;
         } catch (e) {
@@ -50,13 +52,12 @@ export function useBuildCollectionRegistryController(props: {
             return undefined;
         }
 
-
         const userOverride = includeUserOverride ? userConfigPersistence?.getCollectionConfig(slugOrPath) : undefined;
         const overriddenCollection = collection ? mergeDeep(collection, userOverride ?? {}) : undefined;
 
         if (!overriddenCollection) return undefined;
 
-        let result: Partial<CollectionConfig> | undefined = overriddenCollection;
+        let result: Partial<AdminCollection> | undefined = overriddenCollection;
         const subcollections = "subcollections" in overriddenCollection ? overriddenCollection.subcollections : undefined;
         const callbacks = overriddenCollection.callbacks;
         result = {
@@ -68,12 +69,15 @@ export function useBuildCollectionRegistryController(props: {
             (result as Record<string, unknown>).subcollections = (result as Record<string, unknown>).subcollections ?? subcollections;
         }
 
-        return { ...overriddenCollection,
-...result } as CollectionConfig;
+        // Flatten the admin block: everything downstream of here is the panel's
+        // view model, not the authoring shape. Applied after the user-override
+        // merge so an override of a presentation field still wins.
+        return resolveAdminCollection({ ...overriddenCollection,
+...result } as AdminCollection);
 
     }, [userConfigPersistence]);
 
-    const getRawCollection = useCallback((slugOrPath: string): CollectionConfig | undefined => {
+    const getRawCollection = useCallback((slugOrPath: string): AdminCollection | undefined => {
         const registry = collectionRegistryRef.current;
         if (registry === undefined) return undefined;
 
@@ -82,7 +86,7 @@ export function useBuildCollectionRegistryController(props: {
 
         const pathSegments = cleanedPath.split("/");
 
-        return registry.getRaw(pathSegments.join("/")) as CollectionConfig | undefined;
+        return registry.getRaw(pathSegments.join("/")) as AdminCollection | undefined;
     }, []);
 
     const getParentReferencesFromPath = useCallback((path: string): EntityReference[] => {
@@ -115,7 +119,7 @@ export function useBuildCollectionRegistryController(props: {
             result.push(oddPathSegments.slice(0, i));
         }
 
-        const getCollectionFromPaths = (pathSegments: string[]): CollectionConfig | undefined => {
+        const getCollectionFromPaths = (pathSegments: string[]): AdminCollection | undefined => {
             if (!pathSegments?.length) return undefined;
             const testPath = pathSegments.reduce((acc, segment, idx) => {
                 if (idx === 0) return segment;
@@ -144,11 +148,11 @@ export function useBuildCollectionRegistryController(props: {
     const convertIdsToPaths = useCallback((ids: string[]): string[] => {
         const registry = collectionRegistryRef.current;
         if (!registry) return [];
-        let currentCollections: CollectionConfig[] = registry.getCollections();
+        let currentCollections: AdminCollection[] = registry.getCollections();
         const paths: string[] = [];
         for (let i = 0; i < ids.length; i++) {
             const id = ids[i];
-            const collection: CollectionConfig | undefined = currentCollections.find(c => c.slug === id);
+            const collection: AdminCollection | undefined = currentCollections.find(c => c.slug === id);
             if (!collection)
                 throw Error(`Collection with id ${id} not found`);
             paths.push(collection.slug);
@@ -157,7 +161,7 @@ export function useBuildCollectionRegistryController(props: {
         return paths;
     }, []);
 
-    const collections = collectionRegistryRef.current.getCollections();
+    const collections = collectionRegistryRef.current.getCollections().map(resolveAdminCollection);
 
     // Determine initialised automatically based on whether collections exist,
     // though the NavigationStateController also plays a role in overall init

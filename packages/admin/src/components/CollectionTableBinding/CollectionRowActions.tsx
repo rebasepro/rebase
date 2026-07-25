@@ -1,8 +1,9 @@
-import type { CollectionConfig } from "@rebasepro/types";
-import type { EntityAction } from "@rebasepro/types";
+
+import type { EntityAction, AdminCollection } from "@rebasepro/admin-types";
 import React, { MouseEvent, useCallback } from "react";
 
-import { CollectionSize, Entity, SelectionController } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
+import { CollectionSize, SelectionController } from "@rebasepro/admin-types";
 import {
     Badge,
     Checkbox,
@@ -16,7 +17,7 @@ import {
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
-import { getLocalChangesBackup } from "@rebasepro/common";
+import { getLocalChangesBackup } from "@rebasepro/app";
 import { useCMSContext } from "../../hooks/useCMSContext";
 
 /**
@@ -56,7 +57,7 @@ export const CollectionRowActions = function CollectionRowActions({
 }:
     {
         entity: Entity<any>,
-        collection?: CollectionConfig<any>,
+        collection?: AdminCollection<any>,
         path?: string,
         width: number,
         frozen?: boolean,
@@ -77,7 +78,6 @@ export const CollectionRowActions = function CollectionRowActions({
         isDragging?: boolean;
         isDraggable?: boolean;
     }) {
-
 
     const context = useCMSContext();
     const sidePanelCtrl = context.sidePanelController;

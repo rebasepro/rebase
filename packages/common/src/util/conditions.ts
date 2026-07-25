@@ -1,7 +1,7 @@
 import jsonLogic from "json-logic-js";
 import {
     ArrayProperty,
-    AuthController,
+    AuthState,
     ConditionContext,
     EnumValueConfig,
     JsonLogicRule,
@@ -123,7 +123,7 @@ export function buildConditionContext(params: {
     path: string;
     entityId?: string;
     index?: number;
-    authController: AuthController;
+    authController: AuthState;
 }): ConditionContext {
     const {
         propertyKey,

@@ -6,7 +6,8 @@ import {
     getEntityTitlePropertyKey,
     resolveTitleToString
 } from "../../src/util/previews";
-import type { AuthController, CollectionConfig, PropertyConfig, Property } from "@rebasepro/types";
+import type { CollectionConfig, Property } from "@rebasepro/types";
+import type { AuthController, PropertyConfig } from "@rebasepro/admin-types";
 
 const mockAuthController = {
     user: { uid: "test" },

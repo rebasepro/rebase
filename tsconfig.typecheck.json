@@ -36,6 +36,12 @@
       "@rebasepro/admin/*": [
         "packages/admin/src/*"
       ],
+      "@rebasepro/admin-types": [
+        "packages/admin-types/src"
+      ],
+      "@rebasepro/admin-types/*": [
+        "packages/admin-types/src/*"
+      ],
       "@rebasepro/app": [
         "packages/app/src"
       ],
@@ -162,6 +168,7 @@
   },
   "include": [
     "packages/admin/src",
+    "packages/admin-types/src",
     "packages/cli/src",
     "packages/client/src",
     "packages/firebase/src",
@@ -185,6 +192,10 @@
   "exclude": [
     "**/node_modules",
     "**/dist",
+    // baas-typecheck is its own program: it maps react onto an absence stub and
+    // resolves deps from the pnpm store, which is the whole point of it.
+    // Run it with `pnpm check:baas-types`.
+    "e2e/baas-typecheck",
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/__tests__",

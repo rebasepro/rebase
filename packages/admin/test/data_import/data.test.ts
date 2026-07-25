@@ -1,6 +1,7 @@
 import { describe, expect, test, jest } from "@jest/globals";
 import { flattenEntry, processValueMapping, convertDataToEntity } from "../../src/data_import/utils/data";
-import { AuthController, CollectionRegistryController, EntityReference, Property, Properties, Vector, CollectionConfig } from "@rebasepro/types";
+import { CollectionRegistryController, EntityReference, Property, Properties, Vector, CollectionConfig } from "@rebasepro/types";
+import { AuthController } from "@rebasepro/admin-types";
 
 describe("Data Import Utility Functions", () => {
     const mockAuth = {} as AuthController;

@@ -5,6 +5,7 @@ import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import ordersCollection from "./orders";
 // fallow-ignore-next-line circular-dependency
 import productsCollection from "./products";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
 interface ProductValues extends Record<string, unknown> {
     name: string;
@@ -20,14 +21,11 @@ const getRelationId = (val: unknown): string | number | undefined => {
     return undefined;
 };
 
-const orderItemsCollection = defineCollection({
+const orderItemsCollection: AdminCollectionConfig = {
     name: "Order Items",
     singularName: "Order Item",
     slug: "order_items",
     table: "order_items",
-    icon: "ReceiptText",
-    group: "E-Commerce",
-    hideFromNavigation: true,
     properties: {
         id: {
             name: "ID",
@@ -80,14 +78,6 @@ const orderItemsCollection = defineCollection({
             description: "quantity × unit_price"
         }
     },
-    propertiesOrder: [
-        "product",
-        "product_name",
-        "sku",
-        "quantity",
-        "unit_price",
-        "line_total"
-    ],
     callbacks: {
         beforeSave: async ({ values, context }) => {
             const productId = getRelationId(values.product);
@@ -123,7 +113,20 @@ const orderItemsCollection = defineCollection({
             }
         }
     },
-});
+    admin: {
+        icon: "ReceiptText",
+        group: "E-Commerce",
+        hideFromNavigation: true,
+        propertiesOrder: [
+            "product",
+            "product_name",
+            "sku",
+            "quantity",
+            "unit_price",
+            "line_total"
+        ]
+    }
+};
 
 // Helper function to recalculate the parent order subtotal & total
 async function updateOrderTotals(orderId: string | number, context: EntityCallbackContext) {

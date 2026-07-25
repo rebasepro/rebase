@@ -1,4 +1,5 @@
-import type { CollectionConfig, ViewMode } from "@rebasepro/types";
+
+import type { ViewMode, AdminCollection } from "@rebasepro/admin-types";
 import { useLocation } from "react-router-dom";
 import { EditViewBinding } from "../components/EditViewBinding";
 import { DetailViewBinding } from "../components/DetailViewBinding";
@@ -9,7 +10,8 @@ import { NotFoundPage, useUserConfigurationPersistence, useComponentOverride, us
 import { resolveOpenEntityMode, resolveViewMode } from "../util/view_mode";
 import { UnsavedChangesDialog } from "@rebasepro/app";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import { getNavigationEntriesFromPath, NavigationViewCollectionInternal, NavigationViewEntityCustomInternal, NavigationViewInternal } from "@rebasepro/common";
+import { NavigationViewCollectionInternal, NavigationViewEntityCustomInternal, NavigationViewInternal } from "@rebasepro/app";
+import { getNavigationEntriesFromPath } from "@rebasepro/app";
 import { toArray } from "@rebasepro/utils";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
@@ -84,7 +86,7 @@ export function RebaseRoute() {
     }
 
     if (navigationEntries.length === 1 && navigationEntries[0].type === "collection") {
-        let collection: CollectionConfig<any> | undefined;
+        let collection: AdminCollection<any> | undefined;
         collection = collectionRegistry.getCollection(navigationEntries[0].id);
         if (!collection)
             collection = collectionRegistry.getCollection(navigationEntries[0].slug);
@@ -106,7 +108,7 @@ export function RebaseRoute() {
     if (isSidePanel) {
         const lastCollectionEntry = [...navigationEntries].reverse().find((entry) => entry.type === "collection");
         if (lastCollectionEntry) {
-            let collection: CollectionConfig<any> | undefined;
+            let collection: AdminCollection<any> | undefined;
             const firstEntry = navigationEntries[0] as NavigationViewCollectionInternal<any>;
             collection = collectionRegistry.getCollection(firstEntry.id);
             if (!collection)
@@ -142,7 +144,7 @@ export function RebaseRoute() {
         lastEntityEntry?.type === "entity" &&
         (navigationEntries.length === 2 || navigationEntries.length === 3)
     ) {
-        let collection: CollectionConfig<any> | undefined;
+        let collection: AdminCollection<any> | undefined;
         collection = collectionRegistry.getCollection(firstCollectionEntry.id);
         if (!collection)
             collection = collectionRegistry.getCollection(firstCollectionEntry.slug);

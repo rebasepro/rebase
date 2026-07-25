@@ -2,10 +2,11 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { MarkerType } from "@xyflow/react";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
-import type { CollectionConfig, PostgresCollectionConfig, Relation } from "@rebasepro/types";
+import type { Relation } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { getLayoutedElements, getCardinalityLabel, getTypeLabel, NODE_WIDTH } from "./schema-visualizer.utils";
 import type { LayoutDirection, RelationEdgeData } from "./schema-visualizer.utils";
+import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/admin-types";
 
 // ─── Column info extracted from a collection ──────────────────────────
 
@@ -36,9 +37,9 @@ export interface TableNodeData {
     [key: string]: unknown;
 }
 
-// ─── Extract columns from a CollectionConfig ─────────────────────────
+// ─── Extract columns from a AdminCollection ─────────────────────────
 
-const extractColumns = (collection: CollectionConfig): ColumnInfo[] => {
+const extractColumns = (collection: AdminCollection): ColumnInfo[] => {
     const columns: ColumnInfo[] = [];
     const properties = collection.properties ?? {};
 
@@ -117,7 +118,7 @@ const extractColumns = (collection: CollectionConfig): ColumnInfo[] => {
 // ─── Build graph from collections ─────────────────────────────────────
 
 const buildGraph = (
-    collections: CollectionConfig[],
+    collections: AdminCollection[],
     direction: LayoutDirection
 ): { nodes: Node[]; edges: Edge[] } => {
     const nodes: Node[] = [];
@@ -191,7 +192,7 @@ y: 0 },
         }
 
         for (const [relationKey, rel] of Object.entries(resolvedRelations)) {
-            let targetCollection: CollectionConfig;
+            let targetCollection: AdminCollection;
             try {
                 targetCollection = rel.target();
             } catch {
@@ -356,7 +357,7 @@ export interface UseSchemaGraphResult {
 }
 
 export const useSchemaGraph = (
-    collections: CollectionConfig[] | undefined
+    collections: AdminCollection[] | undefined
 ): UseSchemaGraphResult => {
     const [direction, setDirection] = useState<LayoutDirection>("LR");
     const [version, setVersion] = useState(0);

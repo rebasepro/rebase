@@ -13,37 +13,40 @@ Ações de entidade são botões personalizados que aparecem em entidades indivi
 ```typescript
 const articlesCollection: CollectionConfig = {
     slug: "articles",
-    entityActions: [
-        {
-            name: "Publish",
-            icon: "publish",
-            onClick: async ({ entity, context }) => {
-                await context.dataSource.saveEntity({
-                    path: entity.path,
-                    entityId: entity.id,
-                    values: { status: "published", published_at: new Date() },
-                    collection: articlesCollection
-                });
-                context.snackbarController.open({
-                    message: "Article published!"
-                });
+    properties: { /* ... */ },
+    admin: {
+        entityActions: [
+            {
+                name: "Publish",
+                icon: "publish",
+                onClick: async ({ entity, context }) => {
+                    await context.dataSource.saveEntity({
+                        path: entity.path,
+                        entityId: entity.id,
+                        values: { status: "published", published_at: new Date() },
+                        collection: articlesCollection
+                    });
+                    context.snackbarController.open({
+                        message: "Article published!"
+                    });
+                }
+            },
+            {
+                name: "Clone",
+                icon: "content_copy",
+                onClick: async ({ entity, context }) => {
+                    const { id, ...values } = entity.values;
+                    await context.dataSource.saveEntity({
+                        path: entity.path,
+                        values: { ...values, name: values.name + " (Copy)" },
+                        collection: articlesCollection
+                    });
+                }
             }
-        },
-        {
-            name: "Clone",
-            icon: "content_copy",
-            onClick: async ({ entity, context }) => {
-                const { id, ...values } = entity.values;
-                await context.dataSource.saveEntity({
-                    path: entity.path,
-                    values: { ...values, name: values.name + " (Copy)" },
-                    collection: articlesCollection
-                });
-            }
-        }
-    ],
-    properties: { /* ... */ }
+        ]
+    }
 };
+
 ```
 
 ## Ações de Coleção
@@ -73,7 +76,9 @@ function PublishSelectedAction({ selectionController, context }: CollectionActio
 
 // Register
 const collection: CollectionConfig = {
-    Actions: PublishSelectedAction,
+    admin: {
+        Actions: PublishSelectedAction
+    }
     // ...
 };
 ```

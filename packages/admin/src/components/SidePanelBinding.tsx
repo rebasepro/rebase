@@ -1,5 +1,5 @@
-import type { CollectionConfig } from "@rebasepro/types";
-import type { SidePanelBindingProps } from "@rebasepro/types";
+
+import type { SidePanelBindingProps, AdminCollection } from "@rebasepro/admin-types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
@@ -13,7 +13,7 @@ import { saveEntityToMemoryCache, useComponentOverride } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
-import { resolveDefaultSelectedView } from "@rebasepro/common";
+import { resolveDefaultSelectedView } from "@rebasepro/app";
 
 /**
  * This is the component in charge of rendering the side dialog used
@@ -188,7 +188,7 @@ entityId }
                     ? <ResolvedDetailView
                         path={path}
                         layout={collection?.openEntityMode === "dialog" ? "dialog" : "side_panel"}
-                        collection={collection as CollectionConfig}
+                        collection={collection as AdminCollection}
                         entityId={entityId!}
                         parentCollectionSlugs={parentCollectionSlugs}
                         parentEntityIds={parentEntityIds}
@@ -237,7 +237,7 @@ entityId }
                     : <EditViewBinding
                         {...props}
                         layout={collection?.openEntityMode === "dialog" ? "dialog" : "side_panel"}
-                        collection={collection as CollectionConfig}
+                        collection={collection as AdminCollection}
                         parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                         onValuesModified={onValuesModified}
                         onSaved={onUpdate}

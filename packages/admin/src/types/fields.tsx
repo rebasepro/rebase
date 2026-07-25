@@ -1,8 +1,9 @@
 import { InferPropertyType } from "@rebasepro/types";
 import { Entity } from "@rebasepro/types";
 import { FormexController } from "./components/formex";
-import { CollectionConfig } from "@rebasepro/types";
+
 import { Property } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type DefaultFieldConfig =
     | "text_field"
@@ -190,7 +191,7 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     /**
      * Collection of the entity being modified
      */
-    collection?: CollectionConfig<M>;
+    collection?: AdminCollection<M>;
 
     /**
      * Entity id, it can be undefined if it's a new entity

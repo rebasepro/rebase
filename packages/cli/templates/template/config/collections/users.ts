@@ -1,23 +1,22 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const usersCollection: CollectionConfig = {
+const usersCollection: AdminCollectionConfig = {
     name: "Users",
     singularName: "User",
     slug: "users",
     auth: { enabled: true },
     table: "users",
     schema: "rebase",
-    icon: "Users",
-    group: "Settings",
-    openEntityMode: "dialog",
-    disableDefaultActions: ["copy"],
     securityRules: [
-        { operation: "select",
-roles: ["admin"] },
-        { operations: ["insert", "update", "delete"],
-roles: ["admin"] }
+        {
+            operation: "select",
+            roles: ["admin"]
+        },
+        {
+            operations: ["insert", "update", "delete"],
+            roles: ["admin"]
+        }
     ],
-    sort: ["createdAt", "desc"],
     properties: {
         id: {
             name: "ID",
@@ -132,13 +131,20 @@ roles: ["admin"] }
             }
         }
     },
-    propertiesOrder: [
-        "id",
-        "email",
-        "displayName",
-        "roles",
-        "createdAt"
-    ]
+    admin: {
+        icon: "Users",
+        group: "Settings",
+        openEntityMode: "dialog",
+        disableDefaultActions: ["copy"],
+        sort: ["createdAt", "desc"],
+        propertiesOrder: [
+            "id",
+            "email",
+            "displayName",
+            "roles",
+            "createdAt"
+        ]
+    }
 };
 
 export default usersCollection;

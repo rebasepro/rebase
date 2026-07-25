@@ -1,8 +1,8 @@
-import type { HomePageSection, NavigationEntry, NavigationGroupMapping, PluginGenericProps } from "@rebasepro/types";
+import type { HomePageSection, NavigationEntry, NavigationGroupMapping, PluginGenericProps } from "@rebasepro/admin-types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Fuse from "fuse.js";
 import { Container, SearchBar } from "@rebasepro/ui";
-import { AnalyticsEvent } from "@rebasepro/types";
+import { AnalyticsEvent } from "@rebasepro/admin-types";
 import { FavouritesView } from "./FavouritesView";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { NavigationGroup } from "./NavigationGroup";

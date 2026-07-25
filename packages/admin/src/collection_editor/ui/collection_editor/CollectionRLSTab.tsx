@@ -1,5 +1,5 @@
 
-import { CollectionConfig, SecurityRule as GeneratedSecurityRule } from "@rebasepro/types";
+import { SecurityRule as GeneratedSecurityRule } from "@rebasepro/types";
 import { getPolicyNamesForRule, getPolicyNamesForRules } from "@rebasepro/utils";
 import { getEffectiveSecurityRules } from "@rebasepro/common";
 import React, { useState, useEffect, useMemo } from "react";
@@ -41,6 +41,7 @@ import {
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/forms";
 import { useRebaseContext } from "@rebasepro/app";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /** Postgres RLS policy shape — defined inline to avoid depending on @rebasepro/studio */
 export interface PostgresPolicy {
@@ -63,7 +64,7 @@ interface SecurityRule {
     roles?: string[];
 }
 
-type CollectionWithSecurity = CollectionConfig & {
+type CollectionWithSecurity = AdminCollection & {
     securityRules?: SecurityRule[];
     id?: string;
     table?: string;
@@ -183,7 +184,7 @@ export function CollectionRLSTab() {
      */
     const generatedPolicyNames = useMemo(() => {
         if (!tableName) return new Set<string>();
-        const effectiveRules = getEffectiveSecurityRules(values as CollectionConfig);
+        const effectiveRules = getEffectiveSecurityRules(values as AdminCollection);
         return getPolicyNamesForRules(
             [...(rules as unknown as GeneratedSecurityRule[]), ...effectiveRules],
             tableName

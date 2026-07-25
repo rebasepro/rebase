@@ -1,5 +1,6 @@
 
-import type { AppView, AppViewsBuilder, EffectiveRoleController, RebasePlugin } from "@rebasepro/types";
+import type { EffectiveRoleController } from "@rebasepro/types";
+import type { AppView, AppViewsBuilder, RebasePlugin } from "@rebasepro/admin-types";
 import { useMemo, useRef } from "react";
 
 /**
@@ -17,7 +18,8 @@ function viewSlugsEqual(a: AppView[] | undefined, b: AppView[] | undefined): boo
     return true;
 }
 
-import type { AuthController, RebaseData, User } from "@rebasepro/types";
+import type { RebaseData, User } from "@rebasepro/types";
+import type { AuthController } from "@rebasepro/admin-types";
 
 import { resolveAppViews } from "./useNavigationResolution";
 import { useAsyncResolver } from "./useAsyncResolver";

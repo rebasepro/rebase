@@ -1,0 +1,78 @@
+{
+    "//": "BaaS-only typecheck. Resolves @rebasepro/* to SOURCE so it needs no build, and maps react onto a stub standing in for its absence. `jsx` is deliberately unset so real JSX anywhere in the BaaS graph fails. skipLibCheck stays true: the core packages are program files here and fully checked either way, while false only adds noise from optional third-party dialects (drizzle's gel/mysql). The published-.d.ts angle is covered by scripts/headless-guard/check-types.mjs. Run via `pnpm check:baas-types`. See README.md.",
+    "compilerOptions": {
+        "noEmit": true,
+        "module": "ESNext",
+        "target": "ES2023",
+        "lib": [
+            "ES2023",
+            "DOM"
+        ],
+        "moduleResolution": "bundler",
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "resolveJsonModule": true,
+        "strict": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "ignoreDeprecations": "6.0",
+        "types": [
+            "node"
+        ],
+        "baseUrl": ".",
+        "paths": {
+            "react": [
+                "./stubs/react-absent.d.ts"
+            ],
+            "react/*": [
+                "./stubs/react-absent.d.ts"
+            ],
+            "react-dom": [
+                "./stubs/react-absent.d.ts"
+            ],
+            "react-dom/*": [
+                "./stubs/react-absent.d.ts"
+            ],
+            "@rebasepro/types": [
+                "../../packages/types/src"
+            ],
+            "@rebasepro/utils": [
+                "../../packages/utils/src"
+            ],
+            "@rebasepro/common": [
+                "../../packages/common/src"
+            ],
+            "@rebasepro/client": [
+                "../../packages/client/src"
+            ],
+            "@rebasepro/codegen": [
+                "../../packages/codegen/src"
+            ],
+            "@rebasepro/server": [
+                "../../packages/server/src"
+            ],
+            "@rebasepro/server-postgres": [
+                "../../packages/server-postgres/src"
+            ],
+            // Mapped explicitly, not via a "*" catch-all: a catch-all resolves
+            // every bare specifier to the implementation in the pnpm store, and
+            // TypeScript then never looks for its @types — `pg` and
+            // `json-logic-js` both became implicit any that way. hono ships its
+            // own types, so there is nothing here to shadow.
+            "hono": [
+                "../../node_modules/.pnpm/node_modules/hono"
+            ],
+            "hono/*": [
+                "../../node_modules/.pnpm/node_modules/hono/*"
+            ]
+        },
+        "typeRoots": [
+            "../../node_modules/.pnpm/node_modules/@types",
+            "../../node_modules/@types"
+        ]
+    },
+    "include": [
+        "src",
+        "stubs"
+    ]
+}

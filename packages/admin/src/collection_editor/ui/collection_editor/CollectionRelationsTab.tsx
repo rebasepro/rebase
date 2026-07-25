@@ -22,11 +22,12 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/forms";
-import { PostgresCollectionConfig, Relation } from "@rebasepro/types";
+import { Relation } from "@rebasepro/types";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
+import type { AdminPostgresCollection } from "@rebasepro/admin-types";
 
 export function CollectionRelationsTab() {
-    const { values, setFieldValue } = useFormex<PostgresCollectionConfig>();
+    const { values, setFieldValue } = useFormex<AdminPostgresCollection>();
     const { collections } = useCollectionsConfigController();
     const [editingRelationIndex, setEditingRelationIndex] = useState<number | null>(null);
     const [editingRelationState, setEditingRelationState] = useState<Partial<Relation> | null>(null);

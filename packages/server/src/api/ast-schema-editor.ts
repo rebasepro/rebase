@@ -1,6 +1,34 @@
 import { Project, SyntaxKind, ObjectLiteralExpression, ObjectLiteralElementLike, PropertyAssignment, VariableDeclaration, IndentationText } from "ts-morph";
+import { ADMIN_COLLECTION_KEYS } from "@rebasepro/types";
 import * as path from "path";
 import * as fs from "fs";
+
+/**
+ * Move presentation keys into the `admin` block.
+ *
+ * `ADMIN_COLLECTION_KEYS` comes from `@rebasepro/types` rather than being spelled
+ * out here, so adding a field to `AdminCollectionOptions` cannot leave this writer
+ * behind. Any such key already inside `admin` wins over a top-level copy: the
+ * nested one is what the file said, and a flat duplicate is the view model's
+ * flattening leaking back.
+ */
+export function nestAdminKeys(collectionData: Record<string, unknown>): Record<string, unknown> {
+    const adminKeys = new Set<string>(ADMIN_COLLECTION_KEYS as readonly string[]);
+    const existingBlock = (collectionData.admin ?? {}) as Record<string, unknown>;
+
+    const top: Record<string, unknown> = {};
+    const block: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(collectionData)) {
+        if (key === "admin") continue;
+        if (adminKeys.has(key)) block[key] = value;
+        else top[key] = value;
+    }
+
+    const merged = { ...block, ...existingBlock };
+    if (Object.keys(merged).length > 0) top.admin = merged;
+    return top;
+}
 
 export class AstSchemaEditor {
     private project: Project;
@@ -236,7 +264,7 @@ export class AstSchemaEditor {
             // Create a new file
             const safeId = this.sanitizeCollectionId(collectionId);
             const newFilePath = this.safePath(`${safeId}.ts`);
-            file = this.project.createSourceFile(newFilePath, `import { CollectionConfig } from "@rebasepro/types";\n\nconst ${safeId}Collection: CollectionConfig = ${this.convertJsonToAstString(collectionData)};\n\nexport default ${safeId}Collection;\n`, { overwrite: true });
+            file = this.project.createSourceFile(newFilePath, `import { CollectionConfig } from "@rebasepro/types";\n\nconst ${safeId}Collection: CollectionConfig = ${this.convertJsonToAstString(nestAdminKeys(collectionData))};\n\nexport default ${safeId}Collection;\n`, { overwrite: true });
         } else {
             // Update root level properties gracefully
 
@@ -252,6 +280,13 @@ export class AstSchemaEditor {
                 // and correctly triggers "unmapped policies" if the DB still has them.
                 delete collectionData["securityRules"];
             }
+
+            // The panel works with a flat view model — presentation merged onto the
+            // collection — so what arrives here has `icon` and `listProperties` at
+            // the top level. On disk they belong inside `admin`. Writing them flat
+            // would produce a file the backend loads and ignores and the panel
+            // never reads back, which looks exactly like the edit not saving.
+            collectionData = nestAdminKeys(collectionData);
 
             for (const key of Object.keys(collectionData)) {
                 if (key === "relations") continue; // Kept via other AST functions or handled separately.

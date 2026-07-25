@@ -22,7 +22,6 @@ export const productsCollection: CollectionConfig = {
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
     table: "products",            // PostgreSQL table name
-    icon: "inventory_2",           // Material icon key
 
     properties: {
         name: {
@@ -60,8 +59,12 @@ export const productsCollection: CollectionConfig = {
             autoValue: "on_create",
             readOnly: true
         }
+    },
+    admin: {
+        icon: "inventory_2"           // Material icon key
     }
 };
+
 ```
 
 ## Propriétés clés
@@ -74,7 +77,7 @@ export const productsCollection: CollectionConfig = {
 | `name` | `string` | **Obligatoire.** Nom d'affichage (pluriel). Affiché dans la navigation et les en-têtes de page. |
 | `singularName` | `string` | Nom d'affichage pour une entité unique. Utilisé dans "Nouveau Produit", "Modifier Produit", etc. |
 | `table` | `string` | **Obligatoire.** Nom de la table PostgreSQL. S'il est différent du `slug`, il permet de découpler les URL des noms de table. |
-| `icon` | `string` | Clé d'icône Material Design. Voir [Google Fonts Icons](https://fonts.google.com/icons). |
+| `admin.icon` | `string` | Clé d'icône Material Design. Voir [Google Fonts Icons](https://fonts.google.com/icons). |
 
 ### Schéma
 
@@ -85,6 +88,8 @@ export const productsCollection: CollectionConfig = {
 | `securityRules` | `SecurityRule[]` | Politiques de sécurité au niveau des lignes (Row Level Security). Voir [Règles de sécurité](/docs/collections/security-rules). |
 
 ### Configuration de l'interface utilisateur
+
+Tous les champs suivants vont dans `admin`.
 
 | Propriété | Type | Défaut | Description |
 |----------|------|---------|-------------|
@@ -103,6 +108,8 @@ export const productsCollection: CollectionConfig = {
 | `defaultSelectedView` | `string \| function` | — | Vue ou sous-collection par défaut à ouvrir |
 
 ### Options d'entité
+
+Dans `admin`, sauf `history`, qui est une fonctionnalité du backend et reste au niveau supérieur.
 
 | Propriété | Type | Défaut | Description |
 |----------|------|---------|-------------|

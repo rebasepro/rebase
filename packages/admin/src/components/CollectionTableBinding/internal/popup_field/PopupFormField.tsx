@@ -1,5 +1,5 @@
 import type { Properties } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import type { FormContext, PropertyFieldBindingProps } from "../../../../types/fields";
 import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
@@ -17,6 +17,7 @@ import { PropertyFieldBinding, zodToFormErrors } from "../../../../form";
 import { useAuthController, useCustomizationController, useData, useRebaseContext } from "@rebasepro/app";
 import type { OnCellValueChangeParams } from "@rebasepro/app";
 import { isReadOnly } from "@rebasepro/common";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 interface PopupFormFieldProps<M extends Record<string, unknown>> {
     customFieldValidator?: CustomFieldValidator;
@@ -24,7 +25,7 @@ interface PopupFormFieldProps<M extends Record<string, unknown>> {
     entityId: string | number;
     tableKey: string;
     propertyKey?: Extract<keyof M, string>;
-    collection?: CollectionConfig<any>;
+    collection?: AdminCollection<any>;
     cellRect?: DOMRect;
     open: boolean;
     onClose: () => void;

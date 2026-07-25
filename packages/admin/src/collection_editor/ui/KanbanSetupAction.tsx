@@ -1,8 +1,9 @@
 import React from "react";
 import { useTranslation } from "@rebasepro/app";
-import { CollectionConfig } from "@rebasepro/types";
+
 import { Button } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Component rendered when Kanban view is missing orderProperty configuration.
@@ -14,7 +15,7 @@ export function KanbanSetupAction({
     parentCollectionSlugs,
     parentEntityIds
 }: {
-    collection: CollectionConfig;
+    collection: AdminCollection;
     fullPath: string;
     parentCollectionSlugs: string[], parentEntityIds: string[];
 }) {

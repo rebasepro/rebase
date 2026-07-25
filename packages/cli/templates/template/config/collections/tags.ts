@@ -1,11 +1,10 @@
-import { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const tagsCollection: CollectionConfig = {
+const tagsCollection: AdminCollectionConfig = {
     name: "Tags",
     singularName: "Tag",
     slug: "tags",
     table: "tags",
-    icon: "Tag",
     properties: {
         id: {
             name: "ID",
@@ -19,6 +18,9 @@ const tagsCollection: CollectionConfig = {
                 required: true
             }
         }
+    },
+    admin: {
+        icon: "Tag"
     }
 };
 

@@ -1,6 +1,6 @@
 
 import React, { useMemo } from "react";
-import { CollectionSize, ViewMode } from "@rebasepro/types";
+import { CollectionSize, ViewMode } from "@rebasepro/admin-types";
 import {
     Button,
     ColumnsIcon,

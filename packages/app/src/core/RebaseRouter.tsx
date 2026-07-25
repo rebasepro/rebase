@@ -1,5 +1,5 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom"
-import { removeInitialAndTrailingSlashes } from "@rebasepro/common";
+import { removeInitialAndTrailingSlashes } from "@rebasepro/app";
 
 export function RebaseRouter({
     children,

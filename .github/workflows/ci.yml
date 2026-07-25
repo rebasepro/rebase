@@ -47,6 +47,31 @@ jobs:
       - name: Headless guard
         run: pnpm run check:headless
 
+      # The type-level counterpart. check:headless proves the backend never
+      # *executes* React and passed for months while 13 shipped .d.ts files began
+      # with `import React from "react"` and @types/react was a devDependency
+      # only — so a BaaS install had nothing to resolve them against. This scans
+      # the text of core sources AND built .d.ts, plus the manifests.
+      - name: Type-level headless guard
+        run: pnpm run check:types-headless
+
+      # And the end-to-end proof: a real BaaS project (server + driver + client,
+      # a collection file, SDK calls) typechecked with `react` mapped to a stub
+      # that stands in for its absence. Catches a React type reached through an
+      # alias, which a text scan cannot see.
+      - name: BaaS typecheck (React absent)
+        run: pnpm run check:baas-types
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # The scaffolded collection files, compiled once per preset as `rebase init`
+      # lays them out. Nothing else checks them fast: the only thing that compiled
+      # them was the CMS init e2e, inside a Docker build ~15 minutes in, so a
+      # template carrying a stale collection shape stayed invisible until the very
+      # last gate. These are the first files every new project runs.
+      - name: Init template typecheck
+        run: pnpm run check:templates
+
       # Renames leak where a codemod cannot see them: a bare name in an array,
       # a .astro file, an extensionless .env.example, a Tailwind @source path.
       - name: Package name guard

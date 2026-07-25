@@ -103,7 +103,14 @@ export function resolveComponentRef<P = unknown>(
     if (isLazyComponentRef(ref)) {
         return getOrCreateLazy<P>(
             ref as object,
-            () => (ref as LazyComponentRef<P>).load()
+            // `load()` resolves to `ComponentLike<P>` — the structural stand-in
+            // that lets `ComponentRef` live in the React-free core. This function
+            // is the one place that boundary is crossed, so it is the one place
+            // the widening is asserted: `ComponentLike` accepts a return type of
+            // `unknown` where React wants `ReactNode`. What actually arrives is
+            // whatever the collection file pointed at, and rendering it is
+            // React's problem either way.
+            () => (ref as LazyComponentRef<P>).load() as Promise<{ default: React.ComponentType<P> }>
         );
     }
 

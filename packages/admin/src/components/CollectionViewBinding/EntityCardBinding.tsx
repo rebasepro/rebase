@@ -1,6 +1,7 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { useMemo } from "react";
-import { CollectionSize, Entity } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
+import { CollectionSize, AdminCollection } from "@rebasepro/admin-types";
 import {
     Card,
     Checkbox,
@@ -19,7 +20,7 @@ import { useCollectionSlotKeys, resolveEntitySlots } from "./usePreviewSlots";
 
 export type EntityCardBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     entity: Entity<M>;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
     highlighted?: boolean;
@@ -50,7 +51,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
     const customizationController = useCustomizationController();
 
     const slotKeys = useCollectionSlotKeys(
-        collection as CollectionConfig<Record<string, unknown>>,
+        collection as AdminCollection<Record<string, unknown>>,
         authController,
         customizationController.propertyConfigs
     );
@@ -58,7 +59,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
     const slots = useMemo(
         () => resolveEntitySlots(
             entity as Entity<Record<string, unknown>>,
-            collection as CollectionConfig<Record<string, unknown>>,
+            collection as AdminCollection<Record<string, unknown>>,
             slotKeys
         ),
         [entity, collection, slotKeys]

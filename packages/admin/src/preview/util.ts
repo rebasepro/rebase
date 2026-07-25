@@ -1,4 +1,4 @@
-import { CollectionSize } from "@rebasepro/types";
+import { CollectionSize } from "@rebasepro/admin-types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
 export function sanitizeUrl(url: string | undefined): string {
     if (!url) return "about:blank";

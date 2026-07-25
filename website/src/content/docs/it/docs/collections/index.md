@@ -22,7 +22,6 @@ export const productsCollection: CollectionConfig = {
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
     table: "products",            // PostgreSQL table name
-    icon: "inventory_2",           // Material icon key
 
     properties: {
         name: {
@@ -60,8 +59,12 @@ export const productsCollection: CollectionConfig = {
             autoValue: "on_create",
             readOnly: true
         }
+    },
+    admin: {
+        icon: "inventory_2"           // Material icon key
     }
 };
+
 ```
 
 ## Proprietà Chiave
@@ -74,7 +77,7 @@ export const productsCollection: CollectionConfig = {
 | `name` | `string` | **Obbligatorio.** Nome visualizzato (plurale). Mostrato nella navigazione e nelle intestazioni delle pagine. |
 | `singularName` | `string` | Nome visualizzato per una singola entità. Utilizzato in "Nuovo Prodotto", "Modifica Prodotto", ecc. |
 | `table` | `string` | **Obbligatorio.** Nome della tabella PostgreSQL. Se diverso da `slug`, permette di disaccoppiare gli URL dai nomi delle tabelle. |
-| `icon` | `string` | Chiave dell'icona Material. Vedi [Google Fonts Icons](https://fonts.google.com/icons). |
+| `admin.icon` | `string` | Chiave dell'icona Material. Vedi [Google Fonts Icons](https://fonts.google.com/icons). |
 
 ### Schema
 
@@ -85,6 +88,8 @@ export const productsCollection: CollectionConfig = {
 | `securityRules` | `SecurityRule[]` | Policy di Row Level Security. Vedi [Regole di Sicurezza](/docs/collections/security-rules). |
 
 ### Configurazione dell'interfaccia utente
+
+Tutti i campi seguenti vanno dentro `admin`.
 
 | Proprietà | Tipo | Predefinito | Descrizione |
 |----------|------|---------|-------------|
@@ -103,6 +108,8 @@ export const productsCollection: CollectionConfig = {
 | `defaultSelectedView` | `string \| function` | — | Vista o sottocollezione predefinita da aprire |
 
 ### Opzioni Entità
+
+Dentro `admin`, tranne `history`, che è una funzionalità del backend e resta al livello superiore.
 
 | Proprietà | Tipo | Predefinito | Descrizione |
 |----------|------|---------|-------------|

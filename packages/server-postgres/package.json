@@ -70,7 +70,6 @@
     "@types/node": "^25.9.3",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
-    "@vitejs/plugin-react": "^6.0.2",
     "hono": "^4.12.25",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.11",

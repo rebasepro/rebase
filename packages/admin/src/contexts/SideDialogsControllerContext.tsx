@@ -1,4 +1,4 @@
-import type { SideDialogsController } from "@rebasepro/types";
+import type { SideDialogsController } from "@rebasepro/admin-types";
 import React from "react";
 ;
 

@@ -1,11 +1,12 @@
 import { Entity } from "@rebasepro/types";
-import { CollectionConfig } from "@rebasepro/types";
+
 import { FormContext } from "../fields";
 import { FormexController } from "./formex";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export interface EntityFormActionsProps {
     path: string;
-    collection: CollectionConfig;
+    collection: AdminCollection;
     entity?: Entity;
     layout: "bottom" | "side" | "responsive";
     savingError?: Error;

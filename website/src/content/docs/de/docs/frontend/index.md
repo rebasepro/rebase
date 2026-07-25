@@ -132,18 +132,21 @@ const views: CMSView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
-        icon: "dashboard",
-        group: "Analytics",
         view: <MyDashboard />
     },
     {
         slug: "settings",
         name: "App Settings",
-        icon: "settings",
         view: <AppSettings />,
-        nestedRoutes: true  // Support sub-paths
+        nestedRoutes: true  // Support sub-paths,
+        admin: {
+            icon: "dashboard",
+            group: "Analytics",
+            icon: "settings"
+        }
     }
 ];
+
 ```
 
 ## Styling

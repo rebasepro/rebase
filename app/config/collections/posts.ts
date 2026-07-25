@@ -1,23 +1,16 @@
-import { defineCollection } from "@rebasepro/common";
 import authorsCollection from "./authors";
 // Mutually recursive by design; the reference is only dereferenced inside the
 // `target: () =>` thunk below, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import tagsCollection from "./tags";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const postsCollection = defineCollection({
+const postsCollection: AdminCollectionConfig = {
     name: "Blog posts",
     singularName: "Blog post",
     slug: "posts",
     table: "posts",
-    icon: "FileText",
-    group: "Content",
     history: true,
-    defaultViewMode: "cards",
-    enabledViews: ["table", "cards", "kanban"],
-    kanban: {
-        columnProperty: "status"
-    },
     properties: {
         id: {
             name: "ID",
@@ -150,49 +143,6 @@ const postsCollection = defineCollection({
             direction: "owning"
         }
     },
-    propertiesOrder: [
-        "title",
-        "slug",
-        "hero_image",
-        "excerpt",
-        "status",
-        "publish_date",
-        "author",
-        "tags",
-        "content",
-        "created_at",
-        "updated_at"
-    ],
-    entityViews: [
-        "blog_preview"
-    ],
-    filterPresets: [
-        {
-            label: "Published",
-            filterValues: {
-                status: ["==", "published"]
-            },
-            sort: ["publish_date", "desc"]
-        },
-        {
-            label: "Drafts",
-            filterValues: {
-                status: ["==", "draft"]
-            }
-        },
-        {
-            label: "Needs review",
-            filterValues: {
-                status: ["==", "needs_review"]
-            }
-        },
-        {
-            label: "Archived",
-            filterValues: {
-                status: ["==", "archived"]
-            }
-        }
-    ],
     callbacks: {
         beforeSave: ({ values }) => {
             if (typeof values.title === "string" && !values.slug) {
@@ -204,6 +154,58 @@ const postsCollection = defineCollection({
             return values;
         }
     },
-});
+    admin: {
+        icon: "FileText",
+        group: "Content",
+        defaultViewMode: "cards",
+        enabledViews: ["table", "cards", "kanban"],
+        kanban: {
+            columnProperty: "status"
+        },
+        propertiesOrder: [
+            "title",
+            "slug",
+            "hero_image",
+            "excerpt",
+            "status",
+            "publish_date",
+            "author",
+            "tags",
+            "content",
+            "created_at",
+            "updated_at"
+        ],
+        entityViews: [
+            "blog_preview"
+        ],
+        filterPresets: [
+            {
+                label: "Published",
+                filterValues: {
+                    status: ["==", "published"]
+                },
+                sort: ["publish_date", "desc"]
+            },
+            {
+                label: "Drafts",
+                filterValues: {
+                    status: ["==", "draft"]
+                }
+            },
+            {
+                label: "Needs review",
+                filterValues: {
+                    status: ["==", "needs_review"]
+                }
+            },
+            {
+                label: "Archived",
+                filterValues: {
+                    status: ["==", "archived"]
+                }
+            }
+        ]
+    }
+};
 
 export default postsCollection;

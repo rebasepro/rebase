@@ -5,7 +5,8 @@ import {
     useSnackbarController
 } from "@rebasepro/app";
 import { getPropertiesWithPropertiesOrder, getPropertyInPath } from "../../util";
-import { CollectionActionsProps, Properties, Property, User, CollectionConfig } from "@rebasepro/types";
+import { Properties, Property, User } from "@rebasepro/types";
+import { CollectionActionsProps, AdminCollection } from "@rebasepro/admin-types";
 import { getFieldConfig } from "../../components/field_configs";
 import { PropertyConfigBadge } from "../../components/PropertyConfigBadge";
 import { useSelectionController } from "../../components/CollectionViewBinding/useSelectionController";
@@ -176,7 +177,7 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
 
                 {step === "import_data_saving" && importConfig &&
                     <ImportSaveInProgress importConfig={importConfig}
-                        collection={collection as CollectionConfig}
+                        collection={collection as AdminCollection}
                         path={path}
                         onImportSuccess={(importedCollection) => {
                             handleClose();

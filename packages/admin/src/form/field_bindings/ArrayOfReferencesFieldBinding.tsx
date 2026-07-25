@@ -1,5 +1,5 @@
 import { useSelectionDialog } from "../../hooks/useSelectionDialog";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import type { FieldProps } from "../../types/fields";
 import type { ArrayProperty, Property } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
@@ -15,6 +15,7 @@ import { useTranslation, ErrorView } from "@rebasepro/app";
 import { Button, cls, ExpandablePanel, fieldBackgroundMixin, PencilIcon, Typography } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 type ArrayOfReferencesFieldProps = FieldProps<ArrayProperty, EntityReference[]>;
 
@@ -57,7 +58,7 @@ export function ArrayOfReferencesFieldBinding({
     });
 
     const collectionRegistryController = useCollectionRegistryController();
-    const collection: CollectionConfig | undefined = useMemo(() => {
+    const collection: AdminCollection | undefined = useMemo(() => {
         return ofProperty.path ? collectionRegistryController.getCollection(ofProperty.path) : undefined;
     }, [ofProperty.path]);
 

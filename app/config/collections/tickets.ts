@@ -1,21 +1,12 @@
-import { defineCollection } from "@rebasepro/common";
 import customersCollection from "./customers";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const ticketsCollection = defineCollection({
+const ticketsCollection: AdminCollectionConfig = {
     name: "Tickets",
     singularName: "Ticket",
     slug: "tickets",
     table: "tickets",
-    icon: "Ticket",
-    group: "Support",
     history: true,
-    defaultViewMode: "kanban",
-    enabledViews: ["table", "kanban"],
-    kanban: {
-        columnProperty: "status"
-    },
-    orderProperty: "__order",
-    titleProperty: "subject",
     properties: {
         id: {
             name: "ID",
@@ -59,21 +50,31 @@ const ticketsCollection = defineCollection({
             },
             defaultValue: "open",
             enum: [
-                { id: "open",
-label: "Open",
-color: "blue" },
-                { id: "in_progress",
-label: "In Progress",
-color: "orange" },
-                { id: "waiting",
-label: "Waiting on Customer",
-color: "yellow" },
-                { id: "resolved",
-label: "Resolved",
-color: "green" },
-                { id: "closed",
-label: "Closed",
-color: "gray" }
+                {
+                    id: "open",
+                    label: "Open",
+                    color: "blue"
+                },
+                {
+                    id: "in_progress",
+                    label: "In Progress",
+                    color: "orange"
+                },
+                {
+                    id: "waiting",
+                    label: "Waiting on Customer",
+                    color: "yellow"
+                },
+                {
+                    id: "resolved",
+                    label: "Resolved",
+                    color: "green"
+                },
+                {
+                    id: "closed",
+                    label: "Closed",
+                    color: "gray"
+                }
             ]
         },
         priority: {
@@ -84,42 +85,62 @@ color: "gray" }
             },
             defaultValue: "medium",
             enum: [
-                { id: "low",
-label: "Low",
-color: "gray" },
-                { id: "medium",
-label: "Medium",
-color: "blue" },
-                { id: "high",
-label: "High",
-color: "orange" },
-                { id: "urgent",
-label: "Urgent",
-color: "red" }
+                {
+                    id: "low",
+                    label: "Low",
+                    color: "gray"
+                },
+                {
+                    id: "medium",
+                    label: "Medium",
+                    color: "blue"
+                },
+                {
+                    id: "high",
+                    label: "High",
+                    color: "orange"
+                },
+                {
+                    id: "urgent",
+                    label: "Urgent",
+                    color: "red"
+                }
             ]
         },
         category: {
             name: "Category",
             type: "string",
             enum: [
-                { id: "bug",
-label: "Bug",
-color: "red" },
-                { id: "feature_request",
-label: "Feature Request",
-color: "purple" },
-                { id: "question",
-label: "Question",
-color: "blue" },
-                { id: "billing",
-label: "Billing",
-color: "green" },
-                { id: "account",
-label: "Account",
-color: "cyan" },
-                { id: "other",
-label: "Other",
-color: "gray" }
+                {
+                    id: "bug",
+                    label: "Bug",
+                    color: "red"
+                },
+                {
+                    id: "feature_request",
+                    label: "Feature Request",
+                    color: "purple"
+                },
+                {
+                    id: "question",
+                    label: "Question",
+                    color: "blue"
+                },
+                {
+                    id: "billing",
+                    label: "Billing",
+                    color: "green"
+                },
+                {
+                    id: "account",
+                    label: "Account",
+                    color: "cyan"
+                },
+                {
+                    id: "other",
+                    label: "Other",
+                    color: "gray"
+                }
             ]
         },
         customer: {
@@ -139,63 +160,80 @@ color: "gray" }
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: {
+                readOnly: true,
+                hideFromCollection: true
+            }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: {
+                readOnly: true,
+                hideFromCollection: true
+            }
         },
         __order: {
             name: "Order",
             type: "string",
-            ui: { disabled: true,
-hideFromCollection: true }
+            ui: {
+                disabled: true,
+                hideFromCollection: true
+            }
         }
     },
-    propertiesOrder: [
-        "ticket_number",
-        "subject",
-        "status",
-        "priority",
-        "category",
-        "customer",
-        "assigned_to",
-        "description",
-        "resolution_notes",
-        "created_at",
-        "updated_at",
-        "__order"
-    ],
-    filterPresets: [
-        {
-            label: "Urgent & High priority",
-            filterValues: {
-                priority: ["in", ["urgent", "high"]]
-            }
+    admin: {
+        icon: "Ticket",
+        group: "Support",
+        defaultViewMode: "kanban",
+        enabledViews: ["table", "kanban"],
+        kanban: {
+            columnProperty: "status"
         },
-        {
-            label: "Bugs",
-            filterValues: {
-                category: ["==", "bug"]
+        orderProperty: "__order",
+        titleProperty: "subject",
+        propertiesOrder: [
+            "ticket_number",
+            "subject",
+            "status",
+            "priority",
+            "category",
+            "customer",
+            "assigned_to",
+            "description",
+            "resolution_notes",
+            "created_at",
+            "updated_at",
+            "__order"
+        ],
+        filterPresets: [
+            {
+                label: "Urgent & High priority",
+                filterValues: {
+                    priority: ["in", ["urgent", "high"]]
+                }
+            },
+            {
+                label: "Bugs",
+                filterValues: {
+                    category: ["==", "bug"]
+                }
+            },
+            {
+                label: "Feature requests",
+                filterValues: {
+                    category: ["==", "feature_request"]
+                }
+            },
+            {
+                label: "Unassigned",
+                filterValues: {
+                    assigned_to: ["==", null]
+                }
             }
-        },
-        {
-            label: "Feature requests",
-            filterValues: {
-                category: ["==", "feature_request"]
-            }
-        },
-        {
-            label: "Unassigned",
-            filterValues: {
-                assigned_to: ["==", null]
-            }
-        }
-    ],
-});
+        ]
+    }
+};
 
 export default ticketsCollection;

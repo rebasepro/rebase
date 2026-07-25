@@ -18,14 +18,17 @@ Cada colección puede mostrarse en cuatro modos de vista:
 ```typescript
 const productsCollection: CollectionConfig = {
     slug: "products",
-    defaultViewMode: "table",            // Vista predeterminada
-    enabledViews: ["list", "table", "kanban"],    // Vistas disponibles
-    kanban: {
-        columnProperty: "status",        // Propiedad de enumeración para columnas
-        orderProperty: "sort_order"      // Propiedad para el ordenamiento de arrastrar y soltar
-    },
     // ...
+    admin: {
+        defaultViewMode: "table",            // Vista predeterminada
+        enabledViews: ["list", "table", "kanban"],    // Vistas disponibles
+        kanban: {
+            columnProperty: "status",        // Propiedad de enumeración para columnas
+            orderProperty: "sort_order"      // Propiedad para el ordenamiento de arrastrar y soltar
+        }
+    }
 };
+
 ```
 
 ## Vista de Lista
@@ -69,11 +72,6 @@ Configure un tablero Kanban especificando qué propiedad de enumeración usar co
 ```typescript
 const tasksCollection: CollectionConfig = {
     slug: "tasks",
-    defaultViewMode: "kanban",
-    kanban: {
-        columnProperty: "status",
-        orderProperty: "sort_order"
-    },
     properties: {
         title: { type: "string", name: "Título" },
         status: {
@@ -87,8 +85,16 @@ const tasksCollection: CollectionConfig = {
             ]
         },
         sort_order: { type: "number", name: "Orden de Clasificación" }
+    },
+    admin: {
+        defaultViewMode: "kanban",
+        kanban: {
+            columnProperty: "status",
+            orderProperty: "sort_order"
+        }
     }
 };
+
 ```
 
 Arrastrar y soltar entre columnas actualiza automáticamente el campo de enumeración y el orden de clasificación.
@@ -102,7 +108,6 @@ Las tarjetas muestran las entidades como tarjetas visuales — útiles para cont
 ```typescript
 const articlesCollection: CollectionConfig = {
     slug: "articles",
-    defaultViewMode: "cards",
     properties: {
         title: { type: "string", name: "Título" },
         cover: {
@@ -110,8 +115,12 @@ const articlesCollection: CollectionConfig = {
             name: "Imagen de Portada",
             storage: { storagePath: "covers", acceptedFiles: ["image/*"] }
         }
+    },
+    admin: {
+        defaultViewMode: "cards"
     }
 };
+
 ```
 
 ## Próximos Pasos

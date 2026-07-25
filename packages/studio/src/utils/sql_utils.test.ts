@@ -2,7 +2,7 @@
 import { describe, it, expect } from "@jest/globals";
 import { determineTableAndPK, extractTablesFromQuery, resolveQueryCollections } from "./sql_utils";
 import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
-import { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 const mockSchemas: Record<string, TableInfo[]> = {
     "public": [
@@ -81,31 +81,31 @@ isPrimaryKey: false }
     ]
 };
 
-const mockCollections: CollectionConfig[] = [
+const mockCollections: AdminCollection[] = [
     {
         slug: "users",
         name: "Users",
         table: "users",
         properties: {}
-    } as CollectionConfig,
+    } as AdminCollection,
     {
         slug: "roles",
         name: "Roles",
         table: "roles",
         properties: {}
-    } as CollectionConfig,
+    } as AdminCollection,
     {
         slug: "blogPosts",
         name: "Blog Posts",
         table: "blog_posts",
         properties: {}
-    } as CollectionConfig,
+    } as AdminCollection,
     {
         slug: "blog-entries", // slug with hyphen, no table → falls back to snake_case "blog_entries"
         name: "Blog Entries",
         table: "",
         properties: {}
-    } as CollectionConfig
+    } as AdminCollection
 ];
 
 describe("determineTableAndPK", () => {

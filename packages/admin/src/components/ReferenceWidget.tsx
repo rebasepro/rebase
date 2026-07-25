@@ -1,5 +1,5 @@
 import { useSelectionDialog } from "../hooks/useSelectionDialog";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { useCallback, useMemo } from "react";
 
 import { Entity, EntityReference, FilterValues } from "@rebasepro/types";
@@ -8,6 +8,7 @@ import { getReferenceFrom } from "@rebasepro/common";
 import { ReferencePreview } from "../preview";
 import { Button, cls } from "@rebasepro/ui";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type ReferenceWidgetProps<M extends Record<string, unknown>> = {
     name?: string,
@@ -55,7 +56,7 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
 
     const collectionRegistryController = useCollectionRegistryController();
 
-    const collection: CollectionConfig | undefined = useMemo(() => {
+    const collection: AdminCollection | undefined = useMemo(() => {
         return collectionRegistryController.getCollection(path);
     }, [path, collectionRegistryController.getCollection]);
 

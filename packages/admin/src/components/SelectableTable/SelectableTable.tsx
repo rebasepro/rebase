@@ -1,7 +1,8 @@
 import { createSelectionStore, AdminSelectedCell } from "./SelectionStore";
 import type { Property, WhereFilterOp } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { CollectionSize, Entity, EntityTableController, FilterValues, SelectedCellProps } from "@rebasepro/types";
+import { Entity, FilterValues } from "@rebasepro/types";
+import { CollectionSize, EntityTableController, SelectedCellProps, AdminCollection } from "@rebasepro/admin-types";
 import { CellRendererParams, TableView, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams } from "@rebasepro/ui";
 import { DEFAULT_PAGE_SIZE, DataCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/app";
 import { FilterFormFieldProps } from "@rebasepro/ui";
@@ -109,7 +110,7 @@ export type SelectableTableProps<M extends Record<string, unknown>> = {
  * a custom view. If you just need to create a default view you can do it
  * exclusively with config options.
  *
- * If you want to bind a {@link CollectionConfig} to a table with the default
+ * If you want to bind a {@link AdminCollection} to a table with the default
  * options you see in collections in the top level navigation, you can
  * check {@link CollectionViewBinding}.
  *
@@ -305,5 +306,4 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
     );
 
 };
-
 

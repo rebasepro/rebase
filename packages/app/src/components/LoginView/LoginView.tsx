@@ -34,7 +34,8 @@ import {
     TextField,
     Typography
 } from "@rebasepro/ui";
-import { AuthControllerExtended, User } from "@rebasepro/types";
+import { User } from "@rebasepro/types";
+import { AuthControllerExtended } from "@rebasepro/admin-types";
 import { ErrorView } from "../ErrorView";
 import { RebaseLogo } from "../RebaseLogo";
 import { LanguageToggle } from "../LanguageToggle";

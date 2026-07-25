@@ -37,11 +37,12 @@ import {
 } from "@rebasepro/ui";
 import { useStudioUrlController, useStudioCollectionRegistry, useStudioSidePanelController } from "@rebasepro/app";
 import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, SelectableUser, IconForView } from "@rebasepro/app";
-import { CollectionConfig } from "@rebasepro/types";
+
 import { createRebaseClient } from "@rebasepro/client";
 import { JSMonacoEditor } from "./JSMonacoEditor";
 import { JSEditorSidebar, JSSnippet } from "./JSEditorSidebar";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -113,7 +114,7 @@ function formatJSON(value: unknown): string {
 
 interface MatchedJSCollection {
     collectionSlug: string;
-    collection: CollectionConfig;
+    collection: AdminCollection;
     pkColumn: string;
 }
 
@@ -126,7 +127,7 @@ interface MatchedJSCollection {
 function detectCollectionsInResult(
     code: string,
     resultValue: unknown,
-    collections: CollectionConfig[]
+    collections: AdminCollection[]
 ): MatchedJSCollection[] {
     if (!resultValue || !collections?.length) return [];
 

@@ -1,5 +1,5 @@
 import { Button, FilterXIcon, iconSize, Tooltip } from "@rebasepro/ui";
-import { EntityTableController } from "@rebasepro/types";
+import { EntityTableController } from "@rebasepro/admin-types";
 import { useTranslation } from "@rebasepro/app";
 
 export function ClearFilterSortButton({

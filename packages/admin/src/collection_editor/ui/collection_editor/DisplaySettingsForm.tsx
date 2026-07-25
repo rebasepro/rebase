@@ -4,7 +4,7 @@ import React, { useMemo, useState } from "react";
 import { useCustomizationController } from "@rebasepro/app";
 import { getFieldConfig } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
-import { CollectionConfig, Property } from "@rebasepro/types";
+import { Property } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,
     Button,
@@ -25,6 +25,7 @@ import { KanbanConfigSection } from "./KanbanConfigSection";
 import { PropertyFormDialog } from "./PropertyEditView";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { unslugify } from "@rebasepro/utils";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export function DisplaySettingsForm({
     expandKanban,
@@ -39,7 +40,7 @@ export function DisplaySettingsForm({
         setFieldValue,
         handleChange,
         submitCount
-    } = useFormex<CollectionConfig>();
+    } = useFormex<AdminCollection>();
 
     const [orderPropertyDialogOpen, setOrderPropertyDialogOpen] = useState(false);
 

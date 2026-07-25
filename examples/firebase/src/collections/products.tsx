@@ -77,8 +77,6 @@ export const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     singularName: "Product",
-    group: "E-commerce",
-    icon: "ShoppingCart",
     description: "List of the products currently sold in our shop",
     subcollections: () => [localeCollection],
     properties: {
@@ -205,26 +203,30 @@ export const productsCollection = defineCollection({
             }
         }
     },
-    filterPresets: [
-        {
-            label: "Available products",
-            filterValues: {
-                available: ["==", true]
-            }
-        },
-        {
-            label: "Public & available",
-            filterValues: {
-                public: ["==", true],
-                available: ["==", true]
-            }
-        },
-        {
-            label: "High price (> €100)",
-            filterValues: {
-                price: [">", 100]
+    admin: {
+        group: "E-commerce",
+        icon: "ShoppingCart",
+        filterPresets: [
+            {
+                label: "Available products",
+                filterValues: {
+                    available: ["==", true]
+                }
             },
-            sort: ["price", "desc"]
-        }
-    ]
+            {
+                label: "Public & available",
+                filterValues: {
+                    public: ["==", true],
+                    available: ["==", true]
+                }
+            },
+            {
+                label: "High price (> €100)",
+                filterValues: {
+                    price: [">", 100]
+                },
+                sort: ["price", "desc"]
+            }
+        ]
+    }
 });

@@ -11,8 +11,9 @@
   "source": "src/index.ts",
   "dependencies": {
     "@rebasepro/admin": "workspace:*",
-    "@rebasepro/common": "workspace:*",
+    "@rebasepro/admin-types": "workspace:*",
     "@rebasepro/app": "workspace:*",
+    "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
     "@rebasepro/utils": "workspace:*",

@@ -1,4 +1,5 @@
-import { AuthController, RebaseContext, User } from "@rebasepro/types";
+import { User } from "@rebasepro/types";
+import { AuthController, RebaseContext } from "@rebasepro/admin-types";
 import { wrapAsSdkData } from "@rebasepro/common";
 import { useAuthController } from "./useAuthController";
 import { useRebaseClient } from "./useRebaseClient";

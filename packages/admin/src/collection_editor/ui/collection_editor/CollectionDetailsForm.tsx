@@ -4,7 +4,7 @@ import { FieldCaption } from "../../_cms_internals";
 import React, { useMemo, useState } from "react";
 import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { getFieldConfig, PropertyConfigBadge, SearchIconsView } from "../../_cms_internals";
-import { CollectionConfig, Property } from "@rebasepro/types";
+import { Property } from "@rebasepro/types";
 import {
     BooleanSwitchWithLabel,
     Button,
@@ -31,6 +31,7 @@ import { ViewModeSwitch } from "./ViewModeSwitch";
 import { KanbanConfigSection } from "./KanbanConfigSection";
 import { PropertyFormDialog } from "./PropertyEditView";
 import { singular, toSnakeCase, unslugify } from "@rebasepro/utils";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export function CollectionDetailsForm({
     isNewCollection,
@@ -42,11 +43,10 @@ export function CollectionDetailsForm({
     isNewCollection: boolean,
     existingPaths?: string[];
     existingIds?: string[];
-    parentCollection?: CollectionConfig;
+    parentCollection?: AdminCollection;
     parentCollectionSlugs?: string[], parentEntityIds?: string[];
     expandKanban?: boolean;
 }) {
-
 
     const {
         values,
@@ -57,7 +57,7 @@ export function CollectionDetailsForm({
         setFieldTouched,
         isSubmitting,
         submitCount
-    } = useFormex<CollectionConfig>();
+    } = useFormex<AdminCollection>();
 
     const collectionEditor = useCollectionEditorController();
 
@@ -109,7 +109,6 @@ export function CollectionDetailsForm({
     };
 
     const collectionIcon = <IconForView collectionOrView={values}/>;
-
 
     const isSubcollection = !!parentCollection;
 
@@ -174,7 +173,6 @@ export function CollectionDetailsForm({
                         </FieldCaption>
 
                     </div>
-
 
                     <LayoutModeSwitch
                         className={"col-span-12"}

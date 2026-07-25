@@ -1,6 +1,8 @@
-import type { CollectionConfig, Property, PropertyConfig } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/types";
-import { getTitlePropertyKey, isPropertyBuilder } from "@rebasepro/common";
+import type { Property } from "@rebasepro/types";
+import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
+import { AuthController } from "@rebasepro/admin-types";
+import { isPropertyBuilder } from "@rebasepro/common";
+import { getTitlePropertyKey } from "@rebasepro/app";
 
 function isReferenceProperty(property: Property) {
     if (!property) return null;
@@ -48,7 +50,7 @@ function isStorageProperty(property: Property | undefined): boolean {
 
 export function getEntityPreviewKeys(
     authController: AuthController,
-    targetCollection: CollectionConfig<any>,
+    targetCollection: AdminCollection<any>,
     fields: Record<string, PropertyConfig>,
     previewProperties?: string[],
     limit = 3) {
@@ -86,7 +88,7 @@ const INCLUDE_ALL_RELATIONS: string[] = ["*"];
  * relation data unconditionally and ignores it. Passing it either way keeps a
  * realtime-less deployment rendering the same cells as a realtime one.
  */
-export function getRelationIncludeParams(collection: CollectionConfig<any>): string[] | undefined {
+export function getRelationIncludeParams(collection: AdminCollection<any>): string[] | undefined {
     if (!collection.properties) return undefined;
     const hasRelations = Object.values(collection.properties).some(property =>
         property && !isPropertyBuilder(property) &&
@@ -99,7 +101,7 @@ export function getRelationIncludeParams(collection: CollectionConfig<any>): str
  * `@rebasepro/common`, shared with the admin package so both agree on what an
  * entity is called.
  */
-export function getEntityTitlePropertyKey<M extends Record<string, any>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
-    return getTitlePropertyKey(collection as CollectionConfig<Record<string, unknown>>);
+export function getEntityTitlePropertyKey<M extends Record<string, any>>(collection: AdminCollection<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
+    return getTitlePropertyKey(collection as AdminCollection<Record<string, unknown>>);
 }
 

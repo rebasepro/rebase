@@ -1,5 +1,6 @@
 import { resolveCollections } from "../../src/hooks/navigation/useNavigationResolution";
-import type { AuthController, CollectionConfig, RebaseData } from "@rebasepro/types";
+import type { CollectionConfig, RebaseData } from "@rebasepro/types";
+import type { AuthController } from "@rebasepro/admin-types";
 
 /**
  * The "Reset Password" action is injected into `auth: true` collections, but

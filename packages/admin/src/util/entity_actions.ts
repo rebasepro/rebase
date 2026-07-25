@@ -1,4 +1,4 @@
-import type { EntityAction } from "@rebasepro/types";
+import type { EntityAction } from "@rebasepro/admin-types";
 
 const reservedKeys = ["edit", "copy", "delete"];
 

@@ -1,4 +1,4 @@
-import type { AppView } from "@rebasepro/types";
+import type { AppView } from "@rebasepro/admin-types";
 import React, { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 ;

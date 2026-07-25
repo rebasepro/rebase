@@ -19,20 +19,23 @@ Las vistas de entidad le permiten añadir **pestañas** personalizadas a la pág
 const articlesCollection: CollectionConfig = {
     slug: "articles",
     name: "Articles",
-    entityViews: [
-        {
-            key: "preview",
-            name: "Preview",
-            Builder: ArticlePreview
-        },
-        {
-            key: "related",
-            name: "Related Articles",
-            Builder: RelatedArticlesView
-        }
-    ],
-    properties: { /* ... */ }
+    properties: { /* ... */ },
+    admin: {
+        entityViews: [
+            {
+                key: "preview",
+                name: "Preview",
+                Builder: ArticlePreview
+            },
+            {
+                key: "related",
+                name: "Related Articles",
+                Builder: RelatedArticlesView
+            }
+        ]
+    }
 };
+
 ```
 
 ## Construyendo una Vista de Entidad

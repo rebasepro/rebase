@@ -117,11 +117,14 @@ Reemplaza todo el formulario de entidad predeterminado con un componente persona
 ```typescript
 const collection = {
     slug: "products",
-    formView: {
-        Builder: MyCustomProductForm,
-        includeActions: true  // show save/delete bar (default: true)
+    admin: {
+        formView: {
+            Builder: MyCustomProductForm,
+            includeActions: true  // show save/delete bar (default: true)
+        }
     }
 };
+
 ```
 
 Úselo cuando necesite un layout completamente personalizado para la experiencia de edición de entidades de una colección. Para ajustes menores, prefiera `collection.components` con la sustitución `Entity.Form` en su lugar.

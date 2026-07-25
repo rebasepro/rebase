@@ -1,6 +1,7 @@
 import { useCollectionRegistryController } from "../_cms_internals";
 import { useAuthController, useTranslation } from "@rebasepro/app";
-import { CollectionConfig, CollectionActionsProps } from "@rebasepro/types";
+
+import { CollectionActionsProps, AdminCollection } from "@rebasepro/admin-types";
 import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
 
 import { useCollectionEditorController } from "../useCollectionEditorController";
@@ -38,7 +39,7 @@ export function EditorCollectionAction({
                     path,
                     parentCollectionSlugs,
 parentEntityIds,
-                    parentCollection: parentCollection as CollectionConfig,
+                    parentCollection: parentCollection as AdminCollection,
                     existingEntities: tableController?.data ?? []
                 })
                 : undefined}>

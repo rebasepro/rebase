@@ -1,5 +1,5 @@
 import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { useMemo, useState } from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { Entity, EntityReference } from "@rebasepro/types";
@@ -8,6 +8,7 @@ import { Button, Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
 import { getReferenceFrom } from "@rebasepro/common";
 import { useTranslation } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../../hooks/navigation/contexts/CollectionRegistryContext";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 interface ReferenceFilterFieldProps {
     name: string,
@@ -111,7 +112,7 @@ export function ReferenceFilterField({
     }
 
     const collectionRegistryController = useCollectionRegistryController();
-    const collection: CollectionConfig | undefined = useMemo(() => {
+    const collection: AdminCollection | undefined = useMemo(() => {
         return path ? collectionRegistryController.getCollection(path) : undefined;
     }, [path]);
 

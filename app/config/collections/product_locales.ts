@@ -1,18 +1,15 @@
-import { defineCollection } from "@rebasepro/common";
 // Mutually recursive by design; the reference is only dereferenced inside the
 // `target: () =>` thunk below, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import productsCollection from "./products";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const productLocalesCollection = defineCollection({
+const productLocalesCollection: AdminCollectionConfig = {
     name: "Product Locales",
     singularName: "Product Locale",
     slug: "product_locales",
     table: "product_locales",
-    icon: "Translate",
-    group: "E-Commerce",
     history: true,
-    hideFromNavigation: true,
     properties: {
         id: {
             name: "ID",
@@ -46,7 +43,12 @@ const productLocalesCollection = defineCollection({
             ui: { markdown: true }
         }
     },
-});
+    admin: {
+        icon: "Translate",
+        group: "E-Commerce",
+        hideFromNavigation: true
+    }
+};
 
 
 export default productLocalesCollection;

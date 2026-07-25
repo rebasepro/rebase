@@ -10,9 +10,18 @@ differently.
 | **CMS** | BaaS + a schema-driven admin UI built from your collection definitions. | Payload, Directus |
 | **Full** | CMS + Studio (SQL editor, schema visualizer, RLS editor, logs, API explorer). | Supabase + Payload |
 
-The architecture already enforces this: **no server package imports a UI package**,
+The architecture enforces this at two levels. **No server package imports a UI
+package** at runtime, and — since the 0.11 split — **no core package names React even
+in a type position**. `@rebasepro/types` is the BaaS contract;
+`@rebasepro/admin-types` holds the React layer and depends on it, never the reverse.
 `@rebasepro/client` is isomorphic with zero UI dependencies, and every backend
 subsystem is independently gated by config.
+
+That second level was missing for a long time and the gap was invisible: every React
+import in `@rebasepro/types` is erased at build, so the runtime guard passed while 13
+shipped `.d.ts` files began with `import React from "react"` and `@types/react` was a
+devDependency only. A BaaS install had nothing to resolve them against. See
+`PLAN-2026-07-25-BAAS-ADMIN-SPLIT.md`.
 
 ---
 
@@ -158,9 +167,28 @@ could never reach the database, while reading exactly like an authorization sett
 Because the Node backend imports these files, **collection files must never import a
 UI package.** They may import:
 
+- `@rebasepro/types` — the contract, and `AdminCollectionConfig` **as a type only**
 - `@rebasepro/common` (`defineCollection`)
-- `@rebasepro/types`
 - local, non-UI helpers
+
+A collection file gets its `admin` block type-checked with a *type-only* import, which
+is erased and so never reaches the backend's module graph:
+
+```ts
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+
+const posts: AdminCollectionConfig = {
+    slug: "posts",
+    table: "posts",
+    properties: { … },
+    admin: { icon: "FileText", listProperties: ["title"] }
+};
+```
+
+Without the annotation the block is typed as the opaque `AdminBlock` and a typo like
+`icoon` passes silently — checked, and it does. `defineCollection` from
+`@rebasepro/admin-types` gives the same checking plus property-key inference, but it is
+a *value* import, so use it only in frontend-only code.
 
 Custom React components are referenced **by string path** (`Field: "./MyField"`), not
 by import. The Vite plugin rewrites those strings into lazy dynamic imports for the
@@ -194,7 +222,7 @@ That means Studio can ship on top of BaaS mode with no CMS at all.
 
 ```
 Shared kernel   types → utils → common → client        (isomorphic, no UI, no node)
-                client-postgres → client, types
+                                                      (and no React, in any position)
 
 BaaS            server → client, common, types, utils
                 server-postgres / server-mongo → server
@@ -204,9 +232,11 @@ BaaS            server → client, common, types, utils
                 inference (leaf)
 
 CMS             ui, forms (leaves)
-                app → common, forms, types, ui, utils
-                admin → app, common, forms, inference, types, ui, utils
-                firebase → admin, app, common, types, ui, utils
+                admin-types → types                   (the React half of the types)
+                client-postgres → client, types       (a React hook: a frontend driver)
+                app → admin-types, common, forms, types, ui, utils
+                admin → admin-types, app, common, forms, inference, types, ui, utils
+                firebase → admin, admin-types, app, common, types, ui, utils
 
 Full            studio → client, common, app, types, ui, utils
                         (admin: optional peer)
@@ -248,6 +278,22 @@ Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a mis
 
 ## What enforces this
 
+- `pnpm run check:types-headless` — the type-level counterpart, and the one that was
+  missing. Scans the text of every core package's sources **and built `.d.ts`**, plus
+  their manifests, for any mention of React or an admin package. Catches
+  `import type React`, which a `/^import React/` scan misses, and a stray
+  `@types/react` devDependency, which is what let the leak sit unnoticed.
+- `pnpm run check:baas-types` (`e2e/baas-typecheck/`) — typechecks a real BaaS project
+  (backend, a collection file with schema/validation/relations/RLS/callbacks, SDK reads
+  and writes) with `react` mapped onto a stub that stands in for its absence. Catches a
+  React type reached through an alias, which a text scan cannot see. The two are
+  complementary: the scan cannot see through an alias, the fixture cannot see an unused
+  import.
+- `pnpm run check:templates` — compiles the scaffolded collection files once per
+  preset (`blog`, `ecommerce`, `blank`), laid out the way `applyPreset` lays them out.
+  Nothing else checked them fast: the only thing that compiled a template was the CMS
+  init e2e, inside a Docker build about fifteen minutes in. These are the first files
+  every new project runs, so they should fail in seconds.
 - `pnpm run check:headless` — imports every collection file and every server package
   under a Node loader hook that throws on `react`, `react-dom`, or any
   `@rebasepro/{admin,ui,app,studio,forms}`. Runs in CI before the build, reads

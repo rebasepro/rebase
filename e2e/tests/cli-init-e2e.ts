@@ -435,14 +435,17 @@ function createBooksCollection(projectPath: string) {
     console.log("📚 Creating new 'books' collection...");
     const collectionsDir = path.join(projectPath, "config", "collections");
 
-    const booksContent = `import { CollectionConfig } from "@rebasepro/types";
+    // Authored the way the templates are: presentation nested under `admin`, and
+    // annotated with AdminCollectionConfig so the block is type-checked. This file
+    // is compiled by the scaffolded project's `config` package during the Docker
+    // build, so a flat field here fails the build rather than being ignored.
+    const booksContent = `import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const booksCollection: CollectionConfig = {
+const booksCollection: AdminCollectionConfig = {
     name: "Books",
     singularName: "Book",
     slug: "books",
     table: "books",
-    icon: "Book",
     properties: {
         id: {
             name: "ID",
@@ -464,11 +467,14 @@ const booksCollection: CollectionConfig = {
             }
         }
     },
-    propertiesOrder: [
-        "id",
-        "title",
-        "author"
-    ]
+    admin: {
+        icon: "Book",
+        propertiesOrder: [
+            "id",
+            "title",
+            "author"
+        ]
+    }
 };
 
 export default booksCollection;

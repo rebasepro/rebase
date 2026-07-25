@@ -1,4 +1,5 @@
-import { DataDriver, DeleteProps, CollectionConfig, EntityReference, FetchCollectionProps, FetchOneProps, FilterCombination, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { DataDriver, DeleteProps, CollectionConfig, EntityReference, FetchCollectionProps, FetchOneProps, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { FilterCombination } from "@rebasepro/admin-types";
 import { User } from "@firebase/auth";
 import {
     collection as collectionClause,

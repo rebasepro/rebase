@@ -23,7 +23,6 @@ export const authorsCollection: CollectionConfig = {
     name: "Autores",
     singularName: "Autor",
     table: "authors",
-    icon: "person",
     properties: {
         name: {
             type: "string",
@@ -50,8 +49,12 @@ export const authorsCollection: CollectionConfig = {
             name: "Biografia",
             multiline: true
         }
+    },
+    admin: {
+        icon: "person"
     }
 };
+
 ```
 
 ### Categorias
@@ -62,7 +65,6 @@ export const categoriesCollection: CollectionConfig = {
     name: "Categorias",
     singularName: "Categoria",
     table: "categories",
-    icon: "label",
     properties: {
         name: {
             type: "string",
@@ -84,8 +86,12 @@ export const categoriesCollection: CollectionConfig = {
                 { id: "orange", label: "Laranja", color: "orangeDark" }
             ]
         }
+    },
+    admin: {
+        icon: "label"
     }
 };
+
 ```
 
 ### Artigos
@@ -96,8 +102,6 @@ export const articlesCollection: CollectionConfig = {
     name: "Artigos",
     singularName: "Artigo",
     table: "articles",
-    icon: "article",
-    defaultViewMode: "table",
     history: true,
     properties: {
         title: {
@@ -193,8 +197,13 @@ export const articlesCollection: CollectionConfig = {
         { operation: "select", ownerField: "author_id" },
         { operations: ["insert", "update"], ownerField: "author_id" },
         { operation: "delete", roles: ["admin"] }
-    ]
+    ],
+    admin: {
+        icon: "article",
+        defaultViewMode: "table"
+    }
 };
+
 ```
 
 ## Configuração

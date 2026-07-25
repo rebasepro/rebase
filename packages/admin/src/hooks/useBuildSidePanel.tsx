@@ -1,15 +1,12 @@
-import type { CollectionConfig } from "@rebasepro/types";
-import type { CustomizationController, SidePanelBindingProps, SideDialogPanelProps, SideDialogsController, SidePanelController, UrlController, NavigationStateController, Property } from "@rebasepro/types";
+
+import type { Property } from "@rebasepro/types";
+import type { CustomizationController, SidePanelBindingProps, SideDialogPanelProps, SideDialogsController, SidePanelController, UrlController, NavigationStateController, AdminCollection } from "@rebasepro/admin-types";
 import { useCallback, useEffect, useRef, useMemo } from "react";
-import { AuthController, CollectionRegistryController } from "@rebasepro/types";
+import { CollectionRegistryController } from "@rebasepro/types";
+import { AuthController } from "@rebasepro/admin-types";
 import { useLocation } from "react-router-dom";
-import {
-    getNavigationEntriesFromPath,
-    NavigationViewInternal,
-    removeInitialAndTrailingSlashes,
-    removeTrailingSlash,
-    resolveDefaultSelectedView
-} from "@rebasepro/common";
+import { NavigationViewInternal } from "@rebasepro/app";
+import { getNavigationEntriesFromPath, removeInitialAndTrailingSlashes, removeTrailingSlash, resolveDefaultSelectedView } from "@rebasepro/app";
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import { ADDITIONAL_TAB_WIDTH, CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH } from "@rebasepro/app";
 import { useCustomizationController, useLargeLayout, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
@@ -73,7 +70,7 @@ export function getEntityViewWidth(props: SidePanelBindingProps<any>, small: boo
 
 const collectionViewWidthCache: { [key: string]: string } = {};
 
-function calculateCollectionDesiredWidth(collection: CollectionConfig<any>): string {
+function calculateCollectionDesiredWidth(collection: AdminCollection<any>): string {
     if (collectionViewWidthCache[collection.slug]) {
         return collectionViewWidthCache[collection.slug];
     }
@@ -240,7 +237,7 @@ width: newWidth };
     }), [close, open, replace]);
 };
 
-export function buildSidePanelsFromUrl(path: string, collections: CollectionConfig[], newFlag: boolean): SidePanelBindingProps<any>[] {
+export function buildSidePanelsFromUrl(path: string, collections: AdminCollection[], newFlag: boolean): SidePanelBindingProps<any>[] {
 
     const navigationViewsForPath: NavigationViewInternal<any>[] = getNavigationEntriesFromPath({
         path,

@@ -1,12 +1,11 @@
-import { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 import categoriesCollection from "./categories.js";
 
-const productsCollection: CollectionConfig = {
+const productsCollection: AdminCollectionConfig = {
     name: "Products",
     singularName: "Product",
     slug: "products",
     table: "products",
-    icon: "ShoppingCart",
     properties: {
         id: {
             name: "ID",
@@ -39,15 +38,21 @@ const productsCollection: CollectionConfig = {
             name: "Status",
             type: "string",
             enum: [
-                { id: "draft",
-label: "Draft",
-color: "gray" },
-                { id: "active",
-label: "Active",
-color: "green" },
-                { id: "archived",
-label: "Archived",
-color: "orange" }
+                {
+                    id: "draft",
+                    label: "Draft",
+                    color: "gray"
+                },
+                {
+                    id: "active",
+                    label: "Active",
+                    color: "green"
+                },
+                {
+                    id: "archived",
+                    label: "Archived",
+                    color: "orange"
+                }
             ]
         },
         category: {
@@ -58,6 +63,9 @@ color: "orange" }
             cardinality: "one",
             direction: "owning"
         }
+    },
+    admin: {
+        icon: "ShoppingCart"
     }
 };
 

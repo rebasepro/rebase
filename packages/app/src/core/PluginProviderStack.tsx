@@ -1,4 +1,4 @@
-import type { RebasePlugin } from "@rebasepro/types";
+import type { RebasePlugin } from "@rebasepro/admin-types";
 import React from "react";
 ;
 

@@ -18,7 +18,7 @@ import { useContext } from "react";
  *
  * @group Hooks and utilities
  */
-import { SideDialogPanelProps, SideDialogsController } from "@rebasepro/types";
+import { SideDialogPanelProps, SideDialogsController } from "@rebasepro/admin-types";
 
 export type { SideDialogPanelProps, SideDialogsController };
 

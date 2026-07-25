@@ -16,8 +16,9 @@
   },
   "dependencies": {
     "@rebasepro/admin": "workspace:*",
-    "@rebasepro/common": "workspace:*",
+    "@rebasepro/admin-types": "workspace:*",
     "@rebasepro/app": "workspace:*",
+    "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",
     "@rebasepro/utils": "workspace:*"
@@ -76,11 +77,12 @@
       "node"
     ],
     "moduleNameMapper": {
+      "^@rebasepro/admin$": "<rootDir>/../admin/src/index.ts",
+      "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts",
       "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
       "^@rebasepro/ui$": "<rootDir>/../ui/src/index.ts",
-      "^@rebasepro/admin$": "<rootDir>/../admin/src/index.ts",
       "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
     }
   },

@@ -117,11 +117,14 @@ Replaces the entire default entity form with a custom component. Set on a collec
 ```typescript
 const collection = {
     slug: "products",
-    formView: {
-        Builder: MyCustomProductForm,
-        includeActions: true  // show save/delete bar (default: true)
+    admin: {
+        formView: {
+            Builder: MyCustomProductForm,
+            includeActions: true  // show save/delete bar (default: true)
+        }
     }
 };
+
 ```
 
 Use when you need a completely custom layout for one collection's entity editing experience. For smaller tweaks, prefer `collection.components` with `Entity.Form` override instead.

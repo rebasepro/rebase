@@ -15,8 +15,12 @@ export type CollectionRegistryController<
      * Each entry relates to a collection in the root database.
      * Each of the navigation entries in this field
      * generates an entry in the main menu.
+     *
+     * `EC`, like {@link getCollection} — this was hardcoded to `CollectionConfig`
+     * while `getCollection` honoured the parameter, so the admin panel got its
+     * view model from one and the raw contract from the other.
      */
-    collections?: CollectionConfig[];
+    collections?: EC[];
 
     /**
      * Is the registry ready to be used

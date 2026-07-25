@@ -1,5 +1,5 @@
-import { DataType, CollectionConfig } from "@rebasepro/types";
-
+import { DataType } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Valid dataType values for properties
@@ -18,7 +18,6 @@ const VALID_DATA_TYPES = [
     "binary"
 ] as const;
 
-
 /**
  * Validation error with path and message
  */
@@ -33,7 +32,7 @@ export interface CollectionValidationError {
 export interface CollectionValidationResult {
     valid: boolean;
     errors: CollectionValidationError[];
-    collection?: CollectionConfig;
+    collection?: AdminCollection;
 }
 
 /**
@@ -461,6 +460,6 @@ export function validateCollectionJson(jsonString: string): CollectionValidation
     return {
         valid: errors.length === 0,
         errors,
-        collection: errors.length === 0 ? parsed as unknown as CollectionConfig : undefined
+        collection: errors.length === 0 ? parsed as unknown as AdminCollection : undefined
     };
 }

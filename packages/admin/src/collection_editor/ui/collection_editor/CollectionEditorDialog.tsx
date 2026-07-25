@@ -32,19 +32,10 @@ import {
     Tab,
     Tabs
 } from "@rebasepro/ui";
-import {
-    EngineProperties,
-    Entity,
-    CollectionConfig,
-    getDataSourceCapabilities,
-    MapProperty,
-    Properties,
-    Property,
-    PropertyConfig,
-    TableMetadata,
-    User
-} from "@rebasepro/types";
-import { getSubcollections, getTableName, isPropertyBuilder, removeInitialAndTrailingSlashes } from "@rebasepro/common";
+import { EngineProperties, Entity, getDataSourceCapabilities, MapProperty, Properties, Property, TableMetadata, User } from "@rebasepro/types";
+import { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
+import { getSubcollections, getTableName, isPropertyBuilder } from "@rebasepro/common";
+import { removeInitialAndTrailingSlashes } from "@rebasepro/app";
 import { CollectionEditorSchema } from "./CollectionYupValidation";
 import { GeneralSettingsForm } from "./GeneralSettingsForm";
 import { DisplaySettingsForm } from "./DisplaySettingsForm";
@@ -77,11 +68,11 @@ export interface CollectionEditorDialogProps extends CollectionEditorExtensionPr
      * A collection to duplicate from. If provided, the new collection will be
      * pre-populated with the same properties (but with empty name, path, and id).
      */
-    copyFrom?: CollectionConfig;
+    copyFrom?: AdminCollection;
     editedCollectionId?: string;
     path?: string; // full path of this particular collection, like `products/123/locales`
     parentCollectionSlugs?: string[], parentEntityIds?: string[]; // path ids of the parent collection, like [`products`]
-    handleClose: (collection?: CollectionConfig) => void;
+    handleClose: (collection?: AdminCollection) => void;
     configController: CollectionsConfigController;
     collectionInference?: CollectionInference;
     extraView?: {
@@ -92,7 +83,7 @@ export interface CollectionEditorDialogProps extends CollectionEditorExtensionPr
     };
     getUser?: (uid: string) => User | null;
     getData?: (path: string, parentPaths: string[]) => Promise<object[]>;
-    parentCollection?: CollectionConfig;
+    parentCollection?: AdminCollection;
     existingEntities?: Entity<any>[];
     /**
      * Initial view to open when editing: "general", "display", or "properties".
@@ -213,7 +204,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     const collectionsInThisLevel = (props.parentCollection ? getSubcollections(props.parentCollection) : collections) ?? [];
     const existingPaths = collectionsInThisLevel.map(col => getTableName(col)?.trim().toLowerCase()).filter(Boolean);
     const existingIds = collectionsInThisLevel.map(col => col.slug?.trim().toLowerCase()).filter(Boolean) as string[];
-    const [collection, setCollection] = React.useState<CollectionConfig<any> | undefined>();
+    const [collection, setCollection] = React.useState<AdminCollection<any> | undefined>();
     const [initialLoadingCompleted, setInitialLoadingCompleted] = React.useState(false);
 
     useEffect(() => {
@@ -234,7 +225,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
 
                     const registryCol = getRawCollection ? getRawCollection(collectionPath) : undefined;
                     const configCol = props.configController?.collections?.find(c => c.slug === props.editedCollectionId);
-                    setCollection((registryCol ?? configCol) as CollectionConfig<any>);
+                    setCollection((registryCol ?? configCol) as AdminCollection<any>);
                 } else {
                     setCollection(undefined);
                 }
@@ -244,7 +235,6 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
             console.error(e);
         }
     }, [props.editedCollectionId, props.parentCollectionSlugs, props.parentEntityIds, standalone, collectionRegistry.initialised, collectionRegistry.getRawCollection, props.configController.collections, props.configController.loading, collections]);
-
 
     const initialIcon = React.useMemo(() => coolIconKeys[Math.floor(Math.random() * coolIconKeys.length)], []);
     const fallbackSlug = React.useMemo(() => randomString(16), []);
@@ -259,7 +249,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     }, [collection, fallbackSlug]);
 
     // Build initial values - handle copyFrom for duplication
-    const initialValues = React.useMemo((): CollectionConfig<any> => {
+    const initialValues = React.useMemo((): AdminCollection<any> => {
         return (initialCollection
             ? applyPropertyConfigs(initialCollection, propertyConfigs)
             : copyFromProp
@@ -270,7 +260,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
                         ...rest,
                         name: "",
                         ownerId: authController.user?.uid ?? ""
-                    } as CollectionConfig<any>;
+                    } as AdminCollection<any>;
                 })()
                 : {
                     slug: initialValuesProp?.slug ?? fallbackSlug,
@@ -280,7 +270,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
                     propertiesOrder: [],
                     icon: initialIcon,
                     ownerId: authController.user?.uid ?? ""
-                }) as CollectionConfig<any>;
+                }) as AdminCollection<any>;
     }, [initialCollection, propertyConfigs, copyFromProp, initialValuesProp, fallbackSlug, initialIcon, authController.user?.uid]);
 
     if (!initialLoadingCompleted) {
@@ -341,12 +331,12 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 }: CollectionEditorDialogProps & {
     handleCancel: () => void,
     setFormDirty: (dirty: boolean) => void,
-    initialValues: CollectionConfig<M>,
+    initialValues: AdminCollection<M>,
     existingPaths: string[],
     existingIds: string[],
     includeTemplates: boolean,
-    collection: CollectionConfig<M> | undefined,
-    setCollection: (collection: CollectionConfig<M>) => void,
+    collection: AdminCollection<M> | undefined,
+    setCollection: (collection: AdminCollection<M>) => void,
     propertyConfigs: Record<string, PropertyConfig>,
 }
 ) {
@@ -395,7 +385,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     const [error, setError] = React.useState<Error | undefined>();
 
-    const saveCollection = (updatedCollection: CollectionConfig<M>): Promise<boolean> => {
+    const saveCollection = (updatedCollection: AdminCollection<M>): Promise<boolean> => {
         const id = updatedCollection.slug;
 
         return configController.saveCollection({
@@ -442,7 +432,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     };
 
-    const doCollectionInference = collectionInference ? (collection: CollectionConfig<any>) => {
+    const doCollectionInference = collectionInference ? (collection: AdminCollection<any>) => {
         if (!collectionInference) return undefined;
         return collectionInference?.(
             collection.slug,
@@ -451,7 +441,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         );
     } : undefined;
 
-    const inferCollectionFromData = async (newCollection: CollectionConfig<M>) => {
+    const inferCollectionFromData = async (newCollection: AdminCollection<M>) => {
 
         try {
             if (!doCollectionInference) {
@@ -497,7 +487,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         }
     };
 
-    const onSubmit = async (newCollectionState: CollectionConfig<M>, formexController: FormexController<CollectionConfig<M>>) => {
+    const onSubmit = async (newCollectionState: AdminCollection<M>, formexController: FormexController<AdminCollection<M>>) => {
         console.debug("Submitting collection", newCollectionState);
         try {
 
@@ -506,7 +496,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                 if (success) {
                     aiModifiedPaths?.clearAllPaths();
                     formexController.resetForm({ values: newCollectionState });
-                    handleClose(newCollectionState as CollectionConfig);
+                    handleClose(newCollectionState as AdminCollection);
                 }
                 return;
             }
@@ -544,7 +534,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                 if (success) {
                     formexController.resetForm({ values: initialValues });
                     setNextMode();
-                    handleClose(newCollectionState as CollectionConfig);
+                    handleClose(newCollectionState as AdminCollection);
                 }
             } else {
                 setNextMode();
@@ -560,7 +550,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         }
     };
 
-    const validation = (col: CollectionConfig<M>) => {
+    const validation = (col: AdminCollection<M>) => {
 
         let errors: Record<string, string> = {};
         const schema = (currentView === "properties" || currentView === "general") && CollectionEditorSchema;
@@ -595,7 +585,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
         return errors;
     };
 
-    const formController = useCreateFormex<CollectionConfig<M>>({
+    const formController = useCreateFormex<AdminCollection<M>>({
         initialValues,
         onSubmit,
         validation,
@@ -689,8 +679,8 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
     const aiModifiedPaths = useAIModifiedPaths();
 
-    const handleAIGenerated = (generatedCollection: CollectionConfig, operations?: CollectionOperation[]) => {
-        formController.setValues(generatedCollection as CollectionConfig<M>);
+    const handleAIGenerated = (generatedCollection: AdminCollection, operations?: CollectionOperation[]) => {
+        formController.setValues(generatedCollection as AdminCollection<M>);
         if (operations && aiModifiedPaths) {
             aiModifiedPaths.addModifiedPaths(operations);
         }
@@ -776,7 +766,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                         formController.setValues({
                                             ...formController.values,
                                             ...collectionData
-                                        } as CollectionConfig<M>);
+                                        } as AdminCollection<M>);
                                         onWelcomeScreenContinue();
                                     } catch (e: unknown) {
                                         console.error("Error importing table:", e);
@@ -975,7 +965,7 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
 
 }
 
-function applyPropertyConfigs<M extends Record<string, unknown> = Record<string, unknown>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): CollectionConfig<M> {
+function applyPropertyConfigs<M extends Record<string, unknown> = Record<string, unknown>>(collection: AdminCollection<M>, propertyConfigs: Record<string, PropertyConfig>): AdminCollection<M> {
     const {
         properties,
         ...rest
@@ -992,7 +982,7 @@ function applyPropertyConfigs<M extends Record<string, unknown> = Record<string,
     return {
         ...rest,
         properties: propertiesResult as EngineProperties
-    } as CollectionConfig<M>;
+    } as AdminCollection<M>;
 }
 
 function applyPropertiesConfig(property: Property, propertyConfigs: Record<string, PropertyConfig>) {

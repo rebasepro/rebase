@@ -1,9 +1,9 @@
 
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { lazy, Suspense } from "react";
 
 import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/app";
-import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
+import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
 import { Button, IconButton, Tooltip, Popover, iconSize } from "@rebasepro/ui";
 import { ErrorBoundary, MoreVerticalIcon, PlusIcon, Trash2Icon } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/app";
@@ -16,7 +16,7 @@ import { useCollectionEditorController } from "../../collection_editor/useCollec
 import { useCMSContext } from "../../hooks/useCMSContext";
 
 export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     path: string;
     relativePath: string;
     parentCollectionSlugs: string[], parentEntityIds: string[];

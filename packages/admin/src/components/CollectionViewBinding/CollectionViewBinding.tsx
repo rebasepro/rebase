@@ -1,14 +1,17 @@
-import type { AdditionalFieldDelegate, EntityAction, CollectionConfig, Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/types";
+import type { AdditionalFieldDelegate, EntityAction, AdminCollection } from "@rebasepro/admin-types";
 import {
-    CollectionSize,
     Entity,
     EntityReference,
-    EntityTableController,
     FilterValues,
-    getCollectionDataPath,
+    getCollectionDataPath
+} from "@rebasepro/types";
+import {
+    CollectionSize,
+    EntityTableController,
     PartialCollectionConfig,
     ViewMode
-} from "@rebasepro/types";
+} from "@rebasepro/admin-types";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -120,10 +123,10 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
      */
     selectedTab?: string;
 
-} & CollectionConfig<M>;
+} & AdminCollection<M>;
 
 /**
- * This component is in charge of binding a driver path with an {@link CollectionConfig}
+ * This component is in charge of binding a driver path with an {@link AdminCollection}
  * where it's configuration is defined. It includes an infinite scrolling table
  * and a 'Add' new entities button,
  *
@@ -181,7 +184,7 @@ const CollectionViewBindingInner = React.memo(
         const collection = useMemo(() => {
             const registryCollection = collectionRegistry.getCollection(path) || collectionProp;
             const userOverride = userConfigPersistence?.getCollectionConfig<M>(path);
-            return (userOverride ? mergeDeep(registryCollection, userOverride) : registryCollection) as CollectionConfig<M>;
+            return (userOverride ? mergeDeep(registryCollection, userOverride) : registryCollection) as AdminCollection<M>;
         }, [collectionProp, path, userConfigPersistence, collectionRegistry]);
 
         const collectionRef = React.useRef(collection);
@@ -601,7 +604,6 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 property = getPropertyInPath(resolvedCollection.properties, propertyKey);
             }
 
-
             // In v4, properties are already resolved, so we return them directly
             return property ?? null;
         }, [collection.properties, resolvedCollection.properties]);
@@ -622,7 +624,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         const additionalFields = useMemo(() => {
             // v4: use getSubcollections helper to access subcollections
             const subcollectionsList = getSubcollections(collection);
-            const subcollectionColumns: AdditionalFieldDelegate<M, any>[] = subcollectionsList.map((subcollection: CollectionConfig) => {
+            const subcollectionColumns: AdditionalFieldDelegate<M, any>[] = subcollectionsList.map((subcollection: AdminCollection) => {
                 return {
                     key: getSubcollectionColumnId(subcollection),
                     name: subcollection.name,
@@ -778,7 +780,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 propertyKey,
                 onHover,
                 path,
-                collection: collection as CollectionConfig,
+                collection: collection as AdminCollection,
                 tableController: tableController as EntityTableController,
                 parentCollectionSlugs: parentCollectionSlugs ?? EMPTY_ARRAY,
 parentEntityIds: parentEntityIds ?? EMPTY_ARRAY
@@ -1062,7 +1064,6 @@ parentEntityIds,
                     </div>
                 )}
 
-
                 {/* When isSplitLayout, SplitListView is ALWAYS mounted — regardless
                     of viewMode. The toolbar + current view live in the left panel;
                     the right panel (entity detail) shows/hides based on selection.
@@ -1168,7 +1169,7 @@ export const CollectionViewBinding = React.memo(
 
         if (collection) {
             return (
-                <CollectionScopeProvider collection={collection as CollectionConfig}>
+                <CollectionScopeProvider collection={collection as AdminCollection}>
                     {content}
                 </CollectionScopeProvider>
             );
@@ -1233,7 +1234,7 @@ function EntitiesCount({
     onCountChange
 }: {
     path: string,
-    collection: CollectionConfig,
+    collection: AdminCollection,
     filter?: FilterValues<any>,
     sortBy?: [string, "asc" | "desc"],
     onCountChange?: (count: number | null | undefined) => void,
@@ -1307,7 +1308,7 @@ function EntityIdHeaderWidget({
     idPath,
     openEntityMode
 }: {
-    collection: CollectionConfig,
+    collection: AdminCollection,
     path: string,
     idPath: string,
     /**

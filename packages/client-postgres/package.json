@@ -51,6 +51,7 @@
       "node"
     ],
     "moduleNameMapper": {
+      "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts",
       "^@rebasepro/app$": "<rootDir>/../app/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts"

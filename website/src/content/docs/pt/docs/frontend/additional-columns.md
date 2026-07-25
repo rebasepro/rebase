@@ -13,33 +13,36 @@ As colunas adicionais permitem exibir dados computados ou derivados na tabela de
 ```typescript
 const ordersCollection: CollectionConfig = {
     slug: "orders",
-    additionalFields: [
-        {
-            key: "total_display",
-            name: "Total",
-            Builder: ({ entity }) => {
-                const total = entity.values.items?.reduce(
-                    (sum, item) => sum + (item.price * item.quantity), 0
-                ) ?? 0;
-                return <span>${total.toFixed(2)}</span>;
-            }
-        },
-        {
-            key: "status_badge",
-            name: "Status",
-            Builder: ({ entity }) => {
-                const color = entity.values.status === "completed" ? "green" : "orange";
-                return (
-                    <span style={{ color }}>
-                        {entity.values.status}
-                    </span>
-                );
+    properties: { /* ... */ },
+    admin: {
+        additionalFields: [
+            {
+                key: "total_display",
+                name: "Total",
+                Builder: ({ entity }) => {
+                    const total = entity.values.items?.reduce(
+                        (sum, item) => sum + (item.price * item.quantity), 0
+                    ) ?? 0;
+                    return <span>${total.toFixed(2)}</span>;
+                }
             },
-            dependencies: ["status"]  // Re-render when these fields change
-        }
-    ],
-    properties: { /* ... */ }
+            {
+                key: "status_badge",
+                name: "Status",
+                Builder: ({ entity }) => {
+                    const color = entity.values.status === "completed" ? "green" : "orange";
+                    return (
+                        <span style={{ color }}>
+                            {entity.values.status}
+                        </span>
+                    );
+                },
+                dependencies: ["status"]  // Re-render when these fields change
+            }
+        ]
+    }
 };
+
 ```
 
 ## Propriedades do Builder

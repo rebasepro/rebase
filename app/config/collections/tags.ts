@@ -1,15 +1,12 @@
-import { defineCollection } from "@rebasepro/common";
 import postsCollection from "./posts";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const tagsCollection = defineCollection({
+const tagsCollection: AdminCollectionConfig = {
     name: "Tags",
     singularName: "Tag",
     slug: "tags",
     table: "tags",
-    icon: "Tag",
-    group: "Content",
     history: true,
-    hideFromNavigation: true,
     properties: {
         id: {
             name: "ID",
@@ -36,7 +33,12 @@ const tagsCollection = defineCollection({
             inverseRelationName: "tags"
         }
     ],
-});
+    admin: {
+        icon: "Tag",
+        group: "Content",
+        hideFromNavigation: true
+    }
+};
 
 
 export default tagsCollection;

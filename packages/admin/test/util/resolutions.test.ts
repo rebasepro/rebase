@@ -6,7 +6,7 @@ import {
     resolveEntityAction,
     resolvedSelectedEntityView
 } from "../../src/util/resolutions";
-import type { EntityCustomView, EntityAction, CustomizationController } from "@rebasepro/types";
+import type { EntityCustomView, EntityAction, CustomizationController } from "@rebasepro/admin-types";
 
 // ---------------------------------------------------------------------------
 // resolveEntityView

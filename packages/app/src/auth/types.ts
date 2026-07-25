@@ -1,4 +1,5 @@
-import { AuthController, User, AuthTokens, DeviceSession, RebaseSession, AuthChangeEvent } from "@rebasepro/types";
+import { User, AuthTokens, DeviceSession, RebaseSession, AuthChangeEvent } from "@rebasepro/types";
+import { AuthController } from "@rebasepro/admin-types";
 import type { AuthConfigResponse } from "./api";
 
 /** @deprecated Use `User` from `@rebasepro/types` instead. */

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "rootDir": "./src",
+    "sourceMap": true,
+    "paths": {}
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "../ui/src",
+    "../forms/src",
+  ],
+}

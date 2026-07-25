@@ -1,18 +1,13 @@
-import { defineCollection } from "@rebasepro/common";
 import { maskEmail, maskName, maskValues } from "../masking";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const usersCollection = defineCollection({
+const usersCollection: AdminCollectionConfig = {
     name: "Users",
     singularName: "User",
     slug: "users",
     auth: true,
     table: "users",
     schema: "rebase",
-    icon: "Users",
-    group: "Settings",
-    openEntityMode: "dialog",
-    disableDefaultActions: ["copy"],
-    sort: ["createdAt", "desc"],
     properties: {
         id: {
             name: "ID",
@@ -23,8 +18,10 @@ const usersCollection = defineCollection({
         email: {
             name: "Email",
             type: "string",
-            validation: { required: true,
-unique: true }
+            validation: {
+                required: true,
+                unique: true
+            }
         },
         displayName: {
             name: "Name",
@@ -35,7 +32,7 @@ unique: true }
             name: "Photo URL",
             type: "string",
             columnName: "photo_url",
-            url: "image"
+            ui: { url: "image" }
         },
         roles: {
             name: "Roles",
@@ -55,38 +52,48 @@ unique: true }
             name: "Password Hash",
             type: "string",
             columnName: "password_hash",
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            ui: {
+                hideFromCollection: true,
+                disabled: { hidden: true }
+            }
         },
         emailVerified: {
             name: "Email Verified",
             type: "boolean",
             columnName: "email_verified",
             defaultValue: false,
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            ui: {
+                hideFromCollection: true,
+                disabled: { hidden: true }
+            }
         },
         emailVerificationToken: {
             name: "Email Verification Token",
             type: "string",
             columnName: "email_verification_token",
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            ui: {
+                hideFromCollection: true,
+                disabled: { hidden: true }
+            }
         },
         emailVerificationSentAt: {
             name: "Email Verification Sent At",
             type: "date",
             columnName: "email_verification_sent_at",
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            ui: {
+                hideFromCollection: true,
+                disabled: { hidden: true }
+            }
         },
         metadata: {
             name: "Metadata",
             type: "map",
             keyValue: true,
             defaultValue: {},
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            ui: {
+                hideFromCollection: true,
+                disabled: { hidden: true }
+            }
         },
         createdAt: {
             name: "Created At",
@@ -99,12 +106,12 @@ disabled: { hidden: true } }
             type: "date",
             columnName: "updated_at",
             autoValue: "on_update",
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            ui: {
+                hideFromCollection: true,
+                disabled: { hidden: true }
+            }
         }
     },
-    listProperties: ["displayName", "email", "roles", "createdAt"],
-    propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"],
     // Redact PII at the driver level (runs on REST, realtime, and `rebase.data`).
     callbacks: {
         afterRead: ({ row }) => maskValues(row, {
@@ -125,7 +132,16 @@ disabled: { hidden: true } }
             using: "auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']",
             withCheck: "auth.uid() IS NULL OR string_to_array(auth.roles(), ',') && ARRAY['admin']"
         }
-    ]
-});
+    ],
+    admin: {
+        icon: "Users",
+        group: "Settings",
+        openEntityMode: "dialog",
+        disableDefaultActions: ["copy"],
+        sort: ["createdAt", "desc"],
+        listProperties: ["displayName", "email", "roles", "createdAt"],
+        propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"]
+    }
+};
 
 export default usersCollection;

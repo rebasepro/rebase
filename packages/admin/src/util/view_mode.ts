@@ -1,4 +1,5 @@
-import type { CollectionConfig, ViewMode } from "@rebasepro/types";
+
+import type { ViewMode, AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Query param that carries the active collection view mode across navigations.
@@ -66,7 +67,7 @@ export function resolveViewMode({
     search,
     savedViewMode
 }: {
-    collection?: Pick<CollectionConfig<any>, "defaultViewMode">;
+    collection?: Pick<AdminCollection<any>, "defaultViewMode">;
     search?: string;
     savedViewMode?: ViewMode | null;
 }): ViewMode {
@@ -92,7 +93,7 @@ export function resolveOpenEntityMode({
     collection,
     viewMode
 }: {
-    collection?: Pick<CollectionConfig<any>, "openEntityMode">;
+    collection?: Pick<AdminCollection<any>, "openEntityMode">;
     viewMode?: ViewMode;
 }): OpenEntityMode {
     if (collection?.openEntityMode) return collection.openEntityMode;

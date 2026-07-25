@@ -3,7 +3,7 @@ import { ErrorView, useTranslation } from "@rebasepro/app";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 import { Button } from "@rebasepro/ui";
 import { prettifyIdentifier } from "@rebasepro/utils";
-import { getLastSegment } from "@rebasepro/common";
+import { getLastSegment } from "@rebasepro/app";
 
 export function MissingReferenceWidget({ path: pathProp }: {
     path: string

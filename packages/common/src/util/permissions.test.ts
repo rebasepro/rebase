@@ -1,5 +1,5 @@
 import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection } from "./permissions";
-import { CollectionConfig, AuthController, Entity, User, SecurityRule } from "@rebasepro/types";
+import { AuthState, CollectionConfig, Entity, User, SecurityRule } from "@rebasepro/types";
 
 describe("Permissions Evaluator", () => {
 
@@ -25,23 +25,18 @@ describe("Permissions Evaluator", () => {
         roles: ["admin"]
     };
 
-    const mockAuthController: AuthController<User> = {
-        user: mockUser,
-        initialLoading: false,
-        authLoading: false,
-        loginSkipped: false,
-        signOut: async () => { },
-        getAuthToken: async () => "token",
-        setExtra: () => { },
-        extra: undefined
+    // Just the user now. Faking `signOut`, `getAuthToken`, `authLoading` and the
+    // rest of a frontend controller was never anything these assertions read.
+    const mockAuthController: AuthState<User> = {
+        user: mockUser
     };
 
-    const adminAuthController: AuthController<User> = {
+    const adminAuthController: AuthState<User> = {
         ...mockAuthController,
         user: adminUser
     };
 
-    const unauthenticatedController: AuthController<User> = {
+    const unauthenticatedController: AuthState<User> = {
         ...mockAuthController,
         user: null
     };
@@ -709,7 +704,7 @@ isAnonymous: false,
 photoURL: null,
                 roles: ["editor"]
             };
-            const editorAuth: AuthController<User> = { ...mockAuthController,
+            const editorAuth: AuthState<User> = { ...mockAuthController,
 user: editorUser };
 
             const collection = createMockCollection([
@@ -820,7 +815,7 @@ using: "status = 'draft'" }
         test("58. Missing authController ('blankAuth') handled gracefully", () => {
             const collection = createMockCollection([{ operation: "insert",
 roles: ["admin"] }]);
-            const blankAuth = { user: null } as unknown as AuthController<User>;
+            const blankAuth = { user: null } as unknown as AuthState<User>;
             expect(canCreateEntity(collection, blankAuth, "test", null)).toBe(false);
         });
 

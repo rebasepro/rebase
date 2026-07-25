@@ -1,9 +1,10 @@
-import type { ComponentRef, CollectionConfig, EntityCustomViewParams, FormViewConfig } from "@rebasepro/types";
+import type { ComponentRef } from "@rebasepro/types";
+import type { EntityCustomViewParams, FormViewConfig, AdminCollection } from "@rebasepro/admin-types";
 import type { FormContext } from "../types/fields";
-import type { PluginFormActionProps } from "@rebasepro/types";
+import type { PluginFormActionProps } from "@rebasepro/admin-types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, getCollectionDataPath } from "@rebasepro/types";
-import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
+import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider, getAdminSubcollections } from "@rebasepro/app";
 
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { EntityViewBinding } from "./EntityViewBinding";
@@ -25,11 +26,8 @@ import {
 } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/app";
-import {
-    getSubcollections,
-    removeInitialAndTrailingSlashes,
-    resolveDefaultSelectedView
-} from "@rebasepro/common";
+
+import { removeInitialAndTrailingSlashes, resolveDefaultSelectedView } from "@rebasepro/app";
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import {
     useCustomizationController,
@@ -66,7 +64,7 @@ export type OnTabChangeParams<M extends Record<string, unknown>> = {
     path: string;
     entityId?: string | number;
     selectedTab?: string;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
 
 };
 
@@ -75,7 +73,7 @@ export interface EditViewBindingProps<M extends Record<string, unknown> = Record
      * The CMS path of the entity, e.g. "users" or "products".
      */
     path: string;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     entityId?: string | number;
     databaseId?: string;
     copy?: boolean;
@@ -260,7 +258,7 @@ parentEntityIds,
         }
     }, [selectedTabProp, defaultSelectedView]);
 
-    const subcollections = getSubcollections(collection).filter(c => !c.hideFromNavigation);
+    const subcollections = getAdminSubcollections(collection).filter(c => !c.hideFromNavigation);
     const subcollectionsCount = subcollections?.length ?? 0;
     const customViews = collection.entityViews ?? [];
     const customViewsCount = customViews?.length ?? 0;
@@ -460,7 +458,7 @@ parentEntityIds,
     }, [status, onTabChange, path, entityId, collection]);
 
     // Resolve formView.Builder if provided
-    const formViewConfig = (collection as CollectionConfig<M> & { formView?: FormViewConfig<M> }).formView;
+    const formViewConfig = (collection as AdminCollection<M> & { formView?: FormViewConfig<M> }).formView;
     const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<EntityCustomViewParams>(formViewConfig.Builder as ComponentRef<EntityCustomViewParams>) : null;
     const formViewIncludeActions = formViewConfig?.includeActions !== false;
 
@@ -619,7 +617,6 @@ parentEntityIds,
         </Tooltip>
     ) : null;
 
-
     let result = <div className="relative flex flex-col h-full w-full bg-white dark:bg-surface-800">
 
         {shouldShowTopBar && <div
@@ -633,7 +630,6 @@ parentEntityIds,
                 values: formContext?.values ?? usedEntity?.values ?? {},
                 status
             })}
-
 
             {pluginActionsTop}
 
@@ -716,7 +712,7 @@ parentEntityIds,
     return result;
 }
 
-function EntityFormSkeleton({ collection }: { collection: CollectionConfig }) {
+function EntityFormSkeleton({ collection }: { collection: AdminCollection }) {
     return (
         <div className="flex-1 flex flex-row w-full overflow-y-auto justify-center">
             <div className="relative flex flex-row max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit">
