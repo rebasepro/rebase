@@ -64,6 +64,18 @@
 
 ### Fixed
 
+- **A custom `Field` or `Preview` attached as a lazy import rendered nothing** — the documented way to attach one is `admin: { Preview: () => import("./MyPreview") }`. JavaScript names an anonymous function after the property key it is assigned to, so that arrow's name is `"Preview"`, and component detection treated "zero arguments, starts with a capital letter" as proof of a component — which is true of every loader written that way. The thunk went to React as a component, React called it, got a Promise, and rendered nothing: an empty cell with no console error. Detection now leads with what the function does — a dynamic module load in the body outranks the name — and matches both `import(...)` and the `require(...)` that CommonJS transforms produce.
+
+- **`rebase dev` could print a URL served by a different process** — when the first port was busy, the port-retry helper bound the next one but reported the port it had just *failed* to bind. It passed its success handler to `server.listen(port, host, cb)`, and that form registers the handler as a one-shot `listening` listener which a failed attempt never removes; the next attempt's success then ran both, and the earliest won. So with something already on 3001, the server listened on 3002 and announced `http://localhost:3001`. Whatever was already there answered normally, out of its own database, and nothing logged a warning.
+
+  Two consequences are fixed with it. The port file recorded the wrong number as well, and port *affinity* from that file used to outrank an explicitly requested port — so setting `PORT` in `.env` had no effect while a file from an earlier run existed. The file now records the bound port and the requested one, affinity applies only when the same port is requested again, and this matches the precedence the CLI already used (`--port`, then `PORT`, then affinity).
+
+### Testing
+
+- **The template e2e suite could test a server it had not started.** It took the backend's address from the announced banner, which is trustworthy only if the server announces the port it bound — see the fix above. Each backend is now given a port the OS reports as free, and the run fails loudly if the banner disagrees rather than continuing against an unknown server and a database it does not control. It also talks to `127.0.0.1` rather than `localhost`, which resolves to `::1` first on macOS while the server binds `0.0.0.0`.
+
+- **The CLI init e2e leaked its frontend.** `rebase dev` supervises a Vite that ends up outside the process group the teardown signals, so a frontend survived every run — one held port 5173 for hours with its project directory already deleted. Teardown now also reaps whatever still holds the dev server's own ports, restricted to processes that were not already listening there when the run began (a developer's `tsx watch` server gets a new pid whenever it restarts, so "any new listener" would have been a way to kill it).
+
 - **`rebase cloud link` was broken from a fresh checkout** — three prompts still used inquirer's removed `list` type, so running it interactively died with `Prompt type "list" is not registered`. Prompts are only constructed when a command actually asks something, so every non-interactive test passed and CI stayed green while the first command anyone runs did not work.
 
 - **`rebase build` produced bundles that could not boot** — TypeScript emits import specifiers untouched, so a project on `moduleResolution: "bundler"` compiled `from "./posts"` and Node ESM refused it. Specifiers are rewritten after compilation. Bundle tarballs no longer carry macOS extended-attribute headers, which GNU tar warned about once per file on extraction and which buried real errors.

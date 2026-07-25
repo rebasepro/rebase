@@ -65,6 +65,28 @@ properties: {
 }
 ```
 
+### Wenn die Collection-Datei auch vom Server gelesen wird
+
+Im Standard-Scaffold wird `config/collections/` **sowohl** vom Admin-Panel als auch vom Backend geladen — das Backend liest dieselben Dateien, um Schema und API abzuleiten. Eine direkte Komponenten-Referenz ist nur dann unbedenklich, wenn keine Server-Seite diese Datei lädt: Der Import von `ColorPickerField` zieht React, dein CSS und alles Weitere, was die Komponente mitbringt, in den Modulgraphen des Servers.
+
+Verweise stattdessen per Lazy-Import auf die Komponente. Sie wird genauso typgeprüft, und das Backend ruft sie nie auf:
+
+```ts no-verify
+// config/collections/products.ts
+properties: {
+    brand_color: {
+        type: "string",
+        name: "Brand Color",
+        admin: {
+            Field: () => import("../../frontend/src/ColorPickerField"),
+            Preview: () => import("../../frontend/src/ColorPreview")
+        }
+    }
+}
+```
+
+Das Modul braucht einen **Default-Export** — der Thunk löst auf `default` auf, ein rein benannter Export rendert nichts. Das Admin-Panel umhüllt die Komponente beim ersten Rendern mit `React.lazy`, sie landet also in einem eigenen Chunk statt im initialen Bundle.
+
 ### Globale Eigenschaftskonfiguration
 
 Registrieren Sie einen wiederverwendbaren Feldtyp:

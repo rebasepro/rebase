@@ -20,6 +20,7 @@ The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles col
 | Look up a collection by slug | `useCollectionRegistryController()` | `@rebasepro/admin` |
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/admin` |
 | Add custom top-level views | `<RebaseAdmin views={[...]}>` | `@rebasepro/admin` |
+| Replace how one property is edited or shown | `admin: { Field, Preview }` | see §12 |
 | Open a entity selection dialog | `useSelectionDialog()` | `@rebasepro/admin` |
 | Open a custom side dialog | `useSideDialogsController()` | `@rebasepro/admin` |
 | Set breadcrumbs | `useBreadcrumbsController()` | `@rebasepro/admin` |
@@ -774,6 +775,54 @@ if (isAdmin) {
 ```
 
 > **IMPORTANT FOR AGENTS:** Choose **either** a router `basename="/admin"` **or** `<RebaseAdmin basePath="/admin">` — never both, or the prefix is applied twice. Without either, collection views hang on a spinner because URL⇄collection resolution never matches. `<RebaseAdmin>` requires a **data router** (`createBrowserRouter`) because it uses `useBlocker`.
+
+---
+
+## 12. Custom Field and Preview Components
+
+To replace how a single property is edited or displayed, point at your component from the property's `admin` block. `Field` is the form editor; `Preview` is the read-only rendering used in table cells and reference previews.
+
+```ts no-verify
+// config/collections/exercises.ts — a collection file, which the backend also loads
+body_parts: {
+    name: "Affected body parts",
+    type: "array",
+    of: { type: "string", name: "Part", enum: [/* … */] },
+    admin: {
+        Field: () => import("../../frontend/src/BodyPartsField"),
+        Preview: () => import("../../frontend/src/BodyPartsPreview")
+    }
+}
+```
+
+The value is a **lazy import thunk**, and that is deliberate: a collection file is read by the server as well, so it must not import React. The thunk is type-checked at the call site and never called by the backend. The admin resolves it with `React.lazy` on first render. A direct component reference (`Field: MyField`) also works in a file the backend never loads.
+
+The component itself is ordinary React, in `frontend/`:
+
+```tsx
+// frontend/src/BodyPartsField.tsx — default-exported, because the thunk resolves
+// to the module's `default`.
+import type { FieldProps } from "@rebasepro/admin";
+import type { ArrayProperty } from "@rebasepro/types";
+
+export default function BodyPartsField({ value, setValue, property, error, disabled }: FieldProps<ArrayProperty>) {
+    return null; // …your editor
+}
+```
+
+```tsx
+// frontend/src/BodyPartsPreview.tsx
+import type { PropertyPreviewProps } from "@rebasepro/admin";
+import type { ArrayProperty } from "@rebasepro/types";
+
+export default function BodyPartsPreview({ value, property, size }: PropertyPreviewProps<ArrayProperty>) {
+    return null; // …your read-only rendering
+}
+```
+
+Read the enum, labels and limits off the `property` argument rather than restating them, so the component cannot drift from the collection.
+
+> **IMPORTANT FOR AGENTS:** the module must have a **default export** — the resolver takes `default` from what the thunk resolves to, and a named-only export renders nothing. A component whose name begins with a capital and takes no props is treated as a component, not a loader, so `Preview: () => null` is a (useless) component while `Preview: () => import("…")` is a loader; the distinction is made on the dynamic import in the body, not the name.
 
 ---
 

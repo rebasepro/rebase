@@ -65,6 +65,28 @@ properties: {
 }
 ```
 
+### Quand le fichier de collection est aussi lu par le serveur
+
+Dans le scaffold par défaut, `config/collections/` est chargé **à la fois** par le panneau d'administration et par le backend — le backend lit les mêmes fichiers pour en déduire le schéma et l'API. Une référence directe au composant n'est sûre que si rien côté serveur ne charge ce fichier, car importer `ColorPickerField` importe aussi React, votre CSS et tout ce que le composant entraîne dans le graphe de modules du serveur.
+
+Désignez plutôt le composant par un import différé. Il est typé de la même manière et le backend ne l'appelle jamais :
+
+```ts no-verify
+// config/collections/products.ts
+properties: {
+    brand_color: {
+        type: "string",
+        name: "Brand Color",
+        admin: {
+            Field: () => import("../../frontend/src/ColorPickerField"),
+            Preview: () => import("../../frontend/src/ColorPreview")
+        }
+    }
+}
+```
+
+Le module doit avoir un **export par défaut** — le thunk résout `default`, et un export uniquement nommé n'affiche rien. Le panneau l'enveloppe dans `React.lazy` au premier rendu : le composant forme donc son propre chunk au lieu d'alourdir le bundle initial.
+
 ### Configuration globale des propriétés
 
 Enregistrer un type de champ réutilisable :
