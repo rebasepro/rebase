@@ -184,8 +184,8 @@ columnType: "varchar" }
                 }] as unknown as CollectionConfig[]);
 
                 const plain = cleanSchema(await generateSchema(build({})));
-                const markdown = cleanSchema(await generateSchema(build({ ui: { markdown: true } })));
-                const multiline = cleanSchema(await generateSchema(build({ ui: { multiline: true } })));
+                const markdown = cleanSchema(await generateSchema(build({ admin: { markdown: true } })));
+                const multiline = cleanSchema(await generateSchema(build({ admin: { multiline: true } })));
 
                 expect(plain).toContain("body: text(\"body\")");
                 expect(markdown).toBe(plain);

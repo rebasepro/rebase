@@ -24,7 +24,7 @@ const categoriesCollection: AdminCollectionConfig = {
         description: {
             name: "Description",
             type: "string",
-            ui: {
+            admin: {
                 multiline: true
             }
         },

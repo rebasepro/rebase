@@ -91,11 +91,11 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             setSavedTimestamp(Date.now());
         }, []);
 
-        const customField = Boolean(property.ui?.Field);
-        const customPreview = Boolean(property.ui?.Preview);
+        const customField = Boolean(property.admin?.Field);
+        const customPreview = Boolean(property.admin?.Preview);
         const readOnlyProperty = isReadOnly(property);
-        const disabledTooltip: string | undefined = typeof property.ui?.disabled === "object" ? property.ui?.disabled.disabledMessage : undefined;
-        const disabled = readonly || disabledProp || Boolean(property.ui?.disabled);
+        const disabledTooltip: string | undefined = typeof property.admin?.disabled === "object" ? property.admin?.disabled.disabledMessage : undefined;
+        const disabled = readonly || disabledProp || Boolean(property.admin?.disabled);
 
         const validation = useMemo(() => mapPropertyToZod({
             property,

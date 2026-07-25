@@ -46,15 +46,15 @@ Tutti i tipi di proprietà condividono queste opzioni:
 | `dynamicProps` | `function` | Costruttore di proprietà dinamico (vedi Campi Condizionali) |
 | `conditions` | `PropertyConditions` | Condizioni dichiarative JSON Logic |
 
-### Configurazione UI (`ui`)
+### Configurazione UI (`admin`)
 
-Le opzioni relative all'interfaccia utente sono raggruppate sotto il sotto-oggetto `ui`:
+Le opzioni relative all'interfaccia utente sono raggruppate sotto il sotto-oggetto `admin`:
 
 ```typescript
 price: {
     type: "number",
     name: "Price",
-    ui: {
+    admin: {
         readOnly: true,
         columnWidth: 120,
         hideFromCollection: false
@@ -66,11 +66,11 @@ price: {
 |----------|------|-------------|
 | `ui.readOnly` | `boolean` | Impedisce la modifica |
 | `ui.disabled` | `boolean \| PropertyDisabledConfig` | Disabilita con tooltip opzionale |
-| `ui.hideFromCollection` | `boolean` | Nasconde dalla vista tabella |
+| `admin.hideFromCollection` | `boolean` | Nasconde dalla vista tabella |
 | `ui.columnWidth` | `number` | Larghezza della colonna in pixel (vista tabella) |
 | `ui.widthPercentage` | `number` | Larghezza del campo come percentuale nella vista modulo |
-| `ui.Field` | `React.ComponentType` | Componente campo personalizzato |
-| `ui.Preview` | `React.ComponentType` | Componente cella di tabella personalizzato |
+| `admin.Field` | `React.ComponentType` | Componente campo personalizzato |
+| `admin.Preview` | `React.ComponentType` | Componente cella di tabella personalizzato |
 
 ## Proprietà Stringa
 
@@ -300,7 +300,7 @@ created_at: {
     type: "date",
     name: "Created At",
     autoValue: "on_create",
-    ui: { readOnly: true }
+    admin: { readOnly: true }
 }
 
 updated_at: {

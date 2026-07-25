@@ -5,7 +5,7 @@ describe("isReadOnly", () => {
     it("returns true for readOnly property", () => {
         expect(isReadOnly({ type: "string",
 name: "Title",
-ui: { readOnly: true } } as Property)).toBe(true);
+admin: { readOnly: true } } as Property)).toBe(true);
     });
 
     it("returns true for date with autoValue", () => {
@@ -40,14 +40,14 @@ describe("isHidden", () => {
     it("returns true when disabled.hidden is true", () => {
         expect(isHidden({ type: "string",
 name: "Secret",
-ui: { disabled: { hidden: true,
+admin: { disabled: { hidden: true,
 clearOnDisabled: false } } } as Property)).toBe(true);
     });
 
     it("returns false when disabled is boolean true", () => {
         expect(isHidden({ type: "string",
 name: "Title",
-ui: { disabled: true } } as Property)).toBe(false);
+admin: { disabled: true } } as Property)).toBe(false);
     });
 
     it("returns false when disabled is undefined", () => {
@@ -58,7 +58,7 @@ name: "Title" } as Property)).toBe(false);
     it("returns false when hidden is false", () => {
         expect(isHidden({ type: "string",
 name: "Title",
-ui: { disabled: { hidden: false,
+admin: { disabled: { hidden: false,
 clearOnDisabled: false } } } as Property)).toBe(false);
     });
 });

@@ -46,14 +46,14 @@ export const demoCollection = defineCollection({
         description: {
             type: "string",
             name: "Description",
-            ui: { multiline: true },
+            admin: { multiline: true },
         },
 
         // markdown
         text: {
             type: "string",
             name: "Blog text",
-            ui: { markdown: true },
+            admin: { markdown: true },
         },
 
         // array of strings
@@ -70,7 +70,7 @@ export const demoCollection = defineCollection({
         amazon_link: {
             type: "string",
             name: "Amazon link",
-            ui: { url: true },
+            admin: { url: true },
             validation: {
                 required: true,
                 requiredMessage: "The amazon link is required",
@@ -221,7 +221,7 @@ export const demoCollection = defineCollection({
                     text: {
                         type: "string",
                         name: "Text",
-                        ui: { markdown: true }
+                        admin: { markdown: true }
                     },
                     products: {
                         name: "Products",

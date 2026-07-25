@@ -405,10 +405,10 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
             const prop = resolvedCollection.properties[k] as Property | undefined;
             if (!prop) return false;
             // Exclude storage/image properties — they are already rendered in the image slot
-            if (prop.type === "string" && (prop.storage || prop.ui?.urlPreview === "image")) return false;
+            if (prop.type === "string" && (prop.storage || prop.admin?.urlPreview === "image")) return false;
             if (prop.type === "array" && prop.of && !Array.isArray(prop.of)) {
                 const inner = prop.of;
-                if (inner.type === "string" && (inner.storage || inner.ui?.urlPreview === "image")) return false;
+                if (inner.type === "string" && (inner.storage || inner.admin?.urlPreview === "image")) return false;
             }
             return true;
         });

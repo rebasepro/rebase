@@ -7,7 +7,7 @@ export function countStringCharacters(values: EntityValues<any>, properties: Pro
         const value = values[key];
         const property: Property = properties[key];
 
-        if (property && !property.ui?.disabled) {
+        if (property && !property.admin?.disabled) {
             if (property.type === "string" || property.type === "number") {
                 count += String(value).length;
             } else if (property.type === "array" && Array.isArray(value) && property.of && !Array.isArray(property.of) && property.of.type === "string") {

@@ -223,7 +223,7 @@ export function MarkdownEditorFieldBinding({
                     title={property.name ?? propertyKey}
                     className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>
                 <div className="flex-grow"/>
-                {property.ui?.clearable && !disabled && (
+                {property.admin?.clearable && !disabled && (
                     <IconButton
                         size="small"
                         onClick={(e) => {

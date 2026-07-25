@@ -98,7 +98,7 @@ const productsCollection: PostgresCollectionConfig = {
             type: "date",
             mode: "date_time",
             autoValue: "on_create",
-            ui: { readOnly: true, hideFromCollection: true }
+            admin: { readOnly: true, hideFromCollection: true }
         },
         category: {
             name: "Category",
@@ -268,20 +268,20 @@ All property types share these base options:
 | `conditions` | `PropertyConditions` | — | JSON Logic-based declarative conditions |
 | `callbacks` | `PropertyCallbacks` | — | Per-field `afterRead` and `beforeSave` hooks |
 
-### UI Options (BaseUIConfig)
+### UI Options (AdminPropertyOptions)
 
-All property types support a `ui` object for display configuration:
+All property types support a `admin` object for display configuration:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `ui.columnWidth` | `number` | — | Column width in pixels (table view) |
-| `ui.hideFromCollection` | `boolean` | — | Hide from collection table view |
+| `admin.hideFromCollection` | `boolean` | — | Hide from collection table view |
 | `ui.readOnly` | `boolean` | — | Render as read-only preview |
 | `ui.disabled` | `boolean \| PropertyDisabledConfig` | — | Disable editing |
 | `ui.widthPercentage` | `number` | — | Width as percentage of form |
 | `ui.customProps` | `unknown` | — | Custom props passed to the field component |
-| `ui.Field` | `ComponentRef` | — | Custom field component |
-| `ui.Preview` | `ComponentRef` | — | Custom preview/cell component |
+| `admin.Field` | `ComponentRef` | — | Custom field component |
+| `admin.Preview` | `ComponentRef` | — | Custom preview/cell component |
 
 ## String Properties
 
@@ -470,7 +470,7 @@ created_at: {
     mode: "date_time",
     autoValue: "on_create",
     clearable: false,
-    ui: { readOnly: true }
+    admin: { readOnly: true }
 }
 
 updated_at: {
@@ -478,7 +478,7 @@ updated_at: {
     type: "date",
     mode: "date_time",
     autoValue: "on_update",
-    ui: { readOnly: true }
+    admin: { readOnly: true }
 }
 ```
 
@@ -520,7 +520,7 @@ address: {
         ]}
     },
     propertiesOrder: ["street", "city", "zip", "country"],
-    ui: { expanded: true, spreadChildren: true }
+    admin: { expanded: true, spreadChildren: true }
 }
 ```
 
@@ -578,7 +578,7 @@ metadata: {
             value: { name: "Value", type: "string" }
         }
     },
-    ui: { expanded: true }
+    admin: { expanded: true }
 }
 ```
 
@@ -598,7 +598,7 @@ metadata: {
 |--------|------|---------|-------------|
 | `ui.expanded` | `boolean` | — | Expand array items by default |
 | `ui.minimalistView` | `boolean` | — | Compact rendering |
-| `ui.Field` | `ComponentRef` | — | Custom field component for the entire array |
+| `admin.Field` | `ComponentRef` | — | Custom field component for the entire array |
 
 ### Array Validation
 

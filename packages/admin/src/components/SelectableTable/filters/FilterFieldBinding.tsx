@@ -43,14 +43,14 @@ export interface FilterFieldBindingInput {
  * Filters dialog.
  *
  * Resolution order:
- * 1. `property.ui.Filter` — per-property replacement (rendered even when the
+ * 1. `property.admin.Filter` — per-property replacement (rendered even when the
  *    resolved operator list is empty; the component owns filterability).
  * 2. `components["Collection.FilterField"]` — collection-level or app-level
  *    override (wrap mode supported via `OriginalComponent`).
  * 3. Built-in field dispatched by property type.
  *
  * The operators handed to the field are the intersection of the engine's
- * capabilities, the property-type defaults, and `property.ui.filterOperators`
+ * capabilities, the property-type defaults, and `property.admin.filterOperators`
  * (see `resolveFilterOperators`). When that intersection is empty and no
  * per-property `Filter` is set, nothing is rendered.
  *
@@ -75,7 +75,7 @@ export function FilterFieldBinding({
     // Hooks must run unconditionally — before any early return.
     const scopeCollection = useCollectionScope();
     const ResolvedFilterField = useComponentOverride<FilterFieldBindingProps>("Collection.FilterField", DefaultFilterField);
-    const PropertyFilter = useResolvedComponent<FilterFieldBindingProps>(baseProperty?.ui?.Filter);
+    const PropertyFilter = useResolvedComponent<FilterFieldBindingProps>(baseProperty?.admin?.Filter);
 
     if (!baseProperty) return null;
 
@@ -139,7 +139,7 @@ function DefaultFilterField({
             path={referenceProperty.path}
             title={title}
             includeId={referenceProperty.includeId}
-            previewProperties={referenceProperty.ui?.previewProperties}
+            previewProperties={referenceProperty.admin?.previewProperties}
             hidden={hidden ?? false}
             setHidden={setHidden ?? (() => undefined)}/>;
     }

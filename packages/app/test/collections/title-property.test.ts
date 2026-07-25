@@ -134,7 +134,7 @@ target: "users",
 cardinality: "one" },
                     bio: { name: "Bio",
 type: "string",
-ui: { multiline: true } },
+admin: { multiline: true } },
                     status: {
                         name: "Status",
                         type: "string",
@@ -196,7 +196,7 @@ type: "string" }
                     internal_code: {
                         name: "Internal code",
                         type: "string",
-                        ui: { hideFromCollection: true }
+                        admin: { hideFromCollection: true }
                     },
                     picture: {
                         name: "Picture",

@@ -23,7 +23,7 @@ const postsCollection: AdminCollectionConfig = {
         content: {
             name: "Content",
             type: "string",
-            ui: {
+            admin: {
                 markdown: true
             }
         },

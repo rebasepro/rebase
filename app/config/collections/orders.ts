@@ -76,7 +76,7 @@ const ordersCollection: AdminCollectionConfig = {
         subtotal: {
             name: "Subtotal",
             type: "number",
-            ui: { readOnly: true },
+            admin: { readOnly: true },
             description: "Sum of all line items before tax and shipping"
         },
         tax_amount: {
@@ -100,7 +100,7 @@ const ordersCollection: AdminCollectionConfig = {
         total: {
             name: "Total",
             type: "number",
-            ui: { readOnly: true },
+            admin: { readOnly: true },
             description: "Final order total (subtotal + tax + shipping - discount)"
         },
         currency: {
@@ -133,7 +133,7 @@ const ordersCollection: AdminCollectionConfig = {
         shipping_address: {
             name: "Shipping Address",
             type: "string",
-            ui: { multiline: true },
+            admin: { multiline: true },
             description: "Delivery address for this order"
         },
         tracking_number: {
@@ -144,7 +144,7 @@ const ordersCollection: AdminCollectionConfig = {
         notes: {
             name: "Internal Notes",
             type: "string",
-            ui: { multiline: true },
+            admin: { multiline: true },
             description: "Internal notes (not visible to customer)"
         },
         order_date: {
@@ -159,25 +159,25 @@ const ordersCollection: AdminCollectionConfig = {
             name: "Shipped Date",
             type: "date",
             mode: "date_time",
-            ui: { clearable: true }
+            admin: { clearable: true }
         },
         delivered_date: {
             name: "Delivered Date",
             type: "date",
             mode: "date_time",
-            ui: { clearable: true }
+            admin: { clearable: true }
         },
         created_at: {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: { readOnly: true, hideFromCollection: true }
+            admin: { readOnly: true, hideFromCollection: true }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: { readOnly: true, hideFromCollection: true }
+            admin: { readOnly: true, hideFromCollection: true }
         }
     },
     // Headless relation: no property for "order_items", only used for subcollection tab

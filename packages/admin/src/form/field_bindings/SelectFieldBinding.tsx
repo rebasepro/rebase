@@ -68,7 +68,7 @@ export function SelectFieldBinding({
                         />
                     </PropertyIdCopyTooltip>}
                 endAdornment={
-                    property.ui?.clearable && !disabled && <IconButton
+                    property.admin?.clearable && !disabled && <IconButton
                         size="small"
                         onClick={handleClearClick}>
                         <XIcon/>

@@ -115,12 +115,12 @@ columnType: "uuid" } as StringProperty)).toBe("uuid");
         // phantom drift on its markdown columns the first time doctor ran.
         it("should expect text for markdown/multiline strings", () => {
             expect(getExpectedColumnType({ type: "string",
-ui: { markdown: true } } as unknown as StringProperty)).toBe("text");
+admin: { markdown: true } } as unknown as StringProperty)).toBe("text");
             expect(getExpectedColumnType({ type: "string",
-ui: { multiline: true } } as unknown as StringProperty)).toBe("text");
+admin: { multiline: true } } as unknown as StringProperty)).toBe("text");
             // A plain string with unrelated ui config stays varchar.
             expect(getExpectedColumnType({ type: "string",
-ui: { hideFromCollection: true } } as unknown as StringProperty)).toBe("text");
+admin: { hideFromCollection: true } } as unknown as StringProperty)).toBe("text");
         });
 
         it("should map number types correctly", () => {

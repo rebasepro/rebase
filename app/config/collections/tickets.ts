@@ -33,13 +33,13 @@ const ticketsCollection: AdminCollectionConfig = {
         description: {
             name: "Description",
             type: "string",
-            ui: { markdown: true },
+            admin: { markdown: true },
             description: "Detailed description of the ticket in Markdown"
         },
         resolution_notes: {
             name: "Resolution Notes",
             type: "string",
-            ui: { markdown: true },
+            admin: { markdown: true },
             description: "Internal notes about how the issue was resolved"
         },
         status: {
@@ -160,7 +160,7 @@ const ticketsCollection: AdminCollectionConfig = {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: {
+            admin: {
                 readOnly: true,
                 hideFromCollection: true
             }
@@ -169,7 +169,7 @@ const ticketsCollection: AdminCollectionConfig = {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: {
+            admin: {
                 readOnly: true,
                 hideFromCollection: true
             }
@@ -177,7 +177,7 @@ const ticketsCollection: AdminCollectionConfig = {
         __order: {
             name: "Order",
             type: "string",
-            ui: {
+            admin: {
                 disabled: true,
                 hideFromCollection: true
             }

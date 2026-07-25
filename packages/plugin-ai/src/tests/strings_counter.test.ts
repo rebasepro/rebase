@@ -28,7 +28,7 @@ hidden: "Secret" };
 type: "string" },
             hidden: { name: "hidden",
 type: "string",
-ui: { disabled: true } }
+admin: { disabled: true } }
         };
         expect(countStringCharacters(values, properties)).toBe(5);
     });

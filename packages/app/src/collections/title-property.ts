@@ -53,7 +53,7 @@ function normalizeKey(key: string): string {
 }
 
 function isHidden(property: Property): boolean {
-    return Boolean(property.ui?.hideFromCollection);
+    return Boolean(property.admin?.hideFromCollection);
 }
 
 /**
@@ -61,10 +61,10 @@ function isHidden(property: Property): boolean {
  * Rendered by the dedicated image slot, so never a title.
  */
 function isStorageProperty(property: Property): boolean {
-    if (property.type === "string" && (property.storage || property.ui?.urlPreview === "image")) return true;
+    if (property.type === "string" && (property.storage || property.admin?.urlPreview === "image")) return true;
     if (property.type === "array" && property.of && !Array.isArray(property.of)) {
         const inner = property.of;
-        if (inner.type === "string" && (inner.storage || inner.ui?.urlPreview === "image")) return true;
+        if (inner.type === "string" && (inner.storage || inner.admin?.urlPreview === "image")) return true;
     }
     return false;
 }
@@ -147,7 +147,7 @@ function scoreTitleCandidate(property: Property, key: string, idKeys: Set<string
     // it ranks with relations: usable as a title, but only as a last resort.
     if (property.userSelect) return SCORE.USER;
     if (property.enum) return SCORE.ENUM;
-    if (property.ui?.multiline || property.ui?.markdown) return SCORE.LONG_TEXT;
+    if (property.admin?.multiline || property.admin?.markdown) return SCORE.LONG_TEXT;
     if (property.email) return SCORE.EMAIL;
     if (TITLE_LIKE_KEYS.has(normalizeKey(key))) return SCORE.NAMED;
     return SCORE.PLAIN_TEXT;

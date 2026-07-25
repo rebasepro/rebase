@@ -37,7 +37,7 @@ roles: ["admin"] },
 
         const result = applyPropertyConditions(property, baseContext);
 
-        expect(result.ui?.disabled).toEqual({
+        expect(result.admin?.disabled).toEqual({
             clearOnDisabled: false,
             disabledMessage: "Cannot edit archived items",
             hidden: false
@@ -57,7 +57,7 @@ roles: ["admin"] },
 
         const result = applyPropertyConditions(property, baseContext);
 
-        expect(result.ui?.disabled).toEqual(expect.objectContaining({
+        expect(result.admin?.disabled).toEqual(expect.objectContaining({
             hidden: true
         }));
     });
@@ -91,7 +91,7 @@ roles: ["admin"] },
 
         const result = applyPropertyConditions(property, baseContext);
 
-        expect(result.ui?.disabled).toBeUndefined();
+        expect(result.admin?.disabled).toBeUndefined();
     });
 
     it("should apply enum conditions to filter values", () => {
@@ -227,13 +227,13 @@ values: { status: "draft" } };
         } as unknown as Property;
 
         const resultArchived = applyPropertyConditions(property, baseContext);
-        expect(resultArchived.ui?.disabled).toBeDefined();
+        expect(resultArchived.admin?.disabled).toBeDefined();
         expect(resultArchived.validation?.required).toBeFalsy();
 
         const contextPublished = { ...baseContext,
 values: { status: "published" } };
         const resultPublished = applyPropertyConditions(property, contextPublished);
-        expect(resultPublished.ui?.disabled).toBeUndefined();
+        expect(resultPublished.admin?.disabled).toBeUndefined();
         expect(resultPublished.validation?.required).toBe(true);
     });
 
@@ -251,7 +251,7 @@ values: { status: "published" } };
 
         const result = applyPropertyConditions(property, baseContext);
 
-        expect(result.ui?.disabled).toEqual(expect.objectContaining({
+        expect(result.admin?.disabled).toEqual(expect.objectContaining({
             clearOnDisabled: true
         }));
     });
@@ -285,7 +285,7 @@ roles: ["admin"] },
         } as unknown as Property;
 
         const result = applyPropertyConditions(property, baseContext);
-        expect(result.ui?.readOnly).toBe(true);
+        expect(result.admin?.readOnly).toBe(true);
     });
 
     it("should not set readOnly when condition evaluates to false", () => {
@@ -300,7 +300,7 @@ roles: ["admin"] },
         } as unknown as Property;
 
         const result = applyPropertyConditions(property, baseContext);
-        expect(result.ui?.readOnly).toBeUndefined();
+        expect(result.admin?.readOnly).toBeUndefined();
     });
 });
 

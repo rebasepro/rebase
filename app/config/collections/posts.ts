@@ -44,7 +44,7 @@ const postsCollection: AdminCollectionConfig = {
         excerpt: {
             name: "Excerpt",
             type: "string",
-            ui: { multiline: true },
+            admin: { multiline: true },
             description: "Short summary displayed in previews and cards",
             validation: {
                 max: 300
@@ -61,7 +61,7 @@ const postsCollection: AdminCollectionConfig = {
                     text: {
                         name: "Text",
                         type: "string",
-                        ui: { markdown: true }
+                        admin: { markdown: true }
                     },
                     image: {
                         name: "Image",
@@ -107,14 +107,14 @@ const postsCollection: AdminCollectionConfig = {
             name: "Publish date",
             type: "date",
             mode: "date_time",
-            ui: { clearable: true },
+            admin: { clearable: true },
             description: "When this post was or will be published"
         },
         created_at: {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: {
+            admin: {
                 readOnly: true,
                 hideFromCollection: true
             }
@@ -123,7 +123,7 @@ const postsCollection: AdminCollectionConfig = {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: {
+            admin: {
                 readOnly: true,
                 hideFromCollection: true
             }

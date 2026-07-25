@@ -74,7 +74,7 @@ const orderItemsCollection: AdminCollectionConfig = {
         line_total: {
             name: "Line Total",
             type: "number",
-            ui: { readOnly: true },
+            admin: { readOnly: true },
             description: "quantity × unit_price"
         }
     },

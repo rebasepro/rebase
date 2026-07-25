@@ -44,7 +44,7 @@ export function RepeatFieldBinding({
         throw Error("RepeatFieldBinding misconfiguration. Property `type` is not `array`");
     }
 
-    const minimalistView = minimalistViewProp || property.ui?.minimalistView;
+    const minimalistView = minimalistViewProp || property.admin?.minimalistView;
 
     if (!property.of)
         throw Error("RepeatFieldBinding misconfiguration. Property `of` not set");
@@ -57,7 +57,7 @@ export function RepeatFieldBinding({
         authController
     })
 
-    const expanded = property.ui?.expanded === undefined ? true : property.ui?.expanded;
+    const expanded = property.admin?.expanded === undefined ? true : property.admin?.expanded;
     const ofProperty = property.of;
 
     const [lastAddedId, setLastAddedId] = useState<number | undefined>();
@@ -92,19 +92,19 @@ export function RepeatFieldBinding({
         </ErrorBoundary>;
     };
 
-    const canAddElements = !property.ui?.disabled && !isSubmitting && !disabled && (property.canAddElements || property.canAddElements === undefined);
+    const canAddElements = !property.admin?.disabled && !isSubmitting && !disabled && (property.canAddElements || property.canAddElements === undefined);
     const sortable = property.sortable === undefined ? true : property.sortable;
     const arrayContainer = <ArrayContainer droppableId={propertyKey}
         addLabel={property.name ? t("add_to_field", { fieldName: property.name }) : t("add_entry")}
         value={(value as unknown[]) ?? []}
         buildEntry={buildEntry}
         onInternalIdAdded={setLastAddedId}
-        disabled={isSubmitting || Boolean(property.ui?.disabled)}
+        disabled={isSubmitting || Boolean(property.admin?.disabled)}
         canAddElements={canAddElements}
         sortable={sortable}
         newDefaultEntry={getDefaultValueFor(property.of)}
         onValueChange={(value) => setFieldValue(propertyKey, value)}
-        className={property.ui?.widthPercentage !== undefined ? "mt-8" : undefined}
+        className={property.admin?.widthPercentage !== undefined ? "mt-8" : undefined}
     />;
 
     const title = (<>

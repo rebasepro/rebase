@@ -144,7 +144,7 @@ name: "Title" } as Property
 name: "Title" } as Property,
                 secret: { type: "string",
 name: "Secret",
-ui: { hideFromCollection: true } } as Property,
+admin: { hideFromCollection: true } } as Property,
                 body: { type: "string",
 name: "Body" } as Property
             }
@@ -208,7 +208,7 @@ describe("getEntityTitlePropertyKey", () => {
 name: "Name" } as Property,
                 body: { type: "string",
 name: "Body",
-ui: { multiline: true } } as Property
+admin: { multiline: true } } as Property
             }
         } as CollectionConfig;
 
@@ -227,7 +227,7 @@ name: "Count" } as Property,
 name: "Title" } as Property,
                 body: { type: "string",
 name: "Body",
-ui: { multiline: true } } as Property
+admin: { multiline: true } } as Property
             }
         } as CollectionConfig;
 
@@ -242,7 +242,7 @@ ui: { multiline: true } } as Property
             properties: {
                 description: { type: "string",
 name: "Description",
-ui: { multiline: true } } as Property,
+admin: { multiline: true } } as Property,
                 name: { type: "string",
 name: "Name" } as Property
             }
@@ -259,7 +259,7 @@ name: "Name" } as Property
             properties: {
                 content: { type: "string",
 name: "Content",
-ui: { markdown: true } } as Property,
+admin: { markdown: true } } as Property,
                 slug: { type: "string",
 name: "Slug" } as Property
             }
@@ -326,7 +326,7 @@ name: "Flag" } as Property
             properties: {
                 secret: { type: "string",
 name: "Secret",
-ui: { hideFromCollection: true } } as Property,
+admin: { hideFromCollection: true } } as Property,
                 name: { type: "string",
 name: "Name" } as Property
             }

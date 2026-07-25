@@ -56,7 +56,7 @@ const ordersCollection: AdminCollectionConfig = {
         notes: {
             name: "Notes",
             type: "string",
-            ui: {
+            admin: {
                 multiline: true
             }
         },
@@ -65,7 +65,7 @@ const ordersCollection: AdminCollectionConfig = {
             type: "date",
             columnName: "created_at",
             autoValue: "on_create",
-            ui: {
+            admin: {
                 readOnly: true
             }
         }

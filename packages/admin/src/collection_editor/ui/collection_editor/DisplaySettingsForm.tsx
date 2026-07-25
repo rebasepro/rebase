@@ -199,7 +199,7 @@ export function DisplaySettingsForm({
                                             property={{
                                                 type: "string",
                                                 name: dialogPropertyName,
-                                                ui: { disabled: true,
+                                                admin: { disabled: true,
 hideFromCollection: true }
                                             }}
                                             propertyKey={dialogPropertyKey}

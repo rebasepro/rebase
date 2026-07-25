@@ -77,7 +77,7 @@ export function FiltersDialog({
             // A property is filterable when it has a custom filter field, or
             // when at least one operator survives the engine ∩ type ∩
             // property-narrowing resolution.
-            if (baseProperty.ui?.Filter) return true;
+            if (baseProperty.admin?.Filter) return true;
             return resolveFilterOperators({ property: baseProperty, isArray, engine }).length > 0;
         });
     }, [properties, fixedFilter, engine]);

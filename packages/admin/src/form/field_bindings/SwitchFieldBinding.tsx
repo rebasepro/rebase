@@ -44,7 +44,7 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
                     value={value as boolean | null}
                     onValueChange={(v) => setValue(v)}
                     error={showError}
-                    className={property.ui?.widthPercentage !== undefined ? "mt-8" : undefined}
+                    className={property.admin?.widthPercentage !== undefined ? "mt-8" : undefined}
                     label={<LabelWithIcon
                         icon={getIconForProperty(property, "small")}
                         required={property.validation?.required}

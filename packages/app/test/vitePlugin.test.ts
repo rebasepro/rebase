@@ -63,7 +63,7 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
                 properties: {
                     name: {
                         type: "string",
-                        ui: {
+                        admin: {
                             Field: "../../components/NameField",
                             Preview: "../../components/NamePreview"
                         }
@@ -292,7 +292,7 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
             const config = {
                 properties: {
                     name: {
-                        ui: {
+                        admin: {
                             Field: "../../components/DeepField"
                         }
                     }

@@ -50,7 +50,7 @@ export function DateTimeFieldBinding({
                     value={internalValue}
                     onChange={(dateValue) => setValue(dateValue)}
                     mode={property.mode}
-                    clearable={property.ui?.clearable}
+                    clearable={property.admin?.clearable}
                     locale={locale}
                     error={showError}
                     disabled={disabled}

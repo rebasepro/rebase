@@ -48,7 +48,7 @@ Avant l'import, l'assistant valide toutes les lignes par rapport aux définition
 
 ### Configuration de l'import
 
-L'import est activé par défaut. Pour le désactiver sur une collection spécifique, utilisez le sous-objet `ui` :
+L'import est activé par défaut. Pour le désactiver sur une collection spécifique, utilisez le sous-objet `admin` :
 
 ```typescript
 import { CollectionConfig } from "@rebasepro/types";

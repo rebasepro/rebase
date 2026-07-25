@@ -33,7 +33,7 @@ const productsCollection: AdminCollectionConfig = {
         description: {
             name: "Description",
             type: "string",
-            ui: { markdown: true },
+            admin: { markdown: true },
             description: "Detailed product description in Markdown"
         },
         images: {
@@ -192,7 +192,7 @@ const productsCollection: AdminCollectionConfig = {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: {
+            admin: {
                 readOnly: true,
                 hideFromCollection: true
             }
@@ -201,7 +201,7 @@ const productsCollection: AdminCollectionConfig = {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: {
+            admin: {
                 readOnly: true,
                 hideFromCollection: true
             }

@@ -48,7 +48,7 @@ Antes de importar, el asistente valida todas las filas contra las definiciones d
 
 ### Configuración de Importación
 
-La importación está habilitada de forma predeterminada. Para desactivarla en una colección específica, use el sub-objeto `ui`:
+La importación está habilitada de forma predeterminada. Para desactivarla en una colección específica, use el sub-objeto `admin`:
 
 ```typescript
 import { CollectionConfig } from "@rebasepro/types";

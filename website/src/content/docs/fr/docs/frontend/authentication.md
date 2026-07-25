@@ -112,7 +112,7 @@ roles: {
             viewer: "Viewer"
         }
     },
-    ui: {
+    admin: {
         readOnly: false
     }
 }

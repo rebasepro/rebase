@@ -112,14 +112,14 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                 }) as Property | null;
 
                 const readOnly = resolvedProperty ? isReadOnly(resolvedProperty) : true;
-                const disabled = disabledProp || readOnly || Boolean(resolvedProperty?.ui?.disabled) || context.disabled;
+                const disabled = disabledProp || readOnly || Boolean(resolvedProperty?.admin?.disabled) || context.disabled;
 
                 if (resolvedProperty === null || isHidden(resolvedProperty)) {
                     return <></>;
                 } else if (readOnly) {
                     Component = ReadOnlyFieldBinding;
-                } else if (resolvedProperty.ui?.Field) {
-                    const resolved = resolveComponentRef(resolvedProperty.ui.Field);
+                } else if (resolvedProperty.admin?.Field) {
+                    const resolved = resolveComponentRef(resolvedProperty.admin.Field);
                     if (resolved) {
                         Component = resolved as ComponentType<FieldProps<Property, any, any>>;
                     }
@@ -138,7 +138,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                         index,
                         authController
                     }) as Property | null;
-                    Component = resolveComponentRef(configProperty?.ui?.Field) as ComponentType<FieldProps<Property, any, any>> | undefined;
+                    Component = resolveComponentRef(configProperty?.admin?.Field) as ComponentType<FieldProps<Property, any, any>> | undefined;
                 }
                 if (!Component) {
                     console.warn(`No field component found for property ${propertyKey}`);
@@ -208,7 +208,7 @@ function FieldInternal<CustomProps, M extends Record<string, unknown>>
 
     const { plugins } = useCustomizationController();
 
-    const customFieldProps: unknown = property.ui?.customProps;
+    const customFieldProps: unknown = property.admin?.customProps;
     const value = formexFieldProps.field.value;
     const error = getIn(formexFieldProps.form.errors, propertyKey) as string | string[] | undefined;
     const touched = getIn(formexFieldProps.form.touched, propertyKey) as boolean | undefined;
@@ -285,7 +285,7 @@ const shouldPropertyReRender = (property: Property, plugins?: RebasePlugin[]): b
         return true;
     }
     const defAProperty = property as Property;
-    const rerenderThisProperty = Boolean(defAProperty.ui?.Field);
+    const rerenderThisProperty = Boolean(defAProperty.admin?.Field);
     if (defAProperty.type === "map" && defAProperty.properties) {
         return Boolean(rerenderThisProperty || Object.values(defAProperty.properties).some((childProperty) => shouldPropertyReRender(childProperty as Property, plugins)));
     } else {

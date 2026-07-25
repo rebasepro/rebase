@@ -48,7 +48,7 @@ Prima di importare, la procedura guidata valida tutte le righe rispetto alle def
 
 ### Configurazione dell'Importazione
 
-L'importazione è abilitata per impostazione predefinita. Per disabilitarla su una collezione specifica, usa il sotto-oggetto `ui`:
+L'importazione è abilitata per impostazione predefinita. Per disabilitarla su una collezione specifica, usa il sotto-oggetto `admin`:
 
 ```typescript
 import { CollectionConfig } from "@rebasepro/types";

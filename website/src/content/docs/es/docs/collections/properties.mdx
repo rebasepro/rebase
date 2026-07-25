@@ -46,15 +46,15 @@ Todos los tipos de propiedades comparten estas opciones:
 | `dynamicProps` | `function` | Constructor de propiedades dinámicas (ver Campos Condicionales) |
 | `conditions` | `PropertyConditions` | Condiciones declarativas con JSON Logic |
 
-### Configuración de UI (`ui`)
+### Configuración de UI (`admin`)
 
-Las opciones relacionadas con la UI se anidan bajo el sub-objeto `ui`:
+Las opciones relacionadas con la UI se anidan bajo el sub-objeto `admin`:
 
 ```typescript
 price: {
     type: "number",
     name: "Price",
-    ui: {
+    admin: {
         readOnly: true,
         columnWidth: 120,
         hideFromCollection: false
@@ -66,11 +66,11 @@ price: {
 |----------|------|-------------|
 | `ui.readOnly` | `boolean` | Prevenir edición |
 | `ui.disabled` | `boolean \| PropertyDisabledConfig` | Deshabilitar con tooltip opcional |
-| `ui.hideFromCollection` | `boolean` | Ocultar de la vista de tabla |
+| `admin.hideFromCollection` | `boolean` | Ocultar de la vista de tabla |
 | `ui.columnWidth` | `number` | Ancho de columna en píxeles (vista de tabla) |
 | `ui.widthPercentage` | `number` | Ancho del campo como porcentaje en la vista de formulario |
-| `ui.Field` | `React.ComponentType` | Componente de campo personalizado |
-| `ui.Preview` | `React.ComponentType` | Componente de celda de tabla personalizado |
+| `admin.Field` | `React.ComponentType` | Componente de campo personalizado |
+| `admin.Preview` | `React.ComponentType` | Componente de celda de tabla personalizado |
 
 ## Propiedades de Cadena (String)
 
@@ -300,7 +300,7 @@ created_at: {
     type: "date",
     name: "Created At",
     autoValue: "on_create",
-    ui: { readOnly: true }
+    admin: { readOnly: true }
 }
 
 updated_at: {

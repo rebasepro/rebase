@@ -59,7 +59,7 @@ describe("buildStringProperty", () => {
             totalDocsCount: 10,
             valuesResult: makeValuesResult(mixed)
         });
-        expect((result as StringProperty).ui?.url).toBeFalsy();
+        expect((result as StringProperty).admin?.url).toBeFalsy();
     });
 
     it("detects email values", () => {
@@ -80,7 +80,7 @@ describe("buildStringProperty", () => {
             totalDocsCount: 10,
             valuesResult: makeValuesResult(userIds)
         }) as StringProperty;
-        expect(result.ui?.readOnly).toBe(true);
+        expect(result.admin?.readOnly).toBe(true);
     });
 
     it("infers enum when few unique values", () => {
@@ -175,7 +175,7 @@ describe("buildStringProperty", () => {
         });
         expect(result.type).toBe("string");
         expect((result as StringProperty).email).toBeUndefined();
-        expect((result as StringProperty).ui?.url).toBeFalsy();
+        expect((result as StringProperty).admin?.url).toBeFalsy();
         expect((result as StringProperty).storage).toBeUndefined();
     });
 });

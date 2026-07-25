@@ -42,8 +42,8 @@ export function TextFieldBinding<T extends string | number>({
     let multiline: boolean | undefined;
     let url: boolean | PreviewType | undefined;
     if (property.type === "string") {
-        multiline = property.ui?.multiline;
-        url = property.ui?.urlPreview;
+        multiline = property.admin?.multiline;
+        url = property.admin?.urlPreview;
     }
 
     useClearRestoreValue({
@@ -82,7 +82,7 @@ export function TextFieldBinding<T extends string | number>({
         inputType = "number";
     } else if (property.type === "string") {
         if (property.email) inputType = "email";
-        else if (property.ui?.urlPreview) inputType = "url";
+        else if (property.admin?.urlPreview) inputType = "url";
     }
 
     const label = (
@@ -99,7 +99,7 @@ export function TextFieldBinding<T extends string | number>({
                         fieldBackgroundMixin,
                         fieldBackgroundHoverMixin,
                         showError && error ? "border border-red-500 dark:border-red-600" : "",
-                        property.ui?.widthPercentage !== undefined ? "mt-8" : undefined
+                        property.admin?.widthPercentage !== undefined ? "mt-8" : undefined
                     )}>
                         <div
                             className="pointer-events-none absolute top-1 text-xs font-medium px-3 text-text-secondary dark:text-text-secondary-dark">
@@ -116,7 +116,7 @@ export function TextFieldBinding<T extends string | number>({
                                 showError && error ? "text-red-500 dark:text-red-600" : ""
                             )}
                         />
-                        {property.ui?.clearable && (
+                        {property.admin?.clearable && (
                             <div
                                 className="flex flex-row justify-center items-center absolute h-full right-0 top-0 mr-4">
                                 <IconButton onClick={handleClearClick}>
@@ -131,7 +131,7 @@ export function TextFieldBinding<T extends string | number>({
                         value={displayValue}
                         onChange={onChange}
                         autoFocus={autoFocus}
-                        className={property.ui?.widthPercentage !== undefined ? "mt-8" : undefined}
+                        className={property.admin?.widthPercentage !== undefined ? "mt-8" : undefined}
                         label={<LabelWithIcon
                             icon={getIconForProperty(property, "small")}
                             required={property.validation?.required || property.isId === true}
@@ -139,7 +139,7 @@ export function TextFieldBinding<T extends string | number>({
                         type={inputType}
                         disabled={disabled}
                         endAdornment={
-                            property.ui?.clearable && <IconButton
+                            property.admin?.clearable && <IconButton
                                 onClick={handleClearClick}>
                                 <XIcon/>
                             </IconButton>

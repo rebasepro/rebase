@@ -56,7 +56,7 @@ const localeCollection = defineCollection({
         description: {
             type: "string",
             name: "Description",
-            ui: { multiline: true }
+            admin: { multiline: true }
         }
     }
 });
@@ -157,12 +157,12 @@ export const productsCollection = defineCollection({
         description: {
             type: "string",
             name: "Description",
-            ui: { markdown: true }
+            admin: { markdown: true }
         },
         amazon_link: {
             type: "string",
             name: "Amazon link",
-            ui: { url: true }
+            admin: { url: true }
         },
         related_products: {
             type: "array",

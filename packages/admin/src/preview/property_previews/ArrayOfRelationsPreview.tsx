@@ -36,7 +36,7 @@ export function ArrayOfRelationsPreview({
                             key={`preview_array_rel_${propertyKey}_${index}`}>
                             <RelationPreview
                                 disabled={!ofProperty.relation}
-                                previewProperties={ofProperty.ui?.previewProperties}
+                                previewProperties={ofProperty.admin?.previewProperties}
                                 size={"small"}
                                 relation={entityRelation}
                                 includeId={ofProperty.includeId}

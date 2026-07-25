@@ -46,15 +46,15 @@ Tous les types de propriétés partagent ces options :
 | `dynamicProps` | `function` | Constructeur de propriétés dynamiques (voir Champs conditionnels) |
 | `conditions` | `PropertyConditions` | Conditions déclaratives JSON Logic |
 
-### Configuration de l'interface utilisateur (`ui`)
+### Configuration de l'interface utilisateur (`admin`)
 
-Les options liées à l'interface utilisateur sont imbriquées sous le sous-objet `ui` :
+Les options liées à l'interface utilisateur sont imbriquées sous le sous-objet `admin` :
 
 ```typescript
 price: {
     type: "number",
     name: "Price",
-    ui: {
+    admin: {
         readOnly: true,
         columnWidth: 120,
         hideFromCollection: false
@@ -66,11 +66,11 @@ price: {
 |----------|------|-------------|
 | `ui.readOnly` | `boolean` | Empêche l'édition |
 | `ui.disabled` | `boolean \| PropertyDisabledConfig` | Désactiver avec info-bulle optionnelle |
-| `ui.hideFromCollection` | `boolean` | Masquer de la vue tableau |
+| `admin.hideFromCollection` | `boolean` | Masquer de la vue tableau |
 | `ui.columnWidth` | `number` | Largeur de colonne en pixels (vue tableau) |
 | `ui.widthPercentage` | `number` | Largeur du champ en pourcentage dans la vue formulaire |
-| `ui.Field` | `React.ComponentType` | Composant de champ personnalisé |
-| `ui.Preview` | `React.ComponentType` | Composant de cellule de tableau personnalisé |
+| `admin.Field` | `React.ComponentType` | Composant de champ personnalisé |
+| `admin.Preview` | `React.ComponentType` | Composant de cellule de tableau personnalisé |
 
 ## Propriétés de type chaîne de caractères
 
@@ -300,7 +300,7 @@ created_at: {
     type: "date",
     name: "Created At",
     autoValue: "on_create",
-    ui: { readOnly: true }
+    admin: { readOnly: true }
 }
 
 updated_at: {

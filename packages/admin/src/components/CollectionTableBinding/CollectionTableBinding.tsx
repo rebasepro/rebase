@@ -146,7 +146,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
             propertyKey,
             entity
         }) ?? columnCustom?.resolvedProperty;
-        if (!property?.ui?.disabled) {
+        if (!property?.admin?.disabled) {
             disabled = false;
         }
 

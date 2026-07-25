@@ -20,7 +20,7 @@ const productsCollection: AdminCollectionConfig = {
         description: {
             name: "Description",
             type: "string",
-            ui: {
+            admin: {
                 markdown: true
             }
         },

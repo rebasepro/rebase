@@ -38,7 +38,7 @@ title: Changelog
 
 - **22 retired package names deprecated on npm** — the names the repo no longer publishes now carry a deprecation notice pointing at their replacement, so an install of an old name says so instead of silently resolving to an abandoned version.
 
-- **Package renames** — packages are now named for their role, not their position. `core` was frontend-only React while `server-core` was the actual core of the product; they shared a word and were otherwise unrelated. `client-firebase` depended on `admin`/`core`/`ui`, so it was a UI integration wearing a client-SDK name. Import paths are the only change — no behavior moved with them.
+- **Package renames** — packages are now named for their role, not their position. `core` was frontend-only React while `server-core` was the actual core of the product; they shared a word and were otherwise unrelated. `client-firebase` depended on `admin`/`core`/`admin`, so it was a UI integration wearing a client-SDK name. Import paths are the only change — no behavior moved with them.
 
   | Old | New |
   |----------|----------|
@@ -54,7 +54,7 @@ title: Changelog
   | `@rebasepro/mcp-server` | `@rebasepro/mcp` |
   | `@rebasepro/plugin-data-enhancement` | `@rebasepro/plugin-ai` |
 
-  Unchanged: `types`, `utils`, `common`, `client`, `ui`, `admin`, `studio`, `cli`, `plugin-insights`.
+  Unchanged: `types`, `utils`, `common`, `client`, `admin`, `admin`, `studio`, `cli`, `plugin-insights`.
 
 - **`@rebasepro/auth` removed** — it was one hook and an API helper whose only dependency was `@rebasepro/types`, and it always had to be installed alongside `core` anyway. `useRebaseAuthController`, `fetchAuthConfig`, `createAuthConfigCache` and `clearAuthConfigCache` now come from `@rebasepro/app`, beside the `RebaseAuth` and `LoginView` components they are used with. The auth *system* was never here — it lives in `@rebasepro/client` (`client.auth`) and `@rebasepro/server`.
 
@@ -138,7 +138,7 @@ title: Changelog
 
 - **`/admin/bootstrap` was a land-grab** — the self-promotion endpoint only refused to run once an admin already existed. In a "users exist but no admin" state — reachable via concurrent first-registrations, or by deleting the first user — any authenticated user could seize the initial admin role. It is now gated to the earliest-registered user, deterministically tie-broken by id, with security-audit logs on both the denial and the success.
 
-- **The API served password hashes** — `/api/data/users` returned every user their own `passwordHash` and `emailVerificationToken`. RLS scoped the row to the caller so this was not a cross-user leak, but a salted hash is offline-crackable and a verification token can be replayed. The users collection only marked them `ui.hideFromCollection`, which stops the admin panel from *rendering* a field and leaves it in the JSON.
+- **The API served password hashes** — `/api/data/users` returned every user their own `passwordHash` and `emailVerificationToken`. RLS scoped the row to the caller so this was not a cross-user leak, but a salted hash is offline-crackable and a verification token can be replayed. The users collection only marked them `admin.hideFromCollection`, which stops the admin panel from *rendering* a field and leaves it in the JSON.
 
 - **The data API was rate-limited by API key only** — the limiter returned early for any request that carried no API key, so JWT and anonymous traffic — most of what a BaaS serves — was unbounded, and it was mounted only `if (apiKeyStore)`, making its presence depend on a feature it does not need. Every request now falls in exactly one bucket, resolved most-specific first: API key by id, signed-in user by uid, everyone else by IP.
 
@@ -180,7 +180,7 @@ title: Changelog
 
 - **The service key did not authenticate websockets** — the HTTP middleware compares it before JWT verification; the websocket path went straight to `extractUserFromToken`, and a static secret can only ever fail that. Any SDK client using a service key (scripts, cron, server-to-server) got `jwt malformed` on every connect and silently received no realtime events.
 
-- **`collection-file → UI package` imports no longer drag React into the backend** — `users.ts` imported `resetPasswordAction` from `@rebasepro/admin`, so the Node backend loaded the entire admin bundle at boot. The action is already injected frontend-side for `auth` collections, making the import redundant. `@rebasepro/admin` is also gone from the config and backend templates, and `@rebasepro/core`/`ui` from `@rebasepro/auth` — none were imported.
+- **`collection-file → UI package` imports no longer drag React into the backend** — `users.ts` imported `resetPasswordAction` from `@rebasepro/admin`, so the Node backend loaded the entire admin bundle at boot. The action is already injected frontend-side for `auth` collections, making the import redundant. `@rebasepro/admin` is also gone from the config and backend templates, and `@rebasepro/core`/`admin` from `@rebasepro/auth` — none were imported.
 
 ### Testing
 

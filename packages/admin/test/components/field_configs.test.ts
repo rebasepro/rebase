@@ -15,14 +15,14 @@ describe("DEFAULT_FIELD_CONFIGS", () => {
         const entries = Object.entries(DEFAULT_FIELD_CONFIGS);
         expect(entries.length).toBeGreaterThan(0);
         for (const [id, config] of entries) {
-            const Field = (config.property as { ui?: { Field?: unknown } })?.ui?.Field;
+            const Field = (config.property as { ui?: { Field?: unknown } })?.admin?.Field;
             expect([id, typeof Field]).toEqual([id, "function"]);
         }
     });
 
     it("resolves the container fields to their own bindings", () => {
         const fieldOf = (id: keyof typeof DEFAULT_FIELD_CONFIGS) =>
-            (DEFAULT_FIELD_CONFIGS[id].property as { ui: { Field: unknown } }).ui.Field;
+            (DEFAULT_FIELD_CONFIGS[id].property as { admin: { Field: unknown } }).admin.Field;
 
         expect(fieldOf("group")).toBe(MapFieldBinding);
         expect(fieldOf("repeat")).toBe(RepeatFieldBinding);
@@ -36,8 +36,8 @@ describe("DEFAULT_FIELD_CONFIGS", () => {
     // else would catch. Guard the mechanism, not just the result.
     it("declares Field lazily so it is never read during module init", () => {
         for (const [id, config] of Object.entries(DEFAULT_FIELD_CONFIGS)) {
-            const ui = (config.property as { ui?: object }).ui;
-            const descriptor = Object.getOwnPropertyDescriptor(ui, "Field");
+            const admin = (config.property as { admin?: object }).admin;
+            const descriptor = Object.getOwnPropertyDescriptor(admin, "Field");
             expect([id, typeof descriptor?.get]).toEqual([id, "function"]);
             expect([id, descriptor?.value]).toEqual([id, undefined]);
         }
@@ -45,6 +45,6 @@ describe("DEFAULT_FIELD_CONFIGS", () => {
 
     it("still hands a working Field through getFieldConfig's merge", () => {
         const config = getFieldConfig({ type: "map" } as never, {});
-        expect(typeof (config?.property as { ui?: { Field?: unknown } })?.ui?.Field).toBe("function");
+        expect(typeof (config?.property as { ui?: { Field?: unknown } })?.admin?.Field).toBe("function");
     });
 });

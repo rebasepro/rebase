@@ -58,7 +58,7 @@ properties: {
     brand_color: {
         type: "string",
         name: "Brand Color",
-        ui: {
+        admin: {
             Field: ColorPickerField
         }
     }
@@ -75,7 +75,7 @@ const colorPropertyConfig: PropertyConfig = {
     name: "Color Picker",
     property: {
         type: "string",
-        ui: {
+        admin: {
             Field: ColorPickerField
         }
     }
@@ -161,7 +161,7 @@ properties: {
     color: {
         type: "string",
         name: "Color",
-        ui: {
+        admin: {
             Field: ColorPickerField,
             Preview: ColorPreview
         }

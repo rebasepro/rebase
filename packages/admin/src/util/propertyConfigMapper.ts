@@ -35,8 +35,8 @@ export function mapPropertyToConfig(property: Property): CollectionPropertyConfi
         type: TYPE_MAP[property.type] ?? "string",
         name: property.name,
         description: property.description,
-        columnWidth: property.ui?.columnWidth,
-        hideFromCollection: property.ui?.hideFromCollection,
+        columnWidth: property.admin?.columnWidth,
+        hideFromCollection: property.admin?.hideFromCollection,
     };
 
     // String-specific
@@ -44,10 +44,10 @@ export function mapPropertyToConfig(property: Property): CollectionPropertyConfi
         if (property.enum) {
             base.enum = mapEnumValues(property.enum);
         }
-        if (property.ui?.multiline) base.multiline = true;
-        if (property.ui?.previewAsTag) base.previewAsTag = true;
-        if (property.ui?.urlPreview) base.url = property.ui.urlPreview;
-        if (property.ui?.markdown) base.markdown = true;
+        if (property.admin?.multiline) base.multiline = true;
+        if (property.admin?.previewAsTag) base.previewAsTag = true;
+        if (property.admin?.urlPreview) base.url = property.admin.urlPreview;
+        if (property.admin?.markdown) base.markdown = true;
         if (property.storage) base.storage = true;
         if (property.email) base.email = true;
     }
@@ -76,7 +76,7 @@ export function mapPropertyToConfig(property: Property): CollectionPropertyConfi
     }
 
     // Custom preview component
-    if (property.ui?.Preview) {
+    if (property.admin?.Preview) {
         // The connected wrapper will handle this by injecting via cellRenderer override
         // We don't copy it here because Preview may reference entity-aware components
     }

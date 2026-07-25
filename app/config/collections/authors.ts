@@ -54,7 +54,7 @@ const authorsCollection: AdminCollectionConfig = {
         bio: {
             name: "Bio",
             type: "string",
-            ui: { markdown: true },
+            admin: { markdown: true },
             description: "Author biography in Markdown format"
         },
         twitter: {

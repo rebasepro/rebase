@@ -44,7 +44,7 @@ export interface TableFieldConfig {
 }
 
 export function isStorageProperty(property: Property) {
-    if (property.type === "string" && property.ui?.markdown)
+    if (property.type === "string" && property.admin?.markdown)
         return false;
     if (property.type === "string" && (property as StringProperty).storage)
         return true;
@@ -159,8 +159,8 @@ export function getTableBindingForProperty(
                 ),
                 fullHeight: true
             };
-        } else if (stringProperty.ui?.markdown || !stringProperty.storage) {
-            const multiline = Boolean(stringProperty.ui?.multiline) || Boolean(stringProperty.ui?.markdown);
+        } else if (stringProperty.admin?.markdown || !stringProperty.storage) {
+            const multiline = Boolean(stringProperty.admin?.multiline) || Boolean(stringProperty.admin?.markdown);
             return {
                 Component: ({ error, validationError, disabled, selected, internalValue, updateValue }: TableFieldBindingProps) => (
                     <VirtualTableInput
@@ -221,7 +221,7 @@ export function getTableBindingForProperty(
                         size={size}
                         path={(property as ReferenceProperty).path!}
                         multiselect={false}
-                        previewProperties={(property as ReferenceProperty).ui?.previewProperties}
+                        previewProperties={(property as ReferenceProperty).admin?.previewProperties}
                         includeId={(property as ReferenceProperty).includeId}
                         includeEntityLink={(property as ReferenceProperty).includeEntityLink}
                         title={property.name ?? propertyKey}
@@ -234,7 +234,7 @@ export function getTableBindingForProperty(
         }
     } else if (property.type === "relation") {
         if ((property as RelationProperty).relation) {
-            if ((property as RelationProperty).ui?.widget === "dialog") {
+            if ((property as RelationProperty).admin?.widget === "dialog") {
                 return {
                     Component: RelationDialogBindingComponent,
                     allowScroll: false
@@ -288,7 +288,7 @@ export function getTableBindingForProperty(
                                 size={size}
                                 multiselect={true}
                                 path={refOfProp.path!}
-                                previewProperties={refOfProp.ui?.previewProperties}
+                                previewProperties={refOfProp.admin?.previewProperties}
                                 title={arrayProperty.name}
                                 fixedFilter={refOfProp.fixedFilter}
                                 includeId={refOfProp.includeId}
@@ -317,7 +317,7 @@ function RelationDialogBindingComponent({ propertyKey, internalValue, updateValu
             size={size}
             multiselect={false}
             relation={relProp.relation!}
-            previewProperties={relProp.ui?.previewProperties}
+            previewProperties={relProp.admin?.previewProperties}
             includeId={relProp.includeId}
             includeEntityLink={relProp.includeEntityLink}
             title={relProp.name ?? propertyKey}

@@ -291,7 +291,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     const fieldProps: PropertyFieldBindingProps<M> | undefined = propertyKey && property
         ? {
             propertyKey: propertyKey as string,
-            disabled: isSubmitting || isReadOnly(property) || !!property.ui?.disabled,
+            disabled: isSubmitting || isReadOnly(property) || !!property.admin?.disabled,
             property,
             includeDescription: false,
             underlyingValueHasChanged: false,

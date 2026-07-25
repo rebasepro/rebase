@@ -29,7 +29,7 @@ export function RelationFieldBinding(props: FieldProps<RelationProperty>) {
     const relation = resolvedProperty.relation;
 
     const manyRelation = relation?.cardinality === "many";
-    const widget = property.ui?.widget ?? "select";
+    const widget = property.admin?.widget ?? "select";
 
     if (widget === "select" && relation) {
         return <RelationSelectorBinding {...props} relation={relation} manyRelation={manyRelation} />;
@@ -153,7 +153,7 @@ function SingleRelationFieldBinding({
 
                 {usedRelation && <RelationPreview
                     disabled={!usedRelation}
-                    previewProperties={property.ui?.previewProperties}
+                    previewProperties={property.admin?.previewProperties}
                     hover={!disabled}
                     size={size}
                     onClick={disabled || isSubmitting ? undefined : onEntryClick}

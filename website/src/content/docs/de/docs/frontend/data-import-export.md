@@ -48,7 +48,7 @@ Vor dem Import validiert der Assistent alle Zeilen gegen die Property-Definition
 
 ### Import-Konfiguration
 
-Der Import ist standardmäßig aktiviert. Um ihn für eine bestimmte Collection zu deaktivieren, verwenden Sie das Unterobjekt `ui`:
+Der Import ist standardmäßig aktiviert. Um ihn für eine bestimmte Collection zu deaktivieren, verwenden Sie das Unterobjekt `admin`:
 
 ```typescript
 import { CollectionConfig } from "@rebasepro/types";

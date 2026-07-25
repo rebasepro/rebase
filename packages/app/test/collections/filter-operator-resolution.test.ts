@@ -1,10 +1,10 @@
 import { resolveFilterOperators } from "../../src/collections/filter-operator-resolution";
 import type { Property } from "@rebasepro/types";
 
-const stringProp = (ui?: Record<string, unknown>): Property => ({
+const stringProp = (admin?: Record<string, unknown>): Property => ({
     name: "Name",
     type: "string",
-    ...(ui ? { ui } : {})
+    ...(admin ? { admin } : {})
 } as Property);
 
 describe("resolveFilterOperators", () => {
@@ -72,7 +72,7 @@ describe("resolveFilterOperators", () => {
         });
     });
 
-    describe("property-level narrowing (ui.filterOperators)", () => {
+    describe("property-level narrowing (admin.filterOperators)", () => {
         it("restricts the offered set", () => {
             const ops = resolveFilterOperators({
                 property: stringProp({ filterOperators: ["==", "ilike", "is-null"] }),
@@ -92,7 +92,7 @@ describe("resolveFilterOperators", () => {
 
         it("cannot enable an operator that makes no sense for the type", () => {
             const ops = resolveFilterOperators({
-                property: { name: "Active", type: "boolean", ui: { filterOperators: ["ilike", "=="] } } as Property,
+                property: { name: "Active", type: "boolean", admin: { filterOperators: ["ilike", "=="] } } as Property,
                 engine: "postgres"
             });
             expect(ops).toEqual(["=="]);

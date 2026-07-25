@@ -26,7 +26,7 @@ export function SkeletonPropertyComponent({
     let content: React.ReactNode | any;
     if (property.type === "string") {
         const stringProperty = property as StringProperty;
-        if (stringProperty.ui?.urlPreview) {
+        if (stringProperty.admin?.urlPreview) {
             content = renderUrlComponent(stringProperty, size);
         } else if (stringProperty.storage) {
             content = renderSkeletonImageThumbnail(size);
@@ -240,7 +240,7 @@ function renderReference() {
 
 function renderUrlComponent(property: StringProperty, size: PreviewSize = "large") {
 
-    if (typeof property.ui?.urlPreview === "boolean") {
+    if (typeof property.admin?.urlPreview === "boolean") {
         return <div style={{
             display: "flex"
         }}>

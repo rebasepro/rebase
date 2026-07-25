@@ -40,7 +40,7 @@ const productLocalesCollection: AdminCollectionConfig = {
         description: {
             name: "Description",
             type: "string",
-            ui: { markdown: true }
+            admin: { markdown: true }
         }
     },
     admin: {

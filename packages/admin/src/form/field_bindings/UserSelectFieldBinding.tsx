@@ -52,7 +52,7 @@ export function UserSelectFieldBinding({
                     setValue(userId);
                 }}
                 disabled={disabled}
-                clearable={property.ui?.clearable}
+                clearable={property.admin?.clearable}
                 size={selectorSize}
             />
 

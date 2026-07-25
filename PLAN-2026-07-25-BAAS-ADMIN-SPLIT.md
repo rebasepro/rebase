@@ -346,10 +346,10 @@ rots back within two months.
 
 7. **Naming consistency, one open question.** Collection-level UI lands under `admin:`,
    property-level UI stays under `ui:`. Two words for one concept. Recommendation: keep
-   `ui` for properties — it is already shipped, widely used, and reads correctly on a
+   `admin` for properties — it is already shipped, widely used, and reads correctly on a
    field, whereas `admin` reads correctly on a collection (it configures the panel's
    *behaviour*, not just styling). Flagging it rather than deciding silently; renaming
-   property `ui` → `admin` is a one-line addition to the same codemod if preferred.
+   property `admin` → `admin` is a one-line addition to the same codemod if preferred.
 
 ---
 

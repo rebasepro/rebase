@@ -58,12 +58,12 @@ export const usersCollection = defineCollection({
                 large: {
                     name: "Large",
                     type: "string",
-                    ui: { url: "image" }
+                    admin: { url: "image" }
                 },
                 thumbnail: {
                     name: "Thumbnail",
                     type: "string",
-                    ui: { url: "image" }
+                    admin: { url: "image" }
                 }
             }
         }

@@ -1299,7 +1299,7 @@ function buildPropertyWidthOverwrite(key: string, width: number): PartialCollect
         const [parentKey, ...childKey] = key.split(".");
         return { properties: { [parentKey]: buildPropertyWidthOverwrite(childKey.join("."), width) } } as PartialCollectionConfig;
     }
-    return { properties: { [key]: { ui: { columnWidth: width } } } } as PartialCollectionConfig;
+    return { properties: { [key]: { admin: { columnWidth: width } } } } as PartialCollectionConfig;
 }
 
 function EntityIdHeaderWidget({

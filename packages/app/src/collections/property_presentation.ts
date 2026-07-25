@@ -18,20 +18,20 @@ import type { ArrayProperty, ConditionContext, EnumValueConfig, Property, Proper
 import { evaluateCondition } from "@rebasepro/common";
 
 export function isReadOnly(property: Property): boolean {
-    if (property.ui?.readOnly)
+    if (property.admin?.readOnly)
         return true;
     if (property.type === "date") {
         if (property.autoValue)
             return true;
     }
     if (property.type === "reference") {
-        return !property.path && !("Field" in (property.ui || {}) && property.ui?.Field);
+        return !property.path && !("Field" in (property.admin || {}) && property.admin?.Field);
     }
     return false;
 }
 
 export function isHidden(property: Property): boolean {
-    return typeof property.ui?.disabled === "object" && Boolean(property.ui?.disabled.hidden);
+    return typeof property.admin?.disabled === "object" && Boolean(property.admin?.disabled.hidden);
 }
 
 export function applyPropertyConditions(
@@ -51,8 +51,8 @@ export function applyPropertyConditions(
     if (conditions.disabled) {
         const isDisabled = evaluateCondition(conditions.disabled, context);
         if (isDisabled) {
-            result.ui = result.ui || {};
-            result.ui.disabled = {
+            result.admin = result.admin || {};
+            result.admin.disabled = {
                 clearOnDisabled: conditions.clearOnDisabled ?? false,
                 disabledMessage: conditions.disabledMessage,
                 hidden: false
@@ -64,9 +64,9 @@ export function applyPropertyConditions(
     if (conditions.hidden) {
         const isHidden = evaluateCondition(conditions.hidden, context);
         if (isHidden) {
-            result.ui = result.ui || {};
-            result.ui.disabled = {
-                ...(typeof result.ui?.disabled === "object" ? result.ui.disabled : {}),
+            result.admin = result.admin || {};
+            result.admin.disabled = {
+                ...(typeof result.admin?.disabled === "object" ? result.admin.disabled : {}),
                 hidden: true,
                 clearOnDisabled: conditions.clearOnDisabled ?? false
             };
@@ -77,8 +77,8 @@ export function applyPropertyConditions(
     if (conditions.readOnly) {
         const isReadOnly = evaluateCondition(conditions.readOnly, context);
         if (isReadOnly) {
-            result.ui = result.ui || {};
-            result.ui.readOnly = true;
+            result.admin = result.admin || {};
+            result.admin.readOnly = true;
         }
     }
 

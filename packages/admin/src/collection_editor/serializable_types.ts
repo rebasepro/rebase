@@ -37,10 +37,10 @@ import type {
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * JSON-serializable version of `BaseUIConfig`.
+ * JSON-serializable version of `AdminPropertyOptions`.
  * Drops `Field` and `Preview` (ComponentRef — functions/components).
  */
-export interface SerializableBaseUIConfig {
+export interface SerializableAdminBaseOptions {
     columnWidth?: number;
     hideFromCollection?: boolean;
     readOnly?: boolean;
@@ -107,8 +107,8 @@ export interface SerializableStorageConfig {
 
 // ── Serializable UI configs for specific property types ───────────────
 
-/** JSON-serializable version of `StringUIConfig`. */
-export interface SerializableStringUIConfig extends SerializableBaseUIConfig {
+/** JSON-serializable version of `AdminStringOptions`. */
+export interface SerializableAdminStringOptions extends SerializableAdminBaseOptions {
     multiline?: boolean;
     markdown?: boolean;
     previewAsTag?: boolean;
@@ -116,40 +116,40 @@ export interface SerializableStringUIConfig extends SerializableBaseUIConfig {
     url?: boolean | "image" | "video" | "audio" | "file";
 }
 
-/** JSON-serializable version of `NumberUIConfig`. */
-export interface SerializableNumberUIConfig extends SerializableBaseUIConfig {
+/** JSON-serializable version of `AdminNumberOptions`. */
+export interface SerializableAdminNumberOptions extends SerializableAdminBaseOptions {
     clearable?: boolean;
 }
 
-/** JSON-serializable version of `DateUIConfig`. */
-export interface SerializableDateUIConfig extends SerializableBaseUIConfig {
+/** JSON-serializable version of `AdminDateOptions`. */
+export interface SerializableAdminDateOptions extends SerializableAdminBaseOptions {
     clearable?: boolean;
 }
 
-/** JSON-serializable version of `VectorUIConfig`. */
-export interface SerializableVectorUIConfig extends SerializableBaseUIConfig {
+/** JSON-serializable version of `AdminVectorOptions`. */
+export interface SerializableAdminVectorOptions extends SerializableAdminBaseOptions {
     clearable?: boolean;
 }
 
-/** JSON-serializable version of `ReferenceUIConfig`. */
-export interface SerializableReferenceUIConfig extends SerializableBaseUIConfig {
+/** JSON-serializable version of `AdminReferenceOptions`. */
+export interface SerializableAdminReferenceOptions extends SerializableAdminBaseOptions {
     previewProperties?: string[];
 }
 
-/** JSON-serializable version of `RelationUIConfig`. */
-export interface SerializableRelationUIConfig extends SerializableBaseUIConfig {
+/** JSON-serializable version of `AdminRelationOptions`. */
+export interface SerializableAdminRelationOptions extends SerializableAdminBaseOptions {
     previewProperties?: string[];
     widget?: "select" | "dialog";
 }
 
-/** JSON-serializable version of `ArrayUIConfig`. */
-export interface SerializableArrayUIConfig extends SerializableBaseUIConfig {
+/** JSON-serializable version of `AdminArrayOptions`. */
+export interface SerializableAdminArrayOptions extends SerializableAdminBaseOptions {
     expanded?: boolean;
     minimalistView?: boolean;
 }
 
-/** JSON-serializable version of `MapUIConfig`. */
-export interface SerializableMapUIConfig extends SerializableBaseUIConfig {
+/** JSON-serializable version of `AdminMapOptions`. */
+export interface SerializableAdminMapOptions extends SerializableAdminBaseOptions {
     expanded?: boolean;
     minimalistView?: boolean;
     spreadChildren?: boolean;
@@ -163,7 +163,7 @@ export interface SerializableMapUIConfig extends SerializableBaseUIConfig {
  * Keeps: `conditions` (JSON Logic — already serializable by design).
  */
 export interface SerializableBaseProperty {
-    ui?: SerializableBaseUIConfig;
+    admin?: SerializableAdminBaseOptions;
     name: string;
     description?: string;
     propertyConfig?: string;
@@ -187,7 +187,7 @@ export interface SerializableBaseProperty {
 
 /** JSON-serializable `StringProperty`. */
 export interface SerializableStringProperty extends SerializableBaseProperty {
-    ui?: SerializableStringUIConfig;
+    admin?: SerializableAdminStringOptions;
     type: "string";
     columnType?: "varchar" | "text" | "char" | "uuid";
     validation?: SerializableStringValidation;
@@ -201,7 +201,7 @@ export interface SerializableStringProperty extends SerializableBaseProperty {
 
 /** JSON-serializable `NumberProperty`. */
 export interface SerializableNumberProperty extends SerializableBaseProperty {
-    ui?: SerializableNumberUIConfig;
+    admin?: SerializableAdminNumberOptions;
     type: "number";
     columnType?: "integer" | "real" | "double precision" | "numeric" | "bigint" | "serial" | "bigserial";
     validation?: NumberPropertyValidationSchema;
@@ -211,14 +211,14 @@ export interface SerializableNumberProperty extends SerializableBaseProperty {
 
 /** JSON-serializable `BooleanProperty`. */
 export interface SerializableBooleanProperty extends SerializableBaseProperty {
-    ui?: SerializableBaseUIConfig;
+    admin?: SerializableAdminBaseOptions;
     type: "boolean";
     validation?: PropertyValidationSchema;
 }
 
 /** JSON-serializable `DateProperty`. */
 export interface SerializableDateProperty extends SerializableBaseProperty {
-    ui?: SerializableDateUIConfig;
+    admin?: SerializableAdminDateOptions;
     type: "date";
     columnType?: "timestamp" | "date" | "time";
     validation?: SerializableDateValidation;
@@ -229,14 +229,14 @@ export interface SerializableDateProperty extends SerializableBaseProperty {
 
 /** JSON-serializable `GeopointProperty`. */
 export interface SerializableGeopointProperty extends SerializableBaseProperty {
-    ui?: SerializableBaseUIConfig;
+    admin?: SerializableAdminBaseOptions;
     type: "geopoint";
     validation?: PropertyValidationSchema;
 }
 
 /** JSON-serializable `VectorProperty`. */
 export interface SerializableVectorProperty extends SerializableBaseProperty {
-    ui?: SerializableVectorUIConfig;
+    admin?: SerializableAdminVectorOptions;
     type: "vector";
     dimensions: number;
     validation?: PropertyValidationSchema;
@@ -253,7 +253,7 @@ export interface SerializableBinaryProperty extends SerializableBaseProperty {
  * Already largely serializable; just inherits the serializable base.
  */
 export interface SerializableReferenceProperty extends SerializableBaseProperty {
-    ui?: SerializableReferenceUIConfig;
+    admin?: SerializableAdminReferenceOptions;
     type: "reference";
     isId?: boolean;
     path?: string;
@@ -268,7 +268,7 @@ export interface SerializableReferenceProperty extends SerializableBaseProperty 
  * `() => CollectionConfig` is not serializable.
  */
 export interface SerializableRelationProperty extends SerializableBaseProperty {
-    ui?: SerializableRelationUIConfig;
+    admin?: SerializableAdminRelationOptions;
     type: "relation";
     isId?: boolean;
     /** Target collection slug. Function variant is not serializable. */
@@ -297,7 +297,7 @@ export interface SerializableRelationProperty extends SerializableBaseProperty {
 
 /** JSON-serializable `ArrayProperty`. */
 export interface SerializableArrayProperty extends SerializableBaseProperty {
-    ui?: SerializableArrayUIConfig;
+    admin?: SerializableAdminArrayOptions;
     type: "array";
     columnType?: "json" | "jsonb" | "text[]" | "integer[]" | "boolean[]" | "numeric[]";
     of?: SerializableProperty | SerializableProperty[];
@@ -314,7 +314,7 @@ export interface SerializableArrayProperty extends SerializableBaseProperty {
 
 /** JSON-serializable `MapProperty`. */
 export interface SerializableMapProperty extends SerializableBaseProperty {
-    ui?: SerializableMapUIConfig;
+    admin?: SerializableAdminMapOptions;
     type: "map";
     columnType?: "json" | "jsonb";
     properties?: SerializableProperties;

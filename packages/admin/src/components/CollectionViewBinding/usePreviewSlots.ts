@@ -198,8 +198,8 @@ export function resolveCollectionSlotKeys(
         : [...previewKeys].sort((a, b) => {
             const propA = collection.properties[a] as Property | undefined;
             const propB = collection.properties[b] as Property | undefined;
-            const scoreA = propA?.type === "string" ? (propA.ui?.multiline ? 2 : 1) : 0;
-            const scoreB = propB?.type === "string" ? (propB.ui?.multiline ? 2 : 1) : 0;
+            const scoreA = propA?.type === "string" ? (propA.admin?.multiline ? 2 : 1) : 0;
+            const scoreB = propB?.type === "string" ? (propB.admin?.multiline ? 2 : 1) : 0;
             return scoreB - scoreA;
         });
     const subtitleKey = sortedPreviewKeys.length > 0 ? sortedPreviewKeys[0] : undefined;
@@ -493,14 +493,14 @@ function resolveRelationDisplayName(
 
             // Helper to check if a property is hidden/internal
             const isHiddenProp = (p: Property): boolean => {
-                if (p.ui?.hideFromCollection) return true;
-                if (typeof p.ui?.disabled === "object" && p.ui.disabled.hidden) return true;
+                if (p.admin?.hideFromCollection) return true;
+                if (typeof p.admin?.disabled === "object" && p.admin.disabled.hidden) return true;
                 return false;
             };
 
             // Helper to check if a property is a visible, non-id string
             const isDisplayCandidate = (p: Property): boolean => {
-                return p.type === "string" && !p.ui?.multiline && !p.ui?.markdown && !p.storage
+                return p.type === "string" && !p.admin?.multiline && !p.admin?.markdown && !p.storage
                     && !("isId" in p && p.isId) && !isHiddenProp(p);
             };
 

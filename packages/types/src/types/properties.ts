@@ -155,7 +155,7 @@ export type InferEntityType<P extends Properties> = {
  * Interface including all common properties of a CMS property.
  * @group Entity properties
  */
-export interface BaseUIConfig<CustomProps = unknown> {
+export interface AdminPropertyOptions<CustomProps = unknown> {
     columnWidth?: number;
     hideFromCollection?: boolean;
     readOnly?: boolean;
@@ -194,7 +194,7 @@ export interface BaseUIConfig<CustomProps = unknown> {
 }
 
 export interface BaseProperty<CustomProps = unknown> {
-    ui?: BaseUIConfig<CustomProps>;
+    admin?: AdminPropertyOptions<CustomProps>;
     /**
      * Property name (e.g. Product)
      */
@@ -288,7 +288,7 @@ export interface BaseProperty<CustomProps = unknown> {
 /**
  * @group Entity properties
  */
-export interface StringUIConfig extends BaseUIConfig {
+export interface AdminStringOptions extends AdminPropertyOptions {
     /**
      * Is this string property long enough so it should be displayed in
      * a multiple line field. Defaults to false. If set to true,
@@ -317,7 +317,7 @@ export interface StringUIConfig extends BaseUIConfig {
 }
 
 export interface StringProperty extends BaseProperty {
-    ui?: StringUIConfig;
+    admin?: AdminStringOptions;
     type: "string";
     /**
      * Default value for new entities. Must be a string.
@@ -392,12 +392,12 @@ export interface StringProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
-export interface NumberUIConfig extends BaseUIConfig {
+export interface AdminNumberOptions extends AdminPropertyOptions {
     clearable?: boolean;
 }
 
 export interface NumberProperty extends BaseProperty {
-    ui?: NumberUIConfig;
+    admin?: AdminNumberOptions;
     type: "number";
     /**
      * Default value for new entities. Must be a number.
@@ -436,7 +436,7 @@ export interface NumberProperty extends BaseProperty {
  * @group Entity properties
  */
 export interface BooleanProperty extends BaseProperty {
-    ui?: BaseUIConfig;
+    admin?: AdminPropertyOptions;
     type: "boolean";
     /**
      * Default value for new entities. Must be a boolean.
@@ -451,12 +451,12 @@ export interface BooleanProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
-export interface VectorUIConfig extends BaseUIConfig {
+export interface AdminVectorOptions extends AdminPropertyOptions {
     clearable?: boolean;
 }
 
 export interface VectorProperty extends BaseProperty {
-    ui?: VectorUIConfig;
+    admin?: AdminVectorOptions;
     type: "vector";
     /**
      * Default value for new entities.
@@ -481,7 +481,7 @@ export interface BinaryProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
-export interface DateUIConfig extends BaseUIConfig {
+export interface AdminDateOptions extends AdminPropertyOptions {
     /**
      * Add an icon to clear the value and set it to `null`. Defaults to `false`
      */
@@ -489,7 +489,7 @@ export interface DateUIConfig extends BaseUIConfig {
 }
 
 export interface DateProperty extends BaseProperty {
-    ui?: DateUIConfig;
+    admin?: AdminDateOptions;
     type: "date";
     /**
      * Default value for new entities. Must be a Date.
@@ -526,7 +526,7 @@ export interface DateProperty extends BaseProperty {
  * @group Entity properties
  */
 export interface GeopointProperty extends BaseProperty {
-    ui?: BaseUIConfig;
+    admin?: AdminPropertyOptions;
     type: "geopoint";
     /**
      * Default value for new entities. Must be a GeoPoint.
@@ -541,7 +541,7 @@ export interface GeopointProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
-export interface ReferenceUIConfig extends BaseUIConfig {
+export interface AdminReferenceOptions extends AdminPropertyOptions {
     previewProperties?: string[];
 }
 
@@ -562,7 +562,7 @@ export interface ReferenceUIConfig extends BaseUIConfig {
  * @group Entity properties
  */
 export interface ReferenceProperty extends BaseProperty {
-    ui?: ReferenceUIConfig;
+    admin?: AdminReferenceOptions;
     type: "reference";
     /**
      * Default value for new entities. Must be a EntityReference.
@@ -604,7 +604,7 @@ export interface ReferenceProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
-export interface RelationUIConfig extends BaseUIConfig {
+export interface AdminRelationOptions extends AdminPropertyOptions {
     previewProperties?: string[];
     widget?: "select" | "dialog";
 }
@@ -626,7 +626,7 @@ export interface RelationUIConfig extends BaseUIConfig {
  * @group Entity properties
  */
 export interface RelationProperty extends BaseProperty {
-    ui?: RelationUIConfig;
+    admin?: AdminRelationOptions;
     type: "relation";
     /**
      * Default value for new entities. Must be a EntityRelation or array of EntityRelation.
@@ -763,13 +763,13 @@ export interface RelationProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
-export interface ArrayUIConfig extends BaseUIConfig {
+export interface AdminArrayOptions extends AdminPropertyOptions {
     expanded?: boolean;
     minimalistView?: boolean;
 }
 
 export interface ArrayProperty extends BaseProperty {
-    ui?: ArrayUIConfig;
+    admin?: AdminArrayOptions;
     type: "array";
     /**
      * Default value for new entities. Must be an array.
@@ -846,14 +846,14 @@ export interface ArrayProperty extends BaseProperty {
 /**
  * @group Entity properties
  */
-export interface MapUIConfig extends BaseUIConfig {
+export interface AdminMapOptions extends AdminPropertyOptions {
     expanded?: boolean;
     minimalistView?: boolean;
     spreadChildren?: boolean;
 }
 
 export interface MapProperty extends BaseProperty {
-    ui?: MapUIConfig;
+    admin?: AdminMapOptions;
     type: "map";
     /**
      * Default value for new entities. Must be a record/object.

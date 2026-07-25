@@ -18,8 +18,8 @@ const properties = {
         name: "Title",
         validation: { required: true, max: 200, trim: true },
         // Property-level presentation stays available and stays React-free:
-        // `ui.Field` is a ComponentRef, which is structural, not React.ComponentType.
-        ui: { columnWidth: 240, Field: "../../frontend/src/TitleField" }
+        // `admin.Field` is a ComponentRef, which is structural, not React.ComponentType.
+        admin: { columnWidth: 240, Field: "../../frontend/src/TitleField" }
     },
     slug: {
         type: "string",

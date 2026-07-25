@@ -57,42 +57,42 @@ const customersCollection: AdminCollectionConfig = {
         is_vip: {
             name: "VIP",
             type: "boolean",
-            ui: { readOnly: true },
+            admin: { readOnly: true },
             description: "Whether this customer has VIP status (spent >= $1000)"
         },
         lifetime_value: {
             name: "Lifetime Value",
             type: "number",
-            ui: { readOnly: true },
+            admin: { readOnly: true },
             description: "Total amount spent across all orders"
         },
         total_orders: {
             name: "Total Orders",
             type: "number",
-            ui: { readOnly: true },
+            admin: { readOnly: true },
             description: "Number of orders placed"
         },
         shipping_address: {
             name: "Shipping Address",
             type: "string",
-            ui: { multiline: true }
+            admin: { multiline: true }
         },
         billing_address: {
             name: "Billing Address",
             type: "string",
-            ui: { multiline: true }
+            admin: { multiline: true }
         },
         notes: {
             name: "Notes",
             type: "string",
-            ui: { multiline: true },
+            admin: { multiline: true },
             description: "Internal notes about this customer"
         },
         created_at: {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: {
+            admin: {
                 readOnly: true,
                 hideFromCollection: true
             }
@@ -101,7 +101,7 @@ const customersCollection: AdminCollectionConfig = {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: {
+            admin: {
                 readOnly: true,
                 hideFromCollection: true
             }

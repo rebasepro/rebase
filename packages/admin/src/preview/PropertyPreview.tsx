@@ -56,8 +56,8 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
 
     if (property === null) {
         content = <EmptyValue/>;
-    } else if (property.ui?.Preview) {
-        const ResolvedPreview = resolveComponentRef(property.ui.Preview) as React.ComponentType<PropertyPreviewProps<Property>> | undefined;
+    } else if (property.admin?.Preview) {
+        const ResolvedPreview = resolveComponentRef(property.admin.Preview) as React.ComponentType<PropertyPreviewProps<Property>> | undefined;
         if (ResolvedPreview) {
             content = <Suspense fallback={null}>
                 {createElement(ResolvedPreview,
@@ -68,7 +68,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                         size,
                         height,
                         width,
-                        customProps: property.ui?.customProps
+                        customProps: property.admin?.customProps
                     })}
             </Suspense>;
         }
@@ -86,20 +86,20 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                     size={props.size}
                     fill={fill}
                     storagePathOrDownloadUrl={filePath}/>;
-            } else if (stringProperty.ui?.urlPreview) {
-                if (typeof stringProperty.ui?.urlPreview === "boolean")
+            } else if (stringProperty.admin?.urlPreview) {
+                if (typeof stringProperty.admin?.urlPreview === "boolean")
                     content =
                         <UrlComponentPreview size={props.size}
                             url={value}
                             fill={fill}/>;
-                else if (typeof stringProperty.ui?.urlPreview === "string")
+                else if (typeof stringProperty.admin?.urlPreview === "string")
                     content =
                         <UrlComponentPreview size={props.size}
                             url={value}
                             interactive={interactive}
                             fill={fill}
-                            previewType={stringProperty.ui?.urlPreview}/>;
-            } else if (stringProperty.ui?.markdown) {
+                            previewType={stringProperty.admin?.urlPreview}/>;
+            } else if (stringProperty.admin?.markdown) {
                 content = <Markdown source={value} size={"small"}/>;
             } else if (stringProperty.userSelect) {
                 content = <UserPreview
@@ -194,7 +194,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
             if (typeof value === "object" && value !== null && "isEntityReference" in value && (value as EntityReference).isEntityReference()) {
                 content = <ReferencePreview
                     disabled={!property.path}
-                    previewProperties={property.ui?.previewProperties}
+                    previewProperties={property.admin?.previewProperties}
                     includeId={property.includeId}
                     includeEntityLink={property.includeEntityLink}
                     size={props.size}
@@ -223,7 +223,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                                 key={`preview_rel_${propertyKey}_${index}`}>
                                 <RelationPreview
                                     disabled={!property.relation}
-                                    previewProperties={property.ui?.previewProperties}
+                                    previewProperties={property.admin?.previewProperties}
                                     includeId={property.includeId}
                                     includeEntityLink={property.includeEntityLink}
                                     size={"small"}
@@ -241,7 +241,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
             if (relationValue) {
                 content = <RelationPreview
                     disabled={!property.relation}
-                    previewProperties={property.ui?.previewProperties}
+                    previewProperties={property.admin?.previewProperties}
                     includeId={property.includeId}
                     includeEntityLink={property.includeEntityLink}
                     size={props.size}

@@ -47,12 +47,12 @@ export const blogCollection = defineCollection({
                     text: {
                         type: "string",
                         name: "Text",
-                        ui: { markdown: true }
+                        admin: { markdown: true }
                     },
                     quote: {
                         type: "string",
                         name: "Quote",
-                        ui: { multiline: true }
+                        admin: { multiline: true }
                     },
                     images: {
                         name: "Images",

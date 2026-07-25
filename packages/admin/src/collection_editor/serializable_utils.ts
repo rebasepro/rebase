@@ -8,13 +8,13 @@
  * @module
  */
 
-import type { ArrayProperty, BaseUIConfig, BinaryProperty, BooleanProperty, DateProperty, GeopointProperty, MapProperty, NumberProperty, Properties, Property, ReferenceProperty, RelationProperty, StorageConfig, StringProperty, VectorProperty } from "@rebasepro/types";
+import type { ArrayProperty, AdminPropertyOptions, BinaryProperty, BooleanProperty, DateProperty, GeopointProperty, MapProperty, NumberProperty, Properties, Property, ReferenceProperty, RelationProperty, StorageConfig, StringProperty, VectorProperty } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
 import type {
     SerializableArrayProperty,
     SerializableBaseProperty,
-    SerializableBaseUIConfig,
+    SerializableAdminBaseOptions,
     SerializableBinaryProperty,
     SerializableBooleanProperty,
     SerializableCollectionConfig,
@@ -38,12 +38,12 @@ import type {
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Strip non-serializable fields from a `BaseUIConfig`.
+ * Strip non-serializable fields from a `AdminPropertyOptions`.
  * Removes `Field` and `Preview` (ComponentRef).
  */
-function toSerializableUIConfig(ui: BaseUIConfig | undefined): SerializableBaseUIConfig | undefined {
+function toSerializableAdminOptions(ui: AdminPropertyOptions | undefined): SerializableAdminBaseOptions | undefined {
     if (!ui) return undefined;
-    const { Field, Preview, ...rest } = ui as BaseUIConfig & Record<string, unknown>;
+    const { Field, Preview, ...rest } = ui as AdminPropertyOptions & Record<string, unknown>;
     // Only return if there are remaining fields
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(rest)) {
@@ -51,7 +51,7 @@ function toSerializableUIConfig(ui: BaseUIConfig | undefined): SerializableBaseU
             result[key] = value;
         }
     }
-    return Object.keys(result).length > 0 ? result as SerializableBaseUIConfig : undefined;
+    return Object.keys(result).length > 0 ? result as SerializableAdminBaseOptions : undefined;
 }
 
 /**
@@ -129,8 +129,8 @@ function toSerializableBaseFields(property: Property): Omit<SerializableBaseProp
     if (property.metadata) result.metadata = property.metadata;
     // dynamicProps and callbacks are intentionally dropped (functions)
 
-    const ui = toSerializableUIConfig(property.ui);
-    if (ui) result.ui = ui;
+    const ui = toSerializableAdminOptions(property.admin);
+    if (ui) result.admin = ui;
 
     return result as Omit<SerializableBaseProperty, "validation">;
 }

@@ -156,7 +156,7 @@ export const articlesCollection: CollectionConfig = {
             type: "date",
             name: "Created At",
             autoValue: "on_create",
-            ui: { readOnly: true }
+            admin: { readOnly: true }
         }
     },
     relations: [

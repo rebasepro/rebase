@@ -47,15 +47,15 @@ Alle Eigenschaftstypen teilen diese Optionen:
 | `dynamicProps` | `function` | Dynamischer Property-Builder (siehe Bedingte Felder) |
 | `conditions` | `PropertyConditions` | Deklarative JSON Logic-Bedingungen |
 
-### UI-Konfiguration (`ui`)
+### UI-Konfiguration (`admin`)
 
-UI-bezogene Optionen werden im `ui`-Unterobjekt verschachtelt:
+UI-bezogene Optionen werden im `admin`-Unterobjekt verschachtelt:
 
 ```typescript
 price: {
     type: "number",
     name: "Price",
-    ui: {
+    admin: {
         readOnly: true,
         columnWidth: 120,
         hideFromCollection: false
@@ -67,11 +67,11 @@ price: {
 |----------|------|-------------|
 | `ui.readOnly` | `boolean` | Bearbeitung verhindern |
 | `ui.disabled` | `boolean \| PropertyDisabledConfig` | Deaktivieren mit optionalem Tooltip |
-| `ui.hideFromCollection` | `boolean` | Aus der Tabellenansicht ausblenden |
+| `admin.hideFromCollection` | `boolean` | Aus der Tabellenansicht ausblenden |
 | `ui.columnWidth` | `number` | Spaltenbreite in Pixeln (Tabellenansicht) |
 | `ui.widthPercentage` | `number` | Feldbreite als Prozentwert in der Formularansicht |
-| `ui.Field` | `React.ComponentType` | Benutzerdefinierte Feldkomponente |
-| `ui.Preview` | `React.ComponentType` | Benutzerdefinierte Tabellenzellenkomponente |
+| `admin.Field` | `React.ComponentType` | Benutzerdefinierte Feldkomponente |
+| `admin.Preview` | `React.ComponentType` | Benutzerdefinierte Tabellenzellenkomponente |
 
 ## String-Eigenschaften
 
@@ -301,7 +301,7 @@ created_at: {
     type: "date",
     name: "Created At",
     autoValue: "on_create",
-    ui: { readOnly: true }
+    admin: { readOnly: true }
 }
 
 updated_at: {

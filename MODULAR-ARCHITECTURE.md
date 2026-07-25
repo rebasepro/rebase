@@ -245,11 +245,11 @@ Full            studio → client, common, app, types, ui, utils
 
 Names describe **role**, not position or framework. `server` pairs with `client`;
 `app` is the runtime that `admin`, `studio` and the plugins register into. React is a
-peer dependency of the frontend tier, not an identity — `ui`, `admin` and `studio` are
+peer dependency of the frontend tier, not an identity — `admin`, `admin` and `studio` are
 every bit as React as `app`, so none of them carry it in the name.
 
 `firebase` sits in the CMS tier rather than beside `client`, which is where its old
-name (`client-firebase`) filed it: it depends on `admin`, `app` and `ui`, so it is a
+name (`client-firebase`) filed it: it depends on `admin`, `app` and `admin`, so it is a
 UI integration, not a client SDK. `client-postgres` is the one that really is an
 adapter over `client`.
 

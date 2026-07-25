@@ -22,7 +22,7 @@ const usersCollection: AdminCollectionConfig = {
             name: "ID",
             type: "string",
             isId: "uuid",
-            ui: {
+            admin: {
                 readOnly: true
             }
         },
@@ -44,7 +44,7 @@ const usersCollection: AdminCollectionConfig = {
             type: "string",
             columnName: "photo_url",
             url: true,
-            ui: { urlPreview: "image" }
+            admin: { urlPreview: "image" }
         },
         roles: {
             name: "Roles",
@@ -65,7 +65,7 @@ const usersCollection: AdminCollectionConfig = {
             type: "string",
             columnName: "password_hash",
             excludeFromApi: true,
-            ui: {
+            admin: {
                 hideFromCollection: true,
                 disabled: { hidden: true }
             }
@@ -75,7 +75,7 @@ const usersCollection: AdminCollectionConfig = {
             type: "boolean",
             columnName: "email_verified",
             defaultValue: false,
-            ui: {
+            admin: {
                 hideFromCollection: true,
                 disabled: { hidden: true }
             }
@@ -85,7 +85,7 @@ const usersCollection: AdminCollectionConfig = {
             type: "string",
             columnName: "email_verification_token",
             excludeFromApi: true,
-            ui: {
+            admin: {
                 hideFromCollection: true,
                 disabled: { hidden: true }
             }
@@ -94,7 +94,7 @@ const usersCollection: AdminCollectionConfig = {
             name: "Email Verification Sent At",
             type: "date",
             columnName: "email_verification_sent_at",
-            ui: {
+            admin: {
                 hideFromCollection: true,
                 disabled: { hidden: true }
             }
@@ -105,7 +105,7 @@ const usersCollection: AdminCollectionConfig = {
             keyValue: true,
             properties: {},
             defaultValue: {},
-            ui: {
+            admin: {
                 hideFromCollection: true,
                 disabled: { hidden: true }
             }
@@ -115,7 +115,7 @@ const usersCollection: AdminCollectionConfig = {
             type: "date",
             columnName: "created_at",
             autoValue: "on_create",
-            ui: {
+            admin: {
                 readOnly: true
             }
         },
@@ -124,7 +124,7 @@ const usersCollection: AdminCollectionConfig = {
             type: "date",
             columnName: "updated_at",
             autoValue: "on_update",
-            ui: {
+            admin: {
                 hideFromCollection: true,
                 disabled: { hidden: true }
             }

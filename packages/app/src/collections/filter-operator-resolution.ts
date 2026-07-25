@@ -54,7 +54,7 @@ export interface ResolveFilterOperatorsParams {
  * 1. what the engine can execute — {@link DataSourceCapabilities.filterOperators}
  *    (e.g. Firestore cannot run the LIKE family);
  * 2. what makes sense for the property type (e.g. no `>` on booleans);
- * 3. the developer's optional narrowing — `property.ui.filterOperators`.
+ * 3. the developer's optional narrowing — `property.admin.filterOperators`.
  *
  * Returns an empty array when the property is not filterable (either by
  * type, or because the developer disabled it with `filterOperators: []`).
@@ -73,7 +73,7 @@ export function resolveFilterOperators({
 
     const engineOps = new Set(getDataSourceCapabilities(engine).filterOperators ?? ALL_WHERE_FILTER_OPS);
 
-    const narrowing = property.ui?.filterOperators;
+    const narrowing = property.admin?.filterOperators;
     const narrowingSet = narrowing !== undefined ? new Set(narrowing) : undefined;
 
     return typeDefaults.filter(op =>

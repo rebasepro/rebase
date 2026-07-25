@@ -112,7 +112,7 @@ export function MapPropertyField({ disabled, getData, allowDataInference, proper
                     size={"medium"}
                     label={t("spread_children_as_columns")}
                     onValueChange={(v) => setFieldValue("ui.spreadChildren", v)}
-                    value={values.ui?.spreadChildren ?? false}
+                    value={values.admin?.spreadChildren ?? false}
                 />
                 <FieldCaption>
                     Set this flag to true if you want to display the children of this group as individual columns. This

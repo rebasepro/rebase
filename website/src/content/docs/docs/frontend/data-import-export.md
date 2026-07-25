@@ -48,7 +48,7 @@ Before importing, the wizard validates all rows against your collection's proper
 
 ### Import Configuration
 
-Import is enabled by default. To disable it on a specific collection, use the `ui` sub-object:
+Import is enabled by default. To disable it on a specific collection, use the `admin` sub-object:
 
 ```typescript
 import { CollectionConfig } from "@rebasepro/types";

@@ -147,7 +147,7 @@ collection: {
                 last_modified_by: {
                     type: "string",
                     name: "Modified By",
-                    ui: { readOnly: true }
+                    admin: { readOnly: true }
                 }
             }
         };

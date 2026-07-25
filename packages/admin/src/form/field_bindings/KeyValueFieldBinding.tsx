@@ -53,7 +53,7 @@ export function KeyValueFieldBinding({
                                          context
                                      }: FieldProps<MapProperty>) {
 
-    const expanded = (property.ui?.expanded === undefined ? true : property.ui?.expanded) || autoFocus;
+    const expanded = (property.admin?.expanded === undefined ? true : property.admin?.expanded) || autoFocus;
 
     if (!property.keyValue) {
         throw Error(`Your property ${propertyKey} needs to have the 'keyValue' prop in order to use this field binding`);

@@ -23,7 +23,7 @@ const exercisesCollection: AdminCollectionConfig = {
         description: {
             name: "Description",
             type: "string",
-            ui: { markdown: true },
+            admin: { markdown: true },
             description: "Detailed description and tips for performing the exercise"
         },
         images: {
@@ -235,7 +235,7 @@ const exercisesCollection: AdminCollectionConfig = {
                     }
                 ]
             },
-            ui: {
+            admin: {
                 Field: () => import("../../frontend/src/BodyPartsField"),
                 Preview: () => import("../../frontend/src/BodyPartsPreview")
             },
@@ -244,7 +244,7 @@ const exercisesCollection: AdminCollectionConfig = {
         instructions: {
             name: "Instructions",
             type: "string",
-            ui: { markdown: true },
+            admin: { markdown: true },
             description: "Step-by-step instructions on how to perform the exercise"
         },
         default_reps: {
@@ -306,7 +306,7 @@ const exercisesCollection: AdminCollectionConfig = {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: {
+            admin: {
                 readOnly: true,
                 hideFromCollection: true
             }
@@ -315,7 +315,7 @@ const exercisesCollection: AdminCollectionConfig = {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: {
+            admin: {
                 readOnly: true,
                 hideFromCollection: true
             }

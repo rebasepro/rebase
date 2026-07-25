@@ -48,7 +48,7 @@ Antes de importar, o assistente valida todas as linhas contra as definições de
 
 ### Configuração de Importação
 
-A importação é habilitada por padrão. Para desativá-la em uma coleção específica, use o sub-objeto `ui`:
+A importação é habilitada por padrão. Para desativá-la em uma coleção específica, use o sub-objeto `admin`:
 
 ```typescript
 import { CollectionConfig } from "@rebasepro/types";
