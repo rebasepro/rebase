@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import { mergeEntityActions } from "../../src/util/entity_actions";
-import type { EntityAction } from "@rebasepro/types";
+import type { EntityAction } from "@rebasepro/admin-types";
 
 describe("mergeEntityActions", () => {
 

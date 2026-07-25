@@ -2,7 +2,7 @@ import { AIIcon } from "@rebasepro/app";
 ;
 import React, { useState } from "react";
 ;
-import { CollectionConfig } from "@rebasepro/types";
+
 import {
     Button,
     Card,
@@ -31,6 +31,7 @@ import { useCollectionEditorController } from "../../useCollectionEditorControll
 import { AICollectionGeneratorPopover } from "./AICollectionGeneratorPopover";
 import { CollectionGenerationCallback } from "../../api/generateCollectionApi";
 import { prettifyIdentifier } from "@rebasepro/utils";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export function CollectionEditorWelcomeView({
     path,
@@ -43,7 +44,7 @@ export function CollectionEditorWelcomeView({
     onImportFromTable
 }: {
     path: string;
-    parentCollection?: CollectionConfig;
+    parentCollection?: AdminCollection;
     onContinue: (importData?: object[], propertiesOrder?: string[]) => void;
     existingCollectionPaths?: string[];
     generateCollection?: CollectionGenerationCallback;
@@ -61,7 +62,7 @@ export function CollectionEditorWelcomeView({
         setFieldValue,
         setValues,
         submitCount
-    } = useFormex<CollectionConfig>();
+    } = useFormex<AdminCollection>();
 
     const [jsonImportOpen, setJsonImportOpen] = useState(false);
     const [importingTable, setImportingTable] = useState<string | null>(null);

@@ -1,6 +1,4 @@
 import {
-    DefaultSelectedViewBuilder,
-    DefaultSelectedViewParams,
     CollectionConfig,
     Properties,
     Property
@@ -85,34 +83,8 @@ export function sortProperties<M extends Record<string, unknown>>(properties: Pr
     }
 }
 
-export function resolveDefaultSelectedView(
-    defaultSelectedView: string | DefaultSelectedViewBuilder | undefined,
-    params: DefaultSelectedViewParams
-) {
-    if (!defaultSelectedView) {
-        return undefined;
-    } else if (typeof defaultSelectedView === "string") {
-        return defaultSelectedView;
-    } else {
-        return defaultSelectedView(params);
-    }
-}
 
 
-export function getLocalChangesBackup(collection: CollectionConfig) {
-    if (!collection.localChangesBackup) {
-        return "manual_apply";
-    }
-
-    return collection.localChangesBackup;
-}
-
-/**
- * Returns the primary keys for a entity collection by inspecting the properties
- * and finding any properties with `isId`.
- * Fallbacks to `["id"]` if no properties are marked as `isId: true`.
- * @param collection
- */
 export function getPrimaryKeys<M extends Record<string, unknown>>(collection: CollectionConfig<M>): Extract<keyof M, string>[] {
     const properties = collection.properties;
     if (!properties) {

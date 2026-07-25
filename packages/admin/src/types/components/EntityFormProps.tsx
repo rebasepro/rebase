@@ -1,5 +1,6 @@
 import { Entity, EntityStatus } from "@rebasepro/types";
-import { CollectionConfig, EntityCustomViewParams } from "@rebasepro/types";
+
+import { EntityCustomViewParams, AdminCollection } from "@rebasepro/admin-types";
 import { FormContext } from "../fields";
 import { FormexController } from "./formex";
 import { EntityFormActionsProps } from "./EntityFormActionsProps";
@@ -12,7 +13,7 @@ import { EntityFormActionsProps } from "./EntityFormActionsProps";
 export type EntityFormProps<M extends Record<string, unknown>> = {
     path: string;
     fullIdPath?: string;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     entityId?: string | number;
     entity?: Entity<M>;
     databaseId?: string;
@@ -120,5 +121,5 @@ export type OnUpdateParams = {
     path: string,
     entityId?: string | number;
     selectedTab?: string;
-    collection: CollectionConfig<Record<string, unknown>>
+    collection: AdminCollection<Record<string, unknown>>
 };

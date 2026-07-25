@@ -3,7 +3,8 @@ import React from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { AIModifiedIndicator } from "@rebasepro/app";
-import { AdditionalFieldDelegate, Properties, Property } from "@rebasepro/types";
+import { Properties, Property } from "@rebasepro/types";
+import { AdditionalFieldDelegate } from "@rebasepro/admin-types";
 import { isPropertyBuilder } from "@rebasepro/common";
 import {
     ArrowDownToLineIcon,

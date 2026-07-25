@@ -14,17 +14,12 @@ export const defaultUsersCollection = defineCollection({
     auth: true,
     table: "users",
     schema: "rebase",
-    icon: "Users",
-    group: "Settings",
-    openEntityMode: "dialog",
-    disableDefaultActions: ["copy"],
     securityRules: [
         { operation: "select",
 roles: ["admin"] },
         { operations: ["insert", "update", "delete"],
 roles: ["admin"] }
     ],
-    sort: ["createdAt", "desc"],
     properties: {
         id: {
             name: "ID",
@@ -120,6 +115,13 @@ disabled: { hidden: true } }
 disabled: { hidden: true } }
         }
     },
-    listProperties: ["displayName", "email", "roles", "createdAt"],
-    propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"]
+    admin: {
+        icon: "Users",
+        group: "Settings",
+        openEntityMode: "dialog",
+        disableDefaultActions: ["copy"],
+        sort: ["createdAt", "desc"],
+        listProperties: ["displayName", "email", "roles", "createdAt"],
+        propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"]
+    }
 });

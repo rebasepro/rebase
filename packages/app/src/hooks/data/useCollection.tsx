@@ -1,9 +1,10 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { useEffect, useState, useMemo } from "react";
 import { Entity, FilterValues, User } from "@rebasepro/types";
 import { useData } from "./useData";
 import { isSchemaDriftError, useSchemaDriftContext } from "../../components/SchemaDriftBanner";
 import { getRelationIncludeParams } from "../../util/previews";
+import type { AdminCollection } from "@rebasepro/admin-types";
 /**
  * @group Hooks and utilities
  */
@@ -17,7 +18,7 @@ export interface CollectionProps<M extends Record<string, any>> {
     /**
      * collection of the entity displayed by this collection
      */
-    collection: CollectionConfig<M>
+    collection: AdminCollection<M>
 
     /**
      * Number of entities to fetch

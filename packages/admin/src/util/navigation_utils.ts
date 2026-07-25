@@ -1,17 +1,9 @@
-import type { CollectionConfig, UrlController, SidePanelController, NavigateOptions } from "@rebasepro/types";
+
+import type { UrlController, SidePanelController, NavigateOptions, AdminCollection } from "@rebasepro/admin-types";
 import { withViewMode } from "./view_mode";
 
 // Canonical path utilities — single source of truth in @rebasepro/common
-export {
-    removeInitialAndTrailingSlashes,
-    removeInitialSlash,
-    removeTrailingSlash,
-    addInitialSlash,
-    getLastSegment,
-    resolveCollectionPathIds,
-    getCollectionBySlugWithin,
-    getCollectionPathsCombinations
-} from "@rebasepro/common";
+export { removeInitialAndTrailingSlashes, removeInitialSlash, removeTrailingSlash, addInitialSlash, getLastSegment, resolveCollectionPathIds, getCollectionBySlugWithin, getCollectionPathsCombinations } from "@rebasepro/app";
 
 /**
  * Navigate to a entity using either a side panel or full-screen mode.
@@ -33,7 +25,7 @@ export function navigateToEntity({
 
     {
         openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
-        collection?: CollectionConfig;
+        collection?: AdminCollection;
         entityId?: string | number;
         selectedTab?: string;
         copy?: boolean;
@@ -54,7 +46,6 @@ export function navigateToEntity({
     }) {
 
     if (openEntityMode === "side_panel" || openEntityMode === "dialog") {
-
 
         sidePanelController.open({
             entityId,

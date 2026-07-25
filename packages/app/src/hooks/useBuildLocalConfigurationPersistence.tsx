@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { PartialCollectionConfig, UserConfigurationPersistence } from "@rebasepro/types";
+import { PartialCollectionConfig, UserConfigurationPersistence } from "@rebasepro/admin-types";
 import { stripCollectionPath } from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
 

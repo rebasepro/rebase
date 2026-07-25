@@ -1,4 +1,4 @@
-import type { NavigationEntry, NavigationResult } from "@rebasepro/types";
+import type { NavigationEntry, NavigationResult } from "@rebasepro/admin-types";
 import React, { useMemo } from "react";
 
 import { useCollapsedGroups, buildCollapsedDefaults, useLargeLayout, useAdminModeController, useAuthController, useModeController, useTranslation, useSlot, useRebaseContext, useAnalyticsController, useRebaseRegistry, useComponentOverride } from "@rebasepro/app";
@@ -7,7 +7,7 @@ import { useNavigationStateController } from "../hooks/navigation/contexts/Navig
 
 
 import { Link, useNavigate } from "react-router-dom";
-import { AnalyticsEvent } from "@rebasepro/types";
+import { AnalyticsEvent } from "@rebasepro/admin-types";
 import {
     Avatar,
     ChevronsLeftIcon,

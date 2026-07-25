@@ -1,16 +1,17 @@
-import type { CollectionConfig, RebasePlugin } from "@rebasepro/types";
+
+import type { RebasePlugin, AdminCollection } from "@rebasepro/admin-types";
 import { useRef, useMemo } from "react";
 
-import { AuthController, CollectionRegistryController, RebaseData, User } from "@rebasepro/types";
-import type { CollectionConfigsBuilder } from "@rebasepro/types";
+import { CollectionRegistryController, RebaseData, User } from "@rebasepro/types";
+import { AuthController } from "@rebasepro/admin-types";
+import type { CollectionConfigsBuilder } from "@rebasepro/admin-types";
 import { CollectionRegistry } from "@rebasepro/common";
-
 
 import { resolveCollections } from "./useNavigationResolution";
 import { areCollectionListsEqual } from "./utils";
 import { useAsyncResolver } from "./useAsyncResolver";
 
-export type UseResolvedCollectionsProps<EC extends CollectionConfig, USER extends User> = {
+export type UseResolvedCollectionsProps<EC extends AdminCollection, USER extends User> = {
     authController: AuthController<USER>;
     collections?: EC[] | CollectionConfigsBuilder<EC>;
     data: RebaseData;
@@ -21,7 +22,7 @@ export type UseResolvedCollectionsProps<EC extends CollectionConfig, USER extend
 };
 
 export type UseResolvedCollectionsResult = {
-    collections: CollectionConfig[];
+    collections: AdminCollection[];
     loading: boolean;
     error: Error | undefined;
     refresh: () => void;
@@ -29,7 +30,7 @@ export type UseResolvedCollectionsResult = {
 
 /**
  * Hook that resolves collection props (which may be async builders or arrays)
- * into concrete CollectionConfig[], and registers them with the CollectionRegistry.
+ * into concrete AdminCollection[], and registers them with the CollectionRegistry.
  *
  * When userManagement is provided, the default users collection is always
  * prepended. Developer collections override via generic slug-based dedup
@@ -38,7 +39,7 @@ export type UseResolvedCollectionsResult = {
  * Uses refs for potentially-unstable dependencies (driver, authController,
  * plugins) to avoid re-triggering effects when their object identity changes.
  */
-export function useResolvedCollections<EC extends CollectionConfig, USER extends User>(
+export function useResolvedCollections<EC extends AdminCollection, USER extends User>(
     props: UseResolvedCollectionsProps<EC, USER>
 ): UseResolvedCollectionsResult {
 
@@ -66,7 +67,7 @@ export function useResolvedCollections<EC extends CollectionConfig, USER extends
     const pluginsRef = useRef(plugins);
     pluginsRef.current = plugins;
 
-    const { data: collections, loading, error, refresh } = useAsyncResolver<CollectionConfig[]>({
+    const { data: collections, loading, error, refresh } = useAsyncResolver<AdminCollection[]>({
         resolver: async () => {
             const resolved = await resolveCollections(
                 collectionsProp,

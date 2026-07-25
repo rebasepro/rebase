@@ -1,8 +1,8 @@
 import type { Properties } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { useState, useCallback } from "react";
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/app";
-import { CollectionActionsProps, EntityTableController, SelectionController } from "@rebasepro/types";
+import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import { ArrowLeftIcon, Badge, Button, cls, FilterIcon, IconButton, Tooltip } from "@rebasepro/ui";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
@@ -15,7 +15,7 @@ import { useCMSContext } from "../../hooks/useCMSContext";
 import { withViewMode } from "../../util/view_mode";
 
 export type CollectionViewStartActionsProps<M extends Record<string, unknown>> = {
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     path: string;
     relativePath: string;
     parentCollectionSlugs: string[], parentEntityIds: string[];

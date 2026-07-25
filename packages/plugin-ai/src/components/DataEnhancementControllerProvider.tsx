@@ -12,7 +12,8 @@ import {
     useSnackbarController
 } from "@rebasepro/app";
 import { useUrlController } from "@rebasepro/admin";
-import { DataDriver, Entity, CollectionConfig, PluginFormActionProps } from "@rebasepro/types";
+import { DataDriver, Entity, CollectionConfig } from "@rebasepro/types";
+import { PluginFormActionProps } from "@rebasepro/admin-types";
 import { enhanceDataAPIStream, fetchEntityPromptSuggestion } from "../api";
 import { getAppendableSuggestion } from "../utils/suggestions";
 import { getSimplifiedProperties } from "../utils/properties";

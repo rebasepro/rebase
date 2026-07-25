@@ -1,7 +1,8 @@
 
-import type { CollectionConfig, Property } from "@rebasepro/types";
+import type { Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CollectionSize, Entity, EntityAction, EntityTableController, SelectionController } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
+import { CollectionSize, EntityAction, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
 import {
     Checkbox,
     Chip,
@@ -27,7 +28,7 @@ import { useCMSContext } from "../../hooks/useCMSContext";
 import { resolveEntityAction } from "../../util/resolutions";
 
 export type CollectionListViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     tableController: EntityTableController<M>;
     onEntityClick?: (entity: Entity<M>) => void;
     selectionController?: SelectionController<M>;
@@ -77,7 +78,6 @@ type ListColumnDef = {
     align: "left" | "center" | "right";
     width: string;
 };
-
 
 /**
  * Get row padding/spacing classes based on size
@@ -327,19 +327,17 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
 
     // ── Shared slot resolution (replaces 4 individual useMemo calls) ──
     const slotKeys = useCollectionSlotKeys(
-        resolvedCollection as CollectionConfig<Record<string, unknown>>,
+        resolvedCollection as AdminCollection<Record<string, unknown>>,
         authController,
         customizationController.propertyConfigs
     );
     const { titleKey: titlePropertyKey, imageKey: imagePropertyKey, subtitleKey, statusKey: statusPropertyKey, dateKey: datePropertyKey } = slotKeys;
-
 
     const previewKeys = useMemo(
         () => getEntityPreviewKeys(authController, resolvedCollection, customizationController.propertyConfigs, undefined, 10)
             .filter(key => key !== titlePropertyKey && key !== imagePropertyKey && key !== statusPropertyKey && key !== datePropertyKey),
         [authController, resolvedCollection, customizationController.propertyConfigs, titlePropertyKey, imagePropertyKey, statusPropertyKey, datePropertyKey]
     );
-
 
     const columns = useMemo(() => {
         const cols: ListColumnDef[] = [];
@@ -458,7 +456,6 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
     }, [resolvedCollection, titlePropertyKey, statusPropertyKey, datePropertyKey, imagePropertyKey, previewKeys, size]);
 
     const showImage = size !== "xs";
-
 
     // Responsive: determine visible columns based on container width.
     // The first extra column requires significantly more available space (600px)
@@ -611,7 +608,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     openEntityMode
 }: {
     entity: Entity<M>;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
     highlighted?: boolean;
@@ -633,7 +630,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     // ── Resolve slots (pure function, no hooks) ──
     const slots = resolveEntitySlots(
         entity as Entity<Record<string, unknown>>,
-        collection as CollectionConfig<Record<string, unknown>>,
+        collection as AdminCollection<Record<string, unknown>>,
         slotKeys
     );
 
@@ -877,7 +874,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     );
 }) as <M extends Record<string, unknown>>(props: {
     entity: Entity<M>;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
     highlighted?: boolean;

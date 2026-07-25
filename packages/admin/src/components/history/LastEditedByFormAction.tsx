@@ -1,4 +1,4 @@
-import type { PluginFormActionProps } from "@rebasepro/types";
+import type { PluginFormActionProps } from "@rebasepro/admin-types";
 import React from "react";
 ;
 import { LastEditedByIndicator } from "./LastEditedByIndicator";

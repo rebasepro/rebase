@@ -1,11 +1,12 @@
 "use client";
 import type { RebaseProps } from "./RebaseProps";
-import type { CustomizationController, RebasePlugin, SlotContribution } from "@rebasepro/types";
-import type { ComponentOverrideMap } from "@rebasepro/types";
+import type { CustomizationController, RebasePlugin, SlotContribution } from "@rebasepro/admin-types";
+import type { ComponentOverrideMap } from "@rebasepro/admin-types";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CenteredView, Typography } from "@rebasepro/ui";
-import { RebaseContext, User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
+import { User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
+import { RebaseContext } from "@rebasepro/admin-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { AuthControllerContext, CollectionResolverRegistrationContext, CollectionResolver } from "../contexts";

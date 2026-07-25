@@ -1,4 +1,5 @@
-import type { NavigationEntry, CollectionConfig } from "@rebasepro/types";
+
+import type { NavigationEntry, AdminCollection } from "@rebasepro/admin-types";
 import { useNavigate } from "react-router-dom";
 ;
 import { IconButton, StarIcon, Tooltip } from "@rebasepro/ui";
@@ -80,7 +81,6 @@ export function NavigationCardBinding({
         collection: collection!,
         context
     });
-
 
     const actions: React.ReactNode | undefined = <>
         {actionsArray}

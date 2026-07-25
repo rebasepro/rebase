@@ -5,8 +5,8 @@ import {
     useCustomizationController
 } from "@rebasepro/app";
 import { resolveEntityAction } from "../../_cms_internals";
-import { type CollectionConfig } from "@rebasepro/types";
-import { EntityAction } from "@rebasepro/types";
+
+import { EntityAction, AdminCollection } from "@rebasepro/admin-types";
 import {
     Alert,
     Button,
@@ -30,7 +30,7 @@ export function EntityActionsEditTab({
     collection,
     embedded = false
 }: {
-    collection: CollectionConfig,
+    collection: AdminCollection,
     embedded?: boolean;
 }) {
 
@@ -42,7 +42,7 @@ export function EntityActionsEditTab({
     const {
         values,
         setFieldValue
-    } = useFormex<CollectionConfig>();
+    } = useFormex<AdminCollection>();
 
     const resolvedEntityActions = ((values.entityActions ?? []) as (string | EntityAction<any>)[])
         .filter((e): e is string => typeof e === "string")

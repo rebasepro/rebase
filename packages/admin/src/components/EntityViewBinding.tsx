@@ -1,6 +1,6 @@
 import type { Properties } from "@rebasepro/types";
-import type { CollectionConfig } from "@rebasepro/types";
-import type { CustomizationController } from "@rebasepro/types";
+
+import type { CustomizationController, AdminCollection } from "@rebasepro/admin-types";
 import React from "react";
 import { Entity } from "@rebasepro/types";
 import { cls, defaultBorderMixin, ExternalLinkIcon, IconButton, Typography } from "@rebasepro/ui";
@@ -14,7 +14,7 @@ import { PropertyCollectionView } from "./PropertyCollectionView";
  */
 export interface EntityViewBindingProps<M extends Record<string, unknown>> {
     entity: Entity<M>;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     path: string;
     className?: string;
 }

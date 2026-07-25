@@ -1,11 +1,12 @@
 import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/forms";
-import { CollectionConfig, RebaseData, RebaseContext } from "@rebasepro/types";
+import { RebaseData } from "@rebasepro/types";
+import { RebaseContext, AdminCollection } from "@rebasepro/admin-types";
 import { OnCellValueChange, saveEntityWithCallbacks, SaveEntityWithCallbacksProps, UniqueFieldValidator } from "@rebasepro/app";
 
 export interface UseCollectionInlineEditorParams<M extends Record<string, unknown>> {
     path: string;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     dataClient: RebaseData;
     context: RebaseContext;
 }

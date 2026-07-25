@@ -1,0 +1,59 @@
+import { EntityReference } from "@rebasepro/types";
+import { getCollectionPathsCombinations, removeInitialAndTrailingSlashes } from "./navigation_utils";
+import { getSubcollections } from "@rebasepro/common";
+import type { AdminCollection } from "@rebasepro/admin-types";
+
+export function getParentReferencesFromPath(props: {
+    path: string,
+    collections: AdminCollection[] | undefined,
+    currentFullPath?: string,
+}): EntityReference[] {
+
+    const {
+        path,
+        collections = [],
+        currentFullPath
+    } = props;
+
+    const subpaths = removeInitialAndTrailingSlashes(path).split("/");
+    const subpathCombinations = getCollectionPathsCombinations(subpaths);
+
+    const result: EntityReference[] = [];
+    for (let i = 0; i < subpathCombinations.length; i++) {
+        const subpathCombination = subpathCombinations[i];
+
+        const collection: AdminCollection | undefined = collections && collections.find((entry) => entry.slug === subpathCombination);
+
+        // If we find a collection, we add the reference and continue
+        if (collection) {
+            const collectionPath = currentFullPath && currentFullPath.length > 0
+                ? (currentFullPath + "/" + collection.slug) // Use the current full path if provided
+                : collection.slug;
+
+            const restOfThePath = removeInitialAndTrailingSlashes(removeInitialAndTrailingSlashes(path).replace(subpathCombination, ""));
+            const nextSegments = restOfThePath.length > 0 ? restOfThePath.split("/") : [];
+            if (nextSegments.length > 0) {
+                const entityId = nextSegments[0];
+                const path = collectionPath + "/" + entityId;
+                result.push(new EntityReference({ id: entityId,
+path: collectionPath }));
+                if (nextSegments.length > 1) {
+                    const newPath = nextSegments.slice(1).join("/");
+                    if (!collection) {
+                        throw Error("collection not found resolving path: " + collection);
+                    }
+                    if (getSubcollections(collection).length > 0) {
+                        result.push(...getParentReferencesFromPath({
+                            path: newPath,
+                            collections: getSubcollections(collection),
+                            currentFullPath: path
+                        }));
+                    }
+                }
+            }
+            break;
+        }
+
+    }
+    return result;
+}

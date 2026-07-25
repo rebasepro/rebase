@@ -1,5 +1,5 @@
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";
-import { CollectionConfig } from "@rebasepro/types";
+
 import { Button, CopyIcon, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import React from "react";
 import JSON5 from "json5";
@@ -7,17 +7,18 @@ import { Highlight, themes } from "prism-react-renderer"
 import { camelCase } from "./utils/strings";
 import { clone } from "@rebasepro/forms";
 import { isEmptyObject } from "@rebasepro/utils";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export function GetCodeDialog({
     collection,
     onOpenChange,
     open
-}: { onOpenChange: (open: boolean) => void, collection: CollectionConfig, open: boolean }) {
+}: { onOpenChange: (open: boolean) => void, collection: AdminCollection, open: boolean }) {
 
     const snackbarController = useSafeSnackbarController();
 
     const code = collection
-        ? "import { CollectionConfig } from \"@rebasepro/app\";\n\nconst " + (collection?.name ? camelCase(collection.name) : "my") + "Collection:CollectionConfig = " + JSON5.stringify(collectionToCode({ ...collection }), null, "\t")
+        ? "import { AdminCollection } from \"@rebasepro/app\";\n\nconst " + (collection?.name ? camelCase(collection.name) : "my") + "Collection:AdminCollection = " + JSON5.stringify(collectionToCode({ ...collection }), null, "\t")
         : "No collection selected";
     return <Dialog open={open}
         onOpenChange={onOpenChange}
@@ -78,7 +79,7 @@ export function GetCodeDialog({
     </Dialog>;
 }
 
-function collectionToCode(collection: CollectionConfig): object {
+function collectionToCode(collection: AdminCollection): object {
 
     const propertyCleanup = (value: unknown): unknown => {
         if (value === undefined || value === null) {

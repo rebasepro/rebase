@@ -1,5 +1,5 @@
 import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { getCollectionDataPath } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { deepEqual as equal } from "fast-equals";
@@ -8,7 +8,8 @@ import { cls, PencilIcon } from "@rebasepro/ui";
 import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 
 import { RelationPreview } from "../../../preview";
-import { CollectionSize, Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
+import { Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
+import { CollectionSize, AdminCollection } from "@rebasepro/admin-types";
 import { } from "@rebasepro/app";
 import { ErrorView } from "@rebasepro/app";
 import { EntityPreviewContainer } from "../../EntityPreviewBinding";
@@ -34,7 +35,7 @@ export function TableMultipleRelationField(props: TableMultipleRelationFieldProp
 
 export const TableMultipleRelationFieldInternal = React.memo(
     function TableMultipleRelationFieldInternal(props: TableMultipleRelationFieldProps & {
-        collection: CollectionConfig;
+        collection: AdminCollection;
     }) {
         const {
             name,

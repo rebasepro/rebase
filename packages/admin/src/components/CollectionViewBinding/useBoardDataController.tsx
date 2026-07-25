@@ -1,7 +1,8 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { Entity, FilterValues } from "@rebasepro/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getRelationIncludeParams, useData, useRebaseContext } from "@rebasepro/app";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -67,7 +68,7 @@ export interface UseBoardDataControllerProps<M extends Record<string, unknown> =
     /** Full path to the collection */
     fullPath: string;
     /** The entity collection configuration */
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     /** Property key used for column assignment */
     columnProperty: string;
     /** Array of column values (enum values from columnProperty) */

@@ -6,7 +6,8 @@ import { Formex, FormexController, getIn, useCreateFormex } from "@rebasepro/for
 import { ConfirmationDialog } from "@rebasepro/app";
 import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
-import { CollectionConfig, Property, PropertyConfig, PropertyConfigId } from "@rebasepro/types";
+import { Property } from "@rebasepro/types";
+import { PropertyConfig, PropertyConfigId, AdminCollection } from "@rebasepro/admin-types";
 import type { PropertyTypePreset, PropertyType } from "../../extensibility_types";
 import { toSerializableProperty, toSerializableCollectionConfig } from "../../serializable_utils";
 import type { SerializableProperty, SerializableCollectionConfig } from "../../serializable_types";
@@ -93,7 +94,7 @@ export type PropertyFormProps = {
         property: SerializableProperty;
         collection: SerializableCollectionConfig;
     }) => React.ReactNode;
-    collectionValues?: CollectionConfig;
+    collectionValues?: AdminCollection;
 
 };
 
@@ -368,7 +369,7 @@ function PropertyEditFormFields({
     propertyTypePresets?: PropertyTypePreset[];
     hiddenPropertyTypes?: PropertyType[];
     renderExtraPropertyFields?: PropertyFormProps["renderExtraPropertyFields"];
-    collectionValues?: CollectionConfig;
+    collectionValues?: AdminCollection;
 
 } & FormexController<PropertyWithId>) {
 

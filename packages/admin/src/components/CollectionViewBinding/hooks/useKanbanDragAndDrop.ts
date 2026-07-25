@@ -1,13 +1,14 @@
 import { useCallback, useMemo } from "react";
 import { setIn } from "@rebasepro/forms";
-import { CollectionConfig, RebaseData, RebaseContext, AnalyticsController, Entity } from "@rebasepro/types";
+import { RebaseData, Entity } from "@rebasepro/types";
+import { RebaseContext, AnalyticsController, AdminCollection } from "@rebasepro/admin-types";
 import { saveEntityWithCallbacks, SaveEntityWithCallbacksProps } from "@rebasepro/app";
 import { BoardItem } from "@rebasepro/ui";
 import { BoardDataController } from "../useBoardDataController";
 import { generateKeyBetween } from "fractional-indexing";
 
 export interface UseKanbanDragAndDropParams<M extends Record<string, unknown>> {
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     fullPath: string;
     columnProperty: string;
     orderProperty?: string;

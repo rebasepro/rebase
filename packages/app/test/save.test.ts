@@ -1,5 +1,6 @@
 import { saveEntityWithCallbacks } from "../src/hooks/data/save";
-import type { CollectionConfig, Entity, RebaseData, RebaseContext } from "@rebasepro/types";
+import type { CollectionConfig, Entity, RebaseData } from "@rebasepro/types";
+import type { RebaseContext } from "@rebasepro/admin-types";
 
 describe("saveEntityWithCallbacks", () => {
     const mockCollection: CollectionConfig = {

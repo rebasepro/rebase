@@ -1,10 +1,11 @@
 import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { useCallback } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { ReferencePreview } from "../../../preview";
-import { CollectionSize, Entity, EntityReference, FilterValues } from "@rebasepro/types";
+import { Entity, EntityReference, FilterValues } from "@rebasepro/types";
+import { CollectionSize, AdminCollection } from "@rebasepro/admin-types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { useComponentOverride, ErrorView, CollectionScopeProvider } from "@rebasepro/app";
@@ -30,7 +31,7 @@ type TableReferenceFieldProps = {
 
 const DefaultMissingReference: React.FC<{ path: string }> = () => null;
 
-function TableReferenceFieldResolver(props: TableReferenceFieldProps & { collection: CollectionConfig | undefined }) {
+function TableReferenceFieldResolver(props: TableReferenceFieldProps & { collection: AdminCollection | undefined }) {
     const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
     const { path, collection } = props;
 
@@ -68,7 +69,7 @@ export function TableReferenceField(props: TableReferenceFieldProps) {
 
 export const TableReferenceFieldInternal = React.memo(
     function TableReferenceFieldInternal(props: TableReferenceFieldProps & {
-        collection: CollectionConfig;
+        collection: AdminCollection;
     }) {
         const {
             name,

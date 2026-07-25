@@ -8,24 +8,8 @@
  * @module
  */
 
-import type {
-    ArrayProperty,
-    BaseUIConfig,
-    BinaryProperty,
-    BooleanProperty,
-    DateProperty,
-    CollectionConfig,
-    GeopointProperty,
-    MapProperty,
-    NumberProperty,
-    Properties,
-    Property,
-    ReferenceProperty,
-    RelationProperty,
-    StorageConfig,
-    StringProperty,
-    VectorProperty,
-} from "@rebasepro/types";
+import type { ArrayProperty, BaseUIConfig, BinaryProperty, BooleanProperty, DateProperty, GeopointProperty, MapProperty, NumberProperty, Properties, Property, ReferenceProperty, RelationProperty, StorageConfig, StringProperty, VectorProperty } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 import type {
     SerializableArrayProperty,
@@ -107,7 +91,7 @@ function serializeMatches(matches: string | RegExp | undefined): string | undefi
 
 /**
  * Resolve a relation target to a string slug.
- * Functions are called to extract the target; CollectionConfig objects
+ * Functions are called to extract the target; AdminCollection objects
  * use their slug.
  */
 function resolveRelationTarget(target: RelationProperty["target"]): string | undefined {
@@ -118,7 +102,7 @@ function resolveRelationTarget(target: RelationProperty["target"]): string | und
             const resolved = target();
             if (typeof resolved === "string") return resolved;
             if (resolved && typeof resolved === "object" && "slug" in resolved) {
-                return (resolved as CollectionConfig).slug;
+                return (resolved as AdminCollection).slug;
             }
         } catch {
             // If the lazy resolver throws (e.g., circular dependency not yet ready), return undefined
@@ -389,14 +373,14 @@ export function toSerializableProperties(properties: Properties): SerializablePr
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Convert an `CollectionConfig` to its JSON-serializable form.
+ * Convert an `AdminCollection` to its JSON-serializable form.
  *
  * Strips all non-serializable fields (functions, React nodes, class instances)
  * while preserving the structural schema that the collection editor works with.
  *
  * The result is safe for `JSON.stringify()` and database storage.
  */
-export function toSerializableCollectionConfig(collection: CollectionConfig): SerializableCollectionConfig {
+export function toSerializableCollectionConfig(collection: AdminCollection): SerializableCollectionConfig {
     const result: SerializableCollectionConfig = {
         slug: collection.slug,
         name: collection.name,
@@ -560,17 +544,17 @@ export function fromSerializableProperties(serialized: SerializableProperties): 
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Convert a `SerializableCollectionConfig` back to an `CollectionConfig`.
+ * Convert a `SerializableCollectionConfig` back to an `AdminCollection`.
  *
  * The result will NOT contain any of the non-serializable fields
  * (callbacks, entityActions, etc.) — those must be re-attached by the
  * consumer if needed.
  */
-export function fromSerializableCollectionConfig(serialized: SerializableCollectionConfig): CollectionConfig {
+export function fromSerializableCollectionConfig(serialized: SerializableCollectionConfig): AdminCollection {
     const { properties, ...rest } = serialized;
 
     return {
         ...rest,
         properties: fromSerializableProperties(properties),
-    } as CollectionConfig;
+    } as AdminCollection;
 }

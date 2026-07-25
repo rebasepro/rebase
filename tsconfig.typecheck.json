@@ -36,6 +36,12 @@
       "@rebasepro/admin/*": [
         "packages/admin/src/*"
       ],
+      "@rebasepro/admin-types": [
+        "packages/admin-types/src"
+      ],
+      "@rebasepro/admin-types/*": [
+        "packages/admin-types/src/*"
+      ],
       "@rebasepro/app": [
         "packages/app/src"
       ],
@@ -162,6 +168,7 @@
   },
   "include": [
     "packages/admin/src",
+    "packages/admin-types/src",
     "packages/cli/src",
     "packages/client/src",
     "packages/firebase/src",

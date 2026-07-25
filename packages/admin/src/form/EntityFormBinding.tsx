@@ -1,11 +1,13 @@
-import type { CollectionConfig, PluginFormActionProps } from "@rebasepro/types";
+
+import type { PluginFormActionProps, AdminCollection } from "@rebasepro/admin-types";
 import type { FormContext } from "../types/fields";
 import React, { useCallback, useMemo, useState } from "react";
-import { AnalyticsEvent, Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import { AnalyticsEvent } from "@rebasepro/admin-types";
 import type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 
-import { getLocalChangesBackup } from "@rebasepro/common";
+import { getLocalChangesBackup } from "@rebasepro/app";
 
 import {
     saveEntityWithCallbacks,
@@ -278,7 +280,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
         parentEntityIds,
         path,
         status,
-        collection: collection as CollectionConfig,
+        collection: collection as AdminCollection,
         context,
         formContext: undefined as unknown as FormContext<Record<string, unknown>>,
         openEntityMode,

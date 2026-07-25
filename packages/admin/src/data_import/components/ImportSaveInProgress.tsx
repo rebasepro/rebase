@@ -1,11 +1,12 @@
 import { useData } from "@rebasepro/app";
-import { Entity, CollectionConfig } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
 import { RebaseData } from "@rebasepro/types";
 import { Button, CenteredView, CircularProgress, Typography } from "@rebasepro/ui";
 import { useEffect, useRef, useState } from "react";
 import { ImportConfig } from "../types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
-export function ImportSaveInProgress<C extends CollectionConfig<any>>
+export function ImportSaveInProgress<C extends AdminCollection<any>>
     ({
         path,
         importConfig,
@@ -95,7 +96,7 @@ export function ImportSaveInProgress<C extends CollectionConfig<any>>
 }
 
 function saveDataBatch(dataClient: RebaseData,
-    collection: CollectionConfig,
+    collection: AdminCollection,
     path: string,
     data: Partial<Entity<any>>[],
     offset = 0,

@@ -12,10 +12,11 @@ import {
     Tooltip,
     Typography
 } from "@rebasepro/ui";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionStudioView } from "./CollectionStudioView";
 import type { CollectionEditorExtensionProps } from "../../extensibility_types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export interface CollectionsStudioViewProps extends CollectionEditorExtensionProps {
     configController: CollectionsConfigController;
@@ -25,7 +26,7 @@ export interface CollectionsStudioViewProps extends CollectionEditorExtensionPro
      * When provided, overrides the collections from `configController`.
      * Use this to control exactly which collections the editor displays.
      */
-    collections?: CollectionConfig[];
+    collections?: AdminCollection[];
 
     /**
      * Controlled active collection ID.

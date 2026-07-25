@@ -1,12 +1,14 @@
 import React, { Suspense } from "react";
 import {
     ArrayProperty,
-    FilterFieldBindingProps,
     Property,
     ReferenceProperty,
     RelationProperty,
     WhereFilterOp
 } from "@rebasepro/types";
+import {
+    FilterFieldBindingProps
+} from "@rebasepro/admin-types";
 import { enumToObjectEntries, resolveFilterOperators } from "@rebasepro/common";
 import { useCollectionScope, useComponentOverride, useResolvedComponent } from "@rebasepro/app";
 import { StringNumberFilterField } from "./StringNumberFilterField";

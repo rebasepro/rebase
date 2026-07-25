@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import { BreadcrumbContext } from "../contexts/BreacrumbsContext";
-import { BreadcrumbEntry, BreadcrumbsController } from "@rebasepro/types";
+import { BreadcrumbEntry, BreadcrumbsController } from "@rebasepro/admin-types";
 
 export type { BreadcrumbEntry, BreadcrumbsController };
 

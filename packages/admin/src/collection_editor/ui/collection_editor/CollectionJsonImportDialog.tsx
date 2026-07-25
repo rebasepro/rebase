@@ -13,8 +13,9 @@ import {
     TextField,
     Typography
 } from "@rebasepro/ui";
-import { CollectionConfig } from "@rebasepro/types";
+
 import { validateCollectionJson, CollectionValidationError } from "../../validateCollectionJson";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 const EXAMPLE_JSON = `{
   "id": "products",
@@ -41,7 +42,7 @@ const EXAMPLE_JSON = `{
 export interface CollectionJsonImportDialogProps {
     open: boolean;
     onClose: () => void;
-    onImport: (collection: CollectionConfig) => void;
+    onImport: (collection: AdminCollection) => void;
 }
 
 export function CollectionJsonImportDialog({

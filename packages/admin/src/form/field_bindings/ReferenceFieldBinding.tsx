@@ -1,5 +1,5 @@
 import { useSelectionDialog } from "../../hooks/useSelectionDialog";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import type { FieldProps } from "../../types/fields";
 import type { Property, ReferenceProperty } from "@rebasepro/types";
 import React, { useCallback, useMemo } from "react";
@@ -17,6 +17,7 @@ import { getReferenceFrom } from "@rebasepro/common";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { cls } from "@rebasepro/ui";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Field that opens a reference selection dialog.
@@ -65,7 +66,7 @@ function ReferenceFieldBindingInternal({
     const validValue = refValue && typeof refValue === "object" && "isEntityReference" in refValue && refValue.isEntityReference();
 
     const collectionRegistryController = useCollectionRegistryController();
-    const collection: CollectionConfig | undefined = useMemo(() => {
+    const collection: AdminCollection | undefined = useMemo(() => {
         return property.path ? collectionRegistryController.getCollection(property.path) : undefined;
     }, [property.path]);
 

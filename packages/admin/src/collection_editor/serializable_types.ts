@@ -13,22 +13,24 @@
 
 import type {
     ArrayPropertyValidationSchema,
-    CollectionSize,
     EnumValues,
     FileType,
     FilterPreset,
     FilterValues,
     ImageResize,
     JoinStep,
-    KanbanConfig,
-    NavigationGroupMapping,
     NumberPropertyValidationSchema,
     OnAction,
     PropertyConditions,
     PropertyValidationSchema,
-    SecurityRule,
-    ViewMode,
+    SecurityRule
 } from "@rebasepro/types";
+import type {
+    CollectionSize,
+    KanbanConfig,
+    NavigationGroupMapping,
+    ViewMode
+} from "@rebasepro/admin-types";
 
 // ═══════════════════════════════════════════════════════════════════════
 // SERIALIZABLE PROPERTY TYPES

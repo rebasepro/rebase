@@ -17,7 +17,8 @@ import {
     Trash2Icon,
     Typography
 } from "@rebasepro/ui";
-import type { EntityAction, User, UserCreationResult } from "@rebasepro/types";
+import type { User } from "@rebasepro/types";
+import type { EntityAction, UserCreationResult } from "@rebasepro/admin-types";
 import {
     useAuthController,
     useRebaseClient,
@@ -27,7 +28,7 @@ import {
 import { DeleteEntityDialog } from "../DeleteEntityDialog";
 import { addRecentId } from "../CollectionViewBinding/utils";
 import { navigateToEntity } from "../../util/navigation_utils";
-import { resolveDefaultSelectedView } from "@rebasepro/common";
+import { resolveDefaultSelectedView } from "@rebasepro/app";
 import { CreationResultDialog } from "../admin/CreationResultDialog";
 import React, { useState } from "react";
 

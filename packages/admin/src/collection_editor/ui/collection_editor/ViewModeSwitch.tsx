@@ -1,4 +1,4 @@
-import { ViewMode } from "@rebasepro/types";
+import { ViewMode } from "@rebasepro/admin-types";
 import {
     cls,
     KanbanIcon,

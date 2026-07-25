@@ -3,7 +3,7 @@ import { AIIcon } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../_cms_internals";
 import React, { useState } from "react";
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";
-import { CollectionConfig } from "@rebasepro/types";
+
 import {
     Button,
     CircularProgress,
@@ -20,18 +20,19 @@ import {
     CollectionOperation
 } from "../../api/generateCollectionApi";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export interface AICollectionGeneratorPopoverProps {
     /**
      * Current collection being edited (if modifying an existing collection)
      */
-    existingCollection?: CollectionConfig<any>;
+    existingCollection?: AdminCollection<any>;
 
     /**
      * Callback when a collection is generated or modified.
      * Includes the collection and optionally the operations that were applied.
      */
-    onGenerated: (collection: CollectionConfig, operations?: CollectionOperation[]) => void;
+    onGenerated: (collection: AdminCollection, operations?: CollectionOperation[]) => void;
 
     /**
      * Callback function for generating/modifying collections.
@@ -95,7 +96,7 @@ export function AICollectionGeneratorPopover({
                 name: c.name,
                 properties: c.properties,
                 propertiesOrder: c.propertiesOrder
-            } as Partial<CollectionConfig>));
+            } as Partial<AdminCollection>));
 
             const result = await generateCollection({
                 prompt: prompt.trim(),
@@ -106,7 +107,7 @@ export function AICollectionGeneratorPopover({
                         name: existingCollection.name,
                         properties: existingCollection.properties,
                         propertiesOrder: existingCollection.propertiesOrder
-                    } as Partial<CollectionConfig>
+                    } as Partial<AdminCollection>
                 })
             });
 

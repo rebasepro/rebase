@@ -1,5 +1,6 @@
 import { useTranslation } from "@rebasepro/app";
-import { CollectionConfig, EntityTableController, Property } from "@rebasepro/types";
+import { Property } from "@rebasepro/types";
+import { EntityTableController, AdminCollection } from "@rebasepro/admin-types";
 import { IconButton, SettingsIcon, Tooltip } from "@rebasepro/ui";
 import React from "react";
 import { useCollectionEditorController } from "../useCollectionEditorController";
@@ -18,7 +19,7 @@ export function CollectionViewHeaderAction({
     onHover: boolean,
     path: string,
     parentCollectionSlugs: string[], parentEntityIds: string[],
-    collection: CollectionConfig;
+    collection: AdminCollection;
     tableController: EntityTableController;
 }) {
 

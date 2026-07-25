@@ -51,7 +51,7 @@ import { RebaseAuthGate } from "../../src/components/RebaseAuthGate";
 import { PropertyIdCopyTooltip, PropertyIdCopyTooltipContent } from "../../src/components/PropertyIdCopyTooltip";
 import { PropertyConfigBadge } from "../../src/components/PropertyConfigBadge";
 import { useRebaseRegistry, useAuthController } from "@rebasepro/app";
-import { PropertyConfig } from "@rebasepro/types";
+import { PropertyConfig } from "@rebasepro/admin-types";
 
 describe("React Components Tests", () => {
 

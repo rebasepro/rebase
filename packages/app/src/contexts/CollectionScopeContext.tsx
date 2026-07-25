@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from "react";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { CollectionComponentOverrideProvider } from "./ComponentOverrideContext";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Carries the collection a UI subtree is currently bound to.
@@ -15,7 +16,7 @@ import { CollectionComponentOverrideProvider } from "./ComponentOverrideContext"
  *
  * @internal
  */
-export const CollectionScopeContext = createContext<CollectionConfig | undefined>(undefined);
+export const CollectionScopeContext = createContext<AdminCollection | undefined>(undefined);
 
 /**
  * Read the collection the current subtree is bound to, or `undefined` when
@@ -23,7 +24,7 @@ export const CollectionScopeContext = createContext<CollectionConfig | undefined
  *
  * @group Hooks
  */
-export function useCollectionScope(): CollectionConfig | undefined {
+export function useCollectionScope(): AdminCollection | undefined {
     return useContext(CollectionScopeContext);
 }
 
@@ -54,11 +55,11 @@ export function CollectionScopeProvider({
     collection,
     children
 }: {
-    collection: CollectionConfig<any> | undefined;
+    collection: AdminCollection<any> | undefined;
     children: React.ReactNode;
 }) {
     return (
-        <CollectionScopeContext.Provider value={collection as CollectionConfig | undefined}>
+        <CollectionScopeContext.Provider value={collection as AdminCollection | undefined}>
             <CollectionComponentOverrideProvider overrides={collection?.components}>
                 {children}
             </CollectionComponentOverrideProvider>

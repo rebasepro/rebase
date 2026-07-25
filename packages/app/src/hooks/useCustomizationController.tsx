@@ -1,4 +1,4 @@
-import type { CustomizationController } from "@rebasepro/types";
+import type { CustomizationController } from "@rebasepro/admin-types";
 import { useContext } from "react";
 import { CustomizationControllerContext } from "../contexts/CustomizationControllerContext";
 

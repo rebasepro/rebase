@@ -4,7 +4,7 @@ import { FieldCaption } from "../../_cms_internals";
 import React, { useState } from "react";
 
 import { SearchIconsView } from "../../_cms_internals";
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+
 import {
     BooleanSwitchWithLabel,
     Chip,
@@ -28,6 +28,7 @@ import { useCollectionsConfigController } from "../../useCollectionsConfigContro
 import { singular, toSnakeCase } from "@rebasepro/utils";
 import type { ExtraCollectionFieldsParams } from "../../extensibility_types";
 import { toSerializableCollectionConfig } from "../../serializable_utils";
+import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/admin-types";
 
 export function GeneralSettingsForm({
     isNewCollection,
@@ -40,7 +41,7 @@ export function GeneralSettingsForm({
     isNewCollection: boolean;
     existingPaths?: string[];
     existingIds?: string[];
-    parentCollection?: CollectionConfig;
+    parentCollection?: AdminCollection;
     renderExtraCollectionFields?: (params: ExtraCollectionFieldsParams) => React.ReactNode;
     standalone?: boolean;
 }) {
@@ -53,7 +54,7 @@ export function GeneralSettingsForm({
         errors,
         setFieldTouched,
         submitCount
-    } = useFormex<PostgresCollectionConfig>();
+    } = useFormex<AdminPostgresCollection>();
 
     const [iconDialogOpen, setIconDialogOpen] = useState(false);
 
@@ -150,7 +151,6 @@ export function GeneralSettingsForm({
                                     : isSubcollection ? "Relative path to the parent (no need to include the parent path)" : "PostgreSQL table name for this collection"}
                             </FieldCaption>
                         </div>
-
 
                         {/* Singular Name */}
                         <div className={"col-span-12"}>

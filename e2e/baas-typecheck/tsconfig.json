@@ -54,8 +54,16 @@
             "@rebasepro/server-postgres": [
                 "../../packages/server-postgres/src"
             ],
-            "*": [
-                "../../node_modules/.pnpm/node_modules/*"
+            // Mapped explicitly, not via a "*" catch-all: a catch-all resolves
+            // every bare specifier to the implementation in the pnpm store, and
+            // TypeScript then never looks for its @types — `pg` and
+            // `json-logic-js` both became implicit any that way. hono ships its
+            // own types, so there is nothing here to shadow.
+            "hono": [
+                "../../node_modules/.pnpm/node_modules/hono"
+            ],
+            "hono/*": [
+                "../../node_modules/.pnpm/node_modules/hono/*"
             ]
         },
         "typeRoots": [

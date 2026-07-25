@@ -1,4 +1,4 @@
-import type { NavigationStateController } from "@rebasepro/types";
+import type { NavigationStateController } from "@rebasepro/admin-types";
 import React, { createContext } from "react";
 
 

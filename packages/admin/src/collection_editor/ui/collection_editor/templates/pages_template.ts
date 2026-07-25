@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export const pagesCollectionTemplate = {
     slug: "pages",
@@ -180,4 +180,4 @@ export const pagesCollectionTemplate = {
             description: "Should this page be live on the site?"
         }
     }
-} as unknown as CollectionConfig;
+} as unknown as AdminCollection;

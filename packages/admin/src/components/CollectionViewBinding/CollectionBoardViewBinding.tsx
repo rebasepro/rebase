@@ -1,6 +1,7 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Entity, EntityTableController, EnumValueConfig, SelectionController } from "@rebasepro/types";
+import { Entity, EnumValueConfig } from "@rebasepro/types";
+import { EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
 import { BoardCardBinding } from "./BoardCardBinding";
 import {
     Button,
@@ -42,7 +43,7 @@ import { useSidePanel } from "../../hooks/useSidePanel";
 import { generateNKeysBetween } from "fractional-indexing";
 
 export type CollectionBoardViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     tableController: EntityTableController<M>;
     fullPath: string;
     parentCollectionSlugs?: string[], parentEntityIds?: string[];
@@ -467,7 +468,7 @@ parentEntityIds,
         const Comp = (props: BoardItemViewProps<Entity<M>>) => (
             <BoardCardBinding
                 {...props}
-                collection={collectionRef.current as CollectionConfig<M>}
+                collection={collectionRef.current as AdminCollection<M>}
                 onClick={stableOnClick}
                 selected={isEntitySelectedRef.current(props.item.data)}
                 onSelectionChange={stableOnSelectionChange}
@@ -486,7 +487,6 @@ parentEntityIds,
         parentEntityIds
     });
 
-
     // Get AddKanbanColumnComponent from plugin slots
     const addKanbanColumnSlots = useSlot("kanban.add-column", {
         collection,
@@ -495,7 +495,6 @@ parentEntityIds,
 parentEntityIds,
         columnProperty
     });
-
 
     // Check for loading error
     const hasError = Boolean(dataLoadingError);

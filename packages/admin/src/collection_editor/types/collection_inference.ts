@@ -1,4 +1,5 @@
-import { CollectionConfig, FilterValues } from "@rebasepro/types";
+import { FilterValues } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * This function is used to infer the configuration of a collection given its path.
@@ -14,4 +15,4 @@ export type CollectionInference = (
     databaseId?: string,
     initialFilter?: FilterValues<string>,
     initialSort?: [string, "asc" | "desc"]
-) => Promise<Partial<CollectionConfig> | null>;
+) => Promise<Partial<AdminCollection> | null>;

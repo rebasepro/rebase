@@ -1,6 +1,7 @@
-import type { AdditionalFieldDelegate } from "@rebasepro/types";
+import type { AdditionalFieldDelegate, AdminCollection } from "@rebasepro/admin-types";
 import React, { useCallback, useMemo, useRef } from "react";
-import { CollectionSize, Entity, RebaseContext, User, Property } from "@rebasepro/types";
+import { Entity, User, Property } from "@rebasepro/types";
+import { CollectionSize, RebaseContext } from "@rebasepro/admin-types";
 import { PropertyTableCell } from "./PropertyTableCell";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { useRebaseContext, useLargeLayout } from "@rebasepro/app";
@@ -29,7 +30,7 @@ import { getValueInPath } from "@rebasepro/utils";
  * a custom view. If you just need to create a default view you can do it
  * exclusively with config options.
  *
- * If you want to bind a {@link CollectionConfig} to a table with the default
+ * If you want to bind a {@link AdminCollection} to a table with the default
  * options you see in collections in the top level navigation, you can
  * check {@link CollectionViewBinding}.
  *

@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { Entity, CollectionCallbacks } from "@rebasepro/types";
 import React, { useCallback, useMemo, useState } from "react";
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from "@rebasepro/ui";
@@ -12,11 +12,12 @@ import {
 } from "@rebasepro/app";
 import { useCMSContext } from "../hooks";
 import { EntityViewBinding } from "./EntityViewBinding";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export interface DeleteEntityDialogProps<M extends Record<string, unknown>> {
     entityOrEntitiesToDelete?: Entity<M> | Entity<M>[],
     path: string,
-    collection: CollectionConfig<M>
+    collection: AdminCollection<M>
     open: boolean;
     onClose: () => void;
     callbacks?: CollectionCallbacks<M>,

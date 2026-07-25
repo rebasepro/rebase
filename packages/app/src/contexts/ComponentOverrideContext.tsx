@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo } from "react";
-import type { ComponentOverrideMap } from "@rebasepro/types";
+import type { ComponentOverrideMap } from "@rebasepro/admin-types";
 
 /** Stable empty reference to avoid re-creating context values on every render. */
 const EMPTY_OVERRIDES: ComponentOverrideMap = {};

@@ -1,4 +1,4 @@
-import type { NavigationEntry } from "@rebasepro/types";
+import type { NavigationEntry } from "@rebasepro/admin-types";
 import React from "react";
 import { ChevronDownIcon, cls, iconSize, Typography } from "@rebasepro/ui";
 

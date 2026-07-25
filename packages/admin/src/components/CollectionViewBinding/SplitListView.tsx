@@ -1,6 +1,7 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
+import { CollectionSize, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
 import { EditViewBinding } from "../EditViewBinding";
 import { DetailViewBinding } from "../DetailViewBinding";
 import {
@@ -16,7 +17,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { withViewMode } from "../../util/view_mode";
 
 export type SplitListViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     tableController: EntityTableController<M>;
     onEntityClick?: (entity: Entity<M>) => void;
     onNewClick?: () => void;
@@ -358,7 +359,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     ? <DetailViewBinding
                         key={String(renderedEntityId)}
                         path={path}
-                        collection={collection as CollectionConfig<Record<string, unknown>>}
+                        collection={collection as AdminCollection<Record<string, unknown>>}
                         entityId={renderedEntityId}
                         parentCollectionSlugs={usedParentCollectionIds}
                         parentEntityIds={usedParentEntityIds}
@@ -379,7 +380,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                     : <EditViewBinding
                         key={String(renderedEntityId)}
                         path={path}
-                        collection={collection as CollectionConfig<Record<string, unknown>>}
+                        collection={collection as AdminCollection<Record<string, unknown>>}
                         entityId={renderedEntityId}
                         parentCollectionSlugs={usedParentCollectionIds}
                         parentEntityIds={usedParentEntityIds}

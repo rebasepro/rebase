@@ -1,5 +1,6 @@
 import React from "react";
-import { Locale, User, AuthController, AnalyticsEvent, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, UserConfigurationPersistence, CollectionRegistryController, DatabaseAdmin, UrlController, NavigationStateController, RebaseClient, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/types";
+import { User, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, CollectionRegistryController, DatabaseAdmin, RebaseClient } from "@rebasepro/types";
+import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, SlotContribution, PropertyConfig, EntityCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/admin-types";
 
 /**
  * A data source registered on `<Rebase>`. Extends the shared

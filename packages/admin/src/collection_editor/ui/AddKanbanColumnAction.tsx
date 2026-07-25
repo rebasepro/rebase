@@ -6,7 +6,7 @@ import {
     useTranslation
 } from "@rebasepro/app";
 import { getPropertyInPath } from "../_cms_internals";
-import { CollectionConfig, EnumValueConfig, StringProperty } from "@rebasepro/types";
+import { EnumValueConfig, StringProperty } from "@rebasepro/types";
 import { resolveEnumValues } from "@rebasepro/common";
 import {
     Button,
@@ -23,6 +23,7 @@ import {
 } from "@rebasepro/ui";
 import { useCollectionsConfigController } from "../useCollectionsConfigController";
 import { toSnakeCase } from "@rebasepro/utils";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Component rendered at the end of the Kanban board to add new columns (enum values).
@@ -34,7 +35,7 @@ export function AddKanbanColumnAction({
     parentCollectionSlugs, parentEntityIds,
     columnProperty
 }: {
-    collection: CollectionConfig;
+    collection: AdminCollection;
     fullPath: string;
     parentCollectionSlugs: string[], parentEntityIds: string[];
     columnProperty: string;

@@ -1,12 +1,12 @@
 import { CollectionsConfigController, SaveCollectionParams, UpdateCollectionParams, DeleteCollectionParams, SavePropertyParams, DeletePropertyParams, UpdatePropertiesOrderParams } from "./types/config_controller";
-import { CollectionConfig, Properties } from "@rebasepro/types";
+import { Properties } from "@rebasepro/types";
 import { getSubcollections } from "@rebasepro/common";
 
-
 import React, { useMemo, useRef } from "react";
+import type { AdminCollection } from "@rebasepro/admin-types";
 export function useLocalCollectionsConfigController(
     clientOrUrl: any,
-    baseCollections: CollectionConfig[] = [],
+    baseCollections: AdminCollection[] = [],
     options?: {
         readOnly?: boolean;
         getAuthToken?: () => Promise<string | null>;
@@ -73,7 +73,7 @@ export function useLocalCollectionsConfigController(
         readOnlyReason: "Local collection editing is only available in development mode.",
         collections: parsedCollections,
         getCollection: (id: string) => {
-            const found = parsedCollections.find(c => (c as CollectionConfig & { id?: string }).id === id || c.slug === id);
+            const found = parsedCollections.find(c => (c as AdminCollection & { id?: string }).id === id || c.slug === id);
             if (found) return found;
             throw Error(`Collection ${id} not found in local mode`);
         },
@@ -109,7 +109,7 @@ collectionData: { propertiesOrder: newPropertiesOrder } });
         },
 
         updatePropertiesOrder: async ({ collection, fullPath, newPropertiesOrder }: UpdatePropertiesOrderParams) => {
-            const collectionId = (collection as CollectionConfig & { id?: string }).id || fullPath.split("/").pop();
+            const collectionId = (collection as AdminCollection & { id?: string }).id || fullPath.split("/").pop();
             await request("/collection/save", { collectionId,
 collectionData: { propertiesOrder: newPropertiesOrder } });
         },

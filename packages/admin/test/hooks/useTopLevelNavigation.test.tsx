@@ -4,7 +4,8 @@
 
 import { renderHook } from "@testing-library/react";
 import { useTopLevelNavigation } from "../../src/hooks/navigation/useTopLevelNavigation";
-import { UrlController, CollectionRegistryController, CollectionConfig, NavigationResult } from "@rebasepro/types";
+import { CollectionRegistryController, CollectionConfig } from "@rebasepro/types";
+import { UrlController, NavigationResult } from "@rebasepro/admin-types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
 import { deepEqual } from "fast-equals";

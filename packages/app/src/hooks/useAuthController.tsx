@@ -1,4 +1,5 @@
-import { AuthController, User } from "@rebasepro/types";
+import { User } from "@rebasepro/types";
+import { AuthController } from "@rebasepro/admin-types";
 import { useContext } from "react";
 import { AuthControllerContext } from "../contexts/AuthControllerContext";
 

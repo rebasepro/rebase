@@ -1,4 +1,5 @@
-import type { CollectionConfig, ViewMode } from "@rebasepro/types";
+
+import type { ViewMode, AdminCollection } from "@rebasepro/admin-types";
 import React, { useMemo } from "react";
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
@@ -66,7 +67,7 @@ export type CollectionPanelProps = {
      * Any additional collection-level overrides (e.g. `previewProperties`,
      * `enabledViews`, `entityActions`, `defaultFilter`, etc.).
      */
-    collectionOverrides?: Partial<CollectionConfig>;
+    collectionOverrides?: Partial<AdminCollection>;
 };
 
 /**
@@ -101,7 +102,7 @@ function CollectionPanelInner({
     title,
     updateUrl,
     className
-}: CollectionPanelProps & { mergedCollection: CollectionConfig }) {
+}: CollectionPanelProps & { mergedCollection: AdminCollection }) {
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
 
     return (
@@ -150,7 +151,7 @@ export function CollectionPanel(props: CollectionPanelProps) {
             ...registeredCollection,
             ...(collectionOverrides ?? {}),
             ...propOverrides
-        } as CollectionConfig;
+        } as AdminCollection;
     }, [registeredCollection, collectionOverrides, viewMode, sort, limit, openEntityMode]);
 
     if (!mergedCollection) {

@@ -1,7 +1,7 @@
 import React from "react";
 import { useInsightsPlugin } from "@rebasepro/plugin-insights";
 import type { InsightsPluginConfig } from "@rebasepro/plugin-insights";
-import type { RebasePlugin } from "@rebasepro/types";
+import type { RebasePlugin } from "@rebasepro/admin-types";
 import type { createRebaseClient } from "@rebasepro/client";
 
 type RebaseClientType = ReturnType<typeof createRebaseClient>;

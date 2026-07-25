@@ -8,9 +8,10 @@ import {
     TextField,
     Typography
 } from "@rebasepro/ui";
-import { CollectionConfig, OnAction, RelationProperty } from "@rebasepro/types";
+import { OnAction, RelationProperty } from "@rebasepro/types";
 
 import { CollectionsSelect } from "./ReferencePropertyField";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 const ON_ACTION_OPTIONS: OnAction[] = ["cascade", "restrict", "no action", "set null", "set default"];
 
@@ -87,7 +88,7 @@ targetColumn: "" };
         }
     }, [targetSlug, relationName, setFieldValue]);
 
-    const collections: CollectionConfig[] = collectionRegistry?.collections ?? [];
+    const collections: AdminCollection[] = collectionRegistry?.collections ?? [];
 
     return (
         <>

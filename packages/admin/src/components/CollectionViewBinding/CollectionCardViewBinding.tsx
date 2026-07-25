@@ -1,6 +1,7 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { CollectionSize, Entity, EntityTableController, SelectionController } from "@rebasepro/types";
+import { Entity } from "@rebasepro/types";
+import { CollectionSize, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
 import { EntityCardBinding } from "./EntityCardBinding";
 import {
     cls,
@@ -11,7 +12,7 @@ import {
 import { useComponentOverride } from "@rebasepro/app";
 
 export type CollectionCardViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     tableController: EntityTableController<M>;
     onEntityClick?: (entity: Entity<M>) => void;
     selectionController?: SelectionController<M>;

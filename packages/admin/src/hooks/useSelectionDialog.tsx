@@ -1,8 +1,9 @@
 import { SelectionProps, SelectionTableBinding } from "../components/ReferenceTable/SelectionTableBinding";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { useCallback, useMemo } from "react";
 import { useSideDialogsController } from "./useSideDialogsController";
 import { useCollectionRegistryController } from "./navigation/contexts/CollectionRegistryContext";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * This hook is used to open a side dialog that allows the selection
@@ -26,7 +27,7 @@ export function useSelectionDialog<M extends Record<string, unknown>>(referenceD
         if (referenceDialogProps.path) {
             let usedCollection = referenceDialogProps.collection;
             if (!usedCollection)
-                usedCollection = navigation.getCollection(referenceDialogProps.path) as CollectionConfig<M> | undefined;
+                usedCollection = navigation.getCollection(referenceDialogProps.path) as AdminCollection<M> | undefined;
             if (!usedCollection)
                 throw Error("Not able to resolve the collection in useSelectionDialog. Make sure a collection is registered in path " + referenceDialogProps.path);
             sideDialogsController.open({

@@ -1,4 +1,5 @@
-import { CollectionConfig, NavigationGroupMapping, Property } from "@rebasepro/types";
+import { Property } from "@rebasepro/types";
+import { NavigationGroupMapping, AdminCollection } from "@rebasepro/admin-types";
 
 export interface CollectionsSetupInfo {
     status: "ongoing" | "complete" | "error";
@@ -13,7 +14,7 @@ export interface CollectionsConfigController {
 
     loading: boolean;
 
-    collections?: CollectionConfig[];
+    collections?: AdminCollection[];
 
     /**
      * If true, the configuration cannot be modified.
@@ -32,7 +33,7 @@ export interface CollectionsConfigController {
      */
     collectionsSetup?: CollectionsSetupInfo;
 
-    getCollection: (id: string) => CollectionConfig;
+    getCollection: (id: string) => AdminCollection;
 
     saveCollection: <M extends { [Key: string]: any }>(params: SaveCollectionParams<M>) => Promise<void>;
     updateCollection: <M extends { [Key: string]: any }>(params: UpdateCollectionParams<M>) => Promise<void>;
@@ -59,14 +60,14 @@ export interface CollectionsConfigController {
 
 export type UpdateCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
     id: string,
-    collectionData: Partial<CollectionConfig<M>>,
+    collectionData: Partial<AdminCollection<M>>,
     previousId?: string,
     parentCollectionSlugs?: string[], parentEntityIds?: string[]
 }
 
 export type SaveCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {
     id: string,
-    collectionData: CollectionConfig<M>,
+    collectionData: AdminCollection<M>,
     previousId?: string,
     parentCollectionSlugs?: string[], parentEntityIds?: string[]
 }
@@ -96,14 +97,14 @@ export type DeleteCollectionParams = {
 export type UpdatePropertiesOrderParams = {
     fullPath: string;
     parentCollectionSlugs: string[], parentEntityIds: string[];
-    collection: CollectionConfig;
+    collection: AdminCollection;
     newPropertiesOrder: string[];
 }
 
 export type UpdateKanbanColumnsOrderParams = {
     fullPath: string;
     parentCollectionSlugs: string[], parentEntityIds: string[];
-    collection: CollectionConfig;
+    collection: AdminCollection;
     kanbanColumnProperty: string;
     newColumnsOrder: string[];
 }

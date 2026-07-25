@@ -1,6 +1,8 @@
-import type { CollectionConfig, Property, PropertyConfig } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/types";
-import { getTitlePropertyKey, getTitlePropertyKeyForValues, isPropertyBuilder } from "@rebasepro/common";
+import type { Property } from "@rebasepro/types";
+import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
+import { AuthController } from "@rebasepro/admin-types";
+import { isPropertyBuilder } from "@rebasepro/common";
+import { getTitlePropertyKey, getTitlePropertyKeyForValues } from "@rebasepro/app";
 import { isReferenceProperty, isRelationProperty } from "./property_utils";
 
 function isHiddenProperty(property: Property | undefined): boolean {
@@ -29,7 +31,7 @@ function isStorageProperty(property: Property | undefined): boolean {
 
 export function getEntityPreviewKeys(
     authController: AuthController,
-    targetCollection: CollectionConfig<any>,
+    targetCollection: AdminCollection<any>,
     fields: Record<string, PropertyConfig>,
     previewProperties?: string[],
     limit = 3) {
@@ -66,7 +68,7 @@ export function getEntityPreviewKeys(
  * called. Identifiers are excluded from the property *schema* — primary keys,
  * foreign keys, UUID columns — not from the key name.
  */
-export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(collection: CollectionConfig<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
+export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(collection: AdminCollection<M>, propertyConfigs: Record<string, PropertyConfig>): string | undefined {
     return getTitlePropertyKey(collection);
 }
 
@@ -75,7 +77,7 @@ export function getEntityTitlePropertyKey<M extends Record<string, unknown>>(col
  * no readable value for this particular entity (empty, or an opaque id).
  */
 export function getEntityTitlePropertyKeyForEntity<M extends Record<string, unknown>>(
-    collection: CollectionConfig<M>,
+    collection: AdminCollection<M>,
     values: Record<string, unknown> | undefined,
     entityId?: string | number
 ): string | undefined {
@@ -87,7 +89,7 @@ export function getEntityTitlePropertyKeyForEntity<M extends Record<string, unkn
  * auth user id that has to be resolved before it can be displayed.
  */
 export function isUserSelectProperty<M extends Record<string, unknown>>(
-    collection: CollectionConfig<M>,
+    collection: AdminCollection<M>,
     propertyKey: string | undefined
 ): boolean {
     if (!propertyKey) return false;
@@ -171,5 +173,4 @@ export function resolveTitleToString(title: any): string {
         return "";
     }
 }
-
 

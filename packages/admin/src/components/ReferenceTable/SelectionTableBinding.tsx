@@ -1,6 +1,7 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { MouseEventHandler, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CollectionSize, Entity, FilterValues } from "@rebasepro/types";
+import { Entity, FilterValues } from "@rebasepro/types";
+import { CollectionSize, AdminCollection } from "@rebasepro/admin-types";
 
 import {
     CollectionRowActions,
@@ -39,7 +40,7 @@ export interface SelectionProps<M extends Record<string, unknown>> {
     /**
      * Entity collection config
      */
-    collection?: CollectionConfig<M>;
+    collection?: AdminCollection<M>;
 
     /**
      * Absolute path of the collection.
@@ -113,7 +114,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
         description,
         fixedFilter,
         maxSelection
-    }: SelectionProps<M> & { collection: CollectionConfig<M> }) {
+    }: SelectionProps<M> & { collection: AdminCollection<M> }) {
 
     const sideDialogContext = useSideDialogContext();
     const sidePanelController = useSidePanel();
@@ -331,7 +332,7 @@ function EntitySelectionDialogActions({
     onClear,
     onNewClick
 }: {
-    collection: CollectionConfig<any>,
+    collection: AdminCollection<any>,
     path: string,
     onClear: () => void,
     onNewClick: () => void

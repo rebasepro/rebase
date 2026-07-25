@@ -9,7 +9,8 @@ import {
     NAVIGATION_DEFAULT_GROUP_NAME,
     NAVIGATION_ADMIN_GROUP_NAME
 } from "../../src/hooks/navigation/utils";
-import type { CollectionConfig, AppView, RebasePlugin, NavigationGroupMapping } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
+import type { AppView, RebasePlugin, NavigationGroupMapping } from "@rebasepro/admin-types";
 
 // ---------------------------------------------------------------------------
 // getGroup

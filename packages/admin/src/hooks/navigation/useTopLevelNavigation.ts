@@ -1,4 +1,5 @@
-import type { AppView, UrlController, CollectionConfig, RebasePlugin, NavigationEntry, NavigationGroupMapping, NavigationResult } from "@rebasepro/types";
+
+import type { AppView, UrlController, RebasePlugin, NavigationEntry, NavigationGroupMapping, NavigationResult, AdminCollection } from "@rebasepro/admin-types";
 import { useCallback, useMemo, useRef } from "react";
 import { deepEqual as equal } from "fast-equals";
 
@@ -8,7 +9,7 @@ import { CollectionRegistry } from "@rebasepro/common";
 import { computeNavigationGroups, getGroup, NAVIGATION_ADMIN_GROUP_NAME, NAVIGATION_DEFAULT_GROUP_NAME } from "./utils";
 
 export type UseTopLevelNavigationProps = {
-    collections: CollectionConfig[];
+    collections: AdminCollection[];
     views: AppView[] | undefined;
     adminViews: AppView[] | undefined;
     plugins?: RebasePlugin[];

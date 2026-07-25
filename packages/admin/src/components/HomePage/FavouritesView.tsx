@@ -1,4 +1,4 @@
-import type { NavigationEntry } from "@rebasepro/types";
+import type { NavigationEntry } from "@rebasepro/admin-types";
 import { useNavigate } from "react-router-dom";
 ;
 import { Chip, Collapse, StarIcon } from "@rebasepro/ui";

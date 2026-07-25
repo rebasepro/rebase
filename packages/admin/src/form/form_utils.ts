@@ -1,5 +1,7 @@
-import type { CollectionConfig, PropertyConfig } from "@rebasepro/types";
-import type { AuthController, Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+
+import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
+import type { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
+import type { AuthController } from "@rebasepro/admin-types";
 import { deepEqual as equal } from "fast-equals";
 import { getIn, setIn } from "@rebasepro/forms";
 import { getDefaultValuesFor } from "@rebasepro/common";
@@ -114,7 +116,7 @@ export function getChanges<T extends object>(source: Partial<T>, comparison: Par
 
 export function getInitialEntityValues<M extends Record<string, unknown>>(
     authController: AuthController,
-    collection: CollectionConfig,
+    collection: AdminCollection,
     path: string,
     status: "new" | "existing" | "copy",
     entity: Entity<M> | undefined,

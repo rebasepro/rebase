@@ -1,15 +1,7 @@
-import type {
-    AppView,
-    AppViewsBuilder,
-    AuthCollectionConfig,
-    EntityAction,
-    CollectionConfig,
-    CollectionConfigsBuilder,
-    RebaseContext,
-    RebasePlugin,
-    UserCreationResult
-} from "@rebasepro/types";
-import { type AuthController, type User, type RebaseData } from "@rebasepro/types";
+import type { AuthCollectionConfig } from "@rebasepro/types";
+import type { AppView, AppViewsBuilder, EntityAction, CollectionConfigsBuilder, RebaseContext, RebasePlugin, UserCreationResult, AdminCollection } from "@rebasepro/admin-types";
+import { type User, type RebaseData } from "@rebasepro/types";
+import { type AuthController } from "@rebasepro/admin-types";
 import { canReadCollection } from "@rebasepro/common";
 import { resetPasswordAction } from "../../components/common/default_entity_actions";
 import { CreationResultDialog } from "../../components/admin/CreationResultDialog";
@@ -23,7 +15,7 @@ function isRebaseContext(ctx: unknown): ctx is RebaseContext {
     return typeof ctx === "object" && ctx !== null && "dialogsController" in ctx;
 }
 
-export function filterOutNotAllowedCollections(resolvedCollections: CollectionConfig[], authController: AuthController): CollectionConfig[] {
+export function filterOutNotAllowedCollections(resolvedCollections: AdminCollection[], authController: AuthController): AdminCollection[] {
     return resolvedCollections
         .filter((c) => canReadCollection(c, authController))
         .map((c) => {
@@ -35,8 +27,8 @@ export function filterOutNotAllowedCollections(resolvedCollections: CollectionCo
         });
 }
 
-export function applyPluginModifyCollection(resolvedCollections: CollectionConfig[], modifyCollection: (collection: CollectionConfig) => CollectionConfig): CollectionConfig[] {
-    return resolvedCollections.map((collection): CollectionConfig => {
+export function applyPluginModifyCollection(resolvedCollections: AdminCollection[], modifyCollection: (collection: AdminCollection) => AdminCollection): AdminCollection[] {
+    return resolvedCollections.map((collection): AdminCollection => {
         const modifiedCollection = modifyCollection(collection);
         if (modifiedCollection.childCollections) {
             return {
@@ -64,9 +56,9 @@ export function applyPluginModifyCollection(resolvedCollections: CollectionConfi
  * Skips injection if the collection already has the action/callback present.
  */
 function injectAuthCollectionConfig(
-    collections: CollectionConfig[],
+    collections: AdminCollection[],
     adminPasswordResetSupported: boolean
-): CollectionConfig[] {
+): AdminCollection[] {
     return collections.map((collection) => {
         const authProp = collection.auth;
         if (!authProp) return collection;
@@ -87,7 +79,9 @@ function injectAuthCollectionConfig(
         } else if (typeof resetPref === "object") {
             // An explicitly supplied action is the collection author's own; they
             // own its backend, so the adapter capability doesn't apply.
-            actionToInject = resetPref;
+            // `auth.actions.resetPassword`'s object form is an EntityAction; core
+            // types it as `object` because a server never renders one.
+            actionToInject = resetPref as EntityAction;
         } else if (!adminPasswordResetSupported) {
             actionToInject = undefined;
         } else {
@@ -162,12 +156,12 @@ function injectAuthCollectionConfig(
 }
 
 export async function resolveCollections(
-    collections: undefined | CollectionConfig[] | CollectionConfigsBuilder,
+    collections: undefined | AdminCollection[] | CollectionConfigsBuilder,
     authController: AuthController,
     data: RebaseData,
     plugins: RebasePlugin[] | undefined
-): Promise<CollectionConfig[]> {
-    let resolvedCollections: CollectionConfig[] = [];
+): Promise<AdminCollection[]> {
+    let resolvedCollections: AdminCollection[] = [];
     if (typeof collections === "function") {
         resolvedCollections = await collections({
             user: authController.user,

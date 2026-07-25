@@ -1,8 +1,9 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useData } from "./useData";
 import { Entity, EntityRelation, FilterValues } from "@rebasepro/types";
 import { getRelationIncludeParams } from "../../util/previews";
+import type { AdminCollection } from "@rebasepro/admin-types";
 export interface RelationItem {
     id: string | number;
     label: string;
@@ -19,7 +20,7 @@ export interface UseRelationSelectorProps<M extends Record<string, any> = any> {
     /**
      * The collection that represents the relation entities
      */
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     /**
      * Force filter to be applied to the relation search
      */

@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useLayoutEffect, useMemo } from "react";
 import { useRebaseRegistryDispatch } from "@rebasepro/app";
-import type { RebaseStudioConfig, AppView } from "@rebasepro/types";
+import type { RebaseStudioConfig, AppView } from "@rebasepro/admin-types";
 import { CircularProgressCenter } from "@rebasepro/ui";
 
 // Lazy-loaded studio tools — each fetched only when its route is visited.

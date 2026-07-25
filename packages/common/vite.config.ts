@@ -1,11 +1,6 @@
 import path from "path";
 
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react"
-
-const ReactCompilerConfig = {
-    target: "18"
-};
 
 const isExternal = (id: string) => {
     if (id.startsWith(".") || path.isAbsolute(id)) return false;
@@ -48,13 +43,7 @@ export default defineConfig(() => ({
             "@rebasepro/types": path.resolve(__dirname, "../types/src")
         }
     },
-    plugins: [
-        react({
-            babel: {
-                plugins: [
-                    ["babel-plugin-react-compiler", ReactCompilerConfig]
-                ]
-            }
-        })
-    ]
+    // No plugins: this package has no JSX. The React plugin was here from when
+    // the type surface still had .tsx files in it.
+    plugins: []
 }));

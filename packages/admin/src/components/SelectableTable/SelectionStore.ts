@@ -1,5 +1,5 @@
 import { useSyncExternalStore, useCallback, useRef } from "react";
-import { SelectedCellProps } from "@rebasepro/types";
+import { SelectedCellProps } from "@rebasepro/admin-types";
 import {
     createVirtualTableSelectionStore,
     VirtualTableSelectionStore,

@@ -14,7 +14,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useSnackbarController, useTranslation } from "@rebasepro/app";
-import { UserCreationResult } from "@rebasepro/types";
+import { UserCreationResult } from "@rebasepro/admin-types";
 
 export function CreationResultDialog({
     result,

@@ -3,7 +3,8 @@
  */
 import { renderHook, waitFor } from "@testing-library/react";
 import { useResolvedViews } from "../../src/hooks/navigation/useResolvedViews";
-import { AuthController, AppView, RebaseData } from "@rebasepro/types";
+import { RebaseData } from "@rebasepro/types";
+import { AuthController, AppView } from "@rebasepro/admin-types";
 
 describe("useResolvedViews", () => {
 

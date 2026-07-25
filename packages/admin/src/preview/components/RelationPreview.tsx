@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import * as React from "react";
 
 import { Entity, EntityRelation } from "@rebasepro/types";
@@ -9,6 +9,7 @@ import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/E
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { getEntityTitlePropertyKeyForEntity } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type RelationPreviewProps = {
     disabled?: boolean;
@@ -92,7 +93,7 @@ function RelationPreviewInternalInner({
     includeId = true,
     textOnly,
     collection
-}: RelationPreviewProps & { collection?: CollectionConfig }) {
+}: RelationPreviewProps & { collection?: AdminCollection }) {
     const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
 
     if (!collection) {
@@ -154,7 +155,7 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     hover,
     textOnly
 }: RelationPreviewProps & {
-    collection: CollectionConfig<M>
+    collection: AdminCollection<M>
 }) {
 
     // CMS wire format embeds relation data as { id, path, values }

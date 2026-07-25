@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { AnalyticsController } from "@rebasepro/types";
+import { AnalyticsController } from "@rebasepro/admin-types";
 import { AnalyticsContext } from "../contexts/AnalyticsContext";
 
 /**

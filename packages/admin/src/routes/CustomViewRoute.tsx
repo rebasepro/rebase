@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import type { AppView } from "@rebasepro/types";
+import type { AppView } from "@rebasepro/admin-types";
 import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 

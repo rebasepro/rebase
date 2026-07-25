@@ -1,7 +1,7 @@
 
-import { type CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
+import { getCollectionDataPath } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
-import type { EntityAction } from "@rebasepro/types";
+import type { EntityAction, AdminCollection } from "@rebasepro/admin-types";
 import React from "react";
 import { Entity } from "@rebasepro/types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
@@ -81,7 +81,7 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     savingError: Error | undefined,
     entity: Entity<M> | undefined,
     formActions?: EntityAction[],
-    collection: CollectionConfig,
+    collection: AdminCollection,
     disabled: boolean,
     status: "new" | "existing" | "copy",
     pluginActions?: React.ReactNode[],

@@ -10,7 +10,7 @@ import { Scaffold } from "./app/Scaffold";
 import { Drawer } from "./app/Drawer";
 import { SideDialogs } from "./SideDialogs";
 import { AdminModeSyncer } from "./AdminModeSyncer";
-import type { AppView } from "@rebasepro/types";
+import type { AppView } from "@rebasepro/admin-types";
 
 export interface RebaseLayoutProps {
     /** Title shown in the drawer. */

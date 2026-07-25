@@ -1,7 +1,9 @@
-import type { CollectionConfig, EntityCustomView } from "@rebasepro/types";
-import { Entity, RebaseContext, User } from "@rebasepro/types";
+
+import type { EntityCustomView, AdminCollection } from "@rebasepro/admin-types";
+import { Entity, User } from "@rebasepro/types";
+import { RebaseContext } from "@rebasepro/admin-types";
 import { useEffect, useState, useMemo } from "react";
-import { getNavigationEntriesFromPath } from "@rebasepro/common";
+import { getNavigationEntriesFromPath } from "@rebasepro/app";
 import { useCMSContext } from "./useCMSContext";
 
 /**
@@ -22,7 +24,7 @@ export interface ResolvedNavigationEntity<M extends Record<string, unknown>> {
     entity: Entity<M>;
     entityId: string | number;
     path: string;
-    parentCollection: CollectionConfig<M>;
+    parentCollection: AdminCollection<M>;
 }
 
 /**
@@ -32,7 +34,7 @@ export interface ResolvedNavigationEntity<M extends Record<string, unknown>> {
 export interface ResolvedNavigationCollection<M extends Record<string, unknown>> {
     type: "collection";
     path: string;
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
 }
 
 /**

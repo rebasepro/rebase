@@ -4,7 +4,8 @@
 
 import { renderHook, waitFor } from "@testing-library/react";
 import { useResolvedCollections } from "../../src/hooks/navigation/useResolvedCollections";
-import { AuthController, CollectionRegistryController, RebaseData, CollectionConfig } from "@rebasepro/types";
+import { CollectionRegistryController, RebaseData, CollectionConfig } from "@rebasepro/types";
+import { AuthController } from "@rebasepro/admin-types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
 

@@ -1,19 +1,12 @@
-import React, { Dispatch, SetStateAction } from "react";
-import type { Entity, EntityStatus, EntityValues } from "./entities";
 import type { CollectionCallbacks } from "./entity_callbacks";
 
 import type { EnumValues, Properties, PostgresProperties, FirebaseProperties, MongoProperties } from "./properties";
-import type { ExportConfig } from "./export_import";
 
 import type { User } from "../users";
-import type { RebaseContext } from "../rebase_context";
 import type { Relation } from "./relations";
-import type { EntityCustomView, FormViewConfig } from "./entity_views";
-import type { EntityAction } from "./entity_actions";
 import type { SecurityRule } from "./security_rules";
-import type { ComponentRef } from "./component_ref";
-import type { CollectionComponentOverrideMap } from "./component_overrides";
-import type { WhereFilterOp, FilterValues, FilterPreset, OrderByTuple } from "./filter-operators";
+import type { AdminBlock } from "./admin_block";
+import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operators";
 
 /**
  * Base interface containing all driver-agnostic collection properties.
@@ -108,74 +101,32 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
     properties: Properties;
 
     /**
-     * Icon for the navigation sidebar or cards.
+     * Admin-panel presentation and behaviour — icons, list columns, view modes,
+     * kanban, custom views, entity actions, component overrides.
      *
-     * A Lucide icon name (`"FileText"`, `"ShoppingCart"`). Nothing on the server
-     * reads this — it is resolved by the admin panel's `getIcon`, which also
-     * accepts a rendered element; that wider form belongs on the admin options,
-     * not here, because it would put `React.ReactNode` in the BaaS contract.
-     */
-    icon?: string;
-
-    /**
-     * Navigation group for this collection.
-     * Collections sharing the same group name will be visually grouped
-     * together in the drawer and home page. If not set, the collection
-     * falls into the default "Views" group.
-     */
-    group?: string;
-
-    /**
-     * Array of entity views that this collection has.
-     * Can be an array of `EntityCustomView` or a string representing the key of a global `EntityCustomView`.
-     */
-    entityViews?: (string | EntityCustomView<Record<string, unknown>>)[];
-
-    /**
-     * Default preview properties displayed when this collection is referenced to.
-     */
-    previewProperties?: string[];
-
-    /**
-     * Properties to display as columns in the list view.
-     * If not specified, the list view uses a smart default (Title, Status, Date).
-     */
-    listProperties?: string[];
-
-    /**
-     * Title property of the entity. This is the property that will be used
-     * as the title in entity related views and references.
-     * If not specified, the first property simple text property will be used.
-     */
-    readonly titleProperty?: Extract<keyof M, string> | (string & {});
-
-    /**
-     * When editing a entity, you can choose to open the entity in a side dialog
-     * or in a full screen dialog. Defaults to `full_screen`.
-     */
-    openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
-
-    /**
-     * Controls what happens when a user clicks on a entity in the collection view.
-     * - `"edit"` (default): Opens the entity in the edit form.
-     * - `"view"`: Opens a read-only detail view with an "Edit" button.
-     */
-    defaultEntityAction?: "view" | "edit";
-
-    /**
-     * Replace the default entity form with a custom component.
-     * The Builder receives the same props as entity view tabs
-     * (entity, formContext, collection, etc.) and has full control over the UI.
+     * Opaque to the backend, which loads this file and never reads inside the
+     * block. The typed shape is `AdminCollectionOptions` in
+     * `@rebasepro/admin-types`; author against `AdminCollectionConfig` (or
+     * `defineCollection`) to get completion and checking here.
      *
-     * Works in both edit mode and read-only mode (when `defaultEntityAction`
-     * is `"view"`). In read-only mode, `formContext.readOnly` will be `true`.
+     * @example
+     * admin: {
+     *     icon: "FileText",
+     *     listProperties: ["title", "status"],
+     *     defaultViewMode: "table"
+     * }
      */
-    formView?: FormViewConfig;
+    admin?: AdminBlock;
 
-    /**
-     * Prevent default actions from being displayed or executed on this collection.
-     */
-    disableDefaultActions?: ("edit" | "copy" | "delete")[];
+
+
+
+
+
+
+
+
+
 
     /**
      * Mark this collection as an authentication collection.
@@ -203,37 +154,9 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
     disableDefaultPolicies?: boolean;
 
 
-    /**
-     * Order in which the properties are displayed.
-     * If you are specifying your collection as code, the order is the same as the
-     * one you define in `properties`. Additional columns are added at the
-     * end of the list, if the order is not specified.
-     *
-     * You can use this prop to hide some properties from the table view.
-     * Note that if you set this prop, other ways to hide fields, like
-     * `hidden` in the property definition, will be ignored.
-     * `propertiesOrder` has precedence over `hidden`.
-     *
-     * Supported entry formats:
-     *     - For properties, use the property key.
-     *     - For additional fields, use the field key.
-     *     - Child collections (Firestore subcollections, or Postgres relations
-     *       with `many` cardinality) each get a column with id
-     *       `subcollection:<slug>`, e.g. `subcollection:orders`.
-     */
-    propertiesOrder?: (Extract<keyof M, string> | (string & {}) | string | `subcollection:${string}`)[];
-
-    /**
-     * If enabled, content is loaded in batches. If `false` all entities in the
-     * collection are loaded. This means that when reaching the end of the
-     * collection, the CMS will load more entities.
-     * You can specify a number to specify the pagination size (50 by default)
-     * Defaults to `true`
-     */
-    pagination?: boolean | number;
 
 
-    selectionEnabled?: boolean;
+
 
     /**
      * This interface defines all the callbacks that can be used when a entity
@@ -242,114 +165,19 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      */
     readonly callbacks?: CollectionCallbacks<M, USER>;
 
-    /**
-     * Pass your own selection controller if you want to control selected
-     * entities externally.
-     * @see useSelectionController
-     */
-    selectionController?: SelectionController<M>;
 
-    /**
-     * Force a filter in this view. If applied, the rest of the filters will
-     * be disabled. Filters applied with this prop cannot be changed.
-     * e.g. `fixedFilter: { age: [">", 18] }`
-     * e.g. `fixedFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
-     */
-    readonly fixedFilter?: FilterValues<Extract<keyof M, string> | (string & {})>;
 
-    /**
-     * Initial filters applied to the collection this collection is related to.
-     * Defaults to none. Filters applied with this prop can be changed.
-     * e.g. `defaultFilter: { age: [">", 18] }`
-     * e.g. `defaultFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
-     */
-    readonly defaultFilter?: FilterValues<Extract<keyof M, string> | (string & {})>; // setting FilterValues<M> can break defining collections by code
 
-    /**
-     * Pre-defined filter presets that appear as quick-access options in the
-     * collection toolbar. Each preset applies a set of filters (and
-     * optionally a sort order) with a single click.
-     *
-     * ```ts
-     * filterPresets: [
-     *   {
-     *     label: "Shipped this month",
-     *     filterValues: {
-     *       status: ["==", "shipped"],
-     *       order_date: [">=", new Date(Date.now() - 30 * 86400000)]
-     *     }
-     *   }
-     * ]
-     * ```
-     */
-    readonly filterPresets?: FilterPreset<Extract<keyof M, string> | (string & {})>[];
 
-    /**
-     * Default sort applied to this collection.
-     * When setting this prop, entities will have a default order
-     * applied in the collection.
-     * e.g. `sort: ["order", "asc"]`
-     */
-    readonly sort?: OrderByTuple<Extract<keyof M, string> | (string & {})>;
 
-    /**
-     * You can add additional fields to the collection view by implementing
-     * an additional field delegate.
-     */
-    readonly additionalFields?: AdditionalFieldDelegate<M, USER>[];
 
-    /**
-     * Default size of the rendered collection
-     */
-    defaultSize?: CollectionSize;
 
-    /**
-     * Can the elements in this collection be edited inline in the collection
-     * view. Even when inline editing is disabled, entities can still be
-     * edited in the side panel (subject to `securityRules`).
-     */
-    inlineEditing?: boolean;
 
-    /**
-     * Should this collection be hidden from the main navigation panel, if
-     * it is at the root level, or in the entity side panel if it's a
-     * subcollection.
-     * It will still be accessible if you reach the specified path.
-     * You can also use this collection as a reference target.
-     */
-    hideFromNavigation?: boolean;
 
-    /**
-     * If you want to open custom views or subcollections by default when opening the edit
-     * view of a entity, you can specify the path to the view here.
-     * The path is relative to the current collection. For example if you have a collection
-     * that has a custom view as well as a subcollection that refers to another entity, you can
-     * either specify the path to the custom view or the path to the subcollection.
-     */
-    defaultSelectedView?: string | DefaultSelectedViewBuilder;
 
-    /**
-     * Should the ID of this collection be hidden from the form view.
-     */
-    hideIdFromForm?: boolean;
 
-    /**
-     * Should the ID of this collection be hidden from the grid view.
-     */
-    hideIdFromCollection?: boolean;
 
-    /**
-     * If set to true, the form will be auto-saved when the user changes
-     * the value of a field.
-     * Defaults to false.
-     * When a new entity is created, this property can be updated to generated a new ID
-     */
-    formAutoSave?: boolean;
 
-    /**
-     *
-     */
-    exportable?: boolean | ExportConfig<USER>;
 
     /**
      * User id of the owner of this collection. This is used only by plugins, or if you
@@ -364,22 +192,8 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      */
     metadata?: Record<string, unknown>;
 
-    /**
-     * Width of the side dialog (in pixels) when opening a entity in this collection.
-     */
-    sideDialogWidth?: number | string;
 
-    /**
-     * If set to true, the default values of the properties will be applied
-     * to the entity every time the entity is updated (not only when created).
-     * Defaults to false.
-     */
-    alwaysApplyDefaultValues?: boolean;
 
-    /**
-     * If set to true, a tab including the JSON representation of the entity will be included.
-     */
-    includeJsonView?: boolean;
 
     /**
      * If set to true, changes to the entity will be saved in a subcollection.
@@ -399,61 +213,12 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      */
     strictWrites?: boolean;
 
-    /**
-     * Should local changes be backed up in local storage, to prevent data loss on
-     * accidental navigations.
-     * - `manual_apply`: When the user navigates back to a entity with local changes,
-     *   they will be prompted to restore the changes.
-     * - `auto_apply`: When the user navigates back to a entity with local changes,
-     *   the changes will be automatically applied.
-     * - `false`: Local changes will not be backed up.
-     * Defaults to `manual_apply`.
-     */
-    localChangesBackup?: "manual_apply" | "auto_apply" | false;
 
-    /**
-     * Default view mode for displaying this collection.
-     * - "table": Display entities in a table with inline editing (default)
-     * - "cards": Display entities as a grid of cards with thumbnails
-     * - "kanban": Display entities in a Kanban board grouped by a property
-     * Defaults to "table".
-     */
-    defaultViewMode?: ViewMode;
 
-    /**
-     * Which view modes are available for this collection.
-     * Possible values: "table", "cards", "kanban".
-     * Defaults to all three: ["table", "cards", "kanban"].
-     * Note: "kanban" will only be available if the collection has at least
-     * one string property with `enum` defined, regardless of this setting.
-     */
-    enabledViews?: ViewMode[];
 
-    /**
-     * Configuration for Kanban board view mode.
-     * When set, the Kanban view mode becomes available.
-     */
-    kanban?: KanbanConfig<M>;
 
-    /**
-     * Property key to use for ordering items.
-     * Must reference a string/text property. When items are reordered,
-     * this property will be updated with lexicographic sort keys
-     * (e.g. "a0", "a1", "a0V") using string-based fractional indexing.
-     * Used by Kanban view for ordering within columns
-     * and can be used for general ordering purposes.
-     */
-    readonly orderProperty?: Extract<keyof M, string> | (string & {});
 
-    /**
-     * Actions that can be performed on the entities in this collection.
-     */
-    entityActions?: EntityAction<M, USER>[];
 
-    /**
-     * Builder for the collection actions rendered in the toolbar
-     */
-    Actions?: ComponentRef<CollectionActionsProps>[];
 
     /**
      * The database table name for this collection.
@@ -475,30 +240,6 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      */
     securityRules?: readonly SecurityRule[];
 
-    /**
-     * Collection-scoped component overrides. These take precedence over
-     * global overrides set on `<Rebase>`, but only within this collection's
-     * views (entity form, detail view, table, empty state, etc.).
-     *
-     * Only collection-scoped components (like `Entity.Form`, `Collection.EmptyState`,
-     * `Collection.Card`, etc.) can be overridden here. App-level components
-     * (like `Shell.AppBar`, `HomePage`) can only be overridden at the `<Rebase>` level.
-     *
-     * @example
-     * ```tsx
-     * const productsCollection: PostgresCollectionConfig = {
-     *     name: "Products",
-     *     slug: "products",
-     *     table: "products",
-     *     components: {
-     *         "Entity.Form": { Component: ProductCustomForm },
-     *         "Collection.Card": { Component: ProductCard },
-     *     },
-     *     properties: { ... }
-     * };
-     * ```
-     */
-    components?: CollectionComponentOverrideMap;
 }
 
 // ── Driver-specific collection types ──────────────────────────────────
@@ -663,11 +404,18 @@ export type CollectionConfig<M extends Record<string, unknown> = Record<string, 
 /**
  * Type guard for PostgreSQL collections.
  * Returns true if the collection uses the Postgres engine (or the default engine).
+ *
+ * Generic over the *input* type, and narrows by intersection rather than
+ * replacement. Narrowing to a bare `PostgresCollectionConfig` discarded whatever
+ * the caller actually had — most visibly the admin panel's view model, whose
+ * flattened presentation fields vanished the moment a collection passed through
+ * one of these guards.
+ *
  * @group Models
  */
-export function isPostgresCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: CollectionConfig<M, USER>
-): collection is PostgresCollectionConfig<M, USER> {
+export function isPostgresCollectionConfig<C extends CollectionConfig<any, any>>(
+    collection: C
+): collection is C & PostgresCollectionConfig<any, any> {
     return !collection.engine || collection.engine === "postgres";
 }
 
@@ -675,9 +423,9 @@ export function isPostgresCollectionConfig<M extends Record<string, unknown> = R
  * Type guard for Firebase / Firestore collections.
  * @group Models
  */
-export function isFirebaseCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: CollectionConfig<M, USER>
-): collection is FirebaseCollectionConfig<M, USER> {
+export function isFirebaseCollectionConfig<C extends CollectionConfig<any, any>>(
+    collection: C
+): collection is C & FirebaseCollectionConfig<any, any> {
     return collection.engine === "firestore";
 }
 
@@ -685,9 +433,9 @@ export function isFirebaseCollectionConfig<M extends Record<string, unknown> = R
  * Type guard for MongoDB collections.
  * @group Models
  */
-export function isMongoDBCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
-    collection: CollectionConfig<M, USER>
-): collection is MongoDBCollectionConfig<M, USER> {
+export function isMongoDBCollectionConfig<C extends CollectionConfig<any, any>>(
+    collection: C
+): collection is C & MongoDBCollectionConfig<any, any> {
     return collection.engine === "mongodb";
 }
 
@@ -725,247 +473,10 @@ export function getDeclaredSubcollections<M extends Record<string, unknown> = Re
 }
 
 
-/**
- * Configuration for Kanban board view mode.
- * @group Collections
- */
-export interface KanbanConfig<M extends Record<string, unknown> = Record<string, unknown>> {
-    /**
-     * Property key to use for Kanban board columns.
-     * Must reference a string property with `enum` values defined.
-     * Entities will be grouped into columns based on this property's value.
-     * The column order is determined by the order of `enum` values in the property.
-     */
-    columnProperty: Extract<keyof M, string> | (string & {});
-}
-
-/**
- * View mode for displaying a collection.
- * - "list": Simple, clean list view — the classic CMS default
- * - "table": Table with inline editing
- * - "cards": Grid of visual cards with thumbnails
- * - "kanban": Board view grouped by a property
- * @group Collections
- */
-export type ViewMode = "list" | "table" | "cards" | "kanban";
-
-/**
- * Parameter passed to the `Actions` prop in the collection configuration.
- * The component will receive this prop when it is rendered in the collection
- * toolbar.
- *
- * @group Models
- */
-export interface CollectionActionsProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User, EC extends CollectionConfig<M> = CollectionConfig<M>> {
-    /**
-     * Full collection path of this entity. This is the full path, like
-     * `users/1234/addresses`
-     */
-    path: string;
-
-    /**
-     * Path of the last collection, like `addresses`
-     */
-    relativePath: string;
-
-    /**
-     * Array of the parent path segments like `['users']`
-     */
-    parentCollectionSlugs: string[];
-    parentEntityIds: string[];
-
-    /**
-     * The collection configuration
-     */
-    collection: EC;
-
-    /**
-     * Use this controller to get the selected entities and to update the
-     * selected entities state.
-     */
-    selectionController: SelectionController<M>;
-
-    /**
-     * Use this controller to get the table controller and to update the
-     * table controller state.
-     */
-    tableController: EntityTableController<M>;
-
-    /**
-     * Context of the app status
-     */
-    context: RebaseContext<USER>;
-
-    /**
-     * Count of the entities in this collection.
-     * undefined means the count is still loading.
-     */
-    collectionEntitiesCount?: number;
-
-    /**
-     * Programmatically open the new-document form for this collection,
-     * optionally pre-populating it with initial field values.
-     * The form opens in the same mode configured for the collection
-     * (side panel, full screen, or split).
-     *
-     * This is the primary hook for workflows that need to create a document
-     * from external data — e.g. fetching content from a URL, importing from
-     * a third-party API, or duplicating from another system.
-     *
-     * @example
-     * // Inside a custom CollectionAction component:
-     * openNewDocument({ title: "Fetched title", body: "..." });
-     */
-    openNewDocument: (defaultValues?: Record<string, unknown>) => void;
-
-}
-
-/**
- * Use this controller to retrieve the selected entities or modify them in
- * an {@link CollectionConfig}
- * @group Models
- */
-export interface SelectionController<M extends Record<string, unknown> = Record<string, unknown>> {
-    selectedEntities: Entity<M>[];
-    setSelectedEntities(entities: Entity<M>[]): void;
-    setSelectedEntities(action: (prev: Entity<M>[]) => Entity<M>[]): void;
-    isEntitySelected(entity: Entity<M>): boolean;
-    toggleEntitySelection(entity: Entity<M>, newSelectedState?: boolean): void;
-}
-
-// Canonical filter types — re-exported from the single source-of-truth.
 export type { WhereFilterOp, FilterValues, WireFilterValues, FilterPreset } from "./filter-operators";
 
 
-/**
- * Used to indicate valid filter combinations (e.g. created in Firestore)
- * If the user selects a specific filter/sort combination, the CMS checks if it's
- * valid, otherwise it reverts to the simpler valid case
- * @group Models
- */
-export type FilterCombination<Key extends string> = Partial<Record<Key, "asc" | "desc">>;
-
-/**
- * Sizes in which a collection can be rendered
- * @group Models
- */
-export type CollectionSize = "xs" | "s" | "m" | "l" | "xl";
-
-export type AdditionalFieldDelegateProps<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> = {
-    entity: Entity<M>,
-    context: RebaseContext<USER>
-};
-
-/**
- * Use this interface for adding additional fields to entity collection views and forms.
- * @group Models
- */
-export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Record<string, unknown>,
-    USER extends User = User> {
-
-    /**
-     * ID of this column. You can use this id in the `properties` field of the
-     * collection in any order you want
-     */
-    key: string;
-
-    /**
-     * Header of this column
-     */
-    name: string;
-
-    /**
-     * Width of the generated column in pixels
-     */
-    width?: number;
-
-    /**
-     * Builder for the custom field
-     */
-    Builder?(props: { entity: Entity<M>, context: RebaseContext<USER> }): React.ReactNode;
-
-
-    /**
-     * If this column needs to update dynamically based on other properties,
-     * you can define an array of keys as strings with the
-     * `dependencies` prop.
-     * e.g. ["name", "surname"]
-     * This is a performance optimization, if you don't define dependencies
-     * it will be updated in every render.
-     */
-    dependencies?: NoInfer<Extract<keyof M, string>> | NoInfer<Extract<keyof M, string>>[] | (string & {}) | (string & {})[];
-
-    /**
-     * Use this prop to define the value of the column as a string or number.
-     * This is the value that will be used for exporting the collection.
-     * If `Builder` is defined, this prop will be ignored in the collection
-     * view.
-     * @param entity
-     */
-    value?(props: {
-        entity: Entity<M>,
-        context: RebaseContext
-    }): string | number | Promise<string | number> | undefined;
-}
-
-
 export type InferCollectionConfigType<S extends CollectionConfig> = S extends CollectionConfig<infer M> ? M : never;
-
-/**
- * Used in the {@link CollectionConfig#defaultSelectedView} to define the default
- * @group Models
- */
-export type DefaultSelectedViewBuilder = (params: DefaultSelectedViewParams) => string | undefined;
-
-/**
- * Used in the {@link CollectionConfig#defaultSelectedView} to define the default
- * @group Models
- */
-export type DefaultSelectedViewParams = {
-    status?: EntityStatus;
-    entityId?: string | number;
-};
-/**
- * You can use this controller to control the table view of a collection.
- */
-export type EntityTableController<M extends Record<string, unknown> = Record<string, unknown>> = {
-    data: Entity<M>[];
-    dataLoading: boolean;
-    noMoreToLoad: boolean;
-    dataLoadingError?: Error;
-    filterValues?: FilterValues<Extract<keyof M, string> | (string & {})>;
-    setFilterValues?: (filterValues: FilterValues<Extract<keyof M, string> | (string & {})>) => void;
-    sortBy?: [Extract<keyof M, string> | (string & {}), "asc" | "desc"];
-    setSortBy?: (sortBy?: [Extract<keyof M, string> | (string & {}), "asc" | "desc"]) => void;
-    searchString?: string;
-    setSearchString?: (searchString?: string) => void;
-    clearFilter?: () => void;
-    itemCount?: number;
-    setItemCount?: (itemCount: number) => void;
-    initialScroll?: number;
-    onScroll?: (props: {
-        scrollDirection: "forward" | "backward",
-        scrollOffset: number,
-        scrollUpdateWasRequested: boolean
-    }) => void;
-    paginationEnabled?: boolean;
-    pageSize?: number;
-    checkFilterCombination?: (filterValues: FilterValues<string>,
-        sortBy?: [string, "asc" | "desc"]) => boolean;
-    popupCell?: SelectedCellProps<M>;
-    setPopupCell?: (popupCell?: SelectedCellProps<M>) => void;
-
-    onAddColumn?: (column: string) => void;
-}
-
-export type SelectedCellProps<M extends Record<string, unknown> = Record<string, unknown>> = {
-    propertyKey: Extract<keyof M, string> | (string & {});
-    cellRect: DOMRect;
-    width: number;
-    height: number;
-    entityPath: string;
-    entityId: string | number;
-};
 
 /**
  * Configuration for authentication collections.
@@ -1034,9 +545,14 @@ export interface AuthCollectionConfig {
      * the built-in `resetPasswordAction` into the collection's entity actions.
      *
      * Set to `false` to disable, or pass a custom `EntityAction` to replace the UI.
+     *
+     * The object form is an `EntityAction` from `@rebasepro/admin-types`, typed
+     * here as `object` because it is a React component with admin controllers in
+     * its props and nothing on the server reads it — only whether the built-in
+     * action is injected, which is the boolean.
      */
     actions?: {
-        resetPassword?: boolean | EntityAction;
+        resetPassword?: boolean | object;
     };
 }
 

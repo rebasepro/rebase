@@ -1,5 +1,5 @@
 import { DEFAULT_FIELD_CONFIGS } from "../../../../components/field_configs";
-import { PropertyConfigId, PropertyConfig } from "@rebasepro/types";
+import { PropertyConfigId, PropertyConfig } from "@rebasepro/admin-types";
 
 export const supportedFieldsIds: PropertyConfigId[] = [
     "text_field",

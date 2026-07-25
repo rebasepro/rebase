@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export const usersCollectionTemplate = {
     slug: "users",
@@ -39,4 +39,4 @@ export const usersCollectionTemplate = {
             url: "image"
         }
     }
-} as unknown as CollectionConfig;
+} as unknown as AdminCollection;

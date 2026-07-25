@@ -7,6 +7,7 @@
         "@fontsource/jetbrains-mono": "^5.2.8",
         "@fontsource/rubik": "^5.2.8",
         "@rebasepro/admin": "workspace:*",
+        "@rebasepro/admin-types": "workspace:*",
         "@rebasepro/app": "workspace:*",
         "@rebasepro/client": "workspace:*",
         "@rebasepro/plugin-ai": "workspace:*",

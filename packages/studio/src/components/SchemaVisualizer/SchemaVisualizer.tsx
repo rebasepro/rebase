@@ -29,13 +29,13 @@ import {
     useStudioCollectionRegistry,
     IconForView
 } from "@rebasepro/app";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { useSchemaGraph } from "./useSchemaGraph";
 import type { TableNodeData } from "./useSchemaGraph";
 import { TableNode } from "./TableNode";
 import { RelationEdge } from "./RelationEdge";
-
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 // ─── Custom node / edge type registrations ────────────────────────────
 
@@ -52,7 +52,7 @@ const edgeTypes = {
 function SchemaVisualizerCanvas({
     collections
 }: {
-    collections: CollectionConfig[];
+    collections: AdminCollection[];
 }) {
     const reactFlowInstance = useReactFlow();
     const {
@@ -630,7 +630,7 @@ duration: 400 }
 export const SchemaVisualizer = () => {
     const { collections: registryCollections } =
         useStudioCollectionRegistry() as {
-            collections?: CollectionConfig[];
+            collections?: AdminCollection[];
         };
 
     // Merge registry collections with any passed collections

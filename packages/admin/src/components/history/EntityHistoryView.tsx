@@ -1,5 +1,5 @@
 
-import type { EntityCustomViewParams } from "@rebasepro/types";
+import type { EntityCustomViewParams } from "@rebasepro/admin-types";
 import { useRef, useEffect } from "react";
 import { cls, IconButton, Label, Tooltip, Typography } from "@rebasepro/ui";
 import { ErrorBoundary, HistoryIcon } from "@rebasepro/ui";

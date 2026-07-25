@@ -1,4 +1,5 @@
-import { ArrayProperty, BooleanProperty, DateProperty, MapProperty, NumberProperty, Property, PropertyConfig, StringProperty } from "@rebasepro/types";
+import { ArrayProperty, BooleanProperty, DateProperty, MapProperty, NumberProperty, Property, StringProperty } from "@rebasepro/types";
+import { PropertyConfig } from "@rebasepro/admin-types";
 import { mergeDeep } from "@rebasepro/utils";
 
 

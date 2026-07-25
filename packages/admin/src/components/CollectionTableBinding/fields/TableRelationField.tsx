@@ -1,11 +1,12 @@
 import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
-import type { CollectionConfig } from "@rebasepro/types";
+
 import { getCollectionDataPath } from "@rebasepro/types";
 import React, { useCallback } from "react";
 import { deepEqual as equal } from "fast-equals"
 
 import { RelationPreview } from "../../../preview";
-import { CollectionSize, Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
+import { Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
+import { CollectionSize, AdminCollection } from "@rebasepro/admin-types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { } from "@rebasepro/app";
@@ -57,7 +58,7 @@ export function TableRelationField(props: TableRelationFieldProps) {
 
 export const TableRelationFieldInternal = React.memo(
     function TableRelationFieldInternal(props: TableRelationFieldProps & {
-        collection: CollectionConfig;
+        collection: AdminCollection;
     }) {
         const {
             name,

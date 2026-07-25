@@ -1,4 +1,4 @@
-import type { SidePanelController } from "@rebasepro/types";
+import type { SidePanelController } from "@rebasepro/admin-types";
 import React, { useContext } from "react";
 
 export const SidePanelControllerContext = React.createContext<SidePanelController>({} as SidePanelController);

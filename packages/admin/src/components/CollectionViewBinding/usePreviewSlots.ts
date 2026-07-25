@@ -1,13 +1,14 @@
 import { useMemo } from "react";
-import type { CollectionConfig, Property, RelationProperty } from "@rebasepro/types";
-import type { Entity, PropertyConfig, EntityRelation } from "@rebasepro/types";
-import { getEntityImagePreviewPropertyKey, getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/common";
+import type { Property, RelationProperty } from "@rebasepro/types";
+import type { Entity, EntityRelation } from "@rebasepro/types";
+import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
+import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
+import { getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
-import type { AuthController } from "@rebasepro/types";
+import type { AuthController } from "@rebasepro/admin-types";
 import { ChipColorScheme, CHIP_COLORS } from "@rebasepro/ui";
-
 
 // ── Slot types ────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ export interface CollectionSlotKeys {
  * Pure function — call inside `useMemo`.
  */
 export function resolveCollectionSlotKeys(
-    collection: CollectionConfig<Record<string, unknown>>,
+    collection: AdminCollection<Record<string, unknown>>,
     authController: AuthController,
     propertyConfigs: Record<string, PropertyConfig>
 ): CollectionSlotKeys {
@@ -220,7 +221,7 @@ dateKey };
  * and value is the first element (for arrays) or the raw value.
  */
 function resolveImageSlot(
-    collection: CollectionConfig<Record<string, unknown>>,
+    collection: AdminCollection<Record<string, unknown>>,
     imageKey: string,
     entity: Entity<Record<string, unknown>>
 ): PreviewSlot | undefined {
@@ -305,7 +306,7 @@ function formatDateValue(value: unknown): string {
  * `resolveEntitySlots` for each entity row.
  */
 export function useCollectionSlotKeys(
-    collection: CollectionConfig<Record<string, unknown>>,
+    collection: AdminCollection<Record<string, unknown>>,
     authController: AuthController,
     propertyConfigs: Record<string, PropertyConfig>
 ): CollectionSlotKeys {
@@ -324,7 +325,7 @@ export function useCollectionSlotKeys(
  */
 export function resolveEntitySlots(
     entity: Entity<Record<string, unknown>>,
-    collection: CollectionConfig<Record<string, unknown>>,
+    collection: AdminCollection<Record<string, unknown>>,
     slotKeys: CollectionSlotKeys
 ): EntityPreviewSlots {
     const { titleKey, titleKeyCandidates, imageKey, subtitleKey, relationKeys, statusKey, dateKey } = slotKeys;
@@ -472,11 +473,11 @@ function resolveRelationDisplayName(
     const data = "data" in relation ? (relation as EntityRelation).data : undefined;
 
     // Resolve target collection from either `prop.relation.target()` or `prop.target()` (inline API)
-    let targetCollection: CollectionConfig | undefined;
+    let targetCollection: AdminCollection | undefined;
     try {
         const resolved = prop.relation?.target?.() ?? (typeof prop.target === "function" ? prop.target() : undefined);
         if (resolved && typeof resolved === "object") {
-            targetCollection = resolved as CollectionConfig;
+            targetCollection = resolved as AdminCollection;
         }
     } catch {
         // Target collection may not be resolvable

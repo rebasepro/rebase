@@ -13,7 +13,8 @@ import {
     navigateToEntity
 } from "../../src/util/navigation_utils";
 
-import type { CollectionConfig, SidePanelController, UrlController } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
+import type { SidePanelController, UrlController } from "@rebasepro/admin-types";
 
 // ---------------------------------------------------------------------------
 // removeInitialSlash

@@ -26,7 +26,8 @@ import {
     SidePanelProvider,
     RebaseRoute
 } from "@rebasepro/admin";
-import { DEFAULT_DATA_SOURCE_KEY, Entity, PropertyConfig, RebaseContext } from "@rebasepro/types";
+import { DEFAULT_DATA_SOURCE_KEY, Entity } from "@rebasepro/types";
+import { PropertyConfig, RebaseContext } from "@rebasepro/admin-types";
 import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { buildRebaseData } from "@rebasepro/common";
 import { Route, Outlet, Navigate } from "react-router-dom";

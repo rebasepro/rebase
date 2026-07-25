@@ -17,12 +17,13 @@ import {
 } from "@rebasepro/app";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
 import { CircularProgressCenter } from "@rebasepro/ui";
-import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, CollectionConfig, RebasePlugin } from "@rebasepro/types";
+
+import type { AppView, CollectionEditorOptions, EntityCustomView, EntityAction, RebasePlugin, AdminCollection } from "@rebasepro/admin-types";
 import type { CollectionRegistryController } from "@rebasepro/types";
-import type { UrlController, NavigationStateController } from "@rebasepro/types";
+import type { UrlController, NavigationStateController } from "@rebasepro/admin-types";
 
 const EMPTY_PLUGINS: RebasePlugin[] = [];
-const EMPTY_COLLECTIONS: CollectionConfig[] = [];
+const EMPTY_COLLECTIONS: AdminCollection[] = [];
 
 import { useBuildNavigationStateController } from "../hooks/navigation/useBuildNavigationStateController";
 import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController";

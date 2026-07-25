@@ -1,5 +1,6 @@
 import { CollectionsConfigController } from "./config_controller";
-import { Entity, CollectionConfig, Property } from "@rebasepro/types";
+import { Entity, Property } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Controller to open the collection editor dialog.
@@ -11,7 +12,7 @@ export interface CollectionEditorController {
         id?: string,
         path?: string,
         parentCollectionSlugs: string[], parentEntityIds: string[],
-        parentCollection?: CollectionConfig,
+        parentCollection?: AdminCollection,
         existingEntities?: Entity<any>[],
         /**
          * Initial view to open: "general", "display", or "properties"
@@ -34,9 +35,9 @@ export interface CollectionEditorController {
          * A collection to duplicate from. If provided, the new collection will be
          * pre-populated with the same properties (but with empty name, path, and id).
          */
-        copyFrom?: CollectionConfig,
+        copyFrom?: AdminCollection,
         parentCollectionSlugs: string[], parentEntityIds: string[],
-        parentCollection?: CollectionConfig,
+        parentCollection?: AdminCollection,
         redirect: boolean,
         sourceClick?: string
     }) => void;
@@ -47,7 +48,7 @@ export interface CollectionEditorController {
         currentPropertiesOrder?: string[],
         editedCollectionId: string,
         parentCollectionSlugs: string[], parentEntityIds: string[],
-        collection: CollectionConfig,
+        collection: AdminCollection,
         existingEntities: Entity<any>[]
     }) => void;
 

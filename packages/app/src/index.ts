@@ -24,3 +24,4 @@ export * from "./hooks/useStudioBridge";
 
 // Self-assembling bridge registration hook
 export { useBridgeRegistration } from "./hooks/useBridgeRegistration";
+export * from "./collections";

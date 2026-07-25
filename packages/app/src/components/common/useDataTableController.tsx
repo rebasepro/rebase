@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -6,7 +6,8 @@ import { useData, useRebaseContext } from "../../hooks";
 import { useDataOrder } from "../../hooks/data/useDataOrder";
 import { populateFetchCache } from "../../hooks/data/useFetch";
 import { getRelationIncludeParams } from "../../util/previews";
-import { Entity, EntityReference, EntityRelation, EntityTableController, FilterValues, RebaseContext, SelectedCellProps, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
+import { Entity, EntityReference, EntityRelation, FilterValues, User, WhereFilterOp, FindResponse } from "@rebasepro/types";
+import { EntityTableController, RebaseContext, SelectedCellProps, AdminCollection } from "@rebasepro/admin-types";
 import { ScrollRestorationController } from "./useScrollRestoration";
 
 export const DEFAULT_PAGE_SIZE = 50;
@@ -19,7 +20,7 @@ export type DataTableControllerProps<M extends Record<string, any> = any> = {
     /**
      * The collection that is represented by this config.
      */
-    collection: CollectionConfig<M>;
+    collection: AdminCollection<M>;
     /**
      * List of entities that will be displayed on top, no matter the ordering.
      * This is used for reference fields selection
@@ -281,7 +282,6 @@ export function useDataTableController<M extends Record<string, any> = any, USER
 
         return unsubscribe;
     }, [dataClient, path, itemCount, currentSort, sortByProperty, filterValues, searchString]);
-
 
     const orderedData = useDataOrder({
         data: rawData,

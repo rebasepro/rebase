@@ -1,17 +1,21 @@
 import { useMemo } from "react";
 import { useRebaseContext } from "@rebasepro/app";
 import type {
-    AuthController,
-    RebaseContext,
-    SideDialogsController,
-    SidePanelController,
     User
 } from "@rebasepro/types";
 import type {
-    CollectionRegistryController,
+    AuthController,
+    RebaseContext,
+    SideDialogsController,
+    SidePanelController
+} from "@rebasepro/admin-types";
+import type {
+    CollectionRegistryController
+} from "@rebasepro/types";
+import type {
     NavigationStateController,
     UrlController
-} from "@rebasepro/types";
+} from "@rebasepro/admin-types";
 import { useSidePanel } from "./useSidePanel";
 import { useSideDialogsController } from "./useSideDialogsController";
 import {

@@ -1,9 +1,10 @@
 
-import type { CollectionConfig } from "@rebasepro/types";
+
 import type { FormContext } from "../types/fields";
-import type { EntityAction, EntityActionClickProps, SidePanelController } from "@rebasepro/types";
+import type { EntityAction, EntityActionClickProps, SidePanelController, AdminCollection } from "@rebasepro/admin-types";
 import React, { useMemo } from "react";
-import { Entity, getCollectionDataPath, RebaseContext } from "@rebasepro/types";
+import { Entity, getCollectionDataPath } from "@rebasepro/types";
+import { RebaseContext } from "@rebasepro/admin-types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { copyEntityAction, deleteEntityAction } from "./common/default_entity_actions";
 import { mergeEntityActions } from "../util/entity_actions";
@@ -116,7 +117,7 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     savingError: Error | undefined,
     entity: Entity<M> | undefined,
     formActions: EntityAction[],
-    collection: CollectionConfig,
+    collection: AdminCollection,
     context: RebaseContext,
     sidePanelController: SidePanelController,
     disabled: boolean,
@@ -163,7 +164,6 @@ function buildBottomActions<M extends Record<string, unknown>>({
 
         {formActions.length > 0 && <div className="grow flex overflow-auto no-scrollbar">
             {formActions.map((action, index) => {
-
 
                 const props = {
                     view: "form",

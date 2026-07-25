@@ -3,7 +3,8 @@ import {
     useTranslation
 } from "@rebasepro/app";
 import { getDefaultPropertiesOrder } from "../_cms_internals";
-import { CollectionConfig, EntityTableController } from "@rebasepro/types";
+
+import { EntityTableController, AdminCollection } from "@rebasepro/admin-types";
 import { PlusIcon, Tooltip } from "@rebasepro/ui";
 import { useCollectionEditorController } from "../useCollectionEditorController";
 
@@ -15,7 +16,7 @@ export function PropertyAddColumnComponent({
 }: {
     path: string,
     parentCollectionSlugs: string[], parentEntityIds: string[],
-    collection: CollectionConfig;
+    collection: AdminCollection;
     tableController: EntityTableController;
 }) {
 

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useRef } from "react";
-import type { RebaseRegistryController, RebaseAdminConfig, RebaseStudioConfig, RebaseAuthConfig } from "@rebasepro/types";
+import type { RebaseRegistryController, RebaseAdminConfig, RebaseStudioConfig, RebaseAuthConfig } from "@rebasepro/admin-types";
 
 /**
  * Split into two contexts to prevent infinite re-render loops:

@@ -1,4 +1,4 @@
-import type { UrlController } from "@rebasepro/types";
+import type { UrlController } from "@rebasepro/admin-types";
 import React, { createContext } from "react";
 
 

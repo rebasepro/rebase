@@ -1,7 +1,8 @@
-import type { CollectionConfig, Property, MapProperty, Properties } from "@rebasepro/types";
+import type { Property, MapProperty, Properties } from "@rebasepro/types";
 import { useMemo } from "react";
 ;
 import { getSubcollections } from "@rebasepro/common";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Get a property in a property tree from a dot-path like `address.street`.
@@ -28,10 +29,10 @@ export type PropertyColumnConfig = {
     disabled: boolean;
 };
 
-export function getSubcollectionColumnId(collection: CollectionConfig<any>) {
+export function getSubcollectionColumnId(collection: AdminCollection<any>) {
     return `subcollection:${collection.slug}`;
 }
-export function useColumnIds<M extends Record<string, any>>(collection: CollectionConfig<M>, includeSubcollections: boolean): PropertyColumnConfig[] {
+export function useColumnIds<M extends Record<string, any>>(collection: AdminCollection<M>, includeSubcollections: boolean): PropertyColumnConfig[] {
     return useMemo(() => {
         if (collection.propertiesOrder) {
             return hideAndExpandKeys(collection, collection.propertiesOrder);
@@ -40,7 +41,7 @@ export function useColumnIds<M extends Record<string, any>>(collection: Collecti
     }, [collection, includeSubcollections]);
 }
 
-function hideAndExpandKeys<M extends Record<string, any>>(collection: CollectionConfig<M>, keys: string[]): PropertyColumnConfig[] {
+function hideAndExpandKeys<M extends Record<string, any>>(collection: AdminCollection<M>, keys: string[]): PropertyColumnConfig[] {
 
     // First, figure out which spread map roots have individual child keys in the order
     // If so, we should NOT auto-expand them - just use the explicit child keys
@@ -171,11 +172,11 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: Collection
     return result;
 }
 
-function getDefaultColumnKeys<M extends Record<string, any> = any>(collection: CollectionConfig<M>, includeSubCollections: boolean) {
+function getDefaultColumnKeys<M extends Record<string, any> = any>(collection: AdminCollection<M>, includeSubCollections: boolean) {
     const propertyKeys = Object.keys(collection.properties);
 
     const additionalFields = collection.additionalFields ?? [];
-    const subCollections: CollectionConfig[] = getSubcollections(collection) ?? [];
+    const subCollections: AdminCollection[] = getSubcollections(collection) ?? [];
 
     const columnIds: string[] = [
         ...propertyKeys,
@@ -207,7 +208,7 @@ export function getColumnKeysForProperty(property: Property, key: string, disabl
     }];
 }
 
-export function getFormFieldKeys(collection: CollectionConfig): string[] {
+export function getFormFieldKeys(collection: AdminCollection): string[] {
     const propertyKeys = collection.properties ? Object.keys(collection.properties) : [];
     const additionalFields = collection.additionalFields ?? [];
     const allKeys = [

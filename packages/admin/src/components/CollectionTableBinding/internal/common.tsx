@@ -1,5 +1,6 @@
-import type { CollectionConfig } from "@rebasepro/types";
+
 import type { ArrayProperty, Property } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 export function getTableCellAlignment(property: Property): "right" | "left" | "center" {
     if (property.type === "boolean") {
@@ -68,6 +69,6 @@ export function getTablePropertyColumnWidth(property: Property): number {
     }
 }
 
-export function getSubcollectionColumnId(collection: CollectionConfig) {
+export function getSubcollectionColumnId(collection: AdminCollection) {
     return `subcollection:${collection.slug}`;
 }

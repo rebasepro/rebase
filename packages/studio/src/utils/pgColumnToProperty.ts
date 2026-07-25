@@ -1,4 +1,5 @@
-import type { CollectionConfig, PostgresProperties, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, SecurityOperation, SecurityRule } from "@rebasepro/types";
+import type { PostgresProperties, Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, SecurityOperation, SecurityRule } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Maps a PostgreSQL column data type to a Rebase property type.
@@ -194,13 +195,13 @@ label: v.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) }))
 }
 
 /**
- * Builds a partial CollectionConfig from PostgreSQL table metadata.
+ * Builds a partial AdminCollection from PostgreSQL table metadata.
  * This is used when creating a new collection from an existing database table.
  */
 export function buildCollectionFromTableMetadata(
     tableName: string,
     metadata: TableMetadata
-): Partial<CollectionConfig> {
+): Partial<AdminCollection> {
     const properties: Record<string, Property> = {};
     const propertiesOrder: string[] = [];
     const relations: Array<{

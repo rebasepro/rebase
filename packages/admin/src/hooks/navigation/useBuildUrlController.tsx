@@ -1,6 +1,6 @@
-import type { UrlController, NavigateOptions } from "@rebasepro/types";
+import type { UrlController, NavigateOptions } from "@rebasepro/admin-types";
 import { useCallback, useMemo } from "react";
-import { removeInitialAndTrailingSlashes, resolveCollectionPathIds } from "@rebasepro/common";
+import { removeInitialAndTrailingSlashes, resolveCollectionPathIds } from "@rebasepro/app";
 import { CollectionRegistryController } from "@rebasepro/types";
 import { useNavigate } from "react-router-dom";
 

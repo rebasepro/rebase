@@ -1,6 +1,6 @@
 import React, { useLayoutEffect } from "react";
 import { useRebaseRegistryDispatch } from "@rebasepro/app";
-import type { RebaseAdminConfig } from "@rebasepro/types";
+import type { RebaseAdminConfig } from "@rebasepro/admin-types";
 
 /**
  * Declarative component to configure the CMS in Rebase.
