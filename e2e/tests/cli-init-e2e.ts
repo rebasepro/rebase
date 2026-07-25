@@ -435,13 +435,19 @@ function createBooksCollection(projectPath: string) {
     console.log("📚 Creating new 'books' collection...");
     const collectionsDir = path.join(projectPath, "config", "collections");
 
-    // Authored the way the templates are: presentation nested under `admin`, and
-    // annotated with AdminCollectionConfig so the block is type-checked. This file
-    // is compiled by the scaffolded project's `config` package during the Docker
-    // build, so a flat field here fails the build rather than being ignored.
-    const booksContent = `import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+    // Authored exactly the way the templates are: `PostgresCollectionConfig` from
+    // core, with presentation nested under `admin`. There is no separate admin
+    // authoring type — `config/admin.d.ts` carries the one-line
+    // `/// <reference types="@rebasepro/admin-types" />` that declares `admin` onto
+    // the core type for the whole program.
+    //
+    // This file is compiled by the scaffolded project's `config` package during the
+    // Docker build, so it is the end-to-end proof of two things at once: a flat
+    // presentation field fails the build rather than being silently ignored, and
+    // that reference file really does reach a generated project.
+    const booksContent = `import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const booksCollection: AdminCollectionConfig = {
+const booksCollection: PostgresCollectionConfig = {
     name: "Books",
     singularName: "Book",
     slug: "books",

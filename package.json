@@ -47,7 +47,7 @@
     "deploy:web": "cd website && run-s deploy",
     "build": "pnpm --filter './packages/*' -r run build && pnpm --filter './app' -r run build",
     "build:stream": "pnpm -r run build --reporter=append-only",
-    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json && tsc --noEmit -p tsconfig.tests.json",
     "verify:docs": "node --max-old-space-size=8192 scripts/verify-docs.mjs",
     "check:headless": "node scripts/headless-guard/check.mjs",
     "check:types-headless": "node scripts/headless-guard/check-types.mjs",

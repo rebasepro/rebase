@@ -1,0 +1,30 @@
+{
+  "//": "Type-checks test files. Run as the second half of `pnpm typecheck`.",
+  "//why": "Nothing type-checked a test file until this existed. `tsconfig.typecheck.json` reaches only `packages/*/src`, and excludes test files on top of that — so a test could import a type that does not exist and stay green forever, because vitest's esbuild transform strips types without checking them. That is exactly what happened: admin-types' own test kept importing `type AdminCollectionConfig` for the whole refactor, after the type had been deliberately deleted, and the first thing to notice was a Docker build in an end-to-end run.",
+  "//scope": "Only the packages listed below, because the other 16 test directories carry 1493 pre-existing errors between them — worst are server-postgres (808), client (241), common (124) and server (111). Those are real debt and unrelated to the admin/BaaS split; fixing a package's test types is what earns it a line here. `packages/types/__tests__` is deliberately absent and should stay absent: the `bivariance/` files are probes that assert generics are *not* assignable, so they are supposed to error.",
+  "extends": "./tsconfig.typecheck.json",
+  "compilerOptions": {
+    // The parent pins `types: ["node"]`, which leaves `describe`/`it`/`expect`
+    // undeclared. In the whole-monorepo program they happened to resolve anyway,
+    // because some other package pulled `@types/jest` in and global types leak
+    // across a program — not something to rely on. admin-types runs on jest; a
+    // vitest package added to `include` would want `"vitest/globals"` here too.
+    "types": [
+      "node",
+      "jest"
+    ]
+  },
+  "include": [
+    "packages/admin-types/test",
+    // `augment.ts` only declares `admin` if it is *in the program*, and the test
+    // imports `../src/admin_collection` directly, not the package index that
+    // side-effect-imports it. Without this line every `admin` in the fixtures is
+    // an error — the same program-scoping rule the templates deal with via
+    // `config/admin.d.ts`.
+    "packages/admin-types/src"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/dist"
+  ]
+}

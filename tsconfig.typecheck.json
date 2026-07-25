@@ -189,6 +189,9 @@
     "packages/utils/src",
     "e2e"
   ],
+  // Test files are excluded here and type-checked by `tsconfig.tests.json`
+  // instead, which `pnpm typecheck` runs straight after this one. See that file
+  // for why they are a separate program rather than an entry above.
   "exclude": [
     "**/node_modules",
     "**/dist",

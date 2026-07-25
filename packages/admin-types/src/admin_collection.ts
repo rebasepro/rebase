@@ -3,11 +3,12 @@
  *
  * A collection is one file. Schema, security rules and callbacks sit at the top
  * level, where the backend reads them; everything the admin panel renders sits
- * under `admin`. `@rebasepro/types` declares that field as an opaque
- * {@link AdminBlock} because a server has no use for a kanban column definition
- * and naming one would drag `React.ReactNode` back into the BaaS contract. This
- * is the other side of that boundary — the 38 fields, fully typed, in the package
- * where React exists.
+ * under `admin`. `@rebasepro/types` does not declare that field at all — naming a
+ * kanban column definition would drag `React.ReactNode` back into the BaaS
+ * contract, and a server has no use for one. `augment.ts` in this package declares
+ * it, by declaration merging, onto core's `CollectionConfig`. So this is the other
+ * side of that boundary: the 38 fields, fully typed, in the package where React
+ * exists, and reachable only by a program that has opted in.
  *
  * Each field is declared exactly once, here. Core does not carry a React-free
  * skeleton of the same shape; two definitions that agree only by luck is the
@@ -50,11 +51,15 @@ import type { CollectionComponentOverrideMap } from "./types/component_overrides
  * Admin-panel presentation and behaviour for a collection.
  *
  * A `type` rather than an `interface`, and that is load-bearing: TypeScript gives
- * an implicit index signature to an object *type alias* but not to an interface,
- * so as an interface this would not be assignable to {@link AdminBlock} — and
- * every collection authored with a typed `admin` block would be rejected wherever
- * a plain `CollectionConfig` is expected. Declaration merging is not wanted here
- * anyway; a plugin adding fields to the block would have nothing reading them.
+ * an implicit index signature to an object *type alias* but not to an interface.
+ * `toAdminCollectionConfig` has to widen a collection carrying this block to
+ * `Record<string, unknown>` in order to move the flattened keys back under
+ * `admin`, and as an interface that conversion is an error (TS2352, "index
+ * signature for type 'string' is missing"). Flipping it and running
+ * `pnpm typecheck` reproduces that in one line.
+ *
+ * Declaration merging is not wanted here anyway; a plugin adding fields to the
+ * block would have nothing reading them.
  *
  * @group Models
  */
@@ -393,10 +398,10 @@ export type AdminCollectionOptions<
  * Define a collection with the admin block type-checked.
  *
  * The same identity function as `defineCollection` in `@rebasepro/common` — which
- * is what a BaaS or headless project uses, and where `admin` is the opaque
- * {@link AdminBlock} — with one difference: here the block is
- * {@link AdminCollectionOptions}, so `admin: { icon, listProperties, kanban }`
- * gets completion and a typo is an error.
+ * is what a BaaS or headless project uses, and where `admin` does not exist at all
+ * — with one difference: importing this one brings the augmentation with it, so
+ * `admin: { icon, listProperties, kanban }` gets completion and a typo is an
+ * error. See {@link AdminCollectionOptions}.
  *
  * Import it from the layer you are in. A project with an admin panel wants this
  * one; a project without one has no `admin` block to check.
@@ -491,8 +496,9 @@ export const ADMIN_COLLECTION_KEYS = CORE_ADMIN_COLLECTION_KEYS satisfies readon
  * The distinction that matters is direction:
  *
  * - **Reading** a resolved collection → `AdminCollection` (flat, convenient).
- * - **Authoring or persisting** one → {@link AdminCollectionConfig} (nested,
- *   which is what the file on disk and the wire both look like).
+ * - **Authoring or persisting** one → core's `CollectionConfig`, with the `admin`
+ *   block this package augments onto it (nested, which is what the file on disk
+ *   and the wire both look like).
  *
  * `admin` is kept alongside the flattened fields so the collection editor can
  * still see the block it has to write back.

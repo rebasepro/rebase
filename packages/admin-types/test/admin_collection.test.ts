@@ -2,9 +2,11 @@ import {
     ADMIN_COLLECTION_KEYS,
     resolveAdminCollection,
     toAdminCollectionConfig,
-    type AdminCollection,
-    type AdminCollectionConfig
+    type AdminCollection
 } from "../src/admin_collection";
+// There is no separate admin authoring type: `augment.ts` declares `admin` onto
+// `CollectionConfig` itself, so core's type *is* the nested authoring shape.
+import type { CollectionConfig } from "@rebasepro/types";
 
 /**
  * `ADMIN_COLLECTION_KEYS` is the same list as `AdminCollectionOptions`, in data
@@ -50,7 +52,7 @@ describe("ADMIN_COLLECTION_KEYS", () => {
     });
 });
 
-const nested = (): AdminCollectionConfig =>
+const nested = (): CollectionConfig =>
     ({
         slug: "posts",
         name: "Posts",
@@ -58,7 +60,7 @@ const nested = (): AdminCollectionConfig =>
         properties: { title: { name: "Title", type: "string" } },
         securityRules: [{ ownerField: "author_id" }],
         admin: { icon: "FileText", listProperties: ["title"], defaultViewMode: "table" }
-    }) as unknown as AdminCollectionConfig;
+    }) as unknown as CollectionConfig;
 
 describe("resolveAdminCollection", () => {
     it("flattens the block onto the collection", () => {
@@ -91,7 +93,7 @@ describe("resolveAdminCollection", () => {
     });
 
     it("passes a collection with no block straight through", () => {
-        const bare = { slug: "tags", name: "Tags", table: "tags", properties: {} } as unknown as AdminCollectionConfig;
+        const bare = { slug: "tags", name: "Tags", table: "tags", properties: {} } as unknown as CollectionConfig;
         expect(resolveAdminCollection(bare)).toBe(bare);
     });
 
@@ -105,7 +107,7 @@ describe("resolveAdminCollection", () => {
 describe("toAdminCollectionConfig", () => {
     it("lifts flattened fields back into the block", () => {
         const flat = resolveAdminCollection(nested());
-        const authoring = toAdminCollectionConfig(flat) as Record<string, unknown>;
+        const authoring = toAdminCollectionConfig(flat) as unknown as Record<string, unknown>;
         expect(authoring.admin).toEqual({
             icon: "FileText",
             listProperties: ["title"],
@@ -134,7 +136,7 @@ describe("toAdminCollectionConfig", () => {
             strictWrites: true,
             icon: "FileText"
         } as unknown as AdminCollection;
-        const authoring = toAdminCollectionConfig(flat) as Record<string, unknown>;
+        const authoring = toAdminCollectionConfig(flat) as unknown as Record<string, unknown>;
         expect(authoring.strictWrites).toBe(true);
         expect(authoring.admin).toEqual({ icon: "FileText" });
     });
