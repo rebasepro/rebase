@@ -74,6 +74,11 @@ export function bundleDeployBody(input: {
     manifest: RebaseBundleManifest;
     app?: string;
     message?: string;
+    /**
+     * Every app this repository declares in `rebase.json`, so the platform can
+     * register the whole set rather than only the one being deployed.
+     */
+    declaredApps?: DeclaredApp[];
 }): Record<string, unknown> {
     return {
         projectId: input.projectId,
@@ -82,8 +87,33 @@ export function bundleDeployBody(input: {
         app: input.app ?? input.manifest.app ?? "backend",
         client: "cli",
         frameworkVersion: input.manifest.runtime?.builtAgainst,
+        ...(input.declaredApps?.length ? { declaredApps: input.declaredApps } : {}),
         ...(input.message ? { message: input.message } : {})
     };
+}
+
+/** An app as `rebase.json` declares it, reduced to what the registry stores. */
+export interface DeclaredApp {
+    name: string;
+    type: string;
+}
+
+/**
+ * The apps a project manifest declares.
+ *
+ * A deploy only ever ships ONE app's bundle, so the trigger alone could never
+ * tell the platform that the repository also contains a web frontend and an
+ * admin panel — and the Apps page, whose whole job is to show the set, listed a
+ * single entry called "backend". Sending the declared set fixes that without
+ * pretending the others are deployed: the platform registers them, and their
+ * status says what is actually true.
+ */
+export function declaredAppsFrom(manifest: { apps?: Record<string, { type?: string }> } | null | undefined): DeclaredApp[] {
+    const apps = manifest?.apps;
+    if (!apps || typeof apps !== "object") return [];
+    return Object.entries(apps)
+        .filter(([name]) => name.trim().length > 0)
+        .map(([name, value]) => ({ name, type: String(value?.type ?? "custom") }));
 }
 
 /** Upload a bundle archive; returns the control-plane bundle id. */

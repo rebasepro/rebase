@@ -23,7 +23,7 @@ import {
     type CloudClient
 } from "./context";
 import { latestDeployment, fmtDate } from "./projects";
-import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody } from "./bundle-deploy";
+import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, declaredAppsFrom } from "./bundle-deploy";
 import { buildBundle } from "../../bundle";
 import { loadManifest, findBackendApp } from "../../manifest";
 import { requireProjectRoot } from "../../utils/project";
@@ -239,7 +239,18 @@ async function deployBundle(opts: {
     console.log("");
     console.log(`  🚀 Triggering managed deployment for ${chalk.bold(projectRef)} (schema ${manifest.schemaVersion})...`);
 
-    const body = bundleDeployBody({ projectId, bundleId, manifest, message: opts.message });
+    // Tell the platform about every app this repo declares, not only the one
+    // whose bundle is being uploaded. A deploy ships one app; the Apps page is
+    // meant to show the set, and without this it only ever knew about the backend.
+    let declaredApps: ReturnType<typeof declaredAppsFrom> = [];
+    try {
+        declaredApps = declaredAppsFrom(loadManifest(process.cwd()).manifest as never);
+    } catch {
+        // A project with no readable rebase.json still deploys; it just cannot
+        // describe its other apps.
+    }
+
+    const body = bundleDeployBody({ projectId, bundleId, manifest, message: opts.message, declaredApps });
 
     try {
         const res = await client.functions.invoke<{
