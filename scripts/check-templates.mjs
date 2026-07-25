@@ -252,6 +252,44 @@ if (declarationProblems.length > 0) {
 
 const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-template-check-"));
 
+/**
+ * Make `@rebasepro/admin-types` resolvable the way a scaffolded project resolves
+ * it — as a dependency in `node_modules`, found by walking up from the file.
+ *
+ * `config/admin.d.ts` opts the project in with
+ * `/// <reference types="@rebasepro/admin-types" />`, and a triple-slash type
+ * reference is resolved through `typeRoots` and `node_modules` — **not** through
+ * tsconfig `paths`. The `paths` entry below therefore does nothing for it.
+ *
+ * This check happened to pass on a developer machine anyway, because pnpm's hoisted
+ * store (`node_modules/.pnpm/node_modules`, which the per-preset symlink points at)
+ * had an `@rebasepro/admin-types` entry left in it. A fresh `pnpm install
+ * --frozen-lockfile` has no such entry, so CI failed with twelve `'admin' does not
+ * exist` errors on files that compile locally. A gate that depends on a stray link
+ * in someone's store is not a gate.
+ *
+ * The shim sits one directory above each materialized project, so resolution finds
+ * the store symlink first (third-party packages) and this second (@rebasepro). It
+ * points at `src` rather than the package directory on purpose: `check:templates`
+ * runs before `pnpm build` in CI, so `dist` may not exist yet.
+ */
+function linkAdminTypes(into) {
+    const shim = path.join(into, "node_modules", "@rebasepro", "admin-types");
+    fs.mkdirSync(shim, { recursive: true });
+    fs.writeFileSync(
+        path.join(shim, "package.json"),
+        JSON.stringify({ name: "@rebasepro/admin-types", version: "0.0.0", types: "index.d.ts" }, null, 2),
+        "utf8"
+    );
+    fs.writeFileSync(
+        path.join(shim, "index.d.ts"),
+        `export * from ${JSON.stringify(path.join(repoRoot, "packages/admin-types/src/index"))};\n`,
+        "utf8"
+    );
+}
+
+linkAdminTypes(workRoot);
+
 try {
     for (const preset of [...PRESETS, BAAS]) {
         const dir = path.join(workRoot, preset);
