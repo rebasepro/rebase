@@ -170,11 +170,10 @@ export function inferPropertyFromData(
             if (isPk) extraLines.push("            isId: \"cuid\"");
         }
 
-        // Color Codes
-        const allColors = validValues.every(v => typeof v === "string" && COLOR_HEX_REGEX.test(v));
-        if (allColors) {
-            extraLines.push("            admin: {\n                color: true\n            }");
-        }
+        // No colour heuristic. `admin.color` was never a declared option and nothing
+        // reads it — the same dead branch `currency` was. This generator emits *source
+        // text*, so no typechecker ever saw either. Reinstate by adding the option and
+        // something that renders it first.
 
         // Text Lengths, Multiline & Markdown
         let maxLength = 0;
@@ -213,9 +212,9 @@ export function inferPropertyFromData(
         if (allAbsoluteUrls) {
             const isImage = validValues.some(v => typeof v === "string" && v.match(/\.(jpeg|jpg|gif|png|webp|svg)/i));
             if (isImage || isMedia) {
-                extraLines.push("            admin: {\n                url: \"image\"\n            }");
+                extraLines.push("            url: true,\n            admin: {\n                urlPreview: \"image\"\n            }");
             } else {
-                extraLines.push("            admin: {\n                url: true\n            }");
+                extraLines.push("            url: true");
             }
         } else {
             const hasFileExtension = validValues.some(v => typeof v === "string" && v.match(/\.[a-zA-Z0-9]+$/));
@@ -226,9 +225,9 @@ export function inferPropertyFromData(
                 extraLines.push(`            storage: {\n                storagePath: "${inferredStoragePath}"\n            }`);
             } else if (isUrl) {
                 if (isMedia) {
-                    extraLines.push("            admin: {\n                url: \"image\"\n            }");
+                    extraLines.push("            url: true,\n            admin: {\n                urlPreview: \"image\"\n            }");
                 } else {
-                    extraLines.push("            admin: {\n                url: true\n            }");
+                    extraLines.push("            url: true");
                 }
             }
         }

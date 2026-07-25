@@ -604,13 +604,13 @@ export function generateCollectionFile(
             if (isMedia) {
                 extra += `\n            storage: {\n                storagePath: "${tableName}/${col.column_name}"\n            },`;
             } else if (isUrl) {
-                extra += "\n            admin: {\n                url: true\n            },";
+                extra += "\n            url: true,";
             } else if (colNameLower === "description" || colNameLower === "summary" || colNameLower === "excerpt") {
-                extra += "\n            multiline: true,";
+                extra += "\n            admin: {\n                multiline: true\n            },";
             } else if (colNameLower === "content" || colNameLower === "body") {
                 extra += "\n            multiline: true,\n            markdown: true,";
             } else if (col.data_type === "text") {
-                extra += "\n            multiline: true,";
+                extra += "\n            admin: {\n                multiline: true\n            },";
             }
         }
 

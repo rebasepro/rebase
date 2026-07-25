@@ -41,6 +41,17 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # The core packages ALONE, with @rebasepro/admin-types absent from the program.
+      # The type check above includes admin-types, and a TypeScript augmentation applies
+      # to the whole program — so the `admin` field it declares is visible to every core
+      # package there, which makes that gate structurally unable to catch a core package
+      # using it. `packages/inference` was writing `admin.readOnly`, `pnpm typecheck`
+      # said 0 errors, and only a per-package tsc found it.
+      - name: Core-only type check (admin surface absent)
+        run: pnpm run check:core-types
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
       # Proves BaaS mode stays honest: imports every collection file and server
       # package under a loader hook that rejects React and @rebasepro UI packages.
       # Reads source directly, so it needs no build and fails fast.

@@ -51,6 +51,7 @@
     "verify:docs": "node --max-old-space-size=8192 scripts/verify-docs.mjs",
     "check:headless": "node scripts/headless-guard/check.mjs",
     "check:types-headless": "node scripts/headless-guard/check-types.mjs",
+    "check:core-types": "tsc --noEmit -p tsconfig.core.json",
     "check:baas-types": "tsc -p e2e/baas-typecheck/tsconfig.json",
     "check:templates": "node scripts/check-templates.mjs",
     "check:names": "node scripts/headless-guard/check-package-names.mjs",

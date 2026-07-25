@@ -45,9 +45,11 @@ export function buildStringProperty({
         const probablyUserIds = valuesResult.values
             .filter((value) => typeof value === "string" && value.length === 28 && !value.includes(" "))
             .length > totalDocsCount / 3 * 2;
-        if (probablyUserIds)
-            config.admin = { ...config.admin,
-readOnly: true };
+        // No `admin.readOnly` here. This package is core — the field does not exist in
+        // `@rebasepro/types`, because `@rebasepro/admin-types` declares it — and a
+        // guess about whether a form should be editable is presentation, not schema.
+        // (It also would not have enforced anything: nothing on the server reads
+        // `readOnly`.) The inferred `isId` below is the part that carries meaning.
 
         if (!probablyAnEmail &&
             !probablyAURL &&
