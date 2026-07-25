@@ -22,7 +22,6 @@ export const productsCollection: CollectionConfig = {
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
     table: "products",            // PostgreSQL table name
-    icon: "inventory_2",           // Material icon key
 
     properties: {
         name: {
@@ -60,8 +59,12 @@ export const productsCollection: CollectionConfig = {
             autoValue: "on_create",
             readOnly: true
         }
+    },
+    admin: {
+        icon: "inventory_2"           // Material icon key
     }
 };
+
 ```
 
 ## Propiedades Clave
@@ -74,7 +77,7 @@ export const productsCollection: CollectionConfig = {
 | `name` | `string` | **Requerido.** Nombre de visualización (plural). Se muestra en la navegación y los encabezados de página. |
 | `singularName` | `string` | Nombre de visualización para una sola entidad. Usado en "Nuevo Producto", "Editar Producto", etc. |
 | `table` | `string` | **Requerido.** Nombre de la tabla PostgreSQL. Si es diferente de `slug`, permite desacoplar las URLs de los nombres de las tablas. |
-| `icon` | `string` | Clave del icono de Material Design. Ver [Google Fonts Icons](https://fonts.google.com/icons). |
+| `admin.icon` | `string` | Clave del icono de Material Design. Ver [Google Fonts Icons](https://fonts.google.com/icons). |
 
 ### Esquema
 
@@ -85,6 +88,8 @@ export const productsCollection: CollectionConfig = {
 | `securityRules` | `SecurityRule[]` | Políticas de Seguridad a Nivel de Fila. Ver [Reglas de Seguridad](/docs/collections/security-rules). |
 
 ### Configuración de la UI
+
+Todos los siguientes van dentro de `admin`.
 
 | Propiedad | Tipo | Predeterminado | Descripción |
 |----------|------|---------|-------------|
@@ -103,6 +108,8 @@ export const productsCollection: CollectionConfig = {
 | `defaultSelectedView` | `string \| function` | — | Vista o subcolección predeterminada a abrir |
 
 ### Opciones de Entidad
+
+Dentro de `admin`, excepto `history`, que es una función del backend y permanece en el nivel superior.
 
 | Propiedad | Tipo | Predeterminado | Descripción |
 |----------|------|---------|-------------|

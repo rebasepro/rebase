@@ -18,14 +18,17 @@ Jede Sammlung kann in vier Ansichtsmodi angezeigt werden:
 ```typescript
 const productsCollection: CollectionConfig = {
     slug: "products",
-    defaultViewMode: "table",            // Default view
-    enabledViews: ["list", "table", "kanban"],    // Available views
-    kanban: {
-        columnProperty: "status",        // Enum property for columns
-        orderProperty: "sort_order"      // Property for drag-and-drop ordering
-    },
     // ...
+    admin: {
+        defaultViewMode: "table",            // Default view
+        enabledViews: ["list", "table", "kanban"],    // Available views
+        kanban: {
+            columnProperty: "status",        // Enum property for columns
+            orderProperty: "sort_order"      // Property for drag-and-drop ordering
+        }
+    }
 };
+
 ```
 
 ## Listenansicht
@@ -69,11 +72,6 @@ Konfigurieren Sie ein Kanban-Board, indem Sie festlegen, welche Enum-Eigenschaft
 ```typescript
 const tasksCollection: CollectionConfig = {
     slug: "tasks",
-    defaultViewMode: "kanban",
-    kanban: {
-        columnProperty: "status",
-        orderProperty: "sort_order"
-    },
     properties: {
         title: { type: "string", name: "Title" },
         status: {
@@ -87,8 +85,16 @@ const tasksCollection: CollectionConfig = {
             ]
         },
         sort_order: { type: "number", name: "Sort Order" }
+    },
+    admin: {
+        defaultViewMode: "kanban",
+        kanban: {
+            columnProperty: "status",
+            orderProperty: "sort_order"
+        }
     }
 };
+
 ```
 
 Drag-and-drop zwischen Spalten aktualisiert automatisch das Enum-Feld und die Sortierreihenfolge.
@@ -102,7 +108,6 @@ Karten zeigen Entitäten als visuelle Karten an – nützlich für inhaltsreiche
 ```typescript
 const articlesCollection: CollectionConfig = {
     slug: "articles",
-    defaultViewMode: "cards",
     properties: {
         title: { type: "string", name: "Title" },
         cover: {
@@ -110,8 +115,12 @@ const articlesCollection: CollectionConfig = {
             name: "Cover Image",
             storage: { storagePath: "covers", acceptedFiles: ["image/*"] }
         }
+    },
+    admin: {
+        defaultViewMode: "cards"
     }
 };
+
 ```
 
 ## Nächste Schritte

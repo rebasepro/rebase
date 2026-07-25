@@ -11,8 +11,77 @@ A **collection** is a TypeScript object that describes a database table and how 
 - **Schema** — Properties (columns), their types, and validation rules
 - **Relations** — Foreign keys, junction tables, and join paths
 - **Security** — Row Level Security policies
-- **UI behavior** — View modes, inline editing, entity views, actions
 - **Lifecycle hooks** — Callbacks for create, update, delete operations
+- **Admin UI behavior** — View modes, inline editing, entity views, actions — all under `admin`
+
+## Anatomy: the contract, and the panel
+
+One file, two audiences. Everything the *database and the API* care about sits at the
+top level; everything the *admin panel* renders sits inside `admin`.
+
+```typescript
+const posts = {
+    // ── The backend reads these ──────────────────────────────
+    slug: "posts",
+    table: "posts",
+    properties: { /* … */ },
+    relations: [ /* … */ ],
+    securityRules: [ /* … */ ],
+    callbacks: { /* … */ },
+    history: true,
+
+    // ── The admin panel reads these ──────────────────────────
+    admin: {
+        icon: "FileText",
+        listProperties: ["title", "status"],
+        defaultViewMode: "table",
+        entityViews: ["preview"]
+    }
+};
+```
+
+The split is not cosmetic. It is what lets Rebase be a backend on its own:
+
+- A **BaaS or headless** project never writes an `admin` block. Its collections — or no
+  collections at all, since BaaS mode introspects the database — describe data and
+  authorization, nothing else. `@rebasepro/types` contains no React, so there is no
+  React anywhere in the dependency tree.
+- The **backend never reads inside the block**. It is dropped before a collection is
+  serialized to the contract endpoint or into a build bundle, and it is excluded from
+  the schema version — so changing an icon does not report every generated SDK as
+  stale.
+
+### Getting the block type-checked
+
+`CollectionConfig` types `admin` opaquely, which means a typo inside it compiles. Annotate
+with `AdminCollectionConfig` — a **type-only** import, so nothing is added to your
+backend's module graph:
+
+```typescript
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+
+const posts: AdminCollectionConfig = {
+    slug: "posts",
+    table: "posts",
+    properties: { /* … */ },
+    admin: { icon: "FileText" }   // `icoon` is now an error
+};
+```
+
+In frontend-only code, `defineCollection` from `@rebasepro/admin-types` gives the same
+checking plus completion on `admin.titleProperty` and `admin.propertiesOrder` over your
+own property keys. It is a value import, so do not use it in a file the backend loads.
+
+### Migrating from a flat collection
+
+Before 0.11 these fields sat at the top level. To move them:
+
+```bash
+node scripts/codemod/collections-admin-block.mjs config/collections
+```
+
+It reports anything it cannot move safely — notably presentation inside
+`relations[].overrides`, which needs `overrides: { admin: { … } }` by hand.
 
 ```typescript
 import { CollectionConfig } from "@rebasepro/types";
@@ -22,7 +91,6 @@ export const productsCollection: CollectionConfig = {
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
     table: "products",            // PostgreSQL table name
-    icon: "inventory_2",           // Material icon key
 
     properties: {
         name: {
@@ -60,8 +128,12 @@ export const productsCollection: CollectionConfig = {
             autoValue: "on_create",
             ui: { readOnly: true }
         }
+    },
+    admin: {
+        icon: "inventory_2"           // Material icon key
     }
 };
+
 ```
 
 ## Key Properties
@@ -74,7 +146,7 @@ export const productsCollection: CollectionConfig = {
 | `name` | `string` | **Required.** Display name (plural). Shown in navigation and page headers. |
 | `singularName` | `string` | Display name for a single entity. Used in "New Product", "Edit Product", etc. |
 | `table` | `string` | **Required.** PostgreSQL table name. If different from `slug`, allows you to decouple URLs from table names. |
-| `icon` | `string` | Material icon key. See [Google Fonts Icons](https://fonts.google.com/icons). |
+| `admin.icon` | `string` | Icon key. See [Google Fonts Icons](https://fonts.google.com/icons). |
 
 ### Schema
 
@@ -86,6 +158,8 @@ export const productsCollection: CollectionConfig = {
 | `auth` | `boolean | AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
 
 ### UI Configuration
+
+All of the following go inside `admin`.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -104,6 +178,8 @@ export const productsCollection: CollectionConfig = {
 | `defaultSelectedView` | `string \| function` | — | Default view or subcollection to open |
 
 ### Entity Options
+
+Inside `admin`, except `history`, which is a backend feature and stays at the top level.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|

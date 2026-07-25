@@ -1,7 +1,7 @@
-import { defineCollection } from "@rebasepro/common";
 import customersCollection from "./customers";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const ticketsCollection = defineCollection({
+const ticketsCollection: AdminCollectionConfig = {
     name: "Tickets",
     singularName: "Ticket",
     slug: "tickets",
@@ -234,6 +234,6 @@ const ticketsCollection = defineCollection({
             }
         ]
     }
-});
+};
 
 export default ticketsCollection;

@@ -1,11 +1,11 @@
-import { defineCollection } from "@rebasepro/common";
 import authorsCollection from "./authors";
 // Mutually recursive by design; the reference is only dereferenced inside the
 // `target: () =>` thunk below, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import tagsCollection from "./tags";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const postsCollection = defineCollection({
+const postsCollection: AdminCollectionConfig = {
     name: "Blog posts",
     singularName: "Blog post",
     slug: "posts",
@@ -206,6 +206,6 @@ const postsCollection = defineCollection({
             }
         ]
     }
-});
+};
 
 export default postsCollection;

@@ -1,6 +1,7 @@
 import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
 // Helper function to extract ID from relation value (which can be primitive ID or expanded object)
 const getRelationId = (val: unknown): string | number | undefined => {
@@ -10,7 +11,7 @@ const getRelationId = (val: unknown): string | number | undefined => {
     return undefined;
 };
 
-const ordersCollection = defineCollection({
+const ordersCollection: AdminCollectionConfig = {
     name: "Orders",
     singularName: "Order",
     slug: "orders",
@@ -188,7 +189,7 @@ const ordersCollection = defineCollection({
             direction: "inverse",
             inverseRelationName: "order",
             overrides: {
-                hideFromNavigation: false
+                admin: { hideFromNavigation: false }
             }
         }
     ],
@@ -273,7 +274,7 @@ const ordersCollection = defineCollection({
             }
         ]
     }
-});
+};
 
 // Helper function to update customer lifetime value and total orders count
 async function updateCustomerMetrics(customerId: string | number, context: EntityCallbackContext) {

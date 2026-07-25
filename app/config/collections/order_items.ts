@@ -5,6 +5,7 @@ import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import ordersCollection from "./orders";
 // fallow-ignore-next-line circular-dependency
 import productsCollection from "./products";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
 interface ProductValues extends Record<string, unknown> {
     name: string;
@@ -20,7 +21,7 @@ const getRelationId = (val: unknown): string | number | undefined => {
     return undefined;
 };
 
-const orderItemsCollection = defineCollection({
+const orderItemsCollection: AdminCollectionConfig = {
     name: "Order Items",
     singularName: "Order Item",
     slug: "order_items",
@@ -125,7 +126,7 @@ const orderItemsCollection = defineCollection({
             "line_total"
         ]
     }
-});
+};
 
 // Helper function to recalculate the parent order subtotal & total
 async function updateOrderTotals(orderId: string | number, context: EntityCallbackContext) {

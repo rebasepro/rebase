@@ -1,6 +1,6 @@
-import { defineCollection } from "@rebasepro/common";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const exercisesCollection = defineCollection({
+const exercisesCollection: AdminCollectionConfig = {
     name: "Exercises",
     singularName: "Exercise",
     slug: "exercises",
@@ -40,8 +40,8 @@ const exercisesCollection = defineCollection({
         video_url: {
             name: "Video URL",
             type: "string",
-            url: true,
-            description: "Link to a demonstration video"
+            description: "Link to a demonstration video",
+            ui: { url: true }
         },
         difficulty: {
             name: "Difficulty",
@@ -370,6 +370,6 @@ const exercisesCollection = defineCollection({
             }
         ]
     }
-});
+};
 
 export default exercisesCollection;

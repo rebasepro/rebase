@@ -65,16 +65,8 @@ const productsCollection: PostgresCollectionConfig = {
     singularName: "Product",
     slug: "products",
     table: "products",
-    icon: "ShoppingBag",
-    group: "E-Commerce",
     description: "Product catalog with pricing and inventory",
     history: true,
-    defaultViewMode: "table",
-    enabledViews: ["table", "cards"],
-    openEntityMode: "split",
-    inlineEditing: true,
-    exportable: true,
-    selectionEnabled: true,
     properties: {
         id: {
             name: "ID",
@@ -118,14 +110,33 @@ const productsCollection: PostgresCollectionConfig = {
             ]
         }
     },
-    propertiesOrder: [
-        "name", "price", "category", "description",
-        "published", "created_at"
-    ]
+    admin: {
+        icon: "ShoppingBag",
+        group: "E-Commerce",
+        defaultViewMode: "table",
+        enabledViews: ["table", "cards"],
+        openEntityMode: "split",
+        inlineEditing: true,
+        exportable: true,
+        selectionEnabled: true,
+        propertiesOrder: [
+            "name", "price", "category", "description",
+            "published", "created_at"
+        ]
+    }
 };
 
 export default productsCollection;
+
 ```
+
+> **Presentation lives under `admin`.** Keys written `admin.x` below go inside a nested
+> `admin: { … }` block, not at the top level. The backend never reads inside it, which is
+> what lets a BaaS or headless project have no React in its dependency tree at all.
+> Annotate the collection with `AdminCollectionConfig` (a **type-only** import from
+> `@rebasepro/admin-types`) to get the block type-checked — with plain `CollectionConfig`
+> it is opaque and a typo compiles.
+
 
 ### Collection Options
 
@@ -137,47 +148,47 @@ export default productsCollection;
 | `table` | `string` | — | PostgreSQL table name |
 | `schema` | `string` | `"public"` | PostgreSQL schema name |
 | `description` | `string` | — | Description shown in the UI (supports Markdown) |
-| `icon` | `string \| ReactNode` | — | Lucide icon name or React element |
-| `group` | `string` | `"Views"` | Sidebar group heading |
+| `admin.icon` | `string \| ReactNode` | — | Lucide icon name or React element |
+| `admin.group` | `string` | `"Views"` | Sidebar group heading |
 | `dataSource` | `string` | `"(default)"` | Data-source key — routes the collection to a backend registered on `<Rebase dataSources>` / `initializeRebaseBackend({ dataSources })`. See **Data sources & multiple backends** below. |
 | `driver` | `string` | `undefined` | **Deprecated** — engine hint (`"postgres"`/`"firestore"`/`"mongodb"`). Prefer `dataSource`. When `dataSource` is omitted, `driver` doubles as the routing key. |
 | `databaseId` | `string` | — | Physical DB/schema/Firestore-database within the engine |
 | `history` | `boolean` | `false` | Enable entity audit trail (requires history plugin) |
-| `defaultViewMode` | `ViewMode` | `"table"` | Default view: `"table"`, `"cards"`, `"kanban"`, `"list"` |
-| `enabledViews` | `ViewMode[]` | `["table","cards","kanban"]` | Enabled view modes |
-| `openEntityMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | `"full_screen"` | How entities open when clicked |
-| `defaultEntityAction` | `"edit" \| "view"` | `"edit"` | Click behavior: open form or read-only view |
-| `kanban` | `{ columnProperty: string }` | — | Kanban column config (requires enum property) |
-| `propertiesOrder` | `string[]` | — | Field display order in forms and table |
-| `entityViews` | `(string \| EntityCustomView)[]` | — | Custom tabs on entity detail |
-| `titleProperty` | `string` | first text prop | Property used as entity title in previews |
-| `previewProperties` | `string[]` | — | Properties shown when this collection is referenced |
-| `listProperties` | `string[]` | — | Columns to display in list view |
-| `selectionEnabled` | `boolean` | — | Enable row selection checkboxes |
-| `selectionController` | `SelectionController` | — | External selection state controller |
-| `inlineEditing` | `boolean` | — | Allow inline editing in collection table view |
-| `exportable` | `boolean \| ExportConfig` | — | Enable data export. `true` for default, or `ExportConfig` for custom fields |
-| `pagination` | `boolean \| number` | `true` (50) | Enable pagination. Set a number to customize page size |
-| `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — | Default rendered row size |
-| `fixedFilter` | `FilterValues` | — | Permanent filter that cannot be changed by users |
-| `defaultFilter` | `FilterValues` | — | Initial filter (can be changed by users) |
-| `filterPresets` | `FilterPreset[]` | — | Quick-access filter buttons in toolbar |
-| `sort` | `[string, "asc" \| "desc"]` | — | Default sort order. E.g. `["created_at", "desc"]` |
-| `orderProperty` | `string` | — | Property key for drag-and-drop ordering (Kanban/general) |
-| `formAutoSave` | `boolean` | `false` | Auto-save form on field change |
-| `formView` | `FormViewConfig` | — | Custom component replacing the default entity form |
-| `hideFromNavigation` | `boolean` | `false` | Hide from sidebar (still accessible via URL) |
-| `hideIdFromForm` | `boolean` | `false` | Hide ID field in entity form |
-| `hideIdFromCollection` | `boolean` | `false` | Hide ID column in collection table |
-| `defaultSelectedView` | `string \| Function` | — | Auto-open a custom view/subcollection tab |
-| `sideDialogWidth` | `number \| string` | — | Width of side dialog in pixels |
-| `alwaysApplyDefaultValues` | `boolean` | `false` | Re-apply defaults on every update |
-| `includeJsonView` | `boolean` | `false` | Show a JSON tab in entity detail |
-| `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Local changes backup strategy |
-| `disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | — | Disable built-in actions |
-| `additionalFields` | `AdditionalFieldDelegate[]` | — | Virtual computed columns for views |
-| `entityActions` | `EntityAction[]` | — | Custom action buttons (see Entity Actions section) |
-| `Actions` | `ComponentRef[]` | — | Custom toolbar action components |
+| `admin.defaultViewMode` | `ViewMode` | `"table"` | Default view: `"table"`, `"cards"`, `"kanban"`, `"list"` |
+| `admin.enabledViews` | `ViewMode[]` | `["table","cards","kanban"]` | Enabled view modes |
+| `admin.openEntityMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | `"full_screen"` | How entities open when clicked |
+| `admin.defaultEntityAction` | `"edit" \| "view"` | `"edit"` | Click behavior: open form or read-only view |
+| `admin.kanban` | `{ columnProperty: string }` | — | Kanban column config (requires enum property) |
+| `admin.propertiesOrder` | `string[]` | — | Field display order in forms and table |
+| `admin.entityViews` | `(string \| EntityCustomView)[]` | — | Custom tabs on entity detail |
+| `admin.titleProperty` | `string` | first text prop | Property used as entity title in previews |
+| `admin.previewProperties` | `string[]` | — | Properties shown when this collection is referenced |
+| `admin.listProperties` | `string[]` | — | Columns to display in list view |
+| `admin.selectionEnabled` | `boolean` | — | Enable row selection checkboxes |
+| `admin.selectionController` | `SelectionController` | — | External selection state controller |
+| `admin.inlineEditing` | `boolean` | — | Allow inline editing in collection table view |
+| `admin.exportable` | `boolean \| ExportConfig` | — | Enable data export. `true` for default, or `ExportConfig` for custom fields |
+| `admin.pagination` | `boolean \| number` | `true` (50) | Enable pagination. Set a number to customize page size |
+| `admin.defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — | Default rendered row size |
+| `admin.fixedFilter` | `FilterValues` | — | Permanent filter that cannot be changed by users |
+| `admin.defaultFilter` | `FilterValues` | — | Initial filter (can be changed by users) |
+| `admin.filterPresets` | `FilterPreset[]` | — | Quick-access filter buttons in toolbar |
+| `admin.sort` | `[string, "asc" \| "desc"]` | — | Default sort order. E.g. `["created_at", "desc"]` |
+| `admin.orderProperty` | `string` | — | Property key for drag-and-drop ordering (Kanban/general) |
+| `admin.formAutoSave` | `boolean` | `false` | Auto-save form on field change |
+| `admin.formView` | `FormViewConfig` | — | Custom component replacing the default entity form |
+| `admin.hideFromNavigation` | `boolean` | `false` | Hide from sidebar (still accessible via URL) |
+| `admin.hideIdFromForm` | `boolean` | `false` | Hide ID field in entity form |
+| `admin.hideIdFromCollection` | `boolean` | `false` | Hide ID column in collection table |
+| `admin.defaultSelectedView` | `string \| Function` | — | Auto-open a custom view/subcollection tab |
+| `admin.sideDialogWidth` | `number \| string` | — | Width of side dialog in pixels |
+| `admin.alwaysApplyDefaultValues` | `boolean` | `false` | Re-apply defaults on every update |
+| `admin.includeJsonView` | `boolean` | `false` | Show a JSON tab in entity detail |
+| `admin.localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Local changes backup strategy |
+| `admin.disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | — | Disable built-in actions |
+| `admin.additionalFields` | `AdditionalFieldDelegate[]` | — | Virtual computed columns for views |
+| `admin.entityActions` | `EntityAction[]` | — | Custom action buttons (see Entity Actions section) |
+| `admin.Actions` | `ComponentRef[]` | — | Custom toolbar action components |
 | `callbacks` | `CollectionCallbacks<M, USER>` | — | Lifecycle hooks (see Collection Callbacks section) |
 | `relations` | `Relation[]` | — | Explicit relation definitions (usually auto-extracted from properties) |
 | `securityRules` | `SecurityRule[]` | — | Row Level Security policies |
@@ -185,7 +196,7 @@ export default productsCollection;
 | `overrides` | `EntityOverrides` | — | Override data source or storage source |
 | `ownerId` | `string` | — | Owner user ID (for plugins/custom code) |
 | `auth` | `boolean | AuthCollectionConfig` | — | Mark collection as authentication collection (user management, reset password, etc.) |
-| `components` | `CollectionComponentOverrideMap` | — | Collection-scoped UI component overrides |
+| `admin.components` | `CollectionComponentOverrideMap` | — | Collection-scoped UI component overrides |
 
 
 ## Data sources & multiple backends
@@ -519,8 +530,8 @@ address: {
 |--------|------|---------|-------------|
 | `columnType` | `"json" \| "jsonb"` | `"jsonb"` | Database column type |
 | `properties` | `Properties` | — | Nested property schema (same types as collection properties) |
-| `propertiesOrder` | `string[]` | — | Display order of nested fields |
-| `previewProperties` | `string[]` | — | Properties shown in preview/collapsed state |
+| `admin.propertiesOrder` | `string[]` | — | Display order of nested fields |
+| `admin.previewProperties` | `string[]` | — | Properties shown in preview/collapsed state |
 | `keyValue` | `boolean` | — | Render as key-value table with arbitrary keys (no `properties` needed) |
 
 ### Map UI Options
@@ -774,7 +785,7 @@ comments: {
 | `onDelete` | `OnAction` | — | Cascade rule on delete |
 | `onUpdate` | `OnAction` | — | Cascade rule on update |
 | `overrides` | `Partial<CollectionConfig>` | — | Override target collection config when rendered as subcollection tab |
-| `fixedFilter` | `FilterValues` | — | Filter applied when selecting related entities |
+| `admin.fixedFilter` | `FilterValues` | — | Filter applied when selecting related entities |
 | `includeId` | `boolean` | `true` | Show entity ID in the reference preview |
 | `includeEntityLink` | `boolean` | `true` | Show link to open the related entity |
 | `isId` | `boolean` | — | Mark as primary key |
@@ -1078,35 +1089,38 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
     name: "Job Submissions",
     slug: "job_submissions",
     table: "job_submissions",
-    entityActions: [
-        {
-            name: "Approve",
-            icon: <CheckCircleIcon />,
-            // Only show for pending submissions
-            isEnabled: ({ entity }) => entity?.values.status === "pending",
-            onClick: async ({ entity, context, onCollectionChange }) => {
-                if (!entity) return;
-                await context.data.job_submissions.update(entity.id, {
-                    status: "approved"
-                });
-                context.snackbarController?.open({
-                    type: "success",
-                    message: "Submission approved!"
-                });
-                onCollectionChange?.();
+    properties: { /* ... */ },
+    admin: {
+        entityActions: [
+            {
+                name: "Approve",
+                icon: <CheckCircleIcon />,
+                // Only show for pending submissions
+                isEnabled: ({ entity }) => entity?.values.status === "pending",
+                onClick: async ({ entity, context, onCollectionChange }) => {
+                    if (!entity) return;
+                    await context.data.job_submissions.update(entity.id, {
+                        status: "approved"
+                    });
+                    context.snackbarController?.open({
+                        type: "success",
+                        message: "Submission approved!"
+                    });
+                    onCollectionChange?.();
+                }
+            },
+            {
+                name: "Export PDF",
+                collapsed: true,  // Show in overflow menu
+                includeInForm: true,
+                onClick: async ({ entity }) => {
+                    window.open(`/api/functions/export-pdf/${entity?.id}`);
+                }
             }
-        },
-        {
-            name: "Export PDF",
-            collapsed: true,  // Show in overflow menu
-            includeInForm: true,
-            onClick: async ({ entity }) => {
-                window.open(`/api/functions/export-pdf/${entity?.id}`);
-            }
-        }
-    ],
-    properties: { /* ... */ }
+        ]
+    }
 };
+
 ```
 
 ### EntityAction Interface
@@ -1115,7 +1129,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
 |----------|------|---------|-------------|
 | `name` | `string` | — | Button label |
 | `key` | `string` | — | Override default actions: `"edit"`, `"delete"`, `"copy"` |
-| `icon` | `ReactElement` | — | Optional icon |
+| `admin.icon` | `ReactElement` | — | Optional icon |
 | `onClick` | `(props: EntityActionClickProps) => void \| Promise<void>` | — | Action handler |
 | `isEnabled` | `(props: EntityActionClickProps) => boolean` | — | Conditionally disable the action |
 | `collapsed` | `boolean` | `true` | If `true`, show in overflow menu |
@@ -1134,9 +1148,9 @@ The `onClick` and `isEnabled` handlers receive:
 | `collection` | `CollectionConfig<M> \| undefined` | Collection definition |
 | `formContext` | `FormContext \| undefined` | Form state (when called from a form) |
 | `sideEntityController` | `SidePanelController \| undefined` | Side panel control |
-| `selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
+| `admin.selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
 | `view` | `"collection" \| "form"` | Where the action was triggered |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
+| `admin.openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
 | `highlightEntity` | `(entity) => void` | Highlight a entity row |
 | `unhighlightEntity` | `(entity) => void` | Remove highlight |
 | `navigateBack` | `() => void` | Navigate back (e.g., after deleting) |
@@ -1168,9 +1182,12 @@ const postsCollection: PostgresCollectionConfig = {
     name: "Posts",
     slug: "posts",
     table: "posts",
-    entityViews: ["blog_preview"],  // References the global view by key
-    properties: { /* ... */ }
+    properties: { /* ... */ },
+    admin: {
+        entityViews: ["blog_preview"]  // References the global view by key
+    }
 };
+
 ```
 
 The `Builder` component receives:
@@ -1219,23 +1236,26 @@ const productsCollection: PostgresCollectionConfig = {
     name: "Products",
     slug: "products",
     table: "products",
-    components: {
-        // Eject Mode: Replace the empty state view entirely
-        "Collection.EmptyState": { Component: ProductCustomEmptyState },
+    properties: { ... },
+    admin: {
+        components: {
+            // Eject Mode: Replace the empty state view entirely
+            "Collection.EmptyState": { Component: ProductCustomEmptyState },
         
-        // Wrap Mode: Wrap the built-in form, augmenting it
-        "Entity.Form": {
-            Component: ({ OriginalComponent, ...props }) => (
-                <div>
-                    <div className="bg-amber-100 p-2 text-amber-800 text-sm">Editing Product</div>
-                    <OriginalComponent {...props} />
-                </div>
-            ),
-            wrap: true
+            // Wrap Mode: Wrap the built-in form, augmenting it
+            "Entity.Form": {
+                Component: ({ OriginalComponent, ...props }) => (
+                    <div>
+                        <div className="bg-amber-100 p-2 text-amber-800 text-sm">Editing Product</div>
+                        <OriginalComponent {...props} />
+                    </div>
+                ),
+                wrap: true
+            }
         }
-    },
-    properties: { ... }
+    }
 };
+
 ```
 
 ### Collection-Scoped Overridable Components

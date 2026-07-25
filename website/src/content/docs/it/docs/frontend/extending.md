@@ -117,11 +117,14 @@ Sostituisce l'intero modulo entità predefinito con un componente personalizzato
 ```typescript
 const collection = {
     slug: "products",
-    formView: {
-        Builder: MyCustomProductForm,
-        includeActions: true  // show save/delete bar (default: true)
+    admin: {
+        formView: {
+            Builder: MyCustomProductForm,
+            includeActions: true  // show save/delete bar (default: true)
+        }
     }
 };
+
 ```
 
 Usalo quando hai bisogno di un layout completamente personalizzato per l'esperienza di modifica delle entità di una collezione. Per modifiche più piccole, preferisci invece `collection.components` con la sovrascrittura `Entity.Form`.

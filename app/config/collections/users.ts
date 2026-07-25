@@ -1,7 +1,7 @@
-import { defineCollection } from "@rebasepro/common";
 import { maskEmail, maskName, maskValues } from "../masking";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const usersCollection = defineCollection({
+const usersCollection: AdminCollectionConfig = {
     name: "Users",
     singularName: "User",
     slug: "users",
@@ -32,7 +32,7 @@ const usersCollection = defineCollection({
             name: "Photo URL",
             type: "string",
             columnName: "photo_url",
-            url: "image"
+            ui: { url: "image" }
         },
         roles: {
             name: "Roles",
@@ -142,6 +142,6 @@ const usersCollection = defineCollection({
         listProperties: ["displayName", "email", "roles", "createdAt"],
         propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"]
     }
-});
+};
 
 export default usersCollection;

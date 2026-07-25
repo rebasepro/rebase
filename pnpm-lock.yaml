@@ -118,6 +118,9 @@ importers:
 
   app/config:
     dependencies:
+      '@rebasepro/admin-types':
+        specifier: workspace:*
+        version: link:../../packages/admin-types
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../../packages/common

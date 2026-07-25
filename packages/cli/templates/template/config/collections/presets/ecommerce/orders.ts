@@ -1,11 +1,10 @@
-import { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const ordersCollection: CollectionConfig = {
+const ordersCollection: AdminCollectionConfig = {
     name: "Orders",
     singularName: "Order",
     slug: "orders",
     table: "orders",
-    icon: "Receipt",
     properties: {
         id: {
             name: "ID",
@@ -22,21 +21,31 @@ const ordersCollection: CollectionConfig = {
             name: "Status",
             type: "string",
             enum: [
-                { id: "pending",
-label: "Pending",
-color: "gray" },
-                { id: "processing",
-label: "Processing",
-color: "blue" },
-                { id: "shipped",
-label: "Shipped",
-color: "orange" },
-                { id: "delivered",
-label: "Delivered",
-color: "green" },
-                { id: "cancelled",
-label: "Cancelled",
-color: "red" }
+                {
+                    id: "pending",
+                    label: "Pending",
+                    color: "gray"
+                },
+                {
+                    id: "processing",
+                    label: "Processing",
+                    color: "blue"
+                },
+                {
+                    id: "shipped",
+                    label: "Shipped",
+                    color: "orange"
+                },
+                {
+                    id: "delivered",
+                    label: "Delivered",
+                    color: "green"
+                },
+                {
+                    id: "cancelled",
+                    label: "Cancelled",
+                    color: "red"
+                }
             ]
         },
         total: {
@@ -60,6 +69,9 @@ color: "red" }
                 readOnly: true
             }
         }
+    },
+    admin: {
+        icon: "Receipt"
     }
 };
 

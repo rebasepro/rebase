@@ -1,13 +1,12 @@
-import { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 import authorsCollection from "./authors.js";
 import tagsCollection from "./tags.js";
 
-const postsCollection: CollectionConfig = {
+const postsCollection: AdminCollectionConfig = {
     name: "Posts",
     singularName: "Post",
     slug: "posts",
     table: "posts",
-    icon: "Article",
     properties: {
         id: {
             name: "ID",
@@ -65,6 +64,9 @@ const postsCollection: CollectionConfig = {
             cardinality: "many",
             direction: "owning"
         }
+    },
+    admin: {
+        icon: "Article"
     }
 };
 

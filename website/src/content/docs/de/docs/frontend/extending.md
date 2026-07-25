@@ -117,11 +117,14 @@ Ersetzt das gesamte Standard-Entity-Formular durch eine benutzerdefinierte Kompo
 ```typescript
 const collection = {
     slug: "products",
-    formView: {
-        Builder: MyCustomProductForm,
-        includeActions: true  // show save/delete bar (default: true)
+    admin: {
+        formView: {
+            Builder: MyCustomProductForm,
+            includeActions: true  // show save/delete bar (default: true)
+        }
     }
 };
+
 ```
 
 Verwenden Sie dies, wenn Sie ein vollständig benutzerdefiniertes Layout für die Entity-Bearbeitung einer Collection benötigen. Für kleinere Anpassungen bevorzugen Sie stattdessen `collection.components` mit dem `Entity.Form`-Override.

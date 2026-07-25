@@ -85,11 +85,14 @@ const views: CMSView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
-        icon: "dashboard",
-        group: "Analytics",
-        view: <DashboardView />
+        view: <DashboardView />,
+        admin: {
+            icon: "dashboard",
+            group: "Analytics"
+        }
     }
 ];
+
 ```
 
 Pass it to the navigation controller:

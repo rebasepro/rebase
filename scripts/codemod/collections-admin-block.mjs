@@ -137,6 +137,34 @@ function collectionObjectsIn(sourceFile) {
 
 let changedFiles = 0;
 let movedFields = 0;
+const warnings = [];
+
+/**
+ * Presentation keys can also appear inside `relations[].overrides`, which is a
+ * `Partial<CollectionConfig>` describing the *target* collection. Those need the
+ * same nesting, but rewriting them safely means deciding which nested object
+ * literal is an override and which is an unrelated config — so they are reported
+ * rather than guessed at. Leaving them silent would turn a migration into a type
+ * error the user has to trace back to here.
+ */
+function warnAboutNestedOverrides(sourceFile, file) {
+    for (const assignment of sourceFile.getDescendantsOfKind(SyntaxKind.PropertyAssignment)) {
+        if (assignment.getName().replace(/^["']|["']$/g, "") !== "overrides") continue;
+        const block = assignment.getInitializerIfKind(SyntaxKind.ObjectLiteralExpression);
+        if (!block) continue;
+        const stray = block
+            .getProperties()
+            .filter((p) => p.isKind(SyntaxKind.PropertyAssignment))
+            .map((p) => p.getName().replace(/^["']|["']$/g, ""))
+            .filter((name) => ADMIN_KEYS.has(name));
+        if (stray.length === 0) continue;
+        warnings.push(
+            `${path.relative(repoRoot, file)}:${assignment.getStartLineNumber()} — ` +
+                `relation override carries ${stray.join(", ")}; nest by hand as ` +
+                `overrides: { admin: { ${stray[0]}: … } }`
+        );
+    }
+}
 
 for (const target of targets) {
     for (const file of collectionFiles(target)) {
@@ -145,6 +173,8 @@ for (const target of targets) {
         });
         const sourceFile = project.addSourceFileAtPath(file);
         let touched = false;
+
+        warnAboutNestedOverrides(sourceFile, file);
 
         for (const collection of collectionObjectsIn(sourceFile)) {
             const toMove = collection
@@ -196,3 +226,10 @@ for (const target of targets) {
 console.log(
     `${dryRun ? "[dry] " : ""}${changedFiles} collection file(s), ${movedFields} field(s) moved into \`admin\``
 );
+
+if (warnings.length > 0) {
+    console.warn(`\n${warnings.length} place(s) need a hand edit:\n`);
+    for (const warning of warnings) console.warn(`  ${warning}`);
+    // Not a failure: what could be migrated was, and a type error surfaces the
+    // rest. Exiting non-zero would suggest nothing landed.
+}

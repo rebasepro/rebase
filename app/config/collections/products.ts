@@ -1,8 +1,8 @@
-import { defineCollection } from "@rebasepro/common";
 import ordersCollection from "./orders";
 import productLocalesCollection from "./product_locales";
+import type { AdminCollectionConfig } from "@rebasepro/admin-types";
 
-const productsCollection = defineCollection({
+const productsCollection: AdminCollectionConfig = {
     name: "Products",
     singularName: "Product",
     slug: "products",
@@ -238,7 +238,7 @@ const productsCollection = defineCollection({
             direction: "inverse",
             inverseRelationName: "product",
             overrides: {
-                hideFromNavigation: false
+                admin: { hideFromNavigation: false }
             }
         }
     ],
@@ -298,7 +298,7 @@ const productsCollection = defineCollection({
             }
         ]
     }
-});
+};
 
 
 export default productsCollection;

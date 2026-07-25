@@ -95,9 +95,12 @@ import { CollectionConfig } from "@rebasepro/types";
 const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
-    exportable: true,            // Enable (default: true)
-    properties: { /* ... */ }
+    properties: { /* ... */ },
+    admin: {
+        exportable: true            // Enable (default: true)
+    }
 };
+
 ```
 
 Per disabilitare l'esportazione:
@@ -106,9 +109,12 @@ Per disabilitare l'esportazione:
 const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
-    exportable: false,
-    properties: { /* ... */ }
+    properties: { /* ... */ },
+    admin: {
+        exportable: false
+    }
 };
+
 ```
 
 ### Aggiungere Campi Calcolati
@@ -121,26 +127,29 @@ import { CollectionConfig } from "@rebasepro/types";
 const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
-    exportable: {
-        additionalFields: [
-            {
-                key: "computed_margin",
-                builder: ({ entity }) => {
-                    const price = entity.values.price as number;
-                    const cost = entity.values.cost as number;
-                    return String(price - cost);
+    properties: { /* ... */ },
+    admin: {
+        exportable: {
+            additionalFields: [
+                {
+                    key: "computed_margin",
+                    builder: ({ entity }) => {
+                        const price = entity.values.price as number;
+                        const cost = entity.values.cost as number;
+                        return String(price - cost);
+                    }
+                },
+                {
+                    key: "full_url",
+                    builder: ({ entity }) => {
+                        return `https://mystore.com/products/${entity.id}`;
+                    }
                 }
-            },
-            {
-                key: "full_url",
-                builder: ({ entity }) => {
-                    return `https://mystore.com/products/${entity.id}`;
-                }
-            }
-        ]
-    },
-    properties: { /* ... */ }
+            ]
+        }
+    }
 };
+
 ```
 
 Ogni voce di `additionalFields` ha:

@@ -12,6 +12,7 @@
         "clean": "rm -rf dist"
     },
     "dependencies": {
+        "@rebasepro/admin-types": "workspace:*",
         "@rebasepro/common": "workspace:*",
         "@rebasepro/types": "workspace:*"
     },
