@@ -25,7 +25,7 @@ Rebase includes a built-in cron job scheduler for running recurring background t
 
 Enable cron jobs by adding `cronsDir` to your backend config:
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ... other config
     cronsDir: path.resolve(__dirname, "../crons"),  // ← add this
@@ -39,7 +39,7 @@ const backend = await initializeRebaseBackend({
 | `cronsDir` | `string` | — | Absolute path to the directory containing cron job files. Required to enable cron jobs. |
 | `cronPersistence` | `boolean` | `true` | Enable/disable database persistence for execution logs. When `false`, logs are kept in-memory only. |
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     cronsDir: path.resolve(__dirname, "../crons"),
     cronPersistence: false,  // disable DB persistence (in-memory only)
@@ -76,13 +76,15 @@ const job: CronJobDefinition = {
         ctx.log("Starting session cleanup...");
 
         // ✅ Use ctx.client to interact with your data
-        const { data: oldSessions } = await ctx.client.collection("sessions").getList({
-            filter: { createdAt: { lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() } },
-            limit: 500,
-        });
+        const { data: oldSessions } = await ctx.client.data
+            .collection<{ id: string }>("sessions")
+            .find({
+                where: { created_at: ["<", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()] },
+                limit: 500,
+            });
 
         for (const session of oldSessions) {
-            await ctx.client.collection("sessions").delete(session.id);
+            await ctx.client.data.collection("sessions").delete(session.id);
         }
 
         ctx.log(`Cleaned up ${oldSessions.length} expired sessions`);
@@ -119,18 +121,20 @@ const job: CronJobDefinition = {
 
         // Upsert into your collection using ctx.client
         for (const [currency, rate] of Object.entries(data.rates)) {
-            const existing = await ctx.client.collection("exchange_rates").getList({
-                filter: { currency },
-                limit: 1,
-            });
+            const existing = await ctx.client.data
+                .collection<{ id: string }>("exchange_rates")
+                .find({
+                    where: { currency: ["==", currency] },
+                    limit: 1,
+                });
 
             if (existing.data.length > 0) {
-                await ctx.client.collection("exchange_rates").update(existing.data[0].id, {
+                await ctx.client.data.collection("exchange_rates").update(existing.data[0].id, {
                     rate: rate as number,
                     updatedAt: new Date().toISOString(),
                 });
             } else {
-                await ctx.client.collection("exchange_rates").create({
+                await ctx.client.data.collection("exchange_rates").create({
                     currency,
                     rate: rate as number,
                 });
@@ -157,15 +161,19 @@ const job: CronJobDefinition = {
     timeoutSeconds: 120,
 
     async handler(ctx) {
-        const { data: users } = await ctx.client.collection("users").getList({
-            filter: { digestEnabled: true },
-        });
+        const { data: users } = await ctx.client.data
+            .collection<{ id: string; email: string }>("users")
+            .find({
+                where: { digest_enabled: ["==", true] },
+            });
 
         let sent = 0;
         for (const user of users) {
-            const { data: notifications } = await ctx.client.collection("notifications").getList({
-                filter: { userId: user.id, read: false },
-            });
+            const { data: notifications } = await ctx.client.data
+                .collection("notifications")
+                .find({
+                    where: { user_id: ["==", user.id], read: ["==", false] },
+                });
 
             if (notifications.length > 0) {
                 ctx.log(`Sending digest to ${user.email} (${notifications.length} unread)`);
@@ -242,13 +250,13 @@ interface CronJobContext {
 ```typescript
 async handler(ctx) {
     // Collection CRUD
-    const { data } = await ctx.client.collection("orders").getList({ limit: 100 });
-    await ctx.client.collection("orders").update(id, { status: "archived" });
-    await ctx.client.collection("orders").delete(id);
-    await ctx.client.collection("metrics").create({ key: "daily_total", value: 42 });
+    const { data } = await ctx.client.data.collection("orders").find({ limit: 100 });
+    await ctx.client.data.collection("orders").update(id, { status: "archived" });
+    await ctx.client.data.collection("orders").delete(id);
+    await ctx.client.data.collection("metrics").create({ key: "daily_total", value: 42 });
 
     // Filtering and sorting
-    const { data: stale } = await ctx.client.collection("tokens").getList({
+    const { data: stale } = await ctx.client.data.collection("tokens").find({
         filter: { expiresAt: { lt: new Date().toISOString() } },
         sort: "-createdAt",
         limit: 500,
@@ -657,7 +665,8 @@ console.log(`Next run: ${job.nextRunAt}`);
 
 // Trigger a job manually
 const { log, job: updatedJob } = await client.cron.triggerJob("cleanup-sessions");
-if (log.result?.skipped) {
+// `result` is whatever the handler returned, so it arrives as `unknown` — narrow it.
+if ((log.result as { skipped?: boolean } | undefined)?.skipped) {
     console.log("Job was already running — skipped");
 } else {
     console.log(`Completed in ${log.durationMs}ms`, log.result);

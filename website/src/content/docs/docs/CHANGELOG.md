@@ -6,7 +6,51 @@ title: Changelog
 
 ## [Unreleased]
 
+### Breaking
+
+- **Admin-panel presentation moved into an `admin` block** — a collection carried two unrelated concerns in one flat object: what the data *is* (table, schema, properties, relations, validation, security rules, callbacks) and how an admin panel should *draw* it (`icon`, `group`, `listProperties`, `kanban`, entity views, selection controllers, …). Ninety-five fields of the second kind sat beside the first, and twelve React view-model types were exported from `collections.ts` — so a backend that never renders anything still pulled the React layer into its type graph, and `@rebasepro/types` could not be a backend contract while it depended on React.
+
+  `@rebasepro/types` is now the React-free BaaS contract; the presentation layer lives in a new `@rebasepro/admin-types` that depends on it, and nothing in core depends back. `pnpm check:baas-types` typechecks a full BaaS project — backend, driver, collection file, SDK reads and writes — with `react` mapped to a stub, which is the invariant that keeps it that way.
+
+  **What to change.** Move presentation fields into `admin`:
+
+  ```diff
+   export default {
+       slug: "posts",
+       table: "posts",
+  -    icon: "FileText",
+  -    group: "Content",
+  -    propertiesOrder: ["id", "title"],
+  -    sort: ["updatedAt", "desc"],
+       properties: { /* … */ },
+  +    admin: {
+  +        icon: "FileText",
+  +        group: "Content",
+  +        propertiesOrder: ["id", "title"],
+  +        sort: ["updatedAt", "desc"]
+  +    }
+   };
+  ```
+
+  The backend loads the block and never reads inside it, so a project with no admin panel can drop these fields entirely. For completion and checking inside `admin`, author with `defineCollection` from `@rebasepro/admin-types` — it captures the property literals, so `admin.titleProperty`, `admin.sort` and `admin.propertiesOrder` complete over your own property keys instead of `string`.
+
 ### Added
+
+- **A project is a bundle, and the runtime is the platform's** — `rebase build` now emits `dist-bundle/`: compiled collections, functions, crons and schema plus a generated `manifest.json` recording the runtime range it needs, a `schemaVersion` hash, its declared dependencies, and whether it uses native modules. `@rebasepro/server` boots it (`bootFromBundle`, bin `rebase-server`), and `docker/server.Dockerfile` publishes that as an image. The consequence is the point: **the engine can be replaced under a project without rebuilding it** — upgrading is a new image tag against the same bundle — and self-hosting becomes "run the image with your bundle" rather than "build and maintain your own container". `docker/docker-compose.selfhost.yml` is that, ready to run.
+
+  A repo-root `rebase.json` declares topology only — the runtime compatibility range and the apps this repository contributes (`backend`, `static`, `admin`, `mobile`). Schema, rules, hooks and functions stay TypeScript in `config/`, which is the point of the product and does not move into JSON. `rebase link` accepts a self-hosted base URL wherever it accepts a cloud project, and writes an uncommitted `.rebase/cloud.json`, because a project reference is per-checkout.
+
+- **Remote SDK generation from a running project** — `GET /api/meta/contract` (admin, service-key or admin API-key gated; fail-closed 404 when no auth is configured) serves the collection contract, and `rebase generate-sdk --from <link|url>` reads it instead of importing local `config/`. A second repository can therefore build a typed client against a backend it does not contain, which is what makes the multi-repo case work at all. The SDK records the `schemaVersion` it was generated against so drift is detectable; `GET /api/meta/schema-version` is deliberately unauthenticated and returns only that hash.
+
+- **Collection tables are created at boot, additively** — the runtime ensured its auth tables and nothing ensured the project's, so a backend booted against a fresh database answered sign-in and then `500` on every data route. `REBASE_MIGRATE_ON_BOOT=ensure` (the default) now creates missing tables, columns and enum types before serving. **Additive only, permanently**: it never drops, narrows or rewrites, so it is safe to run unattended on every start and re-running is a no-op. A removed field leaves its column behind and a rename reads as an addition — destructive changes stay a deliberate `rebase db push`, with its dry-run and confirmation gate. `none` opts out.
+
+- **Storage authorization can look up ownership** — `storageAuthorize` received a key, a bucket, an operation and a user, and no way to answer the only question that matters: *who owns this object?* Ownership lives in a row, so a hook limited to prefix arithmetic on the key expresses no real multi-tenant rule — and it could not fetch that row itself, because the hook is declared in the project's `config` package, which depends on `@rebasepro/types` alone and cannot resolve `@rebasepro/server` at runtime. The context now carries a trusted, read-only, RLS-bypassing reader (`ctx.data`). It bypasses RLS deliberately: the hook *is* the authorization decision, so making it decide through a reader already narrowed by the caller's permissions is circular.
+
+- **Multiple data and storage sources** — declare `dataSources` / `storageSources` as exports of the config package and configure each by suffixing its env var with the source key: `DATABASE_URL__ANALYTICS`, `S3_BUCKET__MEDIA`. Two underscores, because one collides with real variable names (`S3_BUCKET_NAME`). A source that is declared but not configured fails boot rather than silently falling through to the default database.
+
+- **Prometheus metrics** — `/metrics` in Prometheus text format, off unless `REBASE_METRICS=true` and gated by `REBASE_METRICS_TOKEN`: request counts and latency histograms per surface, plus process heap, RSS and uptime. Self-hosters can scrape it directly.
+
+- **`rebase build` folds a single static app into the backend bundle** — the runtime already served a SPA from `entry.static`; nothing put the assets there. So a project whose container served its site at `/` and its API at `/api` lost the site when it moved to a platform-run runtime: the API answered and every page 404'd. The frontend now travels in the bundle and one runtime serves both, which is the shape the scaffolded template produces. `--no-static` opts out.
 
 - **Local-first sync in the client SDK (`offline: true`)** — the data layer keeps a normalized local database of rows rather than a cache of responses, and answers queries against it. A row written offline therefore appears in *every* filtered list it belongs to (filters, sorting and pagination are evaluated locally), a row edited in one view updates in all of them, and `findById` answers for a row only ever seen inside a `find`. Server responses merge into that database instead of replacing it, so a row carrying unsynced local writes keeps them — the user's own change never flickers away underneath them.
 
@@ -15,6 +59,34 @@ title: Changelog
   `observe()` / `observeById()` are the new reactive reads, on every collection client: local-first, de-duplicated, and re-emitted on any local write, replay, rollback, realtime event, or change from another tab. Each result carries `fromCache`, `hasPendingWrites` and `partial`, so an interface can say what it is showing. Tabs share the local database and the outbox over a `BroadcastChannel`, and only one replays the queue at a time. `client.offline` gained `status()` and `onStatusChange()` for a sync indicator, and `isOfflineError()` distinguishes "offline with nothing local to answer with" from a request that genuinely failed.
 
   See [Offline & Local-First Sync](https://rebase.pro/docs/sdk/offline).
+
+### Changed
+
+- **No bucket means no file storage, rather than a crash or a disappearing disk** — 0.10.0 made a production backend *refuse to boot* on `type: "local"`, which stopped the silent data loss but replaced it with a crash-looping rollout for anyone who simply had not configured storage — a project that never uploads a file was taken down by a feature it does not use. Storage is now opt-in instead: with no bucket configured in production, no storage backend is registered, `/api/storage/*` answers `501 STORAGE_NOT_CONFIGURED` with the fix in the message, and everything else — data, auth, realtime — keeps serving. `501` and not `503`, so the client's offline queue does not retry uploads that can never land.
+
+  The scaffolded backend matches: it configures S3 for `STORAGE_TYPE=s3` and now GCS for `STORAGE_TYPE=gcs`, and falls back to local disk only outside production (or with `FORCE_LOCAL_STORAGE=true`, for a deployment with a real volume mounted). A named backend that is local-in-production is dropped from a multi-backend map without taking the durable ones with it.
+
+### Fixed
+
+- **A custom `Field` or `Preview` attached as a lazy import rendered nothing** — the documented way to attach one is `admin: { Preview: () => import("./MyPreview") }`. JavaScript names an anonymous function after the property key it is assigned to, so that arrow's name is `"Preview"`, and component detection treated "zero arguments, starts with a capital letter" as proof of a component — which is true of every loader written that way. The thunk went to React as a component, React called it, got a Promise, and rendered nothing: an empty cell with no console error. Detection now leads with what the function does — a dynamic module load in the body outranks the name — and matches both `import(...)` and the `require(...)` that CommonJS transforms produce.
+
+- **`rebase dev` could print a URL served by a different process** — when the first port was busy, the port-retry helper bound the next one but reported the port it had just *failed* to bind. It passed its success handler to `server.listen(port, host, cb)`, and that form registers the handler as a one-shot `listening` listener which a failed attempt never removes; the next attempt's success then ran both, and the earliest won. So with something already on 3001, the server listened on 3002 and announced `http://localhost:3001`. Whatever was already there answered normally, out of its own database, and nothing logged a warning.
+
+  Two consequences are fixed with it. The port file recorded the wrong number as well, and port *affinity* from that file used to outrank an explicitly requested port — so setting `PORT` in `.env` had no effect while a file from an earlier run existed. The file now records the bound port and the requested one, affinity applies only when the same port is requested again, and this matches the precedence the CLI already used (`--port`, then `PORT`, then affinity).
+
+### Testing
+
+- **A stable release now runs the full gate before publishing anything.** Publishing was not gated on tests: the canary job ran a build and published, and `publish.yml` had no dependency on CI at all — the two workflows fired in parallel on the same push, so a release could go out while CI was still running, or after it had already failed. The stable job ran unit tests but no end-to-end suite, which meant the failures those suites exist to catch — a broken `rebase init`, RLS not isolating rows — were exactly the ones a green build could not see.
+
+  The whole gate (type checks, headless/BaaS guards, init-template check, unit tests, and every e2e suite) now lives in a reusable `verify.yml` that CI and the stable release both call, so the release path cannot drift from the one that runs on every push. A stable release stops before any version bump, tag or publish if any of it fails. Canary is deliberately unchanged: it still publishes on a green build alone.
+
+- **The template e2e suite could test a server it had not started.** It took the backend's address from the announced banner, which is trustworthy only if the server announces the port it bound — see the fix above. Each backend is now given a port the OS reports as free, and the run fails loudly if the banner disagrees rather than continuing against an unknown server and a database it does not control. It also talks to `127.0.0.1` rather than `localhost`, which resolves to `::1` first on macOS while the server binds `0.0.0.0`.
+
+- **The CLI init e2e leaked its frontend.** `rebase dev` supervises a Vite that ends up outside the process group the teardown signals, so a frontend survived every run — one held port 5173 for hours with its project directory already deleted. Teardown now also reaps whatever still holds the dev server's own ports, restricted to processes that were not already listening there when the run began (a developer's `tsx watch` server gets a new pid whenever it restarts, so "any new listener" would have been a way to kill it).
+
+- **`rebase cloud link` was broken from a fresh checkout** — three prompts still used inquirer's removed `list` type, so running it interactively died with `Prompt type "list" is not registered`. Prompts are only constructed when a command actually asks something, so every non-interactive test passed and CI stayed green while the first command anyone runs did not work.
+
+- **`rebase build` produced bundles that could not boot** — TypeScript emits import specifiers untouched, so a project on `moduleResolution: "bundler"` compiled `from "./posts"` and Node ESM refused it. Specifiers are rewritten after compilation. Bundle tarballs no longer carry macOS extended-attribute headers, which GNU tar warned about once per file on extraction and which buried real errors.
 
 ## [0.10.0] - 2026-07-20
 
@@ -38,7 +110,7 @@ title: Changelog
 
 - **22 retired package names deprecated on npm** — the names the repo no longer publishes now carry a deprecation notice pointing at their replacement, so an install of an old name says so instead of silently resolving to an abandoned version.
 
-- **Package renames** — packages are now named for their role, not their position. `core` was frontend-only React while `server-core` was the actual core of the product; they shared a word and were otherwise unrelated. `client-firebase` depended on `admin`/`core`/`admin`, so it was a UI integration wearing a client-SDK name. Import paths are the only change — no behavior moved with them.
+- **Package renames** — packages are now named for their role, not their position. `core` was frontend-only React while `server-core` was the actual core of the product; they shared a word and were otherwise unrelated. `client-firebase` depended on `admin`/`core`/`ui`, so it was a UI integration wearing a client-SDK name. Import paths are the only change — no behavior moved with them.
 
   | Old | New |
   |----------|----------|
@@ -54,7 +126,7 @@ title: Changelog
   | `@rebasepro/mcp-server` | `@rebasepro/mcp` |
   | `@rebasepro/plugin-data-enhancement` | `@rebasepro/plugin-ai` |
 
-  Unchanged: `types`, `utils`, `common`, `client`, `admin`, `admin`, `studio`, `cli`, `plugin-insights`.
+  Unchanged: `types`, `utils`, `common`, `client`, `ui`, `admin`, `studio`, `cli`, `plugin-insights`.
 
 - **`@rebasepro/auth` removed** — it was one hook and an API helper whose only dependency was `@rebasepro/types`, and it always had to be installed alongside `core` anyway. `useRebaseAuthController`, `fetchAuthConfig`, `createAuthConfigCache` and `clearAuthConfigCache` now come from `@rebasepro/app`, beside the `RebaseAuth` and `LoginView` components they are used with. The auth *system* was never here — it lives in `@rebasepro/client` (`client.auth`) and `@rebasepro/server`.
 
@@ -138,7 +210,7 @@ title: Changelog
 
 - **`/admin/bootstrap` was a land-grab** — the self-promotion endpoint only refused to run once an admin already existed. In a "users exist but no admin" state — reachable via concurrent first-registrations, or by deleting the first user — any authenticated user could seize the initial admin role. It is now gated to the earliest-registered user, deterministically tie-broken by id, with security-audit logs on both the denial and the success.
 
-- **The API served password hashes** — `/api/data/users` returned every user their own `passwordHash` and `emailVerificationToken`. RLS scoped the row to the caller so this was not a cross-user leak, but a salted hash is offline-crackable and a verification token can be replayed. The users collection only marked them `admin.hideFromCollection`, which stops the admin panel from *rendering* a field and leaves it in the JSON.
+- **The API served password hashes** — `/api/data/users` returned every user their own `passwordHash` and `emailVerificationToken`. RLS scoped the row to the caller so this was not a cross-user leak, but a salted hash is offline-crackable and a verification token can be replayed. The users collection only marked them `ui.hideFromCollection`, which stops the admin panel from *rendering* a field and leaves it in the JSON.
 
 - **The data API was rate-limited by API key only** — the limiter returned early for any request that carried no API key, so JWT and anonymous traffic — most of what a BaaS serves — was unbounded, and it was mounted only `if (apiKeyStore)`, making its presence depend on a feature it does not need. Every request now falls in exactly one bucket, resolved most-specific first: API key by id, signed-in user by uid, everyone else by IP.
 
@@ -180,7 +252,7 @@ title: Changelog
 
 - **The service key did not authenticate websockets** — the HTTP middleware compares it before JWT verification; the websocket path went straight to `extractUserFromToken`, and a static secret can only ever fail that. Any SDK client using a service key (scripts, cron, server-to-server) got `jwt malformed` on every connect and silently received no realtime events.
 
-- **`collection-file → UI package` imports no longer drag React into the backend** — `users.ts` imported `resetPasswordAction` from `@rebasepro/admin`, so the Node backend loaded the entire admin bundle at boot. The action is already injected frontend-side for `auth` collections, making the import redundant. `@rebasepro/admin` is also gone from the config and backend templates, and `@rebasepro/core`/`admin` from `@rebasepro/auth` — none were imported.
+- **`collection-file → UI package` imports no longer drag React into the backend** — `users.ts` imported `resetPasswordAction` from `@rebasepro/admin`, so the Node backend loaded the entire admin bundle at boot. The action is already injected frontend-side for `auth` collections, making the import redundant. `@rebasepro/admin` is also gone from the config and backend templates, and `@rebasepro/core`/`ui` from `@rebasepro/auth` — none were imported.
 
 ### Testing
 

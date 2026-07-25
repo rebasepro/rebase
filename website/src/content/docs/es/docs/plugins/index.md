@@ -77,7 +77,7 @@ const navigationStateController = useBuildNavigationStateController({
 Aquí tienes un plugin mínimo que añade una acción a la barra de herramientas de cada colección:
 
 ```typescript
-import { RebasePlugin } from "@rebasepro/types";
+import type { RebasePlugin } from "@rebasepro/admin";
 
 function useMyPlugin(): RebasePlugin {
     return {

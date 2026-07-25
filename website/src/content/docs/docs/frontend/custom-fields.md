@@ -17,7 +17,7 @@ Rebase generates form fields automatically based on property types. For custom b
 A custom field is a React component that receives `FieldProps`:
 
 ```tsx
-import { FieldProps } from "@rebasepro/types";
+import type { FieldProps } from "@rebasepro/admin";
 
 function ColorPickerField({ value, setValue, error, showError }: FieldProps<string>) {
     return (

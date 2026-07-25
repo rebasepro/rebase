@@ -17,7 +17,7 @@ Rebase génère automatiquement des champs de formulaire basés sur les types de
 Un champ personnalisé est un composant React qui reçoit des `FieldProps` :
 
 ```tsx
-import { FieldProps } from "@rebasepro/types";
+import type { FieldProps } from "@rebasepro/admin";
 
 function ColorPickerField({ value, setValue, error, showError }: FieldProps<string>) {
     return (

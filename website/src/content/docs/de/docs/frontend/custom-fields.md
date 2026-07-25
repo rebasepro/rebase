@@ -17,7 +17,7 @@ Rebase generiert Formularfelder automatisch basierend auf Eigenschaftstypen. Fü
 Ein benutzerdefiniertes Feld ist eine React-Komponente, die `FieldProps` empfängt:
 
 ```tsx
-import { FieldProps } from "@rebasepro/types";
+import type { FieldProps } from "@rebasepro/admin";
 
 function ColorPickerField({ value, setValue, error, showError }: FieldProps<string>) {
     return (

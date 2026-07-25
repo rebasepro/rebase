@@ -41,7 +41,7 @@ const articlesCollection: CollectionConfig = {
 ## Costruzione di una vista entità
 
 ```tsx
-import { EntityCustomViewParams } from "@rebasepro/types";
+import type { EntityCustomViewParams } from "@rebasepro/admin-types";
 
 function ArticlePreview({
     entity,
