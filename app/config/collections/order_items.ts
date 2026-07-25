@@ -25,9 +25,6 @@ const orderItemsCollection = defineCollection({
     singularName: "Order Item",
     slug: "order_items",
     table: "order_items",
-    icon: "ReceiptText",
-    group: "E-Commerce",
-    hideFromNavigation: true,
     properties: {
         id: {
             name: "ID",
@@ -80,14 +77,6 @@ const orderItemsCollection = defineCollection({
             description: "quantity × unit_price"
         }
     },
-    propertiesOrder: [
-        "product",
-        "product_name",
-        "sku",
-        "quantity",
-        "unit_price",
-        "line_total"
-    ],
     callbacks: {
         beforeSave: async ({ values, context }) => {
             const productId = getRelationId(values.product);
@@ -123,6 +112,19 @@ const orderItemsCollection = defineCollection({
             }
         }
     },
+    admin: {
+        icon: "ReceiptText",
+        group: "E-Commerce",
+        hideFromNavigation: true,
+        propertiesOrder: [
+            "product",
+            "product_name",
+            "sku",
+            "quantity",
+            "unit_price",
+            "line_total"
+        ]
+    }
 });
 
 // Helper function to recalculate the parent order subtotal & total

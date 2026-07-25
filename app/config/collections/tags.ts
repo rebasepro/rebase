@@ -6,10 +6,7 @@ const tagsCollection = defineCollection({
     singularName: "Tag",
     slug: "tags",
     table: "tags",
-    icon: "Tag",
-    group: "Content",
     history: true,
-    hideFromNavigation: true,
     properties: {
         id: {
             name: "ID",
@@ -36,6 +33,11 @@ const tagsCollection = defineCollection({
             inverseRelationName: "tags"
         }
     ],
+    admin: {
+        icon: "Tag",
+        group: "Content",
+        hideFromNavigation: true
+    }
 });
 
 

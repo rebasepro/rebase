@@ -10,8 +10,6 @@ const authorsCollection = defineCollection({
     singularName: "Author",
     slug: "authors",
     table: "authors",
-    icon: "User",
-    group: "Content",
     history: true,
     properties: {
         id: {
@@ -91,23 +89,26 @@ const authorsCollection = defineCollection({
             inverseRelationName: "author"
         }
     ],
-    propertiesOrder: [
-        "id",
-        "name",
-        "email",
-        "picture",
-        "bio",
-        "twitter",
-        "github",
-        "website",
-        "userId"
-    ],
-
-    defaultFilter: undefined,
-    sort: [
-        "email",
-        "asc"
-    ],
+    admin: {
+        icon: "User",
+        group: "Content",
+        propertiesOrder: [
+            "id",
+            "name",
+            "email",
+            "picture",
+            "bio",
+            "twitter",
+            "github",
+            "website",
+            "userId"
+        ],
+        defaultFilter: undefined,
+        sort: [
+            "email",
+            "asc"
+        ]
+    }
 });
 
 

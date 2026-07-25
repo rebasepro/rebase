@@ -13,8 +13,6 @@ export const usersCollection = defineCollection({
     slug: "users",
     name: "Users",
     singularName: "User",
-    group: "E-commerce",
-    icon: "Users",
     description: "Registered users",
     properties: {
         first_name: {
@@ -69,5 +67,9 @@ export const usersCollection = defineCollection({
                 }
             }
         }
+    },
+    admin: {
+        group: "E-commerce",
+        icon: "Users"
     }
 });

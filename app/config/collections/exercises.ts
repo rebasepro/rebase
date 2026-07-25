@@ -5,12 +5,7 @@ const exercisesCollection = defineCollection({
     singularName: "Exercise",
     slug: "exercises",
     table: "exercises",
-    icon: "Dumbbell",
-    group: "Fitness",
     history: true,
-    defaultViewMode: "table",
-    enabledViews: ["table", "cards"],
-    titleProperty: "name",
     properties: {
         id: {
             name: "ID",
@@ -56,15 +51,21 @@ const exercisesCollection = defineCollection({
             },
             defaultValue: "intermediate",
             enum: [
-                { id: "beginner",
-label: "Beginner",
-color: "green" },
-                { id: "intermediate",
-label: "Intermediate",
-color: "orange" },
-                { id: "advanced",
-label: "Advanced",
-color: "red" }
+                {
+                    id: "beginner",
+                    label: "Beginner",
+                    color: "green"
+                },
+                {
+                    id: "intermediate",
+                    label: "Intermediate",
+                    color: "orange"
+                },
+                {
+                    id: "advanced",
+                    label: "Advanced",
+                    color: "red"
+                }
             ]
         },
         category: {
@@ -74,24 +75,36 @@ color: "red" }
                 required: true
             },
             enum: [
-                { id: "strength",
-label: "Strength",
-color: "red" },
-                { id: "cardio",
-label: "Cardio",
-color: "blue" },
-                { id: "flexibility",
-label: "Flexibility",
-color: "green" },
-                { id: "balance",
-label: "Balance",
-color: "purple" },
-                { id: "plyometrics",
-label: "Plyometrics",
-color: "orange" },
-                { id: "calisthenics",
-label: "Calisthenics",
-color: "cyan" }
+                {
+                    id: "strength",
+                    label: "Strength",
+                    color: "red"
+                },
+                {
+                    id: "cardio",
+                    label: "Cardio",
+                    color: "blue"
+                },
+                {
+                    id: "flexibility",
+                    label: "Flexibility",
+                    color: "green"
+                },
+                {
+                    id: "balance",
+                    label: "Balance",
+                    color: "purple"
+                },
+                {
+                    id: "plyometrics",
+                    label: "Plyometrics",
+                    color: "orange"
+                },
+                {
+                    id: "calisthenics",
+                    label: "Calisthenics",
+                    color: "cyan"
+                }
             ]
         },
         equipment: {
@@ -101,30 +114,54 @@ color: "cyan" }
                 name: "Equipment Item",
                 type: "string",
                 enum: [
-                    { id: "none",
-label: "None (Bodyweight)" },
-                    { id: "barbell",
-label: "Barbell" },
-                    { id: "dumbbell",
-label: "Dumbbell" },
-                    { id: "kettlebell",
-label: "Kettlebell" },
-                    { id: "resistance_band",
-label: "Resistance Band" },
-                    { id: "cable_machine",
-label: "Cable Machine" },
-                    { id: "pull_up_bar",
-label: "Pull-Up Bar" },
-                    { id: "bench",
-label: "Bench" },
-                    { id: "medicine_ball",
-label: "Medicine Ball" },
-                    { id: "foam_roller",
-label: "Foam Roller" },
-                    { id: "trx",
-label: "TRX / Suspension Trainer" },
-                    { id: "box",
-label: "Plyo Box" }
+                    {
+                        id: "none",
+                        label: "None (Bodyweight)"
+                    },
+                    {
+                        id: "barbell",
+                        label: "Barbell"
+                    },
+                    {
+                        id: "dumbbell",
+                        label: "Dumbbell"
+                    },
+                    {
+                        id: "kettlebell",
+                        label: "Kettlebell"
+                    },
+                    {
+                        id: "resistance_band",
+                        label: "Resistance Band"
+                    },
+                    {
+                        id: "cable_machine",
+                        label: "Cable Machine"
+                    },
+                    {
+                        id: "pull_up_bar",
+                        label: "Pull-Up Bar"
+                    },
+                    {
+                        id: "bench",
+                        label: "Bench"
+                    },
+                    {
+                        id: "medicine_ball",
+                        label: "Medicine Ball"
+                    },
+                    {
+                        id: "foam_roller",
+                        label: "Foam Roller"
+                    },
+                    {
+                        id: "trx",
+                        label: "TRX / Suspension Trainer"
+                    },
+                    {
+                        id: "box",
+                        label: "Plyo Box"
+                    }
                 ]
             },
             description: "Equipment needed for this exercise"
@@ -136,36 +173,66 @@ label: "Plyo Box" }
                 name: "Body Part",
                 type: "string",
                 enum: [
-                    { id: "head_neck",
-label: "Head & Neck" },
-                    { id: "shoulders",
-label: "Shoulders" },
-                    { id: "chest",
-label: "Chest" },
-                    { id: "upper_back",
-label: "Upper Back" },
-                    { id: "lower_back",
-label: "Lower Back" },
-                    { id: "biceps",
-label: "Biceps" },
-                    { id: "triceps",
-label: "Triceps" },
-                    { id: "forearms",
-label: "Forearms" },
-                    { id: "abs",
-label: "Abs" },
-                    { id: "obliques",
-label: "Obliques" },
-                    { id: "glutes",
-label: "Glutes" },
-                    { id: "quads",
-label: "Quads" },
-                    { id: "hamstrings",
-label: "Hamstrings" },
-                    { id: "calves",
-label: "Calves" },
-                    { id: "hip_flexors",
-label: "Hip Flexors" }
+                    {
+                        id: "head_neck",
+                        label: "Head & Neck"
+                    },
+                    {
+                        id: "shoulders",
+                        label: "Shoulders"
+                    },
+                    {
+                        id: "chest",
+                        label: "Chest"
+                    },
+                    {
+                        id: "upper_back",
+                        label: "Upper Back"
+                    },
+                    {
+                        id: "lower_back",
+                        label: "Lower Back"
+                    },
+                    {
+                        id: "biceps",
+                        label: "Biceps"
+                    },
+                    {
+                        id: "triceps",
+                        label: "Triceps"
+                    },
+                    {
+                        id: "forearms",
+                        label: "Forearms"
+                    },
+                    {
+                        id: "abs",
+                        label: "Abs"
+                    },
+                    {
+                        id: "obliques",
+                        label: "Obliques"
+                    },
+                    {
+                        id: "glutes",
+                        label: "Glutes"
+                    },
+                    {
+                        id: "quads",
+                        label: "Quads"
+                    },
+                    {
+                        id: "hamstrings",
+                        label: "Hamstrings"
+                    },
+                    {
+                        id: "calves",
+                        label: "Calves"
+                    },
+                    {
+                        id: "hip_flexors",
+                        label: "Hip Flexors"
+                    }
                 ]
             },
             ui: {
@@ -218,74 +285,91 @@ label: "Hip Flexors" }
             },
             defaultValue: "draft",
             enum: [
-                { id: "draft",
-label: "Draft",
-color: "gray" },
-                { id: "published",
-label: "Published",
-color: "green" },
-                { id: "archived",
-label: "Archived",
-color: "red" }
+                {
+                    id: "draft",
+                    label: "Draft",
+                    color: "gray"
+                },
+                {
+                    id: "published",
+                    label: "Published",
+                    color: "green"
+                },
+                {
+                    id: "archived",
+                    label: "Archived",
+                    color: "red"
+                }
             ]
         },
         created_at: {
             name: "Created at",
             type: "date",
             autoValue: "on_create",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: {
+                readOnly: true,
+                hideFromCollection: true
+            }
         },
         updated_at: {
             name: "Updated at",
             type: "date",
             autoValue: "on_update",
-            ui: { readOnly: true,
-hideFromCollection: true }
+            ui: {
+                readOnly: true,
+                hideFromCollection: true
+            }
         }
     },
-    propertiesOrder: [
-        "name",
-        "body_parts",
-        "images",
-        "status",
-        "difficulty",
-        "category",
-        "equipment",
-        "is_compound",
-        "default_reps",
-        "default_sets",
-        "rest_seconds",
-        "calories_per_minute",
-        "video_url",
-        "description",
-        "instructions",
-        "is_featured",
-        "created_at",
-        "updated_at"
-    ],
-    filterPresets: [
-        {
-            label: "Beginner bodyweight",
-            filterValues: {
-                difficulty: ["==", "beginner"],
-                category: ["==", "calisthenics"]
+    admin: {
+        icon: "Dumbbell",
+        group: "Fitness",
+        defaultViewMode: "table",
+        enabledViews: ["table", "cards"],
+        titleProperty: "name",
+        propertiesOrder: [
+            "name",
+            "body_parts",
+            "images",
+            "status",
+            "difficulty",
+            "category",
+            "equipment",
+            "is_compound",
+            "default_reps",
+            "default_sets",
+            "rest_seconds",
+            "calories_per_minute",
+            "video_url",
+            "description",
+            "instructions",
+            "is_featured",
+            "created_at",
+            "updated_at"
+        ],
+        filterPresets: [
+            {
+                label: "Beginner bodyweight",
+                filterValues: {
+                    difficulty: ["==", "beginner"],
+                    category: ["==", "calisthenics"]
+                }
+            },
+            {
+                label: "Published strength",
+                filterValues: {
+                    category: ["==", "strength"],
+                    status: ["==", "published"]
+                }
+            },
+            {
+                label: "Cardio exercises",
+                filterValues: {
+                    category: ["==", "cardio"]
+                }
             }
-        },
-        {
-            label: "Published strength",
-            filterValues: {
-                category: ["==", "strength"],
-                status: ["==", "published"]
-            }
-        },
-        {
-            label: "Cardio exercises",
-            filterValues: {
-                category: ["==", "cardio"]
-            }
-        }
-    ],
+        ]
+    }
 });
 
 export default exercisesCollection;

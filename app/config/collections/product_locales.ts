@@ -9,10 +9,7 @@ const productLocalesCollection = defineCollection({
     singularName: "Product Locale",
     slug: "product_locales",
     table: "product_locales",
-    icon: "Translate",
-    group: "E-Commerce",
     history: true,
-    hideFromNavigation: true,
     properties: {
         id: {
             name: "ID",
@@ -46,6 +43,11 @@ const productLocalesCollection = defineCollection({
             ui: { markdown: true }
         }
     },
+    admin: {
+        icon: "Translate",
+        group: "E-Commerce",
+        hideFromNavigation: true
+    }
 });
 
 

@@ -30,6 +30,8 @@ import type {
     PostgresProperties,
     User
 } from "@rebasepro/types";
+// A value, not a type: the runtime list core owns.
+import { ADMIN_COLLECTION_KEYS as CORE_ADMIN_COLLECTION_KEYS } from "@rebasepro/types";
 
 import type {
     AdditionalFieldDelegate,
@@ -480,66 +482,28 @@ export function defineCollection(collection: AdminCollectionConfig): AdminCollec
 }
 
 /**
- * Every key that belongs inside `admin`, as data.
+ * Re-exported from `@rebasepro/types`, where the list has to live: the ts-morph
+ * schema editor in `@rebasepro/server` needs it to know which keys go inside the
+ * block when it rewrites a collection file, and a core package may not import
+ * this one. The list is plain data, so core is a fine home for it.
  *
- * The type above is erased at build time, but three runtime consumers need the
- * same list and must not each keep their own copy:
- *
- * - `serializeCollections` / `computeSchemaVersion`, to drop the block from the
- *   contract and exclude it from the schema hash
- * - the ts-morph schema editor in `@rebasepro/server`, which rewrites collection
- *   files on disk from the admin panel and has to know where each key goes
- * - the `collections-admin-block` codemod
- *
- * A key added to `AdminCollectionOptions` and forgotten here would be silently
- * written to the top level by the schema editor, so
- * `admin_collection.test.ts` asserts the two agree.
+ * What core *cannot* do is check the list against the type. That happens here.
  *
  * @group Models
  */
-export const ADMIN_COLLECTION_KEYS = [
-    "Actions",
-    "additionalFields",
-    "alwaysApplyDefaultValues",
-    "components",
-    "defaultEntityAction",
-    "defaultFilter",
-    "defaultSelectedView",
-    "defaultSize",
-    "defaultViewMode",
-    "disableDefaultActions",
-    "enabledViews",
-    "entityActions",
-    "entityViews",
-    "exportable",
-    "filterPresets",
-    "fixedFilter",
-    "formAutoSave",
-    "formView",
-    "group",
-    "hideFromNavigation",
-    "hideIdFromCollection",
-    "hideIdFromForm",
-    "icon",
-    "includeJsonView",
-    "inlineEditing",
-    "kanban",
-    "listProperties",
-    "localChangesBackup",
-    "openEntityMode",
-    "orderProperty",
-    "pagination",
-    "previewProperties",
-    "propertiesOrder",
-    "selectionController",
-    "selectionEnabled",
-    "sideDialogWidth",
-    "sort",
-    "titleProperty"
-] as const satisfies readonly (keyof AdminCollectionOptions)[];
+export type { AdminCollectionKey } from "@rebasepro/types";
 
-/** @internal */
-export type AdminCollectionKey = typeof ADMIN_COLLECTION_KEYS[number];
+/**
+ * Core's list, re-exported through a `satisfies` clause that is the agreement
+ * check: a key core names that is not an option here fails to compile, and
+ * `satisfies` keeps the literal tuple type rather than widening it to `string[]`.
+ *
+ * The reverse direction — an option missing from core's list — has no type-level
+ * expression, since there is no exhaustiveness check over an optional-property
+ * keyof. `test/admin_collection.test.ts` counts them instead.
+ */
+export const ADMIN_COLLECTION_KEYS = CORE_ADMIN_COLLECTION_KEYS satisfies readonly (keyof AdminCollectionOptions)[];
+
 
 /**
  * A collection as the admin panel works with it: the contract with the `admin`

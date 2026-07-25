@@ -90,7 +90,9 @@
             "/bivariance/"
         ],
         "moduleNameMapper": {
-            "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js"
+            "\\\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
+            "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
+            "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
         }
     },
     "eslintConfig": {

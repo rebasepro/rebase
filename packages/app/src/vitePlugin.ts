@@ -17,7 +17,11 @@ export interface RebaseCollectionsPluginOptions {
  * the transform plugin replaces it with a `LazyComponentRef` object so the
  * component is loaded lazily and never evaluated by the backend.
  */
-const LAZY_COMPONENT_KEYS = new Set(["Field", "Preview", "Builder"]);
+// `Filter` was missing: BaseUIConfig.Filter is a ComponentRef like the others, so
+// a string path there was left as a string and the resolver logged "raw string
+// ComponentRef at runtime" and rendered nothing. Key-name based, so nesting
+// presentation under `admin` needs no change here.
+const LAZY_COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter"]);
 
 /**
  * Walk a TypeScript AST node tree, invoking `visitor` for every node.

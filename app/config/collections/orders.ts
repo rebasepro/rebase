@@ -15,14 +15,7 @@ const ordersCollection = defineCollection({
     singularName: "Order",
     slug: "orders",
     table: "orders",
-    icon: "ShoppingCart",
-    group: "E-Commerce",
     history: true,
-    defaultEntityAction: "view",
-    enabledViews: ["table", "kanban"],
-    kanban: {
-        columnProperty: "status"
-    },
     properties: {
         id: {
             name: "ID",
@@ -186,27 +179,6 @@ const ordersCollection = defineCollection({
             ui: { readOnly: true, hideFromCollection: true }
         }
     },
-    propertiesOrder: [
-        "order_number",
-        "status",
-        "customer",
-        "payment_status",
-        "order_date",
-        "subtotal",
-        "tax_amount",
-        "shipping_cost",
-        "discount_amount",
-        "total",
-        "currency",
-        "shipping_address",
-        "tracking_number",
-        "shipped_date",
-        "delivered_date",
-        "notes",
-        "created_at",
-        "updated_at",
-        "id"
-    ],
     // Headless relation: no property for "order_items", only used for subcollection tab
     relations: [
         {
@@ -243,34 +215,64 @@ const ordersCollection = defineCollection({
             }
         }
     },
-    filterPresets: [
-        {
-            label: "Shipped orders",
-            filterValues: {
-                status: ["==", "shipped"]
-            }
+    admin: {
+        icon: "ShoppingCart",
+        group: "E-Commerce",
+        defaultEntityAction: "view",
+        enabledViews: ["table", "kanban"],
+        kanban: {
+            columnProperty: "status"
         },
-        {
-            label: "Pending & paid",
-            filterValues: {
-                status: ["==", "pending"],
-                payment_status: ["==", "paid"]
-            }
-        },
-        {
-            label: "High-value orders (> $500)",
-            filterValues: {
-                total: [">", 500]
+        propertiesOrder: [
+            "order_number",
+            "status",
+            "customer",
+            "payment_status",
+            "order_date",
+            "subtotal",
+            "tax_amount",
+            "shipping_cost",
+            "discount_amount",
+            "total",
+            "currency",
+            "shipping_address",
+            "tracking_number",
+            "shipped_date",
+            "delivered_date",
+            "notes",
+            "created_at",
+            "updated_at",
+            "id"
+        ],
+        filterPresets: [
+            {
+                label: "Shipped orders",
+                filterValues: {
+                    status: ["==", "shipped"]
+                }
             },
-            sort: ["total", "desc"]
-        },
-        {
-            label: "Cancelled / Refunded",
-            filterValues: {
-                status: ["in", ["cancelled", "refunded"]]
+            {
+                label: "Pending & paid",
+                filterValues: {
+                    status: ["==", "pending"],
+                    payment_status: ["==", "paid"]
+                }
+            },
+            {
+                label: "High-value orders (> $500)",
+                filterValues: {
+                    total: [">", 500]
+                },
+                sort: ["total", "desc"]
+            },
+            {
+                label: "Cancelled / Refunded",
+                filterValues: {
+                    status: ["in", ["cancelled", "refunded"]]
+                }
             }
-        }
-    ]
+        ]
+    }
 });
 
 // Helper function to update customer lifetime value and total orders count

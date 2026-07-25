@@ -17,13 +17,7 @@ export const blogCollection = defineCollection({
     slug: "blog",
     name: "Blog",
     singularName: "Blog entry",
-    icon: "FileText",
-    group: "Content",
     description: "A collection of blog entries",
-    defaultSize: "l",
-    defaultFilter: {
-        status: ["==", "published"]
-    },
     properties: {
         name: {
             name: "Name",
@@ -119,6 +113,14 @@ export const blogCollection = defineCollection({
                 type: "string",
                 name: "Tag"
             }
+        }
+    },
+    admin: {
+        icon: "FileText",
+        group: "Content",
+        defaultSize: "l",
+        defaultFilter: {
+            status: ["==", "published"]
         }
     }
 });

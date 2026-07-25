@@ -195,11 +195,40 @@ function toSerializable(
 export function serializeCollections(collections: CollectionConfig[]): unknown[] {
     return [...collections]
         .sort((a, b) => String(a.slug ?? "").localeCompare(String(b.slug ?? "")))
-        .map(collection => toSerializable(collection, new WeakSet(), 0, {
+        .map(collection => toSerializable(withoutAdminBlock(collection), new WeakSet(), 0, {
             memo: new WeakMap(),
             truncations: 0
         }))
         .filter((c): c is Record<string, unknown> => c !== undefined);
+}
+
+/**
+ * Drop the admin block before the walk.
+ *
+ * Nothing downstream of serialization is an admin panel. The contract endpoint
+ * feeds remote SDK generation, and `rebase build` writes the result into a bundle
+ * manifest that only the backend runtime reads. The block would survive the walk
+ * as a husk anyway — its React elements and component functions are dropped
+ * individually — and that husk has two costs worth avoiding: it puts every custom
+ * component's *file path* on an endpoint whose job is to describe data shapes, and
+ * it grows a payload that is fetched and cached per project.
+ *
+ * Removing it here rather than at each call site means one chokepoint, so a future
+ * consumer of `serializeCollections` cannot forget.
+ *
+ * Child collections carry their own block, so this recurses — stripping only the
+ * top level was the mistake `stripNonClientFields` in the contract routes already
+ * had to fix once for security rules.
+ */
+function withoutAdminBlock(collection: CollectionConfig): CollectionConfig {
+    const { admin: _admin, ...rest } = collection as CollectionConfig & Record<string, unknown>;
+    const nested = rest as Record<string, unknown>;
+    if (Array.isArray(nested.subcollections)) {
+        nested.subcollections = nested.subcollections.map(
+            (child) => withoutAdminBlock(child as CollectionConfig)
+        );
+    }
+    return rest as CollectionConfig;
 }
 
 /**
