@@ -6,10 +6,12 @@ const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 
 // Code is defined in frontmatter so whitespace is preserved exactly
-const codeHtml = `<span class="text-primary-light">import</span> { buildCollection } <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/common"</span>;
+const codeHtml = `<span class="text-primary-light">import type</span> { PostgresCollectionConfig } <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/types"</span>;
 
-<span class="text-primary-light">export const</span> <span class="text-white">products</span> = buildCollection({
+<span class="text-primary-light">export const</span> <span class="text-white">products</span>: PostgresCollectionConfig = {
   <span class="text-blue-300">name</span>: <span class="text-green-400">"Products"</span>,
+  <span class="text-blue-300">slug</span>: <span class="text-green-400">"products"</span>,
+  <span class="text-blue-300">table</span>: <span class="text-green-400">"products"</span>,
   <span class="text-blue-300">properties</span>: {
     <span class="text-blue-300">name</span>: {
       <span class="text-blue-300">name</span>: <span class="text-green-400">"Name"</span>,
@@ -29,7 +31,7 @@ const codeHtml = `<span class="text-primary-light">import</span> { buildCollecti
     <span class="text-blue-300">in_stock</span>:  { <span class="text-blue-300">name</span>: <span class="text-green-400">"In Stock"</span>, <span class="text-blue-300">type</span>: <span class="text-green-400">"boolean"</span> },
     <span class="text-blue-300">image_url</span>: { <span class="text-blue-300">name</span>: <span class="text-green-400">"Image"</span>, <span class="text-blue-300">type</span>: <span class="text-green-400">"string"</span>, <span class="text-blue-300">url</span>: <span class="text-primary-light">true</span> },
   },
-});`;
+};`;
 ---
 
 <section id="collection-power" class="relative z-0 py-28 overflow-hidden">
