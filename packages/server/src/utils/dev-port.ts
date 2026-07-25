@@ -24,8 +24,11 @@ export const DEV_PORT_FILENAME = ".rebase-dev-port";
  * Try to `listen` on `startPort`. If the port is busy (`EADDRINUSE`), increment
  * and retry up to `maxAttempts` times.
  *
- * When a port file already exists (written by a previous run), the saved port
- * is tried first to maintain port affinity across tsx watch restarts.
+ * When a port file written by a previous run exists *and that run asked for the
+ * same `startPort`*, the port it landed on is tried first, so tsx watch restarts
+ * keep the address the frontend was configured with. A different `startPort` means
+ * the configuration changed and the file is ignored — an explicitly requested port
+ * is never overridden by a stale one.
  *
  * Resolves with the port that was actually bound.
  *
@@ -68,13 +71,29 @@ export function listenWithPortRetry(
     // Read affinity port from a previous run's port file.
     // This ensures tsx watch restarts land on the same port the frontend was
     // configured with, even if the CLI-computed port was different.
+    //
+    // It applies only when the port being *asked for* has not changed since that
+    // file was written, which is why the file records both. Affinity used to win
+    // outright, so a stale file silently overrode an explicit port: set `PORT=4000`
+    // in `.env` and the server would keep binding whatever the last run happened to
+    // land on, reporting the old number. `resolvePort` in the CLI has always ranked
+    // these correctly — explicit `--port`, then `PORT`, then affinity — and this is
+    // the server agreeing with it.
+    //
+    // The e2e suite is what surfaced it: it assigns each backend a fresh free port,
+    // and the second boot in a project ignored it and re-bound the first one.
     let affinityPort: number | null = null;
     if (portFileDir) {
         try {
             const portFile = path.join(portFileDir, DEV_PORT_FILENAME);
             if (fs.existsSync(portFile)) {
-                const saved = parseInt(fs.readFileSync(portFile, "utf-8").trim(), 10);
-                if (saved > 0 && saved < 65536 && saved !== startPort) {
+                // "<bound> <requested>" — `parseInt` stops at the space, so older
+                // readers that expect a bare number still read the bound port.
+                const [savedRaw, requestedRaw] = fs.readFileSync(portFile, "utf-8").trim().split(/\s+/);
+                const saved = parseInt(savedRaw, 10);
+                const requestedThen = requestedRaw === undefined ? NaN : parseInt(requestedRaw, 10);
+                const sameRequest = Number.isNaN(requestedThen) || requestedThen === startPort;
+                if (saved > 0 && saved < 65536 && saved !== startPort && sameRequest) {
                     affinityPort = saved;
                 }
             }
@@ -105,25 +124,32 @@ export function listenWithPortRetry(
             const port = portsToTry[index];
             attempt++;
 
-            const onError = (err: NodeJS.ErrnoException) => {
-                if (err.code === "EADDRINUSE") {
-                    server.removeListener("error", onError);
-                    tryNext(index + 1);
-                } else {
-                    reject(err);
-                }
-            };
-
-            server.once("error", onError);
-
-            server.listen(port, host, () => {
-                server.removeListener("error", onError);
+            // Both listeners are removed on either outcome.
+            //
+            // This used to pass the success handler as `server.listen(port, host, cb)`,
+            // and that form registers `cb` as a one-shot `listening` listener which a
+            // *failed* attempt never removes. So after an EADDRINUSE, the next attempt's
+            // success ran both handlers, and the earliest one won the promise: the
+            // function resolved with — and wrote into the port file — the port it had
+            // just failed to bind.
+            //
+            // What that looked like: with something already on 3001, the server bound
+            // 3002 and announced "API running at http://localhost:3001". Every caller
+            // that trusted the banner reached the *other* process, which answered
+            // normally from its own database. No error was logged anywhere. It cost the
+            // templates e2e six failures that blamed registration, and it would hand a
+            // developer running two projects a URL that silently serves the wrong app.
+            const onListening = () => {
+                cleanup();
 
                 // Write the port file so the CLI can pick it up
                 if (portFileDir) {
                     try {
                         const portFile = path.join(portFileDir, DEV_PORT_FILENAME);
-                        fs.writeFileSync(portFile, String(port), "utf-8");
+                        // Bound port first so `parseInt` still yields it, then the
+                        // port that was requested — that is what makes the affinity
+                        // above conditional rather than absolute.
+                        fs.writeFileSync(portFile, `${port} ${startPort}`, "utf-8");
                     } catch {
                         // Non-fatal — the CLI will fall back to parsing stdout
                     }
@@ -134,7 +160,25 @@ export function listenWithPortRetry(
                 }
 
                 resolve(port);
-            });
+            };
+
+            const onError = (err: NodeJS.ErrnoException) => {
+                cleanup();
+                if (err.code === "EADDRINUSE") {
+                    tryNext(index + 1);
+                } else {
+                    reject(err);
+                }
+            };
+
+            function cleanup() {
+                server.removeListener("listening", onListening);
+                server.removeListener("error", onError);
+            }
+
+            server.once("error", onError);
+            server.once("listening", onListening);
+            server.listen(port, host);
         }
 
         tryNext(0);

@@ -5,6 +5,7 @@
  * scaffold, link and boot projects the same way the original suite does.
  */
 import fs from "fs";
+import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 import { execa, type ResultPromise } from "execa";
@@ -202,17 +203,48 @@ export interface RunningBackend {
     output: () => string;
 }
 
+/** Ask the OS for a port nothing is using, then let go of it. */
+async function reserveFreePort(): Promise<number> {
+    return new Promise<number>((resolve, reject) => {
+        const probe = net.createServer();
+        probe.once("error", reject);
+        probe.listen(0, "127.0.0.1", () => {
+            const address = probe.address();
+            if (address === null || typeof address === "string") {
+                probe.close(() => reject(new Error("Could not determine a free port")));
+                return;
+            }
+            probe.close(() => resolve(address.port));
+        });
+    });
+}
+
 /**
- * Boot the scaffolded backend and wait until it reports its port.
+ * Boot the scaffolded backend on a port of our own choosing, and refuse to
+ * proceed unless the server that answers is the one we started.
  *
- * The port is read from the banner rather than assumed: `rebase dev` picks a
- * free one, so hardcoding 3001 makes the suite fail whenever anything else is
- * listening. cms logs "Server running at", baas logs "API running at".
+ * Both halves are load-bearing, and this suite spent a long time failing because
+ * it had neither.
+ *
+ * The templates ship `PORT=3001`, which is also the port a developer's own
+ * `rebase dev` sits on — so a local demo server and the scaffolded project want
+ * the same socket. The suite used to take the port out of the server's banner,
+ * which sounds safer than hardcoding it but is not: the banner said 3001 while a
+ * *two-day-old* backend held 3001, so every request went there. It answered
+ * perfectly well, from a different database with `ALLOW_REGISTRATION` unset, and
+ * the result was six failures blaming registration — for tests that had never
+ * once talked to the project they scaffolded.
+ *
+ * So: take a port the OS says is free, hand it to the child, and then assert the
+ * banner agrees. If it ever disagrees again, that is a real finding about the
+ * server's port handling and it fails here loudly instead of silently redirecting
+ * the whole suite. cms logs "Server running at", baas logs "API running at".
  */
 export async function startBackend(projectDir: string, env: Record<string, string>, timeoutMs = 90_000): Promise<RunningBackend> {
+    const assignedPort = await reserveFreePort();
     const proc = execa("pnpm", ["run", "dev"], {
         cwd: path.join(projectDir, "backend"),
-        env,
+        env: { ...env, PORT: String(assignedPort) },
         detached: true // so killTree can reap the tsx/backend it spawns
     });
 
@@ -230,11 +262,24 @@ export async function startBackend(projectDir: string, env: Record<string, strin
 
         const onData = (data: Buffer) => {
             buffer += data.toString();
-            const match = buffer.match(/(?:Server|API) running at (http:\/\/localhost:\d+)/);
+            const match = buffer.match(/(?:Server|API) running at http:\/\/localhost:(\d+)/);
             if (match && !settled) {
                 settled = true;
                 clearTimeout(timer);
-                resolve(match[1]);
+                const reportedPort = Number(match[1]);
+                if (reportedPort !== assignedPort) {
+                    killTree(proc, "SIGKILL");
+                    reject(new Error(
+                        `Backend was told PORT=${assignedPort} but reported ${reportedPort}. `
+                        + "Refusing to continue: the suite would be talking to a server it did not "
+                        + "start, against a database it does not control. Output:\n" + buffer
+                    ));
+                    return;
+                }
+                // 127.0.0.1, not "localhost": `localhost` resolves to ::1 first on
+                // this machine, and the server binds 0.0.0.0 — IPv4 only. Anything
+                // answering on ::1 is by definition not the child we just spawned.
+                resolve(`http://127.0.0.1:${assignedPort}`);
             }
         };
 
@@ -292,7 +337,18 @@ export async function registerAndLogin(baseUrl: string, email: string, password:
     });
     const reg = await regRes.json() as any;
     if (!regRes.ok || !reg?.user?.uid) {
-        throw new Error(`register failed (${regRes.status}): ${JSON.stringify(reg)}`);
+        // A bare 403 here says "Registration is disabled" and nothing about *why*:
+        // two different gates throw the same code, and the effective value comes from
+        // a `.env` the test never wrote. Ask the server what it thinks it is doing.
+        let serverView = "(GET /api/auth/config failed)";
+        try {
+            const cfg = await fetch(`${baseUrl}/api/auth/config`);
+            serverView = `${cfg.status} ${JSON.stringify(await cfg.json())}`;
+        } catch { /* keep the placeholder */ }
+        throw new Error(
+            `register failed (${regRes.status}): ${JSON.stringify(reg)}\n`
+            + `  server /api/auth/config → ${serverView}`
+        );
     }
 
     const loginRes = await fetch(`${baseUrl}/api/auth/login`, {
