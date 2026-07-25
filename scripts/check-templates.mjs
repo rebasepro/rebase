@@ -68,6 +68,55 @@ function materialize(preset, into) {
 }
 
 /**
+ * Add the thing a user adds the moment they want a custom field: a component, an
+ * image inside it, and a collection pointing at it with a lazy `import()` thunk.
+ *
+ * This is checked because it is not free. The thunk is *type-checked*, so every
+ * program that compiles the collection resolves the component and then the
+ * component's own imports — including `import icon from "./icon.png"`, which is
+ * Vite's doing and means nothing to `tsc`. The frontend gets away with it through
+ * `vite/client` types, but those belong to the frontend's program, not this one, so
+ * the config build fails on an import the author never thought of as risky.
+ *
+ * `config/frontend-assets.d.ts` is what answers it, and this probe is what keeps it
+ * from being deleted as an unexplained file.
+ *
+ * The component lives inside the materialized config directory rather than at
+ * `../frontend/src`, because only `config/` is materialized here — where the file
+ * sits changes nothing about the asset question.
+ */
+function addCustomComponentProbe(into) {
+    fs.writeFileSync(path.join(into, "__probe_component.tsx"), `
+import icon from "./__probe_icon.png";
+
+export const iconPath: string = icon;
+
+export default function ProbeField() {
+    return null;
+}
+`.trimStart(), "utf8");
+
+    fs.writeFileSync(path.join(into, "__probe_collection.ts"), `
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const probe: PostgresCollectionConfig = {
+    slug: "probe",
+    name: "Probe",
+    table: "probe",
+    properties: {
+        logo: {
+            name: "Logo",
+            type: "string",
+            admin: { Field: () => import("./__probe_component") }
+        }
+    }
+};
+
+export default probe;
+`.trimStart(), "utf8");
+}
+
+/**
  * Lay out the BaaS flavour the way `applyFlavor` does: drop `frontend/`, `config/`
  * and the generated schema, then copy the overlay over the top.
  *
@@ -207,7 +256,11 @@ try {
     for (const preset of [...PRESETS, BAAS]) {
         const dir = path.join(workRoot, preset);
         if (preset === BAAS) materializeBaas(dir);
-        else materialize(preset, dir);
+        else {
+            materialize(preset, dir);
+            // BaaS has no config/ and no components, so this applies to CMS only.
+            addCustomComponentProbe(dir);
+        }
 
         // Real resolution for third-party specifiers, exports maps included.
         fs.symlinkSync(
