@@ -10,6 +10,7 @@
     "@rebasepro/admin-types": "workspace:*",
     "@rebasepro/app": "workspace:*",
     "@rebasepro/client": "workspace:*",
+    "@rebasepro/common": "workspace:*",
     "@rebasepro/plugin-ai": "workspace:*",
     "@rebasepro/plugin-insights": "workspace:*",
     "@rebasepro/studio": "workspace:*",
