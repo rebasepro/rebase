@@ -249,6 +249,7 @@ export function LoginView({
             warnAboutHalfConfiguredOAuth("github", githubClientId, backendProviders);
             warnAboutHalfConfiguredOAuth("linkedin", linkedinClientId, backendProviders);
         }, 3000);
+        return () => clearTimeout(timer);
     }, [googleClientId, githubClientId, linkedinClientId, backendProviders.join(",")]);
     const hasPasswordReset = caps.passwordReset ?? !!authController.forgotPassword;
 
@@ -256,6 +257,7 @@ export function LoginView({
 
     useEffect(() => {
         const timer = setTimeout(() => setFadeIn(true), 50);
+        return () => clearTimeout(timer);
     }, []);
 
     // Effect to handle incoming redirect OAuth codes (GitHub, LinkedIn, etc.)
