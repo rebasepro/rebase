@@ -100,6 +100,44 @@ describe("resolveComponentRef", () => {
         expect(first).toBe(second);
     });
 
+    // ── Loaders whose inferred name looks like a component ────────────
+    //
+    // The documented way to attach a custom component is
+    //
+    //     admin: { Field: () => import("./MyField"), Preview: () => import("./MyPreview") }
+    //
+    // and JavaScript names an anonymous function after the property key it is
+    // assigned to, so both arrows arrive here called "Field" and "Preview".
+    // Classification used to be "starts with an uppercase letter → component",
+    // which matched every one of them: the loader was handed to React as a
+    // component, React called it, got a Promise, and rendered nothing. The demo's
+    // custom body-parts preview column was blank because of this.
+
+    it("wraps a lazy loader whose inferred name is capitalised (the `Preview:` key case)", () => {
+        // Written exactly as a collection file writes it — not as a bare `const`.
+        const admin = { Preview: () => import("./__mocks__/lazyComponent") };
+        expect(admin.Preview.name).toBe("Preview"); // the trap, stated outright
+
+        const result = resolveComponentRef(admin.Preview as any);
+        expect(result).not.toBe(admin.Preview);
+        expect((result as any).$$typeof).toBeDefined(); // React.lazy wrapper
+    });
+
+    it("wraps a capitalised `Field:` loader too", () => {
+        const admin = { Field: () => import("./__mocks__/lazyComponent") };
+        const result = resolveComponentRef(admin.Field as any);
+        expect(result).not.toBe(admin.Field);
+        expect((result as any).$$typeof).toBeDefined();
+    });
+
+    it("still returns a capitalised zero-prop component as-is", () => {
+        // The other side of the same decision: no dynamic import, named like a
+        // component, so it must not be wrapped in React.lazy.
+        const admin = { Preview: () => null };
+        const result = resolveComponentRef(admin.Preview as any);
+        expect(result).toBe(admin.Preview);
+    });
+
     // ── forwardRef / memo ────────────────────────────────────────────
 
     it("returns a React.forwardRef component as-is", () => {

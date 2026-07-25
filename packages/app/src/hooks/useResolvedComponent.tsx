@@ -134,17 +134,43 @@ export function resolveComponentRef<P = unknown>(
             return ref as React.ComponentType<P>;
         }
 
-        // Zero-parameter function — could be a React component with no props
-        // OR a lazy loader `() => import(...)`. We distinguish by checking
-        // if `fn.name` looks like a component (starts with uppercase) or is
-        // an anonymous arrow.
+        // Zero-parameter function — either a React component that takes no props,
+        // or a lazy loader `() => import(...)`.
         //
-        // Convention: named function components always start with an
-        // uppercase letter. Dynamic import wrappers are typically anonymous
-        // arrows or have lowercase names.
-        const name = fn.name;
-        if (name && /^[A-Z]/.test(name)) {
-            // Named component (e.g. `function MyField() { ... }`) — return as-is
+        // Nothing here can be decided with certainty from the outside, so the
+        // signals are ordered by how much they can be trusted, and the strongest
+        // one is what the function *does*, not what it is called.
+        //
+        // The name alone is not usable evidence, which is what this used to rely on.
+        // `admin: { Preview: () => import("./BodyPartsPreview") }` gives the arrow
+        // the *inferred* name "Preview" — JS names an anonymous function after the
+        // property key it is assigned to — so the "starts with an uppercase letter,
+        // therefore a component" rule matched every lazy loader written in the
+        // documented way. The thunk was then handed to React as a component, React
+        // called it, got a Promise back, and rendered nothing. That is what a blank
+        // custom preview column in the demo was.
+        const source = (() => {
+            try {
+                return Function.prototype.toString.call(fn);
+            } catch {
+                return "";
+            }
+        })();
+
+        // A dynamic module load in the body is the strongest signal, and it outranks
+        // the name: a toolchain cannot rename it away without breaking the fetch,
+        // whereas the name is often not the author's at all.
+        //
+        // Both spellings are checked because the body reaching us depends on the
+        // transform. Vite and any ESM build keep `import(...)`; ts-jest and other
+        // CommonJS transforms rewrite it to `require(...)`. Matching only the first
+        // passes in the browser and fails in the test suite, which is precisely how
+        // this went unnoticed. A zero-argument *component* containing either call is
+        // not a thing — components import at module scope.
+        const loadsAChunk = /\b(?:import|require)\s*\(/.test(source);
+
+        if (!loadsAChunk && fn.name && /^[A-Z]/.test(fn.name)) {
+            // Named like a component and does not load a chunk: a component.
             return ref as React.ComponentType<P>;
         }
 
