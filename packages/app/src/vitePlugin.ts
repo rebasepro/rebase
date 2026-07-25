@@ -160,11 +160,26 @@ export function rebaseCollectionsPlugin(options: RebaseCollectionsPluginOptions)
                     // rules while the database enforces the inherited ones.
                     const indexEntry = Object.entries(collectionModules)
                         .find(([path]) => path.endsWith("/index.ts") || path.endsWith("/index.js"));
-                    const defaultSecurityRules = indexEntry?.[1]?.defaultSecurityRules;
+                    const indexModule = indexEntry?.[1];
+                    const defaultSecurityRules = indexModule?.defaultSecurityRules;
+
+                    // The glob hands back files in alphabetical order, which would
+                    // otherwise decide the order of the navigation groups and of the
+                    // cards inside them. If index exports a \`collections\` array, that
+                    // is the one place the developer states an order, so it wins;
+                    // collections it does not mention keep following their filename.
+                    const declaredOrder = Array.isArray(indexModule?.collections)
+                        ? indexModule.collections
+                        : [];
+                    const rankOf = (collection) => {
+                        const index = declaredOrder.indexOf(collection);
+                        return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+                    };
 
                     export const collections = Object.values(collectionModules)
                         .map((module) => module.default)
                         .filter(Boolean)
+                        .sort((a, b) => rankOf(a) - rankOf(b))
                         .map((collection) =>
                             defaultSecurityRules?.length && !collection.securityRules?.length
                                 ? { ...collection, securityRules: defaultSecurityRules }

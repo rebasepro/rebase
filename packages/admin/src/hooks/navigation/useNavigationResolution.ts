@@ -1,7 +1,7 @@
 import type { AuthCollectionConfig } from "@rebasepro/types";
 import type { AppView, AppViewsBuilder, EntityAction, CollectionConfigsBuilder, RebaseContext, RebasePlugin, UserCreationResult, AdminCollection } from "@rebasepro/admin-types";
 import { type User, type RebaseData } from "@rebasepro/types";
-import { type AuthController } from "@rebasepro/admin-types";
+import { type AuthController, resolveAdminCollection } from "@rebasepro/admin-types";
 import { canReadCollection } from "@rebasepro/common";
 import { resetPasswordAction } from "../../components/common/default_entity_actions";
 import { CreationResultDialog } from "../../components/admin/CreationResultDialog";
@@ -172,6 +172,12 @@ export async function resolveCollections(
         resolvedCollections = collections;
     }
 
+    // Collections arrive in the authoring shape, with presentation nested under
+    // `admin`. Everything downstream — plugins, navigation, the drawer — reads the
+    // panel's flat view model, so `admin.group` or `admin.hideFromNavigation`
+    // would otherwise be silently ignored.
+    resolvedCollections = resolvedCollections.map(resolveAdminCollection);
+
     if (plugins) {
         for (const plugin of plugins) {
             if (plugin.hooks?.modifyCollection) {
@@ -179,7 +185,9 @@ export async function resolveCollections(
             }
 
             if (plugin.hooks?.injectCollections) {
-                resolvedCollections = plugin.hooks.injectCollections(resolvedCollections);
+                // A plugin may return collections in the authoring shape too; the
+                // flattening is idempotent, so re-running it is safe.
+                resolvedCollections = plugin.hooks.injectCollections(resolvedCollections).map(resolveAdminCollection);
             }
         }
     }

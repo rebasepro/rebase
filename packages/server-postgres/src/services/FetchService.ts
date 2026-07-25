@@ -19,6 +19,7 @@ import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { toCmsRow, toRestRow, isJunctionRelation } from "./row-pipeline";
+import { isNestedPath, resolveNestedPath } from "./nested-path";
 import { logger } from "@rebasepro/server";
 
 /** Type-safe accessor for Drizzle's relational query API via dynamic table name */
@@ -392,6 +393,23 @@ export class FetchService {
     }
 
     /**
+     * Whether `id` is actually reachable at `collectionPath`.
+     *
+     * Trivially true for a root path. For a nested one it is a real question:
+     * the path resolves to the target collection, and matching on the primary
+     * key alone made the parent segment decorative — `authors/1/posts/43`
+     * returned post 43 whoever wrote it, and the REST layer's delete then
+     * deleted it. A row that is not under this parent is reported as absent,
+     * which is what a caller addressing it through the parent should see.
+     */
+    private async isAddressableUnder(collectionPath: string, id: string | number): Promise<boolean> {
+        if (!isNestedPath(collectionPath)) return true;
+        const hop = resolveNestedPath(collectionPath, this.registry);
+        if (!hop) return true;
+        return this.relationService.isRelated(hop, id);
+    }
+
+    /**
      * Fetch a single row by ID
      */
     async fetchOne<M extends Record<string, unknown>>(
@@ -399,6 +417,8 @@ export class FetchService {
         id: string | number,
         databaseId?: string
     ): Promise<Record<string, unknown> | undefined> {
+        if (!await this.isAddressableUnder(collectionPath, id)) return undefined;
+
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);
@@ -1123,6 +1143,8 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         include?: string[],
         databaseId?: string
     ): Promise<Record<string, unknown> | null> {
+        if (!await this.isAddressableUnder(collectionPath, id)) return null;
+
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = requirePrimaryKeys(collection, this.registry);

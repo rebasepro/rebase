@@ -192,7 +192,16 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
             .catch((e) => {
                 // A 401 before auth is expected; the effect re-runs once the
                 // user logs in (authUser/loginSkipped change) and retries.
-                console.debug("[Rebase] Could not load storage sources", e);
+                //
+                // Guarded on `cancelled` like the success path: once this
+                // provider is gone (or the effect re-ran) the outcome of the
+                // request describes nothing that still exists, and the request
+                // outlives the provider by however long the network takes to
+                // give up — so an unguarded write here lands at an arbitrary
+                // later moment. In a test worker that moment is after the file
+                // finished, which closes the run's console channel mid-write
+                // and fails an otherwise green suite.
+                if (!cancelled) console.debug("[Rebase] Could not load storage sources", e);
             });
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps

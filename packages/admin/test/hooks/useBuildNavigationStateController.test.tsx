@@ -95,6 +95,56 @@ describe("useBuildNavigationStateController", () => {
         });
     });
 
+    it("should group navigation entries by the collection's admin.group", async () => {
+        const mockAuthController = {
+            initialLoading: false,
+            user: { uid: "test" }
+        } as unknown as AuthController;
+
+        // Collections arrive in the authoring shape: presentation nested under
+        // `admin`. Reading `group` off the top level instead sends every entry to
+        // the default group and ignores `hideFromNavigation`, which is what broke
+        // the home page once the BaaS and admin type surfaces were split.
+        const collections = [
+            { id: "products",
+slug: "products",
+name: "Products",
+path: "products",
+admin: { group: "E-Commerce" } },
+            { id: "posts",
+slug: "posts",
+name: "Blog posts",
+path: "posts",
+admin: { group: "Content" } },
+            { id: "order_items",
+slug: "order_items",
+name: "Order Items",
+path: "order_items",
+admin: { group: "E-Commerce",
+hideFromNavigation: true } }
+        ] as unknown as CollectionConfig[];
+
+        const { result } = renderHook(() => useBuildNavigationStateController({
+            authController: mockAuthController,
+            collections,
+            views: undefined,
+            data: mockData,
+            collectionRegistryController: mockCollectionRegistryController,
+            urlController: mockCmsUrlController
+        }));
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        const entries = result.current.topLevelNavigation?.navigationEntries ?? [];
+        expect(entries.map(e => [e.slug, e.group])).toEqual([
+            ["products", "E-Commerce"],
+            ["posts", "Content"]
+        ]);
+        expect(result.current.topLevelNavigation?.groups).toEqual(["E-Commerce", "Content"]);
+    });
+
     it("should aggregate error states if collections fail", async () => {
         const mockAuthController = {
             initialLoading: false,

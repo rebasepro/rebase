@@ -56,28 +56,17 @@ pnpm dlx @rebasepro/cli init my-app
 cd my-app
 ```
 
-Configure your database in `.env`:
+`init` generates a ready-to-run `.env` for you (secrets, database password, a free local port) — no editing needed to get started. Start the bundled PostgreSQL container, create the tables, then run the dev servers:
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/mydb
-JWT_SECRET=your-secret-key
+docker compose up -d db   # start the database
+pnpm run db:push          # create tables from your collections
+pnpm dev                  # start backend + frontend
 ```
 
-If you are connecting to an existing database, you can introspect it to automatically generate your collection files:
+Your admin panel is running at `http://localhost:5173` and the API at `http://localhost:3001`. The first account you register becomes the admin.
 
-```bash
-pnpm rebase schema introspect
-```
-
-Start everything:
-
-```bash
-pnpm dev
-```
-
-That's it. Your admin panel is running at `http://localhost:5173` and the API at `http://localhost:3001`.
-
-→ Follow the full [Quickstart guide](/docs/getting-started/quickstart) for a complete walkthrough.
+→ Follow the full [Quickstart guide](/docs/getting-started/quickstart) for a complete walkthrough, including how to connect your own database.
 
 ### Core Features
 
@@ -133,26 +122,42 @@ This scaffolds a project with three packages:
 ### Prerequisites
 
 - **Node.js** 18+
-- **PostgreSQL** — local install, Docker, or any managed database (Neon, Supabase, etc.)
+- **Docker** — to run the included PostgreSQL container. (Or bring your own PostgreSQL: local install, Neon, Supabase, etc.)
 - **pnpm** (recommended) or npm
 
-### Configure Your Environment
+### Your Environment Is Already Configured
 
-After scaffolding, edit the `.env` file at the project root:
+`init` generates a ready-to-run `.env` at the project root with a real `JWT_SECRET`, a database password, and a free local database port. You don't need to create or edit anything to get started.
+
+:::caution
+Don't run `cp .env.example .env`. `.env.example` is a reference for the available variables — copying it over your `.env` discards the generated secrets and points `DATABASE_URL` at a database that doesn't exist. Edit `.env` directly if you want to change a value.
+:::
+
+If you'd rather point at your own PostgreSQL instead of the bundled container, edit `DATABASE_URL` in `.env`:
 
 ```bash
-# PostgreSQL connection string
 DATABASE_URL=postgresql://username:password@localhost:5432/your_database
-
-# JWT secret for authentication (auto-generated in development if omitted)
-JWT_SECRET=change-me-to-a-random-secret
-
-# Frontend URL for CORS
-VITE_API_URL=http://localhost:3001
-
-# Optional: Google OAuth client ID
-# VITE_GOOGLE_CLIENT_ID=your-google-client-id
 ```
+
+### Start the Database
+
+The scaffold ships a `docker-compose.yml` with a PostgreSQL service. Start it:
+
+```bash
+docker compose up -d db
+```
+
+(Skip this if you pointed `DATABASE_URL` at your own database.)
+
+### Create the Tables
+
+Push your collections to the database. This creates the tables for the example `posts`, `authors`, and `tags` collections:
+
+```bash
+pnpm run db:push
+```
+
+Without this step the admin panel still opens, but every collection is empty and its API calls fail until the tables exist.
 
 ### Introspect an Existing Database (Optional)
 
@@ -170,17 +175,10 @@ This will analyze your database tables and generate corresponding TypeScript fil
 pnpm dev
 ```
 
-This starts:
+This starts both together:
 - **Backend** at `http://localhost:3001` — REST API, auth, storage, WebSocket
 - **Frontend** at `http://localhost:5173` — Rebase admin panel
 - **Hot reload** for both — changes take effect instantly
-
-You can also start them individually:
-
-```bash
-pnpm dev:backend   # Backend only
-pnpm dev:frontend  # Frontend only
-```
 
 ### First Login
 
@@ -192,11 +190,11 @@ When you open `http://localhost:5173`, you'll see the login screen. The **first 
 
 ### Define Your First Collection
 
-Open `config/collections/` and create a new file:
+Open `config/collections/` and create a new file. Export the collection as the **default export** — that's how the registry picks it up:
 
 ```typescript title="config/collections/products.ts"
 
-export const productsCollection: CollectionConfig = {
+const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -215,7 +213,7 @@ export const productsCollection: CollectionConfig = {
         description: {
             type: "string",
             name: "Description",
-            multiline: true
+            admin: { multiline: true }
         },
         active: {
             type: "boolean",
@@ -229,16 +227,29 @@ export const productsCollection: CollectionConfig = {
         }
     }
 };
+
+export default productsCollection;
 ```
 
-### Generate the Database Schema
+Then register it in `config/collections/index.ts` so both the backend and the admin panel know about it:
+
+```typescript title="config/collections/index.ts" {2,5}
+// ...existing imports
+
+export const collections = [
+    postsCollection, authorsCollection, tagsCollection, usersCollection, productsCollection
+];
+```
+
+### Create the Table
+
+Push the new collection to the database:
 
 ```bash
-rebase schema generate   # Generate Drizzle schema from your collections
-rebase db push           # Push the schema to your database
+pnpm run db:push
 ```
 
-Restart the dev servers and your new **Products** collection appears in the navigation.
+This regenerates the schema from your collections and applies it. Restart the dev servers and your new **Products** collection appears in the navigation.
 
 ### Database Commands Reference
 
@@ -445,8 +456,9 @@ All configuration is done via environment variables in your `.env` file at the p
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `STORAGE_TYPE` | Storage backend: `local` or `s3` | `local` |
+| `STORAGE_TYPE` | Storage backend: `local`, `s3` or `gcs`. In production `local` disables storage unless `FORCE_LOCAL_STORAGE=true` | `local` |
 | `STORAGE_PATH` | Base path for local storage | `./uploads` |
+| `FORCE_LOCAL_STORAGE` | Allow local storage in production — only with a durable volume mounted at `STORAGE_PATH` | `false` |
 | `S3_BUCKET` | S3 bucket name (when `STORAGE_TYPE=s3`) | — |
 | `S3_REGION` | AWS region | — |
 | `S3_ACCESS_KEY_ID` | AWS access key | — |
@@ -497,6 +509,9 @@ await initializeRebaseBackend({
         serviceKey: env.REBASE_SERVICE_KEY
     },
 
+    // No bucket configured in production means storage is off, not local:
+    // uploads answer 501 rather than landing on a filesystem that is erased
+    // on the next redeploy.
     storage: env.STORAGE_TYPE === "s3"
         ? {
             type: "s3",
@@ -506,10 +521,19 @@ await initializeRebaseBackend({
             secretAccessKey: env.S3_SECRET_ACCESS_KEY,
             endpoint: env.S3_ENDPOINT
         }
-        : {
-            type: "local",
-            basePath: env.STORAGE_PATH || "./uploads"
-        },
+        : env.STORAGE_TYPE === "gcs"
+            ? {
+                type: "gcs",
+                bucket: env.GCS_BUCKET!,
+                projectId: env.GCS_PROJECT_ID,
+                keyFilename: env.GCS_KEY_FILENAME
+            }
+            : isProduction && !env.FORCE_LOCAL_STORAGE
+                ? undefined
+                : {
+                    type: "local",
+                    basePath: env.STORAGE_PATH || "./uploads"
+                },
 
     history: true,           // Enable entity change history
 
@@ -749,7 +773,7 @@ Import paths only — no behaviour moved with them.
 | `@rebasepro/mcp-server` | `@rebasepro/mcp` |
 | `@rebasepro/plugin-data-enhancement` | `@rebasepro/plugin-ai` |
 
-Unchanged: `types`, `utils`, `common`, `client`, `ui`, `admin`, `studio`,
+Unchanged: `types`, `utils`, `common`, `client`, `admin`, `admin`, `studio`,
 `cli`, `plugin-insights`.
 
 The retired names are deprecated on npm, so installing one tells you rather
@@ -851,8 +875,95 @@ A **collection** is a TypeScript object that describes a database table and how 
 - **Schema** — Properties (columns), their types, and validation rules
 - **Relations** — Foreign keys, junction tables, and join paths
 - **Security** — Row Level Security policies
-- **UI behavior** — View modes, inline editing, entity views, actions
 - **Lifecycle hooks** — Callbacks for create, update, delete operations
+- **Admin UI behavior** — View modes, inline editing, entity views, actions — all under `admin`
+
+### Anatomy: the contract, and the panel
+
+One file, two audiences. Everything the *database and the API* care about sits at the
+top level; everything the *admin panel* renders sits inside `admin`.
+
+```typescript
+const posts = {
+    // ── The backend reads these ──────────────────────────────
+    slug: "posts",
+    table: "posts",
+    properties: { /* … */ },
+    relations: [ /* … */ ],
+    securityRules: [ /* … */ ],
+    callbacks: { /* … */ },
+    history: true,
+
+    // ── The admin panel reads these ──────────────────────────
+    admin: {
+        icon: "FileText",
+        listProperties: ["title", "status"],
+        defaultViewMode: "table",
+        entityViews: ["preview"]
+    }
+};
+```
+
+The split is not cosmetic. It is what lets Rebase be a backend on its own:
+
+- A **BaaS or headless** project never writes an `admin` block. Its collections — or no
+  collections at all, since BaaS mode introspects the database — describe data and
+  authorization, nothing else. `@rebasepro/types` contains no React, so there is no
+  React anywhere in the dependency tree.
+- The **backend never reads inside the block**. It is dropped before a collection is
+  serialized to the contract endpoint or into a build bundle, and it is excluded from
+  the schema version — so changing an icon does not report every generated SDK as
+  stale.
+
+#### The `admin` block exists only if you install the admin types
+
+`@rebasepro/types` declares no `admin` field — not on a collection, not on a property. In
+a BaaS project, writing one is a **type error**. `@rebasepro/admin-types` adds it back by
+declaration merging, so one line per project turns it on:
+
+```typescript
+// config/admin.d.ts
+/// <reference types="@rebasepro/admin-types" />
+```
+
+After that, plain core types carry a fully typed block — a typo like `icoon` is an error,
+and you get completion:
+
+```typescript
+
+const posts: PostgresCollectionConfig = {
+    slug: "posts",
+    table: "posts",
+    properties: {
+        title: { name: "Title", type: "string", admin: { multiline: true } }
+    },
+    admin: { icon: "FileText" }
+};
+```
+
+An augmentation applies to the whole TypeScript *program*, and `config/` and `frontend/`
+are separate programs — which is why the reference belongs in the config package. There
+is no `AdminCollectionConfig` wrapper type: with the field merged in, `CollectionConfig`
+is the authoring type.
+
+:::note[Why a BaaS project pays nothing]
+A property type in a BaaS install has no `Field`, no `columnWidth`, no
+`hideFromCollection` — those live in `AdminPropertyOptions` in the admin package. The
+guarantee is asserted, not claimed: `e2e/baas-typecheck/src/admin_absent.ts` uses
+`@ts-expect-error` on `admin`, so the build fails if the field ever becomes writable in
+core again.
+:::
+
+#### Migrating from a flat collection
+
+Before 0.11 these fields sat at the top level. To move them:
+
+```bash
+node scripts/codemod/collections-admin-block.mjs config/collections
+```
+
+It reports anything it cannot move safely — notably presentation inside
+`relations[].overrides`, which needs `overrides: { admin: { … } }` by hand.
 
 ```typescript
 
@@ -861,7 +972,6 @@ export const productsCollection: CollectionConfig = {
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
     table: "products",            // PostgreSQL table name
-    icon: "inventory_2",           // Material icon key
 
     properties: {
         name: {
@@ -886,7 +996,7 @@ export const productsCollection: CollectionConfig = {
         description: {
             type: "string",
             name: "Description",
-            multiline: true
+            admin: { multiline: true }
         },
         active: {
             type: "boolean",
@@ -897,10 +1007,14 @@ export const productsCollection: CollectionConfig = {
             type: "date",
             name: "Created At",
             autoValue: "on_create",
-            ui: { readOnly: true }
+            admin: { readOnly: true }
         }
+    },
+    admin: {
+        icon: "inventory_2"           // Material icon key
     }
 };
+
 ```
 
 ### Key Properties
@@ -913,7 +1027,7 @@ export const productsCollection: CollectionConfig = {
 | `name` | `string` | **Required.** Display name (plural). Shown in navigation and page headers. |
 | `singularName` | `string` | Display name for a single entity. Used in "New Product", "Edit Product", etc. |
 | `table` | `string` | **Required.** PostgreSQL table name. If different from `slug`, allows you to decouple URLs from table names. |
-| `icon` | `string` | Material icon key. See [Google Fonts Icons](https://fonts.google.com/icons). |
+| `admin.icon` | `string` | Icon key. See [Google Fonts Icons](https://fonts.google.com/icons). |
 
 #### Schema
 
@@ -925,6 +1039,8 @@ export const productsCollection: CollectionConfig = {
 | `auth` | `boolean | AuthCollectionConfig` | Mark collection as authentication collection (user management, reset password, etc.) |
 
 #### UI Configuration
+
+All of the following go inside `admin`.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -943,6 +1059,8 @@ export const productsCollection: CollectionConfig = {
 | `defaultSelectedView` | `string \| function` | — | Default view or subcollection to open |
 
 #### Entity Options
+
+Inside `admin`, except `history`, which is a backend feature and stays at the top level.
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -1072,15 +1190,15 @@ All property types share these options:
 | `dynamicProps` | `function` | Dynamic property builder (see Conditional Fields) |
 | `conditions` | `PropertyConditions` | Declarative JSON Logic conditions |
 
-#### UI Configuration (`ui`)
+#### UI Configuration (`admin`)
 
-UI-related options are nested under the `ui` sub-object:
+UI-related options are nested under the `admin` sub-object:
 
 ```typescript
 price: {
     type: "number",
     name: "Price",
-    ui: {
+    admin: {
         readOnly: true,
         columnWidth: 120,
         hideFromCollection: false
@@ -1092,11 +1210,11 @@ price: {
 |----------|------|-------------|
 | `ui.readOnly` | `boolean` | Prevent editing |
 | `ui.disabled` | `boolean \| PropertyDisabledConfig` | Disable with optional tooltip |
-| `ui.hideFromCollection` | `boolean` | Hide from table view |
+| `admin.hideFromCollection` | `boolean` | Hide from table view |
 | `ui.columnWidth` | `number` | Column width in pixels (table view) |
 | `ui.widthPercentage` | `number` | Field width as a percentage in the form view |
-| `ui.Field` | `React.ComponentType` | Custom field component |
-| `ui.Preview` | `React.ComponentType` | Custom table cell component |
+| `admin.Field` | `React.ComponentType` | Custom field component |
+| `admin.Preview` | `React.ComponentType` | Custom table cell component |
 
 ### String Properties
 
@@ -1302,7 +1420,7 @@ created_at: {
     type: "date",
     name: "Created At",
     autoValue: "on_create",
-    ui: { readOnly: true }
+    admin: { readOnly: true }
 }
 
 updated_at: {
@@ -1567,7 +1685,7 @@ const postsCollection: CollectionConfig = {
     table: "posts",
     properties: {
         title: { type: "string", name: "Title" },
-        content: { type: "string", name: "Content", multiline: true },
+        content: { type: "string", name: "Content", admin: { multiline: true } },
         author: { 
             type: "relation", 
             name: "Author", 
@@ -1591,7 +1709,7 @@ const postsCollection: CollectionConfig = {
     table: "posts",
     properties: {
         title: { type: "string", name: "Title" },
-        content: { type: "string", name: "Content", multiline: true },
+        content: { type: "string", name: "Content", admin: { multiline: true } },
         author: { type: "relation", name: "Author", relationName: "author" }
     },
     relations: [
@@ -3876,7 +3994,9 @@ Each source's `key` must match a backend key registered in the server's `storage
 ### Production Tips
 
 :::caution
-**In production the backend refuses to boot on `type: "local"`.** On an ephemeral platform (Cloud Run, Heroku, a Kubernetes pod) the filesystem is wiped on every deploy, restart and eviction — so uploads succeed, read back fine, and are gone at the next rollout, with no error at any point. A failed boot is recoverable; lost user files are not.
+**In production, `type: "local"` disables file storage instead of using it.** On an ephemeral platform (Cloud Run, Heroku, a Kubernetes pod) the filesystem is wiped on every deploy, restart and eviction — so uploads would succeed, read back fine, and be gone at the next rollout, with no error at any point.
+
+So no storage backend is registered, and `/api/storage/*` answers **`501 STORAGE_NOT_CONFIGURED`**. Uploads fail loudly and recoverably; the rest of the app keeps serving. File storage is opt-in in production: it exists once a bucket does.
 
 Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really is mounted at `STORAGE_PATH`, set `FORCE_LOCAL_STORAGE=true` to say so explicitly.
 :::
@@ -3884,11 +4004,29 @@ Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really is mounted at `ST
 - Mount a **persistent volume** if using local storage on Docker/Kubernetes, and set `FORCE_LOCAL_STORAGE=true`
 - Use **S3** or compatible (R2, MinIO), or **GCS**, for production deployments
 - Configure a **CDN** (CloudFront, Cloudflare) in front of your bucket for performance
-- **Multi-tenant apps must set `storageAuthorize`** — see below
+- **Any app with storage in production must declare an access model** — see below.
+  Not just multi-tenant ones: the server *refuses to boot* without one.
 
 ### Per-Object Authorization
 
-`requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an authorization hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model.
+`requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an authorization hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model. Worse, they can `GET /storage/list?prefix=` first, so the keys do not even have to be guessed.
+
+:::caution[Storage will not boot in production without one]
+Collections are protected by row-level security; storage is not. There is no
+per-object equivalent in the bucket, so this hook *is* the model — and
+`initializeRebaseBackend` **throws at startup** under `NODE_ENV=production` when
+storage is configured and none of these is set:
+
+- `storageAuthorize` — a hook, per object. Recommended.
+- `storagePublicRead: true` — the bucket genuinely is a public read-only CDN.
+- `storageInsecureAllowAnyAuthenticated: true` — a single-tenant app where every
+  signed-in user is trusted with every file. Named to be read twice.
+
+In development it logs a warning instead, so a project can be wrong about this and
+work fine locally right up until it is deployed. A scaffolded project ships a hook in
+`config/storage.ts` already — read it before you replace it, and note that it models
+a CMS's *shared content library*, which is not the same shape as per-user files.
+:::
 
 `storageAuthorize` is the storage analogue of a collection's security rules, and runs after authentication on every storage route:
 
@@ -4251,7 +4389,9 @@ This means each user only receives updates for records they have permission to s
 
 ### Cross-Instance Broadcasting & LISTEN/NOTIFY Architecture
 
-For multi-instance cluster environments (e.g., running inside Kubernetes or Docker containers behind a load balancer), Rebase relies on PostgreSQL `LISTEN/NOTIFY` to synchronize mutating operations and real-time state across instances.
+For multi-instance cluster environments (e.g., running inside Kubernetes or Docker containers behind a load balancer), Rebase relies on PostgreSQL `LISTEN/NOTIFY` to synchronize **row changes** across instances. Collection and entity subscriptions therefore span instances with no configuration — that is what this section describes.
+
+**Broadcast channels and presence are separate**, and are per-instance until you turn on a channel bus. See [Channels and presence across instances](#channels-and-presence-across-instances) below.
 
 #### Bypassing pgBouncer Pools
 
@@ -4275,6 +4415,135 @@ When a entity is modified on Instance A, it broadcasts a notification on the `re
 - **Self-Filtering**: Upon receiving a message, each instance reads the `sid`. If it matches its own instance ID, the server discards the notification to prevent infinite routing loops.
 - **Relay and Fan-out**: If the notification came from another instance, the server schedules a debounced refetch and relays the update to its locally connected WebSocket subscribers.
 - **Supervisor Reconnection Loop**: If the database connection drops, a background connection supervisor monitors the state and triggers an auto-reconnect sequence after a fixed **3-second** delay, restoring the `LISTEN` loop without affecting the main Hono application lifecycle.
+
+### Channels and presence across instances
+
+Row changes cross instances on their own (above). Broadcast channels and presence do **not**: by default they fan out only to the clients connected to the instance that received them.
+
+On a single instance that is exactly right and costs nothing. Behind a load balancer it is a bug you will not see in development: two collaborators land on different replicas, join the same channel, and see an empty room while broadcasting to each other perfectly. Nothing errors.
+
+The fix is a **channel bus** — an opt-in transport that carries channel frames and presence between instances:
+
+```typescript
+database: createPostgresAdapter({
+    connection: db,
+    schema: { tables, enums, relations },
+    realtime: {
+        bus: { type: "postgres" }
+    }
+})
+```
+
+| Bus          | When to use it                                                                                       |
+|--------------|--------------------------------------------------------------------------------------------------------|
+| `memory`     | **Default.** Single instance. No cross-instance delivery, no overhead.                                   |
+| `postgres`   | Two or more instances. Uses `LISTEN/NOTIFY` on the database you already have — no new service to deploy. |
+
+The transport can also be set per deployment with `REALTIME_CHANNEL_BUS=memory|postgres`, which overrides the configured value.
+
+#### Why there is no Redis option in the box
+
+Rebase deploys as Postgres + backend + frontend. A bus that needed a message broker would put a second stateful service into every `docker-compose.yml` the CLI scaffolds, for a feature most applications never use — so the bar for adding one is that the database genuinely cannot carry the load.
+
+It can. Measured across two backend instances against a single Postgres container, the Postgres bus delivered **~10,000 cross-instance messages per second with no losses**, and stayed flat out to **eight instances** (14,000 deliveries, no losses). Twenty people dragging cursors at 60 fps generate around 1,200 messages per second — roughly an eighth of that.
+
+The limit worth watching is not capacity, it is that every notification is a query against your primary database, competing with your application's real queries. The Postgres bus therefore **coalesces** outgoing frames (see below), which is what keeps that cost proportional to elapsed time rather than message count.
+
+If you are still pushing it after that, throttle cursor-grade events on the client (last-write-wins state does not need 60 updates a second), and consider routing a document's collaborators to the same instance — sticky routing drops cross-instance traffic to nearly nothing regardless of user count. Only past that is another transport worth it, and then the answer is a transport package, not a fork. See [Writing your own transport](#writing-your-own-transport).
+
+#### Coalescing
+
+Frames published while a short window is open leave together in a single notification. The window is **leading-edge**: a frame arriving when no window is open is sent immediately, so an idle channel pays no added latency and only a sustained stream is ever batched.
+
+Measured across two instances, 3,000 broadcasts, all delivered in every case:
+
+| Traffic shape | Coalescing off | Coalescing on | Reduction |
+|---|---|---|---|
+| Burst (as fast as possible) | 3,000 queries | 68 queries | **44×** |
+| Paced (~500 msg/s, spread out) | 3,000 queries | 240 queries | **12.5×** |
+
+The burst case also finished ~11× faster in wall-clock, because the database round-trips were the bottleneck rather than the work.
+
+The window defaults to 10 ms and is not a sensitive setting — 5 ms, 10 ms and 20 ms produced identical query counts in both shapes, because a batch is bounded by the 8 KB payload ceiling or by the natural shape of the traffic well before the timer matters. Change it only if you have a reason:
+
+```typescript
+realtime: {
+    bus: { type: "postgres", batchWindowMs: 20 }   // 0 disables coalescing
+}
+```
+
+One deployment note: a batch travels in a different wire shape from a single frame, and an instance running an older build does not understand it. Single frames are always sent unwrapped, so a rolling deploy only risks dropped frames if the cluster is under sustained load *during* the restart — and retained channels repair themselves through history replay regardless.
+
+### Writing your own transport
+
+`realtime.bus` accepts any object implementing the `ChannelBus` interface, so a transport can ship as its own package — `@rebasepro/types` declares the contract, and nothing else is required to implement it:
+
+```typescript
+
+export class MyChannelBus implements ChannelBus {
+    readonly kind = "my-transport";
+    readonly maxFrameBytes = Infinity;
+
+    async start(handler: ChannelBusHandler): Promise<void> {
+        // Connect. Reject if you cannot — the caller falls back to in-process
+        // delivery, which is far better than a cluster that believes it is
+        // connected and silently is not.
+    }
+
+    async publish(frame: ChannelBusFrame): Promise<void> {
+        // Reach every other instance, or reject.
+    }
+
+    async stop(): Promise<void> {
+        // Idempotent; release anything holding the event loop open.
+    }
+}
+```
+
+Pass the instance where a built-in name would go:
+
+```typescript
+database: createPostgresAdapter({
+    connection: db,
+    schema: { tables, enums, relations },
+    realtime: { bus: new MyChannelBus(process.env.MY_TRANSPORT_URL!) }
+})
+```
+
+**What your implementation must guarantee:** `start()` rejects when the transport is unusable; `publish()` reaches every other instance or rejects; `stop()` is idempotent; and a malformed message is dropped and logged rather than thrown, so one bad frame cannot take the listener down.
+
+**What it does not have to guarantee:** ordering (retained channels carry `seq` and the SDK orders by it), durability (a lost frame is a missed live update, repaired by the client's history replay), or exactly-once delivery (retained frames are deduped by `seq`; presence diffs are idempotent).
+
+`maxFrameBytes` is how the framework knows whether to send a large retained message inline or as a pointer. Return `Infinity` when your transport has no meaningful ceiling, so the pointer path is never taken needlessly.
+
+Delivery to local clients is not your concern — the realtime service owns which subscribers receive a frame. A transport only moves frames between instances.
+
+#### The 8 KB limit on the Postgres bus
+
+`pg_notify` refuses a payload of 8000 bytes or more. Cursors and presence fit with room to spare; a document snapshot does not. Rebase handles this the same way it handles large entity changes — by sending an address instead of a body:
+
+- **On a retained channel** (see [Channel Retention](#channel-retention)) the message is already stored with a sequence number, so the notification carries only `(channel, seq)` and each receiving instance reads the body back. There is no size limit at all.
+- **On an ephemeral channel** there is nothing to point at. The broadcast is delivered locally, the sender receives a `CHANNEL_BUS_PAYLOAD_TOO_LARGE` error, and a warning names the channel — rather than the message silently reaching half the cluster.
+
+If you broadcast large messages, give that channel a retention rule. That is the whole fix.
+
+#### Presence is shared state, not just fan-out
+
+`presence_state` has to answer "who is in this channel?" for the whole cluster, which per-instance memory cannot do. When a bus is active, Rebase keeps the roster in `rebase.channel_presence` (created automatically) and answers roster requests from it.
+
+| Column        | Contents                                       |
+|---------------|------------------------------------------------|
+| `channel`     | Channel name                                   |
+| `client_id`   | The tracked client                             |
+| `instance_id` | Which backend instance it is connected to      |
+| `state`       | The client's presence state                    |
+| `last_seen`   | Refreshed by the SDK's presence heartbeat      |
+
+The SDK heartbeats presence every ~20 seconds against a 30-second timeout. Rows that stop being refreshed are reaped, and the departures announced to every instance — which doubles as crash recovery: a pod that dies leaves rows behind that look, after one timeout window, exactly like any other client that went quiet. A graceful shutdown clears its own rows immediately, so a rolling deploy does not show a window of ghosts.
+
+:::caution[The LISTEN connection must bypass your pooler]
+`LISTEN` is session state, so the Postgres bus needs a direct connection — not pgBouncer or any transaction-mode pooler. Rebase uses `DATABASE_DIRECT_URL` when it is set; behind a pooler, point it at the database service itself. Without a usable direct URL the bus logs a warning and stays in memory mode.
+:::
 
 ### Database-Level Change Capture (CDC)
 
@@ -5802,18 +6071,21 @@ const views: CMSView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
-        icon: "dashboard",
-        group: "Analytics",
         view: <MyDashboard />
     },
     {
         slug: "settings",
         name: "App Settings",
-        icon: "settings",
         view: <AppSettings />,
-        nestedRoutes: true  // Support sub-paths
+        nestedRoutes: true  // Support sub-paths,
+        admin: {
+            icon: "dashboard",
+            group: "Analytics",
+            icon: "settings"
+        }
     }
 ];
+
 ```
 
 ### Styling
@@ -5954,11 +6226,14 @@ Replaces the entire default entity form with a custom component. Set on a collec
 ```typescript
 const collection = {
     slug: "products",
-    formView: {
-        Builder: MyCustomProductForm,
-        includeActions: true  // show save/delete bar (default: true)
+    admin: {
+        formView: {
+            Builder: MyCustomProductForm,
+            includeActions: true  // show save/delete bar (default: true)
+        }
     }
 };
+
 ```
 
 Use when you need a completely custom layout for one collection's entity editing experience. For smaller tweaks, prefer `collection.components` with `Entity.Form` override instead.
@@ -6042,25 +6317,28 @@ const productsCollection: PostgresCollectionConfig = {
     name: "Products",
     slug: "products",
     table: "products",
-    components: {
-        // Eject Mode: Replace the default entity form view
-        "Entity.Form": { Component: ProductCustomForm },
+    properties: { /* ... */ },
+    admin: {
+        components: {
+            // Eject Mode: Replace the default entity form view
+            "Entity.Form": { Component: ProductCustomForm },
 
-        // Wrap Mode: Wrap the empty state to add quick links
-        "Collection.EmptyState": {
-            Component: ({ OriginalComponent, ...props }) => (
-                <div className="empty-state-wrapper">
-                    <OriginalComponent {...props} />
-                    <button onClick={() => importDemoProducts()}>
-                        Load Demo Products
-                    </button>
-                </div>
-            ),
-            wrap: true
+            // Wrap Mode: Wrap the empty state to add quick links
+            "Collection.EmptyState": {
+                Component: ({ OriginalComponent, ...props }) => (
+                    <div className="empty-state-wrapper">
+                        <OriginalComponent {...props} />
+                        <button onClick={() => importDemoProducts()}>
+                            Load Demo Products
+                        </button>
+                    </div>
+                ),
+                wrap: true
+            }
         }
-    },
-    properties: { /* ... */ }
+    }
 };
+
 ```
 
 ---
@@ -6108,8 +6386,6 @@ Rebase provides ready-to-use React components and hooks for authentication:
 
 - **`useRebaseAuthController`** — Manages auth state, tokens, and session persistence
 - **`LoginView`** — Pre-built login/signup form with OAuth support
-- **`useBackendUserManagement`** — Hook for managing users from the admin panel
-- **`UsersView`** — Built-in user management interface
 - **Role simulation** — Test different roles without logging out
 
 ### Auth Controller
@@ -6157,36 +6433,6 @@ The login view handles:
 - Password reset flow
 - Form validation and error states
 
-### User Management
-
-#### useBackendUserManagement
-
-This hook connects to the backend user management API:
-
-```tsx
-
-const userManagement = useBackendUserManagement({
-    client: rebaseClient,
-    currentUser: authController.user
-});
-```
-
-#### UsersView Component
-
-Render the built-in user management interface:
-
-```tsx
-
-// In your routes:
-<Route path="/users" element={<UsersView userManagement={userManagement} />} />
-```
-
-This provides a full user table with:
-- User listing with search and filtering
-- Role assignment
-- User creation and editing
-- Account status management
-
 ### Roles Model
 
 Roles are stored as a `text[]` array column directly on the `rebase.users` table. You define available roles as an enum in your users collection definition:
@@ -6205,7 +6451,7 @@ roles: {
             viewer: "Viewer"
         }
     },
-    ui: {
+    admin: {
         readOnly: false
     }
 }
@@ -6397,14 +6643,17 @@ Every collection can be displayed in four view modes:
 ```typescript
 const productsCollection: CollectionConfig = {
     slug: "products",
-    defaultViewMode: "table",            // Default view
-    enabledViews: ["list", "table", "kanban"],    // Available views
-    orderProperty: "sort_order",         // Property for drag-and-drop ordering
-    kanban: {
-        columnProperty: "status"         // Enum property for columns
-    },
     // ...
+    admin: {
+        defaultViewMode: "table",            // Default view
+        enabledViews: ["list", "table", "kanban"],    // Available views
+        orderProperty: "sort_order",         // Property for drag-and-drop ordering
+        kanban: {
+            columnProperty: "status"         // Enum property for columns
+        }
+    }
 };
+
 ```
 
 ### List View
@@ -6448,11 +6697,6 @@ Configure a Kanban board by specifying which enum property to use as columns:
 ```typescript
 const tasksCollection: CollectionConfig = {
     slug: "tasks",
-    defaultViewMode: "kanban",
-    orderProperty: "sort_order",
-    kanban: {
-        columnProperty: "status"
-    },
     properties: {
         title: { type: "string", name: "Title" },
         status: {
@@ -6466,8 +6710,16 @@ const tasksCollection: CollectionConfig = {
             ]
         },
         sort_order: { type: "number", name: "Sort Order" }
+    },
+    admin: {
+        defaultViewMode: "kanban",
+        orderProperty: "sort_order",
+        kanban: {
+            columnProperty: "status"
+        }
     }
 };
+
 ```
 
 Drag-and-drop between columns automatically updates the enum field and sort order.
@@ -6481,7 +6733,6 @@ Cards display entities as visual cards — useful for image-heavy content:
 ```typescript
 const articlesCollection: CollectionConfig = {
     slug: "articles",
-    defaultViewMode: "cards",
     properties: {
         title: { type: "string", name: "Title" },
         cover: {
@@ -6489,8 +6740,12 @@ const articlesCollection: CollectionConfig = {
             name: "Cover Image",
             storage: { storagePath: "covers", acceptedFiles: ["image/*"] }
         }
+    },
+    admin: {
+        defaultViewMode: "cards"
     }
 };
+
 ```
 
 ### Next Steps
@@ -6553,12 +6808,34 @@ properties: {
     brand_color: {
         type: "string",
         name: "Brand Color",
-        ui: {
+        admin: {
             Field: ColorPickerField
         }
     }
 }
 ```
+
+#### When the collection file is also read by the server
+
+In the default scaffold, `config/collections/` is loaded by **both** the admin panel and the backend — the backend reads the same files to derive the schema and the API. A direct component reference is only safe when nothing on the server loads that file, because importing `ColorPickerField` also imports React, your CSS and everything else the component pulls in, into the server's module graph.
+
+Point at the component with a lazy import instead. It is type-checked exactly the same way, and the backend never calls it:
+
+```ts no-verify
+// config/collections/products.ts
+properties: {
+    brand_color: {
+        type: "string",
+        name: "Brand Color",
+        admin: {
+            Field: () => import("../../frontend/src/ColorPickerField"),
+            Preview: () => import("../../frontend/src/ColorPreview")
+        }
+    }
+}
+```
+
+The module must have a **default export** — the thunk resolves to `default`, and a named-only export renders nothing. The admin wraps it in `React.lazy` on first render, so the component is also a separate chunk rather than part of the initial bundle.
 
 #### Global Property Config
 
@@ -6570,7 +6847,7 @@ const colorPropertyConfig: PropertyConfig = {
     name: "Color Picker",
     property: {
         type: "string",
-        ui: {
+        admin: {
             Field: ColorPickerField
         }
     }
@@ -6656,7 +6933,7 @@ properties: {
     color: {
         type: "string",
         name: "Color",
-        ui: {
+        admin: {
             Field: ColorPickerField,
             Preview: ColorPreview
         }
@@ -6687,20 +6964,23 @@ Entity views let you add custom **tabs** to the entity detail page alongside the
 const articlesCollection: CollectionConfig = {
     slug: "articles",
     name: "Articles",
-    entityViews: [
-        {
-            key: "preview",
-            name: "Preview",
-            Builder: ArticlePreview
-        },
-        {
-            key: "related",
-            name: "Related Articles",
-            Builder: RelatedArticlesView
-        }
-    ],
-    properties: { /* ... */ }
+    properties: { /* ... */ },
+    admin: {
+        entityViews: [
+            {
+                key: "preview",
+                name: "Preview",
+                Builder: ArticlePreview
+            },
+            {
+                key: "related",
+                name: "Related Articles",
+                Builder: RelatedArticlesView
+            }
+        ]
+    }
 };
+
 ```
 
 ### Building a entity View
@@ -6767,37 +7047,40 @@ Entity actions are custom buttons that appear on individual entities. Use them f
 ```typescript
 const articlesCollection: CollectionConfig = {
     slug: "articles",
-    entityActions: [
-        {
-            name: "Publish",
-            icon: "publish",
-            onClick: async ({ entity, context }) => {
-                await context.dataSource.saveEntity({
-                    path: entity.path,
-                    entityId: entity.id,
-                    values: { status: "published", published_at: new Date() },
-                    collection: articlesCollection
-                });
-                context.snackbarController.open({
-                    message: "Article published!"
-                });
+    properties: { /* ... */ },
+    admin: {
+        entityActions: [
+            {
+                name: "Publish",
+                icon: "publish",
+                onClick: async ({ entity, context }) => {
+                    await context.dataSource.saveEntity({
+                        path: entity.path,
+                        entityId: entity.id,
+                        values: { status: "published", published_at: new Date() },
+                        collection: articlesCollection
+                    });
+                    context.snackbarController.open({
+                        message: "Article published!"
+                    });
+                }
+            },
+            {
+                name: "Clone",
+                icon: "content_copy",
+                onClick: async ({ entity, context }) => {
+                    const { id, ...values } = entity.values;
+                    await context.dataSource.saveEntity({
+                        path: entity.path,
+                        values: { ...values, name: values.name + " (Copy)" },
+                        collection: articlesCollection
+                    });
+                }
             }
-        },
-        {
-            name: "Clone",
-            icon: "content_copy",
-            onClick: async ({ entity, context }) => {
-                const { id, ...values } = entity.values;
-                await context.dataSource.saveEntity({
-                    path: entity.path,
-                    values: { ...values, name: values.name + " (Copy)" },
-                    collection: articlesCollection
-                });
-            }
-        }
-    ],
-    properties: { /* ... */ }
+        ]
+    }
 };
+
 ```
 
 ### Collection Actions
@@ -6827,7 +7110,9 @@ function PublishSelectedAction({ selectionController, context }: CollectionActio
 
 // Register
 const collection: CollectionConfig = {
-    Actions: PublishSelectedAction,
+    admin: {
+        Actions: PublishSelectedAction
+    }
     // ...
 };
 ```
@@ -6850,33 +7135,36 @@ Additional columns let you display computed or derived data in the collection ta
 ```typescript
 const ordersCollection: CollectionConfig = {
     slug: "orders",
-    additionalFields: [
-        {
-            key: "total_display",
-            name: "Total",
-            Builder: ({ entity }) => {
-                const total = entity.values.items?.reduce(
-                    (sum, item) => sum + (item.price * item.quantity), 0
-                ) ?? 0;
-                return <span>${total.toFixed(2)}</span>;
-            }
-        },
-        {
-            key: "status_badge",
-            name: "Status",
-            Builder: ({ entity }) => {
-                const color = entity.values.status === "completed" ? "green" : "orange";
-                return (
-                    <span style={{ color }}>
-                        {entity.values.status}
-                    </span>
-                );
+    properties: { /* ... */ },
+    admin: {
+        additionalFields: [
+            {
+                key: "total_display",
+                name: "Total",
+                Builder: ({ entity }) => {
+                    const total = entity.values.items?.reduce(
+                        (sum, item) => sum + (item.price * item.quantity), 0
+                    ) ?? 0;
+                    return <span>${total.toFixed(2)}</span>;
+                }
             },
-            dependencies: ["status"]  // Re-render when these fields change
-        }
-    ],
-    properties: { /* ... */ }
+            {
+                key: "status_badge",
+                name: "Status",
+                Builder: ({ entity }) => {
+                    const color = entity.values.status === "completed" ? "green" : "orange";
+                    return (
+                        <span style={{ color }}>
+                            {entity.values.status}
+                        </span>
+                    );
+                },
+                dependencies: ["status"]  // Re-render when these fields change
+            }
+        ]
+    }
 };
+
 ```
 
 ### Builder Props
@@ -7059,7 +7347,7 @@ Before importing, the wizard validates all rows against your collection's proper
 
 #### Import Configuration
 
-Import is enabled by default. To disable it on a specific collection, use the `ui` sub-object:
+Import is enabled by default. To disable it on a specific collection, use the `admin` sub-object:
 
 ```typescript
 
@@ -7104,9 +7392,12 @@ Export is enabled by default. You can configure it with additional computed fiel
 const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
-    exportable: true,            // Enable (default: true)
-    properties: { /* ... */ }
+    properties: { /* ... */ },
+    admin: {
+        exportable: true            // Enable (default: true)
+    }
 };
+
 ```
 
 To disable export:
@@ -7115,9 +7406,12 @@ To disable export:
 const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
-    exportable: false,
-    properties: { /* ... */ }
+    properties: { /* ... */ },
+    admin: {
+        exportable: false
+    }
 };
+
 ```
 
 #### Adding Computed Fields
@@ -7129,26 +7423,29 @@ Use the `ExportConfig` object to add custom computed columns to your exports. Th
 const productsCollection: CollectionConfig = {
     slug: "products",
     name: "Products",
-    exportable: {
-        additionalFields: [
-            {
-                key: "computed_margin",
-                builder: ({ entity }) => {
-                    const price = entity.values.price as number;
-                    const cost = entity.values.cost as number;
-                    return String(price - cost);
+    properties: { /* ... */ },
+    admin: {
+        exportable: {
+            additionalFields: [
+                {
+                    key: "computed_margin",
+                    builder: ({ entity }) => {
+                        const price = entity.values.price as number;
+                        const cost = entity.values.cost as number;
+                        return String(price - cost);
+                    }
+                },
+                {
+                    key: "full_url",
+                    builder: ({ entity }) => {
+                        return `https://mystore.com/products/${entity.id}`;
+                    }
                 }
-            },
-            {
-                key: "full_url",
-                builder: ({ entity }) => {
-                    return `https://mystore.com/products/${entity.id}`;
-                }
-            }
-        ]
-    },
-    properties: { /* ... */ }
+            ]
+        }
+    }
 };
+
 ```
 
 Each `additionalFields` entry has:
@@ -7327,7 +7624,7 @@ collection: {
                 last_modified_by: {
                     type: "string",
                     name: "Modified By",
-                    ui: { readOnly: true }
+                    admin: { readOnly: true }
                 }
             }
         };
@@ -7662,7 +7959,7 @@ Access navigation state and resolved collections:
 ```typescript
 
 function MyComponent() {
-    const navigation = useNavigationController();
+    const navigation = useNavigationStateController();
 
     navigation.collections     // All registered collections
     navigation.views           // Custom views
@@ -7710,51 +8007,6 @@ function CategorySelector({ onSelect }) {
 | `pageSize` | `number` | Optional. Number of items per page. (Default: `10`). |
 | `getLabelFromEntity` | `(entity) => string` | Optional. Customize the display label text. |
 | `getDescriptionFromEntity` | `(entity) => string` | Optional. Customize the description text. |
-
-### `useUserSelector`
-
-Manage user account selection with server-side search and pagination, automatically falling back to client-side filtering if the backend delegate doesn't support server-side search.
-
-```typescript
-
-function AssigneeSelector({ onSelect }) {
-    const { items, isLoading, search, loadMore, hasMore } = useUserSelector({
-        pageSize: 10
-    });
-
-    return (
-        <div>
-            <input type="text" onChange={(e) => search(e.target.value)} placeholder="Search users..." />
-            <ul>
-                {items.map(item => (
-                    <li key={item.uid} onClick={() => onSelect(item.user)}>
-                        {item.label} ({item.description})
-                    </li>
-                ))}
-            </ul>
-            {hasMore && <button onClick={loadMore} disabled={isLoading}>Load More</button>}
-        </div>
-    );
-}
-```
-
-#### Parameters
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `pageSize` | `number` | Optional. Number of users to return per page. (Default: `10`). |
-
-#### Return Value
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `items` | `UserSelectorItem[]` | List of items wrapping `uid`, `label`, `description`, and raw `user`. |
-| `isLoading` | `boolean` | True if fetching is active. |
-| `error` | `Error` | Contains error if fetch fails. |
-| `search` | `(str) => void` | Updates search string with a debounced delay of 300ms. |
-| `loadMore` | `() => void` | Loads next page of users. |
-| `hasMore` | `boolean` | True if more users exist on the server. |
-| `getUser` | `(uid) => User` | Helper to fetch a single user object. |
 
 ### `useRebaseClient`
 
@@ -9708,41 +9960,19 @@ A visual schema editor that lets you create and modify collections through a dra
 />
 ```
 
-#### SQL Console
+#### Built-in tools
 
-Run raw SQL queries against your PostgreSQL database and see results in a table:
+These ship with Studio and are **lazy-loaded by `RebaseStudio`** — each is a separate
+chunk, fetched the first time you open it. They are not importable on their own:
+`@rebasepro/studio` deliberately exports only the orchestrator, so a console you never
+open costs nothing.
 
-```tsx
-
-{ slug: "sql", name: "SQL Console", view: <SQLEditor /> }
-```
-
-#### JS Console
-
-Write and execute JavaScript using the Rebase SDK:
-
-```tsx
-
-{ slug: "js", name: "JS Console", view: <JSEditor /> }
-```
-
-#### RLS Policy Editor
-
-Visualize and manage Row Level Security policies for your PostgreSQL tables:
-
-```tsx
-
-{ slug: "rls", name: "RLS Policies", view: <RLSEditor /> }
-```
-
-#### Storage Browser
-
-Browse, upload, and manage files in your storage backends:
-
-```tsx
-
-{ slug: "storage", name: "Storage", view: <StorageView /> }
-```
+| Tab | Slug | What it does |
+|-----|------|--------------|
+| SQL Console | `sql` | Run raw SQL against your PostgreSQL database and read results in a table |
+| JS Console | `js` | Write and execute JavaScript through the Rebase SDK |
+| RLS Policy Editor | `rls` | Inspect and manage Row Level Security policies for your tables |
+| Storage Browser | `storage` | Browse, upload and manage files across your storage backends |
 
 ### Adding Studio Views
 
@@ -10010,36 +10240,34 @@ On the first visit to a fresh deployment's admin, Rebase shows a bootstrap scree
 
 ### Docker Compose (Recommended)
 
-The generated project includes a `Dockerfile` and `docker-compose.yml`. This is the simplest way to deploy:
+The generated project already includes a working `docker-compose.yml` (Postgres + backend + frontend) and the `backend/`/`frontend/` Dockerfiles — that generated file is the source of truth; use it as-is rather than hand-writing one. The shape is:
 
-```yaml title="docker-compose.yml"
+```yaml title="docker-compose.yml (generated — abridged)"
 services:
-  postgres:
+  db:
     image: postgres:18-alpine
     environment:
       POSTGRES_USER: rebase
-      POSTGRES_PASSWORD: rebase
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
       POSTGRES_DB: rebase
-    volumes:
-      - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
-  app:
-    build: ./backend
+  backend:
+    build:
+      # Context is the PROJECT ROOT so the image can copy
+      # pnpm-workspace.yaml, backend/, and config/. A `./backend`
+      # context would fail — the Dockerfile lives at backend/Dockerfile.
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "3001:3001"
-    environment:
-      DATABASE_URL: postgresql://rebase:rebase@postgres:5432/rebase
-      JWT_SECRET: ${JWT_SECRET}
-      NODE_ENV: production
+    env_file: .env
     depends_on:
-      - postgres
-    volumes:
-      - uploads:/app/uploads
+      - db
 
 volumes:
-  pgdata:
+  postgres_data:
   uploads:
 ```
 
@@ -10047,12 +10275,39 @@ volumes:
 docker compose up -d
 ```
 
+#### Create the database schema
+
+Bringing the stack up is **not enough on its own.** The backend boots and
+auto-creates the **auth** tables, but it does **not** create the tables for
+your own collections — you run that once, explicitly, against the production
+database. From a checkout of your project (with dependencies installed), set
+`DATABASE_URL` to your production database and push the schema:
+
+```bash
+pnpm run db:push
+```
+
+:::caution[Required — or every collection returns errors]
+Skip this step and the app still starts and you can log in, but each of your
+collections is empty and its API calls fail with a "missing table" error until
+the schema exists. On startup the server logs a boxed warning naming exactly
+which tables are missing and the command to run.
+:::
+
+`db:push` is the fast option — it applies the schema directly, with no
+migration files. For a **versioned, team workflow**, commit migration files
+with `pnpm run db:generate` and run `pnpm run db:migrate` as a release step
+instead. Whichever you choose, it runs against the production `DATABASE_URL`
+from a project checkout (or your CI job), not inside the running container —
+the production image ships without the CLI.
+
 ### Production Checklist
 
 Before deploying to production, ensure:
 
 | Item | Details |
 |------|---------|
+| **Database schema** | Run `pnpm run db:push` (or `pnpm run db:migrate` for versioned migrations) against the production database once. The app boots without your collection tables, but every collection errors until they exist. |
 | **JWT_SECRET** | Use a cryptographically strong random string (≥ 32 chars). Never reuse across environments. |
 | **DATABASE_URL** | Use a managed Postgres instance (Neon, Supabase, RDS) with TLS enabled |
 | **CORS** | Configure allowed origins on your backend if frontend and backend are on different domains |
@@ -10185,9 +10440,9 @@ AWS App Runner pulls directly from ECR. Build your Docker image locally and push
 
 1. Navigate to **Elastic Container Registry** and create a new private repository called `rebase-backend`.
 2. Grab the push commands provided by AWS in the console (which handle Docker authentication).
-3. Build your image locally from the root folder:
+3. Build your image locally **from the project root** — the backend Dockerfile needs the whole workspace as its build context (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`), so `./backend` as the context will fail:
    ```bash
-   docker build -t rebase-backend ./backend
+   docker build -t rebase-backend -f backend/Dockerfile .
    ```
 4. Tag and push it to your newly created ECR repository.
 
@@ -10215,6 +10470,16 @@ App Runner is the simplest way to run containers on AWS without managing orchest
 7. Click **Create & deploy**.
 
 AWS will handle TLS termination (providing an `https` URL out of the box) and spin up the Rebase server.
+
+### Create the Database Schema
+
+The service is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your RDS endpoint. If the instance is private, run it from CI or a bastion host inside the same VPC. The deployed image doesn't include the CLI, so this doesn't run inside the App Runner container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
 
 ## Deploying Rebase on Google Cloud Platform
 
@@ -10245,8 +10510,14 @@ gcloud config set project YOUR_PROJECT_ID
 # Create an Artifact Registry repository (one-time)
 gcloud artifacts repositories create rebase --repository-format=docker --location=europe-west3
 
-# Build and push using Cloud Build
-gcloud builds submit --tag europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest ./backend
+# Authenticate Docker to Artifact Registry (one-time)
+gcloud auth configure-docker europe-west3-docker.pkg.dev
+
+# Build from the PROJECT ROOT — the backend Dockerfile needs the whole
+# workspace as its build context (pnpm-workspace.yaml, backend/, config/),
+# so a ./backend context will fail. Then push.
+docker build -f backend/Dockerfile -t europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest .
+docker push europe-west3-docker.pkg.dev/YOUR_PROJECT_ID/rebase/backend:latest
 
 # Deploy the image to Cloud Run
 gcloud run deploy rebase-backend \
@@ -10264,6 +10535,16 @@ Since Cloud Run instances are strictly stateless and ephemeral, you cannot use l
 2. Follow the [Rebase Storage Documentation](/docs/storage) to configure Rebase to use the S3-compatible API provided by Google Cloud Storage instead of the local filesystem.
 
 Your Rebase instance is now fully serverless and highly scalable natively inside the EU!
+
+### Create the Database Schema
+
+The service is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Cloud SQL instance. From your machine, connect through the [Cloud SQL Auth Proxy](https://cloud.google.com/sql/docs/postgres/sql-proxy) and point `DATABASE_URL` at `localhost`. The deployed image doesn't include the CLI, so this doesn't run inside the Cloud Run container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
 
 ## Deploying Rebase on Microsoft Azure
 
@@ -10290,9 +10571,9 @@ Azure Container Apps will pull your Docker image from ACR.
    ```bash
    az acr login --name YourRegistryName
    ```
-3. Build and push the Rebase image from your local repository:
+3. Build and push the Rebase image **from the project root** — the backend Dockerfile needs the whole workspace as its build context (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`), so `./backend` as the context will fail:
    ```bash
-   docker build -t yourregistryname.azurecr.io/rebase-backend:latest ./backend
+   docker build -t yourregistryname.azurecr.io/rebase-backend:latest -f backend/Dockerfile .
    docker push yourregistryname.azurecr.io/rebase-backend:latest
    ```
 
@@ -10318,6 +10599,16 @@ Azure Container Apps provides a serverless container environment with built-in H
 5. Under the **Ingress** tab, explicitly Enable Ingress.
 6. Set the Target Port to **3001**.
 7. Complete the creation. Azure will automatically provision the container and provide you an Application URL secured with TLS!
+
+### Create the Database Schema
+
+The container is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Azure Database for PostgreSQL connection string (add a firewall rule allowing your client IP if needed). The deployed image doesn't include the CLI, so this doesn't run inside the container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
 
 ## Deploying Rebase on Hetzner Cloud
 
@@ -10419,6 +10710,16 @@ systemctl restart caddy
 
 That's it! Your Rebase platform is securely hosted entirely within the EU.
 
+### 6. Create the Database Schema
+
+The stack is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error. From your project checkout on the server (with dependencies installed), point `DATABASE_URL` at the Postgres container and push the schema:
+
+```bash
+pnpm run db:push
+```
+
+For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead. On startup the server logs a boxed warning naming exactly which tables are missing and the command to run.
+
 ## Deploying Rebase on Scaleway
 
 Scaleway is a premier European cloud provider based in France with datacenters in Paris, Amsterdam, and Warsaw. It's an excellent choice for organizations prioritizing EU data sovereignty. 
@@ -10443,10 +10744,10 @@ Scaleway Serverless Containers run standard Docker images. First, build the Reba
 
 1. Go to **Container Registry** in the Scaleway Console and create a Namespace (e.g., `rebase-apps`).
 2. Log in to the registry from your local terminal using the provided instructions.
-3. Build your Rebase app using the generated `Dockerfile`:
+3. Build your Rebase app using the generated `Dockerfile`, **from the project root** — the backend Dockerfile needs the whole workspace as its build context (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`), so `./backend` as the context will fail:
 
 ```bash
-docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest ./backend
+docker build -t rg.fr-par.scw.cloud/rebase-apps/rebase-backend:latest -f backend/Dockerfile .
 ```
 
 4. Push the image:
@@ -10481,6 +10782,16 @@ Scaleway will immediately provision the container and provide you with a public 
 
 *Note: For strict data compliance, verify that your Scaleway Organization details reflect your European corporate entity.*
 
+### 4. Create the Database Schema
+
+The container is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Scaleway Managed Database connection string. The deployed image doesn't include the CLI, so this doesn't run inside the container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
+
 ## Deploying Rebase on Railway
 
 Railway is an incredibly popular modern PaaS (Platform as a Service) that takes the pain out of DevOps. It will automatically detect the Rebase Node framework and build it seamlessly. 
@@ -10502,6 +10813,10 @@ Additionally, Railway fully supports European deployment regions (Amsterdam), me
 2. Select your Rebase repository.
 3. Railway will immediately detect the repository and look for a `Dockerfile`. Wait for the initial build to begin.
 
+:::caution[Point Railway at the backend Dockerfile]
+The scaffold's Dockerfile lives at `backend/Dockerfile`, not the repo root, and its build context must be the **repo root** (it copies `pnpm-workspace.yaml`, `backend/`, and `config/`). In the service's **Settings → Build**, set the **Dockerfile Path** to `backend/Dockerfile` and leave the **Root Directory** at the repository root. Otherwise Railway won't find a Dockerfile — or will build with the wrong context and fail.
+:::
+
 ### 4. Set Environment Variables
 The initial build might fail because it is entirely missing configuration. Let's fix that.
 
@@ -10522,6 +10837,16 @@ The initial build might fail because it is entirely missing configuration. Let's
 3. Under **Public Networking**, click **Generate Domain**. Railway will provide a `.up.railway.app` testing URL. You can also securely attach a Custom Domain here.
 
 Railway will automatically rebuild safely. Your EU-hosted platform is now entirely live!
+
+### 6. Create the Database Schema
+
+The app is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Postgres service's **public** connection string (found under the Postgres widget → **Connect**; the referenced internal `DATABASE_URL` is only reachable from inside Railway). The deployed image doesn't include the CLI, so this doesn't run inside the container. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
 
 ## Deploying Rebase on Fly.io
 
@@ -10567,7 +10892,11 @@ app = "my-rebase-app"
 primary_region = "fra"
 
 [build]
-  dockerfile = "Dockerfile"
+  # The scaffold's Dockerfile lives at backend/Dockerfile, and its build
+  # context is the project root (where fly.toml sits) so it can copy
+  # pnpm-workspace.yaml, backend/, and config/. Pointing this at a bare
+  # "Dockerfile" (repo root) will fail — there is none there.
+  dockerfile = "backend/Dockerfile"
 
 [http_service]
   internal_port = 3001 # Make sure this matches your Hono app port
@@ -10586,6 +10915,16 @@ fly deploy
 ```
 
 Once parsing and uploading completes, your application will come online automatically. Run `fly open` to view your deployed app in the browser!
+
+### 5. Create the Database Schema
+
+The app is running, but Rebase only auto-creates the **auth** tables on boot — the tables for your own collections are **not** created automatically. Run this once against the production database, or every collection returns a "missing table" error:
+
+```bash
+pnpm run db:push
+```
+
+Run it from a checkout of your project (or your CI job) with `DATABASE_URL` set to your Postgres connection string. For a private Fly Postgres, open a tunnel first with `fly proxy 5432 -a <your-db-app>` and point `DATABASE_URL` at `localhost:5432`. The deployed image doesn't include the CLI, so this doesn't run inside the machine and a `release_command` can't call it either. For versioned migrations, commit migration files with `pnpm run db:generate` and run `pnpm run db:migrate` instead.
 
 ## Recipe: Blog CMS
 
@@ -10607,7 +10946,6 @@ export const authorsCollection: CollectionConfig = {
     name: "Authors",
     singularName: "Author",
     table: "authors",
-    icon: "person",
     properties: {
         name: {
             type: "string",
@@ -10632,10 +10970,14 @@ export const authorsCollection: CollectionConfig = {
         bio: {
             type: "string",
             name: "Bio",
-            multiline: true
+            admin: { multiline: true }
         }
+    },
+    admin: {
+        icon: "person"
     }
 };
+
 ```
 
 #### Categories
@@ -10646,7 +10988,6 @@ export const categoriesCollection: CollectionConfig = {
     name: "Categories",
     singularName: "Category",
     table: "categories",
-    icon: "label",
     properties: {
         name: {
             type: "string",
@@ -10668,8 +11009,12 @@ export const categoriesCollection: CollectionConfig = {
                 { id: "orange", label: "Orange", color: "orangeDark" }
             ]
         }
+    },
+    admin: {
+        icon: "label"
     }
 };
+
 ```
 
 #### Articles
@@ -10680,8 +11025,6 @@ export const articlesCollection: CollectionConfig = {
     name: "Articles",
     singularName: "Article",
     table: "articles",
-    icon: "article",
-    defaultViewMode: "table",
     history: true,
     properties: {
         title: {
@@ -10720,12 +11063,12 @@ export const articlesCollection: CollectionConfig = {
         content: {
             type: "string",
             name: "Content",
-            markdown: true
+            admin: { markdown: true }
         },
         excerpt: {
             type: "string",
             name: "Excerpt",
-            multiline: true,
+            admin: { multiline: true },
             validation: { max: 300 }
         },
         published_at: {
@@ -10736,7 +11079,7 @@ export const articlesCollection: CollectionConfig = {
             type: "date",
             name: "Created At",
             autoValue: "on_create",
-            ui: { readOnly: true }
+            admin: { readOnly: true }
         }
     },
     relations: [
@@ -10777,8 +11120,13 @@ export const articlesCollection: CollectionConfig = {
         { operation: "select", ownerField: "author_id" },
         { operations: ["insert", "update"], ownerField: "author_id" },
         { operation: "delete", roles: ["admin"] }
-    ]
+    ],
+    admin: {
+        icon: "article",
+        defaultViewMode: "table"
+    }
 };
+
 ```
 
 ### Setup
@@ -10900,11 +11248,14 @@ const views: CMSView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
-        icon: "dashboard",
-        group: "Analytics",
-        view: <DashboardView />
+        view: <DashboardView />,
+        admin: {
+            icon: "dashboard",
+            group: "Analytics"
+        }
     }
 ];
+
 ```
 
 Pass it to the navigation controller:

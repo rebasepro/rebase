@@ -1,0 +1,332 @@
+# Audit: the relations model and its projection onto subcollections
+
+Date: 2026-07-25
+Scope: `packages/types` (Relation, CollectionConfig), `packages/common` (CollectionRegistry,
+relations/resolutions utils), `packages/server` (REST route generation),
+`packages/server-postgres` (FetchService, PersistService, RelationService),
+`packages/app` + `packages/admin` (navigation, subcollection tabs).
+
+---
+
+## Summary
+
+The model has **two path grammars for the same URL**, and nothing reconciles them.
+
+- The **frontend** treats the third path segment as a *child collection slug*.
+- The **backend** treats it as a *relation key*.
+
+They coincide only when a relation's name happens to equal its target collection's slug.
+The default (`sanitizeRelation` sets `relationName = toSnakeCase(target.slug)`) makes that
+true often enough that the seam is invisible in the demo apps — and false for the most
+common authoring style, an inline relation property, whose relation name defaults to the
+*property key*.
+
+Everything below flows from that single unreconciled projection, plus a nested read/write
+pipeline that was built as an afterthought to the root-collection one.
+
+---
+
+## A. Root cause: the child collection is stamped with the target's slug
+
+`CollectionRegistry.normalizeCollection` builds `childCollections` from many-relations at
+[CollectionRegistry.ts:287](packages/common/src/collections/CollectionRegistry.ts:287):
+
+```ts
+result.childCollections = () => manyRelations.map((r: Relation) => {
+    const target = r.target();
+    return r.overrides ? mergeDeep(target, r.overrides) : target;
+});
+```
+
+The child is the **target collection verbatim** — so its `slug` is the target's slug.
+
+There is a second, *different* implementation of the same projection in
+[resolutions.ts:362-391](packages/common/src/util/resolutions.ts:362), which does the right
+thing — it overrides `slug` with the relation key and pulls the display name off the
+declaring property. It is **unreachable** for anything that went through the registry,
+because `getSubcollections` short-circuits on `childCollections` at
+[resolutions.ts:353](packages/common/src/util/resolutions.ts:353).
+
+Consumers then split:
+
+| Consumer | Reads the segment as | Site |
+|---|---|---|
+| `resolvePathToCollections` | child collection **slug** | [CollectionRegistry.ts:521](packages/common/src/collections/CollectionRegistry.ts:521) |
+| `getCollectionByPath` | **relation key** (`findRelation`) | [CollectionRegistry.ts:446](packages/common/src/collections/CollectionRegistry.ts:446) |
+| `FetchService.fetchCollectionFromPath` | **relation key** | [FetchService.ts:830](packages/server-postgres/src/services/FetchService.ts:830) |
+| `PersistService.save` | **relation key** | [PersistService.ts:147](packages/server-postgres/src/services/PersistService.ts:147) |
+| `RelationService.fetchRelatedEntities` | **relation key** | [RelationService.ts:167](packages/server-postgres/src/services/RelationService.ts:167) |
+| admin subcollection tab | child **slug** | [DetailViewBinding.tsx:354](packages/admin/src/components/DetailViewBinding.tsx:354) |
+
+Reproduced (`posts` has one many-relation `featured_tags` → `tags`):
+
+```
+child slugs:                                   [{ slug: 'tags', name: 'Featured tags' }]
+resolvePathToCollections("posts/1/tags")       => "tags"
+resolvePathToCollections("posts/1/featured_tags") THREW => Subcollection 'featured_tags' not found in posts
+getCollectionByPath("posts/1/tags")            THREW => Relation 'tags' not found in collection 'posts'
+getCollectionByPath("posts/1/featured_tags")   => "tags"
+```
+
+Exactly one of the two resolves any given URL. The admin builds
+`` `${path}/${entityId}/${getCollectionDataPath(subcollection)}` `` — the target slug — so
+opening the subcollection tab produces a request the backend rejects with
+*"Relation 'tags' not found in collection 'posts'"*.
+
+**This is not an exotic config.** `extractRelationsFromProperties`
+([CollectionRegistry.ts:312](packages/common/src/collections/CollectionRegistry.ts:312))
+defaults `relationName` to the property key, so the idiomatic
+
+```ts
+properties: {
+    featuredTags: { type: "relation", target: () => tags, cardinality: "many" }
+}
+```
+
+produces relation `featuredTags` → child slug `tags` → broken.
+
+---
+
+## B. Two relations to the same target collapse into one
+
+Same probe with `featured_tags` and `archived_tags`, both targeting `tags`:
+
+```
+TWO-RELATION subs: [ { slug: 'tags', ... }, { slug: 'tags', ... } ]
+```
+
+Consequences:
+- `getSubcollectionColumnId` ([common.tsx:72](packages/admin/src/components/CollectionTableBinding/internal/common.tsx:72))
+  returns `subcollection:tags` for both — duplicate React keys, duplicate columns.
+- `resolvePathToCollections` uses `.find(c => c.slug === segment)` — the second relation is
+  permanently unreachable.
+- Both tabs point at the same URL.
+
+There is no way to express two named links to the same collection.
+
+---
+
+## C. A relation name that collides with a root slug resolves to the wrong collection
+
+[CollectionRegistry.ts:454-458](packages/common/src/collections/CollectionRegistry.ts:454):
+
+```ts
+const targetRelationKey = relation.relationName || target.slug;
+const targetSlug = relation.overrides?.slug ?? targetRelationKey;
+currentCollection = this.get(targetSlug) || this.normalizeCollection(target);
+```
+
+`this.get(relationName)` searches the **global** slug map. Reproduced — `docs` has a
+relation named `people` targeting `notes`, and an unrelated root collection `people` exists:
+
+```
+getCollectionByPath("docs/1/people") -> should be notes => "people"
+```
+
+The relation's own `target()` is discarded in favour of a name collision. This is reached on
+the write path via `PostgresBackendDriver.resolveCollectionCallbacks`
+([PostgresBackendDriver.ts:168](packages/server-postgres/src/PostgresBackendDriver.ts:168)),
+so a nested write can run **the wrong collection's `beforeSave`/`afterSave` and property
+callbacks**, against the wrong `properties` schema.
+
+---
+
+## D. `relation.overrides` are dropped by path resolution
+
+`resolvePathToCollections` finds the merged child, then throws it away:
+
+```ts
+currentCollection = this.get(subcollection.slug) || this.normalizeCollection(subcollection);
+```
+([CollectionRegistry.ts:530](packages/common/src/collections/CollectionRegistry.ts:530))
+
+`this.get(slug)` returns the registered root target, without the merge. Reproduced:
+
+```
+override in childCollections:            "Featured tags"
+override after resolvePathToCollections: "Tags"
+```
+
+So `overrides` works for rendering the tab list and silently stops working once you navigate
+into it. Anything security- or presentation-relevant put in `overrides` (a narrowed
+`properties` set, a filter preset, a different name) does not survive.
+
+---
+
+## E. The nested read pipeline silently discards almost every query option
+
+Compare the root list route ([api-generator.ts:167](packages/server/src/api/rest/api-generator.ts:167))
+with the nested one ([api-generator.ts:563](packages/server/src/api/rest/api-generator.ts:563)):
+
+1. **`offset` is never passed.** The route omits it from the `fetchCollection` call, yet
+   still reports it in `meta` and computes `hasMore` from it. `FetchService.fetchCollectionFromPath`
+   doesn't accept it either ([FetchService.ts:807](packages/server-postgres/src/services/FetchService.ts:807)).
+   **Subcollection lists cannot paginate — page 2 returns page 1.**
+2. **`filter` is never applied.** `fetchEntitiesUsingJoins` builds `additionalFilters` from
+   `searchString` only ([RelationService.ts:263-282](packages/server-postgres/src/services/RelationService.ts:263));
+   `options.filter` is accepted and never read. `?where=status:eq.published` on a nested path
+   returns drafts.
+3. **`orderBy` / `order` are never applied** on either branch.
+4. **The `joinPath` branch ignores `searchString` too** ([RelationService.ts:208-257](packages/server-postgres/src/services/RelationService.ts:208)) — only `limit` survives.
+5. **`count` ignores everything.** `countRelatedEntities` declares `{ filter, databaseId }`,
+   passes a hardcoded empty `additionalFilters: SQL[] = []`
+   ([RelationService.ts:354](packages/server-postgres/src/services/RelationService.ts:354)),
+   and never sees `searchString` at all. So `total` disagrees with `data` whenever the client
+   filters or searches, and `hasMore` stays true forever.
+6. **`?include=` doesn't work.** Nested GET bypasses `restFetchService` entirely and calls the
+   raw driver.
+
+All of this fails **silently** — the caller gets 200 with wrong data, not a 400.
+
+---
+
+## F. Nested writes skip write validation
+
+`assertKnownWriteFields` is called at lines 270, 308, 312 and 405 — all inside
+`createCollectionRoutes` (140-470). `createSubcollectionRoutes` (490-684) never calls it.
+
+`strictWrites` (documented as default-`true` in
+[collections.ts:196](packages/types/src/types/collections.ts:196)) is **not enforced on any
+nested path**. `POST /authors/1/posts {"tiitle": "x"}` bypasses the guard that
+`POST /posts` applies.
+
+---
+
+## G. Nested single-entity operations are not scoped to the parent — **FIXED**
+
+`fetchOne` resolves the collection through the path and then filters on the primary key alone
+([FetchService.ts:402-427](packages/server-postgres/src/services/FetchService.ts:402)). Same
+for `PersistService.delete` ([PersistService.ts:83](packages/server-postgres/src/services/PersistService.ts:83)).
+
+- `GET /authors/1/posts/43` returns post 43 even when it belongs to author 2.
+- `DELETE /authors/1/posts/43` deletes it.
+- `PUT /authors/1/posts/43` is worse: the nested branch **injects the parent FK into the
+  values** ([PersistService.ts:207](packages/server-postgres/src/services/PersistService.ts:207)),
+  so it silently **reparents** post 43 to author 1.
+
+RLS still gates row visibility, so this is not an auth bypass — but the parent segment in a
+nested URL is decorative for read/update/delete. Only create honours it.
+
+**Fixed.** The path walk that every consumer duplicated now lives once in
+[nested-path.ts](packages/server-postgres/src/services/nested-path.ts).
+`RelationService.isRelated` answers membership with the *same* join the listing uses, and
+`FetchService.fetchOne`/`fetchOneForRest` report a non-member as absent, while
+`PersistService.save`/`delete` reject it. Update no longer injects the parent foreign key:
+the parent segment is read as an assertion about where the row already lives, not an
+instruction to move it there.
+
+---
+
+## H. Many-to-many subcollections are semantically wrong, and destructive — **FIXED**
+
+`cardinality: "many"` is projected to a subcollection regardless of whether it is a
+one-to-many (child rows owned by this parent) or a many-to-many (a shared set). Only the
+first is really a subcollection. The UI renders them identically, and the write path then
+does the wrong thing for m2m:
+
+- **DELETE removes the target row, not the link.** `DELETE /posts/1/tags/5` resolves to the
+  `tags` table and deletes tag 5 globally. In the admin, "remove this tag from this post"
+  **deletes the tag from every post.**
+- **You cannot link an existing row.** The junction insert is gated on create only:
+  `if (junctionTableInfo && !id)` ([PersistService.ts:376](packages/server-postgres/src/services/PersistService.ts:376)).
+  A `PUT` through an m2m path silently ignores the parent — no junction row is written.
+
+So an m2m subcollection view can only ever create brand-new target rows, and its delete is a
+global delete.
+
+**Delete is fixed.** A junction-backed relation now unlinks — `RelationService.unlinkRelatedEntity`
+removes the junction row and leaves the shared target alone. A multi-hop `joinPath`, which has
+no single link to remove, is rejected with a 400 rather than falling through to a row delete.
+**Still open:** linking an *existing* row through the path (`PUT` does not create a junction
+row; it now requires membership instead of silently updating a foreign row).
+
+---
+
+## I. To-one relations are navigable, and writing through them corrupts the target — **FIXED**
+
+Nothing restricts the third segment to a many-relation — `findRelation` matches any relation,
+and the route accepts any odd-length path. `POST /posts/1/author` reaches
+[PersistService.ts:176](packages/server-postgres/src/services/PersistService.ts:176):
+
+```ts
+if (relation.localKey)            targetColumnName = relation.localKey;
+else if (relation.foreignKeyOnTarget) targetColumnName = relation.foreignKeyOnTarget;
+```
+
+`localKey` is a column on the **source** table, and it is written onto the **target** row —
+producing `INSERT INTO authors (author_id, ...)`. Either an opaque Postgres error, or a silent
+wrong write if a column of that name happens to exist on the target.
+
+**Fixed.** `assertWritableThrough` rejects a nested write whose final segment is a to-one
+relation, with a message naming where the foreign key actually lives. `localKey` is no longer
+consulted when resolving the child's parent column; a many-relation that declares neither
+`foreignKeyOnTarget` nor `joinPath` is now a 400 instead of a guess. Reads through a to-one
+path are unaffected.
+
+---
+
+## J. The Firestore/Postgres asymmetry is unmodelled
+
+`childCollections` carries two different meanings with no discriminant:
+
+- **Firestore** — `subcollections` thunk ([collections.ts:329](packages/types/src/types/collections.ts:329)).
+  The segment is a real Firestore path component. Coherent end to end.
+- **Postgres** — the many-relation projection. The segment is a relation key that must be
+  resolved against the parent's relation map.
+
+`getDeclaredSubcollections` ([collections.ts:451](packages/types/src/types/collections.ts:451))
+reads `subcollections` off *any* collection via a cast, gated only by a capability lookup at
+each call site — so the gate is re-implemented per caller rather than enforced by the type.
+
+Minor, related: `extractRelationsFromProperties` recurses into `map` properties
+([CollectionRegistry.ts:328](packages/common/src/collections/CollectionRegistry.ts:328)) and
+hoists nested relations to the collection's top-level `relations[]`. A many-relation declared
+inside a map therefore becomes a top-level subcollection tab, keyed by the inner property key.
+
+---
+
+## K. None of this is documented
+
+[relations.md](website/src/content/docs/docs/collections/relations.md) (304 lines) never
+mentions that a many-relation becomes a subcollection, that nested REST paths exist, or what
+the path segment must be. `docs/data-sources.md` mentions "relations vs subcollections" only
+as an engine-capability axis.
+
+---
+
+## Recommendations, in order
+
+1. **Pick one grammar: the relation key.** It is what every backend consumer already uses,
+   and it is the only one that can express two relations to the same target. Delete the
+   duplicated projection in `normalizeCollection` (CollectionRegistry.ts:279-293) and route
+   it through the `resolutions.ts` implementation, which already stamps
+   `slug = relationKey`. That single change fixes A, B and D, and makes
+   `resolvePathToCollections` and `getCollectionByPath` agree by construction.
+2. **Stop resolving relation targets by global slug lookup** (C). Use `relation.target()`;
+   fall back to the registry only to pick up the registered/normalized instance of *that*
+   collection, matched by table name, never by relation name.
+3. **Make the nested read pipeline reuse the root one** (E). Thread `offset`, `filter`,
+   `orderBy`/`order` and `include` through `fetchRelatedEntities`/`countRelatedEntities`, or
+   — better — rewrite a nested list as a root list on the target collection plus a
+   parent-derived filter, so there is one query path instead of two.
+4. **Call `assertKnownWriteFields` in the subcollection routes** (F). One-line parity fix.
+5. ~~Scope nested `fetchOne`/`update`/`delete` by the parent (G)~~ — **done**.
+6. ~~Split the m2m case: unlink instead of delete (H)~~ — **delete done**; link-an-existing-row
+   still open.
+7. ~~Reject non-many relations as write path segments (I)~~ — **done**.
+8. Document the projection and the path grammar (K).
+
+Items 5, 6 and 7 were the ones that could lose data; they are fixed and covered by
+[test/e2e/nested-path-writes.test.ts](packages/server-postgres/test/e2e/nested-path-writes.test.ts)
+(10 cases — 6 assert the new behaviour and fail against the pre-fix code, 4 are regression
+guards for create-under-parent, own-child update/delete, and m2m create+link, which pass on
+both). Items 1–3 (the path-grammar split) are untouched and remain the largest defect.
+
+---
+
+## Reproduction
+
+The probe used above is at
+`/private/tmp/claude-501/-Users-francesco-rebase/2cfa4dec-e99c-4ba8-81a3-9258d82e5be3/scratchpad/probe_subcollections.test.ts`.
+Copy it into `packages/common/test/` and run `npx jest test/probe_subcollections.test.ts`
+from `packages/common`.

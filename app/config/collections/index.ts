@@ -11,17 +11,26 @@ import productLocalesCollection from "./product_locales";
 import exercisesCollection from "./exercises";
 import usersCollection from "./users";
 
+/**
+ * Order matters: it drives the order of the groups and of the cards inside each
+ * group, both on the home page and in the drawer. Most relevant first.
+ */
 export const collections = [
-    authorsCollection,
-    postsCollection,
-    tagsCollection,
-    customersCollection,
+    // E-Commerce
     productsCollection,
     ordersCollection,
+    customersCollection,
     orderItemsCollection,
-    ticketsCollection,
     productLocalesCollection,
+    // Content
+    postsCollection,
+    authorsCollection,
+    tagsCollection,
+    // Support
+    ticketsCollection,
+    // Fitness
     exercisesCollection,
+    // Settings
     usersCollection
 ];
 

@@ -127,6 +127,40 @@ path: "test" }];
         expect(result.current.collections).toEqual(mockCollections);
     });
 
+    it("should flatten the admin block so navigation sees group and hideFromNavigation", async () => {
+        const mockAuthController = {
+            initialLoading: false,
+            user: { uid: "test-user" }
+        } as unknown as AuthController;
+
+        const mockCollections = [
+            {
+                id: "products",
+                slug: "products",
+                name: "Products",
+                path: "products",
+                admin: { group: "E-Commerce",
+hideFromNavigation: true }
+            }
+        ] as unknown as CollectionConfig[];
+
+        const { result } = renderHook(() => useResolvedCollections({
+            authController: mockAuthController,
+            collections: mockCollections,
+            data: mockData,
+            collectionRegistryController: mockCollectionRegistryController
+        }));
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        expect(result.current.collections[0].group).toBe("E-Commerce");
+        expect(result.current.collections[0].hideFromNavigation).toBe(true);
+        // The authoring shape survives the flattening
+        expect(result.current.collections[0].admin?.group).toBe("E-Commerce");
+    });
+
     it("should capture errors during resolution", async () => {
         const mockAuthController = {
             initialLoading: false,

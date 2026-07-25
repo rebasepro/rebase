@@ -2,7 +2,7 @@ import { eq, and, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig, Properties, Relation } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
@@ -16,6 +16,13 @@ import { RelationService } from "./RelationService";
 import { FetchService } from "./FetchService";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import {
+    assertWritableThrough,
+    isJunctionBackedRelation,
+    isNestedPath,
+    resolveNestedPath,
+    type NestedPathHop
+} from "./nested-path";
 import { ApiError, logger } from "@rebasepro/server";
 import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage } from "../utils/pg-error-utils";
 
@@ -80,6 +87,33 @@ export class PersistService {
      * Delete an row by ID
      */
     async delete(collectionPath: string, id: string | number, _databaseId?: string): Promise<void> {
+        // A nested address deletes *through* a relation, and what that removes
+        // depends on who owns the target row.
+        const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
+        if (hop) {
+            assertWritableThrough(hop, collectionPath);
+
+            if (!await this.relationService.isRelated(hop, id)) {
+                throw ApiError.notFound(`No row "${id}" in "${collectionPath}" to delete.`);
+            }
+
+            if (isJunctionBackedRelation(hop.relation)) {
+                // Shared target: drop the link, not the row.
+                if (!hop.relation.through) {
+                    throw ApiError.badRequest(
+                        `"${collectionPath}" reaches '${hop.targetCollection.slug}' through a multi-hop joinPath, ` +
+                        `so there is no single link to remove. Delete the row at "${hop.targetCollection.slug}" ` +
+                        "directly if that is what you meant.",
+                        "RELATION_NOT_UNLINKABLE"
+                    );
+                }
+                await this.relationService.unlinkRelatedEntity(this.db, hop, id);
+                return;
+            }
+            // Owned child (inverse FK): deleting the row is the right meaning,
+            // and membership above has established it is this parent's child.
+        }
+
         const collection = getCollectionByPath(collectionPath, this.registry);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = getPrimaryKeys(collection, this.registry);
@@ -114,6 +148,44 @@ export class PersistService {
     }
 
     /**
+     * The column on the *target* table that records the parent, for a create
+     * under a nested one-to-many path.
+     *
+     * Returns `undefined` when the link is not a column at all (a multi-hop
+     * `joinPath`), so the caller writes the row without stamping anything.
+     *
+     * `relation.localKey` is deliberately not consulted: it names a column on
+     * the *source* table. Falling back to it here — which is what this used to
+     * do, and first — stamped the parent's own foreign key onto the child row.
+     */
+    private resolveParentForeignKeyColumn(hop: NestedPathHop): string | undefined {
+        const { relation, relationKey, targetCollection } = hop;
+
+        if (relation.foreignKeyOnTarget) return relation.foreignKeyOnTarget;
+
+        if (relation.joinPath && relation.joinPath.length === 1) {
+            const joinStep = relation.joinPath[0];
+            const targetTableName = getTableName(targetCollection);
+            if (joinStep.table !== targetTableName) {
+                logger.warn(`Join step for relation '${relationKey}' targets '${joinStep.table}', not the target table '${targetTableName}'.`);
+            }
+            return DrizzleConditionBuilder.getColumnNamesFromColumns(joinStep.on.to)[0];
+        }
+
+        if (relation.joinPath && relation.joinPath.length > 1) {
+            // Multi-hop: the link lives in an intermediate table, not in a
+            // column on the target. Nothing to stamp.
+            return undefined;
+        }
+
+        throw ApiError.badRequest(
+            `Relation '${relationKey}' on '${hop.parentCollection.slug}' cannot be written through: it declares no ` +
+            "`foreignKeyOnTarget` (the column on " + `'${targetCollection.slug}'` + " that records the parent) and no `joinPath`.",
+            "RELATION_NOT_WRITABLE"
+        );
+    }
+
+    /**
      * Save an row (create or update)
      *
      * With `options.upsert`, the row is written with INSERT ... ON CONFLICT DO
@@ -129,93 +201,52 @@ export class PersistService {
         databaseId?: string,
         options?: { upsert?: boolean }
     ): Promise<Record<string, unknown>> {
-        // If saving under a nested relation path, resolve the parent and inject FK
+        // If saving under a nested relation path, resolve the relation it ends in.
         let effectiveCollectionPath = collectionPath;
         const effectiveValues: Partial<M> = { ...values };
         let junctionTableInfo: { parentCollection: CollectionConfig; parentId: string | number; relation: Relation; relationKey: string; } | undefined;
 
-        if (collectionPath.includes("/")) {
-            const segments = collectionPath.split("/").filter(Boolean);
-            if (segments.length >= 3 && segments.length % 2 === 1) {
-                const rootSegment = segments[0];
-                let currentCollection = getCollectionByPath(rootSegment, this.registry);
-                let currentId: string | number = segments[1];
+        const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
 
-                for (let i = 2; i < segments.length; i += 2) {
-                    const relationKey = segments[i];
-                    const resolvedRelations = resolveCollectionRelations(currentCollection);
-                    const relation = findRelation(resolvedRelations, relationKey);
+        if (hop) {
+            assertWritableThrough(hop, collectionPath);
+            effectiveCollectionPath = hop.targetCollection.slug;
 
-                    if (!relation) {
-                        const available = Object.keys(resolvedRelations).join(", ") || "(none)";
-                        throw new Error(`Relation '${relationKey}' not found in collection '${currentCollection.slug}'. Available relations: [${available}]`);
+            const parentIdForWrite = () => {
+                const parentPks = getPrimaryKeys(hop.parentCollection, this.registry);
+                return parseIdValues(hop.parentId, parentPks)[parentPks[0].fieldName];
+            };
+
+            if (id !== undefined) {
+                // Updating an existing row *through* a parent. The parent segment
+                // is an assertion about where the row already lives, not an
+                // instruction to move it there: injecting the FK here silently
+                // reparented whatever id was named, so `PUT authors/1/posts/43`
+                // stole post 43 from its real author. Check membership instead,
+                // and leave the FK to an explicit value in the body.
+                if (!await this.relationService.isRelated(hop, id)) {
+                    throw ApiError.notFound(`No row "${id}" in "${collectionPath}" to update.`);
+                }
+            } else if (hop.relation.through) {
+                // Many-to-many create: the new row is linked to the parent by a
+                // junction row written after the insert, below.
+                junctionTableInfo = {
+                    parentCollection: hop.parentCollection,
+                    parentId: parentIdForWrite(),
+                    relation: hop.relation,
+                    relationKey: hop.relationKey
+                };
+            } else {
+                // One-to-many create: stamp the parent's id onto the child's FK.
+                const targetColumnName = this.resolveParentForeignKeyColumn(hop);
+
+                if (targetColumnName) {
+                    const parsedParentId = parentIdForWrite();
+                    const existingValue = (effectiveValues as Record<string, unknown>)[targetColumnName];
+                    if (existingValue !== undefined && existingValue !== null && existingValue !== parsedParentId) {
+                        logger.warn(`Overriding provided value '${existingValue}' for FK '${targetColumnName}' with path parent id '${parsedParentId}'.`);
                     }
-
-                    if (i === segments.length - 1) {
-                        const targetCollection = relation.target();
-                        effectiveCollectionPath = targetCollection.slug;
-
-                        // Handle many-to-many with junction table
-                        if (relation.cardinality === "many" && relation.through) {
-                            const parentIdInfoArray = getPrimaryKeys(currentCollection, this.registry);
-                            const parentIdInfo = parentIdInfoArray[0];
-                            const parsedParentIdObj = parseIdValues(currentId, parentIdInfoArray);
-                            const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
-
-                            junctionTableInfo = {
-                                parentCollection: currentCollection,
-                                parentId: parsedParentId,
-                                relation: relation,
-                                relationKey: relationKey
-                            };
-                            break;
-                        }
-
-                        // Find the FK column that should store the parent ID
-                        let targetColumnName: string;
-
-                        if (relation.localKey) {
-                            targetColumnName = relation.localKey;
-                        } else if (relation.foreignKeyOnTarget) {
-                            targetColumnName = relation.foreignKeyOnTarget;
-                        } else if (relation.joinPath && relation.joinPath.length === 1) {
-                            const targetTableName = getTableName(targetCollection);
-                            const relevantJoinStep = relation.joinPath.find(joinStep => joinStep.table === targetTableName);
-
-                            if (relevantJoinStep) {
-                                const targetColumnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(relevantJoinStep.on.to);
-                                targetColumnName = targetColumnNames[0];
-                            } else {
-                                logger.warn(`Could not find specific join step for target table ${targetTableName} in relation '${relationKey}'.`);
-                                const targetColumnNames = DrizzleConditionBuilder.getColumnNamesFromColumns(relation.joinPath[0].on.to);
-                                targetColumnName = targetColumnNames[0];
-                            }
-                        } else if (relation.joinPath && relation.joinPath.length > 1) {
-                            // For multi-hop relations (like many-to-many through a junction table),
-                            // there is no direct foreign key on the target table pointing to the parent.
-                            // The relationship is managed via the junction table.
-                            // We shouldn't inject the parent ID directly into the target row payload.
-                            break;
-                        } else {
-                            throw new Error(`Relation '${relationKey}' lacks configuration for path-based saving.`);
-                        }
-
-                        const parentIdInfoArray = getPrimaryKeys(currentCollection, this.registry);
-                        const parentIdInfo = parentIdInfoArray[0];
-                        const parsedParentIdObj = parseIdValues(currentId, parentIdInfoArray);
-                        const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
-
-                        const existingValue = (effectiveValues as Record<string, unknown>)[targetColumnName];
-                        if (existingValue !== undefined && existingValue !== null && existingValue !== parsedParentId) {
-                            logger.warn(`Overriding provided value '${existingValue}' for FK '${targetColumnName}' with path parent id '${parsedParentId}'.`);
-                        }
-                        (effectiveValues as Record<string, unknown>)[targetColumnName] = parsedParentId;
-                        break;
-                    } else {
-                        const nextEntityId = segments[i + 1];
-                        currentCollection = relation.target();
-                        currentId = nextEntityId;
-                    }
+                    (effectiveValues as Record<string, unknown>)[targetColumnName] = parsedParentId;
                 }
             }
         }

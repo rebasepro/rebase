@@ -72,6 +72,10 @@ export function App() {
             slug: "debug/ui",
             name: "UI Reference / Debug",
             icon: "Plus",
+            // Reachable at /debug/ui, but kept off the home page and the drawer:
+            // this is the design reference, not something a demo visitor wants
+            // sitting between the collections.
+            hideFromNavigation: true,
             view: <UIReferenceView />
         }
     ], []);

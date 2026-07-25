@@ -15,6 +15,7 @@ import {
 import { parseDataFromServer } from "../data-transformer";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { logger } from "@rebasepro/server";
+import type { NestedPathHop } from "./nested-path";
 
 /**
  * Typed wrapper for Drizzle dynamic query innerJoin.
@@ -333,6 +334,24 @@ export class RelationService {
             throw new Error(`Relation '${relationKey}' not found in collection '${parentCollectionPath}'. Available relations: [${available}]`);
         }
 
+        return this.countRelatedRows(parentCollection, parentId, relation, []);
+    }
+
+    /**
+     * Count the target rows a parent reaches through `relation`, narrowed by
+     * `additionalFilters` (conditions on the target table).
+     *
+     * Shared by the public count and by {@link isRelated}, so "how many children
+     * does this parent have" and "is this row one of them" are answered by the
+     * same join — a membership test that reconstructed the join separately would
+     * be free to disagree with the listing it is supposed to gate.
+     */
+    private async countRelatedRows(
+        parentCollection: CollectionConfig,
+        parentId: string | number,
+        relation: Relation,
+        additionalFilters: SQL[]
+    ): Promise<number> {
         const targetCollection = relation.target();
         const targetTable = getTableForCollection(targetCollection, this.registry);
         const targetPks = requirePrimaryKeys(targetCollection, this.registry);
@@ -350,9 +369,6 @@ export class RelationService {
         // Start count with distinct to avoid duplicates from junction tables
         let query = this.db.select({ count: sql<number>`count(distinct ${targetIdField})` }).from(targetTable).$dynamic();
 
-        // Build additional filter conditions
-        const additionalFilters: SQL[] = [];
-
         // Use unified count query builder from DrizzleConditionBuilder
         query = DrizzleConditionBuilder.buildRelationCountQuery(
             query,
@@ -368,6 +384,75 @@ export class RelationService {
 
         const result = await query;
         return Number(result[0]?.count || 0);
+    }
+
+    /**
+     * Whether `targetId` is actually reachable from the parent named in `hop`.
+     *
+     * A nested address like `authors/1/posts/43` used to resolve to the target
+     * collection and then match on the primary key alone, so the parent segment
+     * decided nothing: the row came back, and was updated or deleted, whoever it
+     * belonged to. Reads, updates and deletes now all gate on this.
+     */
+    async isRelated(hop: NestedPathHop, targetId: string | number): Promise<boolean> {
+        const targetTable = getTableForCollection(hop.targetCollection, this.registry);
+        const targetPks = requirePrimaryKeys(hop.targetCollection, this.registry);
+        const parsedTargetId = parseIdValues(targetId, targetPks);
+
+        const identity: SQL[] = targetPks.map(pk => {
+            const column = targetTable[pk.fieldName as keyof typeof targetTable] as AnyPgColumn;
+            if (!column) {
+                throw new Error(`ID field '${pk.fieldName}' not found in table for collection '${hop.targetCollection.slug}'`);
+            }
+            return eq(column, parsedTargetId[pk.fieldName]);
+        });
+
+        return (await this.countRelatedRows(hop.parentCollection, hop.parentId, hop.relation, identity)) > 0;
+    }
+
+    /**
+     * Remove the junction row linking a parent to `targetId`, leaving the target
+     * row itself alone.
+     *
+     * This is what `DELETE authors/1/tags/5` has to mean for a many-to-many: the
+     * target is shared, so deleting the row would remove the tag from every other
+     * post that uses it. It used to do exactly that — resolve the path to the
+     * `tags` table and delete by primary key.
+     */
+    async unlinkRelatedEntity(
+        tx: DrizzleClient,
+        hop: NestedPathHop,
+        targetId: string | number
+    ): Promise<void> {
+        const through = hop.relation.through;
+        if (!through) {
+            throw new Error(`Relation '${hop.relationKey}' has no junction table to unlink through`);
+        }
+
+        const junctionTable = this.registry.getTable(through.table);
+        if (!junctionTable) {
+            throw new Error(`Junction table not found: ${through.table}`);
+        }
+
+        const sourceJunctionColumn = junctionTable[through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
+        const targetJunctionColumn = junctionTable[through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
+
+        if (!sourceJunctionColumn || !targetJunctionColumn) {
+            throw new Error(`Junction columns not found for relation '${hop.relationKey}' on table '${through.table}'`);
+        }
+
+        const parentPks = requirePrimaryKeys(hop.parentCollection, this.registry);
+        const parsedParentId = parseIdValues(hop.parentId, parentPks)[parentPks[0].fieldName];
+
+        const targetPks = requirePrimaryKeys(hop.targetCollection, this.registry);
+        const parsedTargetId = parseIdValues(targetId, targetPks)[targetPks[0].fieldName];
+
+        await tx.delete(junctionTable).where(and(
+            eq(sourceJunctionColumn, parsedParentId),
+            eq(targetJunctionColumn, parsedTargetId)
+        ));
+
+        logger.info(`Unlinked '${hop.relationKey}' ${parsedTargetId} from ${hop.parentCollection.slug} ${parsedParentId}`);
     }
 
     /**
