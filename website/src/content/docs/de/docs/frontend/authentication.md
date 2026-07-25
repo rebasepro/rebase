@@ -1,7 +1,7 @@
 ---
 title: Authentifizierung & Login
 sidebar_label: Authentifizierung & Login
-description: Richten Sie den Auth-Controller, die Login-Ansicht, die Benutzerverwaltung und die Rollensimulation in Ihrem Rebase-React-Frontend ein.
+description: Richten Sie den Auth-Controller, die Login-Ansicht und die Rollensimulation in Ihrem Rebase-React-Frontend ein.
 ---
 
 ## Überblick
@@ -10,8 +10,6 @@ Rebase bietet einsatzbereite React-Komponenten und Hooks für die Authentifizier
 
 - **`useRebaseAuthController`** — Verwaltet den Auth-Zustand, Tokens und die Sitzungspersistenz
 - **`LoginView`** — Vorgefertigtes Login-/Registrierungsformular mit OAuth-Unterstützung
-- **`useBackendUserManagement`** — Hook zum Verwalten von Benutzern aus dem Admin-Panel
-- **`UsersView`** — Integrierte Benutzerverwaltungsoberfläche
 - **Rollensimulation** — Testen Sie verschiedene Rollen, ohne sich abzumelden
 
 ## Auth-Controller
@@ -61,38 +59,6 @@ Die Login-Ansicht übernimmt:
 - Google-OAuth-Anmeldung (wenn konfiguriert)
 - Passwort-Zurücksetzungs-Flow
 - Formularvalidierung und Fehlerzustände
-
-## Benutzerverwaltung
-
-### useBackendUserManagement
-
-Dieser Hook verbindet sich mit der Backend-Benutzerverwaltungs-API:
-
-```tsx
-import { useBackendUserManagement } from "@rebasepro/app";
-
-const userManagement = useBackendUserManagement({
-    client: rebaseClient,
-    currentUser: authController.user
-});
-```
-
-### UsersView-Komponente
-
-Rendern Sie die integrierte Benutzerverwaltungsoberfläche:
-
-```tsx
-import { UsersView } from "@rebasepro/app";
-
-// In your routes:
-<Route path="/users" element={<UsersView userManagement={userManagement} />} />
-```
-
-Dies bietet eine vollständige Benutzertabelle mit:
-- Benutzerauflistung mit Suche und Filterung
-- Rollenzuweisung
-- Benutzererstellung und -bearbeitung
-- Verwaltung des Kontostatus
 
 ## Rollenmodell
 

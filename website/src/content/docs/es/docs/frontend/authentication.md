@@ -1,7 +1,7 @@
 ---
 title: Autenticación e Inicio de Sesión
 sidebar_label: Autenticación e Inicio de Sesión
-description: Configure el controlador de autenticación, la vista de inicio de sesión, la gestión de usuarios y la simulación de roles en su frontend React de Rebase.
+description: Configure el controlador de autenticación, la vista de inicio de sesión y la simulación de roles en su frontend React de Rebase.
 ---
 
 ## Resumen
@@ -10,8 +10,6 @@ Rebase proporciona componentes y hooks de React listos para usar para la autenti
 
 - **`useRebaseAuthController`** — Gestiona el estado de autenticación, los tokens y la persistencia de sesión
 - **`LoginView`** — Formulario de inicio de sesión/registro prediseñado con soporte OAuth
-- **`useBackendUserManagement`** — Hook para gestionar usuarios desde el panel de administración
-- **`UsersView`** — Interfaz de gestión de usuarios integrada
 - **Simulación de roles** — Pruebe distintos roles sin cerrar sesión
 
 ## Controlador de Autenticación
@@ -61,38 +59,6 @@ La vista de inicio de sesión gestiona:
 - Inicio de sesión con Google OAuth (cuando está configurado)
 - Flujo de restablecimiento de contraseña
 - Validación de formularios y estados de error
-
-## Gestión de Usuarios
-
-### useBackendUserManagement
-
-Este hook se conecta a la API de gestión de usuarios del backend:
-
-```tsx
-import { useBackendUserManagement } from "@rebasepro/app";
-
-const userManagement = useBackendUserManagement({
-    client: rebaseClient,
-    currentUser: authController.user
-});
-```
-
-### Componente UsersView
-
-Renderice la interfaz de gestión de usuarios integrada:
-
-```tsx
-import { UsersView } from "@rebasepro/app";
-
-// In your routes:
-<Route path="/users" element={<UsersView userManagement={userManagement} />} />
-```
-
-Esto proporciona una tabla de usuarios completa con:
-- Listado de usuarios con búsqueda y filtrado
-- Asignación de roles
-- Creación y edición de usuarios
-- Gestión del estado de la cuenta
 
 ## Modelo de Roles
 

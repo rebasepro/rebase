@@ -390,52 +390,6 @@ function CategorySelector({ onSelect }) {
 | `getLabelFromEntity` | `(entity) => string` | Optional. Customize the display label text. |
 | `getDescriptionFromEntity` | `(entity) => string` | Optional. Customize the description text. |
 
-## `useUserSelector`
-
-Manage user account selection with server-side search and pagination, automatically falling back to client-side filtering if the backend delegate doesn't support server-side search.
-
-```typescript
-import { useUserSelector } from "@rebasepro/app";
-
-function AssigneeSelector({ onSelect }) {
-    const { items, isLoading, search, loadMore, hasMore } = useUserSelector({
-        pageSize: 10
-    });
-
-    return (
-        <div>
-            <input type="text" onChange={(e) => search(e.target.value)} placeholder="Search users..." />
-            <ul>
-                {items.map(item => (
-                    <li key={item.uid} onClick={() => onSelect(item.user)}>
-                        {item.label} ({item.description})
-                    </li>
-                ))}
-            </ul>
-            {hasMore && <button onClick={loadMore} disabled={isLoading}>Load More</button>}
-        </div>
-    );
-}
-```
-
-### Parameters
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `pageSize` | `number` | Optional. Number of users to return per page. (Default: `10`). |
-
-### Return Value
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `items` | `UserSelectorItem[]` | List of items wrapping `uid`, `label`, `description`, and raw `user`. |
-| `isLoading` | `boolean` | True if fetching is active. |
-| `error` | `Error` | Contains error if fetch fails. |
-| `search` | `(str) => void` | Updates search string with a debounced delay of 300ms. |
-| `loadMore` | `() => void` | Loads next page of users. |
-| `hasMore` | `boolean` | True if more users exist on the server. |
-| `getUser` | `(uid) => User` | Helper to fetch a single user object. |
-
 ## `useRebaseClient`
 
 Retrieve the backing client SDK instance (`RebaseClient`) from the React context. This is useful for invoking raw SDK operations (like calling custom endpoints or manual uploads) within your components.

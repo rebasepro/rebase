@@ -1,7 +1,7 @@
 ---
 title: Autenticação e Login
 sidebar_label: Autenticação e Login
-description: Configure o controlador de autenticação, a visão de login, o gerenciamento de usuários e a simulação de papéis no seu frontend React da Rebase.
+description: Configure o controlador de autenticação, a visão de login e a simulação de papéis no seu frontend React da Rebase.
 ---
 
 ## Visão Geral
@@ -10,8 +10,6 @@ A Rebase fornece componentes e hooks React prontos para uso para autenticação:
 
 - **`useRebaseAuthController`** — Gerencia o estado de autenticação, os tokens e a persistência da sessão
 - **`LoginView`** — Formulário de login/cadastro pré-construído com suporte a OAuth
-- **`useBackendUserManagement`** — Hook para gerenciar usuários a partir do painel de administração
-- **`UsersView`** — Interface integrada de gerenciamento de usuários
 - **Simulação de papéis** — Teste diferentes papéis sem sair da conta
 
 ## Controlador de Autenticação
@@ -61,38 +59,6 @@ A visão de login cuida de:
 - Login com Google OAuth (quando configurado)
 - Fluxo de redefinição de senha
 - Validação de formulário e estados de erro
-
-## Gerenciamento de Usuários
-
-### useBackendUserManagement
-
-Este hook se conecta à API de gerenciamento de usuários do backend:
-
-```tsx
-import { useBackendUserManagement } from "@rebasepro/app";
-
-const userManagement = useBackendUserManagement({
-    client: rebaseClient,
-    currentUser: authController.user
-});
-```
-
-### Componente UsersView
-
-Renderize a interface integrada de gerenciamento de usuários:
-
-```tsx
-import { UsersView } from "@rebasepro/app";
-
-// In your routes:
-<Route path="/users" element={<UsersView userManagement={userManagement} />} />
-```
-
-Isso fornece uma tabela de usuários completa com:
-- Listagem de usuários com busca e filtragem
-- Atribuição de papéis
-- Criação e edição de usuários
-- Gerenciamento do status da conta
 
 ## Modelo de Papéis
 

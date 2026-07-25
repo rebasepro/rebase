@@ -1,7 +1,7 @@
 ---
 title: Authentification et connexion
 sidebar_label: Authentification et connexion
-description: Configurez le contrôleur d'authentification, la vue de connexion, la gestion des utilisateurs et la simulation de rôles dans votre frontend React Rebase.
+description: Configurez le contrôleur d'authentification, la vue de connexion et la simulation de rôles dans votre frontend React Rebase.
 ---
 
 ## Vue d'ensemble
@@ -10,8 +10,6 @@ Rebase fournit des composants et hooks React prêts à l'emploi pour l'authentif
 
 - **`useRebaseAuthController`** — Gère l'état d'authentification, les tokens et la persistance de session
 - **`LoginView`** — Formulaire de connexion/inscription préfabriqué avec prise en charge OAuth
-- **`useBackendUserManagement`** — Hook pour gérer les utilisateurs depuis le panneau d'administration
-- **`UsersView`** — Interface de gestion des utilisateurs intégrée
 - **Simulation de rôles** — Testez différents rôles sans vous déconnecter
 
 ## Contrôleur d'authentification
@@ -61,38 +59,6 @@ La vue de connexion gère :
 - Connexion Google OAuth (lorsqu'elle est configurée)
 - Flux de réinitialisation de mot de passe
 - Validation de formulaire et états d'erreur
-
-## Gestion des utilisateurs
-
-### useBackendUserManagement
-
-Ce hook se connecte à l'API de gestion des utilisateurs du backend :
-
-```tsx
-import { useBackendUserManagement } from "@rebasepro/app";
-
-const userManagement = useBackendUserManagement({
-    client: rebaseClient,
-    currentUser: authController.user
-});
-```
-
-### Composant UsersView
-
-Rendez l'interface de gestion des utilisateurs intégrée :
-
-```tsx
-import { UsersView } from "@rebasepro/app";
-
-// In your routes:
-<Route path="/users" element={<UsersView userManagement={userManagement} />} />
-```
-
-Ceci fournit une table d'utilisateurs complète avec :
-- Listage des utilisateurs avec recherche et filtrage
-- Attribution de rôles
-- Création et modification d'utilisateurs
-- Gestion du statut du compte
 
 ## Modèle de rôles
 
