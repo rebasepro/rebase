@@ -5,7 +5,7 @@ import { useEffect, useMemo } from "react";
 
 import { Entity } from "@rebasepro/types";
 import type { PreviewSize } from "../types/components/PropertyPreviewProps";
-import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
+import { getEntityImagePreviewPropertyKey } from "@rebasepro/app";
 import {
     ArrowRightToLineIcon,
     cls,

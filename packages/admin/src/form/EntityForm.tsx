@@ -9,7 +9,8 @@ import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary } from "@rebasepro/ui";
 import { AlignLeftIcon, CheckIcon, LoaderIcon, PencilIcon, useDebouncedCallback } from "@rebasepro/ui";
-import { getDefaultValuesFor, isHidden, isReadOnly } from "@rebasepro/common";
+import { getDefaultValuesFor } from "@rebasepro/common";
+import { isHidden, isReadOnly } from "@rebasepro/app";
 
 import { useCustomizationController } from "@rebasepro/app";
 import { getFormFieldKeys } from "@rebasepro/app";

@@ -280,8 +280,16 @@ export function resolveArrayProperties<M>({
             }).filter(e => Boolean(e)) as Property[]
             : [];
         return resolvedProperties;
-    } else if (!("Field" in (property.ui || {}) && property.ui?.Field)) {
-        throw Error(`The array property (${propertyKey}) needs to declare an 'of' or a 'oneOf' property, or provide a custom \`Field\` component`);
+    } else if (!property.columnType) {
+        // An array with neither `of`/`oneOf` nor a `columnType` describes no element
+        // type, so nothing can be generated or rendered from it.
+        //
+        // The escape hatch used to be `ui.Field` — "a custom component can render
+        // anything" — which made a *presentation* field decide whether a schema was
+        // valid, in code the Postgres generator runs. `columnType` is the same escape
+        // hatch stated as data: `columnType: "text[]"` says what the column holds,
+        // which is what both the generator and the form actually need.
+        throw Error(`The array property (${propertyKey}) needs to declare an 'of' or a 'oneOf' property, or a \`columnType\` such as "text[]"`);
     } else {
         return [];
     }

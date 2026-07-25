@@ -11,23 +11,6 @@ import {
 import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "./common";
 import { mergeDeep } from "@rebasepro/utils";
 
-export function isReadOnly(property: Property): boolean {
-    if (property.ui?.readOnly)
-        return true;
-    if (property.type === "date") {
-        if (property.autoValue)
-            return true;
-    }
-    if (property.type === "reference") {
-        return !property.path && !("Field" in (property.ui || {}) && property.ui?.Field);
-    }
-    return false;
-}
-
-export function isHidden(property: Property): boolean {
-    return typeof property.ui?.disabled === "object" && Boolean(property.ui?.disabled.hidden);
-}
-
 export function isPropertyBuilder(property?: Property) {
     return typeof property?.dynamicProps === "function";
 }

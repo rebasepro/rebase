@@ -6,7 +6,7 @@ import { useTranslation } from "@rebasepro/app";
 
 import { ErrorBoundary } from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";
-import { isHidden, isReadOnly } from "@rebasepro/common";
+import { isHidden, isReadOnly } from "@rebasepro/app";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";

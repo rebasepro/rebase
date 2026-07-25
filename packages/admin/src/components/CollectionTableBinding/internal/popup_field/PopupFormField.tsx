@@ -16,7 +16,7 @@ import { getPropertyInPath } from "../../../../util/property_utils";
 import { PropertyFieldBinding, zodToFormErrors } from "../../../../form";
 import { useAuthController, useCustomizationController, useData, useRebaseContext } from "@rebasepro/app";
 import type { OnCellValueChangeParams } from "@rebasepro/app";
-import { isReadOnly } from "@rebasepro/common";
+import { isReadOnly } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
 interface PopupFormFieldProps<M extends Record<string, unknown>> {

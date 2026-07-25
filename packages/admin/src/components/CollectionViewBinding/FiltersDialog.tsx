@@ -4,7 +4,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import { FilterIcon, VirtualTableWhereFilterOp } from "@rebasepro/ui";
-import { resolveFilterOperators } from "@rebasepro/common";
+import { resolveFilterOperators } from "@rebasepro/app";
 import { useCollectionScope, useTranslation } from "@rebasepro/app";
 import { FilterFieldBinding } from "../SelectableTable/filters/FilterFieldBinding";
 

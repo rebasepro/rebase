@@ -9,7 +9,8 @@ import {
 import {
     FilterFieldBindingProps
 } from "@rebasepro/admin-types";
-import { enumToObjectEntries, resolveFilterOperators } from "@rebasepro/common";
+import { enumToObjectEntries } from "@rebasepro/common";
+import { resolveFilterOperators } from "@rebasepro/app";
 import { useCollectionScope, useComponentOverride, useResolvedComponent } from "@rebasepro/app";
 import { StringNumberFilterField } from "./StringNumberFilterField";
 import { BooleanFilterField } from "./BooleanFilterField";

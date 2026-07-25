@@ -1,4 +1,4 @@
-import { resolveFilterOperators } from "../src/util/filter-operator-resolution";
+import { resolveFilterOperators } from "../../src/collections/filter-operator-resolution";
 import type { Property } from "@rebasepro/types";
 
 const stringProp = (ui?: Record<string, unknown>): Property => ({

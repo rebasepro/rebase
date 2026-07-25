@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { Property, RelationProperty } from "@rebasepro/types";
 import type { Entity, EntityRelation } from "@rebasepro/types";
 import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
-import { getEntityImagePreviewPropertyKey } from "@rebasepro/common";
+import { getEntityImagePreviewPropertyKey } from "@rebasepro/app";
 import { getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";

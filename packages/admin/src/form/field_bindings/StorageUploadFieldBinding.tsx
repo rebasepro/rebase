@@ -8,7 +8,7 @@ import { useDropzone } from "react-dropzone";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 
-import { isReadOnly } from "@rebasepro/common";
+import { isReadOnly } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { useAuthController, useSnackbarController, useStorageSource, useTranslation } from "@rebasepro/app";
 import { StorageSourceContext } from "@rebasepro/app";

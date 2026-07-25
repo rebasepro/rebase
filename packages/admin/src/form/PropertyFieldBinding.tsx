@@ -13,7 +13,8 @@ import { Field, FormexFieldProps, getIn } from "@rebasepro/forms";
 ;
 import { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";
 
-import { isHidden, isPropertyBuilder, isReadOnly, resolveProperty } from "@rebasepro/common";
+import { isPropertyBuilder, resolveProperty } from "@rebasepro/common";
+import { isHidden, isReadOnly } from "@rebasepro/app";
 import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { Typography } from "@rebasepro/ui";
 import { getFieldConfig, getFieldId } from "../components/field_configs";
