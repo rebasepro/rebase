@@ -72,6 +72,10 @@
 
 ### Testing
 
+- **A stable release now runs the full gate before publishing anything.** Publishing was not gated on tests: the canary job ran a build and published, and `publish.yml` had no dependency on CI at all — the two workflows fired in parallel on the same push, so a release could go out while CI was still running, or after it had already failed. The stable job ran unit tests but no end-to-end suite, which meant the failures those suites exist to catch — a broken `rebase init`, RLS not isolating rows — were exactly the ones a green build could not see.
+
+  The whole gate (type checks, headless/BaaS guards, init-template check, unit tests, and every e2e suite) now lives in a reusable `verify.yml` that CI and the stable release both call, so the release path cannot drift from the one that runs on every push. A stable release stops before any version bump, tag or publish if any of it fails. Canary is deliberately unchanged: it still publishes on a green build alone.
+
 - **The template e2e suite could test a server it had not started.** It took the backend's address from the announced banner, which is trustworthy only if the server announces the port it bound — see the fix above. Each backend is now given a port the OS reports as free, and the run fails loudly if the banner disagrees rather than continuing against an unknown server and a database it does not control. It also talks to `127.0.0.1` rather than `localhost`, which resolves to `::1` first on macOS while the server binds `0.0.0.0`.
 
 - **The CLI init e2e leaked its frontend.** `rebase dev` supervises a Vite that ends up outside the process group the teardown signals, so a frontend survived every run — one held port 5173 for hours with its project directory already deleted. Teardown now also reaps whatever still holds the dev server's own ports, restricted to processes that were not already listening there when the run began (a developer's `tsx watch` server gets a new pid whenever it restarts, so "any new listener" would have been a way to kill it).

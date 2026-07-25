@@ -169,8 +169,23 @@ jobs:
   # ══════════════════════════════════════════════════════════════
   # Stable — manual runs only
   # ══════════════════════════════════════════════════════════════
+
+  # A stable release runs the whole gate first, on the exact commit being released:
+  # type checks, the headless/BaaS guards, the init-template check, unit tests, and
+  # every e2e suite. `publish-stable` needs it, so a failure anywhere stops the
+  # release before a version is bumped, a tag is pushed, or anything reaches npm.
+  #
+  # This is the same workflow CI runs, called rather than copied — a second copy of
+  # the step list on the path that runs least often is how a release gate rots.
+  #
+  # Canary is untouched and still publishes on a green build alone.
+  verify-stable:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.channel == 'stable' }}
+    uses: ./.github/workflows/verify.yml
+
   publish-stable:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.channel == 'stable' }}
+    needs: verify-stable
     runs-on: ubuntu-latest
     concurrency:
       group: stable-publish
@@ -204,13 +219,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Build only. The tests that used to run here — and every e2e suite besides —
+      # now run in `verify-stable`, which this job needs, so getting this far means
+      # they already passed on this commit. This build is for the artifacts being
+      # published, not a check.
       - name: Build packages
         run: pnpm run build
-        env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
-
-      - name: Run tests
-        run: pnpm test
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 

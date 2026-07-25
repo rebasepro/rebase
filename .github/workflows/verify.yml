@@ -1,0 +1,212 @@
+name: Verify
+
+# The full gate — type checks, the headless/BaaS guards, the build, unit tests and
+# every end-to-end suite — defined once and called from two places:
+#
+#   ci.yml            on every push to main and every PR
+#   publish.yml       before a STABLE release, which must not ship unless all of
+#                     this passed for the exact commit being released
+#
+# Canary deliberately does not call it. A canary publishes if it compiles, which is
+# what makes it a canary; anything stricter belongs here.
+#
+# It exists as a reusable workflow rather than copied steps because the copy is the
+# failure mode: the release path is the one that runs rarely, so it is the one that
+# would quietly drift out of date and stop testing what CI tests.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Authoritative type gate. Resolves @rebasepro/* to SOURCE (not dist), so it
+      # is immune to stale build output, build ordering, and incremental caches —
+      # unlike `pnpm build` (esbuild), which strips types WITHOUT checking them.
+      # This is what stops a type regression from silently merging.
+      #
+      # It runs two programs: the monorepo, and `tsconfig.tests.json` for test
+      # files, which nothing type-checked at all until a deleted type name survived
+      # in a test for an entire refactor.
+      - name: Type check
+        run: pnpm run typecheck
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # The core packages ALONE, with @rebasepro/admin-types absent from the program.
+      # The type check above includes admin-types, and a TypeScript augmentation applies
+      # to the whole program — so the `admin` field it declares is visible to every core
+      # package there, which makes that gate structurally unable to catch a core package
+      # using it. `packages/inference` was writing `admin.readOnly`, `pnpm typecheck`
+      # said 0 errors, and only a per-package tsc found it.
+      - name: Core-only type check (admin surface absent)
+        run: pnpm run check:core-types
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # Proves BaaS mode stays honest: imports every collection file and server
+      # package under a loader hook that rejects React and @rebasepro UI packages.
+      # Reads source directly, so it needs no build and fails fast.
+      - name: Headless guard
+        run: pnpm run check:headless
+
+      # The type-level counterpart. check:headless proves the backend never
+      # *executes* React and passed for months while 13 shipped .d.ts files began
+      # with `import React from "react"` and @types/react was a devDependency
+      # only — so a BaaS install had nothing to resolve them against. This scans
+      # the text of core sources AND built .d.ts, plus the manifests.
+      - name: Type-level headless guard
+        run: pnpm run check:types-headless
+
+      # And the end-to-end proof: a real BaaS project (server + driver + client,
+      # a collection file, SDK calls) typechecked with `react` mapped to a stub
+      # that stands in for its absence. Catches a React type reached through an
+      # alias, which a text scan cannot see.
+      - name: BaaS typecheck (React absent)
+        run: pnpm run check:baas-types
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # The scaffolded collection files, compiled once per preset as `rebase init`
+      # lays them out, plus a probe that adds what a user adds first: a custom
+      # component with an image inside it, attached by a lazy import thunk. Nothing
+      # else checks them fast: the only thing that compiled them was the CMS init
+      # e2e, inside a Docker build ~15 minutes in, so a template carrying a stale
+      # collection shape stayed invisible until the very last gate.
+      - name: Init template typecheck
+        run: pnpm run check:templates
+
+      # Renames leak where a codemod cannot see them: a bare name in an array,
+      # a .astro file, an extensionless .env.example, a Tailwind @source path.
+      - name: Package name guard
+        run: pnpm run check:names
+
+      - name: Build packages
+        run: pnpm run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      - name: Run tests
+        run: pnpm test
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+  e2e:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The vitest e2e suites drive @rebasepro/server's built dist, and the CLI
+      # suite scaffolds a project that consumes every package as built output
+      # (its `assertPackagesBuilt` guard fails otherwise). This job runs on its
+      # own runner, so the `checks` job's build does not reach it — build here. Only
+      # `./packages/*`, not the admin app, which the e2e never boots.
+      - name: Build packages
+        run: pnpm --filter './packages/*' -r run build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      - name: Start PostgreSQL container
+        run: |
+          docker run --name rebase-postgres -e POSTGRES_DB=rebase_saas -e POSTGRES_USER=rebase -e POSTGRES_PASSWORD=rebase -p 5432:5432 -d postgres:18
+          until docker exec rebase-postgres pg_isready -U rebase -d rebase_saas; do
+            echo "Waiting for postgres..."
+            sleep 1
+          done
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E Test Suite
+        run: npx tsx e2e/tests/cli-init-e2e.ts
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+          SCREENSHOT_DIR: ${{ github.workspace }}/e2e-screenshots
+
+      # The only place a scaffolded project is installed and booted for real —
+      # workspace: deps don't resolve anywhere else — so it's what proves the
+      # baas template rather than just the library behind it.
+      #
+      # `always()` because the two suites cover different things, and a failure in
+      # the first said nothing about this one: it was skipped, so a single broken
+      # run reported half the truth and each fix revealed the next failure. This
+      # does not soften anything — the step still fails the job on its own, and
+      # the earlier step's failure still fails it. It only stops the second
+      # report from being suppressed by the first.
+      - name: Run BaaS E2E
+        if: always()
+        run: npx tsx e2e/tests/cli-init-baas-e2e.ts
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # The product's real security coverage, orphaned until now (this suite ran
+      # in NO pipeline, so a change breaking RLS shipped green — AUDIT P0 #2).
+      # rls-enforcement boots a real Postgres and asserts DB state after every
+      # RLS denial; policy-agreement proves the Postgres and JS policy backends
+      # agree; cdc/db/channel-history/cli round out the integration surface.
+      #
+      # Each test file boots and tears down its OWN Postgres via Docker (random
+      # host ports — no clash with the 5432 service above), so there are no
+      # connection settings to wire. `--workspace-concurrency=1` runs the two
+      # packages' suites one after another, and each vitest config sets
+      # `fileParallelism: false`, so exactly one container is ever live — the
+      # arrangement that makes this reliable on a shared runner.
+      #
+      # `always()`: like the two steps above, this covers different ground, so a
+      # failure there must not suppress this report. It still fails the job on
+      # its own.
+      - name: Run security & integration E2E (vitest)
+        if: always()
+        run: pnpm --filter @rebasepro/server-postgres --filter @rebasepro/cli --workspace-concurrency=1 test:e2e
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # NOT here, and deliberately: the Playwright admin suite (`pnpm e2e`).
+      # Its `global-setup` signs in as a demo user that must already exist and waits
+      # for seeded collections to render, so it needs a provisioned database, not a
+      # workflow step. Wiring it means writing that seed first.
+      - name: Upload E2E Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: ${{ github.workspace }}/e2e-screenshots/
+          if-no-files-found: ignore
