@@ -84,6 +84,16 @@ app/uploads/
 *.d.ts
 !packages/admin/src/editor/markdown-it-plugins.d.ts
 
+# Hand-written declaration files. The blanket rule above exists for *generated*
+# declarations, and it silently swallowed these — which is worse than it sounds:
+# `react-absent.d.ts` is what makes `pnpm check:baas-types` mean anything, and without
+# it in the tree the guard resolved `react` to the real @types/react and passed while
+# proving nothing. A file importing React.ReactNode into the BaaS graph produced zero
+# errors. Anything hand-written and load-bearing needs a line here.
+!e2e/baas-typecheck/stubs/*.d.ts
+!app/config/*.d.ts
+!packages/cli/templates/template/config/*.d.ts
+
 # Temporary test, linting, and scratch outputs
 /e2e-screenshots/
 /eslint_report.json
