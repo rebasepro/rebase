@@ -151,6 +151,36 @@ type AuthMode = "buttons" | "login" | "register" | "forgot";
  */
 const loginFieldClasses = "w-full dark:border dark:border-surface-700/70 dark:hover:border-surface-600";
 
+/** One warning per provider per page load — this is a config hint, not a log stream. */
+const warnedProviders = new Set<string>();
+
+/**
+ * An OAuth button needs a client id in the frontend *and* the provider
+ * configured on the backend. Half a configuration renders nothing at all, with
+ * no error anywhere — the button simply is not there, which reads as "the
+ * feature broke" rather than "one env var is missing". Say which half is
+ * missing instead.
+ */
+function warnAboutHalfConfiguredOAuth(
+    provider: string,
+    clientId: string | undefined,
+    backendProviders: string[]
+) {
+    const backendHasIt = backendProviders.includes(provider);
+    if (Boolean(clientId) === backendHasIt) return; // both or neither — nothing to say
+    if (warnedProviders.has(provider)) return;
+    warnedProviders.add(provider);
+
+    const envVar = `${provider.toUpperCase()}_CLIENT_ID`;
+    console.warn(
+        clientId
+            ? `[Rebase] ${provider} login is hidden: the login view has a client id, but the backend reports no "${provider}" provider. `
+              + `Set ${envVar} (and ${provider.toUpperCase()}_CLIENT_SECRET) on the server and restart it.`
+            : `[Rebase] ${provider} login is hidden: the backend has a "${provider}" provider, but the login view was given no client id. `
+              + `Pass it to the login view (e.g. VITE_${envVar}) and restart the frontend so the new env var is picked up.`
+    );
+}
+
 /**
  * Generic login view component that works with any AuthControllerExtended.
  * Feature-detects capabilities to show/hide login methods.
@@ -198,16 +228,34 @@ export function LoginView({
         ?? ("needsSetup" in authController && !!(authController as { needsSetup?: boolean }).needsSetup)
         ?? false;
     const canRegister = registrationEnabled ?? caps.registration ?? false;
-    const hasGoogleLogin = googleClientId && (caps.enabledProviders?.includes("google") ?? caps.googleLogin ?? false);
-    const hasGitHubLogin = githubClientId && (caps.enabledProviders?.includes("github") ?? false);
-    const hasLinkedinLogin = linkedinClientId && (caps.enabledProviders?.includes("linkedin") ?? false);
+    // Every OAuth button needs BOTH halves: a client id here and the matching
+    // provider configured on the backend. `enabledProviders` is always an array
+    // (the controller defaults it to `[]`), so a missing entry means "the
+    // backend has no such provider" — never "unknown". A client id on its own
+    // shows nothing, which is silent enough that `warnAboutHalfConfiguredOAuth`
+    // below says so out loud.
+    const backendProviders = caps.enabledProviders ?? [];
+    const hasGoogleLogin = Boolean(googleClientId) && backendProviders.includes("google");
+    const hasGitHubLogin = githubClientId && backendProviders.includes("github");
+    const hasLinkedinLogin = linkedinClientId && backendProviders.includes("linkedin");
+
+    useEffect(() => {
+        // `enabledProviders` is empty until /auth/config lands, which looks
+        // exactly like "the backend has no providers" — so wait for the value
+        // to settle. A config that arrives late re-runs this effect and cancels
+        // the pending warning.
+        const timer = setTimeout(() => {
+            warnAboutHalfConfiguredOAuth("google", googleClientId, backendProviders);
+            warnAboutHalfConfiguredOAuth("github", githubClientId, backendProviders);
+            warnAboutHalfConfiguredOAuth("linkedin", linkedinClientId, backendProviders);
+        }, 3000);
+    }, [googleClientId, githubClientId, linkedinClientId, backendProviders.join(",")]);
     const hasPasswordReset = caps.passwordReset ?? !!authController.forgotPassword;
 
     const showRegistration = !disableSignupScreen && canRegister;
 
     useEffect(() => {
         const timer = setTimeout(() => setFadeIn(true), 50);
-        return () => clearTimeout(timer);
     }, []);
 
     // Effect to handle incoming redirect OAuth codes (GitHub, LinkedIn, etc.)

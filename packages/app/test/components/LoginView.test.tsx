@@ -137,6 +137,72 @@ describe("LoginView Component", () => {
         expect(mockAuthController.register).toHaveBeenCalledWith("new@rebase.pro", "password123", "New User");
     });
 
+    describe("OAuth buttons need both halves configured", () => {
+        const GOOGLE_ID = "test-client-id.apps.googleusercontent.com";
+
+        it("renders the Google button when the client id and the backend provider agree", () => {
+            mockAuthController.capabilities.enabledProviders = ["google"];
+            render(<LoginView authController={mockAuthController} googleClientId={GOOGLE_ID}/>);
+            expect(screen.getByRole("button", { name: /Sign in with Google/i })).toBeInTheDocument();
+        });
+
+        it("hides the Google button when the backend reports no google provider", () => {
+            mockAuthController.capabilities.enabledProviders = [];
+            render(<LoginView authController={mockAuthController} googleClientId={GOOGLE_ID}/>);
+            expect(screen.queryByRole("button", { name: /Sign in with Google/i })).not.toBeInTheDocument();
+        });
+
+        it("hides the Google button when the backend has the provider but no client id was given", () => {
+            mockAuthController.capabilities.enabledProviders = ["google"];
+            render(<LoginView authController={mockAuthController}/>);
+            expect(screen.queryByRole("button", { name: /Sign in with Google/i })).not.toBeInTheDocument();
+        });
+
+        it("warns which half of a half-configured provider is missing", () => {
+            jest.useFakeTimers();
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+            try {
+                mockAuthController.capabilities.enabledProviders = [];
+                render(<LoginView authController={mockAuthController} googleClientId={GOOGLE_ID}/>);
+                act(() => { jest.advanceTimersByTime(3500); });
+
+                expect(warn).toHaveBeenCalledWith(expect.stringContaining("GOOGLE_CLIENT_ID"));
+            } finally {
+                warn.mockRestore();
+                jest.useRealTimers();
+            }
+        });
+
+        // Uses github, not google: the warning dedupes per provider for the
+        // lifetime of the module, and the test above already spent "google".
+        it("stays silent while the backend config is still in flight", () => {
+            jest.useFakeTimers();
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+            try {
+                // Mount with the pre-config empty array, then let the real
+                // provider list land before the warning is due.
+                mockAuthController.capabilities.enabledProviders = [];
+                const { rerender } = render(
+                    <LoginView authController={mockAuthController} githubClientId="gh-client-id"/>
+                );
+                act(() => { jest.advanceTimersByTime(1000); });
+
+                mockAuthController = {
+                    ...mockAuthController,
+                    capabilities: { ...mockAuthController.capabilities,
+enabledProviders: ["github"] }
+                };
+                rerender(<LoginView authController={mockAuthController} githubClientId="gh-client-id"/>);
+                act(() => { jest.advanceTimersByTime(5000); });
+
+                expect(warn).not.toHaveBeenCalled();
+            } finally {
+                warn.mockRestore();
+                jest.useRealTimers();
+            }
+        });
+    });
+
     it("does not render additionalComponent or noUserComponent in bootstrap mode", () => {
         const additionalText = "Custom Additional Component Content";
         const noUserText = "Custom No User Component Content";

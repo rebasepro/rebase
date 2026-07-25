@@ -6,6 +6,7 @@ import {
     collectDeclaredDependencies,
     detectNativeDependencies,
     detectStorageAuthorize,
+    foldStaticIntoBundle,
     normalizeEsmSpecifiers
 } from "./bundle";
 
@@ -271,5 +272,63 @@ describe("storage access-control detection", () => {
 
     it("reports false when there is no config index at all", () => {
         expect(detectStorageAuthorize(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-empty-")))).toBe(false);
+    });
+});
+
+describe("folding a frontend into the backend bundle", () => {
+    function bundleWith(manifest: Record<string, unknown>): string {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-fold-bundle-"));
+        fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(manifest));
+        return dir;
+    }
+
+    function assets(files: Record<string, string>): string {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-fold-assets-"));
+        for (const [name, contents] of Object.entries(files)) {
+            const full = path.join(dir, name);
+            fs.mkdirSync(path.dirname(full), { recursive: true });
+            fs.writeFileSync(full, contents);
+        }
+        return dir;
+    }
+
+    it("copies the assets in and records them in the manifest", () => {
+        // The runtime finds the site through `entry.static`, not by guessing a
+        // directory name — so copying without recording serves nothing.
+        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: { config: "config" } });
+        const assetsDir = assets({ "index.html": "<html>", "assets/app.js": "//", "assets/logo.svg": "<svg>" });
+
+        const { fileCount } = foldStaticIntoBundle({ bundleDir, assetsDir });
+
+        expect(fileCount).toBe(3);
+        expect(fs.existsSync(path.join(bundleDir, "static", "index.html"))).toBe(true);
+        expect(fs.existsSync(path.join(bundleDir, "static", "assets", "app.js"))).toBe(true);
+        const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
+        expect(manifest.entry.static).toBe("static");
+        // And it does not lose what was already there.
+        expect(manifest.entry.config).toBe("config");
+    });
+
+    it("replaces a previous fold rather than merging into it", () => {
+        // A stale asset from the last build served alongside the new ones is a
+        // cache bug that survives a deploy, which is the worst kind.
+        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
+        foldStaticIntoBundle({ bundleDir, assetsDir: assets({ "old.html": "old" }) });
+        foldStaticIntoBundle({ bundleDir, assetsDir: assets({ "new.html": "new" }) });
+
+        expect(fs.existsSync(path.join(bundleDir, "static", "new.html"))).toBe(true);
+        expect(fs.existsSync(path.join(bundleDir, "static", "old.html"))).toBe(false);
+    });
+
+    it("refuses a bundle that has not been built", () => {
+        const empty = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-fold-empty-"));
+        expect(() => foldStaticIntoBundle({ bundleDir: empty, assetsDir: assets({ "a.html": "a" }) }))
+            .toThrow(/build the backend bundle first/i);
+    });
+
+    it("refuses assets that do not exist, rather than shipping an empty site", () => {
+        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
+        expect(() => foldStaticIntoBundle({ bundleDir, assetsDir: path.join(bundleDir, "nope") }))
+            .toThrow(/No built assets/i);
     });
 });

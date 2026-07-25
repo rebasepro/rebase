@@ -21,7 +21,7 @@ import type { RebaseAppConfig, RebaseStaticAppConfig, RebaseAdminAppConfig } fro
 import { requireProjectRoot } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { buildableApps, findBackendApp, loadManifest, ManifestError } from "../manifest";
-import { buildBundle, buildStaticBundle, DEFAULT_BUNDLE_DIR } from "../bundle";
+import { buildBundle, buildStaticBundle, foldStaticIntoBundle, DEFAULT_BUNDLE_DIR } from "../bundle";
 
 function printHelp(): void {
     console.log(`
@@ -50,6 +50,14 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
             "--out": String,
             "--skip-type-check": Boolean,
             "--skip-schema": Boolean,
+            /* Do not fold the frontend into the backend bundle. For a project
+               that publishes its frontend elsewhere and does not want the assets
+               travelling with its API. */
+            "--no-static": Boolean,
+            /* Fold assets that are already built, without re-running the app's
+               build command — for a CI job that built the frontend in an earlier
+               step. */
+            "--skip-static-build": Boolean,
             "--legacy": Boolean,
             "--help": Boolean,
             "-h": "--help"
@@ -135,6 +143,34 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 console.log(chalk.yellow(`    ⚠ native dependencies detected: ${names}`));
                 console.log(chalk.dim("      These cannot run on the managed runtime. See `rebase doctor`."));
             }
+
+            /* Fold the project's frontend into the backend bundle, so ONE runtime
+               serves the site at `/` and the API at `/api` — the shape the
+               scaffolded template produces and the shape a custom container
+               already had.
+
+               Without this, moving a project to the managed runtime silently
+               removed its website: the API answered perfectly and every page
+               404'd, because the managed pod runs the backend bundle and nothing
+               else. Parity with the container being replaced is the only honest
+               baseline for calling managed a drop-in.
+
+               `--no-static` opts out, for a project that publishes its frontend
+               somewhere else and does not want the assets in its bundle. */
+            if (!args["--no-static"]) {
+                const folded = await foldPrimaryStaticApp(
+                    projectRoot,
+                    manifest,
+                    result.outDir,
+                    args["--skip-static-build"] === true
+                );
+                if (folded) {
+                    console.log(
+                        chalk.green(`    ✓ ${folded.appName} folded in`) +
+                        chalk.dim(` (${folded.fileCount} file(s) → served at /)`)
+                    );
+                }
+            }
         } else if (app.type === "static" || app.type === "admin") {
             await buildAssetApp(projectRoot, name, app, manifest.runtime, args["--out"]);
         } else if (app.type === "custom") {
@@ -206,6 +242,63 @@ async function buildAssetApp(
     const result = buildStaticBundle({ projectRoot, appName: name, assetsDir: outputPath, outDir, runtimeRange });
     const rel = path.relative(projectRoot, result.outDir);
     console.log(chalk.green(`  ✓ static bundle → ${rel}/`) + chalk.dim(` (${result.fileCount} file(s))`));
+}
+
+/**
+ * Build the project's primary static app and fold it into the backend bundle.
+ *
+ * "Primary" is the single `static` app when there is exactly one. With several,
+ * folding would have to pick, and a silent choice between two websites is worse
+ * than doing nothing — so it declines and says which apps it saw.
+ *
+ * Returns null when there is nothing to fold, which is the common case for a
+ * backend-only project and is not a problem worth reporting.
+ */
+async function foldPrimaryStaticApp(
+    projectRoot: string,
+    manifest: { apps?: Record<string, { type?: string; build?: string; output?: string }> },
+    bundleDir: string,
+    skipBuild: boolean
+): Promise<{ appName: string; fileCount: number } | null> {
+    const statics = Object.entries(manifest.apps ?? {})
+        .filter(([, app]) => app?.type === "static")
+        .map(([name, app]) => ({ name, app }));
+
+    if (statics.length === 0) return null;
+    if (statics.length > 1) {
+        console.log(chalk.yellow(
+            `    ⚠ ${statics.length} static apps (${statics.map(s => s.name).join(", ")}) — none folded in.`
+        ));
+        console.log(chalk.dim("      Pick one to serve from the backend, or host them separately."));
+        return null;
+    }
+
+    const { name, app } = statics[0];
+    if (!app.output) {
+        console.log(chalk.yellow(`    ⚠ "${name}" declares no output directory — not folded in.`));
+        return null;
+    }
+
+    if (app.build && !skipBuild) {
+        try {
+            await execa(app.build, { cwd: projectRoot, stdio: "inherit", shell: true });
+        } catch {
+            console.error(chalk.red(`    ✗ build command failed for "${name}" — bundle left without a frontend`));
+            process.exit(1);
+        }
+    }
+
+    const assetsDir = path.join(projectRoot, app.output);
+    if (!fs.existsSync(assetsDir)) {
+        // Exited 0 and produced nothing where the manifest says it should.
+        // Folding that would ship an empty site, which looks identical to a
+        // broken deploy from the outside.
+        console.error(chalk.red(`    ✗ "${name}" declared output "${app.output}" does not exist — not folded in`));
+        process.exit(1);
+    }
+
+    const { fileCount } = foldStaticIntoBundle({ bundleDir, assetsDir });
+    return { appName: name, fileCount };
 }
 
 /** The pre-manifest behaviour: build every workspace package. */

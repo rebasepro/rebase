@@ -138,6 +138,18 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
 }> {
     const clientId = typeof config === "string" ? config : config.clientId;
     const clientSecret = typeof config === "string" ? undefined : config.clientSecret;
+
+    // The admin panel's login button uses the authorization-code flow, which
+    // needs the secret. Without it the provider still advertises itself, the
+    // button still renders, and the failure only surfaces when someone clicks
+    // it — so say it at boot instead.
+    if (!clientSecret) {
+        console.warn(
+            "[Rebase] Google provider configured without a client secret. ID-token and access-token "
+            + "sign-in still work, but the authorization-code flow used by the admin login button will "
+            + "fail. Set GOOGLE_CLIENT_SECRET to enable it."
+        );
+    }
     let googleClient: InstanceType<typeof import("google-auth-library/build/src/index.js").OAuth2Client> | undefined;
 
     async function getClient() {

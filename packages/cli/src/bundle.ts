@@ -881,6 +881,71 @@ collectionCount: collections.length };
  * manifest — no compilation, no dependency closure (a static bundle installs
  * nothing at boot).
  */
+/**
+ * Fold a built static app into a backend bundle, so one runtime serves both.
+ *
+ * ## Why this exists
+ *
+ * A managed tenant runs one pod, and `bootFromBundle` on the backend path already
+ * knows how to serve a SPA — it looks for `entry.static` and mounts `serveSPA`
+ * last, behind `REBASE_SERVE_STATIC`. What was missing was anything putting the
+ * assets there.
+ *
+ * The consequence was not subtle. A project whose custom image served its website
+ * at `/` and its API at `/api` — the shape the scaffolded template produces — lost
+ * the website the moment it moved to the managed runtime: the API answered
+ * perfectly and every page 404'd. Managed could not be a drop-in replacement for
+ * custom while the frontend simply vanished.
+ *
+ * Folding restores parity with the container it replaces, which is the only
+ * honest baseline. It is deliberately the FIRST implementation and not the last:
+ * a static app on its own bucket behind a CDN is better for cache behaviour and
+ * lets the frontend deploy independently. But that needs infrastructure that does
+ * not exist yet, and "your site is gone" is not an acceptable state to leave a
+ * project in while it gets built.
+ *
+ * The trade it makes, stated plainly: frontend and backend now deploy together
+ * and the bundle carries the built assets. For a project that was shipping both
+ * in one image already, that is exactly what it had.
+ */
+export function foldStaticIntoBundle(options: {
+    /** The backend bundle directory, already written. */
+    bundleDir: string;
+    /** Directory of built frontend assets (the static app's `output`). */
+    assetsDir: string;
+}): { fileCount: number } {
+    const { bundleDir, assetsDir } = options;
+    const manifestPath = path.join(bundleDir, "manifest.json");
+    if (!fs.existsSync(manifestPath)) {
+        throw new Error(`No manifest at ${manifestPath} — build the backend bundle first.`);
+    }
+    if (!fs.existsSync(assetsDir)) {
+        throw new Error(`No built assets at ${assetsDir}.`);
+    }
+
+    const staticOut = path.join(bundleDir, "static");
+    fs.rmSync(staticOut, { recursive: true, force: true });
+    fs.mkdirSync(staticOut, { recursive: true });
+    fs.cpSync(assetsDir, staticOut, { recursive: true });
+
+    let fileCount = 0;
+    const count = (dir: string): void => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            if (entry.isDirectory()) count(path.join(dir, entry.name));
+            else fileCount++;
+        }
+    };
+    count(staticOut);
+
+    // Record it, because the runtime finds the assets through the manifest —
+    // not by guessing a directory name.
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as RebaseBundleManifest;
+    manifest.entry = { ...manifest.entry, static: "static" };
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+    return { fileCount };
+}
+
 export function buildStaticBundle(options: {
     projectRoot: string;
     appName: string;
