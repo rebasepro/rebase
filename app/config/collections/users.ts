@@ -32,7 +32,8 @@ const usersCollection: AdminCollectionConfig = {
             name: "Photo URL",
             type: "string",
             columnName: "photo_url",
-            ui: { url: "image" }
+            url: true,
+            ui: { urlPreview: "image" }
         },
         roles: {
             name: "Roles",

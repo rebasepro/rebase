@@ -191,7 +191,7 @@ function getZodStringSchema({
             (value: unknown) => value == null || (typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)),
             { message: `${property.name} must be an email` }
         );
-        if (property.ui?.url) {
+        if (property.url) {
             if (!property.storage || property.storage?.storeUrl) {
                 schema = schema.refine(
                     (value: unknown) => {

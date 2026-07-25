@@ -37,11 +37,11 @@ export function StringPropertyPreview({
                     {strValue}
                 </Chip>
             </ErrorBoundary>);
-    } else if (property.ui?.url) {
+    } else if (property.ui?.urlPreview) {
         return (
             <UrlComponentPreview size={size}
                 url={strValue}
-                previewType={typeof property.ui?.url === "string" ? property.ui?.url as PreviewType : undefined}/>
+                previewType={typeof property.ui?.urlPreview === "string" ? property.ui?.urlPreview as PreviewType : undefined}/>
         );
     } else {
         if (!strValue) return <></>;

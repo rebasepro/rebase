@@ -61,10 +61,10 @@ function isHidden(property: Property): boolean {
  * Rendered by the dedicated image slot, so never a title.
  */
 function isStorageProperty(property: Property): boolean {
-    if (property.type === "string" && (property.storage || property.ui?.url === "image")) return true;
+    if (property.type === "string" && (property.storage || property.ui?.urlPreview === "image")) return true;
     if (property.type === "array" && property.of && !Array.isArray(property.of)) {
         const inner = property.of;
-        if (inner.type === "string" && (inner.storage || inner.ui?.url === "image")) return true;
+        if (inner.type === "string" && (inner.storage || inner.ui?.urlPreview === "image")) return true;
     }
     return false;
 }

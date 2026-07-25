@@ -36,7 +36,9 @@ describe("buildStringProperty", () => {
             totalDocsCount: 10,
             valuesResult: makeValuesResult(urls)
         }) as StringProperty;
-        expect(result.ui?.url).toBe(true);
+        // `url` is a fact about the data, not a rendering hint, so it sits on the
+        // property itself beside `email` — and the OpenAPI contract is generated from it.
+        expect(result.url).toBe(true);
     });
 
     it("does not flag as URL if less than 2/3 are URLs", () => {

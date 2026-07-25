@@ -32,8 +32,8 @@ validation: { required: true } },
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("export const products = pgTable(\"products\", {");
-        expect(cleanResult).toContain("id: varchar(\"id\").primaryKey()");
-        expect(cleanResult).toContain("name: varchar(\"name\").notNull(),");
+        expect(cleanResult).toContain("id: text(\"id\").primaryKey()");
+        expect(cleanResult).toContain("name: text(\"name\").notNull(),");
         expect(cleanResult).toContain("price: numeric(\"price\"),");
         expect(cleanResult).toContain("available: boolean(\"available\")");
     });
@@ -70,7 +70,7 @@ relationName: "author" }
         const result = await generateSchema([usersCollection, postsCollection]);
         const cleanResult = cleanSchema(result);
 
-        expect(cleanResult).toContain("author_id: varchar(\"author_id\").references(() => users.id, { onDelete: \"set null\" })");
+        expect(cleanResult).toContain("author_id: text(\"author_id\").references(() => users.id, { onDelete: \"set null\" })");
         const expectedRelation = "export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"author\": one(users, { fields: [posts.author_id], references: [users.id], relationName: \"posts_author_id\" }) }));";
         expect(cleanResult).toContain(cleanSchema(expectedRelation));
     });
@@ -112,8 +112,8 @@ relationName: "tags" }
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("export const postsToTags = pgTable(\"posts_to_tags\",");
-        expect(cleanResult).toContain("post_id: varchar(\"post_id\").notNull().references(() => posts.id, { onDelete: \"cascade\" })");
-        expect(cleanResult).toContain("tag_id: varchar(\"tag_id\").notNull().references(() => tags.id, { onDelete: \"cascade\" })");
+        expect(cleanResult).toContain("post_id: text(\"post_id\").notNull().references(() => posts.id, { onDelete: \"cascade\" })");
+        expect(cleanResult).toContain("tag_id: text(\"tag_id\").notNull().references(() => tags.id, { onDelete: \"cascade\" })");
         // The junction is a generated table like any other: locked by default.
         // It gets its composite key AND the derived policy set — it used to be
         // the one generated table with no RLS at all.
@@ -141,7 +141,7 @@ name: "Texts",
 properties: { t_default: { type: "string" } }
                 }];
                 const result = await generateSchema(collections);
-                expect(cleanSchema(result)).toContain("t_default: varchar(\"t_default\")");
+                expect(cleanSchema(result)).toContain("t_default: text(\"t_default\")");
             });
 
             it("should respect explicit columnType overrides", async () => {
@@ -166,7 +166,54 @@ columnType: "varchar" }
                 expect(cleanResult).toContain("t_varchar: varchar(\"t_varchar\")");
             });
 
-            it("should prioritize isId='uuid' over default varchar", async () => {
+            it("does not let a presentation flag choose the column type", async () => {
+                // `admin.markdown` / `admin.multiline` used to compile to `text`,
+                // which meant a field describing how the editor renders was
+                // choosing the shape of the column. Both are now `text` because
+                // `text` is the default, not because the generator read them — so
+                // a property that says nothing and a property that says "render me
+                // as markdown" produce the identical column.
+                const build = (extra: Record<string, unknown>) => ([{
+                    slug: "notes",
+                    name: "Notes",
+                    table: "notes",
+                    properties: {
+                        id: { name: "ID", type: "string", isId: true },
+                        body: { name: "Body", type: "string", ...extra }
+                    }
+                }] as unknown as CollectionConfig[]);
+
+                const plain = cleanSchema(await generateSchema(build({})));
+                const markdown = cleanSchema(await generateSchema(build({ ui: { markdown: true } })));
+                const multiline = cleanSchema(await generateSchema(build({ ui: { multiline: true } })));
+
+                expect(plain).toContain("body: text(\"body\")");
+                expect(markdown).toBe(plain);
+                expect(multiline).toBe(plain);
+            });
+
+            it("gives a string primary key the same type as any other string", async () => {
+                // The two generators disagreed here: the DDL path emitted
+                // VARCHAR(255) for a string id while the drizzle path emitted a
+                // bare `varchar()`, which Postgres treats as unbounded. So the same
+                // property produced a capped column down one path and an uncapped
+                // one down the other. FK and junction column types follow the key
+                // they reference — relations.test.ts covers those.
+                const collections = [{
+                    slug: "authors", name: "Authors", table: "authors",
+                    properties: {
+                        id: { name: "ID", type: "string", isId: true },
+                        name: { name: "Name", type: "string" }
+                    }
+                }] as unknown as CollectionConfig[];
+
+                const result = cleanSchema(await generateSchema(collections));
+                expect(result).toContain("id: text(\"id\").primaryKey()");
+                expect(result).toContain("name: text(\"name\")");
+                expect(result).not.toMatch(/varchar\("/);
+            });
+
+            it("should prioritize isId='uuid' over the default text", async () => {
                 const collections: CollectionConfig[] = [{
                     slug: "texts",
 table: "texts",
@@ -1046,7 +1093,7 @@ isId: "sql`gen_random_uuid()`" }
         const result = await generateSchema(collections);
         const cleanResult = cleanSchema(result);
 
-        expect(cleanResult).toContain("event_id: varchar(\"event_id\").primaryKey().default(sql`gen_random_uuid()`)");
+        expect(cleanResult).toContain("event_id: text(\"event_id\").primaryKey().default(sql`gen_random_uuid()`)");
     });
 
     it("should generate a normal text primary key when isId is simply true", async () => {
@@ -1062,7 +1109,7 @@ isId: true }
         const result = await generateSchema(collections);
         const cleanResult = cleanSchema(result);
 
-        expect(cleanResult).toContain("user_name: varchar(\"user_name\").primaryKey()");
+        expect(cleanResult).toContain("user_name: text(\"user_name\").primaryKey()");
     });
 });
 
@@ -1100,8 +1147,8 @@ describe("generateDrizzleSchema columnName support", () => {
         const cleanResult = cleanSchema(result);
 
         // Must use the exact columnName, NOT toSnakeCase(propKey) which would produce "employee_number_140_a"
-        expect(cleanResult).toContain('employee_number_140a: varchar("employee_number_140a")');
-        expect(cleanResult).toContain('contract_number_140a: varchar("contract_number_140a")');
+        expect(cleanResult).toContain('employee_number_140a: text("employee_number_140a")');
+        expect(cleanResult).toContain('contract_number_140a: text("contract_number_140a")');
 
         // Must NOT contain the broken snake_case version
         expect(cleanResult).not.toContain("employee_number_140_a");
@@ -1126,7 +1173,7 @@ describe("generateDrizzleSchema columnName support", () => {
         const cleanResult = cleanSchema(result);
 
         // JS key stays camelCase, SQL column name gets snake_cased
-        expect(cleanResult).toContain('productName: varchar("product_name")');
+        expect(cleanResult).toContain('productName: text("product_name")');
     });
 
     it("should handle mixed properties — some with columnName, some without", async () => {
@@ -1153,9 +1200,9 @@ describe("generateDrizzleSchema columnName support", () => {
         const cleanResult = cleanSchema(result);
 
         // Introspected prop uses exact columnName
-        expect(cleanResult).toContain('fee_number_140a: varchar("fee_number_140a")');
+        expect(cleanResult).toContain('fee_number_140a: text("fee_number_140a")');
         // Manual prop: JS key stays camelCase, SQL column gets snake_cased
-        expect(cleanResult).toContain('displayName: varchar("display_name")');
+        expect(cleanResult).toContain('displayName: text("display_name")');
     });
 
     it("should use columnName for all property types, not just strings", async () => {

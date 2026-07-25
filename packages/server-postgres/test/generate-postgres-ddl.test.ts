@@ -28,8 +28,8 @@ describe("generatePostgresDdl", () => {
         const cleanResult = cleanDdl(result);
 
         expect(cleanResult).toContain("CREATE TABLE \"public\".\"products\" (");
-        expect(cleanResult).toContain("\"id\" VARCHAR(255) PRIMARY KEY");
-        expect(cleanResult).toContain("\"name\" VARCHAR(255) NOT NULL");
+        expect(cleanResult).toContain("\"id\" TEXT PRIMARY KEY");
+        expect(cleanResult).toContain("\"name\" TEXT NOT NULL");
         expect(cleanResult).toContain("\"price\" NUMERIC");
         expect(cleanResult).toContain("\"available\" BOOLEAN");
         expect(cleanResult).toContain("ALTER TABLE \"public\".\"products\" ENABLE ROW LEVEL SECURITY");
@@ -104,7 +104,7 @@ describe("generatePostgresDdl", () => {
         const result = await generatePostgresDdl([usersCollection, postsCollection]);
         const cleanResult = cleanDdl(result);
 
-        expect(cleanResult).toContain("\"author_id\" VARCHAR(255)");
+        expect(cleanResult).toContain("\"author_id\" TEXT");
         expect(cleanResult).toContain("ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE SET NULL;");
     });
 
@@ -144,8 +144,8 @@ describe("generatePostgresDdl", () => {
         const cleanResult = cleanDdl(result);
 
         expect(cleanResult).toContain("CREATE TABLE \"public\".\"posts_to_tags\" (");
-        expect(cleanResult).toContain("\"post_id\" VARCHAR(255) NOT NULL");
-        expect(cleanResult).toContain("\"tag_id\" VARCHAR(255) NOT NULL");
+        expect(cleanResult).toContain("\"post_id\" TEXT NOT NULL");
+        expect(cleanResult).toContain("\"tag_id\" TEXT NOT NULL");
         expect(cleanResult).toContain("ALTER TABLE \"public\".\"posts_to_tags\" ADD CONSTRAINT \"posts_to_tags_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE;");
         expect(cleanResult).toContain("ALTER TABLE \"public\".\"posts_to_tags\" ADD CONSTRAINT \"posts_to_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE CASCADE;");
         expect(cleanResult).toContain("PRIMARY KEY (\"post_id\", \"tag_id\")");
@@ -257,7 +257,7 @@ describe("generatePostgresDdl", () => {
         const cleanResult = cleanDdl(result);
 
         expect(cleanResult).toContain("\"uuid_id\" UUID PRIMARY KEY DEFAULT gen_random_uuid()");
-        expect(cleanResult).toContain("\"cuid_id\" VARCHAR(255) PRIMARY KEY DEFAULT cuid()");
+        expect(cleanResult).toContain("\"cuid_id\" TEXT PRIMARY KEY DEFAULT cuid()");
         expect(cleanResult).toContain("\"created\" TIMESTAMP WITH TIME ZONE DEFAULT now()");
     });
 
@@ -345,8 +345,8 @@ describe("generatePostgresDdl", () => {
         expect(cleanResult).toContain("\"num_arr\" NUMERIC[]");
         expect(cleanResult).toContain("\"ref_val\" UUID");
         expect(cleanResult).toContain("ALTER TABLE \"public\".\"items\" ADD CONSTRAINT \"items_ref_val_fkey\" FOREIGN KEY (\"ref_val\") REFERENCES \"public\".\"other_collection\" (\"id\") ON DELETE SET NULL;");
-        expect(cleanResult).toContain("\"req_val\" VARCHAR(255) NOT NULL");
-        expect(cleanResult).toContain("\"uniq_val\" VARCHAR(255) UNIQUE");
+        expect(cleanResult).toContain("\"req_val\" TEXT NOT NULL");
+        expect(cleanResult).toContain("\"uniq_val\" TEXT UNIQUE");
     });
 
     it("should generate RLS policies with restrictive mode, multiple operations, and custom using/check clauses", async () => {

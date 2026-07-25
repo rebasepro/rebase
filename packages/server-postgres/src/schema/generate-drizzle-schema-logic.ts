@@ -97,12 +97,14 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
                 columnDefinition = `uuid("${colName}")`;
             } else if (stringProp.columnType === "uuid") {
                 columnDefinition = `uuid("${colName}")`;
-            } else if (stringProp.columnType === "text" || stringProp.ui?.markdown || stringProp.ui?.multiline) {
-                columnDefinition = `text("${colName}")`;
             } else if (stringProp.columnType === "char") {
                 columnDefinition = `char("${colName}")`;
-            } else {
+            } else if (stringProp.columnType === "varchar") {
                 columnDefinition = `varchar("${colName}")`;
+            } else {
+                // `text` is the default, and the only length-unbounded choice.
+                // Ask for `varchar` explicitly if you want the length constraint.
+                columnDefinition = `text("${colName}")`;
             }
             if (isIdProperty(propName, prop, collection)) {
                 columnDefinition += ".primaryKey()";
@@ -252,7 +254,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             const targetTableVar = getTableVarName(getTableName(targetCollection));
             const pkProp = getPrimaryKeyProp(targetCollection);
             const targetIdField = pkProp.name;
-            const baseColumn = pkProp.type === "number" ? `integer("${fkColumnName}")` : (pkProp.isUuid ? `uuid("${fkColumnName}")` : `varchar("${fkColumnName}")`);
+            const baseColumn = pkProp.type === "number" ? `integer("${fkColumnName}")` : (pkProp.isUuid ? `uuid("${fkColumnName}")` : `text("${fkColumnName}")`);
 
             const onUpdate = relation.onUpdate ? `onUpdate: "${relation.onUpdate}"` : "";
             const required = prop.validation?.required;
@@ -274,14 +276,14 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             const refProp = prop as ReferenceProperty;
             const targetCollection = collections.find(c => c.slug === refProp.path || getTableName(c) === refProp.path);
             if (!targetCollection) {
-                columnDefinition = `varchar("${colName}")`;
+                columnDefinition = `text("${colName}")`;
                 break;
             }
 
             const pkProp = getPrimaryKeyProp(targetCollection);
             const targetTableVar = getTableVarName(getTableName(targetCollection));
             const targetIdField = pkProp.name;
-            const baseColumn = pkProp.type === "number" ? `integer("${colName}")` : (pkProp.isUuid ? `uuid("${colName}")` : `varchar("${colName}")`);
+            const baseColumn = pkProp.type === "number" ? `integer("${colName}")` : (pkProp.isUuid ? `uuid("${colName}")` : `text("${colName}")`);
 
             const required = prop.validation?.required;
             const onDelete = required ? "cascade" : "set null";
@@ -597,8 +599,10 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
             const onDelete = relation.onDelete ?? "cascade";
             const refOptions = `{ onDelete: \"${onDelete}\" }`;
 
-            const sourceColType = isNumericId(sourceCollection) ? "integer" : (getPrimaryKeyProp(sourceCollection).isUuid ? "uuid" : "varchar");
-            const targetColType = isNumericId(targetCollection) ? "integer" : (getPrimaryKeyProp(targetCollection).isUuid ? "uuid" : "varchar");
+            // `text`, matching the string default: a junction column must have the
+            // same type as the primary key it references.
+            const sourceColType = isNumericId(sourceCollection) ? "integer" : (getPrimaryKeyProp(sourceCollection).isUuid ? "uuid" : "text");
+            const targetColType = isNumericId(targetCollection) ? "integer" : (getPrimaryKeyProp(targetCollection).isUuid ? "uuid" : "text");
             const sourceId = getPrimaryKeyName(sourceCollection);
             const targetId = getPrimaryKeyName(targetCollection);
 
@@ -637,7 +641,7 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
             // We should generate a basic id column if one was completely omitted.
             const hasIdColumn = Array.from(columns).some(col => col.includes(".primaryKey()"));
             if (!hasIdColumn) {
-                columns.add("    id: varchar(\"id\").primaryKey()");
+                columns.add("    id: text(\"id\").primaryKey()");
             }
 
             schemaContent += `${Array.from(columns).join(",\n")}`;

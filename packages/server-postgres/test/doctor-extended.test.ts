@@ -23,9 +23,9 @@ describe("Doctor — getExpectedColumnType extended coverage", () => {
             expect(getExpectedColumnType(prop)).toBe("uuid");
         });
 
-        it("should return 'character varying' for basic string (no options)", () => {
+        it("should return 'text' for a basic string (text is the default)", () => {
             const prop: StringProperty = { type: "string" };
-            expect(getExpectedColumnType(prop)).toBe("character varying");
+            expect(getExpectedColumnType(prop)).toBe("text");
         });
 
         it("should return 'text' when columnType is 'text'", () => {
@@ -50,7 +50,7 @@ describe("Doctor — getExpectedColumnType extended coverage", () => {
                 columnType: "uuid",
             };
             // The generator emits a uuid column for this, so doctor must expect
-            // one too. This previously asserted "character varying", pinning a
+            // one too. This previously asserted "text", pinning a
             // known gap as if it were intended behaviour.
             const result = getExpectedColumnType(prop);
             expect(result).toBe("uuid");
@@ -83,7 +83,7 @@ describe("Doctor — getExpectedColumnType extended coverage", () => {
             expect(getExpectedColumnType(prop)).toBe("USER-DEFINED");
         });
 
-        it("should return 'character varying' for string with multiline: true", () => {
+        it("should return 'text' for a string regardless of multiline", () => {
             // multiline is a UI hint, doctor doesn't check it for type mapping
             const prop: StringProperty = {
                 type: "string",
@@ -91,10 +91,10 @@ describe("Doctor — getExpectedColumnType extended coverage", () => {
             };
             const result = getExpectedColumnType(prop);
             // Current behavior: multiline doesn't influence the column type mapping
-            expect(result).toBe("character varying");
+            expect(result).toBe("text");
         });
 
-        it("should return 'character varying' for string with markdown: true", () => {
+        it("should return 'text' for string with markdown: true", () => {
             // markdown is a UI hint, doctor doesn't check it for type mapping
             const prop: StringProperty = {
                 type: "string",
@@ -102,17 +102,17 @@ describe("Doctor — getExpectedColumnType extended coverage", () => {
             };
             const result = getExpectedColumnType(prop);
             // Current behavior: markdown doesn't influence the column type mapping
-            expect(result).toBe("character varying");
+            expect(result).toBe("text");
         });
 
-        it("should return 'character varying' for string with isId: true (boolean)", () => {
+        it("should return 'text' for string with isId: true (boolean)", () => {
             const prop: StringProperty = {
                 type: "string",
                 isId: true,
             };
             // isId: true (not "uuid") doesn't match isId === "uuid"
             const result = getExpectedColumnType(prop);
-            expect(result).toBe("character varying");
+            expect(result).toBe("text");
         });
 
         it("should return 'uuid' for string with isId: 'uuid' even with columnType 'text'", () => {
@@ -125,21 +125,21 @@ describe("Doctor — getExpectedColumnType extended coverage", () => {
             expect(getExpectedColumnType(prop)).toBe("uuid");
         });
 
-        it("should return 'character varying' for string with isId: 'cuid'", () => {
+        it("should return 'text' for string with isId: 'cuid'", () => {
             const prop: StringProperty = {
                 type: "string",
                 isId: "cuid",
             };
             // Only "uuid" isId triggers special handling
-            expect(getExpectedColumnType(prop)).toBe("character varying");
+            expect(getExpectedColumnType(prop)).toBe("text");
         });
 
-        it("should return 'character varying' for string with isId: 'manual'", () => {
+        it("should return 'text' for string with isId: 'manual'", () => {
             const prop: StringProperty = {
                 type: "string",
                 isId: "manual",
             };
-            expect(getExpectedColumnType(prop)).toBe("character varying");
+            expect(getExpectedColumnType(prop)).toBe("text");
         });
     });
 
@@ -283,12 +283,12 @@ describe("Doctor — getExpectedColumnType extended coverage", () => {
     // ── Reference property ──────────────────────────────────────────────
 
     describe("reference property", () => {
-        it("should return 'character varying' for reference type", () => {
+        it("should return 'text' for reference type", () => {
             const prop: Property = {
                 type: "reference",
                 path: "some_collection",
             } as Property;
-            expect(getExpectedColumnType(prop)).toBe("character varying");
+            expect(getExpectedColumnType(prop)).toBe("text");
         });
     });
 

@@ -19,14 +19,14 @@ export function getEntityImagePreviewPropertyKey<M extends Record<string, unknow
     // also check for URL properties with image preview type
     for (const key in collection.properties) {
         const property = collection.properties[key];
-        if (property.type === "string" && property.ui?.url === "image") {
+        if (property.type === "string" && property.ui?.urlPreview === "image") {
             return key;
         }
     }
     // and arrays of URL properties with image preview type
     for (const key in collection.properties) {
         const property = collection.properties[key];
-        if (property.type === "array" && property.of && !Array.isArray(property.of) && property.of.type === "string" && property.of.ui?.url === "image") {
+        if (property.type === "array" && property.of && !Array.isArray(property.of) && property.of.type === "string" && property.of.ui?.urlPreview === "image") {
             return key;
         }
     }

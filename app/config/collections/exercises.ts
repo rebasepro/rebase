@@ -41,7 +41,7 @@ const exercisesCollection: AdminCollectionConfig = {
             name: "Video URL",
             type: "string",
             description: "Link to a demonstration video",
-            ui: { url: true }
+            url: true
         },
         difficulty: {
             name: "Difficulty",
@@ -236,8 +236,8 @@ const exercisesCollection: AdminCollectionConfig = {
                 ]
             },
             ui: {
-                Field: "../../frontend/src/BodyPartsField",
-                Preview: "../../frontend/src/BodyPartsPreview"
+                Field: () => import("../../frontend/src/BodyPartsField"),
+                Preview: () => import("../../frontend/src/BodyPartsPreview")
             },
             description: "Muscle groups targeted by this exercise"
         },

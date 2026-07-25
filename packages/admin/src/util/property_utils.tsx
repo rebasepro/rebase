@@ -73,7 +73,7 @@ function getDefaultIconForProperty(property: Property): LucideIcon {
     switch (property.type) {
         case "string": {
             if (property.storage) return UploadIcon;
-            if (property.ui?.url) return GlobeIcon;
+            if (property.ui?.urlPreview) return GlobeIcon;
             if (property.email) return MailIcon;
             if (property.ui?.multiline || property.ui?.markdown) return AlignLeftIcon;
             return TextIcon;

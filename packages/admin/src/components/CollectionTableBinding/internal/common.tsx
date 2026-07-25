@@ -23,7 +23,7 @@ export function getTablePropertyColumnWidth(property: Property): number {
     }
 
     if (property.type === "string") {
-        if (property.ui?.url) {
+        if (property.ui?.urlPreview) {
             return 280;
         } else if (property.storage) {
             return 160;

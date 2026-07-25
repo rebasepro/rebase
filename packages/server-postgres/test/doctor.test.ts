@@ -101,7 +101,7 @@ describe("Rebase Schema Doctor", () => {
         // These are integration-style tests against the mapping logic
 
         it("should map string types correctly", () => {
-            expect(getExpectedColumnType({ type: "string" })).toBe("character varying");
+            expect(getExpectedColumnType({ type: "string" })).toBe("text");
             expect(getExpectedColumnType({ type: "string",
 columnType: "text" } as StringProperty)).toBe("text");
             expect(getExpectedColumnType({ type: "string",
@@ -111,7 +111,7 @@ columnType: "uuid" } as StringProperty)).toBe("uuid");
         });
 
         // The generator compiles markdown/multiline strings to `text`. When this
-        // expectation said "character varying", every scaffolded project reported
+        // expectation said "text", every scaffolded project reported
         // phantom drift on its markdown columns the first time doctor ran.
         it("should expect text for markdown/multiline strings", () => {
             expect(getExpectedColumnType({ type: "string",
@@ -120,7 +120,7 @@ ui: { markdown: true } } as unknown as StringProperty)).toBe("text");
 ui: { multiline: true } } as unknown as StringProperty)).toBe("text");
             // A plain string with unrelated ui config stays varchar.
             expect(getExpectedColumnType({ type: "string",
-ui: { hideFromCollection: true } } as unknown as StringProperty)).toBe("character varying");
+ui: { hideFromCollection: true } } as unknown as StringProperty)).toBe("text");
         });
 
         it("should map number types correctly", () => {

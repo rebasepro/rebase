@@ -103,13 +103,18 @@ export const getSqlColumnType = (propName: string, prop: Property, collection: C
             if (stringProp.isId === "uuid" || stringProp.columnType === "uuid") {
                 return "UUID";
             }
-            if (stringProp.columnType === "text" || stringProp.ui?.markdown || stringProp.ui?.multiline) {
-                return "TEXT";
-            }
             if (stringProp.columnType === "char") {
                 return "CHAR(255)";
             }
-            return "VARCHAR(255)";
+            if (stringProp.columnType === "varchar") {
+                return "VARCHAR(255)";
+            }
+            // `text` is the default. The two generators disagreed here before:
+            // this one emitted VARCHAR(255) while the drizzle path emitted a bare
+            // `varchar()`, which Postgres treats as unbounded — so the same
+            // property produced a capped column down one path and an uncapped one
+            // down the other.
+            return "TEXT";
         }
         case "number": {
             const numProp = prop as NumberProperty;
@@ -173,20 +178,20 @@ export const getSqlColumnType = (propName: string, prop: Property, collection: C
             try {
                 targetCollection = relation.target();
             } catch {
-                return "VARCHAR(255)";
+                return "TEXT";
             }
             const pkProp = getPrimaryKeyProp(targetCollection);
-            return pkProp.type === "number" ? "INTEGER" : (pkProp.isUuid ? "UUID" : "VARCHAR(255)");
+            return pkProp.type === "number" ? "INTEGER" : (pkProp.isUuid ? "UUID" : "TEXT");
         }
         case "reference": {
             const refProp = prop as ReferenceProperty;
             const targetCollection = collections.find(c => c.slug === refProp.path || getTableName(c) === refProp.path);
-            if (!targetCollection) return "VARCHAR(255)";
+            if (!targetCollection) return "TEXT";
             const pkProp = getPrimaryKeyProp(targetCollection);
-            return pkProp.type === "number" ? "INTEGER" : (pkProp.isUuid ? "UUID" : "VARCHAR(255)");
+            return pkProp.type === "number" ? "INTEGER" : (pkProp.isUuid ? "UUID" : "TEXT");
         }
         default:
-            return "VARCHAR(255)";
+            return "TEXT";
     }
 };
 
@@ -287,8 +292,10 @@ export const generatePostgresDdl = async (
             const targetSchema = isPostgresCollectionConfig(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";
             const { sourceColumn, targetColumn } = relation.through;
 
-            const sourceColType = isNumericId(sourceCollection) ? "INTEGER" : (getPrimaryKeyProp(sourceCollection).isUuid ? "UUID" : "VARCHAR(255)");
-            const targetColType = isNumericId(targetCollection) ? "INTEGER" : (getPrimaryKeyProp(targetCollection).isUuid ? "UUID" : "VARCHAR(255)");
+            // TEXT, matching the string default: a junction column has to have the
+            // same type as the primary key it references.
+            const sourceColType = isNumericId(sourceCollection) ? "INTEGER" : (getPrimaryKeyProp(sourceCollection).isUuid ? "UUID" : "TEXT");
+            const targetColType = isNumericId(targetCollection) ? "INTEGER" : (getPrimaryKeyProp(targetCollection).isUuid ? "UUID" : "TEXT");
             const sourceId = getPrimaryKeyName(sourceCollection);
             const targetId = getPrimaryKeyName(targetCollection);
 
@@ -424,7 +431,7 @@ export const generatePostgresDdl = async (
             // Backwards compatibility: add default id primary key if missing
             const hasPk = columns.some(c => c.includes("PRIMARY KEY"));
             if (!hasPk) {
-                columns.unshift('  "id" VARCHAR(255) PRIMARY KEY');
+                columns.unshift('  "id" TEXT PRIMARY KEY');
             }
 
             ddl += columns.join(",\n");

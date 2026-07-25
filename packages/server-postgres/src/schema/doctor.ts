@@ -62,12 +62,10 @@ export function getExpectedColumnType(prop: Property): string | null {
             if (sp.enum) return "USER-DEFINED"; // pgEnum → USER-DEFINED in information_schema
             if ("isId" in sp && sp.isId === "uuid") return "uuid";
             if (sp.columnType === "uuid") return "uuid";
-            // A markdown/multiline string compiles to `text`, not varchar — the
-            // generator treats those UI hints as column-type signals, so the
-            // expectation here must too or every such column reads as drift.
-            if (sp.columnType === "text" || sp.ui?.markdown || sp.ui?.multiline) return "text";
             if (sp.columnType === "char") return "character";
-            return "character varying";
+            if (sp.columnType === "varchar") return "character varying";
+            // `text` is the default — see generate-postgres-ddl-logic.
+            return "text";
         }
         case "number": {
             const np = prop as NumberProperty;
@@ -122,7 +120,9 @@ export function getExpectedColumnType(prop: Property): string | null {
         case "relation":
             return null; // FK columns are derived from the relation, not from the property
         case "reference":
-            return "character varying"; // References default to varchar FK
+            // A reference FK follows the key it points at, and a string key is
+            // `text` — see generate-postgres-ddl-logic.
+            return "text";
         case "vector":
             return "USER-DEFINED";
         case "binary":

@@ -32,7 +32,7 @@ export function buildStringProperty({
             .filter((value) => typeof value === "string" &&
                 value.toString().startsWith("http")).length > totalDocsCount / 3 * 2;
         if (probablyAURL) {
-            config.ui = { url: true };
+            config.url = true;
         }
 
         const probablyAnEmail = valuesResult.values

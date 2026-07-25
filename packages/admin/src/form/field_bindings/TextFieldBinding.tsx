@@ -43,7 +43,7 @@ export function TextFieldBinding<T extends string | number>({
     let url: boolean | PreviewType | undefined;
     if (property.type === "string") {
         multiline = property.ui?.multiline;
-        url = property.ui?.url;
+        url = property.ui?.urlPreview;
     }
 
     useClearRestoreValue({
@@ -82,7 +82,7 @@ export function TextFieldBinding<T extends string | number>({
         inputType = "number";
     } else if (property.type === "string") {
         if (property.email) inputType = "email";
-        else if (property.ui?.url) inputType = "url";
+        else if (property.ui?.urlPreview) inputType = "url";
     }
 
     const label = (

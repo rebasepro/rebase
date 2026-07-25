@@ -46,7 +46,7 @@ export function mapPropertyToConfig(property: Property): CollectionPropertyConfi
         }
         if (property.ui?.multiline) base.multiline = true;
         if (property.ui?.previewAsTag) base.previewAsTag = true;
-        if (property.ui?.url) base.url = property.ui.url;
+        if (property.ui?.urlPreview) base.url = property.ui.urlPreview;
         if (property.ui?.markdown) base.markdown = true;
         if (property.storage) base.storage = true;
         if (property.email) base.email = true;

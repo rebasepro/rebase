@@ -86,19 +86,19 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                     size={props.size}
                     fill={fill}
                     storagePathOrDownloadUrl={filePath}/>;
-            } else if (stringProperty.ui?.url) {
-                if (typeof stringProperty.ui?.url === "boolean")
+            } else if (stringProperty.ui?.urlPreview) {
+                if (typeof stringProperty.ui?.urlPreview === "boolean")
                     content =
                         <UrlComponentPreview size={props.size}
                             url={value}
                             fill={fill}/>;
-                else if (typeof stringProperty.ui?.url === "string")
+                else if (typeof stringProperty.ui?.urlPreview === "string")
                     content =
                         <UrlComponentPreview size={props.size}
                             url={value}
                             interactive={interactive}
                             fill={fill}
-                            previewType={stringProperty.ui?.url}/>;
+                            previewType={stringProperty.ui?.urlPreview}/>;
             } else if (stringProperty.ui?.markdown) {
                 content = <Markdown source={value} size={"small"}/>;
             } else if (stringProperty.userSelect) {

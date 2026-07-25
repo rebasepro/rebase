@@ -104,8 +104,8 @@ get Field() { return MarkdownEditorFieldBinding; } }
         color: "#154fb3",
         property: {
             type: "string",
-            ui: { url: true,
-get Field() { return TextFieldBinding; } }
+            url: true,
+            ui: { get Field() { return TextFieldBinding; } }
         }
     },
     email: {
@@ -391,7 +391,7 @@ export function getDefaultFieldId(property: Property) {
             return "multiline";
         } else if (property.storage) {
             return "file_upload";
-        } else if (property.ui?.url) {
+        } else if (property.ui?.urlPreview) {
             return "url";
         } else if (property.email) {
             return "email";

@@ -259,8 +259,8 @@ relationName: "books" }
 
             // Should create junction table
             expect(cleanResult).toContain("export const authorBooks = pgTable(\"author_books\"");
-            expect(cleanResult).toContain("author_id: varchar(\"author_id\").notNull().references(() => authors.id, { onDelete: \"cascade\" })");
-            expect(cleanResult).toContain("book_id: varchar(\"book_id\").notNull().references(() => books.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("author_id: text(\"author_id\").notNull().references(() => authors.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("book_id: text(\"book_id\").notNull().references(() => books.id, { onDelete: \"cascade\" })");
             expect(cleanResult).toContain("export const authorsRelations = drizzleRelations(authors, ({ one, many }) => ({ \"books\": many(authorBooks, { relationName: \"books\" }) }));");
         });
 
@@ -377,7 +377,7 @@ relationName: "author" }
             const cleanResult = cleanSchema(result);
 
             // Should create FK on profiles table
-            expect(cleanResult).toContain("author_id: varchar(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("author_id: text(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
 
             // Should create owning relation on profiles
             expect(cleanResult).toContain("export const profilesRelations = drizzleRelations(profiles, ({ one, many }) => ({ \"author\": one(authors, { fields: [profiles.author_id], references: [authors.id], relationName: \"profiles_author_id\" }) }));");
@@ -419,7 +419,7 @@ relationName: "category" }
             const cleanResult = cleanSchema(result);
 
             // Should create FK on posts table
-            expect(cleanResult).toContain("category_id: varchar(\"category_id\").references(() => categories.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("category_id: text(\"category_id\").references(() => categories.id, { onDelete: \"set null\" })");
             // Should create owning relation on posts
             expect(cleanResult).toContain("export const postsRelations = drizzleRelations(posts, ({ one, many }) => ({ \"category\": one(categories, { fields: [posts.category_id], references: [categories.id], relationName: \"posts_category_id\" }) }));");
         });
@@ -476,11 +476,11 @@ relationName: "author" }
             const cleanResult = cleanSchema(result);
 
             // Check owning relation from author to publisher
-            expect(cleanResult).toContain("publisher_id: varchar(\"publisher_id\").references(() => publishers.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("publisher_id: text(\"publisher_id\").references(() => publishers.id, { onDelete: \"set null\" })");
             expect(cleanResult).toContain("\"publisher\": one(publishers, { fields: [authors.publisher_id], references: [publishers.id], relationName: \"authors_publisher_id\" })");
 
             // Check owning relation from book to author
-            expect(cleanResult).toContain("author_id: varchar(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("author_id: text(\"author_id\").references(() => authors.id, { onDelete: \"set null\" })");
             expect(cleanResult).toContain("\"author\": one(authors, { fields: [books.author_id], references: [authors.id], relationName: \"books_author_id\" })");
         });
     });
@@ -536,9 +536,9 @@ validation: { integer: true } },
             expect(cleanResult).toContain("export const customers = pgTable(\"customers\"");
 
             // Should include the multi-column properties in the tables
-            expect(cleanResult).toContain("customer_code: varchar(\"customer_code\")");
+            expect(cleanResult).toContain("customer_code: text(\"customer_code\")");
             expect(cleanResult).toContain("region_id: integer(\"region_id\")");
-            expect(cleanResult).toContain("code: varchar(\"code\")");
+            expect(cleanResult).toContain("code: text(\"code\")");
 
             // No Drizzle relations generated for joinPath relations
             expect(cleanResult).not.toContain("ordersRelations");
@@ -580,8 +580,8 @@ relationName: "friends" }
 
             // Should handle self-referencing relations
             expect(cleanResult).toContain("export const userFriends = pgTable(\"user_friends\"");
-            expect(cleanResult).toContain("user_id: varchar(\"user_id\").notNull().references(() => users.id, { onDelete: \"cascade\" })");
-            expect(cleanResult).toContain("friend_id: varchar(\"friend_id\").notNull().references(() => users.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("user_id: text(\"user_id\").notNull().references(() => users.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("friend_id: text(\"friend_id\").notNull().references(() => users.id, { onDelete: \"cascade\" })");
         });
 
         it("should handle mixed ID types in relations", async () => {
@@ -624,10 +624,10 @@ relationName: "categories" }
             const cleanResult = cleanSchema(result);
 
             // The primary key should be sku
-            expect(cleanResult).toContain("sku: varchar(\"sku\").primaryKey()");
+            expect(cleanResult).toContain("sku: text(\"sku\").primaryKey()");
             expect(cleanResult).not.toContain("id: serial(\"id\").primaryKey()");
-            expect(cleanResult).toContain("product_sku: varchar(\"product_sku\").notNull().references(() => products.sku, { onDelete: \"cascade\" })");
-            expect(cleanResult).toContain("category_id: varchar(\"category_id\").notNull().references(() => categories.id, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("product_sku: text(\"product_sku\").notNull().references(() => products.sku, { onDelete: \"cascade\" })");
+            expect(cleanResult).toContain("category_id: text(\"category_id\").notNull().references(() => categories.id, { onDelete: \"cascade\" })");
         });
 
         it("should handle circular references", async () => {
@@ -678,7 +678,7 @@ relationName: "a_entity" }
             // The 'owning' relation on bCollection should correctly generate the FK
             expect(cleanResult).toContain("export const aEntities = pgTable(\"a_entities\"");
             expect(cleanResult).toContain("export const bEntities = pgTable(\"b_entities\"");
-            expect(cleanResult).toContain("a_entity_id: varchar(\"a_entity_id\").references(() => aEntities.id, { onDelete: \"set null\" })");
+            expect(cleanResult).toContain("a_entity_id: text(\"a_entity_id\").references(() => aEntities.id, { onDelete: \"set null\" })");
             // Check that both drizzle relations are generated
             expect(cleanResult).toContain("\"b_entities\": many(bEntities, { relationName: \"b_entities_a_entity_id\" })");
             expect(cleanResult).toContain("\"a_entity\": one(aEntities, { fields: [bEntities.a_entity_id], references: [aEntities.id], relationName: \"b_entities_a_entity_id\" })");

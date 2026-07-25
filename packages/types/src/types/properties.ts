@@ -307,10 +307,13 @@ export interface StringUIConfig extends BaseUIConfig {
     previewAsTag?: boolean;
     clearable?: boolean;
     /**
-     * If the value of this property is a URL, you can set this flag to true
-     * to add a link, or one of the supported media types to render a preview
+     * How to render a string that holds a URL: a link, or one of the supported
+     * media types for an inline preview.
+     *
+     * Only presentation. Whether the string *is* a URL is `url` on the property
+     * itself, which is what the OpenAPI contract is generated from.
      */
-    url?: boolean | PreviewType;
+    urlPreview?: PreviewType;
 }
 
 export interface StringProperty extends BaseProperty {
@@ -374,6 +377,16 @@ export interface StringProperty extends BaseProperty {
      * Does this field include an email
      */
     email?: boolean;
+
+    /**
+     * Does this string hold a URL?
+     *
+     * A statement about the *data*, which is why it sits here beside `email`
+     * rather than in the admin block: the OpenAPI generator turns it into
+     * `format: "uri"`, so it is part of the published API contract. How the panel
+     * renders it — as a link, an image, a video — is `admin.urlPreview`.
+     */
+    url?: boolean;
 }
 
 /**
