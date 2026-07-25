@@ -500,7 +500,16 @@ Also worth knowing:
 - `saas/config` is migrated but **uncommitted** — that checkout had another session's
   work in it, so the migration was left in the working tree rather than mixed into
   someone else's change.
-- The CMS init e2e (`cli-init-e2e.ts`) verified scaffold → install → build →
-  `db generate`/`db push` → dev boot → API reads, then stalled on step 9 pulling
-  `node:22-alpine`. A bare `docker pull node:22-alpine` hangs the same way here, so
-  that is Docker Hub, not the code.
+- **The CMS init e2e caught a real regression this work introduced, and it was
+  briefly misdiagnosed as a Docker Hub problem.** `cli-init-e2e.ts` generates its own
+  `books.ts` collection at step 4 with `icon` and `propertiesOrder` at the top level;
+  the scaffolded project's `config` package compiles that file during the Docker build,
+  so `tsc` failed inside `docker compose build`. The image pull *was* slow, which is
+  what made the earlier read of the log look like a network stall — but the failure was
+  a type error, not the pull.
+
+  Two lessons taken: the generator is fixed to author the same shape as the templates,
+  and `pnpm check:templates` now compiles the scaffolded collections once per preset in
+  seconds, so this class of break no longer waits fifteen minutes for a Docker build to
+  surface it. Verified the new guard fails on a reintroduced flat `icon` and names the
+  template file.

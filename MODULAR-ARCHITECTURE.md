@@ -289,6 +289,11 @@ Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a mis
   React type reached through an alias, which a text scan cannot see. The two are
   complementary: the scan cannot see through an alias, the fixture cannot see an unused
   import.
+- `pnpm run check:templates` — compiles the scaffolded collection files once per
+  preset (`blog`, `ecommerce`, `blank`), laid out the way `applyPreset` lays them out.
+  Nothing else checked them fast: the only thing that compiled a template was the CMS
+  init e2e, inside a Docker build about fifteen minutes in. These are the first files
+  every new project runs, so they should fail in seconds.
 - `pnpm run check:headless` — imports every collection file and every server package
   under a Node loader hook that throws on `react`, `react-dom`, or any
   `@rebasepro/{admin,ui,app,studio,forms}`. Runs in CI before the build, reads
