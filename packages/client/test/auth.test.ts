@@ -233,6 +233,89 @@ expiresAt: Date.now() + 100000 }));
     });
 
     // -----------------------------------------------------------------------
+    // handleUnauthorized — the 401 path taken by ordinary API requests
+    // -----------------------------------------------------------------------
+    describe("handleUnauthorized", () => {
+        it("refreshes and reports retryable", async () => {
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
+            const auth = createAuth(transport, { storage });
+
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    tokens: {
+                        accessToken: "new-jwt",
+                        refreshToken: "new-refresh",
+                        accessTokenExpiresAt: Date.now() + 3600000
+                    }
+                })
+            });
+
+            await expect(auth.handleUnauthorized()).resolves.toBe(true);
+            expect(auth.getSession()?.accessToken).toBe("new-jwt");
+        });
+
+        it("signs out when the refresh token itself is rejected", async () => {
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
+            const auth = createAuth(transport, { storage });
+            const listener = jest.fn();
+            auth.onAuthStateChange(listener);
+
+            mockFetch.mockResolvedValueOnce({
+                ok: false,
+                status: 401,
+                statusText: "Unauthorized",
+                json: async () => ({ error: { message: "Invalid refresh token", code: "INVALID_TOKEN" } })
+            });
+
+            await expect(auth.handleUnauthorized()).resolves.toBe(false);
+            expect(auth.getSession()).toBeNull();
+            expect(storage.getItem("rebase_auth")).toBeNull();
+            expect(listener).toHaveBeenCalledWith("SIGNED_OUT", null);
+        });
+
+        it("keeps the session on a transient failure", async () => {
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", JSON.stringify(mockSessionObj()));
+            const auth = createAuth(transport, { storage });
+            const listener = jest.fn();
+            auth.onAuthStateChange(listener);
+
+            mockFetch.mockRejectedValueOnce(new Error("Network down"));
+
+            await expect(auth.handleUnauthorized()).resolves.toBe(false);
+            expect(auth.getSession()).not.toBeNull();
+            expect(listener).not.toHaveBeenCalledWith("SIGNED_OUT", null);
+        });
+
+        it("signs out when the session has no refresh token to spend", async () => {
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", JSON.stringify({ ...mockSessionObj(),
+refreshToken: "" }));
+            const auth = createAuth(transport, { storage });
+            const listener = jest.fn();
+            auth.onAuthStateChange(listener);
+
+            await expect(auth.handleUnauthorized()).resolves.toBe(false);
+            expect(auth.getSession()).toBeNull();
+            expect(listener).toHaveBeenCalledWith("SIGNED_OUT", null);
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it("does not emit SIGNED_OUT for an anonymous caller", async () => {
+            const auth = createAuth(transport, { storage: createMemoryStorage() });
+            const listener = jest.fn();
+            auth.onAuthStateChange(listener);
+
+            await expect(auth.handleUnauthorized()).resolves.toBe(false);
+            expect(listener).not.toHaveBeenCalled();
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // signInWithEmail
     // -----------------------------------------------------------------------
     describe("signInWithEmail", () => {

@@ -197,6 +197,44 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         emit("SIGNED_OUT", null);
     }
 
+    /**
+     * Recover from a 401 on an ordinary API request.
+     *
+     * Returns `true` when the caller should retry — we minted a fresh access
+     * token. When the refresh is rejected *fatally* (the refresh token itself
+     * is invalid, expired or revoked) this client can no longer act as the
+     * user at all, so we drop the session and emit `SIGNED_OUT`. UIs gate on
+     * that event, so they show their login screen instead of leaving the user
+     * staring at "Invalid or expired token" on every view.
+     *
+     * Transient failures (offline, 5xx, backend restarting) keep the session:
+     * the scheduled refresh backs off and retries, and the token is very
+     * likely still good once the backend answers again.
+     */
+    async function handleUnauthorized(): Promise<boolean> {
+        // No session to recover: the 401 is just an anonymous caller hitting a
+        // protected route. Emitting SIGNED_OUT here would fire sign-out
+        // handlers for a user who was never signed in.
+        if (!currentSession) return false;
+
+        // Nothing to refresh *with* — the access token is dead and there is no
+        // way back. Same end state as a rejected refresh token.
+        if (authFlowMode !== "cookie" && !currentSession.refreshToken) {
+            abandonSessionLocally();
+            return false;
+        }
+
+        try {
+            await refreshSession();
+            return true;
+        } catch (err) {
+            if (isFatalRefreshError(err)) {
+                abandonSessionLocally();
+            }
+            return false;
+        }
+    }
+
     async function attemptScheduledRefresh(attempt: number) {
         try {
             await refreshSession();
@@ -759,6 +797,7 @@ refreshToken: session.refreshToken };
         signInWithSpotify,
         signOut,
         refreshSession,
+        handleUnauthorized,
         getUser,
         findUserByEmail,
         updateUser,

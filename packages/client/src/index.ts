@@ -320,14 +320,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     /** One channel object per name — see `realtime.channel`. */
     const realtimeChannels = new Map<string, RebaseRealtimeChannel>();
     if (resolvedWsUrl) {
-        const wsOnUnauthorized = options.onUnauthorized || (async () => {
-            try {
-                await auth.refreshSession();
-                return true;
-            } catch (e) {
-                return false;
-            }
-        });
+        const wsOnUnauthorized = options.onUnauthorized || (() => auth.handleUnauthorized());
 
         ws = new RebaseWebSocketClient({
             websocketUrl: resolvedWsUrl,
@@ -366,14 +359,11 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     // options.onUnauthorized — because the transport was already created above
     // and captured the (undefined) value from the config closure.
     if (!options.onUnauthorized) {
-        transport.setOnUnauthorized(async () => {
-            try {
-                await auth.refreshSession();
-                return true;
-            } catch (e) {
-                return false;
-            }
-        });
+        // `handleUnauthorized` (not a bare `refreshSession`) so that a refresh
+        // the server rejects outright drops the session and emits SIGNED_OUT —
+        // otherwise the app keeps thinking it is signed in and every view just
+        // renders "Invalid or expired token".
+        transport.setOnUnauthorized(() => auth.handleUnauthorized());
     }
 
     /**
