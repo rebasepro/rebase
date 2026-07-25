@@ -2,9 +2,9 @@
 // `target: () =>` thunk below, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import ordersCollection from "./orders";
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const customersCollection: AdminCollectionConfig = {
+const customersCollection: PostgresCollectionConfig = {
     name: "Customers",
     singularName: "Customer",
     slug: "customers",

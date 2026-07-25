@@ -270,7 +270,13 @@ export async function typecheckSnippets(root, opts = {}) {
 
     /** Writes scratch files with the given per-snippet prelude and compiles. */
     function compile(preludeFor) {
-        const fileNames = [stubDecl];
+        // @rebasepro/admin-types declares a collection's and a property's `admin`
+        // block onto the core types by declaration merging. Documentation examples are
+        // CMS examples, so the program needs it or every `admin: { … }` in a fence is
+        // an error. Added as a *file* rather than a `/// <reference types>`: that
+        // directive resolves through typeRoots, which cannot see the workspace `paths`
+        // this program relies on.
+        const fileNames = [stubDecl, path.join(root, "packages/admin-types/src/augment.ts")];
         for (const p of prepared) {
             const prelude = preludeFor(p);
             const file = path.join(scratch, p.name);

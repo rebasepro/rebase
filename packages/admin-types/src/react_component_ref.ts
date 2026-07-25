@@ -36,7 +36,7 @@ export type ReactComponentRef<P = any> =
  *
  * @example
  * import { MyField } from "./MyField";
- * ui: { Field: asComponentRef(MyField) }
+ * admin: { Field: asComponentRef(MyField) }
  */
 export function asComponentRef<P>(component: React.ComponentType<P>): ComponentRef<P> {
     return component;

@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 
 import { ImagePreview } from "./ImagePreview";
-import { PreviewType } from "@rebasepro/types";
+import { PreviewType } from "@rebasepro/admin-types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { cls, ExternalLinkIcon, FileTextIcon, Tooltip, Typography } from "@rebasepro/ui";
 import { EmptyValue } from "./EmptyValue";

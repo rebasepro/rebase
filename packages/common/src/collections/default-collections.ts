@@ -6,6 +6,12 @@ import { defineCollection } from "../util/builders";
  * Prepended to the developer's collections array by the admin and server.
  * Slug-based dedup (Map keyed by slug, last-write-wins) lets developers
  * override by defining their own collection with `slug: "users"`.
+ *
+ * Schema only — no `admin` block. This package is on the backend's dependency path,
+ * where that field does not exist: `@rebasepro/admin-types` adds it by declaration
+ * merging, and a BaaS install never installs that. The scaffolded
+ * `config/collections/users.ts` carries the presentation for projects that want this
+ * collection in their panel, which is also where it is editable.
  */
 export const defaultUsersCollection = defineCollection({
     name: "Users",
@@ -24,8 +30,7 @@ roles: ["admin"] }
         id: {
             name: "ID",
             type: "string",
-            isId: "uuid",
-            ui: { readOnly: true }
+            isId: "uuid"
         },
         email: {
             name: "Email",
@@ -42,8 +47,7 @@ unique: true }
         photoURL: {
             name: "Photo URL",
             type: "string",
-            columnName: "photo_url",
-            ui: { urlPreview: "image" }
+            columnName: "photo_url"
         },
         roles: {
             name: "Roles",
@@ -63,65 +67,43 @@ unique: true }
             name: "Password Hash",
             type: "string",
             columnName: "password_hash",
-            excludeFromApi: true,
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            excludeFromApi: true
         },
         emailVerified: {
             name: "Email Verified",
             type: "boolean",
             columnName: "email_verified",
-            defaultValue: false,
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            defaultValue: false
         },
         emailVerificationToken: {
             name: "Email Verification Token",
             type: "string",
             columnName: "email_verification_token",
-            excludeFromApi: true,
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            excludeFromApi: true
         },
         emailVerificationSentAt: {
             name: "Email Verification Sent At",
             type: "date",
-            columnName: "email_verification_sent_at",
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            columnName: "email_verification_sent_at"
         },
         metadata: {
             name: "Metadata",
             type: "map",
             keyValue: true,
             properties: {},
-            defaultValue: {},
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            defaultValue: {}
         },
         createdAt: {
             name: "Created At",
             type: "date",
             columnName: "created_at",
-            autoValue: "on_create",
-            ui: { readOnly: true }
+            autoValue: "on_create"
         },
         updatedAt: {
             name: "Updated At",
             type: "date",
             columnName: "updated_at",
-            autoValue: "on_update",
-            ui: { hideFromCollection: true,
-disabled: { hidden: true } }
+            autoValue: "on_update"
         }
-    },
-    admin: {
-        icon: "Users",
-        group: "Settings",
-        openEntityMode: "dialog",
-        disableDefaultActions: ["copy"],
-        sort: ["createdAt", "desc"],
-        listProperties: ["displayName", "email", "roles", "createdAt"],
-        propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"]
     }
 });

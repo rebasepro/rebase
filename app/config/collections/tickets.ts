@@ -1,7 +1,7 @@
 import customersCollection from "./customers";
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const ticketsCollection: AdminCollectionConfig = {
+const ticketsCollection: PostgresCollectionConfig = {
     name: "Tickets",
     singularName: "Ticket",
     slug: "tickets",

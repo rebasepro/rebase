@@ -1,6 +1,6 @@
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const categoriesCollection: AdminCollectionConfig = {
+const categoriesCollection: PostgresCollectionConfig = {
     name: "Categories",
     singularName: "Category",
     slug: "categories",

@@ -51,10 +51,11 @@ export function inferPropertyFromData(
             }
         }
 
-        // Currency
-        if (colNameLower.includes("price") || colNameLower.includes("cost") || colNameLower.includes("amount") || colNameLower.includes("fee") || pgDataType === "money") {
-            extraLines.push("            ui: {\n                currency: true\n            }");
-        }
+        // No currency heuristic. `admin.currency` was never a declared option and
+        // nothing reads it, so a column called `price` got a block of config that did
+        // nothing — invisible because this generator emits *source text*, which no
+        // typechecker ever saw. Reinstate it by adding `currency` to
+        // AdminNumberOptions first, and something that renders it.
     }
 
     // ── JSON / JSONB Analysis ────────────────────────────────────────────
@@ -172,7 +173,7 @@ export function inferPropertyFromData(
         // Color Codes
         const allColors = validValues.every(v => typeof v === "string" && COLOR_HEX_REGEX.test(v));
         if (allColors) {
-            extraLines.push("            ui: {\n                color: true\n            }");
+            extraLines.push("            admin: {\n                color: true\n            }");
         }
 
         // Text Lengths, Multiline & Markdown
@@ -212,9 +213,9 @@ export function inferPropertyFromData(
         if (allAbsoluteUrls) {
             const isImage = validValues.some(v => typeof v === "string" && v.match(/\.(jpeg|jpg|gif|png|webp|svg)/i));
             if (isImage || isMedia) {
-                extraLines.push("            ui: {\n                url: \"image\"\n            }");
+                extraLines.push("            admin: {\n                url: \"image\"\n            }");
             } else {
-                extraLines.push("            ui: {\n                url: true\n            }");
+                extraLines.push("            admin: {\n                url: true\n            }");
             }
         } else {
             const hasFileExtension = validValues.some(v => typeof v === "string" && v.match(/\.[a-zA-Z0-9]+$/));
@@ -225,9 +226,9 @@ export function inferPropertyFromData(
                 extraLines.push(`            storage: {\n                storagePath: "${inferredStoragePath}"\n            }`);
             } else if (isUrl) {
                 if (isMedia) {
-                    extraLines.push("            ui: {\n                url: \"image\"\n            }");
+                    extraLines.push("            admin: {\n                url: \"image\"\n            }");
                 } else {
-                    extraLines.push("            ui: {\n                url: true\n            }");
+                    extraLines.push("            admin: {\n                url: true\n            }");
                 }
             }
         }

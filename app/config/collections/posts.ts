@@ -3,9 +3,9 @@ import authorsCollection from "./authors";
 // `target: () =>` thunk below, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import tagsCollection from "./tags";
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const postsCollection: AdminCollectionConfig = {
+const postsCollection: PostgresCollectionConfig = {
     name: "Blog posts",
     singularName: "Blog post",
     slug: "posts",

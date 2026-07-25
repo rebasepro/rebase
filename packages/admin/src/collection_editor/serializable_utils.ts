@@ -8,7 +8,8 @@
  * @module
  */
 
-import type { ArrayProperty, AdminPropertyOptions, BinaryProperty, BooleanProperty, DateProperty, GeopointProperty, MapProperty, NumberProperty, Properties, Property, ReferenceProperty, RelationProperty, StorageConfig, StringProperty, VectorProperty } from "@rebasepro/types";
+import type { ArrayProperty, BinaryProperty, BooleanProperty, DateProperty, GeopointProperty, MapProperty, NumberProperty, Properties, Property, ReferenceProperty, RelationProperty, StorageConfig, StringProperty, VectorProperty } from "@rebasepro/types";
+import type { AdminPropertyOptions } from "@rebasepro/admin-types";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
 import type {

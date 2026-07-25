@@ -1,8 +1,8 @@
 import ordersCollection from "./orders";
 import productLocalesCollection from "./product_locales";
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const productsCollection: AdminCollectionConfig = {
+const productsCollection: PostgresCollectionConfig = {
     name: "Products",
     singularName: "Product",
     slug: "products",

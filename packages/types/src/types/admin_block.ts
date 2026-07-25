@@ -1,33 +1,15 @@
 /**
- * The admin panel's half of a collection, as core sees it.
+ * The keys of a collection's admin block, as data.
  *
- * A collection is still one file — schema, security and callbacks at the top
- * level, everything the admin panel renders under `admin`. The backend loads that
- * file and never looks inside the block, which is why the block is typed
- * opaquely here: 38 fields describing kanban columns, side-dialog widths and
- * toolbar actions have no meaning to a server, and naming them would put
- * `React.ReactNode` and nine UI controllers back in the BaaS contract.
+ * There is no *type* for the block in this package any more, and that is the point:
+ * `admin` is not declared on `BaseCollectionConfig` or on any property here, so a
+ * BaaS install cannot even write one. `@rebasepro/admin-types` adds the field back by
+ * declaration merging, which is why installing it is what makes the admin surface
+ * appear.
  *
- * The real types live in `AdminCollectionOptions` in `@rebasepro/admin-types`,
- * which is where React exists. There is exactly one definition of each field —
- * declaring a React-free skeleton here as well would be the `WhereFilterOp`
- * mistake, two copies that agree only by luck. `AdminCollectionOptions` is
- * assignable to this, so a collection typed for authoring passes anywhere a
- * `CollectionConfig` is expected, with no cast and no generic threading.
- *
- * Two consequences, both intended:
- *
- * - Nothing in core can *read* a typed admin field. If a server ever needs one,
- *   that is a signal the field was misclassified, not a reason to widen this.
- * - The whole block is one subtree, so `serializeCollections` drops it in one
- *   step and `computeSchemaVersion` excludes it — an admin-only edit no longer
- *   changes the schema hash and reports every client's SDK as stale.
- *
- * @group Models
+ * The *list* still has to live here, because three runtime consumers need it and two
+ * of them are core — see below.
  */
-export type AdminBlock = {
-    readonly [key: string]: unknown;
-};
 
 /**
  * Every key that belongs inside a collection's `admin` block, as data.

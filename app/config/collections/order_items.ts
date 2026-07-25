@@ -5,7 +5,7 @@ import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import ordersCollection from "./orders";
 // fallow-ignore-next-line circular-dependency
 import productsCollection from "./products";
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 interface ProductValues extends Record<string, unknown> {
     name: string;
@@ -21,7 +21,7 @@ const getRelationId = (val: unknown): string | number | undefined => {
     return undefined;
 };
 
-const orderItemsCollection: AdminCollectionConfig = {
+const orderItemsCollection: PostgresCollectionConfig = {
     name: "Order Items",
     singularName: "Order Item",
     slug: "order_items",

@@ -12,7 +12,7 @@ import {
     TextField,
     XIcon
 } from "@rebasepro/ui";
-import { PreviewType } from "@rebasepro/types";
+import { PreviewType } from "@rebasepro/admin-types";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { PropertyPreview } from "../../preview";

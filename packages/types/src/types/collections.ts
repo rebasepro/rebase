@@ -5,7 +5,6 @@ import type { EnumValues, Properties, PostgresProperties, FirebaseProperties, Mo
 import type { User } from "../users";
 import type { Relation } from "./relations";
 import type { SecurityRule } from "./security_rules";
-import type { AdminBlock } from "./admin_block";
 import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operators";
 
 /**
@@ -100,23 +99,6 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      */
     properties: Properties;
 
-    /**
-     * Admin-panel presentation and behaviour — icons, list columns, view modes,
-     * kanban, custom views, entity actions, component overrides.
-     *
-     * Opaque to the backend, which loads this file and never reads inside the
-     * block. The typed shape is `AdminCollectionOptions` in
-     * `@rebasepro/admin-types`; author against `AdminCollectionConfig` (or
-     * `defineCollection`) to get completion and checking here.
-     *
-     * @example
-     * admin: {
-     *     icon: "FileText",
-     *     listProperties: ["title", "status"],
-     *     defaultViewMode: "table"
-     * }
-     */
-    admin?: AdminBlock;
 
 
 

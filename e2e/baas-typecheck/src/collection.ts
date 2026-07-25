@@ -16,10 +16,9 @@ const properties = {
     title: {
         type: "string",
         name: "Title",
-        validation: { required: true, max: 200, trim: true },
-        // Property-level presentation stays available and stays React-free:
-        // `admin.Field` is a ComponentRef, which is structural, not React.ComponentType.
-        admin: { columnWidth: 240, Field: "../../frontend/src/TitleField" }
+        validation: { required: true, max: 200, trim: true }
+        // No `admin` block here, and that is the point — see admin_absent.ts, which
+        // asserts that writing one in a BaaS project is a type error.
     },
     slug: {
         type: "string",

@@ -15,7 +15,6 @@
  */
 import type React from "react";
 import type {
-    AdminBlock,
     CollectionConfig,
     ComponentRef,
     FilterPreset,
@@ -372,50 +371,23 @@ export type AdminCollectionOptions<
     components?: CollectionComponentOverrideMap;};
 
 /**
- * A collection typed for authoring: the BaaS contract, with `admin` narrowed from
- * {@link AdminBlock} to {@link AdminCollectionOptions}.
+ * There is deliberately no `AdminCollectionConfig` here any more.
  *
- * This is what a collection file should be typed against in a CMS project. It is
- * assignable to `CollectionConfig` — `AdminCollectionOptions` satisfies
- * `AdminBlock`'s index signature — so the same object passes to
- * `initializeRebaseBackend`, the drizzle generator and the SDK codegen unchanged.
+ * It used to be `Omit<CollectionConfig, "admin"> & { admin?: AdminCollectionOptions }`,
+ * a wrapper that existed because core typed the block opaquely. Now that `augment.ts`
+ * declares `admin` directly on `BaseCollectionConfig`, `CollectionConfig` *is* the
+ * authoring type — the wrapper would be an alias of it, and a second name for one thing
+ * is what this whole refactor has been removing.
  *
- * @group Models
+ * A project opts its program in with one line, once:
+ *
+ * ```ts
+ * /// <reference types="@rebasepro/admin-types" />
+ * ```
+ *
+ * after which `admin` is typed on every collection and every property. Without it,
+ * writing one is an error — which is the guarantee a BaaS install depends on.
  */
-export type AdminCollectionConfig<
-    M extends Record<string, unknown> = Record<string, unknown>,
-    USER extends User = User
-> = WithTypedAdmin<CollectionConfig<M, USER>, M, USER>;
-
-/** Distributive, for the reason spelled out on {@link WithFlatAdmin}. */
-type WithTypedAdmin<C, M extends Record<string, unknown>, USER extends User> =
-    C extends unknown
-        ? Omit<C, "admin"> & { admin?: AdminCollectionOptions<M, USER> }
-        : never;
-
-/** {@link AdminCollectionConfig} for a Postgres collection. @group Models */
-export type AdminPostgresCollectionConfig<
-    M extends Record<string, unknown> = Record<string, unknown>,
-    USER extends User = User
-> = Omit<PostgresCollectionConfig<M, USER>, "admin"> & {
-    admin?: AdminCollectionOptions<M, USER>;
-};
-
-/** {@link AdminCollectionConfig} for a Firestore collection. @group Models */
-export type AdminFirebaseCollectionConfig<
-    M extends Record<string, unknown> = Record<string, unknown>,
-    USER extends User = User
-> = Omit<FirebaseCollectionConfig<M, USER>, "admin"> & {
-    admin?: AdminCollectionOptions<M, USER>;
-};
-
-/** {@link AdminCollectionConfig} for a MongoDB collection. @group Models */
-export type AdminMongoDBCollectionConfig<
-    M extends Record<string, unknown> = Record<string, unknown>,
-    USER extends User = User
-> = Omit<MongoDBCollectionConfig<M, USER>, "admin"> & {
-    admin?: AdminCollectionOptions<M, USER>;
-};
 
 /**
  * Define a collection with the admin block type-checked.
@@ -454,30 +426,30 @@ export function defineCollection<
     const P extends PostgresProperties,
     USER extends User = User
 >(
-    collection: Omit<AdminPostgresCollectionConfig<InferEntityType<P>, USER>, "properties">
+    collection: Omit<PostgresCollectionConfig<InferEntityType<P>, USER>, "properties">
         & { properties: P }
-): AdminPostgresCollectionConfig<InferEntityType<P>, USER> & { properties: P };
+): PostgresCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Define a Firestore-backed collection with the admin block checked. @group Builder */
 export function defineCollection<
     const P extends FirebaseProperties,
     USER extends User = User
 >(
-    collection: Omit<AdminFirebaseCollectionConfig<InferEntityType<P>, USER>, "properties">
+    collection: Omit<FirebaseCollectionConfig<InferEntityType<P>, USER>, "properties">
         & { properties: P }
-): AdminFirebaseCollectionConfig<InferEntityType<P>, USER> & { properties: P };
+): FirebaseCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Define a MongoDB-backed collection with the admin block checked. @group Builder */
 export function defineCollection<
     const P extends MongoProperties,
     USER extends User = User
 >(
-    collection: Omit<AdminMongoDBCollectionConfig<InferEntityType<P>, USER>, "properties">
+    collection: Omit<MongoDBCollectionConfig<InferEntityType<P>, USER>, "properties">
         & { properties: P }
-): AdminMongoDBCollectionConfig<InferEntityType<P>, USER> & { properties: P };
+): MongoDBCollectionConfig<InferEntityType<P>, USER> & { properties: P };
 
 /** Identity at runtime; the overloads above are the whole point. @group Builder */
-export function defineCollection(collection: AdminCollectionConfig): AdminCollectionConfig {
+export function defineCollection(collection: CollectionConfig): CollectionConfig {
     return collection;
 }
 
@@ -571,7 +543,7 @@ export type AdminPostgresCollection<
 export function resolveAdminCollection<
     M extends Record<string, unknown> = Record<string, unknown>,
     USER extends User = User
->(collection: AdminCollectionConfig<M, USER> | AdminCollection<M, USER>): AdminCollection<M, USER> {
+>(collection: CollectionConfig<M, USER> | AdminCollection<M, USER>): AdminCollection<M, USER> {
     const block = (collection as { admin?: AdminCollectionOptions<M, USER> }).admin;
     if (!block) return collection as AdminCollection<M, USER>;
     return { ...(collection as AdminCollection<M, USER>), ...block, admin: block };
@@ -588,7 +560,7 @@ export function resolveAdminCollection<
 export function toAdminCollectionConfig<
     M extends Record<string, unknown> = Record<string, unknown>,
     USER extends User = User
->(collection: AdminCollection<M, USER> | AdminCollectionConfig<M, USER>): AdminCollectionConfig<M, USER> {
+>(collection: AdminCollection<M, USER> | CollectionConfig<M, USER>): CollectionConfig<M, USER> {
     const source = collection as Record<string, unknown>;
     const top: Record<string, unknown> = {};
     const block: Record<string, unknown> = { ...(source.admin as object ?? {}) };
@@ -600,5 +572,5 @@ export function toAdminCollectionConfig<
     }
 
     if (Object.keys(block).length > 0) top.admin = block;
-    return top as AdminCollectionConfig<M, USER>;
+    return top as unknown as CollectionConfig<M, USER>;
 }

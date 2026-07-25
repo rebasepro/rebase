@@ -569,11 +569,11 @@ export function generateCollectionFile(
         // Date auto-value heuristics
         if (finalPropType === "date") {
             if (colNameLower === "created_at" || colNameLower === "createdat") {
-                extra += "\n            autoValue: \"on_create\",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
+                extra += "\n            autoValue: \"on_create\",\n            admin: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
             } else if (colNameLower === "updated_at" || colNameLower === "updatedat") {
-                extra += "\n            autoValue: \"on_update\",\n            ui: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
+                extra += "\n            autoValue: \"on_update\",\n            admin: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
             } else if (col.column_default && (col.column_default.includes("now()") || col.column_default.includes("CURRENT_TIMESTAMP"))) {
-                extra += "\n            autoValue: \"on_create\",\n            ui: {\n                readOnly: true\n            },";
+                extra += "\n            autoValue: \"on_create\",\n            admin: {\n                readOnly: true\n            },";
             }
         }
 
@@ -604,7 +604,7 @@ export function generateCollectionFile(
             if (isMedia) {
                 extra += `\n            storage: {\n                storagePath: "${tableName}/${col.column_name}"\n            },`;
             } else if (isUrl) {
-                extra += "\n            ui: {\n                url: true\n            },";
+                extra += "\n            admin: {\n                url: true\n            },";
             } else if (colNameLower === "description" || colNameLower === "summary" || colNameLower === "excerpt") {
                 extra += "\n            multiline: true,";
             } else if (colNameLower === "content" || colNameLower === "body") {

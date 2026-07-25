@@ -41,7 +41,7 @@ export const productsCollectionTemplate = {
         available: {
             type: "boolean",
             name: "Available",
-            ui: { columnWidth: 100 },
+            admin: { columnWidth: 100 },
             description: "Is this product available in the website"
         },
         price: {
@@ -55,7 +55,7 @@ export const productsCollectionTemplate = {
         images: {
             type: "array",
             name: "Images",
-            ui: { hideFromCollection: true },
+            admin: { hideFromCollection: true },
             of: {
                 type: "string",
                 storage: {

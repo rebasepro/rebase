@@ -8,6 +8,10 @@
  *
  * If you are building a backend, you want @rebasepro/types.
  */
+// Side-effect import: this is what adds `admin` back onto the core types.
+import "./augment";
+
+export * from "./types/property_options";
 export * from "./react_component_ref";
 export * from "./collections";
 export * from "./admin_collection";

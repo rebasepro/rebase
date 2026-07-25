@@ -171,24 +171,50 @@ UI package.** They may import:
 - `@rebasepro/common` (`defineCollection`)
 - local, non-UI helpers
 
-A collection file gets its `admin` block type-checked with a *type-only* import, which
-is erased and so never reaches the backend's module graph:
+Custom components are referenced with a **lazy import thunk**, which TypeScript checks
+and the backend never evaluates:
 
 ```ts
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+admin: { Field: () => import("../../frontend/src/BodyPartsField") }
+```
 
-const posts: AdminCollectionConfig = {
+A wrong path is a compile error, go-to-definition works, and editors follow the
+specifier on a file move. The bare-string form (`Field: "../../frontend/src/X"`) still
+works and is what the visual collection editor writes, since ts-morph can emit a string
+literal but not a thunk — prefer the thunk when authoring by hand.
+
+`@rebasepro/types` declares **no `admin` field** — not on a collection, not on a
+property. In a BaaS project, writing one is a type error. `@rebasepro/admin-types` adds
+it back by declaration merging, so installing that package is what makes the admin
+surface exist:
+
+```ts
+// config/admin.d.ts — one line, once per project
+/// <reference types="@rebasepro/admin-types" />
+```
+
+```ts
+// config/collections/posts.ts — plain core types, `admin` now typed
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const posts: PostgresCollectionConfig = {
     slug: "posts",
     table: "posts",
-    properties: { … },
+    properties: {
+        title: { name: "Title", type: "string", admin: { multiline: true } }
+    },
     admin: { icon: "FileText", listProperties: ["title"] }
 };
 ```
 
-Without the annotation the block is typed as the opaque `AdminBlock` and a typo like
-`icoon` passes silently — checked, and it does. `defineCollection` from
-`@rebasepro/admin-types` gives the same checking plus property-key inference, but it is
-a *value* import, so use it only in frontend-only code.
+An augmentation applies to the whole *program*, and `config/` and `frontend/` are
+separate tsconfig programs — which is why the reference lives in the config package
+rather than being inherited from the frontend. There is deliberately no
+`AdminCollectionConfig` wrapper: with the field merged in, `CollectionConfig` *is* the
+authoring type.
+
+This works only because `BaseProperty`, the ten concrete property types and
+`BaseCollectionConfig` are `interface`s. Interfaces merge; `type` aliases do not.
 
 Custom React components are referenced **by string path** (`Field: "./MyField"`), not
 by import. The Vite plugin rewrites those strings into lazy dynamic imports for the

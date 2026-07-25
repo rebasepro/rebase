@@ -1,7 +1,7 @@
 import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 // Helper function to extract ID from relation value (which can be primitive ID or expanded object)
 const getRelationId = (val: unknown): string | number | undefined => {
@@ -11,7 +11,7 @@ const getRelationId = (val: unknown): string | number | undefined => {
     return undefined;
 };
 
-const ordersCollection: AdminCollectionConfig = {
+const ordersCollection: PostgresCollectionConfig = {
     name: "Orders",
     singularName: "Order",
     slug: "orders",

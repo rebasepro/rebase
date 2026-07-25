@@ -1,7 +1,7 @@
 import { maskEmail, maskName, maskValues } from "../masking";
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const usersCollection: AdminCollectionConfig = {
+const usersCollection: PostgresCollectionConfig = {
     name: "Users",
     singularName: "User",
     slug: "users",

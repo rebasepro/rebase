@@ -51,26 +51,45 @@ The split is not cosmetic. It is what lets Rebase be a backend on its own:
   the schema version — so changing an icon does not report every generated SDK as
   stale.
 
-### Getting the block type-checked
+### The `admin` block exists only if you install the admin types
 
-`CollectionConfig` types `admin` opaquely, which means a typo inside it compiles. Annotate
-with `AdminCollectionConfig` — a **type-only** import, so nothing is added to your
-backend's module graph:
+`@rebasepro/types` declares no `admin` field — not on a collection, not on a property. In
+a BaaS project, writing one is a **type error**. `@rebasepro/admin-types` adds it back by
+declaration merging, so one line per project turns it on:
 
 ```typescript
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+// config/admin.d.ts
+/// <reference types="@rebasepro/admin-types" />
+```
 
-const posts: AdminCollectionConfig = {
+After that, plain core types carry a fully typed block — a typo like `icoon` is an error,
+and you get completion:
+
+```typescript
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const posts: PostgresCollectionConfig = {
     slug: "posts",
     table: "posts",
-    properties: { /* … */ },
-    admin: { icon: "FileText" }   // `icoon` is now an error
+    properties: {
+        title: { name: "Title", type: "string", admin: { multiline: true } }
+    },
+    admin: { icon: "FileText" }
 };
 ```
 
-In frontend-only code, `defineCollection` from `@rebasepro/admin-types` gives the same
-checking plus completion on `admin.titleProperty` and `admin.propertiesOrder` over your
-own property keys. It is a value import, so do not use it in a file the backend loads.
+An augmentation applies to the whole TypeScript *program*, and `config/` and `frontend/`
+are separate programs — which is why the reference belongs in the config package. There
+is no `AdminCollectionConfig` wrapper type: with the field merged in, `CollectionConfig`
+is the authoring type.
+
+:::note[Why a BaaS project pays nothing]
+A property type in a BaaS install has no `Field`, no `columnWidth`, no
+`hideFromCollection` — those live in `AdminPropertyOptions` in the admin package. The
+guarantee is asserted, not claimed: `e2e/baas-typecheck/src/admin_absent.ts` uses
+`@ts-expect-error` on `admin`, so the build fails if the field ever becomes writable in
+core again.
+:::
 
 ### Migrating from a flat collection
 

@@ -3,9 +3,9 @@
 // the framework contract for exactly this, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import postsCollection from "./posts";
-import type { AdminCollectionConfig } from "@rebasepro/admin-types";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
 
-const authorsCollection: AdminCollectionConfig = {
+const authorsCollection: PostgresCollectionConfig = {
     name: "Authors",
     singularName: "Author",
     slug: "authors",

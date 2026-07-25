@@ -151,50 +151,7 @@ export type InferEntityType<P extends Properties> = {
     -readonly [K in OptionalPropertyKeys<P>]?: InferPropertyType<P[K]>;
 };
 
-/**
- * Interface including all common properties of a CMS property.
- * @group Entity properties
- */
-export interface AdminPropertyOptions<CustomProps = unknown> {
-    columnWidth?: number;
-    hideFromCollection?: boolean;
-    readOnly?: boolean;
-    disabled?: boolean | PropertyDisabledConfig;
-    widthPercentage?: number;
-    customProps?: CustomProps;
-    Field?: ComponentRef<any>;
-    Preview?: ComponentRef<any>;
-
-    /**
-     * Narrow the filter operators offered for this property in collection
-     * filter UIs (table header filters and the Filters dialog).
-     *
-     * The final offered set is the **intersection** of the engine's
-     * capabilities, the property-type defaults, and this list — you can only
-     * *restrict*, never enable an operator the underlying engine cannot run.
-     *
-     * Pass an empty array to disable filtering on this property entirely.
-     *
-     * @example
-     * // Email column: exact match, contains, and null check only
-     * ui: { filterOperators: ["==", "ilike", "is-null"] }
-     */
-    filterOperators?: readonly WhereFilterOp[];
-
-    /**
-     * Replace the filter field rendered for this property in collection
-     * filter UIs. The component receives `FilterFieldBindingProps`
-     * (property, resolved `operators`, `value`, `setValue`, …).
-     *
-     * Takes precedence over the collection-level
-     * `components["Collection.FilterField"]` override and the built-in
-     * per-type filter fields.
-     */
-    Filter?: ComponentRef<any>;
-}
-
 export interface BaseProperty<CustomProps = unknown> {
-    admin?: AdminPropertyOptions<CustomProps>;
     /**
      * Property name (e.g. Product)
      */
@@ -285,39 +242,7 @@ export interface BaseProperty<CustomProps = unknown> {
 
 }
 
-/**
- * @group Entity properties
- */
-export interface AdminStringOptions extends AdminPropertyOptions {
-    /**
-     * Is this string property long enough so it should be displayed in
-     * a multiple line field. Defaults to false. If set to true,
-     * the number of lines adapts to the content
-     */
-    multiline?: boolean;
-    /**
-     * Should this string property be displayed as a markdown field. If true,
-     * the field is rendered as a text editor that supports markdown highlight
-     * syntax. It also includes a preview of the result.
-     */
-    markdown?: boolean;
-    /**
-     * Should this string be rendered as a tag instead of just text.
-     */
-    previewAsTag?: boolean;
-    clearable?: boolean;
-    /**
-     * How to render a string that holds a URL: a link, or one of the supported
-     * media types for an inline preview.
-     *
-     * Only presentation. Whether the string *is* a URL is `url` on the property
-     * itself, which is what the OpenAPI contract is generated from.
-     */
-    urlPreview?: PreviewType;
-}
-
 export interface StringProperty extends BaseProperty {
-    admin?: AdminStringOptions;
     type: "string";
     /**
      * Default value for new entities. Must be a string.
@@ -389,15 +314,7 @@ export interface StringProperty extends BaseProperty {
     url?: boolean;
 }
 
-/**
- * @group Entity properties
- */
-export interface AdminNumberOptions extends AdminPropertyOptions {
-    clearable?: boolean;
-}
-
 export interface NumberProperty extends BaseProperty {
-    admin?: AdminNumberOptions;
     type: "number";
     /**
      * Default value for new entities. Must be a number.
@@ -436,7 +353,6 @@ export interface NumberProperty extends BaseProperty {
  * @group Entity properties
  */
 export interface BooleanProperty extends BaseProperty {
-    admin?: AdminPropertyOptions;
     type: "boolean";
     /**
      * Default value for new entities. Must be a boolean.
@@ -448,15 +364,7 @@ export interface BooleanProperty extends BaseProperty {
     validation?: PropertyValidationSchema;
 }
 
-/**
- * @group Entity properties
- */
-export interface AdminVectorOptions extends AdminPropertyOptions {
-    clearable?: boolean;
-}
-
 export interface VectorProperty extends BaseProperty {
-    admin?: AdminVectorOptions;
     type: "vector";
     /**
      * Default value for new entities.
@@ -478,18 +386,7 @@ export interface BinaryProperty extends BaseProperty {
     validation?: PropertyValidationSchema;
 }
 
-/**
- * @group Entity properties
- */
-export interface AdminDateOptions extends AdminPropertyOptions {
-    /**
-     * Add an icon to clear the value and set it to `null`. Defaults to `false`
-     */
-    clearable?: boolean;
-}
-
 export interface DateProperty extends BaseProperty {
-    admin?: AdminDateOptions;
     type: "date";
     /**
      * Default value for new entities. Must be a Date.
@@ -526,7 +423,6 @@ export interface DateProperty extends BaseProperty {
  * @group Entity properties
  */
 export interface GeopointProperty extends BaseProperty {
-    admin?: AdminPropertyOptions;
     type: "geopoint";
     /**
      * Default value for new entities. Must be a GeoPoint.
@@ -536,13 +432,6 @@ export interface GeopointProperty extends BaseProperty {
      * Rules for validating this property
      */
     validation?: PropertyValidationSchema;
-}
-
-/**
- * @group Entity properties
- */
-export interface AdminReferenceOptions extends AdminPropertyOptions {
-    previewProperties?: string[];
 }
 
 /**
@@ -562,7 +451,6 @@ export interface AdminReferenceOptions extends AdminPropertyOptions {
  * @group Entity properties
  */
 export interface ReferenceProperty extends BaseProperty {
-    admin?: AdminReferenceOptions;
     type: "reference";
     /**
      * Default value for new entities. Must be a EntityReference.
@@ -602,14 +490,6 @@ export interface ReferenceProperty extends BaseProperty {
 }
 
 /**
- * @group Entity properties
- */
-export interface AdminRelationOptions extends AdminPropertyOptions {
-    previewProperties?: string[];
-    widget?: "select" | "dialog";
-}
-
-/**
  * A schema-level relationship between collections **within a single
  * datasource** — backed by a foreign key, junction table, or explicit join
  * path. The resolved value (an `EntityRelation`) can carry a prefetched entity
@@ -626,7 +506,6 @@ export interface AdminRelationOptions extends AdminPropertyOptions {
  * @group Entity properties
  */
 export interface RelationProperty extends BaseProperty {
-    admin?: AdminRelationOptions;
     type: "relation";
     /**
      * Default value for new entities. Must be a EntityRelation or array of EntityRelation.
@@ -760,16 +639,7 @@ export interface RelationProperty extends BaseProperty {
     widget?: "select" | "dialog";
 }
 
-/**
- * @group Entity properties
- */
-export interface AdminArrayOptions extends AdminPropertyOptions {
-    expanded?: boolean;
-    minimalistView?: boolean;
-}
-
 export interface ArrayProperty extends BaseProperty {
-    admin?: AdminArrayOptions;
     type: "array";
     /**
      * Default value for new entities. Must be an array.
@@ -843,17 +713,7 @@ export interface ArrayProperty extends BaseProperty {
     canAddElements?: boolean;
 }
 
-/**
- * @group Entity properties
- */
-export interface AdminMapOptions extends AdminPropertyOptions {
-    expanded?: boolean;
-    minimalistView?: boolean;
-    spreadChildren?: boolean;
-}
-
 export interface MapProperty extends BaseProperty {
-    admin?: AdminMapOptions;
     type: "map";
     /**
      * Default value for new entities. Must be a record/object.
@@ -902,31 +762,6 @@ export type PropertyBuilderProps<M extends Record<string, unknown> = Record<stri
     entityId?: string | number;
     authController: AuthState;
 };
-
-/**
- * @group Entity properties
- */
-export interface PropertyDisabledConfig {
-    /**
-     * Enable this flag if you would like to clear the value of the field
-     * when the corresponding property gets disabled.
-     *
-     * This is useful for keeping data consistency when you have conditional
-     * properties.
-     */
-    clearOnDisabled?: boolean;
-
-    /**
-     * Explanation of why this property is disabled (e.g. a different field
-     * needs to be enabled)
-     */
-    disabledMessage?: string;
-
-    /**
-     * Set this flag to true if you want to hide this field when disabled
-     */
-    hidden?: boolean;
-}
 
 /**
  * We use this type to define mapping between string or number values in
@@ -1207,12 +1042,6 @@ export interface UploadedFileContext {
      */
     storage: StorageConfig;
 }
-
-/**
- * Used for previewing urls if the download file is known
- * @group Entity properties
- */
-export type PreviewType = "image" | "video" | "audio" | "file";
 
 /**
  * MIME types for storage fields
