@@ -14,10 +14,12 @@ import "../../styles/editor.css";
 
 
 
-const collectionEditorHtml = `<span class="text-primary-light">import</span> { buildCollection } <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/common"</span>;
+const collectionEditorHtml = `<span class="text-primary-light">import type</span> { PostgresCollectionConfig } <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/types"</span>;
 
-<span class="text-primary-light">export const</span> <span class="text-white">orders</span> = buildCollection({
+<span class="text-primary-light">export const</span> <span class="text-white">orders</span>: PostgresCollectionConfig = {
   <span class="text-blue-300">name</span>: <span class="text-green-400">"Orders"</span>,
+  <span class="text-blue-300">slug</span>: <span class="text-green-400">"orders"</span>,
+  <span class="text-blue-300">table</span>: <span class="text-green-400">"orders"</span>,
   <span class="text-blue-300">properties</span>: {
     <span class="text-blue-300">customer</span>: { <span class="text-blue-300">type</span>: <span class="text-green-400">"string"</span>, <span class="text-blue-300">name</span>: <span class="text-green-400">"Customer"</span> },
     <span class="text-blue-300">total</span>:    { <span class="text-blue-300">type</span>: <span class="text-green-400">"number"</span>, <span class="text-blue-300">name</span>: <span class="text-green-400">"Total"</span> },
@@ -28,7 +30,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import</span> { b
   },
   <span class="text-blue-300">securityRules</span>: [<span class="text-surface-500">/* ... */</span>],
   <span class="text-blue-300">callbacks</span>: { <span class="text-blue-300">onSave</span>: <span class="text-surface-500">/* ... */</span> }
-});`;
+};`;
 ---
 
   <div class="flex flex-col isolate">

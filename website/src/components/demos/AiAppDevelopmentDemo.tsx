@@ -167,7 +167,7 @@ export default function AiAppDevelopmentDemo() {
                     <div className="space-y-1">
                       <div><span className="text-slate-500">{"// collections/feedbacks.ts"}</span></div>
                       <div>
-                        <span className="text-sky-400">import</span> {"{"} buildCollection {"}"} <span className="text-sky-400">from</span> <span className="text-emerald-400">"@rebasepro/common"</span>;
+                        <span className="text-sky-400">import type</span> {"{"} PostgresCollectionConfig {"}"} <span className="text-sky-400">from</span> <span className="text-emerald-400">"@rebasepro/types"</span>;
                       </div>
                       <div>
                         <span className="text-sky-400">import</span> OpenAI <span className="text-sky-400">from</span> <span className="text-emerald-400">"openai"</span>;
@@ -178,10 +178,10 @@ export default function AiAppDevelopmentDemo() {
                       </div>
                       <div className="h-2"></div>
                       <div>
-                        <span className="text-sky-400">export const</span> feedbacks = <span className="text-blue-400">buildCollection</span>({"{"}
+                        <span className="text-sky-400">export const</span> feedbacks: <span className="text-blue-400">PostgresCollectionConfig</span> = {"{"}
                       </div>
                       <div className="pl-4">
-                        slug: <span className="text-emerald-400">"feedbacks"</span>,
+                        slug: <span className="text-emerald-400">"feedbacks"</span>, table: <span className="text-emerald-400">"feedbacks"</span>,
                       </div>
                       <div className="pl-4">
                         properties: {"{"} content, aiSentiment, aiTags {"},"}
@@ -207,7 +207,7 @@ export default function AiAppDevelopmentDemo() {
                       <div className="pl-4">
                         {"}"}
                       </div>
-                      <div>{"});"}</div>
+                      <div>{"};"}</div>
                     </div>
                   ) : (
                     <div className="space-y-1">
