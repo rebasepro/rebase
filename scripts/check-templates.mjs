@@ -123,7 +123,42 @@ const TSCONFIG = {
     include: ["**/*.ts"]
 };
 
+/**
+ * The `admin` block reaches a collection file only if the config package can resolve
+ * `@rebasepro/admin-types` — the augmentation is what declares the field, and a
+ * `/// <reference types>` needs the package to be a real dependency.
+ *
+ * The typecheck below maps `@rebasepro/*` through `paths`, so it would compile happily
+ * even if the manifest never declared it. saas/config was in exactly that state: a
+ * reference file, no dependency, 42 errors the moment anything checked it for real.
+ */
+function checkAdminTypesDeclared() {
+    const manifest = path.join(templateConfig, "package.json");
+    const ref = path.join(templateConfig, "admin.d.ts");
+    const problems = [];
+
+    const hasRef = fs.existsSync(ref)
+        && /reference\s+types\s*=\s*["']@rebasepro\/admin-types["']/.test(fs.readFileSync(ref, "utf8"));
+    if (!hasRef) problems.push("config/admin.d.ts is missing its /// <reference types=\"@rebasepro/admin-types\" />");
+
+    const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    if (!deps["@rebasepro/admin-types"]) {
+        problems.push("config/package.json does not depend on @rebasepro/admin-types, so the reference cannot resolve");
+    }
+    return problems;
+}
+
 let failed = 0;
+const declarationProblems = checkAdminTypesDeclared();
+if (declarationProblems.length > 0) {
+    failed++;
+    console.log("  FAIL admin-types wiring");
+    for (const p of declarationProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   admin-types wiring");
+}
+
 const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-template-check-"));
 
 try {

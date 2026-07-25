@@ -1926,6 +1926,9 @@ importers:
 
   saas/config:
     dependencies:
+      '@rebasepro/admin-types':
+        specifier: workspace:*
+        version: link:../../packages/admin-types
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../../packages/types
