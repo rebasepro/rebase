@@ -42,7 +42,14 @@ function resolveRoots() {
     const raw = sh("git", ["rev-parse", "--git-common-dir"]).split("\n").pop().trim();
     if (!raw) return { worktreeRoot, primaryRoot: worktreeRoot };
 
-    const commonDir = path.isAbsolute(raw) ? raw : path.resolve(worktreeRoot, raw);
+    // Resolved against the CWD, NOT the worktree root: git prints this path
+    // relative to wherever it was invoked, so it is `.git` from the toplevel but
+    // `../.git` from `website/`. Resolving `../.git` against the worktree root
+    // yielded the repo's *parent* as primaryRoot, so every harness run started
+    // from a subdirectory looked like a worktree — which is exactly how
+    // `pnpm run deploy` (it cd's into website/) hit the lockfile-worktree guard
+    // in the primary checkout, where lockfile changes are legitimate.
+    const commonDir = path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
     return { worktreeRoot, primaryRoot: path.dirname(commonDir) };
 }
 
