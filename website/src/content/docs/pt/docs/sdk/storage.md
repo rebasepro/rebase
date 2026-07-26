@@ -126,7 +126,7 @@ const result = await client.storage.listObjects("products/images/", {
 });
 
 for (const item of result.items) {
-    console.log(item.key, item.size);
+    console.log(item.fullPath, item.name);
 }
 
 // Paginate
