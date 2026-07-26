@@ -22,7 +22,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/forms";
-import { Relation, JoinStep, OnAction } from "@rebasepro/types";
+import { Relation, RelationKind, JoinStep, OnAction } from "@rebasepro/types";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import type { AdminPostgresCollection } from "@rebasepro/admin-types";
 
@@ -34,7 +34,7 @@ import type { AdminPostgresCollection } from "@rebasepro/admin-types";
  * `kind: "manyToMany"` but not yet a junction table does not typecheck as any
  * member. A form in progress is not a relation — it becomes one on save.
  */
-type RelationDraft = {
+export type RelationDraft = {
     kind?: Relation["kind"];
     relationName?: string;
     target?: string;
@@ -47,6 +47,44 @@ type RelationDraft = {
     onDelete?: OnAction;
 };
 
+
+/**
+ * The dropdown's options, keyed by kind.
+ *
+ * Typed `Record<RelationKind, string>` rather than written inline as JSX, so
+ * adding a sixth kind to the union fails to compile here instead of quietly
+ * producing a picker that cannot author it.
+ */
+export const KIND_LABELS: Record<RelationKind, string> = {
+    belongsTo: "Belongs to — the key is on this table",
+    hasOne: "Has one — the key is on the target",
+    hasMany: "Has many — the key is on the target",
+    manyToMany: "Many to many — through a junction",
+    via: "Via — an explicit join path (read-only)"
+};
+
+/** An empty step, for a `via` chain being built up. */
+const EMPTY_STEP: JoinStep = { table: "",
+on: { from: "",
+to: "" } };
+
+/**
+ * Whether a draft is complete enough to be a relation of its kind.
+ *
+ * `via` is the reason this exists. Every other kind can fall back on a derived
+ * default — a `belongsTo` with no `localKey` resolves to `<name>_id` — but a
+ * join chain has nothing to derive from, so a `via` with an empty `joinPath`
+ * joins nothing and returns nothing. The dialog used to let it be saved.
+ */
+export function draftIsComplete(draft: RelationDraft): boolean {
+    if (!draft.relationName || !draft.target) return false;
+    if (draft.kind === "via") {
+        const steps = draft.joinPath ?? [];
+        if (steps.length === 0) return false;
+        return steps.every(s => s.table && s.on?.from && s.on?.to);
+    }
+    return true;
+}
 
 export function CollectionRelationsTab() {
     const { values, setFieldValue } = useFormex<AdminPostgresCollection>();
@@ -200,11 +238,9 @@ target: val };
                                         onValueChange={(val) => setEditingRelationState(prev => prev ? { ...prev,
 kind: val as unknown as Relation["kind"] } : null)}
                                     >
-                                        <SelectItem value="belongsTo">Belongs to — the key is on this table</SelectItem>
-                                        <SelectItem value="hasOne">Has one — the key is on the target</SelectItem>
-                                        <SelectItem value="hasMany">Has many — the key is on the target</SelectItem>
-                                        <SelectItem value="manyToMany">Many to many — through a junction</SelectItem>
-                                        <SelectItem value="via">Via — an explicit join path</SelectItem>
+                                        {(Object.keys(KIND_LABELS) as RelationKind[]).map(k => (
+                                            <SelectItem key={k} value={k}>{KIND_LABELS[k]}</SelectItem>
+                                        ))}
                                     </Select>
 
                                     {editingRelationState.kind === "manyToMany" && (
@@ -250,6 +286,103 @@ targetColumn: e.target.value } } : null)}
                                             </div>
                                         </div>
                                     )}
+
+                                    {editingRelationState.kind === "via" && (
+                                        <div className={cls("flex flex-col gap-4 mt-4 pt-4 border-t", defaultBorderMixin)}>
+                                            <Typography variant="subtitle2" className="text-text-primary">Join Path</Typography>
+                                            <Typography variant="body2" className="text-text-secondary -mt-3">
+                                                Each step joins one more table. <strong>From</strong> names a column on the
+                                                previous table — this collection&apos;s own table for the first step — and
+                                                <strong> to</strong> names a column on the table being joined. The last step
+                                                should land on the target&apos;s table. A join path is read-only: Rebase will
+                                                not invent which hop to write to.
+                                            </Typography>
+
+                                            <Select
+                                                fullWidth
+                                                label="Cardinality"
+                                                value={editingRelationState.cardinality ?? "many"}
+                                                onValueChange={(val) => setEditingRelationState(prev => prev
+                                                    ? { ...prev,
+cardinality: val as "one" | "many" }
+                                                    : null)}
+                                            >
+                                                <SelectItem value="many">Many — the chain yields a list</SelectItem>
+                                                <SelectItem value="one">One — the chain yields a single row</SelectItem>
+                                            </Select>
+
+                                            {(editingRelationState.joinPath ?? []).map((step, stepIndex) => {
+                                                const updateStep = (patch: Partial<JoinStep> & { from?: string; to?: string }) =>
+                                                    setEditingRelationState(prev => {
+                                                        if (!prev) return null;
+                                                        const steps = [...(prev.joinPath ?? [])];
+                                                        const current = steps[stepIndex];
+                                                        steps[stepIndex] = {
+                                                            table: patch.table ?? current.table,
+                                                            on: {
+                                                                from: patch.from ?? current.on.from,
+                                                                to: patch.to ?? current.on.to
+                                                            }
+                                                        };
+                                                        return { ...prev,
+joinPath: steps };
+                                                    });
+
+                                                return (
+                                                    <div key={stepIndex} className={cls("flex flex-col gap-2 p-3 rounded border", defaultBorderMixin)}>
+                                                        <div className="flex items-center gap-2">
+                                                            <Typography variant="label" className="text-text-secondary flex-1">
+                                                                Step {stepIndex + 1}
+                                                            </Typography>
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => setEditingRelationState(prev => prev
+                                                                    ? { ...prev,
+joinPath: (prev.joinPath ?? []).filter((_, i) => i !== stepIndex) }
+                                                                    : null)}
+                                                            >
+                                                                <Trash2Icon size="smallest"/>
+                                                            </IconButton>
+                                                        </div>
+                                                        <TextField
+                                                            label="Join into table"
+                                                            placeholder="e.g. user_roles"
+                                                            value={step.table}
+                                                            onChange={(e) => updateStep({ table: e.target.value })}
+                                                        />
+                                                        <div className="flex gap-4">
+                                                            <TextField
+                                                                className="flex-1"
+                                                                label="From column"
+                                                                placeholder={stepIndex === 0 ? "column on this table" : "column on the previous table"}
+                                                                value={typeof step.on.from === "string" ? step.on.from : step.on.from.join(", ")}
+                                                                onChange={(e) => updateStep({ from: e.target.value })}
+                                                            />
+                                                            <TextField
+                                                                className="flex-1"
+                                                                label="To column"
+                                                                placeholder={`column on ${step.table || "that table"}`}
+                                                                value={typeof step.on.to === "string" ? step.on.to : step.on.to.join(", ")}
+                                                                onChange={(e) => updateStep({ to: e.target.value })}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={() => setEditingRelationState(prev => prev
+                                                    ? { ...prev,
+joinPath: [...(prev.joinPath ?? []), { ...EMPTY_STEP,
+on: { ...EMPTY_STEP.on } }] }
+                                                    : null)}
+                                            >
+                                                Add step
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             </DialogContent>
                             <DialogActions>
@@ -258,7 +391,7 @@ targetColumn: e.target.value } } : null)}
                                     variant="filled"
                                     color="primary"
                                     onClick={handleSave}
-                                    disabled={!editingRelationState.relationName || !editingRelationState.target}
+                                    disabled={!draftIsComplete(editingRelationState)}
                                 >
                                     Save
                                 </Button>
