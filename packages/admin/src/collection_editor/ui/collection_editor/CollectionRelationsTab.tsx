@@ -23,6 +23,7 @@ import {
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/forms";
 import { Relation, RelationKind, JoinStep, OnAction } from "@rebasepro/types";
+import { RELATION_KINDS, RELATION_KIND_ORDER } from "../../relation_kinds";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import type { AdminPostgresCollection } from "@rebasepro/admin-types";
 
@@ -55,13 +56,9 @@ export type RelationDraft = {
  * adding a sixth kind to the union fails to compile here instead of quietly
  * producing a picker that cannot author it.
  */
-export const KIND_LABELS: Record<RelationKind, string> = {
-    belongsTo: "Belongs to — the key is on this table",
-    hasOne: "Has one — the key is on the target",
-    hasMany: "Has many — the key is on the target",
-    manyToMany: "Many to many — through a junction",
-    via: "Via — an explicit join path (read-only)"
-};
+export const KIND_LABELS: Record<RelationKind, string> = Object.fromEntries(
+    RELATION_KIND_ORDER.map(k => [k, `${RELATION_KINDS[k].label} — ${RELATION_KINDS[k].description}`])
+) as Record<RelationKind, string>;
 
 /** An empty step, for a `via` chain being built up. */
 const EMPTY_STEP: JoinStep = { table: "",

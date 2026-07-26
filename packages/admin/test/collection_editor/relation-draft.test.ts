@@ -19,7 +19,7 @@ describe("the relations tab's kind picker", () => {
     });
 
     it("says via is read-only where the user picks it", () => {
-        expect(KIND_LABELS.via).toContain("read-only");
+        expect(KIND_LABELS.via.toLowerCase()).toContain("read-only");
     });
 });
 

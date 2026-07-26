@@ -431,13 +431,15 @@ function PropertyEditFormFields({
             "array": "repeat",
             "vector": "vector_input",
             "geopoint": "text_field",
-            "binary": "text_field",
+            "binary": "text_field"
         };
         const widgetId = BASE_TYPE_TO_WIDGET[preset.baseType] || "text_field";
         setSelectedFieldConfigId(widgetId);
         // Merge preset defaults into the property
         const updatedValues = updatePropertyFromWidget(values, widgetId, propertyConfigs);
-        const mergedValues = { ...updatedValues, ...preset.defaults, propertyConfig: widgetId };
+        const mergedValues = { ...updatedValues,
+...preset.defaults,
+propertyConfig: widgetId };
         setValues(mergedValues as PropertyWithId);
     }, [values, propertyConfigs, setValues]);
 
@@ -535,7 +537,25 @@ function PropertyEditFormFields({
             <VectorPropertyField
                 disabled={disabled}/>;
     } else {
-        childComponent = null;
+        // No editor matched this widget. `geopoint` lands here every time: the
+        // model defines the type, but the admin has no field binding for it, so
+        // `getDefaultFieldId` falls off the end of its chain, logs to the
+        // console and returns undefined.
+        //
+        // This used to render nothing — the dialog opened showing a name, a
+        // description and no type-specific fields at all, which reads exactly
+        // like a property that simply has no settings. Saying so out loud is
+        // not support, but it is the difference between a gap and a bug.
+        childComponent = (
+            <div className={"col-span-12"}>
+                <InfoLabel mode={"warn"}>
+                    {values?.type
+                        ? `Properties of type "${values.type}" have no editor in the admin panel yet. ` +
+                          "The fields shown here are the ones every property shares — configure the rest in code."
+                        : "This property has no type yet."}
+                </InfoLabel>
+            </div>
+        );
     }
 
     return (
@@ -609,11 +629,12 @@ function PropertyEditFormFields({
                                 const currentMetadata = ((values as unknown as Record<string, unknown>).metadata as Record<string, unknown>) ?? {};
                                 setValues({
                                     ...values,
-                                    metadata: { ...currentMetadata, [key]: value },
+                                    metadata: { ...currentMetadata,
+[key]: value }
                                 } as PropertyWithId);
                             },
                             property: toSerializableProperty(values as Property),
-                            collection: toSerializableCollectionConfig(collectionValues),
+                            collection: toSerializableCollectionConfig(collectionValues)
                         })}
                     </div>
                 )}
@@ -714,7 +735,7 @@ const WIDGET_BASE_TYPE_MAP: Record<string, PropertyType> = {
     block: "map",
     repeat: "array",
     custom_array: "array",
-    vector_input: "vector",
+    vector_input: "vector"
 };
 
 function WidgetSelectView({

@@ -8,7 +8,15 @@ import {
     TextField,
     Typography
 } from "@rebasepro/ui";
-import { OnAction, RelationProperty, Relation } from "@rebasepro/types";
+import { OnAction, RelationProperty, RelationKind, JoinStep } from "@rebasepro/types";
+import {
+    RELATION_KINDS,
+    RELATION_KIND_ORDER,
+    kindUsesForeignKeyOnTarget,
+    kindUsesJoinPath,
+    kindUsesLocalKey,
+    kindUsesThrough
+} from "../../../relation_kinds";
 
 import { CollectionsSelect } from "./ReferencePropertyField";
 import type { AdminCollection } from "@rebasepro/admin-types";
@@ -53,7 +61,7 @@ export function RelationPropertyField({
     // The link lives under `relation` now, and its `kind` decides which of the
     // fields below even exist — which is what drives the conditional sections.
     const link = (values.relation ?? {}) as Record<string, any>;
-    const kind = (link.kind ?? "belongsTo") as Relation["kind"];
+    const kind = (link.kind ?? "belongsTo") as RelationKind;
 
     const relationName = link.relationName ?? "";
     const targetSlug = getTargetSlug(link.target);
@@ -66,9 +74,10 @@ export function RelationPropertyField({
     const onUpdate = link.onUpdate ?? "no action";
     const onDelete = link.onDelete ?? "no action";
 
-    const showThrough = kind === "manyToMany";
-    const showLocalKey = kind === "belongsTo";
-    const showForeignKey = kind === "hasOne" || kind === "hasMany";
+    const showThrough = kindUsesThrough(kind);
+    const showLocalKey = kindUsesLocalKey(kind);
+    const showForeignKey = kindUsesForeignKeyOnTarget(kind);
+    const showJoinPath = kindUsesJoinPath(kind);
 
     const updateThrough = useCallback(
         (patch: Record<string, unknown>) => {
@@ -132,67 +141,29 @@ targetColumn: "" };
                 </FieldCaption>
             </div>
 
-            {/* ─── Cardinality ─── */}
-            <div className={"col-span-12 sm:col-span-6"}>
+            {/* ─── Kind ─── */}
+            <div className={"col-span-12"}>
                 <Select
                     value={kind}
-                    onValueChange={(v) => setFieldValue("relation.kind", v as "one" | "many")}
-                    label={"Cardinality"}
+                    onValueChange={(v) => setFieldValue("relation.kind", v as RelationKind)}
+                    label={"Kind"}
                     disabled={disabled}
                     fullWidth
-                    renderValue={(v) => v === "one" ? "One (has-one)" : "Many (has-many)"}
+                    renderValue={(v) => RELATION_KINDS[v as RelationKind]?.label ?? v}
                 >
-                    <SelectItem value={"one"}>
-                        <div>
-                            <Typography variant={"body2"}>One (has-one)</Typography>
-                            <Typography variant={"caption"} color={"secondary"}>
-                                This property references a single record
-                            </Typography>
-                        </div>
-                    </SelectItem>
-                    <SelectItem value={"many"}>
-                        <div>
-                            <Typography variant={"body2"}>Many (has-many)</Typography>
-                            <Typography variant={"caption"} color={"secondary"}>
-                                This property references multiple records
-                            </Typography>
-                        </div>
-                    </SelectItem>
+                    {RELATION_KIND_ORDER.map((k) => (
+                        <SelectItem key={k} value={k}>
+                            <div>
+                                <Typography variant={"body2"}>{RELATION_KINDS[k].label}</Typography>
+                                <Typography variant={"caption"} color={"secondary"}>
+                                    {RELATION_KINDS[k].description}
+                                </Typography>
+                            </div>
+                        </SelectItem>
+                    ))}
                 </Select>
                 <FieldCaption>
-                    Whether the relation returns one or multiple records
-                </FieldCaption>
-            </div>
-
-            {/* ─── Direction ─── */}
-            <div className={"col-span-12 sm:col-span-6"}>
-                <Select
-                    value={kind}
-                    onValueChange={(v) => setFieldValue("relation.kind", v as "owning" | "inverse")}
-                    label={"Direction"}
-                    disabled={disabled}
-                    fullWidth
-                    renderValue={(v) => v === "owning" ? "Owning" : "Inverse"}
-                >
-                    <SelectItem value={"owning"}>
-                        <div>
-                            <Typography variant={"body2"}>Owning</Typography>
-                            <Typography variant={"caption"} color={"secondary"}>
-                                This table stores the foreign key (or owns the junction table)
-                            </Typography>
-                        </div>
-                    </SelectItem>
-                    <SelectItem value={"inverse"}>
-                        <div>
-                            <Typography variant={"body2"}>Inverse</Typography>
-                            <Typography variant={"caption"} color={"secondary"}>
-                                The target table stores the foreign key pointing back here
-                            </Typography>
-                        </div>
-                    </SelectItem>
-                </Select>
-                <FieldCaption>
-                    Which side of the relation owns the persistence
+                    Which side holds the key, and whether this yields one row or many
                 </FieldCaption>
             </div>
 
@@ -228,6 +199,24 @@ targetColumn: "" };
                     />
                     <FieldCaption>
                         Column on the target table that references this table&apos;s primary key
+                    </FieldCaption>
+                </div>
+            )}
+
+            {/* ─── Join path (via) ─── */}
+            {showJoinPath && (
+                <div className={"col-span-12"}>
+                    <Typography variant={"label"} className={"mb-2"}>
+                        Join path
+                    </Typography>
+                    <FieldCaption>
+                        A <code>via</code> relation is reached by joining across several tables, and is
+                        read-only — Rebase will not guess which hop to write to. Its <code>joinPath</code>
+                        {" "}is edited in the collection&apos;s Relations tab, or in code, where the whole
+                        chain is visible at once.
+                        {(link.joinPath as JoinStep[] | undefined)?.length
+                            ? ` Currently ${(link.joinPath as JoinStep[]).length} step(s).`
+                            : " No steps are configured yet, so this relation will return nothing."}
                     </FieldCaption>
                 </div>
             )}
