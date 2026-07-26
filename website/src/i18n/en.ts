@@ -3,7 +3,7 @@ export const en = {
   "hero.title.part1": "The Postgres you already have.",
   "hero.title.part2": "The backend you always wanted.",
   "hero.subtitle":
-    "Point Rebase at your database and get REST APIs, auth, storage and realtime — secured by Postgres row-level security, not middleware. The admin panel is a separate product: add it when you want one, or never. Built to be driven by your team and your AI agents.",
+    "Connect your database and get REST, auth, storage and realtime — with every access rule enforced by Postgres itself, not by middleware.",
   "hero.cta.demo": "See the live demo",
   "hero.cta.demo.note": "No signup — a real Rebase backend, live, with its generated admin panel",
   "hero.cli.label": "Prefer your terminal? Up and running locally in under a minute:",

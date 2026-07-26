@@ -2,7 +2,8 @@ export const es = {
   "hero.badge": "Open-source · Autoalojado · Hecho para Postgres",
   "hero.title.part1": "El Postgres que ya tienes.",
   "hero.title.part2": "El backend que siempre quisiste.",
-  "hero.subtitle": "Apunta Rebase a tu base de datos y obtén APIs REST, auth, storage y tiempo real — protegido por row-level security de Postgres, no por middleware. El panel de administración es un producto aparte: añádelo cuando quieras, o nunca. Pensado para que lo manejen tu equipo y tus agentes de IA.",
+  "hero.subtitle":
+    "Conecta tu base de datos y obtén REST, auth, storage y tiempo real — con cada regla de acceso aplicada por Postgres, no por middleware.",
   "hero.cta.demo": "Ver la demo en vivo",
   "hero.cta.demo.note": "Sin registro — un backend Rebase real, en vivo, con su panel admin generado",
   "hero.cli.label": "¿Prefieres la terminal? Funcionando en local en menos de un minuto:",

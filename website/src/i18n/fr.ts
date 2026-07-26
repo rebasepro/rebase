@@ -2,7 +2,8 @@ export const fr = {
   "hero.badge": "Open-source · Auto-hébergé · Natif Postgres",
   "hero.title.part1": "Le Postgres que vous avez déjà.",
   "hero.title.part2": "Le backend que vous avez toujours voulu.",
-  "hero.subtitle": "Pointez Rebase vers votre base de données et obtenez des APIs REST, l'auth, le stockage et le temps réel — sécurisés par la row-level security de Postgres, pas par du middleware. Le panneau d'administration est un produit distinct : ajoutez-le quand vous le voulez, ou jamais. Conçu pour être piloté par votre équipe et vos agents IA.",
+  "hero.subtitle":
+    "Connectez votre base de données et obtenez REST, auth, stockage et temps réel — chaque règle d'accès appliquée par Postgres lui-même, pas par du middleware.",
   "hero.cta.demo": "Voir la démo en direct",
   "hero.cta.demo.note": "Sans inscription — un vrai backend Rebase, en direct, avec son panel admin généré",
   "hero.cli.label": "Vous préférez le terminal ? Opérationnel en local en moins d'une minute :",
