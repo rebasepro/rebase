@@ -18,7 +18,7 @@ L'archiviazione viene configurata nel blocco `storage` di `initializeRebaseBacke
 
 ### Archiviazione Locale
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {
@@ -30,7 +30,7 @@ const backend = await initializeRebaseBackend({
 
 ### Archiviazione S3
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {
@@ -47,7 +47,7 @@ const backend = await initializeRebaseBackend({
 
 ### GCS / Firebase Storage
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {

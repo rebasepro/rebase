@@ -54,7 +54,7 @@ El **nombre del archivo** (sin extensión) se convierte en el ID único del trab
 
 Habilita los trabajos cron añadiendo `cronsDir` a tu configuración de backend:
 
-```typescript
+```typescript no-verify
 const instance = await initializeRebaseBackend({
     // ... other config
     functionsDir: path.resolve(__dirname, "../functions"),

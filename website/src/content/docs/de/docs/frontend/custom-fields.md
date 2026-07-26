@@ -18,8 +18,9 @@ Ein benutzerdefiniertes Feld ist eine React-Komponente, die `FieldProps` empfän
 
 ```tsx
 import type { FieldProps } from "@rebasepro/admin";
+import type { StringProperty, NumberProperty } from "@rebasepro/types";
 
-function ColorPickerField({ value, setValue, error, showError }: FieldProps<string>) {
+function ColorPickerField({ value, setValue, error, showError }: FieldProps<StringProperty>) {
     return (
         <div>
             <input
@@ -91,7 +92,7 @@ Das Modul braucht einen **Default-Export** — der Thunk löst auf `default` auf
 
 Registrieren Sie einen wiederverwendbaren Feldtyp:
 
-```typescript
+```tsx
 const colorPropertyConfig: PropertyConfig = {
     key: "color_picker",
     name: "Color Picker",
@@ -103,8 +104,8 @@ const colorPropertyConfig: PropertyConfig = {
     }
 };
 
-// Register globally
-<Rebase propertyConfigs={[colorPropertyConfig]} ... />
+// Register globally — keyed by the config's `key`
+<Rebase propertyConfigs={{ color_picker: colorPropertyConfig }} ... />
 ```
 
 Verwenden Sie es dann in jeder Sammlung:
@@ -124,8 +125,8 @@ properties: {
 Benutzerdefinierte Felder können auf die vollständigen Entitätswerte zugreifen:
 
 ```tsx
-function PriceWithTaxField({ value, setValue, context }: FieldProps<number>) {
-    const taxRate = context.values.tax_rate ?? 0.1;
+function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
+    const taxRate = Number(context.values.tax_rate ?? 0.1);
     const priceWithTax = value ? value * (1 + taxRate) : 0;
 
     return (
@@ -146,8 +147,8 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<number>) {
 Beim Rendern in der Tabellenansicht sollten Felder kompakt sein. Überprüfen Sie `tableMode`:
 
 ```tsx
-function MyField({ value, setValue, tableMode }: FieldProps<string>) {
-    if (tableMode) {
+function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
+    if (minimalistView) {
         return <span onClick={() => { /* open editor */ }}>{value}</span>;
     }
 

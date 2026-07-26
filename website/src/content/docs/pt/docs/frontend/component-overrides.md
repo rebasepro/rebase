@@ -55,10 +55,10 @@ function App() {
 Para substituir componentes apenas para uma coleção específica, adicione um objeto `components` à sua definição. Isso é útil para personalizar estados vazios, cards ou visões de detalhe para modelos específicos.
 
 ```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 import { ProductCustomForm } from "./components/ProductCustomForm";
 
-const productsCollection: PostgresCollectionConfig = {
+const productsCollection = defineCollection({
     name: "Products",
     slug: "products",
     table: "products",
@@ -82,7 +82,7 @@ const productsCollection: PostgresCollectionConfig = {
             }
         }
     }
-};
+});
 
 ```
 

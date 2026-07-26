@@ -16,8 +16,10 @@ Entity views let you add custom **tabs** to the entity detail page alongside the
 ## Adding Entity Views
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
+    table: "articles",
     name: "Articles",
     properties: { /* ... */ },
     admin: {
@@ -34,7 +36,7 @@ const articlesCollection: CollectionConfig = {
             }
         ]
     }
-};
+});
 
 ```
 

@@ -61,8 +61,10 @@ TypeScript Collections
 Given this collection:
 
 ```typescript
-const productsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const productsCollection = defineCollection({
     slug: "products",
+    name: "Products",
     table: "products",
     properties: {
         name: { type: "string", name: "Name", validation: { required: true } },
@@ -70,7 +72,7 @@ const productsCollection: CollectionConfig = {
         active: { type: "boolean", name: "Active", defaultValue: true },
         created_at: { type: "date", name: "Created", autoValue: "on_create" }
     }
-};
+});
 ```
 
 Rebase generates this Drizzle schema:

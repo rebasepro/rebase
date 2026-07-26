@@ -16,8 +16,12 @@ Every collection can be displayed in four view modes:
 ## Configuration
 
 ```typescript
-const productsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const productsCollection = defineCollection({
     slug: "products",
+    properties: { /* … */ },
+    name: "Products",
+    table: "products",
     // ...
     admin: {
         defaultViewMode: "table",            // Default view
@@ -27,7 +31,7 @@ const productsCollection: CollectionConfig = {
             columnProperty: "status"         // Enum property for columns
         }
     }
-};
+});
 
 ```
 
@@ -70,8 +74,11 @@ Control row height with `defaultSize`:
 Configure a Kanban board by specifying which enum property to use as columns:
 
 ```typescript
-const tasksCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const tasksCollection = defineCollection({
     slug: "tasks",
+    name: "Tasks",
+    table: "tasks",
     properties: {
         title: { type: "string", name: "Title" },
         status: {
@@ -93,7 +100,7 @@ const tasksCollection: CollectionConfig = {
             columnProperty: "status"
         }
     }
-};
+});
 
 ```
 
@@ -106,8 +113,11 @@ Drag-and-drop between columns automatically updates the enum field and sort orde
 Cards display entities as visual cards — useful for image-heavy content:
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
+    name: "Articles",
+    table: "articles",
     properties: {
         title: { type: "string", name: "Title" },
         cover: {
@@ -119,7 +129,7 @@ const articlesCollection: CollectionConfig = {
     admin: {
         defaultViewMode: "cards"
     }
-};
+});
 
 ```
 

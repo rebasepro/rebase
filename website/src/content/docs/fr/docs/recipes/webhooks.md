@@ -11,7 +11,8 @@ Utilisez les callbacks `afterSave` et `afterDelete` pour notifier les services e
 ## Notification Slack sur Nouvelle Commande
 
 ```typescript
-const ordersCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",
     table: "orders",
@@ -29,7 +30,7 @@ const ordersCollection: CollectionConfig = {
         }
     },
     properties: { /* ... */ }
-};
+});
 ```
 
 ## Synchronisation vers une API Externe

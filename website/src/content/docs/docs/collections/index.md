@@ -14,6 +14,89 @@ A **collection** is a TypeScript object that describes a database table and how 
 - **Lifecycle hooks** — Callbacks for create, update, delete operations
 - **Admin UI behavior** — View modes, inline editing, entity views, actions — all under `admin`
 
+## Declaring one: `defineCollection`
+
+Wrap the literal in `defineCollection`. At runtime it is the identity function — it
+returns the object unchanged — so it costs nothing. What it buys is inference: a `const`
+type parameter captures your `properties` keys as literal types, and the key-shaped
+fields of the `admin` block are then checked against them. A name that is not one of
+your properties is a **compile error**, not just a missing suggestion.
+
+```typescript
+import { defineCollection } from "@rebasepro/admin-types";
+
+const products = defineCollection({
+    name: "Products",
+    slug: "products",
+    table: "products",
+    properties: {
+        name: { name: "Name", type: "string" },
+        price: { name: "Price", type: "number" }
+    },
+    admin: {
+        titleProperty: "name",       // completion: "name" | "price"
+        sort: ["price", "asc"],      // completion on the first element
+        propertiesOrder: ["name", "price"]
+    }
+});
+```
+
+```typescript
+    admin: {
+        titleProperty: "nmae"
+        //             ~~~~~~ Type '"nmae"' is not assignable to type
+        //                    'PropertyPath<…>'. Did you mean '"name"'?
+    }
+```
+
+The checked fields are `titleProperty`, `sort`, `propertiesOrder` and `listProperties`.
+Three forms are accepted besides a plain property key:
+
+| Form | Example | Notes |
+| --- | --- | --- |
+| Dotted path into a `map` | `"profile.displayName"` | The **root** must be a real property; the path below it is not checked. |
+| Child-collection column | `"subcollection:orders"` | `propertiesOrder` / `listProperties` only. |
+| An `additionalFields` key | `"score" as AdditionalFieldKey` | Needs the cast — see below. |
+
+`AdditionalFieldDelegate.key` is a plain `string`, so the type system has no way to know
+which extra keys a collection declares. Rather than reopen these fields to every string,
+the cast makes the exception explicit:
+
+```typescript
+import type { AdditionalFieldKey } from "@rebasepro/admin-types";
+
+propertiesOrder: ["title", "score" as AdditionalFieldKey]
+```
+
+Import it from `@rebasepro/admin-types` in a project that has an admin panel — that is
+the copy that also typechecks the `admin` block. A headless BaaS project, which has no
+admin block and no React, imports the same function from `@rebasepro/common` instead.
+
+Annotating the type directly still works and is still checked:
+
+```typescript
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const products: PostgresCollectionConfig = {
+    name: "Products",
+    slug: "products",
+    table: "products",
+    properties: {
+        name: { name: "Name", type: "string" }
+    }
+};
+```
+
+but an annotation only *validates the shape* — it cannot see your property names, so the
+`admin` key fields fall back to accepting any string. Prefer `defineCollection` unless you
+need to name the type.
+
+:::note
+`buildCollection` and `buildProperty` were removed in 0.11. `buildCollection` is
+`defineCollection` without the inference; `buildProperty` wrapped a property in a type it
+already had. See the [changelog](/docs/changelog) for the one-line migration.
+:::
+
 ## Anatomy: the contract, and the panel
 
 One file, two audiences. Everything the *database and the API* care about sits at the
@@ -66,16 +149,17 @@ After that, plain core types carry a fully typed block — a typo like `icoon` i
 and you get completion:
 
 ```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const posts: PostgresCollectionConfig = {
+const posts = defineCollection({
     slug: "posts",
+    name: "Posts",
     table: "posts",
     properties: {
         title: { name: "Title", type: "string", admin: { multiline: true } }
     },
     admin: { icon: "FileText" }
-};
+});
 ```
 
 An augmentation applies to the whole TypeScript *program*, and `config/` and `frontend/`
@@ -103,9 +187,9 @@ It reports anything it cannot move safely — notably presentation inside
 `relations[].overrides`, which needs `overrides: { admin: { … } }` by hand.
 
 ```typescript
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-export const productsCollection: CollectionConfig = {
+export const productsCollection = defineCollection({
     slug: "products",              // URL path and API endpoint
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
@@ -127,7 +211,7 @@ export const productsCollection: CollectionConfig = {
             name: "Category",
             enum: [
                 { id: "electronics", label: "Electronics", color: "blue" },
-                { id: "clothing", label: "Clothing", color: "pinkLight" },
+                { id: "clothing", label: "Clothing", color: "pink" },
                 { id: "books", label: "Books", color: "orange" }
             ]
         },
@@ -151,7 +235,7 @@ export const productsCollection: CollectionConfig = {
     admin: {
         icon: "inventory_2"           // Material icon key
     }
-};
+});
 
 ```
 

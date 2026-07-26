@@ -75,13 +75,19 @@ pnpm dev
 ```
 
 Ceci démarre les deux ensemble :
-- **Backend** à `http://localhost:3001` — API REST, authentification, stockage, WebSocket
-- **Frontend** à `http://localhost:5173` — Panneau d'administration Rebase
+- **Backend** — API REST, authentification, stockage, WebSocket
+- **Frontend** — le panneau d'administration Rebase
 - **Hot reload** pour les deux — les changements prennent effet instantanément
+
+Les deux ports sont **dérivés du chemin du projet** plutôt que fixes, ce qui permet
+d'exécuter plusieurs projets Rebase en parallèle. `rebase dev` affiche les deux URLs
+qu'il a liées — utilisez celles-ci, pas `localhost:3001`/`localhost:5173`. (`PORT` et
+`VITE_API_URL` dans `.env` configurent `rebase start`, le serveur de production, et
+sont ignorés ici.) Fixez un port avec `rebase dev --port 3001`.
 
 ## Première connexion
 
-Lorsque vous ouvrez `http://localhost:5173`, vous verrez l'écran de connexion. Le **premier utilisateur** à s'inscrire devient automatiquement un administrateur — c'est le flux d'amorçage.
+Lorsque vous ouvrez l'URL du frontend affichée par `rebase dev`, vous verrez l'écran de connexion. Le **premier utilisateur** à s'inscrire devient automatiquement un administrateur — c'est le flux d'amorçage.
 
 1. Cliquez sur **S'inscrire**
 2. Entrez votre adresse e-mail et votre mot de passe
@@ -92,9 +98,9 @@ Lorsque vous ouvrez `http://localhost:5173`, vous verrez l'écran de connexion. 
 Ouvrez `config/collections/` et créez un nouveau fichier. Exportez la collection en tant qu'**export par défaut** — c'est ainsi que le registre la détecte :
 
 ```typescript title="config/collections/products.ts"
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -126,7 +132,7 @@ const productsCollection: CollectionConfig = {
             autoValue: "on_create"
         }
     }
-};
+});
 
 export default productsCollection;
 ```

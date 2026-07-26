@@ -75,14 +75,14 @@ These options are set internally when mounting routes but are derived from the b
 
 Set `storageAuthorize` on `initializeRebaseBackend`. It is the storage analogue of a collection's security rules, and runs after authentication on every storage route:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     storage: { type: "s3", bucket: "app-files", /* ... */ },
     storageAuthorize: async ({ key, bucket, operation, user }) => {
         if (!user) return false;
         // Keys are laid out as `{teamId}/{docId}/...`
         const [teamId] = key.split("/");
-        return isTeamMember(user.userId, teamId);
+        return isTeamMember(user.uid, teamId);
     }
 });
 ```

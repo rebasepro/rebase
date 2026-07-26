@@ -9,15 +9,17 @@ description: Definieren Sie Row Level Security (RLS)-Richtlinien für Ihre Samml
 Sicherheitsregeln ermöglichen es Ihnen, **Row Level Security (RLS)**-Richtlinien für Ihre PostgreSQL-Tabellen direkt in Ihren Sammlungsdefinitionen zu definieren. Wenn das Drizzle-Schema generiert wird, erstellt Rebase die entsprechenden `CREATE POLICY`-Anweisungen.
 
 ```typescript
-const postsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const postsCollection = defineCollection({
     slug: "posts",
+    name: "Posts",
     table: "posts",
     properties: { /* ... */ },
     securityRules: [
         { operation: "select", access: "public" },
         { operations: ["insert", "update", "delete"], ownerField: "author_id" }
     ]
-};
+});
 ```
 
 ## Funktionsweise
@@ -202,8 +204,11 @@ Ein häufiges Bedürfnis ist es, **nicht authentifizierten Benutzern** das Über
 ### Empfohlen: `access: "public"` mit `withCheck`
 
 ```typescript
-const contactMessagesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const contactMessagesCollection = defineCollection({
     slug: "contact_messages",
+    name: "Contact Messages",
+    table: "contact_messages",
     securityRules: [
         // Jeder kann eine Kontaktanfrage senden
         {
@@ -215,7 +220,7 @@ const contactMessagesCollection: CollectionConfig = {
         { operations: ["select", "update", "delete"], roles: ["admin"] }
     ],
     properties: { /* ... */ }
-};
+});
 ```
 
 Der `access: "public"`-Shortcut generiert eine Richtlinie, die die Operation ohne Authentifizierung ermöglicht.
@@ -223,8 +228,11 @@ Der `access: "public"`-Shortcut generiert eine Richtlinie, die die Operation ohn
 ### Für Lead-Generierung / Anmeldungen
 
 ```typescript
-const leadSignupsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const leadSignupsCollection = defineCollection({
     slug: "lead_magnet_signups",
+    name: "Lead Magnet Signups",
+    table: "lead_magnet_signups",
     securityRules: [
         // Anonyme Einfügungen erlauben
         { operation: "insert", access: "public", withCheck: "true" },
@@ -232,7 +240,7 @@ const leadSignupsCollection: CollectionConfig = {
         { operation: "select", roles: ["admin"] }
     ],
     properties: { /* ... */ }
-};
+});
 ```
 
 ### Wie anonyme Anfragen funktionieren

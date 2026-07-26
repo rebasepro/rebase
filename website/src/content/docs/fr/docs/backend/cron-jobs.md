@@ -54,7 +54,7 @@ Le **nom du fichier** (sans extension) devient l'ID unique de la tâche — par 
 
 Activez les tâches cron en ajoutant `cronsDir` à votre configuration de backend :
 
-```typescript
+```typescript no-verify
 const instance = await initializeRebaseBackend({
     // ... other config
     functionsDir: path.resolve(__dirname, "../functions"),

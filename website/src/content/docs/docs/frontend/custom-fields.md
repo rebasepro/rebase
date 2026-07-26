@@ -18,8 +18,9 @@ A custom field is a React component that receives `FieldProps`:
 
 ```tsx
 import type { FieldProps } from "@rebasepro/admin";
+import type { StringProperty, NumberProperty } from "@rebasepro/types";
 
-function ColorPickerField({ value, setValue, error, showError }: FieldProps<string>) {
+function ColorPickerField({ value, setValue, error, showError }: FieldProps<StringProperty>) {
     return (
         <div>
             <input
@@ -45,7 +46,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<stri
 | `property` | `Property` | The property configuration |
 | `context` | `FormContext` | Full form context with all entity values |
 | `disabled` | `boolean` | Field is readonly |
-| `tableMode` | `boolean` | Rendering inside the spreadsheet (compact mode) |
+| `minimalistView` | `boolean` | Rendering inside the spreadsheet (compact mode) |
 
 ## Registering a Custom Field
 
@@ -91,7 +92,7 @@ The module must have a **default export** — the thunk resolves to `default`, a
 
 Register a reusable field type:
 
-```typescript
+```tsx
 const colorPropertyConfig: PropertyConfig = {
     key: "color_picker",
     name: "Color Picker",
@@ -103,8 +104,8 @@ const colorPropertyConfig: PropertyConfig = {
     }
 };
 
-// Register globally
-<Rebase propertyConfigs={[colorPropertyConfig]} ... />
+// Register globally — keyed by the config's `key`
+<Rebase propertyConfigs={{ color_picker: colorPropertyConfig }} ... />
 ```
 
 Then use it in any collection:
@@ -124,8 +125,8 @@ properties: {
 Custom fields can access the full entity values:
 
 ```tsx
-function PriceWithTaxField({ value, setValue, context }: FieldProps<number>) {
-    const taxRate = context.values.tax_rate ?? 0.1;
+function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
+    const taxRate = Number(context.values.tax_rate ?? 0.1);
     const priceWithTax = value ? value * (1 + taxRate) : 0;
 
     return (
@@ -143,11 +144,11 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<number>) {
 
 ## Table Mode
 
-When rendering inside the spreadsheet view, fields should be compact. Check `tableMode`:
+When rendering inside the spreadsheet view, fields should be compact. Check `minimalistView`:
 
 ```tsx
-function MyField({ value, setValue, tableMode }: FieldProps<string>) {
-    if (tableMode) {
+function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
+    if (minimalistView) {
         return <span onClick={() => { /* open editor */ }}>{value}</span>;
     }
 

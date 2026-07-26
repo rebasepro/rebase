@@ -15,9 +15,9 @@ Une **collection** est un objet TypeScript qui décrit une table de base de donn
 - **Hooks de cycle de vie** — Fonctions de rappel pour les opérations de création, mise à jour, suppression
 
 ```typescript
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-export const productsCollection: CollectionConfig = {
+export const productsCollection = defineCollection({
     slug: "products",              // URL path and API endpoint
     name: "Products",              // Display name (plural)
     singularName: "Product",       // Display name (singular)
@@ -39,7 +39,7 @@ export const productsCollection: CollectionConfig = {
             name: "Category",
             enum: [
                 { id: "electronics", label: "Electronics", color: "blue" },
-                { id: "clothing", label: "Clothing", color: "pinkLight" },
+                { id: "clothing", label: "Clothing", color: "pink" },
                 { id: "books", label: "Books", color: "orange" }
             ]
         },
@@ -63,9 +63,54 @@ export const productsCollection: CollectionConfig = {
     admin: {
         icon: "inventory_2"           // Material icon key
     }
-};
+});
 
 ```
+
+## En déclarer une : `defineCollection`
+
+Enveloppez le littéral dans `defineCollection`. À l'exécution, c'est la fonction identité — elle renvoie l'objet inchangé — donc son coût est nul. Ce qu'elle apporte, c'est l'inférence : un paramètre de type `const` capture les clés de `properties` comme types littéraux, ce qui les fait apparaître dans la complétion de l'éditeur pour `admin.titleProperty`, `admin.sort` et `admin.propertiesOrder`.
+
+```typescript
+import { defineCollection } from "@rebasepro/admin-types";
+
+const products = defineCollection({
+    name: "Products",
+    slug: "products",
+    table: "products",
+    properties: {
+        name: { name: "Name", type: "string" },
+        price: { name: "Price", type: "number" }
+    },
+    admin: {
+        titleProperty: "name",   // complétion : "name" | "price"
+        sort: ["price", "asc"]   // complétion sur le premier élément
+    }
+});
+```
+
+Importez-la depuis `@rebasepro/admin-types` dans un projet doté d'un panneau d'administration — c'est la copie qui vérifie aussi le bloc `admin`. Un projet BaaS headless, sans bloc `admin` ni React, importe la même fonction depuis `@rebasepro/common`.
+
+Annoter le type directement fonctionne toujours et reste vérifié :
+
+```typescript
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const products: PostgresCollectionConfig = {
+    name: "Products",
+    slug: "products",
+    table: "products",
+    properties: {
+        name: { name: "Name", type: "string" }
+    }
+};
+```
+
+Mais une annotation ne fait que *valider* l'objet — elle ne voit pas les noms de vos propriétés, vous n'avez donc aucune complétion. Préférez `defineCollection`, sauf si vous devez nommer le type.
+
+:::note
+`buildCollection` et `buildProperty` ont été supprimés en 0.11. `buildCollection` est `defineCollection` sans l'inférence ; `buildProperty` enveloppait une propriété dans un type qu'elle avait déjà. Voir le [changelog](/docs/changelog) pour la migration en une ligne.
+:::
 
 ## Propriétés clés
 

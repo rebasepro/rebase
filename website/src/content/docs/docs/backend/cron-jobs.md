@@ -57,7 +57,7 @@ The **filename** (without extension) becomes the job's unique ID — e.g., `heal
 
 Enable cron jobs by adding `cronsDir` to your backend config:
 
-```typescript
+```typescript no-verify
 const instance = await initializeRebaseBackend({
     // ... other config
     functionsDir: path.resolve(__dirname, "../functions"),

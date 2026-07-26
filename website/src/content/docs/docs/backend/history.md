@@ -14,7 +14,7 @@ Entity history records a entity of entity values on every create, update, and de
 
 Enable history in `initializeRebaseBackend`:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     // ...
     history: true
@@ -35,11 +35,14 @@ history: {
 Mark which collections should track history:
 
 ```typescript
-const ordersCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const ordersCollection = defineCollection({
     slug: "orders",
+    name: "Orders",
+    table: "orders",
     history: true,       // Enable for this collection
     properties: { /* ... */ }
-};
+});
 ```
 
 ## How It Works

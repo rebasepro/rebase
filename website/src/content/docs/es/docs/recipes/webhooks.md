@@ -11,7 +11,8 @@ Utiliza las devoluciones de llamada `afterSave` y `afterDelete` para notificar a
 ## Notificación de Slack sobre un Nuevo Pedido
 
 ```typescript
-const ordersCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",
     table: "orders",
@@ -29,7 +30,7 @@ const ordersCollection: CollectionConfig = {
         }
     },
     properties: { /* ... */ }
-};
+});
 ```
 
 ## Sincronización con API Externa

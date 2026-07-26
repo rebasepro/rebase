@@ -9,15 +9,17 @@ description: Definisci le politiche di sicurezza a livello di riga (Row Level Se
 Le regole di sicurezza ti consentono di definire le politiche di **Sicurezza a Livello di Riga (RLS)** per le tue tabelle PostgreSQL direttamente nelle definizioni delle tue collection. Quando lo schema Drizzle viene generato, Rebase crea le corrispondenti istruzioni `CREATE POLICY`.
 
 ```typescript
-const postsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const postsCollection = defineCollection({
     slug: "posts",
+    name: "Posts",
     table: "posts",
     properties: { /* ... */ },
     securityRules: [
         { operation: "select", access: "public" },
         { operations: ["insert", "update", "delete"], ownerField: "author_id" }
     ]
-};
+});
 ```
 
 ## Come Funziona
@@ -202,8 +204,11 @@ Un'esigenza comune è consentire agli **utenti non autenticati** di inviare dati
 ### Consigliato: `access: "public"` con `withCheck`
 
 ```typescript
-const contactMessagesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const contactMessagesCollection = defineCollection({
     slug: "contact_messages",
+    name: "Contact Messages",
+    table: "contact_messages",
     securityRules: [
         // Chiunque può inviare un messaggio di contatto
         {
@@ -215,7 +220,7 @@ const contactMessagesCollection: CollectionConfig = {
         { operations: ["select", "update", "delete"], roles: ["admin"] }
     ],
     properties: { /* ... */ }
-};
+});
 ```
 
 La scorciatoia `access: "public"` genera una policy che consente l'operazione senza richiedere autenticazione.
@@ -223,8 +228,11 @@ La scorciatoia `access: "public"` genera una policy che consente l'operazione se
 ### Per la Cattura di Lead / Iscrizioni
 
 ```typescript
-const leadSignupsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const leadSignupsCollection = defineCollection({
     slug: "lead_magnet_signups",
+    name: "Lead Magnet Signups",
+    table: "lead_magnet_signups",
     securityRules: [
         // Consenti inserimenti anonimi
         { operation: "insert", access: "public", withCheck: "true" },
@@ -232,7 +240,7 @@ const leadSignupsCollection: CollectionConfig = {
         { operation: "select", roles: ["admin"] }
     ],
     properties: { /* ... */ }
-};
+});
 ```
 
 ### Come Funzionano le Richieste Anonime

@@ -9,15 +9,17 @@ description: Define Row Level Security policies for your collections using conve
 Security rules let you define **Row Level Security (RLS)** policies for your PostgreSQL tables directly in your collection definitions. When the Drizzle schema is generated, Rebase creates the corresponding `CREATE POLICY` statements.
 
 ```typescript
-const postsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const postsCollection = defineCollection({
     slug: "posts",
+    name: "Posts",
     table: "posts",
     properties: { /* ... */ },
     securityRules: [
         { operation: "select", access: "public" },
         { operations: ["insert", "update", "delete"], ownerField: "author_id" }
     ]
-};
+});
 ```
 
 ## How It Works
@@ -236,8 +238,11 @@ A common need is allowing **unauthenticated users** to submit data — contact f
 ### Recommended: `access: "public"` with `withCheck`
 
 ```typescript
-const contactMessagesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const contactMessagesCollection = defineCollection({
     slug: "contact_messages",
+    name: "Contact Messages",
+    table: "contact_messages",
     securityRules: [
         // Anyone can submit a contact message
         {
@@ -249,7 +254,7 @@ const contactMessagesCollection: CollectionConfig = {
         { operations: ["select", "update", "delete"], roles: ["admin"] }
     ],
     properties: { /* ... */ }
-};
+});
 ```
 
 The `access: "public"` shortcut generates a policy that allows the operation without requiring authentication.
@@ -257,8 +262,11 @@ The `access: "public"` shortcut generates a policy that allows the operation wit
 ### For Lead Capture / Signups
 
 ```typescript
-const leadSignupsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const leadSignupsCollection = defineCollection({
     slug: "lead_magnet_signups",
+    name: "Lead Magnet Signups",
+    table: "lead_magnet_signups",
     securityRules: [
         // Allow anonymous inserts
         { operation: "insert", access: "public", withCheck: "true" },
@@ -266,7 +274,7 @@ const leadSignupsCollection: CollectionConfig = {
         { operation: "select", roles: ["admin"] }
     ],
     properties: { /* ... */ }
-};
+});
 ```
 
 ### How Anonymous Requests Work

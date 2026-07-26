@@ -182,7 +182,7 @@ I flussi di invito devono trasformare un indirizzo email in un ID utente, ma la 
 è protetta da RLS dal client. Invece di creare a mano una funzione server di
 amministrazione, attiva la ricerca integrata:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     auth: {
         // ...
@@ -279,9 +279,9 @@ SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 Invece di affidarti esclusivamente alle regole di autenticazione predefinite del database, puoi contrassegnare qualsiasi collezione Postgres (come `users.ts` o una collezione personalizzata `members.ts`) come collezione di autenticazione. Questo viene configurato tramite la proprietà `auth` sulla collezione stessa:
 
 ```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const membersCollection: PostgresCollectionConfig = {
+const membersCollection = defineCollection({
   name: "Members",
   slug: "members",
   table: "members",
@@ -312,7 +312,7 @@ const membersCollection: PostgresCollectionConfig = {
     }
   },
   properties: { ... }
-};
+});
 ```
 
 Quando vengono chiamati gli hook personalizzati (`onCreateUser`, `onResetPassword`), ricevono una facciata `AuthCollectionContext` contenente:
@@ -356,14 +356,7 @@ Puoi implementare direttamente l'interfaccia `AuthAdapter` per un controllo comp
 
 ```typescript
 import { Hono } from "hono";
-import { 
-  AuthAdapter, 
-  AuthenticatedUser, 
-  AuthAdapterCapabilities,
-  UserManagementAdapter,
-  UserCreationPrepareResult,
-  UserCreationFinalizeResult
-} from "@rebasepro/types";
+import { AuthAdapter, AuthenticatedUser, AuthAdapterCapabilities, UserManagementAdapter, UserCreationPrepareResult, UserCreationFinalizeResult } from "@rebasepro/types";
 
 export interface AuthAdapter {
   /** Unique identifier for this auth adapter (e.g., "clerk", "custom") */

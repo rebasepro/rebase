@@ -143,7 +143,7 @@ Wenn Sie möchten, dass Rebase unter einem Unterpfad läuft (z. B. `/admin`):
 
 **Backend** — Aktualisieren Sie den Basispfad:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     // ...
     basePath: "/admin/api"

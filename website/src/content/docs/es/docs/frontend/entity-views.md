@@ -16,8 +16,10 @@ Las vistas de entidad le permiten añadir **pestañas** personalizadas a la pág
 ## Añadir Vistas de Entidad
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
+    table: "articles",
     name: "Articles",
     properties: { /* ... */ },
     admin: {
@@ -34,7 +36,7 @@ const articlesCollection: CollectionConfig = {
             }
         ]
     }
-};
+});
 
 ```
 

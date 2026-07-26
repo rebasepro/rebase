@@ -11,9 +11,26 @@ Le colonne aggiuntive ti permettono di visualizzare dati calcolati o derivati ne
 ## Definizione di Colonne Aggiuntive
 
 ```typescript
-const ordersCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const ordersCollection = defineCollection({
     slug: "orders",
-    properties: { /* ... */ },
+    name: "Orders",
+    table: "orders",
+    properties: {
+        items: {
+            name: "Items",
+            type: "array",
+            of: {
+                name: "Item",
+                type: "map",
+                properties: {
+                    price: { name: "Price", type: "number" },
+                    quantity: { name: "Quantity", type: "number" }
+                }
+            }
+        },
+        status: { name: "Status", type: "string" }
+    },
     admin: {
         additionalFields: [
             {
@@ -41,7 +58,7 @@ const ordersCollection: CollectionConfig = {
             }
         ]
     }
-};
+});
 
 ```
 

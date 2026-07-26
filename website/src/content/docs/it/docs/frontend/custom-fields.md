@@ -18,8 +18,9 @@ Un campo personalizzato è un componente React che riceve `FieldProps`:
 
 ```tsx
 import type { FieldProps } from "@rebasepro/admin";
+import type { StringProperty, NumberProperty } from "@rebasepro/types";
 
-function ColorPickerField({ value, setValue, error, showError }: FieldProps<string>) {
+function ColorPickerField({ value, setValue, error, showError }: FieldProps<StringProperty>) {
     return (
         <div>
             <input
@@ -91,7 +92,7 @@ Il modulo deve avere un **export default** — il thunk risolve `default`, e un 
 
 Registra un tipo di campo riutilizzabile:
 
-```typescript
+```tsx
 const colorPropertyConfig: PropertyConfig = {
     key: "color_picker",
     name: "Color Picker",
@@ -103,8 +104,8 @@ const colorPropertyConfig: PropertyConfig = {
     }
 };
 
-// Register globally
-<Rebase propertyConfigs={[colorPropertyConfig]} ... />
+// Register globally — keyed by the config's `key`
+<Rebase propertyConfigs={{ color_picker: colorPropertyConfig }} ... />
 ```
 
 Quindi usalo in qualsiasi collezione:
@@ -124,8 +125,8 @@ properties: {
 I campi personalizzati possono accedere a tutti i valori dell'entità:
 
 ```tsx
-function PriceWithTaxField({ value, setValue, context }: FieldProps<number>) {
-    const taxRate = context.values.tax_rate ?? 0.1;
+function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
+    const taxRate = Number(context.values.tax_rate ?? 0.1);
     const priceWithTax = value ? value * (1 + taxRate) : 0;
 
     return (
@@ -146,8 +147,8 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<number>) {
 Quando si effettua il rendering all'interno della vista foglio di calcolo, i campi dovrebbero essere compatti. Controlla `tableMode`:
 
 ```tsx
-function MyField({ value, setValue, tableMode }: FieldProps<string>) {
-    if (tableMode) {
+function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
+    if (minimalistView) {
         return <span onClick={() => { /* open editor */ }}>{value}</span>;
     }
 

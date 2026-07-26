@@ -16,8 +16,12 @@ Chaque collection peut être affichée selon quatre modes d'affichage :
 ## Configuration
 
 ```typescript
-const productsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const productsCollection = defineCollection({
     slug: "products",
+    properties: { /* … */ },
+    name: "Products",
+    table: "products",
     // ...
     admin: {
         defaultViewMode: "table",            // Default view
@@ -27,7 +31,7 @@ const productsCollection: CollectionConfig = {
             orderProperty: "sort_order"      // Property for drag-and-drop ordering
         }
     }
-};
+});
 
 ```
 
@@ -70,8 +74,11 @@ Contrôlez la hauteur des lignes avec `defaultSize` :
 Configurez un tableau Kanban en spécifiant la propriété d'énumération à utiliser comme colonnes :
 
 ```typescript
-const tasksCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const tasksCollection = defineCollection({
     slug: "tasks",
+    name: "Tasks",
+    table: "tasks",
     properties: {
         title: { type: "string", name: "Title" },
         status: {
@@ -93,7 +100,7 @@ const tasksCollection: CollectionConfig = {
             orderProperty: "sort_order"
         }
     }
-};
+});
 
 ```
 
@@ -106,8 +113,11 @@ Le glisser-déposer entre les colonnes met automatiquement à jour le champ d'é
 Les cartes affichent les entités sous forme de cartes visuelles — utile pour le contenu riche en images :
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
+    name: "Articles",
+    table: "articles",
     properties: {
         title: { type: "string", name: "Title" },
         cover: {
@@ -119,7 +129,7 @@ const articlesCollection: CollectionConfig = {
     admin: {
         defaultViewMode: "cards"
     }
-};
+});
 
 ```
 

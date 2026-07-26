@@ -75,13 +75,19 @@ pnpm dev
 ```
 
 Isso inicia ambos juntos:
-- **Backend** em `http://localhost:3001` — REST API, autenticação, armazenamento, WebSocket
-- **Frontend** em `http://localhost:5173` — painel de administração Rebase
+- **Backend** — REST API, autenticação, armazenamento, WebSocket
+- **Frontend** — o painel de administração Rebase
 - **Recarregamento rápido** para ambos — as alterações entram em vigor instantaneamente
+
+Ambas as portas são **derivadas do caminho do projeto** em vez de fixas, então vários
+projetos Rebase podem rodar ao mesmo tempo. `rebase dev` imprime as duas URLs às quais
+se vinculou — use essas, não `localhost:3001`/`localhost:5173`. (`PORT` e
+`VITE_API_URL` no `.env` configuram `rebase start`, o servidor de produção, e são
+ignorados aqui.) Fixe uma porta com `rebase dev --port 3001`.
 
 ## Primeiro Login
 
-Ao abrir `http://localhost:5173`, você verá a tela de login. O **primeiro usuário** a se registrar automaticamente se torna um administrador — este é o fluxo de inicialização.
+Ao abrir a URL do frontend impressa pelo `rebase dev`, você verá a tela de login. O **primeiro usuário** a se registrar automaticamente se torna um administrador — este é o fluxo de inicialização.
 
 1. Clique em **Cadastrar**
 2. Digite seu e-mail e senha
@@ -92,9 +98,9 @@ Ao abrir `http://localhost:5173`, você verá a tela de login. O **primeiro usu�
 Abra `config/collections/` e crie um novo arquivo. Exporte a coleção como **exportação padrão** (`default export`) — é assim que o registro a reconhece:
 
 ```typescript title="config/collections/products.ts"
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -126,7 +132,7 @@ const productsCollection: CollectionConfig = {
             autoValue: "on_create"
         }
     }
-};
+});
 
 export default productsCollection;
 ```

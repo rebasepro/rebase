@@ -161,7 +161,7 @@ Invite flows must turn an email into a user id, but the `users` collection is
 RLS-protected from the client. **Do not** hand-roll an admin server function for
 this — enable `allowUserLookup` and use the built-in primitive:
 
-```typescript
+```typescript no-verify
 // backend: initializeRebaseBackend({ auth: { allowUserLookup: true } })
 
 // client:

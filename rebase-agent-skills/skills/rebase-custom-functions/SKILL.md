@@ -19,7 +19,7 @@ Custom functions let you add arbitrary HTTP endpoints to your Rebase backend. Th
 
 Enable custom functions by adding `functionsDir` to your backend config:
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ... other config
     functionsDir: path.resolve(__dirname, "../functions"),  // ← add this
@@ -149,7 +149,7 @@ The only code that touches provider SDKs is the adapters **inside**
 
 The `user` object set by the auth middleware uses reserved values for system identities:
 
-| Auth Method | `user.userId` | `user.roles` |
+| Auth Method | `user.uid` | `user.roles` |
 |---|---|---|
 | JWT (end-user) | Real user ID | User's assigned roles |
 | Service Key | `"service"` | `["admin"]` |
@@ -161,7 +161,7 @@ The `user` object set by the auth middleware uses reserved values for system ide
 > ```typescript
 > app.get("/sensitive-data", async (c) => {
 >     const user = c.get("user");
->     const isInternal = user?.userId === "service" || user?.roles?.includes("admin");
+>     const isInternal = user?.uid === "service" || user?.roles?.includes("admin");
 >     // Return full or masked data based on identity
 > });
 > ```

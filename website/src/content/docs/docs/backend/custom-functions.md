@@ -154,7 +154,7 @@ app.post("/protected", async (c) => {
     if (!user) {
         return c.json({ error: "Unauthorized" }, 401);
     }
-    return c.json({ message: `Hello, ${user.userId}` });
+    return c.json({ message: `Hello, ${user.uid}` });
 });
 
 // Admin-only endpoint

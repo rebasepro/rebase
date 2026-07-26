@@ -11,7 +11,8 @@ Utilizza i callback `afterSave` e `afterDelete` per notificare i servizi esterni
 ## Notifica Slack per Nuovo Ordine
 
 ```typescript
-const ordersCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",
     table: "orders",
@@ -29,7 +30,7 @@ const ordersCollection: CollectionConfig = {
         }
     },
     properties: { /* ... */ }
-};
+});
 ```
 
 ## Sincronizzazione con API Esterna

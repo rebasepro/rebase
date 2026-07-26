@@ -55,10 +55,10 @@ function App() {
 Per sovrascrivere i componenti solo per una collezione specifica, aggiungi un oggetto `components` alla sua definizione. Questo è utile per personalizzare stati vuoti, card o viste di dettaglio per modelli particolari.
 
 ```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 import { ProductCustomForm } from "./components/ProductCustomForm";
 
-const productsCollection: PostgresCollectionConfig = {
+const productsCollection = defineCollection({
     name: "Products",
     slug: "products",
     table: "products",
@@ -82,7 +82,7 @@ const productsCollection: PostgresCollectionConfig = {
             }
         }
     }
-};
+});
 
 ```
 

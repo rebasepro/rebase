@@ -14,7 +14,7 @@ El historial de entidades registra una instantánea de los valores de las entida
 
 Habilita el historial en `initializeRebaseBackend`:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     // ...
     history: true
@@ -35,11 +35,14 @@ history: {
 Marca qué colecciones deben rastrear el historial:
 
 ```typescript
-const ordersCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const ordersCollection = defineCollection({
     slug: "orders",
+    name: "Orders",
+    table: "orders",
     history: true,       // Enable for this collection
     properties: { /* ... */ }
-};
+});
 ```
 
 ## Cómo Funciona

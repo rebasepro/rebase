@@ -9,15 +9,17 @@ description: Defina políticas de seguridad a nivel de fila (RLS) para sus colec
 Las reglas de seguridad le permiten definir políticas de **Seguridad a Nivel de Fila (RLS)** para sus tablas PostgreSQL directamente en las definiciones de sus colecciones. Cuando se genera el esquema Drizzle, Rebase crea las sentencias `CREATE POLICY` correspondientes.
 
 ```typescript
-const postsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const postsCollection = defineCollection({
     slug: "posts",
+    name: "Posts",
     table: "posts",
     properties: { /* ... */ },
     securityRules: [
         { operation: "select", access: "public" },
         { operations: ["insert", "update", "delete"], ownerField: "author_id" }
     ]
-};
+});
 ```
 
 ## Cómo Funciona
@@ -202,8 +204,11 @@ Una necesidad común es permitir que **usuarios no autenticados** envíen datos 
 ### Recomendado: `access: "public"` con `withCheck`
 
 ```typescript
-const contactMessagesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const contactMessagesCollection = defineCollection({
     slug: "contact_messages",
+    name: "Contact Messages",
+    table: "contact_messages",
     securityRules: [
         // Cualquiera puede enviar un mensaje de contacto
         {
@@ -215,7 +220,7 @@ const contactMessagesCollection: CollectionConfig = {
         { operations: ["select", "update", "delete"], roles: ["admin"] }
     ],
     properties: { /* ... */ }
-};
+});
 ```
 
 El atajo `access: "public"` genera una política que permite la operación sin requerir autenticación.
@@ -223,8 +228,11 @@ El atajo `access: "public"` genera una política que permite la operación sin r
 ### Para Captura de Leads / Registros
 
 ```typescript
-const leadSignupsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const leadSignupsCollection = defineCollection({
     slug: "lead_magnet_signups",
+    name: "Lead Magnet Signups",
+    table: "lead_magnet_signups",
     securityRules: [
         // Permitir inserciones anónimas
         { operation: "insert", access: "public", withCheck: "true" },
@@ -232,7 +240,7 @@ const leadSignupsCollection: CollectionConfig = {
         { operation: "select", roles: ["admin"] }
     ],
     properties: { /* ... */ }
-};
+});
 ```
 
 ### Cómo Funcionan las Solicitudes Anónimas

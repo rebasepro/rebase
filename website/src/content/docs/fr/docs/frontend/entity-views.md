@@ -16,8 +16,10 @@ Les vues d'entité vous permettent d'ajouter des **onglets** personnalisés à l
 ## Ajout de vues d'entité
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
+    table: "articles",
     name: "Articles",
     properties: { /* ... */ },
     admin: {
@@ -34,7 +36,7 @@ const articlesCollection: CollectionConfig = {
             }
         ]
     }
-};
+});
 
 ```
 

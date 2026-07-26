@@ -14,7 +14,7 @@ Die Entitätshistorie zeichnet bei jeder Erstellung, Aktualisierung und Löschun
 
 Aktivieren Sie die Historie in `initializeRebaseBackend`:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     // ...
     history: true
@@ -35,11 +35,14 @@ history: {
 Markieren Sie, welche Kollektionen die Historie verfolgen sollen:
 
 ```typescript
-const ordersCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const ordersCollection = defineCollection({
     slug: "orders",
+    name: "Orders",
+    table: "orders",
     history: true,       // Für diese Kollektion aktivieren
     properties: { /* ... */ }
-};
+});
 ```
 
 ## Funktionsweise

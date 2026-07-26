@@ -16,8 +16,12 @@ Cada coleção pode ser exibida em quatro modos de visualização:
 ## Configuração
 
 ```typescript
-const productsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const productsCollection = defineCollection({
     slug: "products",
+    properties: { /* … */ },
+    name: "Products",
+    table: "products",
     // ...
     admin: {
         defaultViewMode: "table",            // Default view
@@ -27,7 +31,7 @@ const productsCollection: CollectionConfig = {
             orderProperty: "sort_order"      // Property for drag-and-drop ordering
         }
     }
-};
+});
 
 ```
 
@@ -70,8 +74,11 @@ Controle a altura da linha com `defaultSize`:
 Configure um quadro Kanban especificando qual propriedade enum usar como colunas:
 
 ```typescript
-const tasksCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const tasksCollection = defineCollection({
     slug: "tasks",
+    name: "Tasks",
+    table: "tasks",
     properties: {
         title: { type: "string", name: "Title" },
         status: {
@@ -93,7 +100,7 @@ const tasksCollection: CollectionConfig = {
             orderProperty: "sort_order"
         }
     }
-};
+});
 
 ```
 
@@ -106,8 +113,11 @@ Arrastar e soltar entre colunas atualiza automaticamente o campo enum e a ordem 
 Os cartões exibem entidades como cartões visuais — úteis para conteúdo com muitas imagens:
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
+    name: "Articles",
+    table: "articles",
     properties: {
         title: { type: "string", name: "Title" },
         cover: {
@@ -119,7 +129,7 @@ const articlesCollection: CollectionConfig = {
     admin: {
         defaultViewMode: "cards"
     }
-};
+});
 
 ```
 

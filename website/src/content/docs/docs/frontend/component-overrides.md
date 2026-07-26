@@ -55,10 +55,10 @@ function App() {
 To override components only for a specific collection, add a `components` object to its definition. This is useful for customizing empty states, cards, or detail views for particular models.
 
 ```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 import { ProductCustomForm } from "./components/ProductCustomForm";
 
-const productsCollection: PostgresCollectionConfig = {
+const productsCollection = defineCollection({
     name: "Products",
     slug: "products",
     table: "products",
@@ -82,7 +82,7 @@ const productsCollection: PostgresCollectionConfig = {
             }
         }
     }
-};
+});
 
 ```
 

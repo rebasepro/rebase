@@ -54,7 +54,7 @@ Der **Dateiname** (ohne Erweiterung) wird zur eindeutigen ID des Jobs — z.B. `
 
 Aktivieren Sie Cron-Jobs, indem Sie `cronsDir` zu Ihrer Backend-Konfiguration hinzufügen:
 
-```typescript
+```typescript no-verify
 const instance = await initializeRebaseBackend({
     // ... other config
     functionsDir: path.resolve(__dirname, "../functions"),

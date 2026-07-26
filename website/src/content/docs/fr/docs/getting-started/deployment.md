@@ -153,7 +153,7 @@ Si vous voulez que Rebase s'exécute sur un sous-chemin (par ex. `/admin`) :
 
 **Backend** — Mettez à jour le chemin de base :
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     // ...
     basePath: "/admin/api"

@@ -18,8 +18,9 @@ Un campo personalizado es un componente de React que recibe `FieldProps`:
 
 ```tsx
 import type { FieldProps } from "@rebasepro/admin";
+import type { StringProperty, NumberProperty } from "@rebasepro/types";
 
-function ColorPickerField({ value, setValue, error, showError }: FieldProps<string>) {
+function ColorPickerField({ value, setValue, error, showError }: FieldProps<StringProperty>) {
     return (
         <div>
             <input
@@ -91,7 +92,7 @@ El módulo debe tener un **export por defecto** — el thunk resuelve a `default
 
 Registre un tipo de campo reutilizable:
 
-```typescript
+```tsx
 const colorPropertyConfig: PropertyConfig = {
     key: "color_picker",
     name: "Color Picker",
@@ -103,8 +104,8 @@ const colorPropertyConfig: PropertyConfig = {
     }
 };
 
-// Register globally
-<Rebase propertyConfigs={[colorPropertyConfig]} ... />
+// Register globally — keyed by the config's `key`
+<Rebase propertyConfigs={{ color_picker: colorPropertyConfig }} ... />
 ```
 
 Luego úselo en cualquier colección:
@@ -124,8 +125,8 @@ properties: {
 Los campos personalizados pueden acceder a todos los valores de la entidad:
 
 ```tsx
-function PriceWithTaxField({ value, setValue, context }: FieldProps<number>) {
-    const taxRate = context.values.tax_rate ?? 0.1;
+function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProperty>) {
+    const taxRate = Number(context.values.tax_rate ?? 0.1);
     const priceWithTax = value ? value * (1 + taxRate) : 0;
 
     return (
@@ -146,8 +147,8 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<number>) {
 Al renderizarse dentro de la vista de hoja de cálculo, los campos deben ser compactos. Verifique `tableMode`:
 
 ```tsx
-function MyField({ value, setValue, tableMode }: FieldProps<string>) {
-    if (tableMode) {
+function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
+    if (minimalistView) {
         return <span onClick={() => { /* open editor */ }}>{value}</span>;
     }
 

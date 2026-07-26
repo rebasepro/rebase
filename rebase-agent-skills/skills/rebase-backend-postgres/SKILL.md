@@ -501,7 +501,7 @@ export default defineConfig({
 
 Enable audit logging for all entity mutations by setting `history: true` in the backend config:
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     history: true,  // Enable with default settings

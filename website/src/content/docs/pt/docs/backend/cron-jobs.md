@@ -54,7 +54,7 @@ O **nome do arquivo** (sem extensão) torna-se o ID único da tarefa — por exe
 
 Habilite as tarefas cron adicionando `cronsDir` à sua configuração de backend:
 
-```typescript
+```typescript no-verify
 const instance = await initializeRebaseBackend({
     // ... other config
     functionsDir: path.resolve(__dirname, "../functions"),

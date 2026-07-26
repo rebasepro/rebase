@@ -18,7 +18,7 @@ Storage is configured in the `storage` block of `initializeRebaseBackend`:
 
 ### Local Storage
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {
@@ -30,7 +30,7 @@ const backend = await initializeRebaseBackend({
 
 ### S3 Storage
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {
@@ -47,7 +47,7 @@ const backend = await initializeRebaseBackend({
 
 ### GCS / Firebase Storage
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {
@@ -222,14 +222,14 @@ a CMS's *shared content library*, which is not the same shape as per-user files.
 
 `storageAuthorize` is the storage analogue of a collection's security rules, and runs after authentication on every storage route:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     storage: { type: "s3", bucket: "app-files", /* ... */ },
     storageAuthorize: async ({ key, bucket, operation, user }) => {
         if (!user) return false;
         // Keys are laid out as `{teamId}/{docId}/...`
         const [teamId] = key.split("/");
-        return isTeamMember(user.userId, teamId);
+        return isTeamMember(user.uid, teamId);
     }
 });
 ```

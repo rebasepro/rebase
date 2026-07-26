@@ -16,8 +16,10 @@ As vistas de entidade permitem adicionar **abas** personalizadas à página de d
 ## Adicionar Vistas de Entidade
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
+    table: "articles",
     name: "Articles",
     properties: { /* ... */ },
     admin: {
@@ -34,7 +36,7 @@ const articlesCollection: CollectionConfig = {
             }
         ]
     }
-};
+});
 
 ```
 

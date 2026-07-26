@@ -75,13 +75,19 @@ pnpm dev
 ```
 
 Questo avvia entrambi insieme:
-- **Backend** all'indirizzo `http://localhost:3001` — API REST, autenticazione, storage, WebSocket
-- **Frontend** all'indirizzo `http://localhost:5173` — Pannello di amministrazione Rebase
+- **Backend** — API REST, autenticazione, storage, WebSocket
+- **Frontend** — il pannello di amministrazione Rebase
 - **Hot reload** per entrambi — le modifiche hanno effetto istantaneamente
+
+Entrambe le porte sono **derivate dal percorso del progetto** anziché fisse, così più
+progetti Rebase possono essere eseguiti insieme. `rebase dev` stampa i due URL a cui
+si è associato — usa quelli, non `localhost:3001`/`localhost:5173`. (`PORT` e
+`VITE_API_URL` in `.env` configurano `rebase start`, il server di produzione, e qui
+vengono ignorati.) Fissa una porta con `rebase dev --port 3001`.
 
 ## Primo Accesso
 
-Quando apri `http://localhost:5173`, vedrai la schermata di accesso. Il **primo utente** a registrarsi diventa automaticamente un amministratore — questo è il flusso di bootstrap.
+Quando apri l'URL del frontend stampato da `rebase dev`, vedrai la schermata di accesso. Il **primo utente** a registrarsi diventa automaticamente un amministratore — questo è il flusso di bootstrap.
 
 1. Clicca su **Registrati**
 2. Inserisci la tua email e password
@@ -92,9 +98,9 @@ Quando apri `http://localhost:5173`, vedrai la schermata di accesso. Il **primo 
 Apri `config/collections/` e crea un nuovo file. Esporta la collezione come **export di default** — è così che il registry la rileva:
 
 ```typescript title="config/collections/products.ts"
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -126,7 +132,7 @@ const productsCollection: CollectionConfig = {
             autoValue: "on_create"
         }
     }
-};
+});
 
 export default productsCollection;
 ```

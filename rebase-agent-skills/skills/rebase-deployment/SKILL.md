@@ -871,7 +871,7 @@ app.get("/health", async (c) => {
 
 The `RebaseBackendInstance` exposes a `shutdown()` method for clean container termination:
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({ ... });
 
 const gracefulShutdown = async (signal: string) => {

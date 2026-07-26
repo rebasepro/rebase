@@ -51,14 +51,15 @@ Before importing, the wizard validates all rows against your collection's proper
 Import is enabled by default. To disable it on a specific collection, use the `admin` sub-object:
 
 ```typescript
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
+    table: "products",
     name: "Products",
     properties: { /* ... */ },
     // Import is enabled by default
-};
+});
 ```
 
 ## Exporting Data
@@ -90,30 +91,33 @@ Any active filters in the collection view are applied to the export. This lets y
 Export is enabled by default. You can configure it with additional computed fields:
 
 ```typescript
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
+    table: "products",
     name: "Products",
     properties: { /* ... */ },
     admin: {
         exportable: true            // Enable (default: true)
     }
-};
+});
 
 ```
 
 To disable export:
 
 ```typescript
-const productsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const productsCollection = defineCollection({
     slug: "products",
+    table: "products",
     name: "Products",
     properties: { /* ... */ },
     admin: {
         exportable: false
     }
-};
+});
 
 ```
 
@@ -122,10 +126,11 @@ const productsCollection: CollectionConfig = {
 Use the `ExportConfig` object to add custom computed columns to your exports. These columns don't exist in the database — they are calculated at export time:
 
 ```typescript
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
+    table: "products",
     name: "Products",
     properties: { /* ... */ },
     admin: {
@@ -148,7 +153,7 @@ const productsCollection: CollectionConfig = {
             ]
         }
     }
-};
+});
 
 ```
 

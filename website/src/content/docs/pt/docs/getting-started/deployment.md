@@ -141,7 +141,7 @@ Se você quiser que a Rebase rode em um subcaminho (por ex., `/admin`):
 
 **Backend** — Atualize o caminho base:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     // ...
     basePath: "/admin/api"

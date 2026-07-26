@@ -9,15 +9,17 @@ description: Defina políticas de Segurança em Nível de Linha para suas coleç
 As regras de segurança permitem definir políticas de **Segurança em Nível de Linha (RLS)** para suas tabelas PostgreSQL diretamente nas definições de suas coleções. Quando o esquema Drizzle é gerado, o Rebase cria as instruções `CREATE POLICY` correspondentes.
 
 ```typescript
-const postsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const postsCollection = defineCollection({
     slug: "posts",
+    name: "Posts",
     table: "posts",
     properties: { /* ... */ },
     securityRules: [
         { operation: "select", access: "public" },
         { operations: ["insert", "update", "delete"], ownerField: "author_id" }
     ]
-};
+});
 ```
 
 ## Como Funciona
@@ -202,8 +204,11 @@ Uma necessidade comum é permitir que **usuários não autenticados** enviem dad
 ### Recomendado: `access: "public"` com `withCheck`
 
 ```typescript
-const contactMessagesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const contactMessagesCollection = defineCollection({
     slug: "contact_messages",
+    name: "Contact Messages",
+    table: "contact_messages",
     securityRules: [
         // Qualquer pessoa pode enviar uma mensagem de contato
         {
@@ -215,7 +220,7 @@ const contactMessagesCollection: CollectionConfig = {
         { operations: ["select", "update", "delete"], roles: ["admin"] }
     ],
     properties: { /* ... */ }
-};
+});
 ```
 
 O atalho `access: "public"` gera uma política que permite a operação sem exigir autenticação.
@@ -223,8 +228,11 @@ O atalho `access: "public"` gera uma política que permite a operação sem exig
 ### Para Captação de Leads / Inscrições
 
 ```typescript
-const leadSignupsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const leadSignupsCollection = defineCollection({
     slug: "lead_magnet_signups",
+    name: "Lead Magnet Signups",
+    table: "lead_magnet_signups",
     securityRules: [
         // Permitir inserções anônimas
         { operation: "insert", access: "public", withCheck: "true" },
@@ -232,7 +240,7 @@ const leadSignupsCollection: CollectionConfig = {
         { operation: "select", roles: ["admin"] }
     ],
     properties: { /* ... */ }
-};
+});
 ```
 
 ### Como Funcionam as Requisições Anônimas

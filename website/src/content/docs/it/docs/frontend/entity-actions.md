@@ -11,9 +11,17 @@ Le azioni entità sono pulsanti personalizzati che appaiono sulle singole entit�
 ## Definizione delle Azioni Entità
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
-    properties: { /* ... */ },
+    name: "Articles",
+    table: "articles",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        name: { name: "Name", type: "string" },
+        status: { name: "Status", type: "string" },
+        published_at: { name: "Published At", type: "date" }
+    },
     admin: {
         entityActions: [
             {
@@ -45,7 +53,7 @@ const articlesCollection: CollectionConfig = {
             }
         ]
     }
-};
+});
 
 ```
 
@@ -54,6 +62,7 @@ const articlesCollection: CollectionConfig = {
 Per le azioni a livello di barra degli strumenti che operano sulla collezione o sulle entità selezionate:
 
 ```tsx
+import { defineCollection } from "@rebasepro/admin-types";
 function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;
@@ -75,12 +84,12 @@ function PublishSelectedAction({ selectionController, context }: CollectionActio
 }
 
 // Register
-const collection: CollectionConfig = {
+const collection = defineCollection({
     admin: {
         Actions: PublishSelectedAction
     }
     // ...
-};
+});
 ```
 
 ![Azioni collezione](/img/collection_actions.png)

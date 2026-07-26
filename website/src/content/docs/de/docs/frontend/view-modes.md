@@ -16,8 +16,12 @@ Jede Sammlung kann in vier Ansichtsmodi angezeigt werden:
 ## Konfiguration
 
 ```typescript
-const productsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const productsCollection = defineCollection({
     slug: "products",
+    properties: { /* … */ },
+    name: "Products",
+    table: "products",
     // ...
     admin: {
         defaultViewMode: "table",            // Default view
@@ -27,7 +31,7 @@ const productsCollection: CollectionConfig = {
             orderProperty: "sort_order"      // Property for drag-and-drop ordering
         }
     }
-};
+});
 
 ```
 
@@ -70,8 +74,11 @@ Steuern Sie die Zeilenhöhe mit `defaultSize`:
 Konfigurieren Sie ein Kanban-Board, indem Sie festlegen, welche Enum-Eigenschaft als Spalten verwendet werden soll:
 
 ```typescript
-const tasksCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const tasksCollection = defineCollection({
     slug: "tasks",
+    name: "Tasks",
+    table: "tasks",
     properties: {
         title: { type: "string", name: "Title" },
         status: {
@@ -93,7 +100,7 @@ const tasksCollection: CollectionConfig = {
             orderProperty: "sort_order"
         }
     }
-};
+});
 
 ```
 
@@ -106,8 +113,11 @@ Drag-and-drop zwischen Spalten aktualisiert automatisch das Enum-Feld und die So
 Karten zeigen Entitäten als visuelle Karten an – nützlich für inhaltsreiche Inhalte mit vielen Bildern:
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
+    name: "Articles",
+    table: "articles",
     properties: {
         title: { type: "string", name: "Title" },
         cover: {
@@ -119,7 +129,7 @@ const articlesCollection: CollectionConfig = {
     admin: {
         defaultViewMode: "cards"
     }
-};
+});
 
 ```
 

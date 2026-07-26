@@ -18,7 +18,7 @@ O armazenamento é configurado no bloco `storage` de `initializeRebaseBackend`:
 
 ### Armazenamento Local
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {
@@ -30,7 +30,7 @@ const backend = await initializeRebaseBackend({
 
 ### Armazenamento S3
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {
@@ -47,7 +47,7 @@ const backend = await initializeRebaseBackend({
 
 ### GCS / Firebase Storage
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {

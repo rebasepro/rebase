@@ -54,7 +54,7 @@ Il **nome del file** (senza estensione) diventa l'ID univoco del lavoro — ad e
 
 Abilita i lavori cron aggiungendo `cronsDir` alla tua configurazione backend:
 
-```typescript
+```typescript no-verify
 const instance = await initializeRebaseBackend({
     // ... other config
     functionsDir: path.resolve(__dirname, "../functions"),

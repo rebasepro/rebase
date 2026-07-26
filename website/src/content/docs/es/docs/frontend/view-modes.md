@@ -16,8 +16,12 @@ Cada colección puede mostrarse en cuatro modos de vista:
 ## Configuración
 
 ```typescript
-const productsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const productsCollection = defineCollection({
     slug: "products",
+    properties: { /* … */ },
+    name: "Products",
+    table: "products",
     // ...
     admin: {
         defaultViewMode: "table",            // Vista predeterminada
@@ -27,7 +31,7 @@ const productsCollection: CollectionConfig = {
             orderProperty: "sort_order"      // Propiedad para el ordenamiento de arrastrar y soltar
         }
     }
-};
+});
 
 ```
 
@@ -70,8 +74,11 @@ Controle la altura de la fila con `defaultSize`:
 Configure un tablero Kanban especificando qué propiedad de enumeración usar como columnas:
 
 ```typescript
-const tasksCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const tasksCollection = defineCollection({
     slug: "tasks",
+    name: "Tasks",
+    table: "tasks",
     properties: {
         title: { type: "string", name: "Título" },
         status: {
@@ -93,7 +100,7 @@ const tasksCollection: CollectionConfig = {
             orderProperty: "sort_order"
         }
     }
-};
+});
 
 ```
 
@@ -106,8 +113,11 @@ Arrastrar y soltar entre columnas actualiza automáticamente el campo de enumera
 Las tarjetas muestran las entidades como tarjetas visuales — útiles para contenido con muchas imágenes:
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
+    name: "Articles",
+    table: "articles",
     properties: {
         title: { type: "string", name: "Título" },
         cover: {
@@ -119,7 +129,7 @@ const articlesCollection: CollectionConfig = {
     admin: {
         defaultViewMode: "cards"
     }
-};
+});
 
 ```
 

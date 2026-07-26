@@ -51,14 +51,15 @@ Avant l'import, l'assistant valide toutes les lignes par rapport aux définition
 L'import est activé par défaut. Pour le désactiver sur une collection spécifique, utilisez le sous-objet `admin` :
 
 ```typescript
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
+    table: "products",
     name: "Products",
     properties: { /* ... */ },
     // Import is enabled by default
-};
+});
 ```
 
 ## Exportation de données
@@ -90,30 +91,33 @@ Tous les filtres actifs dans la vue de collection sont appliqués à l'export. C
 L'export est activé par défaut. Vous pouvez le configurer avec des champs calculés supplémentaires :
 
 ```typescript
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
+    table: "products",
     name: "Products",
     properties: { /* ... */ },
     admin: {
         exportable: true            // Enable (default: true)
     }
-};
+});
 
 ```
 
 Pour désactiver l'export :
 
 ```typescript
-const productsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const productsCollection = defineCollection({
     slug: "products",
+    table: "products",
     name: "Products",
     properties: { /* ... */ },
     admin: {
         exportable: false
     }
-};
+});
 
 ```
 
@@ -122,10 +126,11 @@ const productsCollection: CollectionConfig = {
 Utilisez l'objet `ExportConfig` pour ajouter des colonnes calculées personnalisées à vos exports. Ces colonnes n'existent pas dans la base de données — elles sont calculées au moment de l'export :
 
 ```typescript
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
+    table: "products",
     name: "Products",
     properties: { /* ... */ },
     admin: {
@@ -148,7 +153,7 @@ const productsCollection: CollectionConfig = {
             ]
         }
     }
-};
+});
 
 ```
 

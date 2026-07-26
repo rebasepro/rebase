@@ -75,13 +75,20 @@ pnpm dev
 ```
 
 Dies startet beide zusammen:
-- **Backend** unter `http://localhost:3001` — REST API, Authentifizierung, Speicher, WebSocket
-- **Frontend** unter `http://localhost:5173` — Rebase Admin-Panel
+- **Backend** — REST API, Authentifizierung, Speicher, WebSocket
+- **Frontend** — das Rebase Admin-Panel
 - **Hot-Reload** für beides — Änderungen werden sofort wirksam
+
+Beide Ports werden **aus dem Projektpfad abgeleitet** statt fest vergeben, sodass
+mehrere Rebase-Projekte parallel laufen können. `rebase dev` gibt die beiden
+gebundenen URLs aus — verwenden Sie diese, nicht `localhost:3001`/`localhost:5173`.
+(`PORT` und `VITE_API_URL` in `.env` konfigurieren `rebase start`, den
+Produktionsserver, und werden hier ignoriert.) Mit `rebase dev --port 3001` legen
+Sie einen festen Port fest.
 
 ## Erster Login
 
-Wenn Sie `http://localhost:5173` öffnen, sehen Sie den Anmeldebildschirm. Der **erste Benutzer**, der sich registriert, wird automatisch zum Administrator – dies ist der Bootstrap-Prozess.
+Wenn Sie die von `rebase dev` ausgegebene Frontend-URL öffnen, sehen Sie den Anmeldebildschirm. Der **erste Benutzer**, der sich registriert, wird automatisch zum Administrator – dies ist der Bootstrap-Prozess.
 
 1. Klicken Sie auf **Registrieren**
 2. Geben Sie Ihre E-Mail-Adresse und Ihr Passwort ein
@@ -92,9 +99,9 @@ Wenn Sie `http://localhost:5173` öffnen, sehen Sie den Anmeldebildschirm. Der *
 Öffnen Sie `config/collections/` und erstellen Sie eine neue Datei. Exportieren Sie die Sammlung als **Default-Export** — so wird sie von der Registry erkannt:
 
 ```typescript title="config/collections/products.ts"
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -126,7 +133,7 @@ const productsCollection: CollectionConfig = {
             autoValue: "on_create"
         }
     }
-};
+});
 
 export default productsCollection;
 ```

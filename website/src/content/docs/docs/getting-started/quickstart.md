@@ -75,13 +75,19 @@ pnpm dev
 ```
 
 This starts both together:
-- **Backend** at `http://localhost:3001` — REST API, auth, storage, WebSocket
-- **Frontend** at `http://localhost:5173` — Rebase admin panel
+- **Backend** — REST API, auth, storage, WebSocket
+- **Frontend** — the Rebase admin panel
 - **Hot reload** for both — changes take effect instantly
+
+Both ports are **derived from this project's path** rather than fixed, so several
+Rebase projects can run side by side. `rebase dev` prints the two URLs it bound —
+use those, not `localhost:3001`/`localhost:5173`. (`PORT` and `VITE_API_URL` in
+`.env` configure `rebase start`, the production server, and are ignored here.)
+Pin a port with `rebase dev --port 3001`.
 
 ## First Login
 
-When you open `http://localhost:5173`, you'll see the login screen. The **first user** to register automatically becomes an admin — this is the bootstrap flow.
+When you open the frontend URL `rebase dev` printed, you'll see the login screen. The **first user** to register automatically becomes an admin — this is the bootstrap flow.
 
 1. Click **Sign Up**
 2. Enter your email and password
@@ -92,9 +98,9 @@ When you open `http://localhost:5173`, you'll see the login screen. The **first 
 Open `config/collections/` and create a new file. Export the collection as the **default export** — that's how the registry picks it up:
 
 ```typescript title="config/collections/products.ts"
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -126,7 +132,7 @@ const productsCollection: CollectionConfig = {
             autoValue: "on_create"
         }
     }
-};
+});
 
 export default productsCollection;
 ```

@@ -339,7 +339,7 @@ Pruning errors are logged but never block the main operation.
 
 Pass the `retention` option (in days) through the global history config:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     // ...
     history: { retention: 30 },  // TTL of 30 days

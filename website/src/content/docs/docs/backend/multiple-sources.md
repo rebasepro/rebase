@@ -37,12 +37,14 @@ export const storageSources: StorageSourceDefinition[] = [
 Then point a collection at one:
 
 ```ts
-const pageViewsCollection: PostgresCollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const pageViewsCollection = defineCollection({
     name: "Page Views",
     slug: "page_views",
+    table: "page_views",
     dataSource: "analytics",
     properties: { /* … */ }
-};
+});
 ```
 
 ...or a file property:

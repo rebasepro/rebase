@@ -11,7 +11,8 @@ Use `afterSave` and `afterDelete` callbacks to notify external services when dat
 ## Slack Notification on New Order
 
 ```typescript
-const ordersCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",
     table: "orders",
@@ -29,7 +30,7 @@ const ordersCollection: CollectionConfig = {
         }
     },
     properties: { /* ... */ }
-};
+});
 ```
 
 ## Sync to External API

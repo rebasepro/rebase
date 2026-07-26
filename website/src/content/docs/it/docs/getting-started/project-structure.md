@@ -102,9 +102,9 @@ await initializeRebaseBackend({
 Le collezioni sono la **singola fonte di verità** per il tuo modello di dati. Sono definite in TypeScript e utilizzate sia dal frontend (per la generazione dell'interfaccia utente) che dal backend (per la generazione dello schema e il routing delle API).
 
 ```typescript title="config/collections/products.ts"
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-export const productsCollection: CollectionConfig = {
+export const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     table: "products",
@@ -112,7 +112,7 @@ export const productsCollection: CollectionConfig = {
         name: { type: "string", name: "Name" },
         price: { type: "number", name: "Price" }
     }
-};
+});
 ```
 
 Lo `slug` diventa il percorso URL nell'interfaccia utente di amministrazione e l'endpoint dell'API REST (`/api/data/products`). La `table` mappa al nome della tabella PostgreSQL.

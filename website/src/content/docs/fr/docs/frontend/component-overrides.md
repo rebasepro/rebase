@@ -55,10 +55,10 @@ function App() {
 Pour surcharger des composants uniquement pour une collection spécifique, ajoutez un objet `components` à sa définition. C'est utile pour personnaliser les états vides, les cartes ou les vues de détail pour des modèles particuliers.
 
 ```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 import { ProductCustomForm } from "./components/ProductCustomForm";
 
-const productsCollection: PostgresCollectionConfig = {
+const productsCollection = defineCollection({
     name: "Products",
     slug: "products",
     table: "products",
@@ -82,7 +82,7 @@ const productsCollection: PostgresCollectionConfig = {
             }
         }
     }
-};
+});
 
 ```
 

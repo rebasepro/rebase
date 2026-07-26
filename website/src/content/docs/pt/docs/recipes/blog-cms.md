@@ -16,9 +16,9 @@ Crie um backend de blog com:
 ### Autores
 
 ```typescript
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-export const authorsCollection: CollectionConfig = {
+export const authorsCollection = defineCollection({
     slug: "authors",
     name: "Autores",
     singularName: "Autor",
@@ -53,14 +53,15 @@ export const authorsCollection: CollectionConfig = {
     admin: {
         icon: "person"
     }
-};
+});
 
 ```
 
 ### Categorias
 
 ```typescript
-export const categoriesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+export const categoriesCollection = defineCollection({
     slug: "categories",
     name: "Categorias",
     singularName: "Categoria",
@@ -90,13 +91,14 @@ export const categoriesCollection: CollectionConfig = {
     admin: {
         icon: "label"
     }
-};
+});
 
 ```
 
 ### Artigos
 
 ```typescript
+import { defineCollection } from "@rebasepro/admin-types";
 // The row shape, so callbacks below see typed `values` instead of `unknown`.
 type Article = {
     title: string;
@@ -105,7 +107,7 @@ type Article = {
     published_at?: string | null;
 };
 
-export const articlesCollection: CollectionConfig<Article> = {
+export const articlesCollection = defineCollection({
     slug: "articles",
     name: "Artigos",
     singularName: "Artigo",
@@ -210,7 +212,7 @@ export const articlesCollection: CollectionConfig<Article> = {
         icon: "article",
         defaultViewMode: "table"
     }
-};
+});
 
 ```
 

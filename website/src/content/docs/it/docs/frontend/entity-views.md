@@ -16,8 +16,10 @@ Le viste entità ti permettono di aggiungere **schede** personalizzate alla pagi
 ## Aggiunta di viste entità
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
+    table: "articles",
     name: "Articles",
     properties: { /* ... */ },
     admin: {
@@ -34,7 +36,7 @@ const articlesCollection: CollectionConfig = {
             }
         ]
     }
-};
+});
 
 ```
 

@@ -8,6 +8,28 @@ title: Changelog
 
 ### Breaking
 
+- **`buildCollection` and `buildProperty` are removed** — not deprecated, removed. Both were FireCMS-migration shims that had been superseded by `defineCollection`, and keeping a deprecated alias around in a framework that has not shipped 1.0 only buys two ways to write the same thing.
+
+  `buildCollection` was a plain identity function whose generic had to be supplied by hand, so it gave up the property inference that is the entire reason to wrap a collection literal at all. `defineCollection` uses a `const` type parameter to capture the literal, which is what puts your property keys into completion for `admin.titleProperty`, `admin.sort` and `admin.propertiesOrder`. `buildProperty` wrapped a single property in a conditional type that resolved to the type the property already had — a no-op once the surrounding collection is inferred.
+
+  ```diff
+  - import { buildCollection, buildProperty } from "@rebasepro/common";
+  + import { defineCollection } from "@rebasepro/admin-types";
+
+  - export default buildCollection({
+  + export default defineCollection({
+        name: "Posts",
+        slug: "posts",
+        table: "posts",
+  -     properties: { title: buildProperty({ name: "Title", type: "string" }) }
+  +     properties: { title: { name: "Title", type: "string" } }
+    });
+  ```
+
+  A plain `const posts: CollectionConfig = { … }` annotation still works and is still typechecked — it just infers nothing, so prefer `defineCollection` in new code. The scaffold templates and every docs example now use it.
+
+- **`CollectionConfig` reports Postgres in its type errors** — `CollectionConfig` is a union discriminated on `engine`, and Postgres collections omit `engine` because it defaults to `"postgres"`. An incomplete Postgres literal therefore matched no member, and TypeScript elaborated the failure against the last constituent — MongoDB. Leaving out `name`, the most common mistake there is, told a Postgres user of a Postgres-first framework that they were missing `engine` on a `MongoDBCollectionConfig`. Postgres is now last in the union, so the same mistake names `PostgresCollectionConfig` and only the field actually missing. No runtime or assignability change; error text only.
+
 - **Admin-panel presentation moved into an `admin` block** — a collection carried two unrelated concerns in one flat object: what the data *is* (table, schema, properties, relations, validation, security rules, callbacks) and how an admin panel should *draw* it (`icon`, `group`, `listProperties`, `kanban`, entity views, selection controllers, …). Ninety-five fields of the second kind sat beside the first, and twelve React view-model types were exported from `collections.ts` — so a backend that never renders anything still pulled the React layer into its type graph, and `@rebasepro/types` could not be a backend contract while it depended on React.
 
   `@rebasepro/types` is now the React-free BaaS contract; the presentation layer lives in a new `@rebasepro/admin-types` that depends on it, and nothing in core depends back. `pnpm check:baas-types` typechecks a full BaaS project — backend, driver, collection file, SDK reads and writes — with `react` mapped to a stub, which is the invariant that keeps it that way.
@@ -94,7 +116,7 @@ title: Changelog
 
 - **The authenticated principal is `uid` everywhere** — the identity had two names. `uid` was the domain model's: the `User` type, the `AuthenticatedUser` adapter contract, the driver scope, and the RLS layer, where policies read `auth.uid()`. `userId` was the JWT claim's, inherited by the Hono request context because it was populated straight from the decoded payload. A request crossed that boundary twice, so a route handler and a collection hook two frames apart saw the same person under different keys — and three unrelated places had independently grown the same defensive `a ?? b` read to cope. `uid` wins because `userId` was confined to four server-side packages while `uid` is the vocabulary of twelve, and because the two ends of the stack — Postgres policies and the client SDK — already agreed on it.
 
-  Tokens now carry a `uid` claim and `c.get("user")` returns `{ uid, roles }`. Anything reading `payload.userId` or `user.userId` must move.
+  Tokens now carry a `uid` claim and `c.get("user")` returns `{ uid, roles }`. Anything reading `payload.userId` or `user.uid` must move.
 
 - **ESM only — the CJS/UMD output is gone** — the packages shipped both, but the output banner injects `import` / `import.meta.url`, which a UMD bundle cannot parse as CommonJS, so the CJS half was never loadable. `main`, `module` and the `import` condition all point at `index.es.js`; the `require` condition is removed. A CommonJS consumer must `import()` or move to ESM.
 

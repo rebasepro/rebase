@@ -18,10 +18,28 @@ Callbacks ermöglichen es Ihnen, sich in den Entitätslebenszyklus einzuhängen,
 ## Callbacks definieren
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+// The row shape. Without it every `values.x` below is `unknown`.
+type Article = {
+    title: string;
+    slug: string;
+    created_at: string;
+    updated_at: string;
+};
+
+const articlesCollection: PostgresCollectionConfig<Article> = {
     slug: "articles",
+    name: "Articles",
+    table: "articles",
+    properties: {
+        title: { name: "Title", type: "string" },
+        slug: { name: "Slug", type: "string" },
+        created_at: { name: "Created at", type: "string" },
+        updated_at: { name: "Updated at", type: "string" }
+    },
     callbacks: {
-        beforeSave: async ({ values, entityId, status }) => {
+        beforeSave: async ({ values, id, status }) => {
             // Auto-generate slug from title
             if (values.title) {
                 values.slug = values.title
@@ -32,9 +50,9 @@ const articlesCollection: CollectionConfig = {
 
             // Set timestamps
             if (status === "new") {
-                values.created_at = new Date();
+                values.created_at = new Date().toISOString();
             }
-            values.updated_at = new Date();
+            values.updated_at = new Date().toISOString();
 
             return values;
         },
@@ -55,7 +73,7 @@ const articlesCollection: CollectionConfig = {
         }
     },
     properties: { /* ... */ }
-};
+});
 ```
 
 ## Callback-Referenz
@@ -342,18 +360,37 @@ afterSave: async ({ values, entityId, context }) => {
 Eine der mächtigsten Anwendungen von Callbacks ist das **Synchronisieren von Daten über Sammlungen hinweg** mit `context.data`:
 
 ```typescript
-const submissionsCollection: CollectionConfig = {
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+type Submission = {
+    title: string;
+    description: string;
+    company_id: string;
+    status: string;
+    promoted_job_id: string;
+};
+
+const submissionsCollection: PostgresCollectionConfig<Submission> = {
     slug: "job_submissions",
+    name: "Job Submissions",
+    table: "job_submissions",
+    properties: {
+        title: { name: "Title", type: "string" },
+        description: { name: "Description", type: "string" },
+        company_id: { name: "Company", type: "string" },
+        status: { name: "Status", type: "string" },
+        promoted_job_id: { name: "Promoted job", type: "string" }
+    },
     callbacks: {
-        afterSave: async ({ values, entityId, previousValues, context }) => {
+        afterSave: async ({ values, id, previousValues, context }) => {
             // Wenn eine Einreichung genehmigt wird, einen veröffentlichten Job erstellen
             if (values.status === "approved" && previousValues?.status !== "approved") {
-                const newJob = await context.data.jobs.create({
+                const newJob = await context.data.collection("jobs").create({
                     title: values.title,
                     description: values.description,
                     company_id: values.company_id,
                     status: "published",
-                    source_submission_id: entityId,
+                    source_submission_id: id,
                 });
 
                 // Die Einreichung mit der Referenz des beworbenen Jobs aktualisieren
@@ -364,7 +401,7 @@ const submissionsCollection: CollectionConfig = {
         }
     },
     properties: { /* ... */ }
-};
+});
 ```
 
 Andere sammlungsübergreifende Muster:

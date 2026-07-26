@@ -145,7 +145,7 @@ Si quieres que Rebase se ejecute en una subruta (p. ej., `/admin`):
 
 **Backend** — Actualiza la ruta base:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     // ...
     basePath: "/admin/api"

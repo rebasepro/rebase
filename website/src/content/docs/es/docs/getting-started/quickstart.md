@@ -75,13 +75,19 @@ pnpm dev
 ```
 
 Esto inicia ambos a la vez:
-- **Backend** en `http://localhost:3001` — API REST, autenticación, almacenamiento, WebSocket
-- **Frontend** en `http://localhost:5173` — Panel de administración de Rebase
+- **Backend** — API REST, autenticación, almacenamiento, WebSocket
+- **Frontend** — el panel de administración de Rebase
 - **Recarga en caliente** para ambos — los cambios surten efecto al instante
+
+Ambos puertos se **derivan de la ruta del proyecto** en lugar de ser fijos, así que
+varios proyectos Rebase pueden ejecutarse a la vez. `rebase dev` imprime las dos
+URLs que vinculó — usa esas, no `localhost:3001`/`localhost:5173`. (`PORT` y
+`VITE_API_URL` en `.env` configuran `rebase start`, el servidor de producción, y
+aquí se ignoran.) Fija un puerto con `rebase dev --port 3001`.
 
 ## Primer Inicio de Sesión
 
-Cuando abras `http://localhost:5173`, verás la pantalla de inicio de sesión. El primer usuario en registrarse se convierte automáticamente en administrador — este es el flujo de arranque.
+Cuando abras la URL del frontend que imprimió `rebase dev`, verás la pantalla de inicio de sesión. El primer usuario en registrarse se convierte automáticamente en administrador — este es el flujo de arranque.
 
 1. Haz clic en **Registrarse**
 2. Introduce tu correo electrónico y contraseña
@@ -92,9 +98,9 @@ Cuando abras `http://localhost:5173`, verás la pantalla de inicio de sesión. E
 Abre `config/collections/` y crea un nuevo archivo. Exporta la colección como **export por defecto** — así es como el registro la detecta:
 
 ```typescript title="config/collections/products.ts"
-import { CollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const productsCollection: CollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     singularName: "Product",
@@ -126,7 +132,7 @@ const productsCollection: CollectionConfig = {
             autoValue: "on_create"
         }
     }
-};
+});
 
 export default productsCollection;
 ```

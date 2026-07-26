@@ -14,7 +14,7 @@ La cronologia delle entità registra uno entity dei valori delle entità ad ogni
 
 Abilita la cronologia in `initializeRebaseBackend`:
 
-```typescript
+```typescript no-verify
 await initializeRebaseBackend({
     // ...
     history: true
@@ -35,11 +35,14 @@ history: {
 Indica quali collezioni devono tracciare la cronologia:
 
 ```typescript
-const ordersCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const ordersCollection = defineCollection({
     slug: "orders",
+    name: "Orders",
+    table: "orders",
     history: true,       // Abilita per questa collezione
     properties: { /* ... */ }
-};
+});
 ```
 
 ## Come funziona

@@ -11,9 +11,17 @@ Las acciones de entidad son botones personalizados que aparecen en entidades ind
 ## Definición de Acciones de Entidad
 
 ```typescript
-const articlesCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const articlesCollection = defineCollection({
     slug: "articles",
-    properties: { /* ... */ },
+    name: "Articles",
+    table: "articles",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        name: { name: "Name", type: "string" },
+        status: { name: "Status", type: "string" },
+        published_at: { name: "Published At", type: "date" }
+    },
     admin: {
         entityActions: [
             {
@@ -45,7 +53,7 @@ const articlesCollection: CollectionConfig = {
             }
         ]
     }
-};
+});
 
 ```
 
@@ -54,6 +62,7 @@ const articlesCollection: CollectionConfig = {
 Para acciones a nivel de barra de herramientas que funcionan en la colección o en entidades seleccionadas:
 
 ```tsx
+import { defineCollection } from "@rebasepro/admin-types";
 function PublishSelectedAction({ selectionController, context }: CollectionActionsProps) {
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;
@@ -75,12 +84,12 @@ function PublishSelectedAction({ selectionController, context }: CollectionActio
 }
 
 // Register
-const collection: CollectionConfig = {
+const collection = defineCollection({
     admin: {
         Actions: PublishSelectedAction
     }
     // ...
-};
+});
 ```
 
 ![Acciones de colección](/img/collection_actions.png)

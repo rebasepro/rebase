@@ -18,7 +18,7 @@ Der Speicher wird im `storage`-Block von `initializeRebaseBackend` konfiguriert:
 
 ### Lokaler Speicher
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {
@@ -30,7 +30,7 @@ const backend = await initializeRebaseBackend({
 
 ### S3-Speicher
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {
@@ -47,7 +47,7 @@ const backend = await initializeRebaseBackend({
 
 ### GCS / Firebase Storage
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     storage: {

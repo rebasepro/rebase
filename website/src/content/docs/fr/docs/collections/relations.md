@@ -20,7 +20,8 @@ Les relations peuvent être définies soit en ligne dans la propriété, soit ex
 Vous pouvez définir la relation directement sur la propriété. Le framework extrait automatiquement celles-ci dans le tableau `relations[]` de la collection au moment de la normalisation, de sorte que vous n'avez plus besoin d'une entrée `relations[]` distincte pour les propriétés.
 
 ```typescript
-const postsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -36,7 +37,7 @@ const postsCollection: CollectionConfig = {
             localKey: "author_id"
         }
     }
-};
+});
 ```
 
 ### 2. Tableau de Relations Explicite
@@ -44,7 +45,8 @@ const postsCollection: CollectionConfig = {
 Pour les cas d'utilisation avancés ou lorsqu'une relation ne correspond pas directement à un champ de formulaire, vous pouvez la définir dans le tableau `relations` :
 
 ```typescript
-const postsCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const postsCollection = defineCollection({
     slug: "posts",
     name: "Posts",
     table: "posts",
@@ -61,7 +63,7 @@ const postsCollection: CollectionConfig = {
             localKey: "author_id"
         }
     ]
-};
+});
 ```
 
 ## Types de Relations

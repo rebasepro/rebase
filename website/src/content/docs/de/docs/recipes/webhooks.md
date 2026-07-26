@@ -11,7 +11,8 @@ Verwenden Sie die Callbacks `afterSave` und `afterDelete`, um externe Dienste zu
 ## Slack-Benachrichtigung bei neuer Bestellung
 
 ```typescript
-const ordersCollection: CollectionConfig = {
+import { defineCollection } from "@rebasepro/admin-types";
+const ordersCollection = defineCollection({
     slug: "orders",
     name: "Orders",
     table: "orders",
@@ -29,7 +30,7 @@ const ordersCollection: CollectionConfig = {
         }
     },
     properties: { /* ... */ }
-};
+});
 ```
 
 ## Synchronisation mit externer API
