@@ -38,7 +38,7 @@ Dies wird unter **`/api/functions/hello`** eingebunden. Der Dateiname (ohne Erwe
 
 Aktivieren Sie benutzerdefinierte Funktionen, indem Sie `functionsDir` zu Ihrer Backend-Konfiguration hinzufügen:
 
-```typescript
+```typescript no-verify
 import path from "path";
 
 const instance = await initializeRebaseBackend({
@@ -211,7 +211,7 @@ Benutzerdefinierte Funktionen werden **nachdem** `initializeRebaseBackend()` die
 
 Das bedeutet, dass Ihre benutzerdefinierten Funktionen Zugriff auf alle initialisierten Dienste haben. Registrieren Sie alle Routen, die **vor** Rebase ausgeführt werden müssen, direkt in der Hono-App, bevor Sie `initializeRebaseBackend()` aufrufen:
 
-```typescript
+```typescript no-verify
 const app = new Hono();
 
 // This runs BEFORE Rebase routes

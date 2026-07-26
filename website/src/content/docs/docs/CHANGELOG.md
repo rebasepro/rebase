@@ -28,6 +28,14 @@ title: Changelog
 
   A plain `const posts: CollectionConfig = { … }` annotation still works and is still typechecked — it just infers nothing, so prefer `defineCollection` in new code. The scaffold templates and every docs example now use it.
 
+- **`where` and `orderBy` are now checked against the row type** — `FindParams` was not generic, so its `where` was `FilterValues<string>` and its `orderBy` an untyped `OrderByTuple`. Passing a generated `Database` to `createRebaseClient` typed the *rows* correctly but not the *query*: `find({ where: { nonexistent_column: ["==", 1] } })` compiled, then came back as a 400 from the API — or matched nothing at all, which is worse. `FindParams<M>` now carries the row type, and a column that does not exist is a compile error.
+
+  A dotted path (`"meta.tag"`) still works for reaching into a `map`/jsonb column; its **root** must be a real column. `include` is unchanged — relation names come from `relations`, not from the row type, so nothing in `Database` can check them.
+
+  `M` defaults to `Record<string, unknown>` all the way through, so an untyped `createRebaseClient()` behaves exactly as before. The chain that has to stay intact is `createRebaseClient<DB>` → `SDKCollectionClient<M>` → `FindParams<M>` → `FilterValues<FieldPath<M>>`; a non-generic alias anywhere along it silently flattens `M` back to the default, which is precisely how the re-export in `client/src/transport.ts` (`export type FindParams = TypesFindParams`) hid this. `e2e/baas-typecheck/src/sdk.ts` now pins it with `@ts-expect-error`, so `pnpm check:baas-types` fails if the check ever comes back off.
+
+  The fluent builder is unaffected: `.where("status", "==", "draft")` was already typed on its parameters. Its internal accumulator stays keyed by `string`, because a `Partial<Record<FieldPath<M>, …>>` is read-only under a generic `M` (TS2862) and cannot be built up in place.
+
 - **The `admin` block's key fields are now checked against the collection's properties** — `titleProperty`, `sort`, `propertiesOrder` and `listProperties` reject a name that is not one of your properties. Previously they accepted any string, so a removed or misspelled field was found by noticing a column had quietly vanished from the panel.
 
   The cause was one line. `augment.ts` merged the block on as `admin?: AdminCollectionOptions` with **no type arguments**, so `M` fell back to its default `Record<string, unknown>`, `Extract<keyof M, string>` widened to `string`, and every key-shaped field accepted anything. `defineCollection` computed the property-key inference correctly the whole time; it was dropped at that seam, one line short of the field that needed it. The completion those fields' docs promised had therefore never worked.
@@ -214,7 +222,7 @@ title: Changelog
 
 - **BaaS mode — a REST API over your database with no collections at all** — `mode: "baas"` derives collections from the live database at boot instead of loading config files. Every protected table becomes a REST resource, with types, primary keys and relations read from `information_schema`; the drizzle tables the query layer needs are built in memory, so no generated `schema.generated.ts` is required either. Change the schema with a migration and the API follows. Join tables are skipped, the schema editor is off (it exists to write config files), and no React enters the backend's module graph. `introspectionSchema` on the Postgres adapter selects a schema other than `public`.
 
-- **The SDK works with no collections** — `rebase.data.collection<Record<string, unknown>>("posts").find()` needs only a table name against a BaaS backend: no collections map, no generated types, nothing to declare. The optional `collections` option exists only to pin non-obvious slugs.
+- **The SDK works with no collections** — `rebase.data.collection("posts").find()` needs only a table name against a BaaS backend: no collections map, no generated types, nothing to declare. The optional `collections` option exists only to pin non-obvious slugs.
 
 - **`rebase init --flavor baas`** — scaffolds a headless project: `backend/` alone, no `config/`, no `frontend/`, and no UI package in the install tree. Without `--flavor`, `init` asks: *BaaS + admin* (default) or *BaaS only*.
 
@@ -435,7 +443,7 @@ title: Changelog
 
 - **`installShutdownHandlers`** — New `@rebasepro/server-core` helper that encapsulates graceful shutdown: drains via `backend.shutdown()`, runs `onCleanup` (e.g. closing your database pool), guards against repeated signals, and force-exits if shutdown hangs. Replaces the hand-rolled ~40-line shutdown block in the backend templates — the CLI template previously lacked the re-entry guard and force-exit timer entirely.
 
-- **Honest Realtime Meta** — Added `FindResponse.meta.total` flag on realtime first-paint updates. When `listen()` emits its immediate heuristic metadata, the emission now carries `estimated: true`. Redundant second emissions are skipped when the authoritative count matches the heuristic, and count failures no longer silently pretend to be authoritative — the `estimated` flag remains as the signal.
+- **Honest Realtime Meta** — Added `FindResponse.meta.estimated` flag on realtime first-paint updates. When `listen()` emits its immediate heuristic metadata, the emission now carries `estimated: true`. Redundant second emissions are skipped when the authoritative count matches the heuristic, and count failures no longer silently pretend to be authoritative — the `estimated` flag remains as the signal.
 
 ### Fixes
 
@@ -459,7 +467,7 @@ title: Changelog
 
 ### Changed
 
-- **Strict collection accessors** — When a `collections` dictionary is passed to `createRebaseClient`, unknown property accessors on `client.data` now throw immediately with a nearest-match suggestion instead of silently producing a 404 later. Use `data.collection<Record<string, unknown>>("slug")` for dynamic slugs.
+- **Strict collection accessors** — When a `collections` dictionary is passed to `createRebaseClient`, unknown property accessors on `client.data` now throw immediately with a nearest-match suggestion instead of silently producing a 404 later. Use `data.collection("slug")` for dynamic slugs.
 
 ### Cleanup
 

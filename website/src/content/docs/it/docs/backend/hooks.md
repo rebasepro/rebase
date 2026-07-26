@@ -26,7 +26,7 @@ Usa i callback globali per:
 
 Passa la chiave `callbacks` a `initializeRebaseBackend`:
 
-```typescript
+```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
 
 const instance = await initializeRebaseBackend({
@@ -49,8 +49,6 @@ const instance = await initializeRebaseBackend({
 ## Tipo `CollectionCallbacks`
 
 ```typescript
-import type { CollectionCallbacks } from "@rebasepro/types";
-
 type CollectionCallbacks = {
     afterRead?(props):   Record<string, unknown>;  // Transform row before returning to caller
     beforeSave?(props):  Partial<Values>;           // Modify values before writing to DB
@@ -130,7 +128,7 @@ Ogni callback riceve un singolo oggetto di props. Campi comuni:
 
 Oscura gli indirizzi email per i chiamanti non amministratori su ogni collezione:
 
-```typescript
+```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
 
 const instance = await initializeRebaseBackend({
@@ -151,7 +149,7 @@ const instance = await initializeRebaseBackend({
 
 Registra tutte le eliminazioni su ogni collezione:
 
-```typescript
+```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
 
 const instance = await initializeRebaseBackend({

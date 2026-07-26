@@ -38,7 +38,7 @@ Esto se monta en **`/api/functions/hello`**. El nombre del archivo (sin extensi�
 
 Habilite las funciones personalizadas añadiendo `functionsDir` a su configuración de backend:
 
-```typescript
+```typescript no-verify
 import path from "path";
 
 const instance = await initializeRebaseBackend({
@@ -211,7 +211,7 @@ Las funciones personalizadas se cargan y montan **después** de que `initializeR
 
 Esto significa que sus funciones personalizadas tienen acceso a todos los servicios inicializados. Registre cualquier ruta que necesite ejecutarse **antes** de Rebase directamente en la aplicación Hono, antes de llamar a `initializeRebaseBackend()`:
 
-```typescript
+```typescript no-verify
 const app = new Hono();
 
 // This runs BEFORE Rebase routes

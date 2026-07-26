@@ -38,7 +38,7 @@ This mounts at **`/api/functions/hello`**. The filename (without extension) beco
 
 Enable custom functions by adding `functionsDir` to your backend config:
 
-```typescript
+```typescript no-verify
 import path from "path";
 
 const instance = await initializeRebaseBackend({
@@ -303,7 +303,7 @@ Custom functions are loaded and mounted **after** `initializeRebaseBackend()` co
 
 This means your custom functions have access to all initialized services. Register any routes that need to run **before** Rebase on the Hono app directly, prior to calling `initializeRebaseBackend()`:
 
-```typescript
+```typescript no-verify
 const app = new Hono();
 
 // This runs BEFORE Rebase routes

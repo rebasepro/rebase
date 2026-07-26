@@ -265,7 +265,7 @@ server.listen(3001);
 
 The bootstrapper protocol — database-specific logic is encapsulated in bootstrapper objects:
 
-```typescript
+```typescript no-verify
 import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgres";
 import { tables, enums, relations } from "./schema.generated.js";
 

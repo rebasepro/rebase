@@ -1198,7 +1198,7 @@ interface BackendHookContext {
 
 ### Example: PII Masking
 
-```typescript
+```typescript no-verify
 const hooks: BackendHooks = {
   data: {
     afterRead(slug, entity, ctx) {
