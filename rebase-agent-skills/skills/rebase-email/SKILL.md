@@ -430,23 +430,22 @@ if (rebase.email) {
 // functions/send-report.ts
 import { defineFunction } from "@rebasepro/server";
 
-export default defineFunction({
-    method: "POST",
-    handler: async (ctx) => {
-        const { email, reportData } = ctx.body;
+export default defineFunction((app, { rebase }) => {
+    app.post("/", async (c) => {
+        const { email, reportData } = await c.req.json();
 
         if (!ctx.client.email) {
             return ctx.json({ error: "Email not configured" }, 503);
         }
 
-        await ctx.client.email.send({
+        await rebase.email?.send({
             to: email,
             subject: "Your Monthly Report",
-            html: `<h1>Report</h1><pre>${JSON.stringify(reportData, null, 2)}</pre>`,
+            html: `<h1>Report</h1><pre>${JSON.stringify(reportData, null, 2)}</pre>`
         });
 
-        return ctx.json({ success: true, message: "Report sent" });
-    },
+        return c.json({ success: true, message: "Report sent" });
+    });
 });
 ```
 
@@ -457,6 +456,7 @@ export default defineFunction({
 import { defineCron } from "@rebasepro/server";
 
 export default defineCron({
+    name: "weekly-digest",
     schedule: "0 9 * * 1",  // Every Monday at 9 AM
     handler: async (ctx) => {
         if (!ctx.client.email) {
@@ -466,7 +466,7 @@ export default defineCron({
 
         // Fetch subscribers
         const { data: subscribers } = await ctx.client.data
-            .collection<Record<string, unknown>>("subscribers")
+            .collection<{ email: string }>("subscribers")
             .find({ where: { active: ["==", true] } });
 
         for (const sub of subscribers) {
@@ -604,7 +604,8 @@ When using a custom `sendEmail` function instead of SMTP, `verifyConnection()` s
 ```typescript
 import { Hono } from "hono";
 import type { HonoEnv } from "@rebasepro/server";
-import { serve } from "@hono/node-server";
+import { getRequestListener } from "@hono/node-server";
+import { createServer } from "http";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { defaultUsersCollection } from "@rebasepro/common";
@@ -625,7 +626,7 @@ const env = loadEnv({
 
 // 2. Set up Hono and HTTP server
 const app = new Hono<HonoEnv>();
-const server = serve({ fetch: app.fetch, port: env.PORT });
+const server = createServer(getRequestListener(app.fetch));
 
 // 3. Create database adapter
 const postgresAdapter = createPostgresAdapter({

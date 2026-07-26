@@ -212,7 +212,6 @@ Using the driver ensures that users can only query or update records they are au
 // backend/functions/my-products.ts
 import { Hono } from "hono";
 import type { HonoEnv } from "@rebasepro/server";
-import { HonoEnv } from "@rebasepro/server"; // Import types for typing Hono context
 
 const app = new Hono<HonoEnv>();
 
@@ -225,7 +224,7 @@ app.get("/", async (c) => {
     }
 
     // Queries respect Row-Level Security
-    const { data: myProducts } = await driver.fetchCollection({
+    const myProducts = await driver.fetchCollection({
         path: "products",
         limit: 10
     });
@@ -252,7 +251,7 @@ app.post("/:id/approve", async (c) => {
     const id = c.req.param("id");
 
     // Use the admin-level data API (bypasses RLS completely)
-    await rebase.data.jobs.update(id, {
+    await rebase.data.collection<Record<string, unknown>>("jobs").update(id, {
         status: "published",
         approved_at: new Date().toISOString(),
     });
