@@ -3,7 +3,7 @@ export const en = {
   "hero.title.part1": "The Postgres you already have.",
   "hero.title.part2": "The backend you always wanted.",
   "hero.subtitle":
-    "Point Rebase at your database and get REST APIs, auth, storage, realtime — and an admin panel when you want one. Secured by Postgres row-level security, not middleware. Ready for your team and your AI agents.",
+    "Point Rebase at your database and get REST APIs, auth, storage and realtime — secured by Postgres row-level security, not middleware. The admin panel is a separate product: add it when you want one, or never. Built to be driven by your team and your AI agents.",
   "hero.cta.demo": "See the live demo",
   "hero.cta.demo.note": "No signup — a real Rebase backend, live, with its generated admin panel",
   "hero.cli.label": "Prefer your terminal? Up and running locally in under a minute:",
@@ -14,19 +14,19 @@ export const en = {
   "demo.pull": "✔ Schema pushed to database. Tables created.",
   "demo.dev": "✔ Admin panel, API, and WebSocket server running.",
   "social.title": "Teams shipping products on our tools — Rebase and FireCMS",
-  "see.badge": "See it for yourself",
+  "see.badge": "The optional half",
   "see.title": "From connection string to control panel",
   "see.subtitle":
-    "APIs, auth and realtime are running the moment you connect. This is the back office that comes with them — generated, not built.",
+    "Everything above runs without a single line of UI. Add the admin layer and the same collections become a back office — generated, not built.",
   "engine.badge": "The backend underneath",
   "engine.title": "A full backend. Not just a pretty face.",
   "engine.subtitle":
     "The admin panel is the layer you see. Underneath it: a typed SDK, instant REST, and realtime over WebSocket — running against your database from minute one.",
   "engine.link": "Explore the backend",
-  "modes.badge": "Modular by design",
+  "modes.badge": "Two products, one file",
   "modes.title": 'Adopt only <span class="text-primary">what you need.</span>',
   "modes.subtitle":
-    "Three modes, same packages, wired differently. Start headless, add the admin panel later — or never. Nothing is bundled that you didn't ask for.",
+    "The backend and the admin panel are separate products that happen to share a schema. Start headless, add the panel later — or never. Nothing is bundled that you didn't ask for.",
   "modes.baas.title": "BaaS — just the backend",
   "modes.baas.desc":
     "REST, auth, storage, realtime and backups over your database. No config files, no UI, no React in the dependency tree. Every protected table is served automatically, straight from your schema.",
@@ -40,6 +40,31 @@ export const en = {
     "SQL editor, schema visualizer, RLS policy editor, logs and API explorer on top of everything else. The whole platform, one self-hosted app.",
   "modes.full.tag": "Supabase + Payload, owned end to end",
   "modes.link": "Why we built it this way",
+  "modes.heading": "How far you take it",
+  "split.title": 'One file. <span class="text-primary">Two halves.</span>',
+  "split.subtitle":
+    "A collection describes your data. The <code class=\"font-mono text-surface-300\">admin</code> block describes how it looks. The server loads the file and never reads inside <code class=\"font-mono text-surface-300\">admin</code> — so your API, auth and realtime behave identically whether an admin panel exists or not.",
+  "split.tag.backend": "Backend contract",
+  "split.tag.admin": "Admin panel only",
+  "split.fact1.title": "The backend contract is React-free",
+  "split.fact1.desc":
+    "<code class=\"font-mono text-surface-300\">@rebasepro/types</code> ships zero React imports. A backend-only install — server, driver, SDK — typechecks with no React and nothing UI-shaped in the dependency tree.",
+  "split.fact2.title": "Presentation is opt-in, and the compiler enforces it",
+  "split.fact2.desc":
+    "The <code class=\"font-mono text-surface-300\">admin</code> block only exists once you add <code class=\"font-mono text-surface-300\">@rebasepro/admin-types</code>. Without it, an <code class=\"font-mono text-surface-300\">admin</code> key is a type error — UI concerns can't drift into a headless project by accident.",
+  "split.fact3.title": "Delete the panel. Your API won't notice.",
+  "split.fact3.desc":
+    "The panel reads and writes your data through the same REST, auth and realtime APIs you build on, under the same row-level security. No privileged data path, no second source of truth.",
+  "paths.title": 'Two ways in. <span class="text-primary">Same schema.</span>',
+  "paths.subtitle": "Pick the half you need today. The other one is one dependency away.",
+  "paths.backend.title": "Rebase Backend",
+  "paths.backend.desc":
+    "REST, auth, storage, realtime and RLS over your Postgres. Headless, React-free, consumed from any client.",
+  "paths.backend.cta": "Explore the backend",
+  "paths.admin.title": "Rebase Admin",
+  "paths.admin.desc":
+    "A generated back office on top of any Rebase backend — spreadsheet editing, media, roles, extensible with your own React.",
+  "paths.admin.cta": "Explore the admin panel",
   "howitworks.badge": "Time reclaimed",
   "howitworks.title":
     'What you\'ll <span class="text-primary">never build again.</span>',
@@ -204,7 +229,9 @@ export const en = {
   "nav.editing": "Editing Experience",
   "nav.editing.desc": "Notion-style editor, Kanban boards, inline editing.",
   "nav.backend": "Backend & APIs",
-  "nav.backend.desc": "Hono server, REST, WebSockets.",
+  "nav.backend.desc": "The headless BaaS: REST, auth, realtime, RLS.",
+  "nav.admin": "Admin panel",
+  "nav.admin.desc": "The optional back office, generated from your collections.",
   "nav.ai": "AI & Agents",
   "nav.ai.desc": "MCP server, AI autofill, natural language queries.",
   "nav.developers": "Developers",
@@ -264,6 +291,7 @@ export const en = {
   "footer.features": "Features",
   "footer.studio": "Rebase Studio",
   "footer.backend": "Backend & APIs",
+  "footer.admin": "Admin panel",
   "footer.ai": "AI & Agents",
   "footer.demo": "Demo",
   "footer.devOverview": "Overview",
@@ -540,6 +568,8 @@ export const en = {
   "about.join.discord": "Join our Discord",
   "index.meta.title": "Rebase — The Open-Source Backend for Postgres: APIs, Auth, Realtime & Admin Panel",
   "index.meta.description": "Point Rebase at your Postgres and get REST APIs, auth, storage, realtime and backups — plus a schema-driven admin panel when you want one. Secured by row-level security. Open-source, self-hosted.",
+  "admin.meta.title": "Admin panel — a separate product from the Rebase backend",
+  "admin.meta.description": "A generated back office on top of any Rebase backend: spreadsheet editing, media, roles and history — opt-in, extensible with your own React, and never required by the API.",
   "backend.meta.title": "Backend & APIs — Rebase App Engine",
   "backend.meta.description": "Get an auto-generated backend powered by Hono and Drizzle ORM. Complete with REST and WebSockets.",
   "ai.meta.title": "AI & Agents Infrastructure — Rebase",

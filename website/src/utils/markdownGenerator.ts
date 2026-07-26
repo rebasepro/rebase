@@ -157,6 +157,27 @@ Define your collections in TypeScript and get a production-ready API server.
 `;
   }
 
+  if (page === "admin") {
+    return `# Rebase — Admin panel
+
+A generated back office that sits on top of a Rebase backend, as a separate, optional product.
+
+## How it relates to the backend
+- **Opt-in**: the \`admin\` block on a collection only type-checks once \`@rebasepro/admin-types\` is added to the project.
+- **Non-invasive**: the server loads your collection files and never reads inside \`admin\`; the REST, auth and realtime APIs are identical with or without a panel.
+- **Same data path**: the panel reads and writes through the same APIs you build on, under the same Postgres row-level security.
+
+## Features
+- **Every view**: data grid, cards, list and Kanban over the same rows, with inline editing.
+- **Rich content editing**: block editor, Markdown fields and structured content written straight to Postgres.
+- **Media & storage**: uploads and previews backed by your own storage bucket.
+- **History & audit**: per-collection version history with side-by-side comparison and revert.
+- **Import & export**: CSV, JSON and Excel with automatic field mapping.
+- **Users & roles**: account management against the same roles your RLS policies read.
+- **Extensible in React**: custom fields, previews, entity views and actions referenced from the \`admin\` block.
+`;
+  }
+
   if (page === "ai") {
     return `# Rebase — AI & Agents
 

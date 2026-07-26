@@ -32,24 +32,24 @@ export function ApiMiniDemo() {
                 {/* Active endpoint */}
                 <div className="px-3 py-2 bg-primary/5 border-l-2 border-primary flex items-center gap-1.5">
                     <span className="text-[8px] font-bold text-green-400 bg-green-400/10 px-1 py-0.5 rounded">GET</span>
-                    <span className="text-[9px] font-mono text-surface-300">/api/users</span>
+                    <span className="text-[9px] font-mono text-surface-300">/api/data/users</span>
                 </div>
                 {/* Other endpoints */}
                 <div className="px-3 py-2 flex items-center gap-1.5">
                     <span className="text-[8px] font-bold text-blue-400 bg-blue-400/10 px-1 py-0.5 rounded">POST</span>
-                    <span className="text-[9px] font-mono text-surface-500">/api/users</span>
+                    <span className="text-[9px] font-mono text-surface-500">/api/data/users</span>
                 </div>
                 <div className="px-3 py-2 flex items-center gap-1.5">
                     <span className="text-[8px] font-bold text-green-400 bg-green-400/10 px-1 py-0.5 rounded">GET</span>
-                    <span className="text-[9px] font-mono text-surface-500">/api/posts</span>
+                    <span className="text-[9px] font-mono text-surface-500">/api/data/posts</span>
                 </div>
                 <div className="px-3 py-2 flex items-center gap-1.5">
                     <span className="text-[8px] font-bold text-amber-400 bg-amber-400/10 px-1 py-0.5 rounded">PUT</span>
-                    <span className="text-[9px] font-mono text-surface-500">/api/posts/:id</span>
+                    <span className="text-[9px] font-mono text-surface-500">/api/data/posts/:id</span>
                 </div>
                 <div className="px-3 py-2 flex items-center gap-1.5">
                     <span className="text-[8px] font-bold text-red-400 bg-red-400/10 px-1 py-0.5 rounded">DEL</span>
-                    <span className="text-[9px] font-mono text-surface-500">/api/posts/:id</span>
+                    <span className="text-[9px] font-mono text-surface-500">/api/data/posts/:id</span>
                 </div>
                 {/* Animated request line */}
                 <div className="mt-auto px-3 py-2 border-t border-surface-800/40">

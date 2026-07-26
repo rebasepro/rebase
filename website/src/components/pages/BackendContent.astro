@@ -1,9 +1,12 @@
 ---
 const { lang, t } = Astro.props;
 
-import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+import { languages, defaultLang, useTranslations, useTranslatedPath } from '../../i18n/ui';
 import { NeatBackground } from '../../components/NeatBackground';
 import HeroConnectionWidget from '../demos/HeroConnectionWidget';
+import { SplitLayerDemo } from '../demos/SplitLayerDemo';
+
+const translatePath = useTranslatedPath(lang);
 
 
 
@@ -53,19 +56,25 @@ const drizzleCode = `<span class="text-surface-500">// Your collection definitio
 
       <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
         <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
-          <span class="text-sm font-medium">Hono · Drizzle · PostgreSQL</span>
+          <span class="text-sm font-medium">Hono · Drizzle · PostgreSQL · React-free</span>
         </div>
         <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-          Backend & APIs
+          The backend,<br/><span class="text-primary">on its own.</span>
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
-          A production-ready API server over your Postgres: REST, WebSocket realtime, JWT auth, and auto-generated
-          OpenAPI docs. Point it at an existing database and every protected table is served automatically — no config
-          files — or define collections in TypeScript when you want full control.
+          A production-ready API server over your Postgres: REST, WebSocket realtime, JWT auth, storage, and
+          auto-generated OpenAPI docs. Point it at an existing database and every protected table is served
+          automatically — no config files — or define collections in TypeScript when you want full control.
+          No admin panel required, and no React in the dependency tree.
         </p>
         <div class="mt-4 max-w-xl mx-auto">
           <HeroConnectionWidget client:load />
         </div>
+        <p class="mt-8 text-sm text-surface-400">
+          Want the back office too?
+          <a href={translatePath("/admin")} class="text-primary hover:underline">Rebase Admin</a>
+          is the optional layer on top.
+        </p>
       </div>
     </section>
 
@@ -349,6 +358,31 @@ const drizzleCode = `<span class="text-surface-500">// Your collection definitio
             <h3 class="text-lg font-semibold text-white mb-2">Entity History</h3>
             <p class="text-sm text-surface-400">Full audit trail for every data change. Track who changed what, when, and restore previous versions.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Where the admin panel fits -->
+ <section class="py-16 sm:py-24">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="mx-auto max-w-3xl text-center mb-12">
+          <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Headless by default</h2>
+          <p class="mt-4 text-lg text-surface-400">
+            The admin panel is a separate product. Toggle it on below — the project gains a dependency and a nested
+            <code class="font-mono text-surface-300">admin</code> block, and the API response does not move.
+          </p>
+        </div>
+        <SplitLayerDemo client:visible/>
+        <div class="mt-8 text-center">
+          <a href={translatePath("/admin")}
+             class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+            See what the admin panel gives you
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14"/>
+              <path d="m12 5 7 7-7 7"/>
+            </svg>
+          </a>
         </div>
       </div>
     </section>
