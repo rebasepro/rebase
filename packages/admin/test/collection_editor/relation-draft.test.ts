@@ -1,6 +1,6 @@
 import { RelationKind } from "@rebasepro/types";
 
-import { KIND_LABELS, draftIsComplete } from "../../src/collection_editor/ui/collection_editor/CollectionRelationsTab";
+import { KIND_LABELS, draftIsComplete, relationFromDraft } from "../../src/collection_editor/ui/collection_editor/CollectionRelationsTab";
 
 /**
  * The relations tab used to enable Save as soon as a draft had a name and a
@@ -84,5 +84,69 @@ on: { from: "role_id",
 to: "id" } }
             ]
         })).toBe(true);
+    });
+});
+
+describe("building a relation from a draft", () => {
+    it("keeps only the fields the chosen kind owns", () => {
+        // A draft that has been through several kinds: the user filled in a
+        // junction table, then switched to "Belongs to". Casting this straight
+        // to a Relation saved both `localKey` and `through`.
+        const messy = {
+            kind: "belongsTo" as const,
+            relationName: "author",
+            target: "users",
+            localKey: "author_id",
+            foreignKeyOnTarget: "post_id",
+            through: { table: "posts_tags",
+sourceColumn: "post_id",
+targetColumn: "tag_id" },
+            joinPath: [{ table: "x",
+on: { from: "a",
+to: "b" } }],
+            cardinality: "many" as const
+        };
+        expect(relationFromDraft(messy)).toEqual({
+            kind: "belongsTo",
+            relationName: "author",
+            target: "users",
+            localKey: "author_id"
+        });
+    });
+
+    it("drops a junction when the kind is not many-to-many", () => {
+        const built = relationFromDraft({
+            kind: "hasMany",
+            relationName: "comments",
+            target: "comments",
+            foreignKeyOnTarget: "post_id",
+            through: { table: "leftover" }
+        });
+        expect(built).not.toHaveProperty("through");
+        expect(built).toMatchObject({ kind: "hasMany",
+foreignKeyOnTarget: "post_id" });
+    });
+
+    it("refuses a draft that is not a relation yet", () => {
+        expect(relationFromDraft({ relationName: "x",
+target: "y" })).toBeNull();
+        expect(relationFromDraft({ kind: "belongsTo",
+target: "y" })).toBeNull();
+        expect(relationFromDraft({ kind: "belongsTo",
+relationName: "x" })).toBeNull();
+    });
+
+    it("gives a via its cardinality and path", () => {
+        expect(relationFromDraft({
+            kind: "via",
+            relationName: "perms",
+            target: "permissions",
+            cardinality: "one",
+            joinPath: [{ table: "roles",
+on: { from: "role_id",
+to: "id" } }]
+        })).toMatchObject({ kind: "via",
+cardinality: "one",
+joinPath: [{ table: "roles" }] });
     });
 });

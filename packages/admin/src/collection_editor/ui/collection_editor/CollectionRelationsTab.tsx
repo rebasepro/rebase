@@ -73,6 +73,8 @@ to: "" } };
  * join chain has nothing to derive from, so a `via` with an empty `joinPath`
  * joins nothing and returns nothing. The dialog used to let it be saved.
  */
+export { relationFromDraft };
+
 export function draftIsComplete(draft: RelationDraft): boolean {
     if (!draft.relationName || !draft.target) return false;
     if (draft.kind === "via") {
@@ -81,6 +83,60 @@ export function draftIsComplete(draft: RelationDraft): boolean {
         return steps.every(s => s.table && s.on?.from && s.on?.to);
     }
     return true;
+}
+
+/**
+ * Build a relation from a draft, keeping only the fields its kind owns.
+ *
+ * The dialog used to cast the draft straight to `Relation`. A draft accumulates
+ * whatever the user has typed, and switching kind does not clear what the
+ * previous kind collected — so filling in a junction table, then switching to
+ * "Belongs to", saved a relation carrying both `localKey` and `through`. That
+ * is exactly the shape the union exists to make impossible, smuggled past it by
+ * the cast. Reloading would then fail validation on a collection the editor
+ * itself had written.
+ *
+ * Returns null for a draft that is not a relation yet, so the caller can bail
+ * rather than persist a half-built one.
+ */
+function relationFromDraft(draft: RelationDraft): Relation | null {
+    if (!draft.kind || !draft.relationName || !draft.target) return null;
+
+    const common = {
+        relationName: draft.relationName,
+        target: draft.target as unknown as Relation["target"],
+        ...(draft.onUpdate ? { onUpdate: draft.onUpdate } : {}),
+        ...(draft.onDelete ? { onDelete: draft.onDelete } : {})
+    };
+
+    switch (draft.kind) {
+        case "belongsTo":
+            return { ...common,
+kind: "belongsTo",
+...(draft.localKey ? { localKey: draft.localKey } : {}) };
+        case "hasOne":
+        case "hasMany":
+            return {
+                ...common,
+                kind: draft.kind,
+                ...(draft.foreignKeyOnTarget ? { foreignKeyOnTarget: draft.foreignKeyOnTarget } : {})
+            };
+        case "manyToMany":
+            return { ...common,
+kind: "manyToMany",
+...(draft.through ? { through: draft.through } : {}) };
+        case "via":
+            return {
+                ...common,
+                kind: "via",
+                cardinality: draft.cardinality ?? "many",
+                joinPath: draft.joinPath ?? []
+            };
+        default: {
+            const exhaustive: never = draft.kind;
+            throw new Error(`Unhandled relation kind: ${String(exhaustive)}`);
+        }
+    }
 }
 
 export function CollectionRelationsTab() {
@@ -118,11 +174,14 @@ export function CollectionRelationsTab() {
     const handleSave = () => {
         if (!editingRelationState) return;
 
+        const relation = relationFromDraft(editingRelationState);
+        if (!relation) return;
+
         const newRelations = [...relations];
         if (editingRelationIndex === -1) {
-            newRelations.push(editingRelationState as unknown as Relation);
+            newRelations.push(relation);
         } else if (editingRelationIndex !== null) {
-            newRelations[editingRelationIndex] = editingRelationState as unknown as Relation;
+            newRelations[editingRelationIndex] = relation;
         }
         setFieldValue("relations", newRelations);
 
@@ -157,8 +216,7 @@ kind: "hasMany" });
                                 <TableCell header className="w-16"></TableCell>
                                 <TableCell header>Name</TableCell>
                                 <TableCell header>Target</TableCell>
-                                <TableCell header>Cardinality</TableCell>
-                                <TableCell header>Direction</TableCell>
+                                <TableCell header>Kind</TableCell>
                             </TableHeader>
                             <TableBody>
                                 {relations.map((relation, index) => (
