@@ -17,6 +17,8 @@ import { StorageUploadFieldBinding } from "../form/field_bindings/StorageUploadF
 import { SwitchFieldBinding } from "../form/field_bindings/SwitchFieldBinding";
 import { TextFieldBinding } from "../form/field_bindings/TextFieldBinding";
 import { VectorFieldBinding } from "../form/field_bindings/VectorFieldBinding";
+import { GeopointFieldBinding } from "../form/field_bindings/GeopointFieldBinding";
+import { BinaryFieldBinding } from "../form/field_bindings/BinaryFieldBinding";
 import { isPropertyBuilder } from "@rebasepro/common";
 
 import {
@@ -360,6 +362,28 @@ get Field() { return MarkdownEditorFieldBinding; } }
             dimensions: 1536,
             admin: { get Field() { return VectorFieldBinding; } }
         }
+    },
+    geopoint: {
+        key: "geopoint",
+        name: "Location",
+        description: "A latitude and longitude",
+        Icon: GlobeIcon,
+        color: "#3f9e5c",
+        property: {
+            type: "geopoint",
+            admin: { get Field() { return GeopointFieldBinding; } }
+        }
+    },
+    binary: {
+        key: "binary",
+        name: "Binary",
+        description: "Base64-encoded bytes",
+        Icon: HashIcon,
+        color: "#7a6ff0",
+        property: {
+            type: "binary",
+            admin: { get Field() { return BinaryFieldBinding; } }
+        }
     }
 };
 
@@ -432,7 +456,18 @@ export function getDefaultFieldId(property: Property) {
             } else if (ofProperty.type === "reference") {
                 return "multi_references";
             } else if (of?.type === "relation") {
-                throw new Error("The 'relation' type is not supported inside arrays. Use 'reference' instead.");
+                // Genuinely unsupported — a relation is a join, not a value, so
+                // there is nothing sensible to put in an array cell. But this
+                // used to `throw`, and it is called during render: an array of
+                // relations took down the whole property dialog with an error
+                // boundary instead of showing which property was at fault.
+                // Returning undefined routes it to the "no editor" notice.
+                console.error(
+                    "A `relation` cannot go inside an array — a relation is a join, not a stored value. " +
+                    "Use a `reference` for an array of links, or declare a to-many relation on the collection.",
+                    property
+                );
+                return undefined;
             } else {
                 return "repeat";
             }
@@ -450,7 +485,14 @@ export function getDefaultFieldId(property: Property) {
     } else if (property.type === "vector") {
         return "vector_input";
     } else if (property.type === "binary") {
-        return "text_field";
+        // Was "text_field": a binary column rendered as a string input, and the
+        // string widget's editor merges `type: "string"`, so touching the widget
+        // silently changed the property's type.
+        return "binary";
+    } else if (property.type === "geopoint") {
+        // Was missing entirely — this fell through to the console.error below,
+        // returned undefined, and the field never rendered at all.
+        return "geopoint";
     }
 
     console.error("Unsupported field config mapping", property);

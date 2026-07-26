@@ -430,8 +430,8 @@ function PropertyEditFormFields({
             "map": "group",
             "array": "repeat",
             "vector": "vector_input",
-            "geopoint": "text_field",
-            "binary": "text_field"
+            "geopoint": "geopoint",
+            "binary": "binary"
         };
         const widgetId = BASE_TYPE_TO_WIDGET[preset.baseType] || "text_field";
         setSelectedFieldConfigId(widgetId);
@@ -536,6 +536,20 @@ propertyConfig: widgetId };
         childComponent =
             <VectorPropertyField
                 disabled={disabled}/>;
+    } else if (selectedFieldConfigId === "geopoint" || selectedFieldConfigId === "binary") {
+        // These two have nothing of their own to configure — a geopoint is a
+        // latitude and a longitude, a binary value is base64 — so the shared
+        // fields above are the whole editor. Said out loud, because a dialog
+        // that just stops is indistinguishable from one that failed to load.
+        childComponent = (
+            <div className={"col-span-12"}>
+                <Typography variant={"body2"} color={"secondary"}>
+                    {selectedFieldConfigId === "geopoint"
+                        ? "A location is stored as a latitude and a longitude. There is nothing further to configure here."
+                        : "Binary values are stored as base64. There is nothing further to configure here."}
+                </Typography>
+            </div>
+        );
     } else {
         // No editor matched this widget. `geopoint` lands here every time: the
         // model defines the type, but the admin has no field binding for it, so
@@ -708,7 +722,9 @@ const WIDGET_TYPE_MAP: Record<PropertyConfigId, string> = {
     repeat: "Array",
     custom_array: "Array",
     block: "Group",
-    vector_input: "Number"
+    vector_input: "Number",
+    geopoint: "Location",
+    binary: "Binary"
 };
 
 const WIDGET_BASE_TYPE_MAP: Record<string, PropertyType> = {
@@ -735,7 +751,9 @@ const WIDGET_BASE_TYPE_MAP: Record<string, PropertyType> = {
     block: "map",
     repeat: "array",
     custom_array: "array",
-    vector_input: "vector"
+    vector_input: "vector",
+    geopoint: "geopoint",
+    binary: "binary"
 };
 
 function WidgetSelectView({

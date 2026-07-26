@@ -29,7 +29,9 @@ export type DefaultFieldConfig =
     | "repeat"
     | "custom_array"
     | "block"
-    | "vector_input";
+    | "vector_input"
+    | "geopoint"
+    | "binary";
 
 /**
  * When building a custom field you need to create a React component that takes

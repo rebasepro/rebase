@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
     Button,
     CheckIcon,
+    cls,
+    defaultBorderMixin,
     EyeIcon,
     EyeOffIcon,
     IconButton,
@@ -105,7 +107,7 @@ export function VectorFieldBinding({
                 <div className="w-full">
                     {!isEditing ? (
                         /* Compact Preview Card */
-                        <div className="flex flex-col gap-3 p-4 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/20 backdrop-blur-sm transition-all duration-200 hover:border-surface-300 dark:hover:border-surface-600">
+                        <div className={cls("flex flex-col gap-3 p-4 rounded-xl border bg-surface-50/50 dark:bg-surface-800/20 backdrop-blur-sm transition-all duration-200", defaultBorderMixin)}>
                             <div className="flex items-center justify-between flex-wrap gap-2">
                                 <div className="flex items-center gap-2.5">
                                     {/* Status Dot */}
@@ -158,7 +160,7 @@ export function VectorFieldBinding({
                         </div>
                     ) : (
                         /* Editing View: Text Input */
-                        <div className="flex flex-col gap-2 p-4 rounded-xl border border-primary-500/30 dark:border-primary-400/20 bg-surface-50/20 dark:bg-surface-800/10">
+                        <div className={cls("flex flex-col gap-2 p-4 rounded-xl border bg-surface-50/20 dark:bg-surface-800/10", defaultBorderMixin)}>
                             <TextField
                                 size={size}
                                 value={textValue}

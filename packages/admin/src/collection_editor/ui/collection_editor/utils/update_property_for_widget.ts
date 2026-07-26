@@ -251,9 +251,24 @@ export function updatePropertyFromWidget(propertyData: any,
             } as ArrayProperty
         );
     } else if (selectedWidgetId && propertyConfigs[selectedWidgetId]) {
+        // Every widget without a branch of its own — vector, geopoint, binary,
+        // and any registered custom one — takes its shape from the config.
+        //
+        // The identity fields are carried across explicitly. This used to
+        // return the config's property alone, which dropped the name, the
+        // description and the column mapping: switching an existing property to
+        // one of these widgets silently blanked its label. The branches above
+        // all merge onto `propertyData`; this one did not.
+        //
+        // Only those three are kept, not a full merge: the point of changing
+        // widget is to change type, and a `defaultValue` or `enum` left over
+        // from the previous type is not valid for the new one.
         updatedProperty = {
             ...propertyConfigs[selectedWidgetId].property,
-            propertyConfig: selectedWidgetId
+            propertyConfig: selectedWidgetId,
+            ...(propertyData?.name !== undefined ? { name: propertyData.name } : {}),
+            ...(propertyData?.description !== undefined ? { description: propertyData.description } : {}),
+            ...(propertyData?.columnName !== undefined ? { columnName: propertyData.columnName } : {})
         };
     }
 

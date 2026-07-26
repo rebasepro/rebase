@@ -92,4 +92,6 @@ export type PropertyConfigId =
     "repeat" |
     "custom_array" |
     "block" |
-    "vector_input";
+    "vector_input" |
+    "geopoint" |
+    "binary";

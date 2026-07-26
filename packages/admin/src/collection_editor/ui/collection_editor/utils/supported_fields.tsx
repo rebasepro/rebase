@@ -23,7 +23,13 @@ export const supportedFieldsIds: PropertyConfigId[] = [
     "group",
     "key_value",
     "repeat",
-    "block"
+    "block",
+    // These three have a field binding and a property editor, and were simply
+    // never added to the picker — so a property of the type rendered correctly
+    // once it existed, but there was no way to create one from the UI.
+    "vector_input",
+    "geopoint",
+    "binary"
 ];
 
 export const supportedFields: Record<string, PropertyConfig> = Object.entries(DEFAULT_FIELD_CONFIGS)
