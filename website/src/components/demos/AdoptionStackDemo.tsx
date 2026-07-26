@@ -66,7 +66,7 @@ export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionSt
                 {/* light pooling under the stack */}
                 <div className="pointer-events-none absolute -inset-x-16 -inset-y-10 -z-10"
                      aria-hidden="true"
-                     style={{ background: "radial-gradient(58% 52% at 50% 48%, rgba(0,112,244,0.30), transparent 72%)" }}/>
+                     style={{ background: "radial-gradient(58% 52% at 50% 48%, rgba(0,112,244,0.14), transparent 72%)" }}/>
 
                 <div className="[perspective:1600px]">
                     <div className="flex flex-col items-center gap-3.5 [transform-style:preserve-3d] [transform:rotateX(12deg)]">
@@ -77,7 +77,7 @@ export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionSt
                         <Slab width="w-full" copy={backend} active alwaysLabel={labels.alwaysOn}/>
 
                         {/* Base plate — your database */}
-                        <div className="w-full rounded-2xl bg-white/[0.04] ring-1 ring-inset ring-white/10 backdrop-blur-sm px-6 py-4 shadow-[0_10px_0_-2px_rgba(255,255,255,0.05)]">
+                        <div className="w-full rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/70 to-surface-950/60 px-6 py-4 shadow-[0_10px_0_-3px_rgba(10,12,18,0.9)]">
                             <div className="flex items-center justify-between gap-3">
                                 <span className="flex items-center gap-2.5 text-base font-semibold text-surface-200">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -101,9 +101,19 @@ export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionSt
             </div>
 
             {/* ── What that costs you ──────────────────────────────── */}
-            <div className="rounded-2xl bg-black/40 ring-1 ring-inset ring-white/10 backdrop-blur-xl shadow-[0_24px_70px_rgba(0,0,0,0.55)] overflow-hidden">
+            <div className="rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] overflow-hidden">
 
-                <div className="px-6 pt-6">
+                {/* window chrome, like every other mock on this page */}
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-800/60 bg-surface-950/50">
+                    <span className="flex gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]"/>
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]"/>
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]"/>
+                    </span>
+                    <span className="ml-2 font-mono text-[11px] text-surface-500">package.json</span>
+                </div>
+
+                <div className="px-6 pt-5">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-surface-400 mb-3">
                         {labels.deps}
                     </p>
@@ -159,12 +169,12 @@ export function AdoptionStackDemo({ backend, admin, studio, labels }: AdoptionSt
                 </div>
 
                 {/* The constant */}
-                <div className="mt-7 border-t border-white/10 bg-gradient-to-b from-emerald-400/[0.06] to-transparent px-6 py-5">
+                <div className="mt-7 border-t border-surface-800/60 bg-surface-950/50 px-6 py-5">
                     <div className="flex items-center justify-between gap-3 mb-2">
                         <span className="font-mono text-sm text-surface-200">
                             <span className="text-emerald-400 font-semibold">GET</span> /api/data/users
                         </span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-emerald-400/15 text-emerald-300 ring-1 ring-inset ring-emerald-400/30">
+                        <span className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
                             {labels.unchanged}
                         </span>
                     </div>
@@ -193,50 +203,63 @@ function Slab({ width, copy, active, optional, optionalLabel, alwaysLabel, onCli
             {...(optional ? { type: "button" as const, onClick, "aria-pressed": active } : {})}
             className={`${width} group relative block text-left rounded-2xl px-6 py-5 transition-all duration-300 ${
                 active
-                    ? "bg-gradient-to-br from-primary/30 via-primary/10 to-transparent ring-1 ring-inset ring-primary/50 shadow-[0_12px_0_-3px_rgba(0,112,244,0.35),0_26px_60px_-18px_rgba(0,112,244,0.65)] backdrop-blur-md"
-                    : "bg-white/[0.03] ring-1 ring-inset ring-white/10 border border-dashed border-white/15 translate-y-2 backdrop-blur-sm hover:bg-white/[0.06] hover:ring-white/20"
+                    ? "border border-primary/40 bg-gradient-to-br from-surface-900/90 to-surface-950/80 shadow-[0_10px_0_-3px_rgba(10,12,18,0.9),0_18px_44px_rgba(0,112,244,0.12)]"
+                    : "border border-dashed border-surface-700/80 bg-surface-950/60 translate-y-2 hover:border-surface-600"
             } ${optional ? "cursor-pointer" : ""}`}>
 
-            <div className="flex items-center justify-between gap-4">
-                <span className="flex items-baseline gap-3 min-w-0">
-                    <span className={`text-base font-semibold transition-colors duration-300 ${
-                        active ? "text-white" : "text-surface-400"
-                    }`}>
-                        {copy.title}
-                    </span>
-                    {/* off slabs keep their one-liner so they never read as an empty bar */}
-                    {!active && (
-                        <span className="truncate text-xs text-surface-600">{copy.tag}</span>
-                    )}
-                </span>
+            {/* the same hover pool the rest of the page's cards use */}
+            {active && (
+                <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-60"
+                     aria-hidden="true"
+                     style={{ background: "radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%)" }}/>
+            )}
+            <div className="relative">
 
-                {optional ? (
-                    <span className={`flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider transition-colors duration-300 ${
-                        active ? "text-primary-light" : "text-surface-500"
-                    }`}>
-                        {active ? "on" : optionalLabel}
-                        <span className={`relative inline-flex h-4 w-7 rounded-full transition-colors duration-300 ${
-                            active ? "bg-primary shadow-[0_0_12px_rgba(0,112,244,0.7)]" : "bg-white/10"
+                <div className="flex items-center justify-between gap-4">
+                    <span className="flex items-baseline gap-3 min-w-0">
+                        <span className={`text-base font-semibold transition-colors duration-300 ${
+                            active ? "text-white" : "text-surface-400"
                         }`}>
-                            <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all duration-300 ${
-                                active ? "left-3.5" : "left-0.5 opacity-50"
-                            }`}/>
+                            {copy.title}
                         </span>
+                        {/* off slabs keep their one-liner so they never read as an empty bar */}
+                        {!active && (
+                            <span className="truncate text-xs text-surface-600">{copy.tag}</span>
+                        )}
                     </span>
-                ) : (
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-primary-light/80">
-                        {alwaysLabel}
-                    </span>
-                )}
-            </div>
 
-            {/* The slab grows when the layer is on */}
-            <div className={`grid transition-all duration-300 ${
-                active ? "grid-rows-[1fr] opacity-100 mt-2.5" : "grid-rows-[0fr] opacity-0"
-            }`}>
-                <div className="overflow-hidden">
-                    <p className="text-sm leading-relaxed text-surface-300">{copy.desc}</p>
-                    <p className="mt-2.5 text-xs text-primary-light/70">{copy.tag}</p>
+                    {optional ? (
+                        <span className="flex items-center gap-2.5 flex-none">
+                            <span className={`px-2 py-1 rounded-lg text-[11px] font-medium transition-colors duration-300 ${
+                                active
+                                    ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/20"
+                                    : "bg-surface-800/60 text-surface-400 ring-1 ring-inset ring-surface-700/50"
+                            }`}>
+                                {active ? "on" : optionalLabel}
+                            </span>
+                            <span className={`relative inline-flex h-4 w-7 rounded-full transition-colors duration-300 ${
+                                active ? "bg-primary" : "bg-surface-700"
+                            }`}>
+                                <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all duration-300 ${
+                                    active ? "left-3.5" : "left-0.5 opacity-60"
+                                }`}/>
+                            </span>
+                        </span>
+                    ) : (
+                        <span className="flex-none px-2 py-1 rounded-lg text-[11px] font-medium bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
+                            {alwaysLabel}
+                        </span>
+                    )}
+                </div>
+
+                {/* The slab grows when the layer is on */}
+                <div className={`grid transition-all duration-300 ${
+                    active ? "grid-rows-[1fr] opacity-100 mt-2.5" : "grid-rows-[0fr] opacity-0"
+                }`}>
+                    <div className="overflow-hidden">
+                        <p className="text-sm leading-relaxed text-surface-400">{copy.desc}</p>
+                        <p className="mt-2.5 text-xs text-surface-500">{copy.tag}</p>
+                    </div>
                 </div>
             </div>
         </Tag>

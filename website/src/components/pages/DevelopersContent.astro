@@ -425,15 +425,15 @@ const productDetailPreviewCode = `export function ProductDetailPreview({ modifie
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2">
                         <!-- Custom Component Registration -->
-                        <div class="p-5 bg-[#0f0f11] font-mono text-[10.5px] leading-relaxed border-r border-surface-800/40 whitespace-pre-wrap"><span class="text-purple-400">import</span> &#123; <span class="text-blue-300">buildProperty</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"@rebasepro/common"</span>;
+                        <div class="p-5 bg-[#0f0f11] font-mono text-[10.5px] leading-relaxed border-r border-surface-800/40 whitespace-pre-wrap"><span class="text-purple-400">import type</span> &#123; <span class="text-blue-300">StringProperty</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"@rebasepro/types"</span>;
 <span class="text-purple-400">import</span> &#123; <span class="text-blue-300">ColorPicker</span> &#125; <span class="text-purple-400">from</span> <span class="text-green-400">"./widgets"</span>;
 
-<span class="text-purple-400">export const</span> brand = <span class="text-blue-400">buildProperty</span>(&#123;
+<span class="text-purple-400">export const</span> brand: <span class="text-blue-300">StringProperty</span> = &#123;
   name: <span class="text-green-400">"Brand Color"</span>,
   type: <span class="text-green-400">"string"</span>,
-  ui: &#123; Field: <span class="text-blue-300">ColorPicker</span> &#125;,
+  admin: &#123; Field: <span class="text-blue-300">ColorPicker</span> &#125;,
   validation: &#123; required: <span class="text-amber-400">true</span> &#125;
-&#125;);</div>
+&#125;;</div>
                         <!-- Live widget panel -->
                         <div class="p-1 bg-[#09090b] flex flex-col justify-center">
                             <CustomFieldsDemo client:only="react" />

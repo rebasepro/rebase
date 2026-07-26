@@ -27,17 +27,17 @@ export const de = {
     "Backend",
   "modes.baas.desc":
     "REST, Auth, Storage, Realtime und Backups über deiner Datenbank — direkt aus deinem Schema serviert. Keine Config-Dateien, keine UI, kein React im Dependency-Baum.",
-  "modes.baas.tag": "Wie Supabase — auf dem Postgres, das du bereits betreibst",
+  "modes.baas.tag": "Läuft für sich allein — nichts sonst installiert",
   "modes.cms.title":
     "Admin-Panel",
   "modes.cms.desc":
     "Ein schemagetriebenes Backoffice: Tabellen-Editing, Medien und Workflows, erweiterbar mit deinen eigenen React-Komponenten.",
-  "modes.cms.tag": "Wie Payload oder Directus — ohne Framework-Lock-in",
+  "modes.cms.tag": "Eine Dependency. Kein zweites Datenmodell.",
   "modes.full.title":
     "Studio",
   "modes.full.desc":
     "SQL-Editor, Schema-Visualizer, RLS-Policy-Editor, Logs und API-Explorer — die Tooling-Hälfte, über allem anderen.",
-  "modes.full.tag": "Supabase + Payload, von Anfang bis Ende in deiner Hand",
+  "modes.full.tag": "SQL- und Schema-Tooling, dieselbe App",
   "modes.link": "Warum wir es so gebaut haben",
   "stack.deps": "Deine Dependencies",
   "stack.capabilities": "Was du bekommst",

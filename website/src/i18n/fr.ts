@@ -27,17 +27,17 @@ export const fr = {
     "Backend",
   "modes.baas.desc":
     "REST, auth, stockage, temps réel et sauvegardes au-dessus de votre base — servis directement depuis votre schéma. Aucun fichier de configuration, aucune UI, aucun React dans l'arbre de dépendances.",
-  "modes.baas.tag": "Comme Supabase — sur le Postgres que vous utilisez déjà",
+  "modes.baas.tag": "Fonctionne seul — rien d'autre à installer",
   "modes.cms.title":
     "Panneau d'administration",
   "modes.cms.desc":
     "Un back-office piloté par le schéma : édition tableur, médias et workflows, extensible avec vos propres composants React.",
-  "modes.cms.tag": "Comme Payload ou Directus — sans verrouillage de framework",
+  "modes.cms.tag": "Une dépendance. Aucun second modèle de données.",
   "modes.full.title":
     "Studio",
   "modes.full.desc":
     "Éditeur SQL, visualiseur de schéma, éditeur de politiques RLS, logs et explorateur d'API — la moitié outillage, par-dessus tout le reste.",
-  "modes.full.tag": "Supabase + Payload, contrôlé de bout en bout",
+  "modes.full.tag": "SQL et outillage de schéma, même app",
   "modes.link": "Pourquoi nous l'avons conçu ainsi",
   "stack.deps": "Vos dépendances",
   "stack.capabilities": "Ce que vous obtenez",

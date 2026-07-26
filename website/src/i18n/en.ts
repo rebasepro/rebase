@@ -31,17 +31,17 @@ export const en = {
     "Backend",
   "modes.baas.desc":
     "REST, auth, storage, realtime and backups over your database — served straight from your schema. No config files, no UI, no React in the dependency tree.",
-  "modes.baas.tag": "Like Supabase — on the Postgres you already run",
+  "modes.baas.tag": "Runs on its own — nothing else installed",
   "modes.cms.title":
     "Admin panel",
   "modes.cms.desc":
     "A schema-driven back office: spreadsheet editing, media and workflows, extensible with your own React components.",
-  "modes.cms.tag": "Like Payload or Directus — without the framework lock-in",
+  "modes.cms.tag": "One dependency. No second data model.",
   "modes.full.title":
     "Studio",
   "modes.full.desc":
     "SQL editor, schema visualizer, RLS policy editor, logs and API explorer — the tooling half, on top of everything else.",
-  "modes.full.tag": "Supabase + Payload, owned end to end",
+  "modes.full.tag": "SQL and schema tooling, same app",
   "modes.link": "Why we built it this way",
   "stack.deps": "Your dependencies",
   "stack.capabilities": "What you get",

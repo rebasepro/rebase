@@ -27,17 +27,17 @@ export const es = {
     "Backend",
   "modes.baas.desc":
     "REST, auth, storage, tiempo real y backups sobre tu base de datos, servidos directamente desde tu esquema. Sin archivos de configuración, sin UI, sin React en el árbol de dependencias.",
-  "modes.baas.tag": "Como Supabase — en el Postgres que ya ejecutas",
+  "modes.baas.tag": "Funciona solo — sin instalar nada más",
   "modes.cms.title":
     "Panel de administración",
   "modes.cms.desc":
     "Un back office dirigido por el esquema: edición tipo hoja de cálculo, medios y flujos de trabajo, ampliable con tus propios componentes React.",
-  "modes.cms.tag": "Como Payload o Directus — sin bloqueo de framework",
+  "modes.cms.tag": "Una dependencia. Ningún segundo modelo de datos.",
   "modes.full.title":
     "Studio",
   "modes.full.desc":
     "Editor SQL, visualizador de esquema, editor de políticas RLS, logs y explorador de API: la mitad de herramientas, encima de todo lo demás.",
-  "modes.full.tag": "Supabase + Payload, bajo tu control total",
+  "modes.full.tag": "SQL y herramientas de esquema, en la misma app",
   "modes.link": "Por qué lo construimos así",
   "stack.deps": "Tus dependencias",
   "stack.capabilities": "Lo que obtienes",

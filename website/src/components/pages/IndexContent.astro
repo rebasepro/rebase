@@ -11,6 +11,7 @@ import { SdkMiniDemo } from "../../components/demos/SdkMiniDemo";
 import { RealtimeMiniDemo } from "../../components/demos/RealtimeMiniDemo";
 import { RLSEditorDemo } from "../../components/demos/RLSEditorDemo";
 import AiAppDevelopmentDemo from "../../components/demos/AiAppDevelopmentDemo";
+import { AgentConsoleDemo } from "../../components/demos/AgentConsoleDemo";
 import RebaseMosaicDemo from "../../components/demos/RebaseMosaicDemo";
 import CollectionPowerSection from "../../components/CollectionPowerSection.astro";
 import RoadmapSection from "../../components/RoadmapSection.astro";
@@ -604,41 +605,32 @@ const translatePath = useTranslatedPath(lang);
     <!-- The split: backend contract vs admin panel, then how far you take it -->
  <section id="s-modes" class="relative isolate z-0 py-24 sm:py-28 overflow-hidden">
         <!-- Live WebGL gradient, faded at the edges so the section still reads dark -->
-        <div class="absolute inset-0 -z-20 pointer-events-none opacity-80"
+        <div class="absolute inset-0 -z-20 pointer-events-none opacity-50"
              aria-hidden="true"
              style="mask-image: radial-gradient(120% 80% at 55% 50%, #000 15%, transparent 78%); -webkit-mask-image: radial-gradient(120% 80% at 55% 50%, #000 15%, transparent 78%);">
             <NeatBackground variant="b" client:visible/>
         </div>
 
-        <!-- CSS light, so the section still glows without WebGL (reduced motion, old GPUs) -->
+        <!-- CSS light, so the section still reads lit without WebGL (reduced motion, old GPUs) -->
         <div class="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true"
              style="background:
-                radial-gradient(46% 42% at 26% 46%, rgba(0,112,244,0.20), transparent 68%),
-                radial-gradient(38% 40% at 82% 40%, rgba(120,80,220,0.14), transparent 70%),
-                radial-gradient(70% 45% at 50% 108%, rgba(0,112,244,0.10), transparent 70%);"></div>
+                radial-gradient(44% 40% at 30% 48%, rgba(0,112,244,0.12), transparent 70%),
+                radial-gradient(40% 40% at 78% 42%, rgba(0,112,244,0.07), transparent 72%);"></div>
         <!-- faint dot grid for texture -->
-        <div class="absolute inset-0 -z-10 pointer-events-none opacity-[0.18]" aria-hidden="true"
+        <div class="absolute inset-0 -z-10 pointer-events-none opacity-[0.10]" aria-hidden="true"
              style="background-image: radial-gradient(rgba(255,255,255,0.5) 1px, transparent 1px);
                     background-size: 34px 34px;
-                    mask-image: radial-gradient(80% 60% at 50% 45%, #000, transparent 72%);
-                    -webkit-mask-image: radial-gradient(80% 60% at 50% 45%, #000, transparent 72%);"></div>
-        <!-- horizon line at the top edge -->
-        <div class="absolute inset-x-0 top-0 h-px pointer-events-none" aria-hidden="true"
-             style="background: linear-gradient(90deg, transparent, rgba(0,112,244,0.55) 35%, rgba(160,120,255,0.45) 65%, transparent);"></div>
+                    mask-image: radial-gradient(75% 55% at 50% 45%, #000, transparent 72%);
+                    -webkit-mask-image: radial-gradient(75% 55% at 50% 45%, #000, transparent 72%);"></div>
 
         <div class="mx-auto max-w-7xl px-6 lg:px-12">
-            <!-- Editorial split header: the one section on the page that isn't centred -->
-            <div class="mx-auto max-w-6xl mb-10 animate-on-scroll fade-in-up">
-                <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 pb-8 border-b border-white/10">
-                    <div class="max-w-2xl">
-                        <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase"><span class="font-mono text-surface-500">04</span><span class="mx-2 text-surface-600">·</span>{t("modes.badge")}</h2>
-                        <p class="mt-4 text-3xl md:text-[2.75rem] font-semibold tracking-tight text-white leading-[1.08]"
-                           set:html={t("modes.title")}></p>
-                    </div>
-                    <p class="max-w-xs text-sm text-surface-400 leading-relaxed lg:text-right">
-                        {t("modes.subtitle")}
-                    </p>
-                </div>
+            <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
+                <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase"><span class="font-mono text-surface-500">04</span><span class="mx-2 text-surface-600">·</span>{t("modes.badge")}</h2>
+                <p class="mt-4 text-3xl md:text-5xl font-semibold tracking-tight text-white"
+                   set:html={t("modes.title")}></p>
+                <p class="mt-5 text-base sm:text-lg text-surface-400 leading-relaxed">
+                    {t("modes.subtitle")}
+                </p>
             </div>
 
             <div class="mx-auto max-w-6xl">
@@ -934,288 +926,9 @@ const translatePath = useTranslatedPath(lang);
                 <AiAppDevelopmentDemo client:visible/>
             </div>
 
-            <!-- Agent Infrastructure Feature Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto animate-on-scroll fade-in-up delay-100">
-
-                <!-- Vector Similarity Search -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="text-primary">
-                                    <circle cx="11" cy="11" r="8"/>
-                                    <path d="m21 21-4.3-4.3"/>
-                                    <path d="M11 8v6"/>
-                                    <path d="M8 11h6"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Vector Similarity Search</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Native pgvector integration with
-                            cosine, L2, and inner product distance. Query embeddings via REST API — no external vector
-                            DB needed.</p>
-                        <div class="rounded-lg bg-surface-950/80 p-3 ring-1 ring-surface-800/50">
-                            <code class="text-xs font-mono text-surface-300">
-                                <span class="text-surface-400">GET</span> <span
-                                    class="text-emerald-400">/api/data/docs</span><br/>
-                                <span class="text-surface-400">&nbsp;&nbsp;?vector_search=</span><span
-                                    class="text-amber-400">embedding</span><br/>
-                                <span class="text-surface-400">&nbsp;&nbsp;&vector=</span><span class="text-primary">[0.1,0.2,...]</span><br/>
-                                <span class="text-surface-400">&nbsp;&nbsp;&vector_distance=</span><span
-                                    class="text-cyan-400">cosine</span>
-                            </code>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Service API Keys -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="text-primary">
-                                    <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/>
-                                    <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Scoped Service API Keys</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Issue keys with granular
-                            per-collection, per-operation permissions. Built-in rate limiting, automatic expiry, and
-                            Studio management.</p>
-                        <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">SHA-256 hashed</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Per-key rate limits</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Soft revocation</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Custom Functions & Streaming -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="text-primary">
-                                    <path d="m5 8 6 6"/>
-                                    <path d="m4 14 6-6 2-3"/>
-                                    <path d="M2 5h12"/>
-                                    <path d="M7 2h1"/>
-                                    <path d="m22 22-5-10-5 10"/>
-                                    <path d="M14 18h6"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Custom Functions & Streaming</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Define server-side endpoints with full
-                            access to your typed data layer. Stream LLM responses, chain agent actions, or build
-                            webhooks — all in TypeScript.</p>
-                        <div class="rounded-lg bg-surface-950/80 p-3 ring-1 ring-surface-800/50">
-                            <code class="text-xs font-mono text-surface-300">
-                                <span class="text-blue-400">export default</span> <span
-                                    class="text-amber-400">async</span> (req, res) => {"{"}
-                                <br/>&nbsp;&nbsp;<span class="text-surface-400">// Full typed access to driver</span>
-                                <br/>&nbsp;&nbsp;<span class="text-blue-400">const</span> docs = <span
-                                    class="text-blue-400">await</span> <span class="text-amber-400">data</span>.docs.find();
-                                <br/>{"}"}
-                            </code>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- MCP Server -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="text-primary">
-                                    <rect x="2" y="6" width="20" height="12" rx="2"/>
-                                    <path d="M12 12h.01"/>
-                                    <path d="M17 12h.01"/>
-                                    <path d="M7 12h.01"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">MCP Server</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Expose your entire project to Cursor,
-                            Claude, and Windsurf via the Model Context Protocol. Agents can CRUD data, run migrations,
-                            and manage schemas.</p>
-                        <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Data tools</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Schema tools</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Admin tools</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Real-time Subscriptions -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="text-primary">
-                                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
-                                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Realtime Engine</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Full WebSocket engine with live data subscriptions, broadcast channels for messaging, and presence tracking for online status — agents and clients stay in sync instantly.</p>
-                        <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">WebSocket</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Data subscriptions</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Broadcast channels</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Presence tracking</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Auto-reconnect</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Cron Jobs & Background Tasks -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="text-primary">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <polyline points="12 6 12 12 16 14"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Cron Jobs & Background Tasks</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Schedule recurring agent tasks with
-                            cron expressions. Sync external APIs, process embedding batches, clean stale data, or
-                            trigger LLM pipelines on a timer.</p>
-                        <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Cron expressions</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Typed handlers</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Execution logs</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Official agent skills -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="text-primary">
-                                    <path d="M12 7v14"/>
-                                    <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Official Agent Skills</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Twenty maintained skills — collections,
-                            security rules, auth, realtime, storage, the SDK — installed straight into your agent's
-                            rules directory. Your agent reads how Rebase actually works instead of guessing.</p>
-                        <div class="rounded-lg bg-surface-950/80 p-3 ring-1 ring-surface-800/50 mb-3">
-                            <code class="text-xs font-mono text-surface-300">
-                                <span class="text-primary">~</span> rebase skills
-                            </code>
-                        </div>
-                        <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Claude Code</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Cursor</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Windsurf</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Gemini CLI</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- One typed file, no UI in it -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="text-primary">
-                                    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
-                                    <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
-                                    <path d="m9 15 2 2 4-4"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">A Surface an Agent Can Hold</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">A whole backend is a handful of typed
-                            collection files. No controllers, no serializers, no migrations to hand-write — and no
-                            React anywhere in the contract, so nothing about your UI can confuse the model about your
-                            data.</p>
-                        <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">1 file per collection</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">React-free types</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">Compiler-checked</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Scaffolded agent context -->
-                <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 p-6">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <div class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 flex-none ring-1 ring-primary/20 text-primary">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="text-primary">
-                                    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="text-lg font-semibold text-white mb-2">Agent Context, Scaffolded</h3>
-                        <p class="text-surface-400 text-sm leading-relaxed mb-4">Every new project ships with
-                            <code class="font-mono text-surface-300">AGENTS.md</code> and
-                            <code class="font-mono text-surface-300">CLAUDE.md</code> already written: the project
-                            layout, the commands, the conventions. Your agent is productive on the first prompt.</p>
-                        <div class="flex flex-wrap gap-1.5">
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">AGENTS.md</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">CLAUDE.md</span>
-                            <span class="px-2 py-1 rounded-lg bg-surface-800/60 text-xs text-surface-300 ring-1 ring-surface-700/50">rebase init</span>
-                        </div>
-                    </div>
-                </div>
-
+            <!-- Nine capabilities as one console, not a 3x3 card wall -->
+            <div class="max-w-6xl mx-auto animate-on-scroll fade-in-up delay-100">
+                <AgentConsoleDemo client:visible/>
             </div>
 
             <!-- The honest close: boilerplate depreciates, guarantees appreciate -->
