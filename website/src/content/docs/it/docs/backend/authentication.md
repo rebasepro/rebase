@@ -20,7 +20,7 @@ Rebase include un sistema di autenticazione backend completo:
 
 Il blocco `auth` in `initializeRebaseBackend` controlla tutta l'autenticazione del backend:
 
-```typescript
+```typescript no-verify
 const backend = await initializeRebaseBackend({
     // ...
     auth: {
@@ -29,8 +29,7 @@ const backend = await initializeRebaseBackend({
         accessExpiresIn: "1h",               // Access token lifetime (default: 1h)
         refreshExpiresIn: "30d",             // Refresh token lifetime (default: 30d)
         serviceKey: env.REBASE_SERVICE_KEY,  // Optional — for server-to-server calls
-        allowRegistration: true,             // Allow new signups (default: true)
-        seedDefaultRoles: true,              // Seed enum roles on startup
+        allowRegistration: true,             // Allow new signups (default: false)
 
         // OAuth providers
         google: env.GOOGLE_CLIENT_ID
@@ -356,7 +355,7 @@ Puoi implementare direttamente l'interfaccia `AuthAdapter` per un controllo comp
 
 ```typescript
 import { Hono } from "hono";
-import { AuthAdapter, AuthenticatedUser, AuthAdapterCapabilities, UserManagementAdapter, UserCreationPrepareResult, UserCreationFinalizeResult } from "@rebasepro/types";
+import { AuthenticatedUser, AuthAdapterCapabilities, UserManagementAdapter, UserCreationPrepareResult, UserCreationFinalizeResult } from "@rebasepro/types";
 
 export interface AuthAdapter {
   /** Unique identifier for this auth adapter (e.g., "clerk", "custom") */
@@ -433,7 +432,7 @@ Per scenari standard (come la validazione di JWT da un servizio di terze parti),
 
 Per connettere un backend Rebase con **Clerk**, puoi verificare i token JWT di Clerk usando il JSON Web Key Set (JWKS) di Clerk:
 
-```typescript
+```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
 import { createCustomAuthAdapter } from "@rebasepro/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
@@ -489,7 +488,7 @@ const backend = await initializeRebaseBackend({
 
 Per verificare i token di Firebase Auth usando i certificati pubblici di Firebase:
 
-```typescript
+```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
 import { createCustomAuthAdapter } from "@rebasepro/server";
 import { createRemoteJWKSet, jwtVerify } from "jose";
@@ -544,15 +543,23 @@ Se il tuo provider di autenticazione personalizzato richiede il montaggio di end
 ```typescript
 const myOauthAdapter: AuthAdapter = {
     id: "custom-oauth",
-    verifyRequest: async (req) => { /* token validation */ },
+    verifyRequest: async (req) => ({
+        // validate the token, then return the caller
+        uid: "…",
+        email: "user@example.com",
+        roles: [],
+        isAdmin: false
+    }),
     getCapabilities: () => ({
         hasBuiltInAuthRoutes: true,
         emailPasswordLogin: false,
         registration: false,
         passwordReset: false,
+        adminPasswordReset: false,
         sessionManagement: false,
         profileUpdate: false,
         emailVerification: false,
+        magicLink: false,
         enabledProviders: []
     }),
     createAuthRoutes: () => {

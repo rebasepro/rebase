@@ -98,7 +98,7 @@ async function startServer() {
     app.post('/custom-data', async (req, res) => {
         try {
             // Utilizar el controlador de base de datos nativo de Rebase
-            const result = await driver.saveEntity({
+            const result = await driver.save({
                 collection: 'products',
                 entity: req.body
             });

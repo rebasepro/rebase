@@ -98,7 +98,7 @@ async function startServer() {
     app.post('/custom-data', async (req, res) => {
         try {
             // Utiliser le pilote de base de données Rebase brut
-            const result = await driver.saveEntity({
+            const result = await driver.save({
                 collection: 'products',
                 entity: req.body
             });

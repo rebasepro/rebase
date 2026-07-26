@@ -61,7 +61,7 @@ function PublishSelectedAction({ selectionController, context }: CollectionActio
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;
         for (const entity of selected) {
-            await context.data.saveEntity({
+            await context.data.save({
                 path: entity.path,
                 entityId: entity.id,
                 values: { status: "published" },

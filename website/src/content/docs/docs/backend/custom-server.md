@@ -113,7 +113,7 @@ async function startServer() {
     // Direct Driver CRUD Operation
     app.post("/api/products", async (req, res) => {
         try {
-            const result = await driver.saveEntity({
+            const result = await driver.save({
                 path: "products",
                 entity: req.body
             });
