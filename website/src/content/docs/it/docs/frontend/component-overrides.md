@@ -54,7 +54,7 @@ function App() {
 
 Per sovrascrivere i componenti solo per una collezione specifica, aggiungi un oggetto `components` alla sua definizione. Questo è utile per personalizzare stati vuoti, card o viste di dettaglio per modelli particolari.
 
-```typescript
+```tsx
 import { defineCollection } from "@rebasepro/admin-types";
 import { ProductCustomForm } from "./components/ProductCustomForm";
 

@@ -28,6 +28,20 @@ title: Changelog
 
   A plain `const posts: CollectionConfig = { … }` annotation still works and is still typechecked — it just infers nothing, so prefer `defineCollection` in new code. The scaffold templates and every docs example now use it.
 
+- **The `admin` block's key fields are now checked against the collection's properties** — `titleProperty`, `sort`, `propertiesOrder` and `listProperties` reject a name that is not one of your properties. Previously they accepted any string, so a removed or misspelled field was found by noticing a column had quietly vanished from the panel.
+
+  The cause was one line. `augment.ts` merged the block on as `admin?: AdminCollectionOptions` with **no type arguments**, so `M` fell back to its default `Record<string, unknown>`, `Extract<keyof M, string>` widened to `string`, and every key-shaped field accepted anything. `defineCollection` computed the property-key inference correctly the whole time; it was dropped at that seam, one line short of the field that needed it. The completion those fields' docs promised had therefore never worked.
+
+  Three non-property forms are still accepted: a dotted path into a `map` property (`"profile.displayName"` — the root is checked, the path below it is not), a child-collection column (`"subcollection:orders"`), and an `additionalFields` key. That last one needs an explicit cast, because `AdditionalFieldDelegate.key` is a plain `string` and nothing carries those keys into the type:
+
+  ```diff
+  + import type { AdditionalFieldKey } from "@rebasepro/admin-types";
+  -     propertiesOrder: ["title", "score"]
+  +     propertiesOrder: ["title", "score" as AdditionalFieldKey]
+  ```
+
+  Only `defineCollection` turns the check on — it is what supplies `M`. A plain `const x: PostgresCollectionConfig = { … }` annotation infers nothing, so these fields stay permissive there, exactly as before. A type-level test in `packages/admin-types/test/admin_collection.test.ts` now pins all four fields with `@ts-expect-error`, so the seam cannot reopen without a build failure.
+
 - **`CollectionConfig` reports Postgres in its type errors** — `CollectionConfig` is a union discriminated on `engine`, and Postgres collections omit `engine` because it defaults to `"postgres"`. An incomplete Postgres literal therefore matched no member, and TypeScript elaborated the failure against the last constituent — MongoDB. Leaving out `name`, the most common mistake there is, told a Postgres user of a Postgres-first framework that they were missing `engine` on a `MongoDBCollectionConfig`. Postgres is now last in the union, so the same mistake names `PostgresCollectionConfig` and only the field actually missing. No runtime or assignability change; error text only.
 
 - **Admin-panel presentation moved into an `admin` block** — a collection carried two unrelated concerns in one flat object: what the data *is* (table, schema, properties, relations, validation, security rules, callbacks) and how an admin panel should *draw* it (`icon`, `group`, `listProperties`, `kanban`, entity views, selection controllers, …). Ninety-five fields of the second kind sat beside the first, and twelve React view-model types were exported from `collections.ts` — so a backend that never renders anything still pulled the React layer into its type graph, and `@rebasepro/types` could not be a backend contract while it depended on React.
@@ -116,7 +130,7 @@ title: Changelog
 
 - **The authenticated principal is `uid` everywhere** — the identity had two names. `uid` was the domain model's: the `User` type, the `AuthenticatedUser` adapter contract, the driver scope, and the RLS layer, where policies read `auth.uid()`. `userId` was the JWT claim's, inherited by the Hono request context because it was populated straight from the decoded payload. A request crossed that boundary twice, so a route handler and a collection hook two frames apart saw the same person under different keys — and three unrelated places had independently grown the same defensive `a ?? b` read to cope. `uid` wins because `userId` was confined to four server-side packages while `uid` is the vocabulary of twelve, and because the two ends of the stack — Postgres policies and the client SDK — already agreed on it.
 
-  Tokens now carry a `uid` claim and `c.get("user")` returns `{ uid, roles }`. Anything reading `payload.userId` or `user.uid` must move.
+  Tokens now carry a `uid` claim and `c.get("user")` returns `{ uid, roles }`. Anything reading `payload.userId` or `user.userId` must move.
 
 - **ESM only — the CJS/UMD output is gone** — the packages shipped both, but the output banner injects `import` / `import.meta.url`, which a UMD bundle cannot parse as CommonJS, so the CJS half was never loadable. `main`, `module` and the `import` condition all point at `index.es.js`; the `require` condition is removed. A CommonJS consumer must `import()` or move to ESM.
 

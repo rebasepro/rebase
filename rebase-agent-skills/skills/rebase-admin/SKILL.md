@@ -39,7 +39,7 @@ import { useSidePanel } from "@rebasepro/admin";
 
 ### SidePanelController Interface
 
-```typescript
+```tsx
 interface SidePanelController {
     /** Close the last (topmost) panel */
     close: () => void;
@@ -236,7 +236,7 @@ import { useCollectionRegistryController } from "@rebasepro/admin";
 
 ### CollectionRegistryController Interface
 
-```typescript
+```tsx
 type CollectionRegistryController<
     DB = Record<string, unknown>,
     EC extends CollectionConfig = CollectionConfig

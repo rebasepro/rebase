@@ -1093,7 +1093,7 @@ title: {
 
 Add an `entityActions` array to any collection definition:
 
-```typescript
+```tsx
 const jobSubmissionsCollection: PostgresCollectionConfig = {
     name: "Job Submissions",
     slug: "job_submissions",
@@ -1173,7 +1173,7 @@ Entity views can be registered:
 1. **Globally** in the `<RebaseAdmin>` component via the `entityViews` prop
 2. **Per-collection** by referencing view keys in the collection's `entityViews` array
 
-```typescript
+```tsx
 // Global registration in App.tsx
 const entityViews = [
     {
@@ -1241,7 +1241,7 @@ You can override built-in UI components for a specific collection by adding a `c
 
 Only collection-scoped components can be overridden here. App-level components (such as `Shell.AppBar` or `HomePage`) must be overridden globally at the `<Rebase>` root.
 
-```typescript
+```tsx
 import { PostgresCollectionConfig } from "@rebasepro/types";
 
 const productsCollection: PostgresCollectionConfig = {

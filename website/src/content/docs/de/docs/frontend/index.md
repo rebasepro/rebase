@@ -127,7 +127,7 @@ const adminModeController = useBuildAdminModeController();
 
 Fügen Sie übergeordnete Navigationsansichten für Dashboards, Tools oder benutzerdefinierte Seiten hinzu:
 
-```typescript
+```tsx
 const views: CMSView[] = [
     {
         slug: "dashboard",

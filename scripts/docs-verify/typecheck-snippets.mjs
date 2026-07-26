@@ -234,10 +234,19 @@ export async function typecheckSnippets(root, opts = {}) {
             return `declare module "${spec}" {\n${members}\n    const _default: any;\n    export default _default;\n}`;
         })
         .join("\n");
+    // `import.meta.env.VITE_*` is a Vite ambient, not an SDK API. The compiler options
+    // below ask for `vite/client`, but vite is not a dependency of the workspace root,
+    // so that request silently resolves to nothing and every frontend snippet reading
+    // `import.meta.env` reported a missing property. Declaring it here needs no
+    // dependency and cannot drift.
+    const importMetaEnv = [
+        "interface ImportMetaEnv { readonly [key: string]: string | boolean | undefined }",
+        "interface ImportMeta { readonly env: ImportMetaEnv }"
+    ].join("\n");
     writeFileSync(
         path.join(scratch, "stubs.d.ts"),
         // The wildcard catches specifiers with no named imports.
-        `declare module "docsverify-stub:*";\n${stubBody}\n`
+        `declare module "docsverify-stub:*";\n${importMetaEnv}\n${stubBody}\n`
     );
 
     const configPath = path.join(root, "tsconfig.typecheck.json");

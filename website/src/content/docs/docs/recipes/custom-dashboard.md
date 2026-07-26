@@ -80,7 +80,7 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
 
 ## Register as a Custom View
 
-```typescript
+```tsx
 const views: CMSView[] = [
     {
         slug: "dashboard",

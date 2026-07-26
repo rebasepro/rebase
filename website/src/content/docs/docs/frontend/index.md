@@ -127,7 +127,7 @@ const adminModeController = useBuildAdminModeController();
 
 Add top-level navigation views for dashboards, tools, or custom pages:
 
-```typescript
+```tsx
 const views: CMSView[] = [
     {
         slug: "dashboard",

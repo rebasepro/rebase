@@ -127,7 +127,7 @@ const adminModeController = useBuildAdminModeController();
 
 Ajoutez des vues de navigation de premier niveau pour les tableaux de bord, les outils ou les pages personnalisées :
 
-```typescript
+```tsx
 const views: CMSView[] = [
     {
         slug: "dashboard",
