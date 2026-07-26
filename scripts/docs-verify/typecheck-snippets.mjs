@@ -283,7 +283,12 @@ export async function typecheckSnippets(root, opts = {}) {
             ...(parsed.options.paths ?? {}),
             hono: [path.join(root, "packages/server/node_modules/hono")],
             "hono/*": [path.join(root, "packages/server/node_modules/hono/*")],
-            zod: [path.join(root, "packages/server/node_modules/zod")]
+            zod: [path.join(root, "packages/server/node_modules/zod")],
+            // React is not a root dependency either, so `useRef<HTMLDivElement>(null)` in a
+            // frontend snippet hit "untyped function calls may not accept type arguments" —
+            // the stub had swallowed the whole module.
+            react: [path.join(root, "packages/app/node_modules/react")],
+            "react-dom": [path.join(root, "packages/app/node_modules/react-dom")]
         }
     };
 

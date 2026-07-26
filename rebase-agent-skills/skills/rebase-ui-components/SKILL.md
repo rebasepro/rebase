@@ -821,6 +821,9 @@ Basic HTML table components with consistent styling.
 ```tsx
 import { Table, TableHeader, TableBody, TableRow, TableCell } from "@rebasepro/ui";
 
+// Named `rows` rather than `users`: a Drizzle schema table of that name would shadow it.
+const rows: { id: string; name: string; email: string }[] = [];
+
 <Table>
     <TableHeader>
         <TableCell header>Name</TableCell>
@@ -828,7 +831,7 @@ import { Table, TableHeader, TableBody, TableRow, TableCell } from "@rebasepro/u
         <TableCell header align="right">Actions</TableCell>
     </TableHeader>
     <TableBody>
-        {users.map(user => (
+        {rows.map(user => (
             <TableRow key={user.id} onClick={() => selectUser(user)}>
                 <TableCell>{user.name}</TableCell>
                 <TableCell>{user.email}</TableCell>
@@ -888,7 +891,7 @@ function EditableCell({ rowId, columnKey, value, onUpdate }) {
         <div 
             className="w-full h-full flex items-center px-2 cursor-text"
             onClick={(e) => selectionStore.select({ 
-                rowId, 
+                id: rowId, 
                 columnKey, 
                 cellRect: e.currentTarget.getBoundingClientRect(),
                 width: e.currentTarget.offsetWidth,
@@ -1325,6 +1328,7 @@ useInjectStyles("MyComponent", `
 Calls `onOutsideClick` when a click occurs outside the referenced element. Ignores clicks inside Radix presentation layers.
 
 ```tsx
+import { useRef } from "react";
 import { useOutsideAlerter } from "@rebasepro/ui";
 
 const ref = useRef<HTMLDivElement>(null);
@@ -1372,6 +1376,7 @@ useEffect(() => { fetchResults(debouncedSearch); }, [debouncedSearch]);
 Context provider that controls where Radix portals are rendered. All portal-based components (`Dialog`, `Sheet`, `Select`, `MultiSelect`, `Tooltip`, `Popover`) automatically use this context.
 
 ```tsx
+import { useRef } from "react";
 import { PortalContainerProvider } from "@rebasepro/ui";
 
 const containerRef = useRef<HTMLDivElement>(null);
@@ -1379,7 +1384,7 @@ const containerRef = useRef<HTMLDivElement>(null);
 <div ref={containerRef}>
     <PortalContainerProvider container={containerRef.current}>
         {/* All portals render inside this div */}
-        <Select ... />
+        <Select />
         <Dialog>…</Dialog>
     </PortalContainerProvider>
 </div>
