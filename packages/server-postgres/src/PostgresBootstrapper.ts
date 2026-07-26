@@ -37,6 +37,7 @@ import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./s
 import { buildDrizzleTablesFromSchema, buildDrizzleRelationsFromSchema } from "./schema/dynamic-tables";
 import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, warnOnAnonymousGrants, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
+import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
 import { isChannelBusInstance } from "@rebasepro/types";
 
@@ -233,8 +234,8 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                         `  The database server is not running or is not accepting\n` +
                         `  connections. Common fixes:\n` +
                         `\n` +
+                        `    • docker compose up -d db          (the service a Rebase scaffold ships)\n` +
                         `    • brew services start postgresql@18\n` +
-                        `    • docker compose up -d postgres\n` +
                         `    • Verify DATABASE_URL in your .env file\n` +
                         `\n` +
                         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
@@ -417,6 +418,14 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                             table: getCollectionTableName(c)
                         }))
                         .filter((t) => Boolean(t.table) && registry.hasTableForCollection(t.table));
+                    // Junction tables back no collection, so the list above misses
+                    // them — and a link or unlink is a write nobody would hear
+                    // about. Their rows are the contents of a child list, which is
+                    // as much a change as a write to the rows themselves.
+                    for (const link of collectJunctionLinks(registry)) {
+                        cdcTables.push({ schema: link.schema,
+table: link.table });
+                    }
                     // Provisioning throws only when the connection can't create the
                     // trigger function (insufficient privilege); enableCdc throws when
                     // the LISTEN connection can't be established. Either → fall back.

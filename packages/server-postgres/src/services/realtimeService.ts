@@ -11,6 +11,7 @@ import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfi
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { buildPropertyCallbacks, getTableName } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
+import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
 import { logger } from "@rebasepro/server";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
 import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
@@ -159,6 +160,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private cdcListener?: CdcListener;
     /** Whether database-level CDC is the active cross-instance change source. */
     private cdcActive = false;
+    /** Junction table → the child lists its rows belong to, built when CDC starts. */
+    private junctionLinkMap?: Map<string, JunctionLink[]>;
+
     /** Reverse lookup: `schema.table` (and bare `table`) → collection, built when CDC starts. */
     private cdcTableMap?: Map<string, CollectionConfig>;
     /**
@@ -1795,6 +1799,7 @@ lastSeen: Date.now() });
             return;
         }
         this.cdcTableMap = this.buildCdcTableMap();
+        this.junctionLinkMap = buildJunctionLinkMap(this.registry);
         this.cdcListener = new CdcListener(connectionString, (event) => this.handleCdcEvent(event));
         try {
             // start() validates the initial connection; if it can't be established
@@ -1805,6 +1810,7 @@ lastSeen: Date.now() });
             await this.cdcListener.stop().catch(() => { /* best effort */ });
             this.cdcListener = undefined;
             this.cdcTableMap = undefined;
+            this.junctionLinkMap = undefined;
             throw err;
         }
         this.cdcActive = true;
@@ -1822,6 +1828,7 @@ lastSeen: Date.now() });
             this.cdcListener = undefined;
         }
         this.cdcTableMap = undefined;
+        this.junctionLinkMap = undefined;
         this.recentAppEmits.clear();
     }
 
@@ -1862,6 +1869,10 @@ lastSeen: Date.now() });
     private async handleCdcEvent(event: CdcChangeEvent): Promise<void> {
         const collection = this.resolveCollectionForTable(event.schema, event.table);
         if (!collection) {
+            // A junction table backs no collection, but its rows *are* a child
+            // list. Route the change to the lists it changes before giving up.
+            if (await this.handleJunctionCdcEvent(event)) return;
+
             // Unmapped table (not backed by a collection) — nothing to deliver.
             this.debugLog(`📡 [CDC] Ignoring change on unmapped table ${event.schema}.${event.table}`);
             return;
@@ -1876,6 +1887,55 @@ lastSeen: Date.now() });
         const row = event.op === "DELETE" ? null : { _rebase_invalidated: true };
 
         await this.notifyUpdate(path, id, row, databaseId, /* broadcast */ false, /* origin */ "cdc");
+    }
+
+    /**
+     * Deliver a change on a many-to-many junction table as a change to the child
+     * lists it belongs to.
+     *
+     * Linking a tag to a post writes only `posts_tags`. That table backs no
+     * collection, so change capture dropped the event as unmapped and the
+     * subscribers of `posts/1/tags` never heard about it — every other write in
+     * the system was realtime, and this one silently was not. The junction row
+     * carries both ids, so it names its own paths exactly.
+     *
+     * Notifies the nested path rather than either endpoint collection, because
+     * invalidation walks *parent* paths and never child ones: telling `tags` it
+     * changed would not reach a subscription on `posts/1/tags`.
+     *
+     * Returns whether the table was recognised as a junction.
+     */
+    private async handleJunctionCdcEvent(event: CdcChangeEvent): Promise<boolean> {
+        const links = this.junctionLinkMap?.get(`${event.schema}.${event.table}`)
+            ?? this.junctionLinkMap?.get(event.table);
+        if (!links?.length) return false;
+
+        for (const link of links) {
+            const sourceId = event.row?.[link.sourceColumn];
+            const targetId = event.row?.[link.targetColumn];
+            if (sourceId === undefined || sourceId === null || targetId === undefined || targetId === null) {
+                this.debugLog(
+                    `📡 [CDC] Junction row on ${event.table} is missing '${link.sourceColumn}'/'${link.targetColumn}' — skipping.`
+                );
+                continue;
+            }
+
+            const path = `${link.parentCollection.slug}/${String(sourceId)}/${link.relationKey}`;
+            // An unlink removes the target from this list; a link invalidates it
+            // so each subscriber refetches under its own RLS context.
+            const row = event.op === "DELETE" ? null : { _rebase_invalidated: true };
+
+            await this.notifyUpdate(
+                path,
+                String(targetId),
+                row,
+                (link.parentCollection as { databaseId?: string }).databaseId,
+                /* broadcast */ false,
+                /* origin */ "cdc"
+            );
+        }
+
+        return true;
     }
 
     /** Compute the canonical (possibly composite) id string from a captured row. */

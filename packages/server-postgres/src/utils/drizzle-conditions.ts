@@ -75,7 +75,7 @@ export class DrizzleConditionBuilder {
         if (relation.joinPath && relation.joinPath.length > 0) {
             const { table, idColumn } = parent();
             return this.buildJoinPathScopeCondition(
-                relation.joinPath, table, idColumn, parentId, targetIdColumn, registry
+                relation.joinPath, table, idColumn, parentId, targetTable, registry
             );
         }
 
@@ -132,7 +132,7 @@ export class DrizzleConditionBuilder {
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
         parentId: string | number,
-        targetIdColumn: AnyPgColumn,
+        targetTable: PgTable<any>,
         registry: PostgresCollectionRegistry
     ): SQL {
         const sourceAlias = "__rel_src";
@@ -166,15 +166,26 @@ export class DrizzleConditionBuilder {
 
         // The last step correlates to the outer row instead of joining the
         // target table into the subquery.
-        const lastPairs = pairs(last);
-        const correlation = lastPairs.length === 1
-            ? sql`${fromRef(inner.length, lastPairs[0].from)} = ${targetIdColumn}`
-            : sql.join(
-                lastPairs.map(({ from, to }) =>
-                    sql`${fromRef(inner.length, from)} = ${sql.identifier(getColumnName(to))}`
-                ),
-                sql` AND `
-            );
+        //
+        // On the step's own `to` column, which is not always the target's
+        // primary key: a one-step path like `{ table: "posts", on: { from:
+        // "id", to: "author_id" } }` correlates through a foreign key, and
+        // matching `authors.id = posts.id` there compares two unrelated
+        // identifiers — which returns nothing, quietly. Referencing the Drizzle
+        // column rather than a bare name also keeps it qualified, so it binds
+        // to the outer target and not to a table joined inside the EXISTS.
+        const targetColumn = (name: string): AnyPgColumn => {
+            const column = targetTable[getColumnName(name) as keyof typeof targetTable] as AnyPgColumn;
+            if (!column) {
+                throw new Error(`Join step column '${name}' not found in the target table of this joinPath`);
+            }
+            return column;
+        };
+
+        const correlation = sql.join(
+            pairs(last).map(({ from, to }) => sql`${fromRef(inner.length, from)} = ${targetColumn(to)}`),
+            sql` AND `
+        );
 
         const joinsSql = joins.length > 0 ? sql` ${sql.join(joins, sql` `)}` : sql``;
 

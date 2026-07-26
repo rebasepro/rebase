@@ -23,6 +23,7 @@ import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { provisionTriggerCdc } from "../../src/services/cdc/trigger-cdc.js";
+import { collectJunctionLinks } from "../../src/services/cdc/junction-tables.js";
 import type { RawSqlRunner } from "../../src/security/rls-enforcement.js";
 
 const postsTable = pgTable("posts", {
@@ -37,6 +38,35 @@ const postsCollection: CollectionConfig = {
         id: { name: "ID", type: "number", isId: true },
         title: { name: "Title", type: "string" }
     }
+} as unknown as CollectionConfig;
+
+// A many-to-many, declared on `tags` so the `posts` collection above — and the
+// tests that subscribe to it — stay exactly as they were.
+const tagsTable = pgTable("tags", {
+    id: integer("id").primaryKey(),
+    label: varchar("label")
+});
+const postsTagsTable = pgTable("posts_tags", {
+    post_id: integer("post_id"),
+    tag_id: integer("tag_id")
+});
+const tagsCollection: CollectionConfig = {
+    name: "Tags",
+    slug: "tags",
+    table: "tags",
+    properties: {
+        id: { name: "ID", type: "number", isId: true },
+        label: { name: "Label", type: "string" }
+    },
+    relations: [
+        {
+            relationName: "posts",
+            target: () => postsCollection,
+            cardinality: "many",
+            direction: "owning",
+            through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" }
+        }
+    ]
 } as unknown as CollectionConfig;
 
 /** Minimal stand-in for a connected WebSocket client. */
@@ -83,13 +113,20 @@ describe("Database-level CDC (E2E)", () => {
         await adminClient.query(`
             CREATE TABLE public.posts (id INTEGER PRIMARY KEY, title VARCHAR(255));
             INSERT INTO public.posts (id, title) VALUES (1, 'original title');
+            CREATE TABLE public.tags (id INTEGER PRIMARY KEY, label VARCHAR(255));
+            INSERT INTO public.tags (id, label) VALUES (1, 'postgres');
+            CREATE TABLE public.posts_tags (
+                post_id INTEGER, tag_id INTEGER, PRIMARY KEY (post_id, tag_id)
+            );
         `);
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
         const registry = new PostgresCollectionRegistry();
-        registry.registerMultiple([postsCollection]);
+        registry.registerMultiple([postsCollection, tagsCollection]);
         registry.registerTable(postsTable, "posts");
+        registry.registerTable(tagsTable, "tags");
+        registry.registerTable(postsTagsTable, "posts_tags");
 
         realtime = new RealtimeService(db as never, registry);
         driver = new PostgresBackendDriver(db as never, realtime as never, registry);
@@ -98,7 +135,13 @@ describe("Database-level CDC (E2E)", () => {
         // Self-provision the CDC triggers + start the LISTEN client, exactly as
         // the bootstrapper does when REALTIME_CDC=trigger.
         const runSql: RawSqlRunner = async (text) => (await pool.query(text)).rows as Record<string, unknown>[];
-        await provisionTriggerCdc(runSql, [{ schema: "public", table: "posts" }]);
+        // Junction tables come from the same derivation the bootstrapper uses,
+        // so the test exercises that derivation rather than a hand-written list.
+        await provisionTriggerCdc(runSql, [
+            { schema: "public", table: "posts" },
+            ...collectJunctionLinks(registry).map((l) => ({ schema: l.schema,
+table: l.table }))
+        ]);
         await realtime.enableCdc(container.connectionString);
 
         expect(realtime.isCdcActive()).toBe(true);
@@ -109,6 +152,49 @@ describe("Database-level CDC (E2E)", () => {
         await pool?.end();
         await adminClient?.end();
         if (container) await stopPgContainer(container.containerName);
+    });
+
+    it("delivers a realtime event for a link written straight into the junction table", async () => {
+        // Linking is a write to `posts_tags` and to nothing else. That table
+        // backs no collection, so change capture used to drop the event as
+        // unmapped and a subscriber on the child list never heard about it —
+        // the one write in the system that was silently not realtime.
+        const ws = new CollectingSocket();
+        realtime.addClient("client-link", ws as never);
+        await realtime.handleClientMessage("client-link", {
+            type: "subscribe_collection",
+            payload: { path: "tags/1/posts", subscriptionId: "sub-link" }
+        } as never);
+        ws.clear();
+
+        // Raw SQL on a SEPARATE connection — no Rebase API, no admin panel.
+        await adminClient.query(`INSERT INTO public.posts_tags (post_id, tag_id) VALUES (1, 1)`);
+
+        const update = await waitFor(() =>
+            ws.parsed().find((m) => m.type === "collection_update" && m.subscriptionId === "sub-link")
+        );
+        const ids = (update.rows as Array<{ id?: number; values?: { id?: number } }>)
+            .map((r) => r.id ?? r.values?.id);
+        expect(ids).toContain(1);
+    });
+
+    it("delivers a realtime event when a link is removed", async () => {
+        const ws = new CollectingSocket();
+        realtime.addClient("client-unlink", ws as never);
+        await realtime.handleClientMessage("client-unlink", {
+            type: "subscribe_collection",
+            payload: { path: "tags/1/posts", subscriptionId: "sub-unlink" }
+        } as never);
+        ws.clear();
+
+        await adminClient.query(`DELETE FROM public.posts_tags WHERE post_id = 1 AND tag_id = 1`);
+
+        const update = await waitFor(() =>
+            ws.parsed().find((m) => m.type === "collection_update" && m.subscriptionId === "sub-unlink")
+        );
+        const ids = (update.rows as Array<{ id?: number; values?: { id?: number } }>)
+            .map((r) => r.id ?? r.values?.id);
+        expect(ids).not.toContain(1);
     });
 
     it("delivers a realtime event for a raw SQL UPDATE made outside the Rebase API", async () => {

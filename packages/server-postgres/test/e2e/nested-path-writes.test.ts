@@ -66,6 +66,19 @@ const tagsCollection: CollectionConfig = {
             cardinality: "many",
             direction: "inverse",
             through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" }
+        },
+        {
+            // The same reach spelled as a multi-hop `joinPath`: tags → the
+            // junction → posts. Here the last step's `to` *is* the target's
+            // primary key, which is the shape that happens to work either way.
+            relationName: "posts_via_hops",
+            target: () => postsCollection,
+            cardinality: "many",
+            direction: "inverse",
+            joinPath: [
+                { table: "posts_tags", on: { from: "id", to: "tag_id" } },
+                { table: "posts", on: { from: "post_id", to: "id" } }
+            ]
         }
     ]
 } as unknown as CollectionConfig;
@@ -83,6 +96,19 @@ const authorsCollection: CollectionConfig = {
             cardinality: "many",
             direction: "inverse",
             foreignKeyOnTarget: "author_id"
+        },
+        {
+            // The same link spelled as an explicit one-step `joinPath`. The
+            // step's `to` is a foreign key on the target, *not* the target's
+            // primary key — which is the case a scope condition correlating on
+            // the primary key gets wrong.
+            relationName: "posts_via_join",
+            target: () => postsCollection,
+            cardinality: "many",
+            direction: "inverse",
+            joinPath: [
+                { table: "posts", on: { from: "id", to: "author_id" } }
+            ]
         }
     ]
 } as unknown as CollectionConfig;
@@ -328,6 +354,16 @@ describe("Nested path writes (E2E)", () => {
         expect(await one("SELECT * FROM public.authors WHERE id = 'a-new'")).toBeUndefined();
     });
 
+    it("reads through a to-one relation, which is rejected only for writes", async () => {
+        // `posts/p-1/author` is a legitimate read even though writing through it
+        // is not: the scope resolves the single row the parent's foreign key
+        // points at.
+        const rows = await driver.fetchCollection({ path: "posts/p-1/author" } as never);
+
+        expect(rows.map(r => r.name)).toEqual(["Ada"]);
+        expect(await driver.count!({ path: "posts/p-1/author" } as never)).toBe(1);
+    });
+
     // ── 5. Reads are scoped the same way ────────────────────────────────────
 
     it("does not serve a row through a parent that does not own it", async () => {
@@ -387,6 +423,27 @@ describe("Nested path writes (E2E)", () => {
                 path: "authors/a-1/posts",
                 filter: { title: ["==", "Ada 2"] }
             } as never)).toBe(1);
+        });
+
+        it("scopes a one-step joinPath by the step's own column, not the target's key", async () => {
+            // `posts_via_join` reaches the same rows as `posts`, so the two must
+            // agree. Correlating on the target's primary key instead of the
+            // step's `to` compares a post id to an author id: no rows, or a
+            // type error, depending on the key types.
+            const viaFk = await driver.fetchCollection({ path: "authors/a-1/posts" } as never);
+            const viaJoin = await driver.fetchCollection({ path: "authors/a-1/posts_via_join" } as never);
+
+            expect(titles(viaJoin).sort()).toEqual(titles(viaFk).sort());
+            expect(titles(viaJoin).sort()).toEqual(["Ada 2", "Ada 3", "Ada 4", "Ada post"]);
+            expect(await driver.count!({ path: "authors/a-1/posts_via_join" } as never)).toBe(4);
+        });
+
+        it("scopes a multi-hop joinPath through its intermediate table", async () => {
+            const viaThrough = await driver.fetchCollection({ path: "tags/t-1/posts_via_tag" } as never);
+            const viaHops = await driver.fetchCollection({ path: "tags/t-1/posts_via_hops" } as never);
+
+            expect(titles(viaHops).sort()).toEqual(titles(viaThrough).sort());
+            expect(await driver.count!({ path: "tags/t-1/posts_via_hops" } as never)).toBe(4);
         });
 
         it("does the same through a junction, without the join multiplying rows", async () => {
