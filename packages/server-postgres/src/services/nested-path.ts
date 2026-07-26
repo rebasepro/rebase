@@ -118,13 +118,28 @@ export function isJunctionBackedRelation(relation: ResolvedRelation): boolean {
  * one.
  */
 export function assertWritableThrough(hop: NestedPathHop, path: string): void {
-    if (hop.relation.cardinality !== "many") {
+    const { relation } = hop;
+
+    // Read the flag rather than re-deriving the rule. This guard used to test
+    // `cardinality !== "many"`, which let a to-many `via` through even though
+    // its type declares `writable: false` — a second expression of one rule,
+    // free to disagree with the first, which is the shape of defect this union
+    // exists to remove.
+    if (relation.writable && relation.cardinality === "many") return;
+
+    if (!relation.writable) {
         throw ApiError.badRequest(
-            `"${path}" ends in the to-one relation '${hop.relationKey}', which cannot be written through: ` +
-            `the foreign key for a to-one relation lives on '${hop.parentCollection.slug}', not on ` +
-            `'${hop.targetCollection.slug}'. Write the target row at "${hop.targetCollection.slug}" and set ` +
-            `'${hop.relationKey}' on the parent instead.`,
+            `"${path}" ends in '${hop.relationKey}', a \`via\` relation. Rebase will not infer how to write ` +
+            `through an arbitrary join chain — write the row at "${hop.targetCollection.slug}" directly.`,
             "RELATION_NOT_WRITABLE"
         );
     }
+
+    throw ApiError.badRequest(
+        `"${path}" ends in the to-one relation '${hop.relationKey}', which cannot be written through: ` +
+        `the foreign key for a to-one relation lives on '${hop.parentCollection.slug}', not on ` +
+        `'${hop.targetCollection.slug}'. Write the target row at "${hop.targetCollection.slug}" and set ` +
+        `'${hop.relationKey}' on the parent instead.`,
+        "RELATION_NOT_WRITABLE"
+    );
 }
