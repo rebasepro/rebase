@@ -22,8 +22,9 @@ Erstellen Sie eine Datei in Ihrem `backend/functions/`-Verzeichnis, die standard
 ```typescript
 // backend/functions/hello.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.get("/", (c) => {
     return c.json({ message: "Hello from custom function!" });
@@ -76,7 +77,8 @@ Der Loader akzeptiert zwei Exportformate:
 
 ```typescript
 import { Hono } from "hono";
-const app = new Hono();
+import type { HonoEnv } from "@rebasepro/server";
+const app = new Hono<HonoEnv>();
 app.get("/status", (c) => c.json({ ok: true }));
 export default app;
 ```
@@ -85,8 +87,9 @@ export default app;
 
 ```typescript
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 export default function () {
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.get("/status", (c) => c.json({ ok: true }));
     return app;
 }
@@ -108,8 +111,9 @@ Verwenden Sie die integrierten Auth-Helfer von Rebase:
 
 ```typescript
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 // Public endpoint — no auth required
 app.get("/public", (c) => {
@@ -118,7 +122,8 @@ app.get("/public", (c) => {
 
 // Protected endpoint — requires a valid JWT
 app.post("/protected", async (c) => {
-    const user = c.get("user"); // Injected by Rebase middleware
+    // Narrowed: the env types every variable the middleware may set.
+    const user = c.get("user") as { uid: string; roles?: string[] } | undefined;
     if (!user) {
         return c.json({ error: "Unauthorized" }, 401);
     }
@@ -127,7 +132,7 @@ app.post("/protected", async (c) => {
 
 // Admin-only endpoint
 app.post("/admin-only", async (c) => {
-    const user = c.get("user");
+    const user = c.get("user") as { uid: string; roles?: string[] } | undefined;
     const roles: string[] = user?.roles ?? [];
     if (!roles.includes("admin")) {
         return c.json({ error: "Admin access required" }, 403);
@@ -153,9 +158,10 @@ Das Paket `@rebasepro/server` stellt ein `rebase`-Singleton bereit, das Ihnen vo
 ```typescript
 // backend/functions/approve-job.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { rebase } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.post("/:id/approve", async (c) => {
     const id = c.req.param("id");
@@ -178,10 +184,11 @@ export default app;
 ```typescript
 // backend/functions/reports.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { db } from "../src/db"; // Your Drizzle instance
 import { sql } from "drizzle-orm";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.get("/stats", async (c) => {
     const result = await db.execute(sql`
@@ -212,7 +219,7 @@ Benutzerdefinierte Funktionen werden **nachdem** `initializeRebaseBackend()` die
 Das bedeutet, dass Ihre benutzerdefinierten Funktionen Zugriff auf alle initialisierten Dienste haben. Registrieren Sie alle Routen, die **vor** Rebase ausgeführt werden müssen, direkt in der Hono-App, bevor Sie `initializeRebaseBackend()` aufrufen:
 
 ```typescript no-verify
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 // This runs BEFORE Rebase routes
 app.get("/health", (c) => c.json({ status: "ok" }));
@@ -226,11 +233,12 @@ const instance = await initializeRebaseBackend({ app, /* ... */ });
 ```typescript
 // backend/functions/stripe-webhook.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import Stripe from "stripe";
 import { instance } from "../src/index";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.post("/", async (c) => {
     const sig = c.req.header("stripe-signature")!;

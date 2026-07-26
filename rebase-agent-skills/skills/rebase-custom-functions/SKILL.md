@@ -33,8 +33,9 @@ Each file default-exports a Hono app:
 ```typescript
 // backend/functions/send-invoice.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.post("/", async (c) => {
     const { orderId, email } = await c.req.json();
@@ -66,9 +67,10 @@ You can also export a factory function:
 ```typescript
 // backend/functions/webhooks.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 
 export default function () {
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
 
     app.post("/stripe", async (c) => {
         const body = await c.req.text();

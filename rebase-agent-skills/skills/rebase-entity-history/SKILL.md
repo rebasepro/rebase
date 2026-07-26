@@ -394,6 +394,7 @@ For custom client applications, use `fetch()` directly against the REST endpoint
 ```typescript
 // backend/src/index.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { serve } from "@hono/node-server";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
@@ -403,7 +404,7 @@ import dotenv from "dotenv";
 dotenv.config({ path: "../../.env" });
 const env = loadEnv();
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 const server = serve({ fetch: app.fetch, port: env.PORT });
 
 // Collection with history enabled

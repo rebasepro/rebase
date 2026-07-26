@@ -603,6 +603,7 @@ When using a custom `sendEmail` function instead of SMTP, `verifyConnection()` s
 
 ```typescript
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { serve } from "@hono/node-server";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
@@ -623,7 +624,7 @@ const env = loadEnv({
 });
 
 // 2. Set up Hono and HTTP server
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 const server = serve({ fetch: app.fetch, port: env.PORT });
 
 // 3. Create database adapter

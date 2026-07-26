@@ -217,6 +217,7 @@ The `DatabaseAdapter` API — a simpler, flattened interface that wraps the boot
 
 ```typescript
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
 import path from "path";
