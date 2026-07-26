@@ -17,7 +17,8 @@ Relations can be defined either inline within the property, or explicitly in the
 
 ### 1. Inline Relations (Recommended)
 
-You can define the relation directly on the property. The framework automatically extracts these into the collection's `relations[]` at normalization time, so you no longer need a separate `relations[]` entry for properties.
+Declare the link on the property, nested under `relation`. Pick the `kind` and
+the type offers exactly the fields that kind needs.
 
 ```typescript
 import { defineCollection } from "@rebasepro/admin-types";
@@ -28,13 +29,13 @@ const postsCollection = defineCollection({
     properties: {
         title: { type: "string", name: "Title" },
         content: { type: "string", name: "Content", admin: { multiline: true } },
-        author: { 
-            type: "relation", 
-            name: "Author", 
-            target: () => usersCollection,
-            cardinality: "one",
-            direction: "owning",
-            localKey: "author_id"
+        author: {
+            type: "relation",
+            name: "Author",
+            relation: {
+                kind: "belongsTo",
+                target: () => usersCollection
+            }
         }
     }
 });
@@ -42,95 +43,107 @@ const postsCollection = defineCollection({
 
 ### 2. Explicit Relations Array
 
-For advanced use cases or when a relation doesn't map directly to a form field, you can define it in the `relations` array:
+For a link with no form field of its own — a list you only want as a tab —
+declare it in `relations`:
 
 ```typescript
 import { defineCollection } from "@rebasepro/admin-types";
-const postsCollection = defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
+const usersCollection = defineCollection({
+    slug: "users",
+    name: "Users",
+    table: "users",
     properties: {
-        title: { type: "string", name: "Title" },
-        content: { type: "string", name: "Content", admin: { multiline: true } },
-        author: { type: "relation", name: "Author", relationName: "author" }
+        name: { type: "string", name: "Name" }
     },
     relations: [
         {
-            relationName: "author",
-            target: () => usersCollection,
-            cardinality: "one",
-            localKey: "author_id"
+            kind: "hasMany",
+            relationName: "posts",
+            target: () => postsCollection
         }
     ]
 });
 ```
 
-## Relation Types
+## The five kinds
 
-### One-to-One / Many-to-One
+A relation is one of five kinds. The kind decides where the key lives, whether
+one row or many come back, and what a write through it may touch.
 
-A foreign key on **this** table points to another table's primary key.
+| Kind | The key lives | Returns | Notes |
+|---|---|---|---|
+| `belongsTo` | on **this** table | one | `localKey`, defaults to `<relationName>_id` |
+| `hasOne` | on the **target's** table | one | `foreignKeyOnTarget`, defaults to `<thisCollection>_id` |
+| `hasMany` | on the **target's** table | many | children belong to this parent alone |
+| `manyToMany` | in a **junction table** | many | rows are shared; you own the link |
+| `via` | an explicit `joinPath` | either | read-only; state `cardinality` yourself |
+
+Every field is optional except `kind` and `target` — the rest is derived.
+
+### belongsTo — the key is on this table
+
+```typescript
+author: {
+    type: "relation",
+    name: "Author",
+    relation: { kind: "belongsTo", target: () => usersCollection }
+}
+// → posts.author_id
+```
+
+### hasMany / hasOne — the key is on theirs
 
 ```typescript
 relations: [
-    {
-        relationName: "author",
-        target: () => usersCollection,
-        cardinality: "one",          // This entity has ONE author
-        direction: "owning",         // The FK is on THIS table
-        localKey: "author_id"        // Column on the posts table
-    }
+    { kind: "hasMany", relationName: "posts", target: () => postsCollection }
 ]
+// → reads posts.user_id
 ```
 
-This creates: `posts.author_id → users.id`
+`hasOne` is the same link with at most one row on the far side.
 
-### One-to-Many (Inverse)
-
-The foreign key is on the **target** table, pointing back to this entity.
+### manyToMany — through a junction
 
 ```typescript
-// On the Users collection:
-relations: [
-    {
-        relationName: "posts",
-        target: () => postsCollection,
-        cardinality: "many",          // This user has MANY posts
-        direction: "inverse",         // The FK is on the TARGET table
-        foreignKeyOnTarget: "author_id"  // Column on the posts table
-    }
-]
+tags: {
+    type: "relation",
+    name: "Tags",
+    relation: { kind: "manyToMany", target: () => tagsCollection }
+}
+// → junction `posts_tags` (both table names, sorted), columns post_id / tag_id
 ```
 
-### Many-to-Many (Junction Table)
-
-Two collections connected through an intermediate junction table.
+Both sides declare their own, and each writes `through` **from its own point of
+view** — `sourceColumn` always names *this* collection:
 
 ```typescript
-// On the Articles collection:
-relations: [
-    {
-        relationName: "tags",
-        target: () => tagsCollection,
-        cardinality: "many",
-        direction: "owning",
-        through: {
-            table: "article_tags",           // Junction table name
-            sourceColumn: "article_id",      // FK to this collection
-            targetColumn: "tag_id"           // FK to target collection
-        }
-    }
-]
+// on posts
+{ kind: "manyToMany", relationName: "tags", target: () => tagsCollection,
+  through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } }
+
+// on tags
+{ kind: "manyToMany", relationName: "posts", target: () => postsCollection,
+  through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" } }
 ```
 
-This creates:
-```sql
-CREATE TABLE article_tags (
-    article_id INTEGER REFERENCES articles(id),
-    tag_id INTEGER REFERENCES tags(id),
-    PRIMARY KEY (article_id, tag_id)
-);
+### via — an explicit join chain
+
+For links the four shapes above cannot express: multi-hop paths, composite keys,
+or a join whose condition is not a plain foreign key. Read-only — Rebase will
+not infer how to write through an arbitrary chain.
+
+```typescript
+{
+    kind: "via",
+    relationName: "permissions",
+    target: () => permissionsCollection,
+    cardinality: "many",
+    joinPath: [
+        { table: "user_roles",       on: { from: "id",            to: "user_id" } },
+        { table: "role_permissions", on: { from: "role_id",       to: "role_id" } },
+        { table: "permissions",      on: { from: "permission_id", to: "id" } }
+    ]
+}
 ```
 
 ## Relation Properties
@@ -142,7 +155,7 @@ properties: {
     author: {
         type: "relation",
         name: "Author",
-        target: () => usersCollection, // Target collection
+        relation: { kind: "belongsTo", target: () => usersCollection },
         widget: "select"           // "select" (dropdown) or "dialog" (full picker)
     }
 }
@@ -156,12 +169,14 @@ When rendering a preview (like in a table cell or a reference chip), Rebase hand
 
 ## Multi-Hop Joins
 
-For complex relationships that traverse multiple tables, use `joinPath`:
+For relationships that traverse multiple tables, use `kind: "via"` with a `joinPath`.
+These are read-only: Rebase will not infer how to write through an arbitrary chain.
 
 ```typescript
 // Users → Permissions through Roles
 relations: [
     {
+        kind: "via",
         relationName: "permissions",
         target: () => permissionsCollection,
         cardinality: "many",
@@ -208,9 +223,9 @@ Control what happens when related entities are updated or deleted:
 ```typescript
 relations: [
     {
+        kind: "belongsTo",
         relationName: "author",
         target: () => usersCollection,
-        cardinality: "one",
         localKey: "author_id",
         onDelete: "cascade",    // Delete posts when user is deleted
         onUpdate: "cascade"     // Update FK when user ID changes
@@ -278,8 +293,8 @@ For the full query builder reference (filtering, sorting, pagination, real-time)
 
 ## Relations in the admin panel
 
-Every relation with `cardinality: "many"` becomes a **tab** under a record in the
-admin panel, listing the rows that record reaches.
+Every to-many relation — `hasMany`, `manyToMany`, or a to-many `via` — becomes a
+**tab** under a record in the admin panel, listing the rows that record reaches.
 
 ### The path segment is the relation name
 
@@ -298,8 +313,7 @@ inline relation property takes the *property key*:
 properties: {
     featuredTags: {
         type: "relation",
-        target: () => tagsCollection,
-        cardinality: "many"
+        relation: { kind: "manyToMany", target: () => tagsCollection }
     }
 }
 // tab and path segment: featuredTags   (not "tags")
@@ -354,27 +368,65 @@ already exists.
 
 ## Full Relation Interface
 
+`Relation` is a closed union — one member per kind, each carrying only the
+fields that kind has. There is no combination of fields that describes two
+different links, and no field you can set that the kind does not use.
+
 ```typescript
-interface Relation {
-    relationName?: string;
+type Relation =
+    | BelongsToRelation
+    | HasOneRelation
+    | HasManyRelation
+    | ManyToManyRelation
+    | ViaRelation;
+
+interface RelationBase {
+    relationName?: string;          // defaults to the property key, then the target's slug
     target: () => CollectionConfig;
-    cardinality: "one" | "many";
-    direction?: "owning" | "inverse";
-    inverseRelationName?: string;
-    localKey?: string;
-    foreignKeyOnTarget?: string;
-    through?: {
-        table: string;
-        sourceColumn: string;
-        targetColumn: string;
-    };
-    joinPath?: JoinStep[];
-    onUpdate?: "cascade" | "restrict" | "no action" | "set null" | "set default";
-    onDelete?: "cascade" | "restrict" | "no action" | "set null" | "set default";
-    overrides?: Partial<CollectionConfig>;
+    onUpdate?: OnAction;
+    onDelete?: OnAction;
+    overrides?: Partial<CollectionConfig>;   // applied when rendered as a tab
     validation?: { required?: boolean };
 }
+
+interface BelongsToRelation extends RelationBase {
+    kind: "belongsTo";
+    localKey?: string;              // column on THIS table
+}
+
+interface HasOneRelation extends RelationBase {
+    kind: "hasOne";
+    foreignKeyOnTarget?: string;    // column on the TARGET's table
+}
+
+interface HasManyRelation extends RelationBase {
+    kind: "hasMany";
+    foreignKeyOnTarget?: string;    // column on the TARGET's table
+}
+
+interface ManyToManyRelation extends RelationBase {
+    kind: "manyToMany";
+    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
+}
+
+interface ViaRelation extends RelationBase {
+    kind: "via";
+    cardinality: "one" | "many";    // a join chain cannot imply it
+    joinPath: JoinStep[];
+}
 ```
+
+### The resolved form
+
+What you write above is the *authoring* shape. Internally Rebase works with
+`ResolvedRelation`: the same link with every default filled in and nothing
+optional, plus `cardinality`, `targetSlug`, and two flags — `writable` (false
+only for `via`) and `shared` (true when the target rows belong to other parents
+too, so a removal unlinks rather than deletes).
+
+You never write a `ResolvedRelation`. On a relation property, `relation` is
+yours and `resolvedRelation` is the filled-in one, stamped during
+normalization.
 
 ## Next Steps
 

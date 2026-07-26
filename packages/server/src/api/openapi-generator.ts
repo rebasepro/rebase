@@ -1,4 +1,5 @@
-import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, Relation, VectorProperty } from "@rebasepro/types";
+import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, VectorProperty } from "@rebasepro/types";
+import { resolveCollectionRelations } from "@rebasepro/common";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -313,76 +314,90 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
             }
         };
 
-        // ── Subcollection routes ──────────────────────────────────────
-        const relations = collection.relations;
-        if (relations && relations.length > 0) {
-            for (const relation of relations) {
-                const relationName = relation.relationName;
-                if (!relationName) continue;
+    }
 
-                let targetName: string;
-                try {
-                    const targetCollection = relation.target();
-                    targetName = targetCollection.singularName || targetCollection.name;
-                } catch {
-                    targetName = relationName;
-                }
-                const targetSchema = toPascalCase(targetName);
+    // ── Subcollection routes ─────────────────────────────────────────────
+    //
+    // A second pass, after every collection's component schema exists. These
+    // routes `$ref` the *target's* schema, and the first pass builds schemas in
+    // array order — so doing this inline meant a subcollection whose target
+    // appeared later in the list silently degraded to an untyped `object`.
+    //
+    // The names come from the *resolved* relations, not from the authored
+    // `relations` array. `relationName` is optional at the authoring surface —
+    // it defaults to the property key, or to the target's slug — so reading the
+    // raw field skipped every relation that relied on the default, and missed
+    // relations declared inline on a property entirely, since those are not in
+    // the array. These are the same resolved names the nested-path router
+    // matches, so the spec and the routes cannot drift apart.
+    //
+    // A to-one relation is left out. `posts/1/author` resolves, but it
+    // addresses a single row, and documenting it as a paginated list would
+    // describe a response shape the client never gets.
+    for (const collection of (collections || [])) {
+        const slug = collection.slug;
+        const schemaName = toPascalCase(collection.singularName || collection.name);
+        const relations = Object.values(resolveCollectionRelations(collection))
+            .filter(isToMany);
+        for (const relation of relations) {
+            const relationName = relation.relationName;
+            const targetCollection = relation.target();
+            const targetName = targetCollection.singularName || targetCollection.name;
+            const targetSchema = toPascalCase(targetName);
 
-                const subPath = `/data/${slug}/{parentId}/${relationName}`;
+            const subPath = `/data/${slug}/{parentId}/${relationName}`;
 
-                // Only add if the schema exists (target collection is also registered)
-                paths[subPath] = {
-                    get: {
-                        tags: [collection.name],
-                        summary: `List ${relationName} for ${withIndefiniteArticle(collection.singularName || collection.name)}`,
-                        operationId: `list${schemaName}${toPascalCase(relationName)}`,
-                        parameters: [
-                            { name: "parentId",
+            // Only add if the schema exists (target collection is also registered)
+            paths[subPath] = {
+                get: {
+                    tags: [collection.name],
+                    summary: `List ${relationName} for ${withIndefiniteArticle(collection.singularName || collection.name)}`,
+                    operationId: `list${schemaName}${toPascalCase(relationName)}`,
+                    parameters: [
+                        { name: "parentId",
 in: "path",
 required: true,
 schema: { type: "string" },
 description: `${collection.singularName || collection.name} ID` },
-                            { name: "limit",
+                        { name: "limit",
 in: "query",
 schema: { type: "integer",
 default: 20 } },
-                            { name: "offset",
+                        { name: "offset",
 in: "query",
 schema: { type: "integer",
 default: 0 } },
-                            { name: "orderBy",
+                        { name: "orderBy",
 in: "query",
 schema: { type: "string" } },
-                            { name: "searchString",
+                        { name: "searchString",
 in: "query",
 schema: { type: "string" } }
-                        ],
-                        responses: {
-                            200: {
-                                description: `List of related ${relationName}`,
-                                content: {
-                                    "application/json": {
-                                        schema: {
-                                            type: "object",
-                                            properties: {
-                                                data: {
-                                                    type: "array",
-                                                    items: schemas[targetSchema]
-                                                        ? { $ref: `#/components/schemas/${targetSchema}` }
-                                                        : { type: "object" }
-                                                },
-                                                meta: { $ref: "#/components/schemas/PaginationMeta" }
-                                            }
+                    ],
+                    responses: {
+                        200: {
+                            description: `List of related ${relationName}`,
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "object",
+                                        properties: {
+                                            data: {
+                                                type: "array",
+                                                items: schemas[targetSchema]
+                                                    ? { $ref: `#/components/schemas/${targetSchema}` }
+                                                    : { type: "object" }
+                                            },
+                                            meta: { $ref: "#/components/schemas/PaginationMeta" }
                                         }
                                     }
                                 }
-                            },
-                            ...errorResponses(requireAuth)
-                        }
+                            }
+                        },
+                        ...errorResponses(requireAuth)
                     }
-                };
-            }
+                }
+            };
         }
     }
 

@@ -43,7 +43,7 @@ Properties define the fields of your collection. Rebase supports these built-in 
 | Cascade rules | `onDelete`, `onUpdate` | None |
 | Junction tables | Yes (many-to-many) | No |
 | Multi-hop joins | Yes (`joinPath`) | No |
-| Inverse lookups | Yes (`direction: "inverse"`) | No |
+| Inverse lookups | Yes (`kind: "hasMany"` / `"hasOne"`) | No |
 | Where to use | **PostgresCollectionConfig** | FirebaseCollectionConfig or legacy |
 | Stored value | FK column(s) managed by framework | `{ id, path }` object or string |
 
@@ -732,9 +732,7 @@ const postsCollection: PostgresCollectionConfig = {
         author: {
             name: "Author",
             type: "relation",
-            target: () => authorsCollection,
-            cardinality: "one",
-            direction: "owning"
+            relation: { kind: "belongsTo", target: () => authorsCollection }
         }
     }
 };
@@ -742,30 +740,29 @@ const postsCollection: PostgresCollectionConfig = {
 
 This automatically creates an `author_id` foreign key column on the `posts` table.
 
-### Many-to-Many (Owning)
+### Many-to-Many
 
 ```typescript
 tags: {
     name: "Tags",
     type: "relation",
-    target: () => tagsCollection,
-    cardinality: "many",
-    direction: "owning"
+    relation: { kind: "manyToMany", target: () => tagsCollection }
 }
 ```
 
 This automatically creates a `posts_tags` junction table with `post_id` and `tag_id` columns.
 
-### One-to-Many (Inverse)
+### One-to-Many
 
 ```typescript
 comments: {
     name: "Comments",
     type: "relation",
-    target: () => commentsCollection,
-    cardinality: "many",
-    direction: "inverse",
-    foreignKeyOnTarget: "post_id"
+    relation: {
+        kind: "hasMany",
+        target: () => commentsCollection,
+        foreignKeyOnTarget: "post_id"
+    }
 }
 ```
 
@@ -773,15 +770,18 @@ comments: {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `target` | `string \| (() => CollectionConfig \| string)` | — | Target collection (use a function for lazy resolution to avoid circular imports) |
-| `cardinality` | `"one" \| "many"` | `"one"` | Whether this references one or many records |
-| `direction` | `"owning" \| "inverse"` | `"owning"` | Which side owns the FK or junction table |
-| `localKey` | `string` | auto-inferred | Column on THIS table storing the FK (e.g. `"author_id"`) |
-| `foreignKeyOnTarget` | `string` | auto-inferred | Column on TARGET table storing the FK (for inverse) |
-| `through` | `{ table, sourceColumn, targetColumn }` | auto-inferred | Junction table config for many-to-many |
-| `joinPath` | `JoinStep[]` | — | Explicit multi-hop join path (overrides all other join config) |
-| `relationName` | `string` | property key | Override the relation name (defaults to the property key) |
-| `inverseRelationName` | `string` | — | Name of the corresponding relation on the target collection |
+The link goes under `relation`, and its `kind` decides which fields apply.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `kind` | `"belongsTo" \| "hasOne" \| "hasMany" \| "manyToMany" \| "via"` | — | **Required.** Which kind of link |
+| `target` | `() => CollectionConfig` | — | Target collection (a thunk, to survive circular imports) |
+| `localKey` | `string` | `<relationName>_id` | `belongsTo` only — column on THIS table |
+| `foreignKeyOnTarget` | `string` | `<thisCollection>_id` | `hasOne`/`hasMany` only — column on the TARGET's table |
+| `through` | `{ table?, sourceColumn?, targetColumn? }` | derived | `manyToMany` only; `sourceColumn` names THIS collection |
+| `joinPath` | `JoinStep[]` | — | `via` only; read-only |
+| `cardinality` | `"one" \| "many"` | — | `via` only — a join chain cannot imply it |
+| `relationName` | `string` | property key | The name it is addressed by: `include`, admin tab, nested path segment |
 | `onDelete` | `OnAction` | — | Cascade rule on delete |
 | `onUpdate` | `OnAction` | — | Cascade rule on update |
 | `overrides` | `Partial<CollectionConfig>` | — | Override target collection config when rendered as subcollection tab |
@@ -830,26 +830,29 @@ interface JoinStep {
 permissions: {
     name: "Permissions",
     type: "relation",
-    target: () => permissionsCollection,
-    cardinality: "many",
-    joinPath: [
-        {
-            table: "user_roles",
-            on: { from: "id", to: "user_id" }         // users.id = user_roles.user_id
-        },
-        {
-            table: "roles",
-            on: { from: "role_id", to: "id" }          // user_roles.role_id = roles.id
-        },
-        {
-            table: "role_permissions",
-            on: { from: "id", to: "role_id" }          // roles.id = role_permissions.role_id
-        },
-        {
-            table: "permissions",
-            on: { from: "permission_id", to: "id" }    // role_permissions.permission_id = permissions.id
-        }
-    ]
+    relation: {
+        kind: "via",
+        target: () => permissionsCollection,
+        cardinality: "many",
+        joinPath: [
+            {
+                table: "user_roles",
+                on: { from: "id", to: "user_id" }          // users.id = user_roles.user_id
+            },
+            {
+                table: "roles",
+                on: { from: "role_id", to: "id" }          // user_roles.role_id = roles.id
+            },
+            {
+                table: "role_permissions",
+                on: { from: "id", to: "role_id" }          // roles.id = role_permissions.role_id
+            },
+            {
+                table: "permissions",
+                on: { from: "permission_id", to: "id" }    // role_permissions.permission_id = permissions.id
+            }
+        ]
+    }
 }
 ```
 
@@ -859,19 +862,24 @@ permissions: {
 customer: {
     name: "Customer",
     type: "relation",
-    target: () => customersCollection,
-    cardinality: "one",
-    joinPath: [
-        {
-            table: "customers",
-            on: {
-                from: ["company_code", "region_id"],  // orders table columns
-                to: ["code", "region_id"]             // customers table columns
+    relation: {
+        kind: "via",
+        target: () => customersCollection,
+        cardinality: "one",
+        joinPath: [
+            {
+                table: "customers",
+                on: {
+                    from: ["company_code", "region_id"],  // orders table columns
+                    to: ["code", "region_id"]             // customers table columns
+                }
             }
-        }
-    ]
+        ]
+    }
 }
 ```
+
+A `via` relation is read-only: a join chain does not say which row to write.
 
 > **See full documentation:** [Relations](https://rebase.pro/docs/collections/relations)
 

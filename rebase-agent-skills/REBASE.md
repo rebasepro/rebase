@@ -35,7 +35,7 @@ Collections are defined as standalone TypeScript files (e.g., `config/collection
 Collections support lifecycle hooks (`beforeSave`, `afterSave`, `afterRead`, `beforeDelete`, `afterDelete`) for business logic, data synchronization, and side effects. **Use callbacks instead of raw SQL triggers or external scripts.**
 
 ### Inline Relations
-Relations are defined **directly on the property** using `type: "relation"` with `target`, `cardinality`, and `direction`. There is no separate `relations[]` array — the framework auto-extracts relations during collection normalization.
+Relations are declared on the property under `relation`, as a tagged union: pick a `kind` (`belongsTo`, `hasOne`, `hasMany`, `manyToMany`, `via`) and a `target`, and the type offers only the fields that kind uses. A link with no form field of its own goes in the collection's `relations` array instead.
 
 ### Two-Step Migrations
 1. `rebase schema generate` — Converts collections to a Drizzle ORM schema

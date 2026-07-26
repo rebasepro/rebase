@@ -171,15 +171,15 @@ export const articlesCollection = defineCollection({
     },
     relations: [
         {
+            kind: "belongsTo",
             relationName: "author",
             target: () => authorsCollection,
-            cardinality: "one",
             localKey: "author_id"
         },
         {
+            kind: "manyToMany",
             relationName: "categories",
             target: () => categoriesCollection,
-            cardinality: "many",
             through: {
                 table: "article_categories",
                 sourceColumn: "article_id",

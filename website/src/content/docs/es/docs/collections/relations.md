@@ -28,13 +28,14 @@ const postsCollection = defineCollection({
     properties: {
         title: { type: "string", name: "Title" },
         content: { type: "string", name: "Content", admin: { multiline: true } },
-        author: { 
-            type: "relation", 
-            name: "Author", 
-            target: () => usersCollection,
-            cardinality: "one",
-            direction: "owning",
-            localKey: "author_id"
+        author: {
+            type: "relation",
+            name: "Author",
+            relation: {
+                kind: "belongsTo",
+                target: () => usersCollection,
+                localKey: "author_id"
+            }
         }
     }
 });
@@ -57,9 +58,9 @@ const postsCollection = defineCollection({
     },
     relations: [
         {
+            kind: "belongsTo",
             relationName: "author",
             target: () => usersCollection,
-            cardinality: "one",
             localKey: "author_id"
         }
     ]
@@ -75,10 +76,9 @@ Una clave foránea en **esta** tabla apunta a la clave primaria de otra tabla.
 ```typescript
 relations: [
     {
+        kind: "belongsTo",           // The FK is on THIS table
         relationName: "author",
         target: () => usersCollection,
-        cardinality: "one",          // This entity has ONE author
-        direction: "owning",         // The FK is on THIS table
         localKey: "author_id"        // Column on the posts table
     }
 ]
@@ -94,10 +94,9 @@ La clave foránea está en la tabla **objetivo**, apuntando de vuelta a esta ent
 // On the Users collection:
 relations: [
     {
+        kind: "hasMany",                 // The FK is on the TARGET table
         relationName: "posts",
         target: () => postsCollection,
-        cardinality: "many",          // This user has MANY posts
-        direction: "inverse",         // The FK is on the TARGET table
         foreignKeyOnTarget: "author_id"  // Column on the posts table
     }
 ]
@@ -111,10 +110,9 @@ Dos colecciones conectadas a través de una tabla de unión intermedia.
 // On the Users collection:
 relations: [
     {
+        kind: "manyToMany",
         relationName: "roles",
         target: () => rolesCollection,
-        cardinality: "many",
-        direction: "owning",
         through: {
             table: "user_roles",         // Junction table name
             sourceColumn: "user_id",     // FK to this collection
@@ -162,6 +160,7 @@ Para relaciones complejas que atraviesan múltiples tablas, usa `joinPath`:
 // Users → Permissions through Roles
 relations: [
     {
+        kind: "via",
         relationName: "permissions",
         target: () => permissionsCollection,
         cardinality: "many",
@@ -208,9 +207,9 @@ Controla qué sucede cuando las entidades relacionadas son actualizadas o elimin
 ```typescript
 relations: [
     {
+        kind: "belongsTo",
         relationName: "author",
         target: () => usersCollection,
-        cardinality: "one",
         localKey: "author_id",
         onDelete: "cascade",    // Delete posts when user is deleted
         onUpdate: "cascade"     // Update FK when user ID changes
@@ -279,24 +278,53 @@ Para la referencia completa del constructor de consultas (filtrado, ordenación,
 ## Interfaz Completa de Relación
 
 ```typescript
-interface Relation {
+type Relation =
+    | BelongsToRelation
+    | HasOneRelation
+    | HasManyRelation
+    | ManyToManyRelation
+    | ViaRelation;
+
+// Every kind carries these:
+interface RelationBase {
     relationName?: string;
     target: () => CollectionConfig;
-    cardinality: "one" | "many";
-    direction?: "owning" | "inverse";
     inverseRelationName?: string;
-    localKey?: string;
-    foreignKeyOnTarget?: string;
-    through?: {
-        table: string;
-        sourceColumn: string;
-        targetColumn: string;
-    };
-    joinPath?: JoinStep[];
     onUpdate?: "cascade" | "restrict" | "no action" | "set null" | "set default";
     onDelete?: "cascade" | "restrict" | "no action" | "set null" | "set default";
     overrides?: Partial<CollectionConfig>;
     validation?: { required?: boolean };
+}
+
+// ...and only the fields its own kind uses:
+interface BelongsToRelation extends RelationBase {
+    kind: "belongsTo";
+    localKey?: string;              // column on THIS table
+}
+
+interface HasOneRelation extends RelationBase {
+    kind: "hasOne";
+    foreignKeyOnTarget?: string;    // column on the TARGET table
+}
+
+interface HasManyRelation extends RelationBase {
+    kind: "hasMany";
+    foreignKeyOnTarget?: string;    // column on the TARGET table
+}
+
+interface ManyToManyRelation extends RelationBase {
+    kind: "manyToMany";
+    through?: {
+        table?: string;
+        sourceColumn?: string;      // FK naming THIS collection
+        targetColumn?: string;
+    };
+}
+
+interface ViaRelation extends RelationBase {
+    kind: "via";
+    cardinality: "one" | "many";    // a join chain cannot imply it
+    joinPath: JoinStep[];           // read-only
 }
 ```
 
