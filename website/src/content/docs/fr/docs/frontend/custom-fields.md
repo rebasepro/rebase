@@ -105,7 +105,7 @@ const colorPropertyConfig: PropertyConfig = {
 };
 
 // Register globally — keyed by the config's `key`
-<Rebase propertyConfigs={{ color_picker: colorPropertyConfig }} ... />
+<Rebase propertyConfigs={{ color_picker: colorPropertyConfig }}>…</Rebase>
 ```
 
 Utilisez-le ensuite dans n'importe quelle collection :

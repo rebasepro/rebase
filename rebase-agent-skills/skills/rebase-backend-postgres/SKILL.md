@@ -405,7 +405,7 @@ export const env = loadEnv({
 
 **Signatures:**
 
-```typescript
+```typescript no-verify
 function loadEnv(): RebaseEnv;
 function loadEnv<E extends z.AnyZodObject>(options: { extend: E }): RebaseEnv & z.infer<E>;
 ```

@@ -60,9 +60,9 @@ const productsCollection: PostgresCollectionConfig = {
     history: true,
 
     properties: {
-        name: { dataType: "string", name: "Name" },
-        price: { dataType: "number", name: "Price" },
-        status: { dataType: "string", name: "Status" },
+        name: { type: "string", name: "Name" },
+        price: { type: "number", name: "Price" },
+        status: { type: "string", name: "Status" },
     },
 };
 ```
@@ -413,9 +413,9 @@ const productsCollection = {
     table: "products",
     history: true,  // ← Per-collection opt-in
     properties: {
-        name: { dataType: "string" as const, name: "Name" },
-        price: { dataType: "number" as const, name: "Price" },
-        description: { dataType: "string" as const, name: "Description" },
+        name: { type: "string" as const, name: "Name" },
+        price: { type: "number" as const, name: "Price" },
+        description: { type: "string" as const, name: "Description" },
     },
 };
 
@@ -426,8 +426,8 @@ const logsCollection = {
     table: "logs",
     // history: false (default) — high-volume tables shouldn't track history
     properties: {
-        message: { dataType: "string" as const, name: "Message" },
-        level: { dataType: "string" as const, name: "Level" },
+        message: { type: "string" as const, name: "Message" },
+        level: { type: "string" as const, name: "Level" },
     },
 };
 

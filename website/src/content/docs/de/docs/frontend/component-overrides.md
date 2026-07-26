@@ -42,7 +42,8 @@ function App() {
                 }
             }}
         >
-            {/* ... */}
+            {/* your app */}
+            …
         </Rebase>
     );
 }

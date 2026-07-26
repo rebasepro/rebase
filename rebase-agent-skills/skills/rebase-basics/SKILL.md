@@ -376,7 +376,7 @@ export const env = loadEnv({
 
 ### Function Overloads
 
-```typescript
+```typescript no-verify
 function loadEnv(): RebaseEnv;
 function loadEnv<E extends z.AnyZodObject>(options: { extend: E }): RebaseEnv & z.infer<E>;
 ```

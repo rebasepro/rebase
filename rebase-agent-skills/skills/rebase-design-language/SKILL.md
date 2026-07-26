@@ -271,6 +271,7 @@ The reference layout used by `ContentHomePage` (the default Rebase home page):
 <div className="py-2 overflow-auto h-full w-full bg-surface-50 dark:bg-surface-800">
     <Container maxWidth="6xl">
         {/* Content sections */}
+        …
     </Container>
 </div>
 ```

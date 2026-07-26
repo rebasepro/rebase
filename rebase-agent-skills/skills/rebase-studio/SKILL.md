@@ -218,7 +218,8 @@ import { MyAppBar } from "./MyAppBar";
         }
     }}
 >
-    {/* ... */}
+    {/* your app */}
+    …
 </Rebase>
 ```
 

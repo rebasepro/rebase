@@ -368,7 +368,7 @@ The `extend` schema is merged with the base `rebaseEnvSchema` using Zod's `.merg
 
 ### `loadEnv()` Function Signature
 
-```typescript
+```typescript no-verify
 function loadEnv(): RebaseEnv;
 function loadEnv<E extends z.AnyZodObject>(options: { extend: E }): RebaseEnv & z.infer<E>;
 ```

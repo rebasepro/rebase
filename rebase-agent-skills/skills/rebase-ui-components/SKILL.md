@@ -166,6 +166,7 @@ import { Container } from "@rebasepro/ui";
 
 <Container maxWidth="4xl">
     {/* Content limited to max-w-4xl with mx-auto px-3 md:px-4 */}
+    …
 </Container>
 ```
 
@@ -1379,7 +1380,7 @@ const containerRef = useRef<HTMLDivElement>(null);
     <PortalContainerProvider container={containerRef.current}>
         {/* All portals render inside this div */}
         <Select ... />
-        <Dialog ... />
+        <Dialog>…</Dialog>
     </PortalContainerProvider>
 </div>
 ```

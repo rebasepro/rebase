@@ -272,7 +272,19 @@ export async function typecheckSnippets(root, opts = {}) {
         strictPropertyInitialization: false,
         // Frontend snippets read `import.meta.env.VITE_*`, which is a Vite
         // ambient rather than an SDK API.
-        types: [...(parsed.options.types ?? []), "vite/client"]
+        types: [...(parsed.options.types ?? []), "vite/client"],
+        // Backend snippets legitimately import `hono` and `zod`. Neither is a
+        // dependency of the workspace root, and `tsconfig.typecheck.json` maps hono to
+        // `node_modules/hono`, which does not exist — that mapping only ever worked for
+        // files sitting inside `packages/server`, whose own node_modules has both.
+        // Snippets compile from a scratch directory, so they need the real location or
+        // every backend example reports a missing module.
+        paths: {
+            ...(parsed.options.paths ?? {}),
+            hono: [path.join(root, "packages/server/node_modules/hono")],
+            "hono/*": [path.join(root, "packages/server/node_modules/hono/*")],
+            zod: [path.join(root, "packages/server/node_modules/zod")]
+        }
     };
 
     const stubDecl = path.join(scratch, "stubs.d.ts");
