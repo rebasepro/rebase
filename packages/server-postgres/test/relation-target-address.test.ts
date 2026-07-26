@@ -47,10 +47,9 @@ relationName: "seat" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "seat",
                 target: () => seatsCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "seat_id"
             }
         ]
@@ -98,10 +97,9 @@ occupant: "Ada" }
             ...bookingsCollection,
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "seat",
                     target: () => keylessCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "seat_id"
                 }
             ]

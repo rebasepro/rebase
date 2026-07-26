@@ -206,9 +206,9 @@ describe("generatePostgresDdl edge cases", () => {
                 },
                 relations: [
                     {
+                        kind: "belongsTo",
                         relationName: "owner",
                         target: () => usersCollection,
-                        cardinality: "one",
                         localKey: "owner_id",
                         onDelete: "cascade"
                     }

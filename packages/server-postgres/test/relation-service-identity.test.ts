@@ -46,10 +46,9 @@ relationName: "seats" }
         },
         relations: [
             {
+                kind: "hasMany",
                 relationName: "seats",
                 target: () => seatsCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "booking_id"
             }
         ],
@@ -114,10 +113,10 @@ relationName: "seats" }
             },
             relations: [
                 {
+                    kind: "via",
                     relationName: "seats",
                     target: () => seatsCollection,
                     cardinality: "many",
-                    direction: "inverse",
                     joinPath: [
                         { table: "seats",
 on: { from: "tenant_bookings.ref",
@@ -189,10 +188,9 @@ relationName: "seats" }
             },
             relations: [
                 {
+                    kind: "hasMany",
                     relationName: "seats",
                     target: () => seatsCollection,
-                    cardinality: "many",
-                    direction: "inverse",
                     foreignKeyOnTarget: "booking_id"
                 }
             ]
@@ -245,10 +243,9 @@ relationName: "guests" }
             },
             relations: [
                 {
+                    kind: "hasMany",
                     relationName: "guests",
                     target: () => guestsCollection,
-                    cardinality: "many",
-                    direction: "inverse",
                     foreignKeyOnTarget: "booking_id"
                 }
             ]

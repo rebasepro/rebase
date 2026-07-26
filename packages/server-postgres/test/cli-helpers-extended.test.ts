@@ -252,10 +252,9 @@ describe("CLI Helpers — Extended", () => {
                 properties: { title: { type: "string" } },
                 relations: [
                     {
+                        kind: "manyToMany",
                         relationName: "tags",
                         target: () => tagsCollection,
-                        cardinality: "many",
-                        direction: "owning",
                         through: {
                             table: "posts_to_tags",
                             sourceColumn: "post_id",
@@ -287,10 +286,9 @@ describe("CLI Helpers — Extended", () => {
                 properties: { title: { type: "string" } },
                 relations: [
                     {
+                        kind: "manyToMany",
                         relationName: "categories",
                         target: () => categoriesCollection,
-                        cardinality: "many",
-                        direction: "owning",
                         through: {
                             table: "products_categories",
                             sourceColumn: "product_id",

@@ -54,9 +54,9 @@ describe("sanitizeRelation", () => {
 
     it("should generate a default relationName if not provided", () => {
         const relation: Partial<Relation> = {
+            kind: "belongsTo",
             target: () => mockPostCollection,
-            cardinality: "one"
-        };
+            };
         const normalized = sanitizeRelation(relation, mockAuthorCollection);
         expect(normalized.relationName).toBe("posts");
     });
@@ -65,10 +65,10 @@ describe("sanitizeRelation", () => {
     describe("Belongs-To (one-to-one/many-to-one)", () => {
         it("should generate default localKey for a simple belongs-to relation", () => {
             const relation: Partial<Relation> = {
+                kind: "belongsTo",
                 relationName: "post",
                 target: () => mockPostCollection,
-                cardinality: "one"
-            };
+                };
             const normalized = sanitizeRelation(relation, mockAuthorCollection);
             expect(normalized.localKey).toEqual("post_id");
             expect(normalized.direction).toEqual("owning");
@@ -76,9 +76,9 @@ describe("sanitizeRelation", () => {
 
         it("should use provided `localKey` for a belongs-to relation", () => {
             const relation: Partial<Relation> = {
+                kind: "belongsTo",
                 relationName: "post",
                 target: () => mockPostCollection,
-                cardinality: "one",
                 localKey: "custom_post_fk"
             };
             const normalized = sanitizeRelation(relation, mockAuthorCollection);
@@ -91,11 +91,12 @@ describe("sanitizeRelation", () => {
     describe("Inverse One-to-One", () => {
         it("should generate default foreignKeyOnTarget for an inverse one-to-one relation", () => {
             const relation: Partial<Relation> = {
+                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                // Was: cardinality=one direction=inverse
+                kind: "AMBIGUOUS",
                 relationName: "profile",
                 target: () => mockPostCollection,
-                cardinality: "one",
-                direction: "inverse"
-            };
+                };
             const normalized = sanitizeRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
             expect(normalized.direction).toEqual("inverse");
@@ -103,10 +104,9 @@ describe("sanitizeRelation", () => {
 
         it("should use provided `foreignKeyOnTarget` for an inverse one-to-one relation", () => {
             const relation: Partial<Relation> = {
+                kind: "hasOne",
                 relationName: "profile",
                 target: () => mockPostCollection,
-                cardinality: "one",
-                direction: "inverse",
                 foreignKeyOnTarget: "custom_author_fk"
             };
             const normalized = sanitizeRelation(relation, mockAuthorCollection);
@@ -116,12 +116,12 @@ describe("sanitizeRelation", () => {
 
         it("should work with inverseRelationName property", () => {
             const relation: Partial<Relation> = {
+                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                // Was: cardinality=one direction=inverse
+                kind: "AMBIGUOUS",
                 relationName: "profile",
                 target: () => mockPostCollection,
-                cardinality: "one",
-                direction: "inverse",
-                inverseRelationName: "author"
-            };
+                };
             const normalized = sanitizeRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
             expect(normalized.inverseRelationName).toEqual("author");
@@ -133,21 +133,21 @@ describe("sanitizeRelation", () => {
     describe("Has-Many (one-to-many)", () => {
         it("should generate default foreignKeyOnTarget for a simple has-many relation", () => {
             const relation: Partial<Relation> = {
+                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                // Was: cardinality=many direction=inverse
+                kind: "AMBIGUOUS",
                 relationName: "posts",
                 target: () => mockPostCollection,
-                cardinality: "many",
-                direction: "inverse"
-            };
+                };
             const normalized = sanitizeRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
         });
 
         it("should use provided `foreignKeyOnTarget` for a has-many relation", () => {
             const relation: Partial<Relation> = {
+                kind: "hasMany",
                 relationName: "posts",
                 target: () => mockPostCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "writer_id"
             };
             const normalized = sanitizeRelation(relation, mockAuthorCollection);
@@ -159,9 +159,9 @@ describe("sanitizeRelation", () => {
     describe("Many-To-Many", () => {
         it("should use provided `through` for a many-to-many relation", () => {
             const relation: Partial<Relation> = {
+                kind: "manyToMany",
                 relationName: "tags",
                 target: () => mockTagCollection,
-                cardinality: "many",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "post_id",
@@ -182,10 +182,12 @@ describe("sanitizeRelation", () => {
     describe("Fallback Behavior", () => {
         it("should fallback to has-many for ambiguous 'many' without direction or through", () => {
             const relation: Partial<Relation> = {
+                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                // Was: cardinality=many direction=?
+                kind: "AMBIGUOUS",
                 relationName: "posts",
                 target: () => mockPostCollection,
-                cardinality: "many"
-            };
+                };
             const normalized = sanitizeRelation(relation, mockAuthorCollection);
             // Should default to has-many (inverse) behavior
             expect(normalized.direction).toEqual("inverse");
@@ -194,11 +196,10 @@ describe("sanitizeRelation", () => {
 
         it("should handle 'one' with 'owning' direction", () => {
             const relation: Partial<Relation> = {
+                kind: "belongsTo",
                 relationName: "author",
                 target: () => mockAuthorCollection,
-                cardinality: "one",
-                direction: "owning" // Changed from "inverse"
-            };
+                };
             const normalized = sanitizeRelation(relation, mockPostCollection);
             expect(normalized.localKey).toEqual("author_id");
         });
@@ -232,10 +233,9 @@ relationName: "books" }
                 },
                 relations: [
                     {
+                        kind: "manyToMany",
                         relationName: "books",
                         target: () => booksCollection,
-                        cardinality: "many",
-                        direction: "owning",
                         through: {
                             table: "author_books",
                             sourceColumn: "author_id",
@@ -276,6 +276,7 @@ relationName: "permissions" }
                 },
                 relations: [
                     {
+                        kind: "via",
                         relationName: "permissions",
                         target: () => permissionsCollection,
                         cardinality: "many",
@@ -345,12 +346,12 @@ relationName: "profile" }
                 },
                 relations: [
                     {
+                        // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                        // Was: cardinality=one direction=inverse
+                        kind: "AMBIGUOUS",
                         relationName: "profile",
                         target: () => profilesCollection,
-                        cardinality: "one",
-                        direction: "inverse",
-                        inverseRelationName: "author"
-                    }
+                        }
                 ]
             };
 
@@ -365,9 +366,9 @@ relationName: "author" }
                 },
                 relations: [
                     {
+                        kind: "belongsTo",
                         relationName: "author",
                         target: () => authorsCollection,
-                        cardinality: "one",
                         localKey: "author_id"
                     }
                 ]
@@ -407,9 +408,9 @@ relationName: "category" }
                 },
                 relations: [
                     {
+                        kind: "belongsTo",
                         relationName: "category",
                         target: () => categoriesCollection,
-                        cardinality: "one",
                         localKey: "category_id"
                     }
                 ]
@@ -438,9 +439,9 @@ relationName: "publisher" }
                 },
                 relations: [
                     {
+                        kind: "belongsTo",
                         relationName: "publisher",
                         target: () => publishersCollection,
-                        cardinality: "one",
                         localKey: "publisher_id"
                     }
                 ]
@@ -465,9 +466,9 @@ relationName: "publisher" }
 relationName: "author" }
                 },
                 relations: [{
+                    kind: "belongsTo",
                     relationName: "author",
                     target: () => authorsCollection,
-                    cardinality: "one",
                     localKey: "author_id"
                 }]
             };
@@ -500,6 +501,7 @@ relationName: "customer" }
                 },
                 relations: [
                     {
+                        kind: "via",
                         relationName: "customer",
                         target: () => customersCollection,
                         cardinality: "many",
@@ -562,10 +564,9 @@ relationName: "friends" }
                 },
                 relations: [
                     {
+                        kind: "manyToMany",
                         relationName: "friends",
                         target: () => usersCollection,
-                        cardinality: "many",
-                        direction: "owning",
                         through: {
                             table: "user_friends",
                             sourceColumn: "user_id",
@@ -598,10 +599,9 @@ relationName: "categories" }
                 },
                 relations: [
                     {
+                        kind: "manyToMany",
                         relationName: "categories",
                         target: () => categoriesCollection,
-                        cardinality: "many",
-                        direction: "owning",
                         through: {
                             table: "product_categories",
                             sourceColumn: "product_sku",
@@ -642,10 +642,9 @@ relationName: "b_entities" }
                 },
                 relations: [
                     {
+                        kind: "hasMany",
                         relationName: "b_entities",
                         target: () => bCollection,
-                        cardinality: "many",
-                        direction: "inverse",
                         foreignKeyOnTarget: "a_entity_id"
                     }
                 ]
@@ -662,10 +661,9 @@ relationName: "a_entity" }
                 },
                 relations: [
                     {
+                        kind: "belongsTo",
                         relationName: "a_entity",
                         target: () => aCollection,
-                        cardinality: "one",
-                        direction: "owning",
                         localKey: "a_entity_id"
                     }
                 ]
@@ -718,10 +716,9 @@ describe("Shared relationName regression", () => {
             },
             relations: [
                 {
+                    kind: "hasMany",
                     relationName: "jobs",
                     target: () => jobsCollection,
-                    cardinality: "many",
-                    direction: "inverse",
                     foreignKeyOnTarget: "company_id"
                 }
             ]
@@ -738,10 +735,9 @@ relationName: "company" }
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "company",
                     target: () => companiesCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "company_id"
                 }
             ]
@@ -779,10 +775,9 @@ relationName: "company" }
             },
             relations: [
                 {
+                    kind: "hasOne",
                     relationName: "profile",
                     target: () => profilesCollection,
-                    cardinality: "one",
-                    direction: "inverse",
                     foreignKeyOnTarget: "user_id"
                 }
             ]
@@ -799,10 +794,9 @@ relationName: "user" }
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "user",
                     target: () => usersCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "user_id"
                 }
             ]
@@ -837,17 +831,15 @@ relationName: "user" }
             properties: { name: { type: "string" } },
             relations: [
                 {
+                    kind: "hasMany",
                     relationName: "employees",
                     target: () => peopleCollection,
-                    cardinality: "many",
-                    direction: "inverse",
                     foreignKeyOnTarget: "employer_id"
                 },
                 {
+                    kind: "hasMany",
                     relationName: "founders",
                     target: () => peopleCollection,
-                    cardinality: "many",
-                    direction: "inverse",
                     foreignKeyOnTarget: "startup_id"
                 }
             ]
@@ -866,17 +858,15 @@ relationName: "startup" }
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "employer",
                     target: () => companiesCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "employer_id"
                 },
                 {
+                    kind: "belongsTo",
                     relationName: "startup",
                     target: () => companiesCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "startup_id"
                 }
             ]
@@ -946,10 +936,9 @@ describe("Duplicate relation deduplication regression", () => {
             },
             relations: [
                 {
+                    kind: "hasMany",
                     relationName: "jobs",
                     target: () => jobsCollection,
-                    cardinality: "many",
-                    direction: "inverse",
                     foreignKeyOnTarget: "company_id"
                 }
             ]
@@ -969,10 +958,9 @@ describe("Duplicate relation deduplication regression", () => {
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "company",
                     target: () => companiesCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "company_id"
                 }
             ]
@@ -1011,10 +999,9 @@ describe("Duplicate relation deduplication regression", () => {
             },
             relations: [
                 {
+                    kind: "hasMany",
                     relationName: "team_members",
                     target: () => memberCollection,
-                    cardinality: "many",
-                    direction: "inverse",
                     foreignKeyOnTarget: "department_id"
                 }
             ]
@@ -1033,10 +1020,9 @@ describe("Duplicate relation deduplication regression", () => {
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "department",
                     target: () => parentCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "department_id"
                 }
             ]
@@ -1084,17 +1070,15 @@ relationName: "recipient" }
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "sender",
                     target: () => usersCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "sender_id"
                 },
                 {
+                    kind: "belongsTo",
                     relationName: "recipient",
                     target: () => usersCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "recipient_id"
                 }
             ]
@@ -1136,10 +1120,9 @@ describe("columnName vs property key deduplication regression", () => {
             },
             relations: [
                 {
+                    kind: "hasMany",
                     relationName: "engagements",
                     target: () => engagementsCollection,
-                    cardinality: "many",
-                    direction: "inverse",
                     foreignKeyOnTarget: "client_id"
                 }
             ]
@@ -1154,20 +1137,20 @@ describe("columnName vs property key deduplication regression", () => {
                 clientId: {
                     type: "relation",
                     columnName: "client_id",
-                    target: () => clientsCollection,
-                    cardinality: "one",
-                    direction: "owning",
-                    localKey: "clientId",
-                    relationName: "client"
+                    relation: {
+                        kind: "belongsTo",
+                        target: () => clientsCollection,
+                        relationName: "client",
+                        localKey: "clientId",
+                    }
                 } as any,
                 title: { type: "string" }
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "client",
                     target: () => clientsCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "clientId"
                 }
             ]
@@ -1199,10 +1182,9 @@ describe("columnName vs property key deduplication regression", () => {
             },
             relations: [
                 {
+                    kind: "hasMany",
                     relationName: "engagements",
                     target: () => engagementsCollection,
-                    cardinality: "many",
-                    direction: "inverse",
                     foreignKeyOnTarget: "client_id"
                 }
             ]
@@ -1217,20 +1199,20 @@ describe("columnName vs property key deduplication regression", () => {
                 clientId: {
                     type: "relation",
                     columnName: "client_id",
-                    target: () => clientsCollection,
-                    cardinality: "one",
-                    direction: "owning",
-                    localKey: "clientId",
-                    relationName: "client"
+                    relation: {
+                        kind: "belongsTo",
+                        target: () => clientsCollection,
+                        relationName: "client",
+                        localKey: "clientId",
+                    }
                 } as any,
                 title: { type: "string" }
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "client",
                     target: () => clientsCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "clientId"
                 }
             ]
@@ -1266,10 +1248,9 @@ describe("columnName vs property key deduplication regression", () => {
             },
             relations: [
                 {
+                    kind: "hasOne",
                     relationName: "profile",
                     target: () => profilesCollection,
-                    cardinality: "one",
-                    direction: "inverse",
                     foreignKeyOnTarget: "user_id"
                 }
             ]
@@ -1284,20 +1265,20 @@ describe("columnName vs property key deduplication regression", () => {
                 userId: {
                     type: "relation",
                     columnName: "user_id",
-                    target: () => usersCollection,
-                    cardinality: "one",
-                    direction: "owning",
-                    localKey: "userId",
-                    relationName: "user"
+                    relation: {
+                        kind: "belongsTo",
+                        target: () => usersCollection,
+                        relationName: "user",
+                        localKey: "userId",
+                    }
                 } as any,
                 bio: { type: "string" }
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "user",
                     target: () => usersCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "userId"
                 }
             ]
@@ -1331,10 +1312,9 @@ describe("columnName vs property key deduplication regression", () => {
             },
             relations: [
                 {
+                    kind: "hasMany",
                     relationName: "products",
                     target: () => productsCollection,
-                    cardinality: "many",
-                    direction: "inverse",
                     foreignKeyOnTarget: "category_id"
                 }
             ]

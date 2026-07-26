@@ -90,10 +90,9 @@ relationName: "tags" }
     },
     relations: [
         {
+            kind: "manyToMany",
             relationName: "tags",
             target: () => tagsCollection,
-            cardinality: "many",
-            direction: "owning",
             through: {
                 table: "posts_tags",
                 sourceColumn: "post_id",
@@ -128,10 +127,9 @@ relationName: "posts" }
     },
     relations: [
         {
+            kind: "manyToMany",
             relationName: "posts",
             target: () => postsCollection,
-            cardinality: "many",
-            direction: "inverse",
             through: {
                 table: "posts_tags",
                 sourceColumn: "post_id",
@@ -155,10 +153,10 @@ relationName: "posts" }
     },
     relations: [
         {
+            kind: "via",
             relationName: "posts",
             target: () => postsCollection,
             cardinality: "many",
-            direction: "owning",
             joinPath: [
                 { table: "author_posts",
 on: { from: "id",

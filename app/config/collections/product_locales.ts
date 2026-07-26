@@ -22,9 +22,10 @@ const productLocalesCollection: PostgresCollectionConfig = {
         product: {
             name: "Product",
             type: "relation",
-            target: () => productsCollection,
-            cardinality: "one",
-            direction: "owning"
+            relation: {
+                kind: "belongsTo",
+                target: () => productsCollection,
+            }
         },
         locale: {
             name: "Locale",

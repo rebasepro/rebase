@@ -60,10 +60,9 @@ const tagsCollection: CollectionConfig = {
     },
     relations: [
         {
+            kind: "manyToMany",
             relationName: "posts",
             target: () => postsCollection,
-            cardinality: "many",
-            direction: "owning",
             through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" }
         }
     ]

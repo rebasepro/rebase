@@ -35,11 +35,12 @@ const ordersCollection: PostgresCollectionConfig = {
         customer: {
             name: "Customer",
             type: "relation",
-            target: () => customersCollection,
-            cardinality: "one",
-            direction: "owning",
             validation: {
                 required: true
+            },
+            relation: {
+                kind: "belongsTo",
+                target: () => customersCollection,
             }
         },
         status: {
@@ -183,11 +184,11 @@ const ordersCollection: PostgresCollectionConfig = {
     // Headless relation: no property for "order_items", only used for subcollection tab
     relations: [
         {
+            // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+            // Was: cardinality=many direction=inverse
+            kind: "AMBIGUOUS",
             relationName: "order_items",
             target: () => orderItemsCollection,
-            cardinality: "many",
-            direction: "inverse",
-            inverseRelationName: "order",
             overrides: {
                 admin: { hideFromNavigation: false }
             }

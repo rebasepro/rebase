@@ -210,10 +210,10 @@ const productsCollection: PostgresCollectionConfig = {
     // Headless relation: shows related orders (through order_items) as a subcollection tab
     relations: [
         {
+            kind: "via",
             relationName: "orders",
             target: () => ordersCollection,
             cardinality: "many",
-            direction: "inverse",
             joinPath: [
                 {
                     table: "order_items",
@@ -232,11 +232,11 @@ const productsCollection: PostgresCollectionConfig = {
             ]
         },
         {
+            // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+            // Was: cardinality=many direction=inverse
+            kind: "AMBIGUOUS",
             relationName: "product_locales",
             target: () => productLocalesCollection,
-            cardinality: "many",
-            direction: "inverse",
-            inverseRelationName: "product",
             overrides: {
                 admin: { hideFromNavigation: false }
             }

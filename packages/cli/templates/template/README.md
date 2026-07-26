@@ -43,9 +43,14 @@ pnpm run db:push   # or: npm run db:push
 pnpm dev   # or: npm run dev
 ```
 
-Open **http://localhost:5173** — the admin panel. The first account you
-register becomes the admin. The backend API (Hono + PostgreSQL) runs on
-port 3001; the frontend (Vite + React) on port 5173.
+`rebase dev` prints the two URLs it actually bound and opens the admin panel
+there. The first account you register becomes the admin.
+
+Ports are **derived from this project's path**, not fixed at 3001/5173, so
+several Rebase projects can run at once without colliding. That is why the URL
+in your terminal is the one to trust — and why the `PORT` and `VITE_API_URL` in
+`.env` are ignored by `rebase dev` (they apply to `rebase start`, the production
+server). Pin a port with `rebase dev --port 3001` if you need a stable one.
 
 > The `db:push` step is what creates the tables for the example `posts`,
 > `authors`, and `tags` collections. Skip it and the admin panel still opens,

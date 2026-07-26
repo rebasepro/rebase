@@ -1,6 +1,6 @@
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const categoriesCollection: PostgresCollectionConfig = {
+const categoriesCollection = defineCollection({
     name: "Categories",
     singularName: "Category",
     slug: "categories",
@@ -37,6 +37,6 @@ const categoriesCollection: PostgresCollectionConfig = {
         icon: "Category",
         propertiesOrder: ["id", "name", "slug", "description", "icon"]
     }
-};
+});
 
 export default categoriesCollection;

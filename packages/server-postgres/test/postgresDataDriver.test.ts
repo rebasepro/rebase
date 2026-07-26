@@ -101,7 +101,8 @@ properties: {} }),
             const authors = { slug: "authors", properties: {}, callbacks: { afterRead: ({ row }: any) => ({ ...row, email: maskEmail(row.email) }) } };
             const posts = {
                 slug: "posts", properties: {},
-                relations: [{ relationName: "author", cardinality: "one", direction: "owning", localKey: "author_id", target: () => authors }],
+                relations: [{
+    kind: "belongsTo", relationName: "author", localKey: "author_id", target: () => authors }],
                 callbacks: undefined
             };
             const driver = buildDriver(posts, {

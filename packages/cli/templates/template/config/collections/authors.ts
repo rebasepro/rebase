@@ -1,6 +1,6 @@
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const authorsCollection: PostgresCollectionConfig = {
+const authorsCollection = defineCollection({
     name: "Authors",
     singularName: "Author",
     slug: "authors",
@@ -42,6 +42,6 @@ const authorsCollection: PostgresCollectionConfig = {
             "picture"
         ]
     }
-};
+});
 
 export default authorsCollection;

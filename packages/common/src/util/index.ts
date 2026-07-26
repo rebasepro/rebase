@@ -11,6 +11,7 @@ export * from "./builders";
 export * from "./storage";
 export * from "./callbacks";
 export * from "./relations";
+export * from "./resolve-relation";
 export * from "./auth-default-policies";
 export * from "./junction-policies";
 export * from "./conditions";

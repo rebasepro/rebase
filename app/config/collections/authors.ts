@@ -82,12 +82,12 @@ const authorsCollection: PostgresCollectionConfig = {
     // Headless relation: no property for "posts", only used for subcollection tab
     relations: [
         {
+            // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+            // Was: cardinality=many direction=inverse
+            kind: "AMBIGUOUS",
             relationName: "posts",
             target: () => postsCollection,
-            cardinality: "many",
-            direction: "inverse",
-            inverseRelationName: "author"
-        }
+            }
     ],
     admin: {
         icon: "User",

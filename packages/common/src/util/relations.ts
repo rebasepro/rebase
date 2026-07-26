@@ -1,321 +1,69 @@
-import { CollectionConfig, getDataSourceCapabilities, Property, Relation, RelationProperty } from "@rebasepro/types";
+import { CollectionConfig, getDataSourceCapabilities, Property, ResolvedRelation, RelationProperty } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
-import { generateForeignKeyName } from "@rebasepro/utils";
 
-export function sanitizeRelation(
-    relation: Partial<Relation>,
-    sourceCollection: CollectionConfig,
-    resolveCollection?: (slugOrTable: string) => CollectionConfig | undefined
-): Relation {
-    if (!relation.target) {
-        throw new Error("Relation is missing a `target` collection.");
-    }
-
-    const rawTarget = relation.target;
-    let targetCollection: CollectionConfig | undefined;
-
-    if (typeof rawTarget === "string") {
-        if (resolveCollection) {
-            targetCollection = resolveCollection(rawTarget);
-        }
-        if (!targetCollection) {
-            targetCollection = { slug: rawTarget,
-name: rawTarget } as CollectionConfig;
-        }
-    } else if (typeof rawTarget === "function") {
-        const evaluated = rawTarget();
-        if (typeof evaluated === "string") {
-            if (resolveCollection) {
-                targetCollection = resolveCollection(evaluated);
-            }
-            if (!targetCollection) {
-                targetCollection = { slug: evaluated,
-name: evaluated } as CollectionConfig;
-            }
-        } else {
-            targetCollection = evaluated;
-        }
-    } else if (rawTarget && typeof rawTarget === "object") {
-        targetCollection = rawTarget as CollectionConfig;
-    }
-
-    if (!targetCollection) {
-        throw new Error("Relation is missing a valid `target` collection.");
-    }
-
-    const newRelation: Partial<Relation> = { ...relation };
-
-    newRelation.target = () => {
-        if (typeof rawTarget === "string") {
-            return (resolveCollection && resolveCollection(rawTarget)) || targetCollection!;
-        } else if (typeof rawTarget === "function") {
-            const evaluated = rawTarget();
-            if (typeof evaluated === "string") {
-                return (resolveCollection && resolveCollection(evaluated)) || targetCollection!;
-            }
-            return evaluated;
-        }
-        return targetCollection!;
-    };
-
-    // 1. Default relationName from target collection slug
-    if (!newRelation.relationName) {
-        newRelation.relationName = toSnakeCase(targetCollection.slug);
-    }
-
-    // 2. Infer or default direction if absent
-    if (!newRelation.direction) {
-        if (newRelation.foreignKeyOnTarget) newRelation.direction = "inverse";
-        else if (newRelation.through) newRelation.direction = "owning";
-        else if (newRelation.cardinality === "many") newRelation.direction = "inverse"; // Default has-many to be inverse
-        else newRelation.direction = "owning"; // Default all others to owning
-    }
-
-    // Do not default keys if a custom joinPath is provided; it's an advanced override.
-    if (!newRelation.joinPath) {
-        const sourceName = toSnakeCase(sourceCollection.slug ?? sourceCollection.name);
-
-        // 3. Default keys based on the relation type (cardinality and direction)
-        if (newRelation.cardinality === "one" && newRelation.direction === "owning") {
-            // Belongs-to / many-to-one
-            if (!newRelation.localKey) {
-                newRelation.localKey = generateForeignKeyName(newRelation.relationName);
-            }
-        } else if (newRelation.cardinality === "one" && newRelation.direction === "inverse") {
-            // Inverse one-to-one: the foreign key is on the target table pointing back to this collection
-            if (!newRelation.foreignKeyOnTarget) {
-                // First, try to find the corresponding owning relation's localKey on the target collection
-                let foundForeignKey = false;
-
-                try {
-                    // Look for an owning relation on the target that points back to this collection
-                    const targetRelations = getDataSourceCapabilities(targetCollection.engine).supportsRelations ? (targetCollection.relations || []) : [];
-                    for (const targetRel of targetRelations) {
-                        if (targetRel.direction === "owning" &&
-                            targetRel.cardinality === "one" &&
-                            targetRel.localKey) {
-                            try {
-                                const targetRelTarget = targetRel.target();
-                                if (targetRelTarget.slug === sourceCollection.slug) {
-                                    // Found the corresponding owning relation, use its localKey
-                                    newRelation.foreignKeyOnTarget = targetRel.localKey;
-                                    foundForeignKey = true;
-                                    break;
-                                }
-                            } catch (e) {
-                                // Continue looking if we can't resolve this target
-                                continue;
-                            }
-                        }
-                    }
-                } catch (e) {
-                    // If we can't inspect the target collection, fall back to naming convention
-                }
-
-                // If we couldn't find an explicit foreign key, fall back to naming convention
-                if (!foundForeignKey) {
-                    const keyPrefix = newRelation.inverseRelationName
-                        ? toSnakeCase(newRelation.inverseRelationName)
-                        : sourceName;
-                    newRelation.foreignKeyOnTarget = generateForeignKeyName(keyPrefix);
-                }
-            }
-        } else if (newRelation.cardinality === "many" && newRelation.direction === "inverse") {
-            // This could be either one-to-many or many-to-many inverse relation
-            // We need to check if there's a corresponding owning many-to-many relation
-
-            let isManyToManyInverse = false;
-
-            // Try to determine if this is a many-to-many inverse relation
-            if (newRelation.inverseRelationName && !newRelation.foreignKeyOnTarget) {
-                try {
-                    // Look for a corresponding owning many-to-many relation on the target collection.
-                    // Note: we intentionally do NOT require `through` here because the raw (unsanitized)
-                    // relations won't have `through` populated yet — sanitizeRelation fills it in later.
-                    // `cardinality: "many" + direction: "owning"` is sufficient to identify owning M2M.
-
-                    // 1. Check the explicit relations[] array
-                    const targetRelations = getDataSourceCapabilities(targetCollection.engine).supportsRelations ? (targetCollection.relations || []) : [];
-                    for (const targetRel of targetRelations) {
-                        if (targetRel.cardinality === "many" &&
-                            (targetRel.direction === "owning" || !targetRel.direction) &&
-                            (targetRel.relationName === newRelation.inverseRelationName)) {
-                            isManyToManyInverse = true;
-                            break;
-                        }
-                    }
-
-                    // 2. Also check the target's properties for inline relation definitions
-                    //    (e.g. posts.properties.tags = { type: "relation", cardinality: "many", direction: "owning" })
-                    if (!isManyToManyInverse && targetCollection.properties) {
-                        for (const [propKey, prop] of Object.entries(targetCollection.properties)) {
-                            if ((prop as Property).type !== "relation") continue;
-                            const relProp = prop as RelationProperty;
-                            const relName = relProp.relationName || propKey;
-                            if (relName === newRelation.inverseRelationName &&
-                                relProp.cardinality === "many" &&
-                                (relProp.direction === "owning" || !relProp.direction)) {
-                                isManyToManyInverse = true;
-                                break;
-                            }
-                        }
-                    }
-                } catch (e) {
-                    // If we can't inspect the target collection, assume one-to-many
-                }
-            }
-
-            // Only add foreignKeyOnTarget for one-to-many inverse relations
-            if (!isManyToManyInverse && !newRelation.foreignKeyOnTarget) {
-                newRelation.foreignKeyOnTarget = generateForeignKeyName(sourceName);
-            }
-        } else if (newRelation.cardinality === "many" && newRelation.direction === "owning") {
-
-            // Many-to-many via junction table
-            const sourceTableName = getTableName(sourceCollection);
-            const targetTableName = getTableName(targetCollection);
-
-            newRelation.through = {
-                table: newRelation.through?.table ?? [sourceTableName, targetTableName].sort().join("_"),
-                sourceColumn: newRelation.through?.sourceColumn ?? generateForeignKeyName(sourceName),
-                targetColumn: newRelation.through?.targetColumn ?? generateForeignKeyName(newRelation.relationName)
-            };
-        }
-    }
-
-    // 4. Basic validation to catch configuration errors early
-    if (newRelation.cardinality === "one" && newRelation.direction === "owning" && !newRelation.localKey && !newRelation.joinPath) {
-        throw new Error(`Configuration Error in relation from '${sourceCollection.name}': An 'owning' one-to-one relation requires a 'localKey'. Check the relation config for '${newRelation.relationName}'`);
-    }
-    if (newRelation.cardinality === "one" && newRelation.direction === "inverse" && !newRelation.foreignKeyOnTarget && !newRelation.joinPath) {
-        throw new Error(`Configuration Error in relation from '${sourceCollection.name}': An 'inverse' one-to-one relation requires a 'foreignKeyOnTarget'. Check the relation config for '${newRelation.relationName}'`);
-    }
-    if (newRelation.cardinality === "many" && newRelation.direction === "inverse" && !newRelation.foreignKeyOnTarget && !newRelation.joinPath && !newRelation.inverseRelationName) {
-        throw new Error(`Configuration Error in relation from '${sourceCollection.name}': An 'inverse' one-to-many relation requires a 'foreignKeyOnTarget'. Check the relation config for '${newRelation.relationName}'`);
-    }
-
-    return newRelation as Relation;
-}
+import { resolveRelation } from "./resolve-relation";
 
 /**
- * Whether the target rows of this relation are reached through a junction — a
- * many-to-many, or a multi-hop `joinPath`.
+ * Whether the target rows are shared with other parents — a many-to-many, or a
+ * multi-hop `via` chain.
  *
- * The distinction decides what a write "through" the relation may touch: a
- * junction-backed target is shared with other parents, so the parent owns the
- * *link* and not the row. The backend enforces that (an unlink rather than a
- * delete) and the admin renders it (remove-from-parent rather than delete), so
- * the predicate lives here rather than once per side.
+ * Decides what a write "through" the relation may touch: a shared target
+ * belongs to every parent that links it, so the parent owns the *link* and not
+ * the row. The backend enforces that (an unlink rather than a delete) and the
+ * admin renders it (remove-from-parent rather than delete).
+ *
+ * Now a field on the resolved relation rather than a re-derivation, so both
+ * sides read the same answer instead of each computing one.
  */
-export function isJunctionBackedRelation(relation: Relation): boolean {
-    return Boolean(relation.through) || Boolean(relation.joinPath && relation.joinPath.length > 1);
+export function isJunctionBackedRelation(relation: ResolvedRelation): boolean {
+    return relation.shared;
 }
 
 /** WeakMap cache — same collection instance always yields the same relation map. */
-const _resolvedRelationsCache = new WeakMap<CollectionConfig, Record<string, Relation>>();
+const _resolvedRelationsCache = new WeakMap<CollectionConfig, Record<string, ResolvedRelation>>();
 
+/**
+ * Every relation a collection declares, keyed by the name it is addressed by.
+ *
+ * A relation reaches the map from either of two places — the collection's
+ * `relations` array, or a `relation` property that declares one inline — and is
+ * keyed by its resolved `relationName`, which is what a nested path segment,
+ * an `include` key and an admin tab all match against.
+ *
+ * Resolution no longer swallows failures. It used to wrap each relation in a
+ * `try/catch` that dropped anything it could not work out, so a
+ * mis-declared relation silently vanished instead of being reported; with the
+ * kind declared, the only remaining failure is a `target` that does not resolve,
+ * which is worth hearing about.
+ */
 export function resolveCollectionRelations(
     collection: CollectionConfig
-): Record<string, Relation> {
+): Record<string, ResolvedRelation> {
     const cached = _resolvedRelationsCache.get(collection);
     if (cached) return cached;
 
     if (!getDataSourceCapabilities(collection.engine).supportsRelations) return {};
-    const relations: Record<string, Relation> = {};
 
-    // Track which explicit relationName values have been registered so that
-    // property-based entries in section 2 don't re-add the same underlying relation
-    // under a different key (e.g. explicit "company" + property "company_id").
-    const registeredRelationNames = new Set<string>();
+    const relations: Record<string, ResolvedRelation> = {};
 
-    // 1. Process explicit relations from the `relations` field.
-    //    Each relation is stored once under its canonical relationName key.
-    if (collection.relations) {
-        collection.relations.forEach((relation: Relation) => {
-            try {
-                const normalizedRelation = sanitizeRelation(relation, collection);
-                const relationKey = normalizedRelation.relationName;
-                if (relationKey) {
-                    relations[relationKey] = normalizedRelation;
-                    registeredRelationNames.add(relationKey);
-                }
-            } catch (e) {
-                // Ignore incomplete or invalid relations (e.g. missing target during registry setup)
-            }
-        });
+    for (const relation of collection.relations ?? []) {
+        const resolved = resolveRelation(relation, collection);
+        relations[resolved.relationName] = resolved;
     }
 
-    // 2. Process properties of type "relation".
-    //    Only adds an entry if:
-    //    (a) the property key itself is not already in the map, AND
-    //    (b) the underlying relation (by relationName) hasn't already been registered.
-    //    This prevents duplicate entries when a property key differs from the
-    //    explicit relation's relationName (e.g. property "company_id" referencing
-    //    explicit relation "company").
-    if (collection.properties) {
-        Object.entries(collection.properties).forEach(([propKey, prop]) => {
-            const relation = resolvePropertyRelation({
-                propertyKey: propKey,
-                property: prop as Property,
-                sourceCollection: collection
-            });
-            if (relation) {
-                // Skip if the property key is already registered
-                if (relations[propKey]) return;
+    // A property declaring a relation inline is registered under the property
+    // key as well: the fetch layer hydrates the result back onto that key, and
+    // it is the name the admin addresses the field by.
+    for (const [propertyKey, property] of Object.entries(collection.properties ?? {})) {
+        if ((property as Property)?.type !== "relation") continue;
+        const declared = (property as RelationProperty).relation;
+        if (!declared || relations[propertyKey]) continue;
 
-                // We previously skipped if the underlying relation was already registered under
-                // its canonical relationName in section 1. But we need to keep the property mapping
-                // for FetchService to hydrate the relation back to the correct property key.
-                // Deduplication for Drizzle schema generation is handled in generate-drizzle-schema-logic.ts.
-
-                if (!relation.relationName) {
-                    relation.relationName = propKey;
-                }
-                const normalizedRelation = sanitizeRelation(relation, collection);
-                relations[propKey] = normalizedRelation;
-                registeredRelationNames.add(normalizedRelation.relationName ?? propKey);
-            }
-        });
+        relations[propertyKey] = resolveRelation(declared, collection, propertyKey);
     }
 
     _resolvedRelationsCache.set(collection, relations);
     return relations;
-}
-
-export function resolvePropertyRelation({
-    propertyKey,
-    property,
-    sourceCollection
-}: {
-    propertyKey: string;
-    property: Property;
-    sourceCollection: CollectionConfig;
-}): Relation | undefined {
-    if (property.type !== "relation") return undefined;
-
-    const relProp = property as RelationProperty;
-
-    // If the property has inline config (target set), build a Relation from it.
-    // We only support the flat format where properties are directly on the RelationProperty.
-    if (relProp.target) {
-        return {
-            relationName: relProp.relationName || propertyKey,
-            target: relProp.target,
-            cardinality: relProp.cardinality || "one",
-            direction: relProp.direction || "owning",
-            inverseRelationName: relProp.inverseRelationName,
-            localKey: relProp.localKey,
-            foreignKeyOnTarget: relProp.foreignKeyOnTarget,
-            through: relProp.through,
-            joinPath: relProp.joinPath,
-            onUpdate: relProp.onUpdate,
-            onDelete: relProp.onDelete,
-            overrides: relProp.overrides
-        } as Relation;
-    }
-
-    console.warn(`Unrecognized or missing relation target for property '${propertyKey}' in collection '${sourceCollection.slug}'`);
-    return undefined;
 }
 
 export function getTableName(collection: CollectionConfig): string {
@@ -349,9 +97,9 @@ export function getColumnName(fullColumn: string): string {
  * user-provided config, etc.) can still find the right entry.
  */
 export function findRelation(
-    resolvedRelations: Record<string, Relation>,
+    resolvedRelations: Record<string, ResolvedRelation>,
     key: string
-): Relation | undefined {
+): ResolvedRelation | undefined {
     // Exact match first
     if (resolvedRelations[key]) return resolvedRelations[key];
 

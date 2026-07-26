@@ -63,10 +63,9 @@ relationName: "posts" }
         },
         relations: [
             {
+                kind: "hasMany",
                 relationName: "posts",
                 target: () => postsCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "tag_id"
             }
         ],
@@ -90,24 +89,21 @@ relationName: "comments" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "tag",
                 target: () => tagsCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "tag_id"
             },
             {
+                kind: "belongsTo",
                 relationName: "author",
                 target: () => authorsCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "author_id"
             },
             {
+                kind: "hasMany",
                 relationName: "comments",
                 target: () => commentsCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "post_id"
             }
         ],
@@ -128,10 +124,9 @@ relationName: "posts" }
         },
         relations: [
             {
+                kind: "hasMany",
                 relationName: "posts",
                 target: () => postsCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "author_id"
             }
         ],
@@ -151,10 +146,9 @@ relationName: "post" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "post",
                 target: () => postsCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "post_id"
             }
         ],

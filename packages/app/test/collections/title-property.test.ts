@@ -69,9 +69,11 @@ type: "string" },
                     customer: {
                         name: "Customer",
                         type: "relation",
-                        target: "customers",
-                        cardinality: "one",
-                        localKey: "customer_id"
+                        relation: {
+                            kind: "belongsTo",
+                            target: "customers",
+                            localKey: "customer_id",
+                        }
                     },
                     reference: { name: "Reference",
 type: "string" }
@@ -94,8 +96,10 @@ type: "string" },
                     author: {
                         name: "Author",
                         type: "relation",
-                        target: "users",
-                        cardinality: "one"
+                        relation: {
+                            kind: "belongsTo",
+                            target: "users",
+                        }
                     },
                     headline: { name: "Headline",
 type: "string" }
@@ -128,10 +132,14 @@ type: "string" }
                 slug: "leads",
                 table: "leads",
                 properties: {
-                    owner: { name: "Owner",
+                    owner: {
+ name: "Owner",
 type: "relation",
-target: "users",
-cardinality: "one" },
+    relation: {
+        kind: "belongsTo",
+        target: "users",
+    }
+},
                     bio: { name: "Bio",
 type: "string",
 admin: { multiline: true } },
@@ -161,11 +169,15 @@ type: "string" }
                     id: { name: "ID",
 type: "string",
 isId: "uuid" },
-                    tag: { name: "Tag",
+                    tag: {
+ name: "Tag",
 type: "relation",
-target: "tags",
-cardinality: "one",
-localKey: "tag_id" }
+    relation: {
+        kind: "belongsTo",
+        target: "tags",
+        localKey: "tag_id",
+    }
+}
                 }
             };
             expect(getTitlePropertyKey(collection)).toBe("tag");
@@ -222,10 +234,14 @@ type: "string" }
                     id: { name: "ID",
 type: "string",
 isId: "uuid" },
-                    project: { name: "Project",
+                    project: {
+ name: "Project",
 type: "relation",
-target: "projects",
-cardinality: "one" },
+    relation: {
+        kind: "belongsTo",
+        target: "projects",
+    }
+},
                     connection_string: { name: "Connection string",
 type: "string" }
                 },
@@ -251,9 +267,11 @@ type: "string" },
                     tenant: {
                         name: "Tenant",
                         type: "relation",
-                        target: "tenants",
-                        cardinality: "one",
-                        localKey: "tenant_id"
+                        relation: {
+                            kind: "belongsTo",
+                            target: "tenants",
+                            localKey: "tenant_id",
+                        }
                     },
                     full_name: { name: "Full Name",
 type: "string" }

@@ -10,6 +10,7 @@ import {
 import { getPolicyOperations } from "@rebasepro/utils";
 import { getTableName } from "./relations";
 import { resolveCollectionRelations } from "./relations";
+import { isManyToMany } from "@rebasepro/types";
 import { securityRuleToConditions } from "./policy/securityRuleToConditions";
 
 /**
@@ -108,10 +109,11 @@ export function resolveJunctionSpecs(collections: CollectionConfig[]): Map<strin
     for (const collection of collections) {
         const resolved = resolveCollectionRelations(collection);
         for (const relation of Object.values(resolved)) {
-            if (!relation.through) continue;
+            // Narrowed rather than probed: only a many-to-many has a junction,
+            // and only after narrowing is `through` guaranteed complete.
+            if (!isManyToMany(relation)) continue;
 
-            const targetCollection: CollectionConfig | undefined =
-                typeof relation.target === "function" ? relation.target() : undefined;
+            const targetCollection: CollectionConfig | undefined = relation.target();
             if (!targetCollection) continue;
 
             const rawName = relation.through.table;

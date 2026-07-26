@@ -33,18 +33,18 @@ function makeCollections(options?: {
         securityRules: options?.postsRules,
         properties: { id: { type: "string", isId: "uuid" }, title: { type: "string" }, author_id: { type: "string" } },
         relations: [{
+            kind: "manyToMany",
             relationName: "tags",
             target: () => tags,
-            cardinality: "many",
             through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
         }]
     } as unknown as CollectionConfig;
 
     if (options?.tagsDeclaresToo) {
         (tags as unknown as { relations: unknown[] }).relations = [{
+            kind: "manyToMany",
             relationName: "posts",
             target: () => posts,
-            cardinality: "many",
             through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" }
         }];
     }

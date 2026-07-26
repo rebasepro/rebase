@@ -58,9 +58,9 @@ relationName: "author" }
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "author",
                     target: () => usersCollection,
-                    cardinality: "one",
                     localKey: "author_id",
                     onDelete: "set null"
                 }
@@ -87,10 +87,9 @@ relationName: "tags" }
             },
             relations: [
                 {
+                    kind: "manyToMany",
                     relationName: "tags",
                     target: () => tagsCollection,
-                    cardinality: "many",
-                    direction: "owning",
                     through: {
                         table: "posts_to_tags",
                         sourceColumn: "post_id",

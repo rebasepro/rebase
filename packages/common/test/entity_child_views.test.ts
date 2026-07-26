@@ -30,10 +30,9 @@ describe("entity child views", () => {
         properties: { id: { type: "number" }, title: { type: "string" } },
         relations: [
             {
+                kind: "hasMany",
                 relationName: "featured_tags",
                 target: () => tags,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "post_id",
                 overrides: { name: "Featured tags" }
             }
@@ -87,8 +86,10 @@ describe("entity child views", () => {
             table: "dual_posts",
             properties: { id: { type: "number" } },
             relations: [
-                { relationName: "featured_tags", target: () => tags, cardinality: "many", direction: "inverse", foreignKeyOnTarget: "featured_post_id" },
-                { relationName: "archived_tags", target: () => tags, cardinality: "many", direction: "inverse", foreignKeyOnTarget: "archived_post_id" }
+                {
+    kind: "hasMany", relationName: "featured_tags", target: () => tags, foreignKeyOnTarget: "featured_post_id" },
+                {
+    kind: "hasMany", relationName: "archived_tags", target: () => tags, foreignKeyOnTarget: "archived_post_id" }
             ]
         } as unknown as CollectionConfig;
 
@@ -113,7 +114,8 @@ describe("entity child views", () => {
             properties: { id: { type: "number" } },
             relations: [
                 // Named "people", targets `notes`.
-                { relationName: "people", target: () => notes, cardinality: "many", direction: "inverse", foreignKeyOnTarget: "doc_id" }
+                {
+    kind: "hasMany", relationName: "people", target: () => notes, foreignKeyOnTarget: "doc_id" }
             ]
         } as unknown as CollectionConfig;
 
@@ -132,10 +134,9 @@ describe("entity child views", () => {
             properties: { id: { type: "number" } },
             relations: [
                 {
+                    kind: "manyToMany",
                     relationName: "tags",
                     target: () => tags,
-                    cardinality: "many",
-                    direction: "owning",
                     through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
                 }
             ]
@@ -192,10 +193,11 @@ targetSlug: "tags" });
                         // top-level tab keyed by the inner property key.
                         related_tags: {
                             type: "relation",
-                            target: () => tags,
-                            cardinality: "many",
-                            direction: "inverse",
-                            foreignKeyOnTarget: "with_map_id"
+                            relation: {
+                                kind: "hasMany",
+                                target: () => tags,
+                                foreignKeyOnTarget: "with_map_id",
+                            }
                         }
                     }
                 }
@@ -214,20 +216,22 @@ targetSlug: "tags" });
                 id: { type: "number" },
                 related_tags: {
                     type: "relation",
-                    target: () => tags,
-                    cardinality: "many",
-                    direction: "inverse",
-                    foreignKeyOnTarget: "both_id"
+                    relation: {
+                        kind: "hasMany",
+                        target: () => tags,
+                        foreignKeyOnTarget: "both_id",
+                    }
                 },
                 metadata: {
                     type: "map",
                     properties: {
                         related_tags: {
                             type: "relation",
-                            target: () => tags,
-                            cardinality: "many",
-                            direction: "inverse",
-                            foreignKeyOnTarget: "both_id"
+                            relation: {
+                                kind: "hasMany",
+                                target: () => tags,
+                                foreignKeyOnTarget: "both_id",
+                            }
                         }
                     }
                 }

@@ -34,11 +34,12 @@ const databasesCollection: CollectionConfig = {
         project: {
             name: "Project",
             type: "relation",
-            relationName: "project",
-            cardinality: "one",
-            direction: "owning",
-            target: () => ({} as CollectionConfig),
-            onDelete: "cascade"
+            relation: {
+                kind: "belongsTo",
+                target: () => ({} as CollectionConfig),
+                relationName: "project",
+                onDelete: "cascade",
+            }
         } as unknown as Property,
         type: {
             name: "Type",

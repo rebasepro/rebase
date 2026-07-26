@@ -1,7 +1,7 @@
 import type { ComponentRef } from "./component_ref";
 
 import type { Entity, EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entities";
-import type { JoinStep, OnAction, Relation } from "./relations";
+import type { JoinStep, OnAction, Relation, ResolvedRelation } from "./relations";
 import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
 import type { ColorKey, ColorScheme } from "./chips";
 import type { AuthState } from "../controllers/auth_state";
@@ -519,101 +519,35 @@ export interface RelationProperty extends BaseProperty {
      */
     isId?: boolean;
 
-    // ─── Inline relation config ───
-    // Define the relation directly on the property. The framework automatically
-    // extracts these into the collection's `relations[]` at normalization time.
-    // You no longer need a separate `relations[]` entry for properties.
-
     /**
-     * The target collection this relation points to.
-     * When set, the framework treats this property as a self-contained relation
-     * definition and no separate `relations[]` entry is needed.
-     */
-    target?: string | (() => CollectionConfig | string);
-
-    /**
-     * Whether this property references one or many records.
-     * Defaults to `"one"`.
-     */
-    cardinality?: "one" | "many";
-
-    /**
-     * Which side owns the persistence for this relationship.
-     * - `"owning"`: The foreign key (for one-to-one) or junction table (for many-to-many) is on this collection.
-     * - `"inverse"`: The foreign key is on the target collection's table.
-     * Defaults to `"owning"`.
-     */
-    direction?: "owning" | "inverse";
-
-    /**
-     * The name of the corresponding relation on the target collection.
-     * Used for inverse relations to locate the owning side.
-     */
-    inverseRelationName?: string;
-
-    /**
-     * Column on THIS table that stores the foreign key to the target.
-     * Required when `direction` is `"owning"` and `cardinality` is `"one"`.
-     * Auto-inferred if not set.
-     * @example "author_id"
-     */
-    localKey?: string;
-
-    /**
-     * Column on the TARGET table that stores the foreign key back to this entity.
-     * Required when `direction` is `"inverse"`.
-     * Auto-inferred if not set.
-     * @example "post_id"
-     */
-    foreignKeyOnTarget?: string;
-
-    /**
-     * Junction table configuration for many-to-many relationships.
-     * Required when `cardinality` is `"many"` and `direction` is `"owning"`.
-     * Auto-inferred if not set.
-     */
-    through?: {
-        table: string;
-        sourceColumn: string;
-        targetColumn: string;
-    };
-
-    /**
-     * Explicit, ordered join path for advanced multi-hop relations.
-     * When set, overrides `localKey`, `foreignKeyOnTarget`, and `through`.
-     */
-    joinPath?: JoinStep[];
-
-    /**
-     * Cascade action on update.
-     */
-    onUpdate?: OnAction;
-
-    /**
-     * Cascade action on delete.
-     */
-    onDelete?: OnAction;
-
-    /**
-     * Overrides applied to the target collection when rendered as a subcollection tab.
-     */
-    overrides?: Partial<CollectionConfig>;
-
-    // ─── Framework-managed fields ───
-
-    /**
-     * Optional name for this relation. Defaults to the property key at runtime.
-     * Only needed when the relation name should differ from the property key,
-     * or for backward compatibility with existing `relations[]` entries.
-     */
-    relationName?: string;
-
-    /**
-     * The resolved relation object, populated by the framework at normalization time.
-     * **Do not set manually** — it is computed from the inline fields above
-     * or looked up from the collection's `relations[]` array.
+     * The link this field represents.
+     *
+     * A closed union: pick the `kind` and the type offers exactly the fields
+     * that kind needs. This used to be the relation's fields spread flat across
+     * the property — `target`, `cardinality`, `direction`, `localKey`,
+     * `foreignKeyOnTarget`, `through` and `joinPath`, every one optional and all
+     * of them simultaneously legal. Which link you meant then had to be
+     * inferred, and combinations that meant nothing (a `many` relation carrying
+     * a `localKey`) typechecked and corrupted writes.
+     *
+     * @example
+     * ```ts
+     * tags: {
+     *     name: "Tags",
+     *     type: "relation",
+     *     relation: { kind: "manyToMany", target: () => tagsCollection }
+     * }
+     * ```
      */
     relation?: Relation;
+
+    /**
+     * The same relation with every default filled in, stamped during
+     * normalization. **Do not set manually** — it is derived from
+     * {@link RelationProperty.relation}, or looked up by name from the
+     * collection's `relations` array.
+     */
+    resolvedRelation?: ResolvedRelation;
 
     // ─── UI configuration ───
 

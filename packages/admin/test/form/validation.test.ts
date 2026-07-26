@@ -687,7 +687,10 @@ describe("Relation property validation", () => {
         const property: RelationProperty = {
             type: "relation",
             name: "Categories",
-            relation: { cardinality: "many" },
+            relation: {
+    // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+    // Was: cardinality=many direction=?
+    kind: "AMBIGUOUS", },
             validation: { required: true }
         } as unknown as RelationProperty;
 

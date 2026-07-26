@@ -99,9 +99,8 @@ name: "Name" } as Property
             type: "relation",
             name: "Author",
             relation: {
+                kind: "belongsTo",
                 target: () => targetCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "author_id",
                 relationName: "author"
             }
@@ -188,9 +187,8 @@ internal_counter: 999 } as any,
                 type: "relation",
                 name: "Customer",
                 relation: {
+                    kind: "belongsTo",
                     target: () => collection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "customer_id",
                     relationName: "customer"
                 }
@@ -427,9 +425,8 @@ name: "Title" } as Property,
                 type: "relation",
                 name: "Tag",
                 relation: {
+                    kind: "belongsTo",
                     target: () => targetCollection,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "tag_id",
                     relationName: "tag"
                 }

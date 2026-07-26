@@ -109,12 +109,12 @@ const customersCollection: PostgresCollectionConfig = {
     },
     relations: [
         {
+            // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+            // Was: cardinality=many direction=inverse
+            kind: "AMBIGUOUS",
             relationName: "orders",
             target: () => ordersCollection,
-            cardinality: "many",
-            direction: "inverse",
-            inverseRelationName: "customer"
-        }
+            }
     ],
     admin: {
         icon: "Users",

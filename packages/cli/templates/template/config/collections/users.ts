@@ -1,6 +1,6 @@
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 
-const usersCollection: PostgresCollectionConfig = {
+const usersCollection = defineCollection({
     name: "Users",
     singularName: "User",
     slug: "users",
@@ -144,6 +144,6 @@ const usersCollection: PostgresCollectionConfig = {
             "createdAt"
         ]
     }
-};
+});
 
 export default usersCollection;

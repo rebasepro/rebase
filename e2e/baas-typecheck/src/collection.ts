@@ -79,9 +79,9 @@ const posts: PostgresCollectionConfig<Post> = {
 
     relations: [
         {
+            kind: "belongsTo",
             relationName: "author",
             target: () => "authors",
-            cardinality: "one",
             localKey: "author_id",
             onDelete: "cascade"
         }

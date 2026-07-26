@@ -43,10 +43,9 @@ relationName: "comments" }
         },
         relations: [
             {
+                kind: "hasMany",
                 relationName: "comments",
                 target: () => commentsCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "post_id"
             }
         ],

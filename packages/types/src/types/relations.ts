@@ -6,287 +6,302 @@ import type { CollectionConfig } from "./collections";
 export type OnAction = "cascade" | "restrict" | "no action" | "set null" | "set default";
 
 /**
- * Extended relation that combines base relation with Rebase UI config
+ * What kind of link a relation is.
+ *
+ * The discriminant. Every other field a relation carries belongs to exactly one
+ * of these, which is the point: a relation used to be a single open interface
+ * where `cardinality`, `direction`, `localKey`, `foreignKeyOnTarget`, `through`
+ * and `joinPath` were all optional and any combination typechecked. Which link
+ * you meant then had to be *inferred* from which fields you happened to set,
+ * and the inference was ~200 lines that guessed, fell back on naming
+ * conventions, and swallowed its own failures.
+ *
+ * Most of that guessing produced bugs rather than convenience. A `many`
+ * relation carrying a `localKey` — a combination the old type permitted — made
+ * the write path stamp the parent's own foreign key onto the child row. Under
+ * these kinds that state cannot be written down.
+ *
  * @group Models
  */
-export interface Relation {
+export type RelationKind = "belongsTo" | "hasOne" | "hasMany" | "manyToMany" | "via";
+
+/** Fields every relation carries, whatever its kind. @group Models */
+export interface RelationBase {
     /**
-     * The application-level name for this relationship.
-     * If not provided, it will be inferred from the target collection path.
-     * @example "posts"
+     * The name this link is addressed by: the key in `include`, the tab in the
+     * admin panel, and the path segment of a nested URL.
+     *
+     * Defaults to the declaring property's key, or to the target's slug for an
+     * entry in `relations`.
      */
     relationName?: string;
 
-    /**
-     * The final collection you want to retrieve records from.
-     */
-    target: (() => CollectionConfig) | any;
+    /** The collection on the other end. */
+    target: () => CollectionConfig;
 
-    /**
-     * The nature of the relationship, determining if one or many records are returned.
-     */
-    cardinality: "one" | "many";
-
-    /**
-     * Which side owns the persistence for this relationship.
-     * - "owning": The foreign key (for one-to-one/many-to-one) or the junction table (for many-to-many) is managed by this collection.
-     * - "inverse": The foreign key is on the target collection's table. This side of the relation is typically read-only.
-     * Defaults to "owning".
-     */
-    direction?: "owning" | "inverse";
-
-    /**
-     * The name of the inverse relation.
-     * This is only needed when the inverse relation is not the same as the relation name.
-     * For example, if the relation name is "posts", the inverse relation name might be "author".
-     */
-    inverseRelationName?: string
-
-    /**
-     * Column on THIS table that stores the foreign key to the target.
-     * Required when `direction` is "owning" and `cardinality` is "one".
-     * @example "author_id"
-     */
-    localKey?: string;
-
-    /**
-     * Column on the TARGET table that stores the foreign key to this entity.
-     * Required when `direction` is "inverse".
-     * @example "post_id"
-     */
-    foreignKeyOnTarget?: string;
-
-    /**
-     * Defines the junction table for a many-to-many relationship.
-     * Required when `cardinality` is "many" and `direction` is "owning".
-     *
-     * @example Simple many-to-many between Users and Roles:
-     * ```typescript
-     * // Users collection
-     * {
-     *   relations: [{
-     *     relationName: "roles",
-     *     target: () => rolesCollection,
-     *     cardinality: "many",
-     *     through: {
-     *       table: "user_roles",        // Junction table name
-     *       sourceColumn: "user_id",    // Column that references this collection's ID
-     *       targetColumn: "role_id"     // Column that references target collection's ID
-     *     }
-     *   }]
-     * }
-     *
-     * // This creates a junction table like:
-     * // CREATE TABLE user_roles (
-     * //   user_id INTEGER REFERENCES users(id),
-     * //   role_id INTEGER REFERENCES roles(id),
-     * //   PRIMARY KEY (user_id, role_id)
-     * // );
-     * ```
-     *
-     * @example Many-to-many with additional junction table data:
-     * ```typescript
-     * // Students and Courses with enrollment date
-     * {
-     *   relations: [{
-     *     relationName: "courses",
-     *     target: () => coursesCollection,
-     *     cardinality: "many",
-     *     through: {
-     *       table: "enrollments",
-     *       sourceColumn: "student_id",
-     *       targetColumn: "course_id"
-     *     }
-     *   }]
-     * }
-     *
-     * // Junction table can have additional columns:
-     * // CREATE TABLE enrollments (
-     * //   student_id INTEGER REFERENCES students(id),
-     * //   course_id INTEGER REFERENCES courses(id),
-     * //   enrolled_at TIMESTAMP DEFAULT NOW(),
-     * //   grade VARCHAR(2),
-     * //   PRIMARY KEY (student_id, course_id)
-     * // );
-     * ```
-     */
-    through?: {
-        table: string;
-        sourceColumn: string; // FK to "this" collection's PK
-        targetColumn: string; // FK to the target collection's PK
-    };
-
-    /**
-     * An explicit, ordered array of JOINs to perform to get from the source
-     * to the target. Used for multi-hop relations, composite keys, or when you need
-     * fine-grained control over the join logic.
-     *
-     * When `joinPath` is provided, it overrides all other relation configuration
-     * (localKey, foreignKeyOnTarget, through) and gives you complete control
-     * over how tables are joined together.
-     *
-     * @example Simple one-to-one join (equivalent to localKey):
-     * ```typescript
-     * // Posts -> Authors relationship
-     * {
-     *   relationName: "author",
-     *   target: () => authorsCollection,
-     *   cardinality: "one",
-     *   joinPath: [
-     *     {
-     *       table: "authors",
-     *       on: {
-     *         from: "author_id",  // Column on posts table
-     *         to: "id"           // Column on authors table
-     *       }
-     *     }
-     *   ]
-     * }
-     *
-     * // Generates: SELECT * FROM posts JOIN authors ON posts.author_id = authors.id
-     * ```
-     *
-     * @example Multi-hop relationship (3 tables):
-     * ```typescript
-     * // Users -> Permissions through Roles
-     * {
-     *   relationName: "permissions",
-     *   target: () => permissionsCollection,
-     *   cardinality: "many",
-     *   joinPath: [
-     *     {
-     *       table: "user_roles",
-     *       on: {
-     *         from: "id",        // users.id
-     *         to: "user_id"      // user_roles.user_id
-     *       }
-     *     },
-     *     {
-     *       table: "roles",
-     *       on: {
-     *         from: "role_id",   // user_roles.role_id
-     *         to: "id"          // roles.id
-     *       }
-     *     },
-     *     {
-     *       table: "role_permissions",
-     *       on: {
-     *         from: "id",        // roles.id
-     *         to: "role_id"      // role_permissions.role_id
-     *       }
-     *     },
-     *     {
-     *       table: "permissions",
-     *       on: {
-     *         from: "permission_id", // role_permissions.permission_id
-     *         to: "id"              // permissions.id
-     *       }
-     *     }
-     *   ]
-     * }
-     *
-     * // Generates:
-     * // SELECT * FROM users
-     * // JOIN user_roles ON users.id = user_roles.user_id
-     * // JOIN roles ON user_roles.role_id = roles.id
-     * // JOIN role_permissions ON roles.id = role_permissions.role_id
-     * // JOIN permissions ON role_permissions.permission_id = permissions.id
-     * ```
-     *
-     * @example Composite key relationship:
-     * ```typescript
-     * // Orders -> Customer by company_code + region
-     * {
-     *   relationName: "customer",
-     *   target: () => customersCollection,
-     *   cardinality: "one",
-     *   joinPath: [
-     *     {
-     *       table: "customers",
-     *       on: {
-     *         from: ["company_code", "region_id"], // Multiple columns from orders
-     *         to: ["code", "region_id"]            // Multiple columns on customers
-     *       }
-     *     }
-     *   ]
-     * }
-     *
-     * // Generates:
-     * // SELECT * FROM orders
-     * // JOIN customers ON orders.company_code = customers.code
-     * //               AND orders.region_id = customers.region_id
-     * ```
-     *
-     * @example Self-referencing with intermediate table:
-     * ```typescript
-     * // Users -> Friends (many-to-many self-reference)
-     * {
-     *   relationName: "friends",
-     *   target: () => usersCollection, // Same collection
-     *   cardinality: "many",
-     *   joinPath: [
-     *     {
-     *       table: "friendships",
-     *       on: {
-     *         from: "id",         // users.id
-     *         to: "user_id"       // friendships.user_id
-     *       }
-     *     },
-     *     {
-     *       table: "users",
-     *       on: {
-     *         from: "friend_id",  // friendships.friend_id
-     *         to: "id"           // users.id (target)
-     *       }
-     *     }
-     *   ]
-     * }
-     * ```
-     *
-     * @example Complex business logic join:
-     * ```typescript
-     * // Products -> Active Suppliers (only current, non-expired contracts)
-     * {
-     *   relationName: "activeSuppliers",
-     *   target: () => suppliersCollection,
-     *   cardinality: "many",
-     *   joinPath: [
-     *     {
-     *       table: "product_supplier_contracts",
-     *       on: {
-     *         from: "id",           // products.id
-     *         to: "product_id"      // contracts.product_id
-     *       }
-     *     },
-     *     {
-     *       table: "suppliers",
-     *       on: {
-     *         from: "supplier_id",  // contracts.supplier_id
-     *         to: "id"             // suppliers.id
-     *       }
-     *     }
-     *   ]
-     *   // Note: Additional WHERE conditions for active/non-expired
-     *   // would be handled in the query logic, not in joinPath
-     * }
-     * ```
-     */
-    joinPath?: JoinStep[];
-
-    /**
-     * Action to perform on update.
-     */
     onUpdate?: OnAction;
-    /**
-     * Action to perform on delete.
-     */
     onDelete?: OnAction;
 
+    /** Presentation overrides applied when this relation is rendered as a tab. */
     overrides?: Partial<CollectionConfig>;
 
     validation?: {
         required?: boolean;
-    }
+    };
+}
+
+/**
+ * This collection holds the foreign key. One target row per source row.
+ *
+ * ```ts
+ * author: { kind: "belongsTo", target: () => authors, localKey: "author_id" }
+ * ```
+ * @group Models
+ */
+export interface BelongsToRelation extends RelationBase {
+    kind: "belongsTo";
+    /**
+     * Column on **this** collection's table holding the target's key.
+     * Defaults to `<relationName>_id`.
+     */
+    localKey?: string;
+}
+
+/**
+ * The target holds the foreign key, and at most one target row points back.
+ *
+ * ```ts
+ * profile: { kind: "hasOne", target: () => profiles, foreignKeyOnTarget: "user_id" }
+ * ```
+ * @group Models
+ */
+export interface HasOneRelation extends RelationBase {
+    kind: "hasOne";
+    /**
+     * Column on the **target's** table holding this collection's key.
+     * Defaults to `<thisCollection>_id`.
+     */
+    foreignKeyOnTarget?: string;
+}
+
+/**
+ * The target holds the foreign key, and many target rows point back. The
+ * children belong to this parent alone — deleting one deletes a row.
+ *
+ * ```ts
+ * posts: { kind: "hasMany", target: () => posts, foreignKeyOnTarget: "author_id" }
+ * ```
+ * @group Models
+ */
+export interface HasManyRelation extends RelationBase {
+    kind: "hasMany";
+    /**
+     * Column on the **target's** table holding this collection's key.
+     * Defaults to `<thisCollection>_id`.
+     */
+    foreignKeyOnTarget?: string;
+}
+
+/**
+ * Both sides hold many, through a junction table. The target rows are shared,
+ * so this collection owns the *link* and not the row: removing one removes a
+ * junction row and leaves the target alone.
+ *
+ * Declared the same way from either side — there is no owning and inverse
+ * version. Swap `sourceColumn` and `targetColumn` to describe the other
+ * direction.
+ *
+ * ```ts
+ * tags: { kind: "manyToMany", target: () => tags }
+ * ```
+ * @group Models
+ */
+export interface ManyToManyRelation extends RelationBase {
+    kind: "manyToMany";
+    /**
+     * The junction table and its two key columns. Every part defaults: the
+     * table to both table names sorted and joined, the columns to
+     * `<collection>_id` and `<relationName>_id`.
+     */
+    through?: {
+        table?: string;
+        /** Junction column holding **this** collection's key. */
+        sourceColumn?: string;
+        /** Junction column holding the **target's** key. */
+        targetColumn?: string;
+    };
+}
+
+/**
+ * An explicit chain of joins, for links the four shapes above cannot express:
+ * multi-hop paths, composite keys, or a join whose condition is not a plain
+ * foreign key.
+ *
+ * Read-only. Rebase will not infer how to write through an arbitrary join
+ * chain, and guessing is what this type exists to stop.
+ *
+ * ```ts
+ * permissions: {
+ *     kind: "via",
+ *     target: () => permissions,
+ *     cardinality: "many",
+ *     joinPath: [
+ *         { table: "user_roles",       on: { from: "id",            to: "user_id" } },
+ *         { table: "role_permissions", on: { from: "role_id",       to: "role_id" } },
+ *         { table: "permissions",      on: { from: "permission_id", to: "id" } }
+ *     ]
+ * }
+ * ```
+ * @group Models
+ */
+export interface ViaRelation extends RelationBase {
+    kind: "via";
+    /** Whether the chain yields one row or many. Cannot be derived from a join chain. */
+    cardinality: "one" | "many";
+    joinPath: JoinStep[];
+}
+
+/**
+ * A link from one collection to another, as authored.
+ *
+ * A closed union: pick the kind that describes the link and the type offers
+ * exactly the fields that kind needs. See {@link ResolvedRelation} for the form
+ * the runtime works with, which has every default filled in.
+ *
+ * @group Models
+ */
+export type Relation =
+    | BelongsToRelation
+    | HasOneRelation
+    | HasManyRelation
+    | ManyToManyRelation
+    | ViaRelation;
+
+/**
+ * A relation with every default filled in — the form the runtime works with.
+ *
+ * The authored {@link Relation} and this are deliberately different types.
+ * They used to be one, which meant no reader could tell which fields had been
+ * supplied and which had been guessed, and so every consumer re-derived what it
+ * needed with its own chain of `if (through) … else if (localKey) …` fallbacks.
+ * Those chains disagreed with each other; that disagreement is what produced
+ * silently wrong reads and corrupt writes.
+ *
+ * Here each variant carries exactly its own fields, all required. A consumer
+ * switches on `kind` and gets what it needs without a fallback, and the cases
+ * it forgot are a compile error rather than a wrong answer at runtime.
+ *
+ * @group Models
+ */
+export type ResolvedRelation =
+    | ResolvedBelongsTo
+    | ResolvedHasOne
+    | ResolvedHasMany
+    | ResolvedManyToMany
+    | ResolvedVia;
+
+/** Fields present on every resolved relation. @group Models */
+export interface ResolvedRelationBase {
+    /** Always set: defaulted during resolution if the author omitted it. */
+    relationName: string;
+    target: () => CollectionConfig;
+    /** The target's slug, resolved once so consumers need not call `target()`. */
+    targetSlug: string;
+    onUpdate?: OnAction;
+    onDelete?: OnAction;
+    overrides?: Partial<CollectionConfig>;
+    validation?: { required?: boolean };
+    /**
+     * Whether one row or many come back. Derived from `kind` — kept because it
+     * is what most consumers actually branch on, and because `via` is the one
+     * kind where it is authored rather than implied.
+     */
+    cardinality: "one" | "many";
+    /**
+     * Whether Rebase knows how to write through this link. False only for
+     * {@link ResolvedVia}, whose join chain it will not invent a write for.
+     */
+    writable: boolean;
+    /**
+     * Whether the target rows are shared with other parents. True for
+     * many-to-many and for multi-hop `via`: what the parent owns is the link,
+     * so removing one must not delete the row.
+     */
+    shared: boolean;
+}
+
+/** @group Models */
+export interface ResolvedBelongsTo extends ResolvedRelationBase {
+    kind: "belongsTo";
+    cardinality: "one";
+    writable: true;
+    shared: false;
+    /** Column on this collection's table. */
+    localKey: string;
+}
+
+/** @group Models */
+export interface ResolvedHasOne extends ResolvedRelationBase {
+    kind: "hasOne";
+    cardinality: "one";
+    writable: true;
+    shared: false;
+    /** Column on the target's table. */
+    foreignKeyOnTarget: string;
+}
+
+/** @group Models */
+export interface ResolvedHasMany extends ResolvedRelationBase {
+    kind: "hasMany";
+    cardinality: "many";
+    writable: true;
+    shared: false;
+    /** Column on the target's table. */
+    foreignKeyOnTarget: string;
+}
+
+/** @group Models */
+export interface ResolvedManyToMany extends ResolvedRelationBase {
+    kind: "manyToMany";
+    cardinality: "many";
+    writable: true;
+    shared: true;
+    through: {
+        table: string;
+        sourceColumn: string;
+        targetColumn: string;
+    };
+}
+
+/** @group Models */
+export interface ResolvedVia extends ResolvedRelationBase {
+    kind: "via";
+    writable: false;
+    joinPath: JoinStep[];
+}
+
+// ── Narrowing helpers ────────────────────────────────────────────────
+//
+// Consumers that only care about one axis — "does this list many rows",
+// "is there a column on the target" — should ask that question rather
+// than enumerate kinds, so adding a kind later does not silently skip them.
+
+/** Relations whose target row carries this collection's key. @group Models */
+export type ResolvedForeignKeyOnTarget = ResolvedHasOne | ResolvedHasMany;
+
+/** @group Models */
+export function hasForeignKeyOnTarget(relation: ResolvedRelation): relation is ResolvedForeignKeyOnTarget {
+    return relation.kind === "hasOne" || relation.kind === "hasMany";
+}
+
+/** @group Models */
+export function isManyToMany(relation: ResolvedRelation): relation is ResolvedManyToMany {
+    return relation.kind === "manyToMany";
+}
+
+/** @group Models */
+export function isToMany(relation: ResolvedRelation): boolean {
+    return relation.cardinality === "many";
 }
 
 /**

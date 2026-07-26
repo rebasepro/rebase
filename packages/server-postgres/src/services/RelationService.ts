@@ -1,8 +1,9 @@
 import { and, eq, inArray, or, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
-import { CollectionConfig, FilterValues, Relation } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, ResolvedRelation, ResolvedManyToMany } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
+import { hasForeignKeyOnTarget } from "@rebasepro/types";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
@@ -181,7 +182,7 @@ export class RelationService {
     async fetchEntitiesUsingJoins<M extends Record<string, unknown>>(
         parentCollection: CollectionConfig,
         parentId: string | number,
-        relation: Relation,
+        relation: ResolvedRelation,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
             orderBy?: string;
@@ -206,7 +207,7 @@ export class RelationService {
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
         // Handle join path relations
-        if (relation.joinPath && relation.joinPath.length > 0) {
+        if (relation.kind === "via") {
             let query = this.db.select().from(parentTable).$dynamic();
             let currentTable = parentTable;
 
@@ -349,7 +350,7 @@ export class RelationService {
     private async countRelatedRows(
         parentCollection: CollectionConfig,
         parentId: string | number,
-        relation: Relation,
+        relation: ResolvedRelation,
         additionalFilters: SQL[]
     ): Promise<number> {
         const targetCollection = relation.target();
@@ -462,7 +463,7 @@ export class RelationService {
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
-        relation: Relation
+        relation: ResolvedRelation
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>>> {
         if (parentIds.length === 0) return new Map();
 
@@ -483,7 +484,7 @@ export class RelationService {
         const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentIdInfo.fieldName]);
 
         // Handle join path relations with batching
-        if (relation.joinPath && relation.joinPath.length > 0) {
+        if (relation.kind === "via") {
             let query = this.db.select().from(parentTable).$dynamic();
             let currentTable = parentTable;
 
@@ -542,7 +543,7 @@ export class RelationService {
         //   1. Fetch FK values from the parent table in a single query
         //   2. Query the target table with unique FK values
         //   3. Map results back to parent rows via their FK values
-        if (relation.direction === "owning" && relation.localKey) {
+        if (relation.kind === "belongsTo") {
             this.assertSingleKeyAddressable(parentCollection, parentPks, relation.localKey);
             const localKeyCol = parentTable[relation.localKey as keyof typeof parentTable] as AnyPgColumn;
             if (!localKeyCol) {
@@ -639,7 +640,7 @@ export class RelationService {
             // Determine the parent ID this result belongs to based on the relation type
             let parentId: string | number | undefined;
 
-            if (relation.direction === "inverse" && relation.foreignKeyOnTarget) {
+            if (hasForeignKeyOnTarget(relation)) {
                 parentId = targetRow[relation.foreignKeyOnTarget] as string | number | undefined;
             } else if (relation.direction === "inverse" && relation.cardinality === "one" && relation.inverseRelationName) {
                 const inferredForeignKeyName = `${relation.inverseRelationName}_id`;
@@ -663,7 +664,7 @@ export class RelationService {
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
-        relation: Relation
+        relation: ResolvedRelation
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>[]>> {
         if (parentIds.length === 0) return new Map();
 
@@ -683,7 +684,7 @@ export class RelationService {
         const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentIdInfo.fieldName]);
 
         // Handle join path relations (many-to-many through junction tables)
-        if (relation.joinPath && relation.joinPath.length > 0) {
+        if (relation.kind === "via") {
             let query = this.db.select().from(parentTable).$dynamic();
             let currentTable = parentTable;
 
@@ -725,7 +726,7 @@ export class RelationService {
         // Handle many-to-many owning relations with junction table (relation.through)
         // This is the standard path for posts→tags style relations where
         // sanitizeRelation populated the `through` config.
-        if (relation.through && relation.cardinality === "many" && relation.direction === "owning") {
+        if (relation.kind === "manyToMany") {
             // The junction names its parent with one column, so the same
             // single-key limit applies as for a direct foreign key.
             this.assertSingleKeyAddressable(parentCollection, parentPks, `${relation.through.table}.${relation.through.sourceColumn}`);
@@ -810,7 +811,7 @@ export class RelationService {
                 // references the parent (since from the inverse perspective, source/target are swapped).
                 const junctionData = (row[relation.through.table] || row) as Record<string, unknown>;
                 parentId = junctionData[relation.through.targetColumn] as string | number | undefined;
-            } else if (relation.direction === "inverse" && relation.foreignKeyOnTarget) {
+            } else if (hasForeignKeyOnTarget(relation)) {
                 parentId = targetRow[relation.foreignKeyOnTarget] as string | number | undefined;
             } else if (relation.direction === "inverse" && relation.inverseRelationName) {
                 const inferredForeignKeyName = `${relation.inverseRelationName}_id`;
@@ -847,7 +848,7 @@ export class RelationService {
             const targetCollection = relation.target();
 
             // Use joinPath if available
-            if (relation.joinPath && relation.joinPath.length > 0) {
+            if (relation.kind === "via") {
                 const parentTableName = getTableName(collection);
                 const targetTableName = getTableName(targetCollection);
 
@@ -913,7 +914,7 @@ export class RelationService {
                         await tx.insert(junctionTable).values(newLinks);
                     }
                 }
-            } else if (relation.through && relation.cardinality === "many" && relation.direction === "owning") {
+            } else if (relation.kind === "manyToMany") {
                 // Handle many-to-many relations with junction table using 'through' property
                 const junctionTable = this.registry.getTable(relation.through.table);
                 if (!junctionTable) {
@@ -951,11 +952,11 @@ export class RelationService {
                         await tx.insert(junctionTable).values(newLinks);
                     }
                 }
-            } else if (relation.through && relation.cardinality === "many" && relation.direction === "inverse") {
+            } else if (relation.kind === "manyToMany") {
                 // Inverse M2M relations should be saved from the owning side.
                 // The owning collection manages the junction table rows.
                 logger.warn(`[updateRelationsUsingJoins] Inverse M2M relation '${key}' in collection '${collection.slug}' should be saved from the owning side. Skipping.`);
-            } else if (relation.cardinality === "many" && relation.direction === "inverse" && relation.foreignKeyOnTarget) {
+            } else if (relation.cardinality === "many" && hasForeignKeyOnTarget(relation)) {
                 // Handle one-to-many (inverse) by updating target FK to point to parent
                 const targetTable = getTableForCollection(targetCollection, this.registry);
                 const targetPks = requirePrimaryKeys(targetCollection, this.registry);
@@ -1008,7 +1009,7 @@ export class RelationService {
         sourceEntityId: string | number,
         inverseRelationUpdates: Array<{
             relationKey: string;
-            relation: Relation;
+            relation: ResolvedRelation;
             newValue: unknown;
         }>
     ) {
@@ -1024,7 +1025,7 @@ export class RelationService {
                 const sourceIdInfo = sourcePks[0];
 
                 // Handle inverse relations with joinPath
-                if (relation.direction === "inverse" && relation.joinPath && relation.joinPath.length > 0) {
+                if (relation.direction === "inverse" && relation.kind === "via") {
                     await this.updateInverseJoinPathRelation(
                         tx,
                         sourceCollection,
@@ -1120,7 +1121,7 @@ export class RelationService {
         sourceCollection: CollectionConfig,
         sourceEntityId: string | number,
         targetCollection: CollectionConfig,
-        relation: Relation,
+        relation: ResolvedRelation,
         newValue: unknown
     ) {
         try {
@@ -1230,7 +1231,7 @@ export class RelationService {
         sourceCollection: CollectionConfig,
         sourceEntityId: string | number,
         targetCollection: CollectionConfig,
-        relation: Relation,
+        relation: ResolvedRelation,
         newValue: unknown,
         junctionInfo: { table: string; sourceColumn: string; targetColumn: string }
     ) {
@@ -1288,7 +1289,7 @@ export class RelationService {
         parentId: string | number,
         updates: Array<{
             relationKey: string;
-            relation: Relation;
+            relation: ResolvedRelation;
             newTargetId: string | number | null;
         }>
     ) {
@@ -1366,7 +1367,7 @@ export class RelationService {
      */
     resolveJoinPathWriteMapping(
         parentCollection: CollectionConfig,
-        relation: Relation
+        relation: ResolvedRelation
     ): { targetFKColName: string; parentSourceColName: string } {
         if (!relation.joinPath || relation.joinPath.length === 0) {
             throw new Error("resolveJoinPathWriteMapping requires a joinPath relation");
@@ -1405,7 +1406,7 @@ parentSourceColName };
         junctionTableInfo: {
             parentCollection: CollectionConfig;
             parentId: string | number;
-            relation: Relation;
+            relation: ResolvedRelation;
             relationKey: string;
         }
     ) {

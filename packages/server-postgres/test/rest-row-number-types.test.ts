@@ -94,8 +94,8 @@ describe("REST row — declared number properties keep their declared type", () 
             ...productsCollection,
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "category",
-                    cardinality: "one",
                     localKey: "category_id",
                     target: () => categoriesCollection
                 }

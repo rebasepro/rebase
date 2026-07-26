@@ -7,8 +7,8 @@ import {
     NumberProperty,
     Properties,
     Property,
-    Relation,
     RelationProperty,
+    ResolvedRelation,
     StringProperty,
     getDataSourceCapabilities,
     getDeclaredSubcollections,
@@ -22,6 +22,7 @@ import { DEFAULT_ONE_OF_TYPE } from "./common";
 import { isDefaultFieldConfigId } from "@rebasepro/utils";
 import { getIn, mergeDeep } from "@rebasepro/utils";
 import { isJunctionBackedRelation, resolveCollectionRelations } from "./relations";
+import { resolveRelation } from "./resolve-relation";
 
 /**
  * Resolve property builders, enums and arrays.
@@ -137,25 +138,34 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
     return resolvedProperty;
 }
 
-export function resolveRelationProperty(property: RelationProperty, relations: Relation[], propertyKey?: string) {
-    // If the property already has a resolved relation, return as-is
+/**
+ * The resolved relation a relation property refers to.
+ *
+ * Normalization stamps `resolvedRelation` onto the property, so this is usually
+ * a field read. It falls back to resolving from the collection for properties
+ * that never went through the registry — a preview, or a form rendered straight
+ * from an authored config.
+ */
+export function resolveRelationProperty(
+    property: RelationProperty,
+    collection: CollectionConfig,
+    propertyKey?: string
+): ResolvedRelation {
+    if (property.resolvedRelation) return property.resolvedRelation;
+
     if (property.relation) {
-        return property;
+        return resolveRelation(property.relation, collection, propertyKey);
     }
 
-    // Determine the relation name: explicit > property key
-    const name = property.relationName || propertyKey;
-
-    // Find the relation by name (it may have been extracted from the property during normalization)
-    const relation = name ? relations.find((rel) => rel.relationName === name) : undefined;
-    if (!relation) {
-        throw Error(`Relation ${name ?? "(unnamed)"} not found`);
+    const name = propertyKey ?? "";
+    const declared = resolveCollectionRelations(collection)[name];
+    if (!declared) {
+        throw Error(
+            `Relation property '${name || "(unnamed)"}' on '${collection.slug}' declares no \`relation\`, ` +
+            "and the collection has no relation of that name."
+        );
     }
-    return {
-        ...property,
-        relation: relation
-    } as RelationProperty;
-
+    return declared;
 }
 
 /**
@@ -351,48 +361,6 @@ export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefi
 
 
 /**
- * Relation identities that only ever appear *below* the top level of
- * `properties` — inside a `map`, an `array`, or a `oneOf` branch.
- *
- * A relation declared at the top level is a list hanging off the record and
- * earns a tab. One declared inside a map is a field of that map. Both end up in
- * the collection's flat `relations` array after normalization, so the shape of
- * `properties` is the only remaining evidence of which is which.
- *
- * An identity declared in both places is *not* nested-only, and keeps its tab.
- */
-function getNestedRelationIdentities(properties: Properties | undefined): Set<string> {
-    const topLevel = new Set<string>();
-    const nested = new Set<string>();
-
-    const walk = (props: Properties | undefined, depth: number): void => {
-        if (!props) return;
-        for (const [key, property] of Object.entries(props as Record<string, Property>)) {
-            if (!property) continue;
-            if (property.type === "relation") {
-                const relProp = property as RelationProperty;
-                (depth === 0 ? topLevel : nested).add(relProp.relationName ?? key);
-            } else if (property.type === "map") {
-                walk(property.properties, depth + 1);
-            } else if (property.type === "array") {
-                const arrayProp = property as ArrayProperty;
-                if (Array.isArray(arrayProp.of)) {
-                    arrayProp.of.forEach(p => walk({ entry: p } as Properties, depth + 1));
-                } else if (arrayProp.of) {
-                    walk({ entry: arrayProp.of } as Properties, depth + 1);
-                }
-                if (arrayProp.oneOf?.properties) walk(arrayProp.oneOf.properties, depth + 1);
-            }
-        }
-    };
-
-    walk(properties, 0);
-
-    for (const identity of topLevel) nested.delete(identity);
-    return nested;
-}
-
-/**
  * The lists rendered inside an entity view of `collection` — its tabs.
  *
  * The single derivation. There used to be two that disagreed: this one, and a
@@ -431,7 +399,6 @@ export function getEntityChildViews<M extends Record<string, unknown> = Record<s
     if (!capabilities.supportsRelations) return [];
 
     const resolvedRelations = resolveCollectionRelations(collection);
-    const nestedOnly = getNestedRelationIdentities(collection.properties);
     const views: EntityChildView[] = [];
     const seen = new Set<string>();
 
@@ -446,13 +413,6 @@ export function getEntityChildViews<M extends Record<string, unknown> = Record<s
         const identity = relation.relationName ?? relationKey;
         if (seen.has(identity)) continue;
 
-        // A relation declared inside a `map` is a field of that map, not a list
-        // hanging off the record. `extractRelationsFromProperties` hoists it to
-        // the collection's `relations` so the nested property can be stamped —
-        // which had the side effect of giving it a tab of its own, keyed by the
-        // inner property key.
-        if (nestedOnly.has(identity)) continue;
-
         let target: CollectionConfig | undefined;
         try {
             target = relation.target();
@@ -464,7 +424,7 @@ export function getEntityChildViews<M extends Record<string, unknown> = Record<s
 
         // A name given to the declaring property is the author naming the tab.
         const declaringProperty = Object.entries((collection.properties ?? {}) as Record<string, Property>)
-            .find(([propKey, p]) => p.type === "relation" && (p.relationName ?? propKey) === identity);
+            .find(([propKey, p]) => p.type === "relation" && ((p as RelationProperty).relation?.relationName ?? propKey) === identity);
         const customName = declaringProperty?.[1]?.name;
 
         const base: CollectionConfig<Record<string, unknown>> = {

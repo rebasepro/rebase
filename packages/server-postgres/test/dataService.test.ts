@@ -102,17 +102,15 @@ const postsCollection: CollectionConfig = {
     },
     relations: [
         {
+            kind: "belongsTo",
             relationName: "author",
             target: () => authorsCollection,
-            cardinality: "one",
-            direction: "owning",
             localKey: "author_id"
         },
         {
+            kind: "manyToMany",
             relationName: "tags",
             target: () => tagsCollection,
-            cardinality: "many",
-            direction: "owning",
             through: {
                 table: "posts_tags",
                 sourceColumn: "post_id",
@@ -137,10 +135,9 @@ authorsCollection = {
     },
     relations: [
         {
+            kind: "hasMany",
             relationName: "posts",
             target: () => postsCollection,
-            cardinality: "many",
-            direction: "inverse",
             foreignKeyOnTarget: "author_id"
         }
     ],
@@ -455,10 +452,9 @@ dataType: "number" },
 relationName: "companies" }
         },
         relations: [{
+            kind: "hasMany",
             relationName: "companies",
             target: () => companiesCollection,
-            cardinality: "many",
-            direction: "inverse",
             foreignKeyOnTarget: "user_id"
         }],
         idField: "id"
@@ -478,17 +474,15 @@ relationName: "projects" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "owner",
                 target: () => usersCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "user_id"
             },
             {
+                kind: "hasMany",
                 relationName: "projects",
                 target: () => projectsCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "company_id"
             }
         ],
@@ -514,24 +508,21 @@ relationName: "tags" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "company",
                 target: () => companiesCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "company_id"
             },
             {
+                kind: "hasMany",
                 relationName: "tasks",
                 target: () => tasksCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "project_id"
             },
             {
+                kind: "manyToMany",
                 relationName: "tags",
                 target: () => tagsCollection,
-                cardinality: "many",
-                direction: "owning",
                 through: {
                     table: "project_tags",
                     sourceColumn: "project_id",
@@ -556,17 +547,15 @@ relationName: "assignee" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "project",
                 target: () => projectsCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "project_id"
             },
             {
+                kind: "belongsTo",
                 relationName: "assignee",
                 target: () => usersCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "assignee_id"
             }
         ],
@@ -598,17 +587,15 @@ relationName: "children" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "parent",
                 target: () => categoriesCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "parent_id"
             },
             {
+                kind: "hasMany",
                 relationName: "children",
                 target: () => categoriesCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "parent_id"
             }
         ],

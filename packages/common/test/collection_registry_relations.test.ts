@@ -57,16 +57,18 @@ isId: "increment" },
             author: {
                 name: "Author",
                 type: "relation",
-                target: () => authorsCol,
-                cardinality: "one",
-                direction: "owning"
+                relation: {
+                    kind: "belongsTo",
+                    target: () => authorsCol,
+                }
             } as RelationProperty,
             tags: {
                 name: "Tags",
                 type: "relation",
-                target: () => tagsCol,
-                cardinality: "many",
-                direction: "owning"
+                relation: {
+                    kind: "manyToMany",
+                    target: () => tagsCol,
+                }
             } as RelationProperty
         }
     };
@@ -103,17 +105,15 @@ isId: "increment" },
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "author_rel",
                 target: () => authorsCol,
-                cardinality: "one",
-                direction: "owning"
-            },
+                },
             {
+                kind: "manyToMany",
                 relationName: "tags_rel",
                 target: () => tagsCol,
-                cardinality: "many",
-                direction: "owning"
-            }
+                }
         ]
     };
 }
@@ -222,9 +222,10 @@ describe("Layer 2 – normalizeProperty stamps relation metadata", () => {
                         primary_tag: {
                             name: "Primary Tag",
                             type: "relation",
-                            target: () => tags,
-                            cardinality: "one",
-                            direction: "owning"
+                            relation: {
+                                kind: "belongsTo",
+                                target: () => tags,
+                            }
                         } as RelationProperty
                     }
                 }
@@ -419,9 +420,9 @@ describe("Layer 5 – idempotent re-registration", () => {
             properties: {
                 ...posts.properties,
                 tags: {
+                    kind: "belongsTo",
                     ...(posts.properties.tags as RelationProperty),
-                    cardinality: "one"
-                }
+                    }
             }
         };
 
@@ -464,9 +465,10 @@ isId: "increment" },
                 tags: {
                     name: "Tags",
                     type: "relation",
-                    target: () => tags,
-                    cardinality: "many",
-                    direction: "owning"
+                    relation: {
+                        kind: "manyToMany",
+                        target: () => tags,
+                    }
                 } as RelationProperty
             }
         };
@@ -474,12 +476,12 @@ isId: "increment" },
         // Now add the inverse relation on tags pointing back to posts
         tags.relations = [
             {
+                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                // Was: cardinality=many direction=inverse
+                kind: "AMBIGUOUS",
                 relationName: "posts",
                 target: () => posts,
-                cardinality: "many",
-                direction: "inverse",
-                inverseRelationName: "tags"
-            }
+                }
         ];
 
         const registry = new CollectionRegistry([posts, tags]);
@@ -509,9 +511,11 @@ isId: "increment" },
                 author: {
                     name: "Author",
                     type: "relation",
-                    target: "authors", // String slug instead of function returning reference
-                    cardinality: "one",
-                    direction: "owning"
+                    // String slug instead of function returning reference,
+                    relation: {
+                        kind: "belongsTo",
+                        target: "authors",
+                    }
                 } as RelationProperty
             }
         };
@@ -574,9 +578,10 @@ isId: "increment" },
                 tags: {
                     name: "Tags",
                     type: "relation",
-                    target: () => tags,
-                    cardinality: "many",
-                    direction: "owning"
+                    relation: {
+                        kind: "manyToMany",
+                        target: () => tags,
+                    }
                 } as RelationProperty,
                 // Legacy relation — uses explicit relations[]
                 author: {
@@ -589,18 +594,18 @@ isId: "increment" },
                 category: {
                     name: "Category",
                     type: "relation",
-                    target: () => categories,
-                    cardinality: "one",
-                    direction: "owning"
+                    relation: {
+                        kind: "belongsTo",
+                        target: () => categories,
+                    }
                 } as RelationProperty
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "author_link",
                     target: () => authors,
-                    cardinality: "one",
-                    direction: "owning"
-                }
+                    }
             ]
         };
 
@@ -666,13 +671,14 @@ isId: "increment" },
                 tags: {
                     name: "Tags",
                     type: "relation",
-                    target: () => tags,
-                    cardinality: "many",
-                    direction: "owning",
-                    through: {
+                    relation: {
+                        kind: "manyToMany",
+                        target: () => tags,
+                        through: {
                         table: "posts_tags",
                         sourceColumn: "post_id",
                         targetColumn: "tag_id"
+                    },
                     }
                 } as RelationProperty
             }
@@ -726,10 +732,9 @@ isId: "increment" },
                     name: "Customer",
                     type: "relation",
                     relation: {
+                        kind: "belongsTo",
                         relationName: "customer",
                         target: () => customers,
-                        cardinality: "one",
-                        direction: "owning",
                         localKey: "customer_id"
                     }
                 } as RelationProperty
@@ -782,11 +787,12 @@ isId: "increment" },
                     direction: "owning",
                     // Nested relation with different cardinality (should be ignored)
                     relation: {
+                        // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                        // Was: cardinality=many direction=inverse
+                        kind: "AMBIGUOUS",
                         relationName: "customer",
                         target: () => customers,
-                        cardinality: "many",
-                        direction: "inverse"
-                    }
+                        }
                 } as RelationProperty
             }
         };
@@ -833,19 +839,19 @@ isId: "increment" },
                     name: "Order",
                     type: "relation",
                     relation: {
+                        kind: "belongsTo",
                         relationName: "order",
                         target: () => orders,
-                        cardinality: "one",
-                        direction: "owning"
-                    }
+                        }
                 } as RelationProperty,
                 // Inline relation to products
                 product: {
                     name: "Product",
                     type: "relation",
-                    target: () => products,
-                    cardinality: "one",
-                    direction: "owning"
+                    relation: {
+                        kind: "belongsTo",
+                        target: () => products,
+                    }
                 } as RelationProperty
             }
         };
@@ -861,12 +867,12 @@ isId: "increment" },
             },
             relations: [
                 {
+                    // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                    // Was: cardinality=many direction=inverse
+                    kind: "AMBIGUOUS",
                     relationName: "order_items",
                     target: () => orderItems,
-                    cardinality: "many",
-                    direction: "inverse",
-                    inverseRelationName: "order"
-                }
+                    }
             ]
         };
 
@@ -881,12 +887,12 @@ isId: "increment" },
             },
             relations: [
                 {
+                    // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                    // Was: cardinality=many direction=inverse
+                    kind: "AMBIGUOUS",
                     relationName: "orders",
                     target: () => orders,
-                    cardinality: "many",
-                    direction: "inverse",
-                    inverseRelationName: "customer"
-                }
+                    }
             ]
         };
 
@@ -929,9 +935,10 @@ isId: "increment" },
                 product: {
                     name: "Product",
                     type: "relation",
-                    target: () => products,
-                    cardinality: "one",
-                    direction: "owning"
+                    relation: {
+                        kind: "belongsTo",
+                        target: () => products,
+                    }
                 } as RelationProperty
             }
         };
@@ -946,11 +953,12 @@ isId: "increment" }
             },
             relations: [
                 {
+                    // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                    // Was: cardinality=many direction=inverse
+                    kind: "AMBIGUOUS",
                     relationName: "order_items",
                     target: () => orderItems,
-                    cardinality: "many",
-                    direction: "inverse"
-                }
+                    }
             ]
         };
 
@@ -1046,13 +1054,14 @@ isId: "increment" },
                 tags: {
                     name: "Tags",
                     type: "relation",
-                    target: () => tags,
-                    cardinality: "many",
-                    direction: "owning",
-                    through: {
+                    relation: {
+                        kind: "manyToMany",
+                        target: () => tags,
+                        through: {
                         table: "custom_junction",
                         sourceColumn: "src",
                         targetColumn: "tgt"
+                    },
                     }
                 } as RelationProperty
             }

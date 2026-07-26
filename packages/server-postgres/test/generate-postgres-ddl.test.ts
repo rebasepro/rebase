@@ -92,9 +92,9 @@ describe("generatePostgresDdl", () => {
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "author",
                     target: () => usersCollection,
-                    cardinality: "one",
                     localKey: "author_id",
                     onDelete: "set null"
                 }
@@ -119,10 +119,9 @@ describe("generatePostgresDdl", () => {
             },
             relations: [
                 {
+                    kind: "manyToMany",
                     relationName: "tags",
                     target: () => tagsCollection,
-                    cardinality: "many",
-                    direction: "owning",
                     through: {
                         table: "posts_to_tags",
                         sourceColumn: "post_id",
@@ -168,10 +167,9 @@ describe("generatePostgresDdl", () => {
             ],
             relations: [
                 {
+                    kind: "manyToMany",
                     relationName: "tags",
                     target: () => tagsCollection,
-                    cardinality: "many",
-                    direction: "owning",
                     through: { table: "posts_to_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
                 }
             ]
@@ -213,10 +211,9 @@ describe("generatePostgresDdl", () => {
             properties: { title: { type: "string" } },
             relations: [
                 {
+                    kind: "manyToMany",
                     relationName: "tags",
                     target: () => tagsCollection,
-                    cardinality: "many",
-                    direction: "owning",
                     through: { table: "posts_to_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
                 }
             ]

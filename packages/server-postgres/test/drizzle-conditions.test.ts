@@ -62,10 +62,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     describe("buildRelationConditions - Owning Many-to-Many", () => {
         it("should build correct conditions for owning many-to-many relation", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "tags",
                 target: () => ({ slug: "tags" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "owning",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "post_id",
@@ -90,10 +89,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
         it("should handle array of parent entity IDs for owning relation", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "tags",
                 target: () => ({ slug: "tags" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "owning",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "post_id",
@@ -119,10 +117,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     describe("buildRelationConditions - Inverse Many-to-Many", () => {
         it("should build correct conditions for inverse many-to-many relation", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "posts",
                 target: () => ({ slug: "posts" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "inverse",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id",
@@ -147,10 +144,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
         it("should handle array of parent entity IDs for inverse relation", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "posts",
                 target: () => ({ slug: "posts" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "inverse",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id",
@@ -215,10 +211,10 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             ];
 
             const relation: Relation = {
+                kind: "via",
                 relationName: "tags_via_join",
                 target: () => ({ slug: "tags" } as unknown as CollectionConfig),
                 cardinality: "many",
-                direction: "inverse",
                 joinPath: joinPathWithJunction
             };
 
@@ -250,10 +246,10 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             ];
 
             const relation: Relation = {
+                kind: "via",
                 relationName: "missing_relation",
                 target: () => ({ slug: "nonexistent" } as unknown as CollectionConfig),
                 cardinality: "one",
-                direction: "inverse",
                 joinPath: joinPathWithMissingRelation
             };
 
@@ -290,10 +286,10 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             ];
 
             const relation: Relation = {
+                kind: "via",
                 relationName: "author_tags",
                 target: () => ({ slug: "tags" } as unknown as CollectionConfig),
                 cardinality: "many",
-                direction: "inverse",
                 joinPath: complexJoinPath
             };
 
@@ -315,10 +311,10 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     describe("Junction Table Discovery", () => {
         it("should try multiple naming patterns for junction tables", () => {
             const relation: Relation = {
+                kind: "via",
                 relationName: "test_junction",
                 target: () => ({ slug: "tags" } as unknown as CollectionConfig),
                 cardinality: "many",
-                direction: "inverse",
                 joinPath: [
                     {
                         table: "tags",
@@ -359,10 +355,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     describe("Error handling", () => {
         it("should throw error when junction table is not found", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "posts",
                 target: () => ({ slug: "posts" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "inverse",
                 through: {
                     table: "nonexistent_table",
                     sourceColumn: "tag_id",
@@ -385,10 +380,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
         it("should throw error when source column is not found in junction table", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "posts",
                 target: () => ({ slug: "posts" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "inverse",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "nonexistent_column",
@@ -411,10 +405,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
         it("should throw error when target column is not found in junction table", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "posts",
                 target: () => ({ slug: "posts" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "inverse",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id",
@@ -439,10 +432,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     describe("buildRelationCountQuery - Many-to-Many", () => {
         it("should build correct count query for owning many-to-many relation", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "tags",
                 target: () => ({ slug: "tags" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "owning",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "post_id",
@@ -473,10 +465,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
         it("should build correct count query for inverse many-to-many relation", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "posts",
                 target: () => ({ slug: "posts" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "inverse",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id",
@@ -509,10 +500,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     describe("buildRelationQuery - Many-to-Many", () => {
         it("should build correct query for owning many-to-many relation with additional filters", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "tags",
                 target: () => ({ slug: "tags" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "owning",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "post_id",
@@ -546,10 +536,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
         it("should build correct query for inverse many-to-many relation with additional filters", () => {
             const relation: Relation = {
+                kind: "manyToMany",
                 relationName: "posts",
                 target: () => ({ slug: "posts" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "inverse",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id",
@@ -586,10 +575,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         it("should correctly handle the tags/20/posts scenario that was failing", () => {
             // This is the exact scenario from the user's error
             const tagsToPostsRelation: Relation = {
+                kind: "manyToMany",
                 relationName: "posts",
                 target: () => ({ slug: "posts" } as unknown as CollectionConfig),
-                cardinality: "many",
-                direction: "inverse",
                 through: {
                     table: "posts_tags",
                     sourceColumn: "tag_id", // FK to this collection's PK in junction table
@@ -625,9 +613,8 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 table: "posts",
                 relations: [
                     {
+                        kind: "manyToMany",
                         relationName: "tags",
-                        cardinality: "many",
-                        direction: "owning",
                         through: {
                             table: "posts_tags",
                             sourceColumn: "post_id",
@@ -641,11 +628,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             // This is the ACTUAL scenario: inverse relation without through property
             // but with foreignKeyOnTarget incorrectly added by sanitizeRelation
             const tagsToPostsRelation: Relation = {
+                kind: "hasMany",
                 relationName: "posts",
                 target: () => mockPostsCollection as unknown as CollectionConfig,
-                cardinality: "many",
-                direction: "inverse",
-                inverseRelationName: "tags",
                 foreignKeyOnTarget: "tag_id" // This gets added by sanitizeRelation at runtime
                 // NO through property - this is the key difference
             };
@@ -692,9 +677,8 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 table: "posts",
                 relations: [
                     {
+                        kind: "manyToMany",
                         relationName: "tags",
-                        cardinality: "many" as const,
-                        direction: "owning" as const,
                         through: {
                             table: "posts_tags",
                             sourceColumn: "post_id",
@@ -707,12 +691,12 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
             // Create the inverse relation (tags -> posts)
             const inverseRelation: Relation = {
+                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                // Was: cardinality=many direction=inverse
+                kind: "AMBIGUOUS",
                 relationName: "posts",
                 target: () => mockPostsCollection as unknown as CollectionConfig,
-                cardinality: "many",
-                direction: "inverse",
-                inverseRelationName: "tags" // This should match the key in the target collection relations
-            };
+                };
 
             // Test the buildRelationConditions with the inverse relation (without explicit through)
             const result = DrizzleConditionBuilder.buildRelationConditions(
@@ -745,9 +729,8 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 table: "posts",
                 relations: [
                     {
+                        kind: "manyToMany",
                         relationName: "tags",
-                        cardinality: "many" as const,
-                        direction: "owning" as const,
                         through: {
                             table: "posts_tags",
                             sourceColumn: "post_id",
@@ -760,12 +743,12 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
             // The inverse relation from tags collection (this was failing before the fix)
             const tagsToPostsRelation: Relation = {
+                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                // Was: cardinality=many direction=inverse
+                kind: "AMBIGUOUS",
                 relationName: "posts",
                 target: () => mockPostsCollection as unknown as CollectionConfig,
-                cardinality: "many",
-                direction: "inverse",
-                inverseRelationName: "tags" // This is the key that should match the owning relation
-            };
+                };
 
             // This should NOT throw "Foreign key column 'tag_id' not found in target table"
             const result = DrizzleConditionBuilder.buildRelationConditions(
@@ -794,12 +777,12 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             };
 
             const inverseRelation: Relation = {
+                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                // Was: cardinality=many direction=inverse
+                kind: "AMBIGUOUS",
                 relationName: "posts",
                 target: () => mockPostsCollection as unknown as CollectionConfig,
-                cardinality: "many",
-                direction: "inverse",
-                inverseRelationName: "nonexistent"
-            };
+                };
 
             // Should fall back to checking foreignKeyOnTarget or throw appropriate error
             expect(() => {
@@ -826,9 +809,8 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 table: "posts",
                 relations: [
                     {
+                        kind: "manyToMany",
                         relationName: "tags",
-                        cardinality: "many" as const,
-                        direction: "owning" as const,
                         through: {
                             table: "posts_tags",
                             sourceColumn: "post_id", // From posts perspective
@@ -840,12 +822,12 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             };
 
             const inverseRelation: Relation = {
+                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                // Was: cardinality=many direction=inverse
+                kind: "AMBIGUOUS",
                 relationName: "posts",
                 target: () => mockPostsCollection as unknown as CollectionConfig,
-                cardinality: "many",
-                direction: "inverse",
-                inverseRelationName: "tags"
-            };
+                };
 
             const result = DrizzleConditionBuilder.buildRelationConditions(
                 inverseRelation,
@@ -872,12 +854,12 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             };
 
             const inverseRelationWithoutInverseName: Relation = {
+                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+                // Was: cardinality=many direction=?
+                kind: "AMBIGUOUS",
                 relationName: "posts",
                 target: () => mockPostsCollection as unknown as CollectionConfig,
-                cardinality: "many",
-                direction: "inverse"
-                // No inverseRelationName specified
-            };
+                };
 
             // Should throw an appropriate error since it can't find the junction table
             expect(() => {

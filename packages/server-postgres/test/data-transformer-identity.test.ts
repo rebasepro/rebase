@@ -78,10 +78,9 @@ relationName: "attendees" }
         },
         relations: [
             {
+                kind: "hasMany",
                 relationName: "attendees",
                 target: () => attendeesCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "event_sku"
             }
         ]
@@ -97,10 +96,9 @@ relationName: "seat" }
         },
         relations: [
             {
+                kind: "hasOne",
                 relationName: "seat",
                 target: () => seatsCollection,
-                cardinality: "one",
-                direction: "inverse",
                 foreignKeyOnTarget: "event_sku"
             }
         ]

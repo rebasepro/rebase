@@ -72,8 +72,9 @@ describe("sanitizeRelation", () => {
     it("defaults relationName from target slug", () => {
         const target = makeTargetCollection({ slug: "user_profiles" });
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "one" } as Partial<Relation>,
+            {
+    kind: "belongsTo", target: () => target,
+} as Partial<Relation>,
             makeCollection()
         );
         expect(result.relationName).toBe("user_profiles");
@@ -82,8 +83,9 @@ cardinality: "one" } as Partial<Relation>,
     it("infers direction as owning for one-to-one without foreignKeyOnTarget", () => {
         const target = makeTargetCollection();
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "one" } as Partial<Relation>,
+            {
+    kind: "belongsTo", target: () => target,
+} as Partial<Relation>,
             makeCollection()
         );
         expect(result.direction).toBe("owning");
@@ -92,8 +94,8 @@ cardinality: "one" } as Partial<Relation>,
     it("infers direction as inverse for one-to-one with foreignKeyOnTarget", () => {
         const target = makeTargetCollection();
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "one",
+            {
+    kind: "belongsTo", target: () => target,
 foreignKeyOnTarget: "source_id" } as Partial<Relation>,
             makeCollection()
         );
@@ -103,8 +105,11 @@ foreignKeyOnTarget: "source_id" } as Partial<Relation>,
     it("infers direction as inverse for has-many", () => {
         const target = makeTargetCollection();
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "many" } as Partial<Relation>,
+            {
+    // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+    // Was: cardinality=many direction=?
+    kind: "AMBIGUOUS", target: () => target,
+} as Partial<Relation>,
             makeCollection()
         );
         expect(result.direction).toBe("inverse");
@@ -113,9 +118,9 @@ cardinality: "many" } as Partial<Relation>,
     it("generates localKey for owning one-to-one", () => {
         const target = makeTargetCollection({ slug: "authors" });
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "one",
-direction: "owning" } as Partial<Relation>,
+            {
+    kind: "belongsTo", target: () => target,
+} as Partial<Relation>,
             makeCollection()
         );
         // Should generate a FK name from the relation name
@@ -126,9 +131,11 @@ direction: "owning" } as Partial<Relation>,
     it("generates foreignKeyOnTarget for inverse one-to-many", () => {
         const target = makeTargetCollection({ slug: "comments" });
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "many",
-direction: "inverse" } as Partial<Relation>,
+            {
+    // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+    // Was: cardinality=many direction=inverse
+    kind: "AMBIGUOUS", target: () => target,
+} as Partial<Relation>,
             makeCollection({ slug: "posts",
 name: "Posts" })
         );
@@ -142,9 +149,9 @@ table: "tags" });
 name: "Posts",
 table: "posts" });
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "many",
-direction: "owning" } as Partial<Relation>,
+            {
+    kind: "manyToMany", target: () => target,
+} as Partial<Relation>,
             source
         );
         expect(result.through).toBeDefined();
@@ -160,9 +167,9 @@ table: "tags" });
 name: "Posts",
 table: "posts" });
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "many",
-direction: "owning" } as Partial<Relation>,
+            {
+    kind: "manyToMany", target: () => target,
+} as Partial<Relation>,
             source
         );
         // Should be alphabetically sorted: "posts_tags"
@@ -175,9 +182,9 @@ direction: "owning" } as Partial<Relation>,
         // Actually let's test the validation error by using custom joinPath=undefined but no auto-generation
         // The current code auto-generates localKey, so this won't throw. Let's verify it's generated.
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "one",
-direction: "owning" } as Partial<Relation>,
+            {
+    kind: "belongsTo", target: () => target,
+} as Partial<Relation>,
             makeCollection()
         );
         expect(result.localKey).toBeDefined();
@@ -186,9 +193,8 @@ direction: "owning" } as Partial<Relation>,
     it("preserves explicit localKey", () => {
         const target = makeTargetCollection();
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "one",
-direction: "owning",
+            {
+    kind: "belongsTo", target: () => target,
 localKey: "custom_fk" } as Partial<Relation>,
             makeCollection()
         );
@@ -198,9 +204,8 @@ localKey: "custom_fk" } as Partial<Relation>,
     it("preserves explicit foreignKeyOnTarget", () => {
         const target = makeTargetCollection();
         const result = sanitizeRelation(
-            { target: () => target,
-cardinality: "one",
-direction: "inverse",
+            {
+    kind: "hasOne", target: () => target,
 foreignKeyOnTarget: "custom_fk" } as Partial<Relation>,
             makeCollection()
         );
@@ -220,9 +225,10 @@ describe("resolvePropertyRelation", () => {
         const property: RelationProperty = {
             name: "Author",
             type: "relation",
-            target: () => target,
-            cardinality: "one",
-            direction: "owning"
+            relation: {
+                kind: "belongsTo",
+                target: () => target,
+            }
         };
         const result = resolvePropertyRelation({
             propertyKey: "author",
@@ -240,10 +246,9 @@ describe("resolvePropertyRelation", () => {
             name: "Author",
             type: "relation",
             relation: {
+                kind: "belongsTo",
                 target: () => target,
-                cardinality: "one",
-                direction: "owning"
-            }
+                }
         };
         const result = resolvePropertyRelation({
             propertyKey: "author",
@@ -263,11 +268,10 @@ describe("resolvePropertyRelation", () => {
         const sourceCollection = makeCollection({
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "author",
                     target: () => target,
-                    cardinality: "one",
-                    direction: "owning"
-                } as Relation
+                    } as Relation
             ]
         });
         const result = resolvePropertyRelation({

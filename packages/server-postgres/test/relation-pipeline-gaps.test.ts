@@ -80,10 +80,9 @@ relationName: "tags" }
     },
     relations: [
         {
+            kind: "manyToMany",
             relationName: "tags",
             target: () => tagsCollection,
-            cardinality: "many",
-            direction: "owning",
             through: {
                 table: "posts_tags",
                 sourceColumn: "post_id",
@@ -106,10 +105,9 @@ relationName: "posts" }
     },
     relations: [
         {
+            kind: "hasMany",
             relationName: "posts",
             target: () => postsCollection,
-            cardinality: "many",
-            direction: "inverse",
             foreignKeyOnTarget: "author_id"
         }
     ],
@@ -129,10 +127,9 @@ relationName: "posts" }
     },
     relations: [
         {
+            kind: "manyToMany",
             relationName: "posts",
             target: () => postsCollection,
-            cardinality: "many",
-            direction: "inverse",
             through: {
                 table: "posts_tags",
                 sourceColumn: "post_id",
@@ -352,12 +349,12 @@ author_id: "999" }
         });
 
         const relation: Relation = {
+            // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
+            // Was: cardinality=one direction=inverse
+            kind: "AMBIGUOUS",
             relationName: "posts",
             target: () => postsWithFK,
-            cardinality: "one",
-            direction: "inverse",
-            inverseRelationName: "author"
-        };
+            };
 
         // Drizzle returns author_id as string
         const resultRows = [
@@ -480,11 +477,10 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
         };
 
         const relation: Partial<Relation> = {
+            kind: "manyToMany",
             relationName: "tags",
             target: () => target,
-            cardinality: "many",
-            direction: "owning"
-        };
+            };
 
         const normalized = sanitizeRelation(relation, source as any);
 
@@ -507,11 +503,10 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
         };
 
         const relation: Partial<Relation> = {
+            kind: "manyToMany",
             relationName: "articles",
             target: () => target,
-            cardinality: "many",
-            direction: "owning"
-        };
+            };
 
         const normalized = sanitizeRelation(relation, source as any);
 
@@ -533,11 +528,10 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
         };
 
         const relation: Partial<Relation> = {
+            kind: "manyToMany",
             relationName: "labels",
             target: () => target,
-            cardinality: "many",
-            direction: "owning"
-        };
+            };
 
         const normalized = sanitizeRelation(relation, source as any);
 
@@ -559,11 +553,10 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
         };
 
         const relation: Partial<Relation> = {
+            kind: "manyToMany",
             relationName: "tags",
             target: () => target,
-            cardinality: "many",
-            direction: "owning"
-        };
+            };
 
         const normalized = sanitizeRelation(relation, source as any);
 
@@ -588,10 +581,9 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
         };
 
         const relation: Partial<Relation> = {
+            kind: "manyToMany",
             relationName: "tags",
             target: () => target,
-            cardinality: "many",
-            direction: "owning",
             through: {
                 table: "custom_junction",
                 sourceColumn: "src_id",
@@ -615,11 +607,10 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
         };
 
         const relation: Partial<Relation> = {
+            kind: "manyToMany",
             relationName: "friends",
             target: () => usersCollection,
-            cardinality: "many",
-            direction: "owning"
-        };
+            };
 
         const normalized = sanitizeRelation(relation, usersCollection as any);
 
@@ -642,10 +633,10 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
         };
 
         const relation: Partial<Relation> = {
+            kind: "via",
             relationName: "permissions",
             target: () => target,
             cardinality: "many",
-            direction: "owning",
             joinPath: [
                 { table: "user_roles",
 on: { from: "id",
@@ -712,11 +703,12 @@ columnName: "client_id" },
             title: { type: "string" },
             client: {
                 type: "relation",
-                relationName: "client",
-                target: () => clientsCollection,
-                cardinality: "one",
-                direction: "owning",
-                localKey: "clientId"
+                relation: {
+                    kind: "belongsTo",
+                    target: () => clientsCollection,
+                    relationName: "client",
+                    localKey: "clientId",
+                }
             } as any
         }
     };

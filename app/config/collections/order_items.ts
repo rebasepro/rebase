@@ -35,18 +35,20 @@ const orderItemsCollection: PostgresCollectionConfig = {
         order: {
             name: "Order",
             type: "relation",
-            target: () => ordersCollection,
-            cardinality: "one",
-            direction: "owning",
-            onDelete: "cascade"
+            relation: {
+                kind: "belongsTo",
+                target: () => ordersCollection,
+                onDelete: "cascade",
+            }
         },
         product: {
             name: "Product",
             type: "relation",
-            target: () => productsCollection,
-            cardinality: "one",
-            direction: "owning",
-            onDelete: "restrict"
+            relation: {
+                kind: "belongsTo",
+                target: () => productsCollection,
+                onDelete: "restrict",
+            }
         },
         product_name: {
             name: "Product Name",

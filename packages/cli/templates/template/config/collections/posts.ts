@@ -1,8 +1,8 @@
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 import authorsCollection from "./authors.js";
 import tagsCollection from "./tags.js";
 
-const postsCollection: PostgresCollectionConfig = {
+const postsCollection = defineCollection({
     name: "Posts",
     singularName: "Post",
     slug: "posts",
@@ -51,23 +51,25 @@ const postsCollection: PostgresCollectionConfig = {
         author: {
             name: "Author",
             type: "relation",
-            relationName: "author",
-            target: () => authorsCollection,
-            cardinality: "one",
-            direction: "owning"
+            relation: {
+                kind: "belongsTo",
+                target: () => authorsCollection,
+                relationName: "author",
+            }
         },
         tags: {
             name: "Tags",
             type: "relation",
-            relationName: "tags",
-            target: () => tagsCollection,
-            cardinality: "many",
-            direction: "owning"
+            relation: {
+                kind: "manyToMany",
+                target: () => tagsCollection,
+                relationName: "tags",
+            }
         }
     },
     admin: {
         icon: "Article"
     }
-};
+});
 
 export default postsCollection;

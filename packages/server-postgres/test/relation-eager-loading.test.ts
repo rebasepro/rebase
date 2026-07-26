@@ -56,10 +56,9 @@ relationName: "user" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "user",
                 target: () => customersCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "user_id"
             }
         ],

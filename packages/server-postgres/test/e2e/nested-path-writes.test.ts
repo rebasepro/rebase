@@ -61,20 +61,19 @@ const tagsCollection: CollectionConfig = {
         // The other side of the junction, so a listing can be exercised through
         // one. Named differently from its target's slug on purpose.
         {
+            kind: "manyToMany",
             relationName: "posts_via_tag",
             target: () => postsCollection,
-            cardinality: "many",
-            direction: "inverse",
             through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" }
         },
         {
+            kind: "via",
             // The same reach spelled as a multi-hop `joinPath`: tags → the
             // junction → posts. Here the last step's `to` *is* the target's
             // primary key, which is the shape that happens to work either way.
             relationName: "posts_via_hops",
             target: () => postsCollection,
             cardinality: "many",
-            direction: "inverse",
             joinPath: [
                 { table: "posts_tags", on: { from: "id", to: "tag_id" } },
                 { table: "posts", on: { from: "post_id", to: "id" } }
@@ -91,13 +90,13 @@ const authorsCollection: CollectionConfig = {
     },
     relations: [
         {
+            kind: "hasMany",
             relationName: "posts",
             target: () => postsCollection,
-            cardinality: "many",
-            direction: "inverse",
             foreignKeyOnTarget: "author_id"
         },
         {
+            kind: "via",
             // The same link spelled as an explicit one-step `joinPath`. The
             // step's `to` is a foreign key on the target, *not* the target's
             // primary key — which is the case a scope condition correlating on
@@ -105,7 +104,6 @@ const authorsCollection: CollectionConfig = {
             relationName: "posts_via_join",
             target: () => postsCollection,
             cardinality: "many",
-            direction: "inverse",
             joinPath: [
                 { table: "posts", on: { from: "id", to: "author_id" } }
             ]
@@ -122,17 +120,15 @@ const postsCollection: CollectionConfig = {
     },
     relations: [
         {
+            kind: "belongsTo",
             relationName: "author",
             target: () => authorsCollection,
-            cardinality: "one",
-            direction: "owning",
             localKey: "author_id"
         },
         {
+            kind: "manyToMany",
             relationName: "tags",
             target: () => tagsCollection,
-            cardinality: "many",
-            direction: "owning",
             through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
         }
     ]

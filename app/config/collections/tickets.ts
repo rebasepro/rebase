@@ -146,9 +146,10 @@ const ticketsCollection: PostgresCollectionConfig = {
         customer: {
             name: "Customer",
             type: "relation",
-            target: () => customersCollection,
-            cardinality: "one",
-            direction: "owning"
+            relation: {
+                kind: "belongsTo",
+                target: () => customersCollection,
+            }
         },
         assigned_to: {
             name: "Assigned To",

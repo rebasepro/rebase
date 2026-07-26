@@ -131,16 +131,18 @@ const postsCollection: PostgresCollectionConfig = {
         author: {
             name: "Author",
             type: "relation",
-            target: () => authorsCollection,
-            cardinality: "one",
-            direction: "owning"
+            relation: {
+                kind: "belongsTo",
+                target: () => authorsCollection,
+            }
         },
         tags: {
             name: "Tags",
             type: "relation",
-            target: () => tagsCollection,
-            cardinality: "many",
-            direction: "owning"
+            relation: {
+                kind: "manyToMany",
+                target: () => tagsCollection,
+            }
         }
     },
     callbacks: {

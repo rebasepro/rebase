@@ -1,7 +1,7 @@
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/admin-types";
 import categoriesCollection from "./categories.js";
 
-const productsCollection: PostgresCollectionConfig = {
+const productsCollection = defineCollection({
     name: "Products",
     singularName: "Product",
     slug: "products",
@@ -58,15 +58,16 @@ const productsCollection: PostgresCollectionConfig = {
         category: {
             name: "Category",
             type: "relation",
-            relationName: "category",
-            target: () => categoriesCollection,
-            cardinality: "one",
-            direction: "owning"
+            relation: {
+                kind: "belongsTo",
+                target: () => categoriesCollection,
+                relationName: "category",
+            }
         }
     },
     admin: {
         icon: "ShoppingCart"
     }
-};
+});
 
 export default productsCollection;

@@ -83,17 +83,15 @@ relationName: "profile" }
         },
         relations: [
             {
+                kind: "hasMany",
                 relationName: "orders",
                 target: () => ordersCollection,
-                cardinality: "many",
-                direction: "inverse",
                 foreignKeyOnTarget: "customer_id"
             },
             {
+                kind: "hasOne",
                 relationName: "profile",
                 target: () => userProfilesCollection,
-                cardinality: "one",
-                direction: "inverse",
                 foreignKeyOnTarget: "user_id"
             }
         ],
@@ -114,17 +112,15 @@ relationName: "products" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "customer",
                 target: () => customersCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "customer_id"
             },
             {
+                kind: "manyToMany",
                 relationName: "products",
                 target: () => productsCollection,
-                cardinality: "many",
-                direction: "owning",
                 through: {
                     table: "order_items",
                     sourceColumn: "order_id",
@@ -159,10 +155,9 @@ relationName: "user" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "user",
                 target: () => customersCollection,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "user_id"
             }
         ],
@@ -557,10 +552,10 @@ relationName: "authorProfile" }
                 },
                 relations: [
                     {
+                        kind: "via",
                         relationName: "authorProfile",
                         target: () => userProfilesCollection,
                         cardinality: "one",
-                        direction: "owning",
                         joinPath: [
                             { table: "authors",
 on: { from: "posts.author_id",
@@ -682,10 +677,10 @@ relationName: "profile" }
                 },
                 relations: [
                     {
+                        kind: "via",
                         relationName: "profile",
                         target: () => userProfilesCollection,
                         cardinality: "one",
-                        direction: "inverse",
                         joinPath: [
                             { table: "customers",
 on: { from: "authors.id",
@@ -765,6 +760,7 @@ relationName: "tags" }
                 },
                 relations: [
                     {
+                        kind: "via",
                         relationName: "tags",
                         target: () => ({
                             slug: "tags",
@@ -775,7 +771,6 @@ name: { type: "string" } },
                             idField: "id"
                         }),
                         cardinality: "many",
-                        direction: "owning",
                         joinPath: [
                             { table: "post_tags",
 on: { from: "posts.id",
@@ -867,11 +862,10 @@ relationName: "orders" }
                 },
                 relations: [
                     {
+                        kind: "via",
                         relationName: "orders",
                         target: () => ordersCollection,
                         cardinality: "many",
-                        direction: "inverse",
-                        inverseRelationName: "products",
                         // Add joinPath to satisfy the validation
                         joinPath: [
                             { table: "order_items",
@@ -938,6 +932,7 @@ relationName: "posts" }
                 },
                 relations: [
                     {
+                        kind: "via",
                         relationName: "posts",
                         target: () => ({
                             slug: "posts",
@@ -948,7 +943,6 @@ title: { type: "string" } },
                             idField: "id"
                         }),
                         cardinality: "many",
-                        direction: "inverse",
                         joinPath: [
                             { table: "post_tags",
 on: { from: "tags.id",

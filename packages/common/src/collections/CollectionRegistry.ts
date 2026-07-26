@@ -20,7 +20,7 @@ import {
     getSubcollections,
     getTableName,
     resolveCollectionRelations,
-    sanitizeRelation
+    resolveRelation
 } from "../util";
 import { deepClone, mergeDeep, removeFunctions } from "@rebasepro/utils";
 import { DataSourceRegistry, resolveDataSource } from "../data/resolveDataSource";
@@ -225,54 +225,21 @@ export class CollectionRegistry {
             if (!result.engine) (result as { engine?: string }).engine = resolved.engine;
         }
 
-        // 1. Extract relations from properties that have inline config (target set)
-        const extractedRelations = this.extractRelationsFromProperties(result.properties);
+        // Relations are left exactly as authored.
+        //
+        // This used to hoist every inline relation property into
+        // `collection.relations`, merge it with the declared ones, and run each
+        // through `sanitizeRelation` — a pass that guessed at missing fields and
+        // fell back to the raw relation when it threw. `resolveCollectionRelations`
+        // now reads both sources itself and defaults deterministically, so there
+        // is nothing to hoist, nothing to merge and nothing to guess.
+        //
+        // The hoisting also had a defect worth not reinstating: it flattened
+        // relations declared inside a `map` up to the collection's top level,
+        // where they became child-view tabs keyed by the inner property key.
 
-        // 2. Merge with manual relations[] (manual entries win on name conflict)
-        const relResult = result;
-        const manualRelations = getDataSourceCapabilities(result.engine).supportsRelations ? (relResult.relations ?? []) : [];
-        const mergedRelationsRaw = [...extractedRelations];
-        for (const manual of manualRelations) {
-            const name = manual.relationName;
-            if (!name) {
-                mergedRelationsRaw.push(manual);
-            } else {
-                const existingIndex = mergedRelationsRaw.findIndex(r => r.relationName === name);
-                if (existingIndex === -1) {
-                    mergedRelationsRaw.push(manual);
-                } else {
-                    // Merge manual into existing, preserving custom fields like 'collection'
-                    mergedRelationsRaw[existingIndex] = {
-                        ...manual,
-                        ...mergedRelationsRaw[existingIndex]
-                    };
-                }
-            }
-        }
-
-        let mergedRelations = mergedRelationsRaw;
-
-        // 2b. Sanitize each relation so derived fields (through, localKey,
-        //     foreignKeyOnTarget, etc.) are populated. Without this the
-        //     property.relation stamp is missing junction-table metadata and
-        //     the backend cannot fetch many-to-many data.
-        if (getDataSourceCapabilities(result.engine).supportsRelations) {
-            mergedRelations = mergedRelationsRaw.map(r => {
-                try {
-                    return sanitizeRelation(r, result, (slug) => this.get(slug));
-                } catch {
-                    // sanitizeRelation may throw for incomplete configs
-                    // (e.g. missing target). Keep the raw relation as-is.
-                    return r;
-                }
-            });
-
-            // 3. Set the merged relations on the result copy
-            relResult.relations = mergedRelations;
-        }
-
-        // 4. Normalize properties (which stamps relation on each property)
-        const properties: Properties = this.normalizeProperties(result.properties, mergedRelations);
+        // Stamp each relation property with its resolved relation.
+        const properties: Properties = this.normalizeProperties(result.properties, result);
         result.properties = properties as EngineProperties;
 
         // `childCollections` is deliberately NOT populated here.
@@ -286,68 +253,30 @@ export class CollectionRegistry {
         return result;
     }
 
-    /**
-     * Extract Relation[] from properties that have inline relation config (i.e. `target` is set).
-     * This allows developers to define relations directly on properties without a separate
-     * `relations[]` entry on the collection.
-     */
-    private extractRelationsFromProperties(properties: Properties): Relation[] {
-        const relations: Relation[] = [];
-        for (const [key, property] of Object.entries(properties as Record<string, Property>)) {
-            if (property.type === "relation") {
-                const relProp = property as RelationProperty;
-                // Support both inline config (target directly on property)
-                // and nested config (target inside property.relation)
-                const target = relProp.target ?? relProp.relation?.target;
-                if (target) {
-                    const relationName = relProp.relationName ?? relProp.relation?.relationName ?? key;
-                    relations.push({
-                        relationName,
-                        target,
-                        cardinality: relProp.cardinality ?? relProp.relation?.cardinality ?? "one",
-                        direction: relProp.direction ?? relProp.relation?.direction ?? "owning",
-                        inverseRelationName: relProp.inverseRelationName ?? relProp.relation?.inverseRelationName,
-                        localKey: relProp.localKey ?? relProp.relation?.localKey,
-                        foreignKeyOnTarget: relProp.foreignKeyOnTarget ?? relProp.relation?.foreignKeyOnTarget,
-                        through: relProp.through ?? relProp.relation?.through,
-                        joinPath: relProp.joinPath ?? relProp.relation?.joinPath,
-                        onUpdate: relProp.onUpdate ?? relProp.relation?.onUpdate,
-                        onDelete: relProp.onDelete ?? relProp.relation?.onDelete,
-                        overrides: relProp.overrides ?? relProp.relation?.overrides
-                    });
-                }
-            } else if (property.type === "map" && property.properties) {
-                // Recurse into map children to extract nested inline relations
-                relations.push(...this.extractRelationsFromProperties(property.properties));
-            }
-        }
-        return relations;
-    }
-
-    private normalizeProperties(properties: Properties, relations: Relation[]): Properties {
+    private normalizeProperties(properties: Properties, collection: CollectionConfig): Properties {
         const newProperties: Properties = {};
         for (const key in properties) {
-            newProperties[key] = this.normalizeProperty(key, properties[key], relations);
+            newProperties[key] = this.normalizeProperty(key, properties[key], collection);
         }
         return newProperties;
     }
 
-    private normalizeProperty(key: string, property: Property, relations: Relation[]): Property {
+    private normalizeProperty(key: string, property: Property, collection: CollectionConfig): Property {
         const newProperty = { ...property };
 
         if (newProperty.type === "map" && newProperty.properties) {
-            newProperty.properties = this.normalizeProperties(newProperty.properties, relations);
+            newProperty.properties = this.normalizeProperties(newProperty.properties, collection);
         } else if (newProperty.type === "array") {
             // Cast to get a properly typed mutable reference
             const arrayProp = newProperty as ArrayProperty;
             if (arrayProp.of) {
                 if (Array.isArray(arrayProp.of)) {
-                    (arrayProp as { of: Property | Property[] }).of = arrayProp.of.map((p, i) => this.normalizeProperty(`${key}[${i}]`, p, relations));
+                    (arrayProp as { of: Property | Property[] }).of = arrayProp.of.map((p, i) => this.normalizeProperty(`${key}[${i}]`, p, collection));
                 } else {
-                    arrayProp.of = this.normalizeProperty(`${key}.of`, arrayProp.of, relations);
+                    arrayProp.of = this.normalizeProperty(`${key}.of`, arrayProp.of, collection);
                 }
             } else if (arrayProp.oneOf && arrayProp.oneOf.properties) {
-                arrayProp.oneOf.properties = this.normalizeProperties(arrayProp.oneOf.properties, relations);
+                arrayProp.oneOf.properties = this.normalizeProperties(arrayProp.oneOf.properties, collection);
             }
         } else if ((newProperty.type === "string" || newProperty.type === "number") && newProperty.enum) {
             const stringOrNumberProperty = newProperty as StringProperty | NumberProperty;
@@ -356,13 +285,23 @@ export class CollectionRegistry {
             }
         } else if (newProperty.type === "relation") {
             const relationProperty = newProperty as RelationProperty;
-            const name = relationProperty.relationName || key;
-            const relation = relations.find(r => r.relationName === name);
-            if (relation) {
-                // we attach the resolved relation to the property
-                relationProperty.relation = relation;
+
+            // A property either declares its link inline, or names one the
+            // collection declares. Resolve the first directly; look the second
+            // up by name. Either way the property carries the fully-defaulted
+            // relation, so no consumer has to re-derive it.
+            if (relationProperty.relation) {
+                relationProperty.resolvedRelation = resolveRelation(relationProperty.relation, collection, key);
             } else {
-                console.warn(`Could not find relation for property '${key}' with relationName: ${name}`);
+                const declared = resolveCollectionRelations(collection)[key];
+                if (declared) {
+                    relationProperty.resolvedRelation = declared;
+                } else {
+                    console.warn(
+                        `Relation property '${key}' on '${collection.slug}' declares no \`relation\`, and the ` +
+                        "collection has no relation of that name."
+                    );
+                }
             }
         }
 

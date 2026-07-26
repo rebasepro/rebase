@@ -55,10 +55,10 @@ relationName: "all_warehouses" }
         },
         relations: [
             {
+                kind: "via",
                 relationName: "warehouse",
                 target: () => warehousesCollection,
                 cardinality: "one",
-                direction: "inverse",
                 joinPath: [
                     { table: "stock",
 sourceColumn: "sku",
@@ -69,10 +69,10 @@ targetColumn: "id" }
                 ]
             },
             {
+                kind: "via",
                 relationName: "all_warehouses",
                 target: () => warehousesCollection,
                 cardinality: "many",
-                direction: "inverse",
                 joinPath: [
                     { table: "stock",
 sourceColumn: "sku",
@@ -100,10 +100,10 @@ relationName: "warehouse" }
         },
         relations: [
             {
+                kind: "via",
                 relationName: "warehouse",
                 target: () => warehousesCollection,
                 cardinality: "one",
-                direction: "inverse",
                 joinPath: [
                     { table: "stock",
 sourceColumn: "tenant_id",

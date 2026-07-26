@@ -50,10 +50,9 @@ const postsCollection: CollectionConfig = {
     },
     relations: [
         {
+            kind: "belongsTo",
             relationName: "author",
             target: () => authorsCollection,
-            cardinality: "one",
-            direction: "owning",
             localKey: "author_id"
         }
     ],

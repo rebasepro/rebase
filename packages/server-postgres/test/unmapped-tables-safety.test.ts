@@ -16,10 +16,9 @@ describe("Unmapped tables safety with Atlas", () => {
                 },
                 relations: [
                     {
+                        kind: "manyToMany",
                         relationName: "tags",
                         target: () => ({ table: "tags", slug: "tags" }),
-                        cardinality: "many",
-                        direction: "owning",
                         through: {
                             table: "posts_to_tags",
                             sourceColumn: "post_id",
