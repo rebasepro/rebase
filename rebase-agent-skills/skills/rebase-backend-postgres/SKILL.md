@@ -217,6 +217,7 @@ The `DatabaseAdapter` API — a simpler, flattened interface that wraps the boot
 
 ```typescript
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
 import path from "path";
@@ -265,7 +266,7 @@ server.listen(3001);
 
 The bootstrapper protocol — database-specific logic is encapsulated in bootstrapper objects:
 
-```typescript
+```typescript no-verify
 import { createPostgresDatabaseConnection, createPostgresBootstrapper } from "@rebasepro/server-postgres";
 import { tables, enums, relations } from "./schema.generated.js";
 

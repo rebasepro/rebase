@@ -352,6 +352,7 @@ You can implement the `AuthAdapter` interface directly for complete control. The
 
 ```typescript
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { AuthenticatedUser, AuthAdapterCapabilities, UserManagementAdapter, UserCreationPrepareResult, UserCreationFinalizeResult } from "@rebasepro/types";
 
 export interface AuthAdapter {
@@ -560,7 +561,7 @@ const myOauthAdapter: AuthAdapter = {
         enabledProviders: []
     }),
     createAuthRoutes: () => {
-        const app = new Hono();
+        const app = new Hono<HonoEnv>();
         
         // Mounted automatically under /api/auth/callback
         app.get("/callback", async (c) => {

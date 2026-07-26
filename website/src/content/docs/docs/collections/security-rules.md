@@ -235,11 +235,12 @@ securityRules: [
 
 A common need is allowing **unauthenticated users** to submit data — contact forms, newsletter signups, public applications. Rebase provides a clean pattern for this.
 
-### Recommended: `access: "public"` with `withCheck`
+### Recommended: a raw `withCheck` rule
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
-const contactMessagesCollection = defineCollection({
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const contactMessagesCollection: PostgresCollectionConfig = {
     slug: "contact_messages",
     name: "Contact Messages",
     table: "contact_messages",
@@ -247,14 +248,18 @@ const contactMessagesCollection = defineCollection({
         // Anyone can submit a contact message
         {
             operation: "insert",
-            access: "public",
+            // A raw rule carries `using` (which rows are visible) and `withCheck`
+            // (what a write must satisfy); an insert only exercises the latter.
+            using: "true",
             withCheck: "true"
         },
         // Only admins can read, update, or delete messages
         { operations: ["select", "update", "delete"], roles: ["admin"] }
     ],
-    properties: { /* ... */ }
-});
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+};
 ```
 
 The `access: "public"` shortcut generates a policy that allows the operation without requiring authentication.
@@ -262,19 +267,22 @@ The `access: "public"` shortcut generates a policy that allows the operation wit
 ### For Lead Capture / Signups
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
-const leadSignupsCollection = defineCollection({
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const leadSignupsCollection: PostgresCollectionConfig = {
     slug: "lead_magnet_signups",
     name: "Lead Magnet Signups",
     table: "lead_magnet_signups",
     securityRules: [
         // Allow anonymous inserts
-        { operation: "insert", access: "public", withCheck: "true" },
+        { operation: "insert", using: "true", withCheck: "true" },
         // Admins can view all signups
         { operation: "select", roles: ["admin"] }
     ],
-    properties: { /* ... */ }
-});
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+};
 ```
 
 ### How Anonymous Requests Work

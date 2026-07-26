@@ -482,8 +482,6 @@ In production, the backend can serve the frontend SPA directly, eliminating the 
 ### `serveSPA()` Function Signature
 
 ```typescript
-import { serveSPA } from "@rebasepro/server";
-
 function serveSPA<E extends Env>(app: Hono<E>, config: ServeSPAConfig): void;
 ```
 

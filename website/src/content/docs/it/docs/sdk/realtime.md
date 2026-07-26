@@ -47,7 +47,7 @@ const unsubscribe = client.data.orders.listen(
 
 ### Firma
 
-```typescript
+```typescript no-verify
 listen(
     params: FindParams | undefined,
     onUpdate: (response: FindResponse<M>) => void,

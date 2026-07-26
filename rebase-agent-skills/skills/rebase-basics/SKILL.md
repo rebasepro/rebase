@@ -538,7 +538,9 @@ When `shutdown()` is called, it performs these steps in order:
 
 ```typescript
 import { Hono } from "hono";
-import { serve } from "@hono/node-server";
+import type { HonoEnv } from "@rebasepro/server";
+import { getRequestListener } from "@hono/node-server";
+import { createServer } from "http";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { defaultUsersCollection } from "@rebasepro/common";
@@ -548,8 +550,8 @@ import dotenv from "dotenv";
 dotenv.config({ path: "../../.env" });
 const env = loadEnv();
 
-const app = new Hono();
-const server = serve({ fetch: app.fetch, port: env.PORT });
+const app = new Hono<HonoEnv>();
+const server = createServer(getRequestListener(app.fetch));
 
 await initializeRebaseBackend({
     app,
@@ -645,8 +647,8 @@ import { rebase } from "@rebasepro/server";
 // In a cron job, custom function, or hook:
 
 // Data operations (admin-level, no RLS)
-const posts = await rebase.data.posts.find({ limit: 10 });
-await rebase.data.orders.create({ status: "pending", total: 99.99 });
+const { data: posts } = await rebase.data.collection<Record<string, unknown>>("posts").find({ limit: 10 });
+await rebase.data.collection<Record<string, unknown>>("orders").create({ status: "pending", total: 99.99 });
 
 // Send an email
 await rebase.email?.send({
@@ -663,7 +665,7 @@ if (rebase.sql) {
 
 ### Testing
 
-```typescript
+```typescript no-verify
 import { _setRebaseMock, _resetRebaseMock } from "@rebasepro/server";
 
 // Only works when NODE_ENV=test

@@ -204,8 +204,9 @@ Ein häufiges Bedürfnis ist es, **nicht authentifizierten Benutzern** das Über
 ### Empfohlen: `access: "public"` mit `withCheck`
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
-const contactMessagesCollection = defineCollection({
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const contactMessagesCollection: PostgresCollectionConfig = {
     slug: "contact_messages",
     name: "Contact Messages",
     table: "contact_messages",
@@ -213,14 +214,18 @@ const contactMessagesCollection = defineCollection({
         // Jeder kann eine Kontaktanfrage senden
         {
             operation: "insert",
-            access: "public",
+            // A raw rule carries `using` (which rows are visible) and `withCheck`
+            // (what a write must satisfy); an insert only exercises the latter.
+            using: "true",
             withCheck: "true"
         },
         // Nur Admins können Nachrichten lesen, aktualisieren oder löschen
         { operations: ["select", "update", "delete"], roles: ["admin"] }
     ],
-    properties: { /* ... */ }
-});
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+};
 ```
 
 Der `access: "public"`-Shortcut generiert eine Richtlinie, die die Operation ohne Authentifizierung ermöglicht.
@@ -228,19 +233,22 @@ Der `access: "public"`-Shortcut generiert eine Richtlinie, die die Operation ohn
 ### Für Lead-Generierung / Anmeldungen
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
-const leadSignupsCollection = defineCollection({
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const leadSignupsCollection: PostgresCollectionConfig = {
     slug: "lead_magnet_signups",
     name: "Lead Magnet Signups",
     table: "lead_magnet_signups",
     securityRules: [
         // Anonyme Einfügungen erlauben
-        { operation: "insert", access: "public", withCheck: "true" },
+        { operation: "insert", using: "true", withCheck: "true" },
         // Admins können alle Anmeldungen einsehen
         { operation: "select", roles: ["admin"] }
     ],
-    properties: { /* ... */ }
-});
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+};
 ```
 
 ### Wie anonyme Anfragen funktionieren

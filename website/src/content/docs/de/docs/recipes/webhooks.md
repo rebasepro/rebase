@@ -11,19 +11,23 @@ Verwenden Sie die Callbacks `afterSave` und `afterDelete`, um externe Dienste zu
 ## Slack-Benachrichtigung bei neuer Bestellung
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
-const ordersCollection = defineCollection({
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+// The row shape, so `values.customer_name` is a string rather than nothing.
+type Order = { customer_name: string; total: number };
+
+const ordersCollection: PostgresCollectionConfig<Order> = {
     slug: "orders",
     name: "Orders",
     table: "orders",
     callbacks: {
-        afterSave: async ({ values, entityId, status }) => {
+        afterSave: async ({ values, id, status }) => {
             if (status === "new") {
                 await fetch(process.env.SLACK_WEBHOOK_URL!, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        text: `🛒 New order #${entityId}\nCustomer: ${values.customer_name}\nTotal: $${values.total}`
+                        text: `🛒 New order #${id}\nCustomer: ${values.customer_name}\nTotal: $${values.total}`
                     })
                 });
             }

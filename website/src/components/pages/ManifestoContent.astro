@@ -27,6 +27,26 @@ import { NeatBackground } from '../../components/NeatBackground';
  <section class="relative z-0 py-16 sm:py-24">
       <article class="mx-auto max-w-3xl px-6 lg:px-8">
 
+        <!-- Where We Come From — deliberately first. The FireCMS record (10,000+
+             projects, years of learning where a CMS breaks) is the one thing on
+             this page no competitor could have written, and it was previously
+             sitting below a problem statement any of them could have published. -->
+        <div class="mb-16">
+          <h2 class="text-2xl font-medium tracking-tight text-white sm:text-3xl mb-6 border-l-2 border-primary pl-4">
+            {t("manifesto.origin.title")}
+          </h2>
+          <div class="prose prose-lg prose-invert max-w-none space-y-5">
+            <p class="text-lg text-surface-300 leading-relaxed" set:html={t("manifesto.origin.p1")}>
+            </p>
+            <p class="text-lg text-surface-300 leading-relaxed">
+              {t("manifesto.origin.p2")}
+            </p>
+            <p class="text-lg text-surface-300 leading-relaxed">
+              {t("manifesto.origin.p3")}
+            </p>
+          </div>
+        </div>
+
         <!-- The Problem -->
         <div class="mb-16">
           <h2 class="text-2xl font-medium tracking-tight text-white sm:text-3xl mb-6 border-l-2 border-primary pl-4">
@@ -41,23 +61,6 @@ import { NeatBackground } from '../../components/NeatBackground';
             </p>
             <p class="text-lg text-surface-300 leading-relaxed">
               {t("manifesto.problem.p3")}
-            </p>
-          </div>
-        </div>
-
-        <!-- Where We Come From -->
-        <div class="mb-16">
-          <h2 class="text-2xl font-medium tracking-tight text-white sm:text-3xl mb-6 border-l-2 border-primary pl-4">
-            {t("manifesto.origin.title")}
-          </h2>
-          <div class="prose prose-lg prose-invert max-w-none space-y-5">
-            <p class="text-lg text-surface-300 leading-relaxed" set:html={t("manifesto.origin.p1")}>
-            </p>
-            <p class="text-lg text-surface-300 leading-relaxed">
-              {t("manifesto.origin.p2")}
-            </p>
-            <p class="text-lg text-surface-300 leading-relaxed">
-              {t("manifesto.origin.p3")}
             </p>
           </div>
         </div>
@@ -87,10 +90,6 @@ import { NeatBackground } from '../../components/NeatBackground';
             <div class="border-l border-surface-800 pl-5">
               <h3 class="text-xl font-semibold text-white mb-2">{t("manifesto.beliefs.b5.title")}</h3>
               <p class="text-surface-400 leading-relaxed">{t("manifesto.beliefs.b5.desc")}</p>
-            </div>
-            <div class="border-l border-surface-800 pl-5">
-              <h3 class="text-xl font-semibold text-white mb-2">{t("manifesto.beliefs.b6.title")}</h3>
-              <p class="text-surface-400 leading-relaxed">{t("manifesto.beliefs.b6.desc")}</p>
             </div>
           </div>
         </div>

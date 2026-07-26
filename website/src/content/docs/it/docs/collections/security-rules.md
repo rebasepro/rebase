@@ -204,8 +204,9 @@ Un'esigenza comune è consentire agli **utenti non autenticati** di inviare dati
 ### Consigliato: `access: "public"` con `withCheck`
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
-const contactMessagesCollection = defineCollection({
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const contactMessagesCollection: PostgresCollectionConfig = {
     slug: "contact_messages",
     name: "Contact Messages",
     table: "contact_messages",
@@ -213,14 +214,18 @@ const contactMessagesCollection = defineCollection({
         // Chiunque può inviare un messaggio di contatto
         {
             operation: "insert",
-            access: "public",
+            // A raw rule carries `using` (which rows are visible) and `withCheck`
+            // (what a write must satisfy); an insert only exercises the latter.
+            using: "true",
             withCheck: "true"
         },
         // Solo gli amministratori possono leggere, aggiornare o eliminare messaggi
         { operations: ["select", "update", "delete"], roles: ["admin"] }
     ],
-    properties: { /* ... */ }
-});
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+};
 ```
 
 La scorciatoia `access: "public"` genera una policy che consente l'operazione senza richiedere autenticazione.
@@ -228,19 +233,22 @@ La scorciatoia `access: "public"` genera una policy che consente l'operazione se
 ### Per la Cattura di Lead / Iscrizioni
 
 ```typescript
-import { defineCollection } from "@rebasepro/admin-types";
-const leadSignupsCollection = defineCollection({
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+const leadSignupsCollection: PostgresCollectionConfig = {
     slug: "lead_magnet_signups",
     name: "Lead Magnet Signups",
     table: "lead_magnet_signups",
     securityRules: [
         // Consenti inserimenti anonimi
-        { operation: "insert", access: "public", withCheck: "true" },
+        { operation: "insert", using: "true", withCheck: "true" },
         // Gli amministratori possono visualizzare tutte le iscrizioni
         { operation: "select", roles: ["admin"] }
     ],
-    properties: { /* ... */ }
-});
+    properties: {
+        email: { name: "Email", type: "string" }
+    }
+};
 ```
 
 ### Come Funzionano le Richieste Anonime

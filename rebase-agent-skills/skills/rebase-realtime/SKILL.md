@@ -44,7 +44,7 @@ import { createRebaseClient } from "@rebasepro/client";
 const client = createRebaseClient({
     baseUrl: "http://localhost:3001",
     websocketUrl: "ws://localhost:3001",
-    getAuthToken: async () => myAuthToken,
+    token: myAuthToken,
 });
 
 // Subscribe to all products
@@ -84,7 +84,7 @@ The server respects these filters — only matching records are included in upda
 
 ### `listen()` Signature
 
-```typescript
+```typescript no-verify
 listen(
     params: FindParams | undefined,
     onUpdate: (response: FindResponse<M>) => void,
@@ -180,7 +180,7 @@ const unsubscribe = client.data.orders
 
 ### `.listen()` Signature on QueryBuilder
 
-```typescript
+```typescript no-verify
 listen(
     onUpdate: (data: FindResponse<M>) => void,
     onError?: (error: Error) => void

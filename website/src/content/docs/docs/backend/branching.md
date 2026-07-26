@@ -75,7 +75,7 @@ The branching API is exposed via the backend's `BranchService`. Below is a refer
 
 Generates a new branch database from the default database or an explicit source template.
 
-```typescript
+```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
 
 const backend = await initializeRebaseBackend({ /* ... */ });

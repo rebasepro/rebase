@@ -724,18 +724,16 @@ All SDK methods accept an optional `storageId` parameter (passed as a query para
 
 ```typescript
 // Upload to a specific backend
-const result = await client.storage.putObject({
+// `client.storage` is the default source. Pick a named backend from the registry.
+const media = client.storageRegistry.get("media") ?? client.storage;
+
+const result = await media.putObject({
     file: myFile,
-    key: "products/images/photo.jpg",
-    storageId: "media",   // routes to the "media" backend
+    key: "products/images/photo.jpg"
 });
 
-// Get signed URL from a specific backend
-const config = await client.storage.getSignedUrl(
-    "products/images/photo.jpg",
-    "default",     // bucket
-    { storageId: "media" }
-);
+// Get a signed URL from that same backend (second argument is the bucket)
+const config = await media.getSignedUrl("products/images/photo.jpg", "default");
 ```
 
 ### putObject
@@ -924,15 +922,16 @@ Registered storage sources are exposed to the component tree via `StorageSources
 import { useStorageSources } from "@rebasepro/app";
 
 function MyUploadComponent() {
-    const storageSources = useStorageSources();
+    // `registry` holds the definitions, `sources` the live clients — both keyed by
+    // the source key, so this is a lookup rather than a search.
+    const { sources } = useStorageSources();
 
-    // Get a specific source
-    const externalSource = storageSources.find(s => s.key === "external");
-
-    // Use it for direct uploads
-    if (externalSource?.source) {
-        await externalSource.source.putObject({ file, key: "photos/image.jpg" });
-    }
+    const upload = async (file: File) => {
+        const external = sources["external"];
+        if (external) {
+            await external.putObject({ file, key: "photos/image.jpg" });
+        }
+    };
 }
 ```
 

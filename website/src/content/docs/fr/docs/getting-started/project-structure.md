@@ -67,8 +67,9 @@ Le backend est un **serveur Node.js** basé sur [Hono](https://hono.dev/) (un fr
 import { initializeRebaseBackend } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 await initializeRebaseBackend({
     app,

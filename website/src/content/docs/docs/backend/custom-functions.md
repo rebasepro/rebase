@@ -22,8 +22,9 @@ Create a file in your `backend/functions/` directory that default-exports a Hono
 ```typescript
 // backend/functions/hello.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.get("/", (c) => {
     return c.json({ message: "Hello from custom function!" });
@@ -38,7 +39,7 @@ This mounts at **`/api/functions/hello`**. The filename (without extension) beco
 
 Enable custom functions by adding `functionsDir` to your backend config:
 
-```typescript
+```typescript no-verify
 import path from "path";
 
 const instance = await initializeRebaseBackend({
@@ -76,7 +77,8 @@ The loader accepts two export formats:
 
 ```typescript
 import { Hono } from "hono";
-const app = new Hono();
+import type { HonoEnv } from "@rebasepro/server";
+const app = new Hono<HonoEnv>();
 app.get("/status", (c) => c.json({ ok: true }));
 export default app;
 ```
@@ -85,8 +87,9 @@ export default app;
 
 ```typescript
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 export default function () {
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.get("/status", (c) => c.json({ ok: true }));
     return app;
 }
@@ -140,8 +143,9 @@ Use Rebase's built-in auth helpers:
 
 ```typescript
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 // Public endpoint — no auth required
 app.get("/public", (c) => {
@@ -150,7 +154,8 @@ app.get("/public", (c) => {
 
 // Protected endpoint — requires a valid JWT
 app.post("/protected", async (c) => {
-    const user = c.get("user"); // Injected by Rebase middleware
+    // Narrowed: the env types every variable the middleware may set.
+    const user = c.get("user") as { uid: string; roles?: string[] } | undefined;
     if (!user) {
         return c.json({ error: "Unauthorized" }, 401);
     }
@@ -159,7 +164,7 @@ app.post("/protected", async (c) => {
 
 // Admin-only endpoint
 app.post("/admin-only", async (c) => {
-    const user = c.get("user");
+    const user = c.get("user") as { uid: string; roles?: string[] } | undefined;
     const roles: string[] = user?.roles ?? [];
     if (!roles.includes("admin")) {
         return c.json({ error: "Admin access required" }, 403);
@@ -206,7 +211,7 @@ Using the driver ensures that users can only query or update records they are au
 ```typescript
 // backend/functions/my-products.ts
 import { Hono } from "hono";
-import { HonoEnv } from "@rebasepro/server"; // Import types for typing Hono context
+import type { HonoEnv } from "@rebasepro/server";
 
 const app = new Hono<HonoEnv>();
 
@@ -219,7 +224,7 @@ app.get("/", async (c) => {
     }
 
     // Queries respect Row-Level Security
-    const { data: myProducts } = await driver.fetchCollection({
+    const myProducts = await driver.fetchCollection({
         path: "products",
         limit: 10
     });
@@ -237,15 +242,16 @@ The `@rebasepro/server` package provides a `rebase` singleton that has **full ad
 ```typescript
 // backend/functions/approve-job.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { rebase } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.post("/:id/approve", async (c) => {
     const id = c.req.param("id");
 
     // Use the admin-level data API (bypasses RLS completely)
-    await rebase.data.jobs.update(id, {
+    await rebase.data.collection<Record<string, unknown>>("jobs").update(id, {
         status: "published",
         approved_at: new Date().toISOString(),
     });
@@ -270,10 +276,11 @@ If you need raw SQL or complex custom queries, you can access your Drizzle datab
 ```typescript
 // backend/functions/reports.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { db } from "../src/db"; // Your Drizzle instance
 import { sql } from "drizzle-orm";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.get("/stats", async (c) => {
     const result = await db.execute(sql`
@@ -303,8 +310,8 @@ Custom functions are loaded and mounted **after** `initializeRebaseBackend()` co
 
 This means your custom functions have access to all initialized services. Register any routes that need to run **before** Rebase on the Hono app directly, prior to calling `initializeRebaseBackend()`:
 
-```typescript
-const app = new Hono();
+```typescript no-verify
+const app = new Hono<HonoEnv>();
 
 // This runs BEFORE Rebase routes
 app.get("/health", (c) => c.json({ status: "ok" }));
@@ -318,11 +325,12 @@ const instance = await initializeRebaseBackend({ app, /* ... */ });
 ```typescript
 // backend/functions/stripe-webhook.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import Stripe from "stripe";
 import { instance } from "../src/index";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.post("/", async (c) => {
     const sig = c.req.header("stripe-signature")!;

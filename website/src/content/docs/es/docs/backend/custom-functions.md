@@ -22,8 +22,9 @@ Cree un archivo en su directorio `backend/functions/` que exporte por defecto un
 ```typescript
 // backend/functions/hello.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.get("/", (c) => {
     return c.json({ message: "Hello from custom function!" });
@@ -38,7 +39,7 @@ Esto se monta en **`/api/functions/hello`**. El nombre del archivo (sin extensi�
 
 Habilite las funciones personalizadas añadiendo `functionsDir` a su configuración de backend:
 
-```typescript
+```typescript no-verify
 import path from "path";
 
 const instance = await initializeRebaseBackend({
@@ -76,7 +77,8 @@ El cargador acepta dos formatos de exportación:
 
 ```typescript
 import { Hono } from "hono";
-const app = new Hono();
+import type { HonoEnv } from "@rebasepro/server";
+const app = new Hono<HonoEnv>();
 app.get("/status", (c) => c.json({ ok: true }));
 export default app;
 ```
@@ -85,8 +87,9 @@ export default app;
 
 ```typescript
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 export default function () {
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.get("/status", (c) => c.json({ ok: true }));
     return app;
 }
@@ -108,8 +111,9 @@ Utilice los helpers de autenticación incorporados de Rebase:
 
 ```typescript
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 // Public endpoint — no auth required
 app.get("/public", (c) => {
@@ -118,7 +122,8 @@ app.get("/public", (c) => {
 
 // Protected endpoint — requires a valid JWT
 app.post("/protected", async (c) => {
-    const user = c.get("user"); // Injected by Rebase middleware
+    // Narrowed: the env types every variable the middleware may set.
+    const user = c.get("user") as { uid: string; roles?: string[] } | undefined;
     if (!user) {
         return c.json({ error: "Unauthorized" }, 401);
     }
@@ -127,7 +132,7 @@ app.post("/protected", async (c) => {
 
 // Admin-only endpoint
 app.post("/admin-only", async (c) => {
-    const user = c.get("user");
+    const user = c.get("user") as { uid: string; roles?: string[] } | undefined;
     const roles: string[] = user?.roles ?? [];
     if (!roles.includes("admin")) {
         return c.json({ error: "Admin access required" }, 403);
@@ -153,9 +158,10 @@ El paquete `@rebasepro/server` proporciona un singleton `rebase` que le da acces
 ```typescript
 // backend/functions/approve-job.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { rebase } from "@rebasepro/server";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.post("/:id/approve", async (c) => {
     const id = c.req.param("id");
@@ -178,10 +184,11 @@ export default app;
 ```typescript
 // backend/functions/reports.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import { db } from "../src/db"; // Your Drizzle instance
 import { sql } from "drizzle-orm";
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.get("/stats", async (c) => {
     const result = await db.execute(sql`
@@ -211,8 +218,8 @@ Las funciones personalizadas se cargan y montan **después** de que `initializeR
 
 Esto significa que sus funciones personalizadas tienen acceso a todos los servicios inicializados. Registre cualquier ruta que necesite ejecutarse **antes** de Rebase directamente en la aplicación Hono, antes de llamar a `initializeRebaseBackend()`:
 
-```typescript
-const app = new Hono();
+```typescript no-verify
+const app = new Hono<HonoEnv>();
 
 // This runs BEFORE Rebase routes
 app.get("/health", (c) => c.json({ status: "ok" }));
@@ -226,11 +233,12 @@ const instance = await initializeRebaseBackend({ app, /* ... */ });
 ```typescript
 // backend/functions/stripe-webhook.ts
 import { Hono } from "hono";
+import type { HonoEnv } from "@rebasepro/server";
 import Stripe from "stripe";
 import { instance } from "../src/index";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 app.post("/", async (c) => {
     const sig = c.req.header("stripe-signature")!;

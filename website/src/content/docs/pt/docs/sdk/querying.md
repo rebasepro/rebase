@@ -240,16 +240,17 @@ const { data } = await client.data.posts
 Quando as relações são incluídas, a resposta contém **tanto** a chave estrangeira escalar quanto o objeto de relação hidratado:
 
 ```typescript
-const { data } = await client.data.posts
+const { data } = await client.data
+    .collection<{ author_id: string; author?: { name: string } }>("posts")
     .include("author")
     .find();
 
 for (const post of data) {
     // Scalar foreign key — always present
-    console.log(post.values.author_id);    // "uuid-1234"
+    console.log(post.author_id);    // "uuid-1234"
 
     // Hydrated relation — present when included
-    console.log(post.values.author?.name); // "Jane Doe"
+    console.log(post.author?.name); // "Jane Doe"
 }
 ```
 

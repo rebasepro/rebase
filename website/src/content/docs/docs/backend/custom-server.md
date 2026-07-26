@@ -95,9 +95,17 @@ async function startServer() {
         collections: [] // Pass Rebase CollectionConfigs if using schema-as-code
     });
 
-    // Access the underlying schema-aware Drizzle client if needed
-    const db = internals.db; // Drizzle NodePgDatabase instance
-    const readDb = internals.readDb; // Read replica Drizzle instance if DATABASE_READ_URL is set
+    // Access the underlying schema-aware Drizzle client if needed.
+    // `internals` is an *opaque handle* on the DatabaseAdapter contract — the shape is
+    // the driver's business, so narrow it to what the Postgres bootstrapper puts there.
+    // (named `driverInternals` rather than `pg`, which is the node-postgres import)
+    const driverInternals = internals as {
+        db: any;                                    // Drizzle NodePgDatabase
+        readDb?: any;                               // Read replica, when DATABASE_READ_URL is set
+        poolManager?: { destroy(): Promise<void> };
+    };
+    const db = driverInternals.db;
+    const readDb = driverInternals.readDb;
 
     // 5. Mount Realtime WebSockets
     await bootstrapper.initializeWebsockets(server, realtimeProvider, driver, {
@@ -115,7 +123,8 @@ async function startServer() {
         try {
             const result = await driver.save({
                 path: "products",
-                entity: req.body
+                values: req.body,
+                status: "new"   // required: "new" | "existing" | "copy"
             });
             res.status(201).json({ success: true, data: result });
         } catch (error) {
@@ -154,8 +163,8 @@ async function startServer() {
                 }
 
                 // Disconnect dynamic branch connection pools
-                if (internals.poolManager) {
-                    await internals.poolManager.destroy();
+                if (driverInternals.poolManager) {
+                    await driverInternals.poolManager.destroy();
                     console.log("✔ Branch connection pools evicted.");
                 }
 

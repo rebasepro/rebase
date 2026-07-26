@@ -380,7 +380,7 @@ const callbacks: CollectionCallbacks = {
     afterSave: async ({ id, values, previousValues, status, collection }) => {
         const event = status === "new" ? "INSERT" : "UPDATE";
         await dispatcher.onEntityChange(
-            collection.path,
+            collection.slug,
             event,
             String(id),
             values,
@@ -389,7 +389,7 @@ const callbacks: CollectionCallbacks = {
     },
     afterDelete: async ({ id, collection }) => {
         await dispatcher.onEntityChange(
-            collection.path,
+            collection.slug,
             "DELETE",
             String(id),
             null
@@ -508,7 +508,7 @@ import { dispatcher } from "../lib/webhooks";
 // In a collection callback:
 afterSave: async ({ id, values, status, collection }) => {
     if (status === "new") {
-        await dispatcher.onEntityChange(collection.path, "INSERT", String(id), values);
+        await dispatcher.onEntityChange(collection.slug, "INSERT", String(id), values);
     }
 },
 ```
@@ -582,7 +582,7 @@ If you don't want webhook delivery to block your API response, use fire-and-forg
 ```typescript
 afterSave: async ({ id, values, collection }) => {
     // Fire-and-forget — don't await
-    dispatcher.onEntityChange(collection.path, "INSERT", String(id), values)
+    dispatcher.onEntityChange(collection.slug, "INSERT", String(id), values)
         .catch(err => console.error("Webhook dispatch error:", err));
 },
 ```

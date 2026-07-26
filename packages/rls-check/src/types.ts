@@ -1,0 +1,216 @@
+/**
+ * The contract between the three layers of `rls-check`:
+ *
+ *   introspect.ts  — reads the catalogs into a {@link DbSnapshot}. Talks to Postgres.
+ *   checks/*.ts    — pure functions, snapshot in, {@link Finding}s out. No I/O.
+ *   report.ts      — Findings to text or JSON. No knowledge of Postgres.
+ *
+ * Checks being pure is the point: every one of them is unit-testable against a
+ * hand-written snapshot, so the test suite does not need a live database to
+ * cover the interesting cases (it has a Docker-backed suite too, for the
+ * introspection layer, which is the only part that can lie).
+ */
+
+/** Ordered least → most severe; the CLI's `--fail-on` compares by index. */
+export const SEVERITIES = ["info", "low", "medium", "high", "critical"] as const;
+
+export type Severity = (typeof SEVERITIES)[number];
+
+/** What a finding points at. `table` is absent for database-wide findings. */
+export interface FindingTarget {
+    schema: string;
+    table?: string;
+    /** Policy name, for policy-level findings. */
+    policy?: string;
+    view?: string;
+    routine?: string;
+    column?: string;
+}
+
+export interface Finding {
+    /**
+     * Stable, kebab-case check id — `rls-disabled`, `permissive-tautology`.
+     * Stable because people put it in `--skip` lists and CI baselines; treat a
+     * rename as a breaking change.
+     */
+    id: string;
+    severity: Severity;
+    /** One line, specific: names the object and what is wrong with it. */
+    title: string;
+    target: FindingTarget;
+    /**
+     * Why this is wrong, in concrete terms. Not "RLS is recommended" — say what
+     * the database will actually do when a request arrives.
+     */
+    detail: string;
+    /**
+     * What an unauthenticated or wrong-tenant caller gets out of it. This is the
+     * line people screenshot, so it must be true and not inflated: if reachability
+     * depends on the API layer, say "if this table is exposed over an API".
+     */
+    impact: string;
+    /** Copy-pasteable SQL, or a precise instruction when SQL cannot express it. */
+    fix?: string;
+    /** Anchor on https://rebase.pro/docs/rls-check#<id>, filled in by the check. */
+    docs?: string;
+    /**
+     * How sure the check is. Heuristic checks (junction inference, unqualified
+     * column detection) MUST set `"heuristic"` — the report separates them, and
+     * a false positive in the confident bucket is what makes a tool like this
+     * get uninstalled.
+     */
+    confidence: "certain" | "heuristic";
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot — the read-only picture of the database the checks reason about.
+// ---------------------------------------------------------------------------
+
+export type RelationKind = "table" | "partitioned_table" | "view" | "materialized_view" | "foreign_table";
+
+export interface DbRelation {
+    schema: string;
+    name: string;
+    kind: RelationKind;
+    owner: string;
+    /** `pg_class.relrowsecurity`. Always false for views. */
+    rlsEnabled: boolean;
+    /** `pg_class.relforcerowsecurity` — without it the owner bypasses RLS. */
+    rlsForced: boolean;
+    columns: DbColumn[];
+    /** Estimated live rows (`pg_class.reltuples`), -1 when never analyzed. */
+    estimatedRows: number;
+}
+
+export interface DbColumn {
+    name: string;
+    type: string;
+    notNull: boolean;
+    isPrimaryKey: boolean;
+}
+
+export type PolicyCommand = "ALL" | "SELECT" | "INSERT" | "UPDATE" | "DELETE";
+
+export interface DbPolicy {
+    schema: string;
+    table: string;
+    name: string;
+    /** PERMISSIVE policies OR together; RESTRICTIVE ones AND. */
+    permissive: boolean;
+    /** Roles in the TO clause. `["public"]` means every role. */
+    roles: string[];
+    command: PolicyCommand;
+    /** `pg_policies.qual` — the USING expression, as Postgres rewrote it. */
+    using: string | null;
+    /** `pg_policies.with_check`. */
+    withCheck: string | null;
+}
+
+export interface DbRole {
+    name: string;
+    canLogin: boolean;
+    superuser: boolean;
+    /** BYPASSRLS — every policy is a no-op for this role. */
+    bypassRls: boolean;
+    /** Roles this one is a member of, transitively resolved. */
+    memberOf: string[];
+}
+
+/** One privilege grant on a relation, from `information_schema.role_table_grants`. */
+export interface DbGrant {
+    schema: string;
+    table: string;
+    grantee: string;
+    privileges: ("SELECT" | "INSERT" | "UPDATE" | "DELETE" | "TRUNCATE" | "REFERENCES" | "TRIGGER")[];
+}
+
+export interface DbView {
+    schema: string;
+    name: string;
+    owner: string;
+    /**
+     * PG15+ `security_invoker=true`. When false, the view runs with the *owner's*
+     * privileges, so it reads straight past the RLS on its base tables.
+     * `null` on servers older than 15, where the option does not exist at all.
+     */
+    securityInvoker: boolean | null;
+    /** Base relations the view reads, resolved through `pg_depend`. */
+    dependsOn: { schema: string; table: string }[];
+}
+
+export interface DbForeignKey {
+    schema: string;
+    table: string;
+    columns: string[];
+    refSchema: string;
+    refTable: string;
+    refColumns: string[];
+}
+
+export interface DbRoutine {
+    schema: string;
+    name: string;
+    owner: string;
+    /** SECURITY DEFINER runs as the owner and can bypass RLS. */
+    securityDefiner: boolean;
+    /** True when `search_path` is NOT pinned in the routine's config. */
+    mutableSearchPath: boolean;
+}
+
+export interface DbSnapshot {
+    /** `server_version_num`, e.g. 160004. */
+    serverVersionNum: number;
+    serverVersion: string;
+    /** The role the scan itself connected as. */
+    currentRole: string;
+    /** True when the scanning role cannot be constrained by RLS — see report caveat. */
+    scannerIsPrivileged: boolean;
+    /** Schemas actually scanned, after `--schema` and the system-schema filter. */
+    schemas: string[];
+    /**
+     * Roles that are plausibly reachable by an untrusted caller: Supabase's
+     * `anon` / `authenticated`, PostgREST's `web_anon`, Rebase's `rebase_user`,
+     * plus `PUBLIC`. Checks use this to decide whether an exposure is real.
+     */
+    exposedRoles: string[];
+    /** Detected platform, which changes the wording of several findings. */
+    platform: "supabase" | "neon" | "rebase" | "postgrest" | "unknown";
+    relations: DbRelation[];
+    policies: DbPolicy[];
+    roles: DbRole[];
+    grants: DbGrant[];
+    views: DbView[];
+    foreignKeys: DbForeignKey[];
+    routines: DbRoutine[];
+}
+
+// ---------------------------------------------------------------------------
+// Checks
+// ---------------------------------------------------------------------------
+
+export interface Check {
+    id: string;
+    /** Shown in `--list-checks`. */
+    title: string;
+    /** One sentence on what the check looks for. */
+    description: string;
+    run(snapshot: DbSnapshot): Finding[];
+}
+
+export interface ScanResult {
+    /** ISO timestamp, stamped by the caller — checks stay pure. */
+    scannedAt: string;
+    /** Host and database only. NEVER the user, password or full URL. */
+    database: { host: string; name: string };
+    serverVersion: string;
+    platform: DbSnapshot["platform"];
+    scannerIsPrivileged: boolean;
+    stats: {
+        schemas: number;
+        tables: number;
+        policies: number;
+        tablesWithoutRls: number;
+        checksRun: number;
+    };
+    findings: Finding[];
+}

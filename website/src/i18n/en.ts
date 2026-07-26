@@ -3,11 +3,21 @@ export const en = {
   "hero.title.part1": "The Postgres you already have.",
   "hero.title.part2": "The backend you always wanted.",
   "hero.subtitle":
-    "Point Rebase at your database and get REST APIs, auth, storage and realtime — secured by Postgres row-level security, not middleware. The admin panel is a separate product: add it when you want one, or never. Built to be driven by your team and your AI agents.",
+    "Connect your database and get REST, auth, storage and realtime — with every access rule enforced by Postgres itself, not by middleware.",
   "hero.cta.demo": "See the live demo",
   "hero.cta.demo.note": "No signup — a real Rebase backend, live, with its generated admin panel",
   "hero.cli.label": "Prefer your terminal? Up and running locally in under a minute:",
   "hero.cta.github": "View on GitHub",
+
+  // Free-tool section. The copy stays useful to someone who will never adopt
+  // Rebase — the moment it reads as a funnel, it stops being worth running.
+  "rlscheck.badge": "Free tool · no signup",
+  "rlscheck.title": "Audit the Postgres you already have",
+  "rlscheck.subtitle":
+    "rls-check reads your database's policies and reports what is actually exposed: tables served with row-level security switched off, policies that evaluate to true for everyone, views that read straight past the RLS on their base tables. It works on any Postgres — Supabase, Neon, RDS, or your own server.",
+  "rlscheck.note":
+    "Read-only by construction: it opens a read-only transaction and runs catalog queries. It writes nothing, and no data ever leaves your machine.",
+  "rlscheck.cta": "See all 14 checks",
   "demo.badge": "Three commands. Zero boilerplate.",
   "demo.title": "Schema In · Platform Out",
   "demo.init": "✔ Initialized Rebase in current directory.",
@@ -649,10 +659,10 @@ export const en = {
 
   // Manifesto Page
   "manifesto.meta.title": "Our Manifesto — Why We're Building Rebase",
-  "manifesto.meta.description": "We're building the open-source, self-hosted foundation for every digital project. From weekend hacks to enterprise platforms — on Postgres, with no lock-in.",
+  "manifesto.meta.description": "Why we build Rebase: authorization belongs in the database, your schema stays yours, and agents are first-class users of your backend. MIT-licensed, built in Europe.",
   "manifesto.badge": "A letter from the team",
   "manifesto.hero.title": "Why we're building Rebase",
-  "manifesto.hero.subtitle": "And why we believe the future of application development is open, self-hosted, and built on Postgres.",
+  "manifesto.hero.subtitle": "And why we think the industry put authorization in the wrong place — in application code, instead of in the database that actually holds the data.",
 
   "manifesto.problem.title": "The problem we keep seeing",
   "manifesto.problem.p1": "Every new project starts the same way. You need a database. You need an admin panel. You need authentication, an API layer, file storage, permissions. You've built all of this before — maybe dozens of times. And yet, every time, you start from scratch or lock yourself into a platform that owns your data and your roadmap.",
@@ -664,19 +674,20 @@ export const en = {
   "manifesto.origin.p2": "FireCMS taught us a lot. It taught us that developers want flexibility, not lock-in. That end users want beauty and simplicity, not a wall of forms. That the best tools disappear into the background and let people focus on their actual work.",
   "manifesto.origin.p3": "But FireCMS was tied to Firebase. And as we watched the industry move toward Postgres, toward open standards, toward data sovereignty — we knew it was time to build something bigger. Something that could be the foundation for any digital project, not just those on one cloud provider.",
 
+  // Five beliefs, not six, and each one is meant to be disagreeable. The test we
+  // hold this section to: if a competitor could publish the same line under their
+  // own logo, it is a values page, not a manifesto — cut it or sharpen it.
   "manifesto.beliefs.title": "What we believe",
-  "manifesto.beliefs.b1.title": "Open source is not a feature — it's a foundation",
-  "manifesto.beliefs.b1.desc": "Rebase is fully open source under the MIT license. Every package, every line of code. Not open-core with a bait-and-switch. Not source-available with restrictions. MIT — because we believe the infrastructure you build on should truly be yours.",
-  "manifesto.beliefs.b2.title": "Self-hosting should be as easy as using a cloud service",
-  "manifesto.beliefs.b2.desc": "If setting up your own instance takes more than a few minutes, we've failed. Rebase should be as frictionless to deploy as signing up for a SaaS. Docker, Railway, Fly, bare metal — wherever you want to run it, it should just work.",
-  "manifesto.beliefs.b3.title": "Your database is your truth",
-  "manifesto.beliefs.b3.desc": "We don't create shadow databases. We don't abstract your schema away behind proprietary layers. Rebase connects directly to your Postgres, reads your tables, and builds on top of what you already have. Your data never leaves your infrastructure.",
-  "manifesto.beliefs.b4.title": "From weekend project to enterprise — on the same platform",
-  "manifesto.beliefs.b4.desc": "We want Rebase to be what you reach for on a Saturday afternoon hack and what you deploy in production on Monday. The same tool for a solo developer prototyping an idea and for a team of fifty managing a complex internal platform. No artificial ceilings, no upgrade-to-unlock walls.",
-  "manifesto.beliefs.b5.title": "The repetitive parts should not exist",
-  "manifesto.beliefs.b5.desc": "Setting up an admin panel, writing CRUD endpoints, wiring authentication, building form validation, configuring file storage — this is solved-problem territory. You shouldn't spend another week on it. Define your schema, and let the platform generate the rest.",
-  "manifesto.beliefs.b6.title": "Europe needs its own infrastructure",
-  "manifesto.beliefs.b6.desc": "We're building Rebase from Europe, and we care deeply about data sovereignty, GDPR compliance, and digital independence. But this isn't just a European project — it's for anyone who believes their data should stay where they put it.",
+  "manifesto.beliefs.b1.title": "Authorization belongs in the database",
+  "manifesto.beliefs.b1.desc": "This is the belief we bet the architecture on, and the one most likely to start an argument. Access rules that live in application code are rules a forgotten endpoint, a background job, a migration script or a direct SQL console can walk straight past — they protect the door, not the room. In Rebase, authorization is Postgres row-level security: written in TypeScript, compiled to real policies, enforced by the database itself on every statement and every caller. A table with no policy isn't served at all. We fail closed even when that's inconvenient, even when your very first query comes back empty and you have to go write a rule before you can continue. Every other model we've shipped eventually leaked. This one cannot.",
+  "manifesto.beliefs.b2.title": "Your database is your truth",
+  "manifesto.beliefs.b2.desc": "We don't create shadow databases. We don't hide your schema behind a proprietary layer, and we won't ask you to model your data twice. Rebase connects to your Postgres, reads your tables, and builds on what's already there — so what you see in psql is what the API serves. And if you delete Rebase tomorrow, your data is exactly where you left it, in a shape you can still use. A backend you can't walk away from isn't infrastructure, it's a hostage arrangement.",
+  "manifesto.beliefs.b3.title": "Agents are users of your backend, not a feature bolted onto it",
+  "manifesto.beliefs.b3.desc": "A large and growing share of the code written against your backend is now written by an agent — and agents don't read dashboards. They read schemas, types, and error messages. So Rebase ships an MCP server, machine-readable collection definitions, a generated typed SDK and scoped API keys, and we treat a confusing error as a bug whether the reader is a person or a model. Tools designed solely for a human clicking through a console are already being worked around rather than used.",
+  "manifesto.beliefs.b4.title": "Open source is a foundation, not a feature",
+  "manifesto.beliefs.b4.desc": "Rebase is MIT — every package, every line. Not open-core with the useful half behind a licence key. Not source-available with a clause about who may compete with us. We've watched too many infrastructure projects use \"open source\" as a funnel and then relicense once the community had done its part, and we know exactly how that felt from the outside. The licence is the promise, and MIT is the only version of that promise we couldn't quietly take back later.",
+  "manifesto.beliefs.b5.title": "Europe should own its infrastructure",
+  "manifesto.beliefs.b5.desc": "We build from Madrid, and we think the current arrangement — where most European companies run their data on infrastructure owned elsewhere and governed by someone else's law — is a strategic mistake worth undoing. Data sovereignty and GDPR aren't a compliance checkbox on our roadmap; they're the reason several design decisions here went the harder way. You can run Rebase anywhere on earth and we'd be glad if you did. But we aren't neutral about this one.",
 
   "manifesto.audience.title": "Who is Rebase for",
   "manifesto.audience.p1": "Rebase is for anyone who's tired of choosing between ease-of-use and ownership:",
@@ -697,11 +708,11 @@ export const en = {
 
   "manifesto.promise.title": "Our promise",
   "manifesto.promise.p1": "We're not building Rebase to flip it or to lock you in. We're building it because we've spent our careers making developer tools, and we know this is what's missing: an open, beautiful, Postgres-native platform that respects your data, your time, and your intelligence.",
-  "manifesto.promise.p2": "We ship fast. We listen to our community. We believe in building in public. And we're just getting started.",
+  "manifesto.promise.p2": "We ship fast, and we ship in public — the changelog and the issue tracker are the record. Rebase is early. Early enough that the beliefs above are still the whole product, and early enough that an argument you make can still change one of them. That's the best moment to show up.",
 
   "manifesto.closing": "If any of this resonates with you — if you've felt the same frustration, if you believe the same things — come build with us.",
   "manifesto.signature": "The Rebase Team",
-  "manifesto.signatureSubtitle": "Madrid · Building in the open since 2020",
+  "manifesto.signatureSubtitle": "Madrid · Building open-source developer tools since 2020",
 
   "manifesto.cta.title": "Ready to build something?",
   "manifesto.cta.getStarted": "Get Started",
