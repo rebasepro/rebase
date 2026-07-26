@@ -700,11 +700,12 @@ export function generateCollectionFile(
         ${relName}: {
             name: "${relHumanName}",
             type: "relation",
-            target: () => ${targetCollectionCamel},
-            cardinality: "one",
-            direction: "owning",
-            localKey: "${fk.column_name}",
             // mapped from foreign key: ${fk.column_name} -> ${targetTableName}(${fk.foreign_column_name})
+            relation: {
+                kind: "belongsTo",
+                target: () => ${targetCollectionCamel},
+                localKey: "${fk.column_name}"
+            }
         },`);
         }
     }
@@ -718,15 +719,12 @@ export function generateCollectionFile(
         const targetCollectionCamel = toCollectionVarName(sourceTableName);
         imports.add(`import ${targetCollectionCamel} from "./${sourceTableName}";`);
 
-        const inverseRelName = fk.column_name.replace(/_id$/, "");
-
         relationsOutput += `
         {
+            kind: "hasMany",
             relationName: "${sourceTableName}",
             target: () => ${targetCollectionCamel},
-            cardinality: "many",
-            direction: "inverse",
-            inverseRelationName: "${inverseRelName}",
+            // the ${sourceTableName}.${fk.column_name} FK points back here
             foreignKeyOnTarget: "${fk.column_name}"
         },`;
     }
@@ -755,10 +753,9 @@ export function generateCollectionFile(
 
             relationsOutput += `
         {
+            kind: "manyToMany",
             relationName: "${relPropName}",
             target: () => ${tableName}Collection,
-            cardinality: "many",
-            direction: "owning",
             through: {
                 table: "${jt}",
                 sourceColumn: "${thisFk.column_name}",
@@ -776,24 +773,23 @@ export function generateCollectionFile(
             const targetCollectionCamel = toCollectionVarName(targetTableName);
             imports.add(`import ${targetCollectionCamel} from "./${targetTableName}";`);
 
-            // Determine direction (alphabetically first table is owning)
-            const direction = tableName < targetTableName ? "owning" : "inverse";
-
+            // Both sides of a many-to-many are `manyToMany`. There is no owning
+            // and inverse side to pick between any more, so this no longer
+            // guesses one from table-name ordering and no longer emits a
+            // half-configured relation on the losing side with a comment asking
+            // the reader to finish it by hand. Introspection already knows both
+            // junction columns; each side just names them from its own end.
             const thisFk = joinFks.find((fk) => fk.foreign_table_name === tableName);
 
-            let throughCode = "";
-            if (direction === "owning" && thisFk) {
-                throughCode = `\n            through: {\n                table: "${jt}",\n                sourceColumn: "${thisFk.column_name}",\n                targetColumn: "${otherFk.column_name}"\n            },`;
-            } else if (direction === "inverse") {
-                throughCode = "\n            // Make sure the target collection configures the 'through' property.";
-            }
+            const throughCode = thisFk
+                ? `\n            through: {\n                table: "${jt}",\n                sourceColumn: "${thisFk.column_name}",\n                targetColumn: "${otherFk.column_name}"\n            }`
+                : "";
 
             relationsOutput += `
         {
+            kind: "manyToMany",
             relationName: "${targetTableName}",
-            target: () => ${targetCollectionCamel},
-            cardinality: "many",
-            direction: "${direction}",${throughCode}
+            target: () => ${targetCollectionCamel},${throughCode}
         },`;
         }
     }

@@ -351,9 +351,12 @@ is_nullable: "NO" }),
             const result = generateCollectionFile("posts", meta, fks, new Set(), new Map([["posts", meta]]), new Map());
             expect(result).toContain('import usersCollection from "./users"');
             expect(result).toContain("author: {");
-            expect(result).toContain('cardinality: "one"');
-            expect(result).toContain('direction: "owning"');
+            expect(result).toContain('kind: "belongsTo"');
             expect(result).toContain('localKey: "author_id"');
+            // The link nests under `relation` — it is not spread across the property.
+            expect(result).toContain("relation: {");
+            expect(result).not.toContain("cardinality:");
+            expect(result).not.toContain("direction:");
         });
     });
 
@@ -370,10 +373,9 @@ is_nullable: "NO" })
             // Should be in the relations array, not as an inline property
             expect(result).toContain("relations: [");
             expect(result).toContain('relationName: "comments"');
-            expect(result).toContain('cardinality: "many"');
-            expect(result).toContain('direction: "inverse"');
-            expect(result).toContain('inverseRelationName: "post"');
+            expect(result).toContain('kind: "hasMany"');
             expect(result).toContain('foreignKeyOnTarget: "post_id"');
+            expect(result).not.toContain("direction:");
             // Should NOT appear as an inline property with type: "relation"
             const propsSection = result.split("properties:")[1].split("relations:")[0];
             expect(propsSection).not.toContain('"relation"');
@@ -417,7 +419,7 @@ is_nullable: "NO" })
             const result = generateCollectionFile("articles", articlesMeta, [], joinTables, tablesMap, new Map());
             expect(result).toContain("relations: [");
             expect(result).toContain('relationName: "tags"');
-            expect(result).toContain('direction: "owning"');
+            expect(result).toContain('kind: "manyToMany"');
             expect(result).toContain('table: "articles_tags"');
             expect(result).toContain('sourceColumn: "article_id"');
             expect(result).toContain('targetColumn: "tag_id"');
@@ -444,7 +446,7 @@ is_nullable: "NO" })
 
             const result = generateCollectionFile("tags", tagsMeta, [], joinTables, tablesMap, new Map());
             expect(result).toContain("relations: [");
-            expect(result).toContain('direction: "inverse"');
+            expect(result).toContain('kind: "manyToMany"');
         });
     });
 
