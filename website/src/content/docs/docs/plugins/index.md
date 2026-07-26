@@ -109,7 +109,7 @@ function useMyPlugin(): RebasePlugin {
 AI-powered field autocompletion:
 
 ```typescript
-import { useDataEnhancementPlugin } from "@rebasepro/data_enhancement";
+import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 
 const enhancementPlugin = useDataEnhancementPlugin();
 ```

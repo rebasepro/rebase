@@ -107,7 +107,7 @@ function useMyPlugin(): RebasePlugin {
 KI-gestützte Feld-Autovervollständigung:
 
 ```typescript
-import { useDataEnhancementPlugin } from "@rebasepro/data_enhancement";
+import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 
 const enhancementPlugin = useDataEnhancementPlugin();
 ```

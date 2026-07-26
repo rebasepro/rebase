@@ -107,7 +107,7 @@ function useMyPlugin(): RebasePlugin {
 Autocompletado de campos impulsado por IA:
 
 ```typescript
-import { useDataEnhancementPlugin } from "@rebasepro/data_enhancement";
+import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 
 const enhancementPlugin = useDataEnhancementPlugin();
 ```

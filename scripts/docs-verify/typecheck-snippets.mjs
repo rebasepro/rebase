@@ -107,7 +107,20 @@ function isStubbable(specifier, root) {
     if (specifier.startsWith(".") || specifier.startsWith("/")) return true;
     if (specifier.includes(":")) return true; // virtual:, node:… (node: resolves anyway)
     try {
-        require.resolve(specifier, { paths: [root] });
+        // Resolve from the packages that actually depend on these, not just the
+        // workspace root. `react`, `hono` and `zod` are not root dependencies, so
+        // resolving from the root alone stubbed them out — and a stubbed module is
+        // `any`, which silently un-checks every snippet that imports it. That is how
+        // `useRef<HTMLDivElement>(null)` came to report "untyped function calls may
+        // not accept type arguments": React was never really in the program.
+        require.resolve(specifier, {
+            paths: [
+                root,
+                path.join(root, "packages/app"),
+                path.join(root, "packages/server"),
+                path.join(root, "packages/admin")
+            ]
+        });
         return false;
     } catch {
         return true;
@@ -287,8 +300,15 @@ export async function typecheckSnippets(root, opts = {}) {
             // React is not a root dependency either, so `useRef<HTMLDivElement>(null)` in a
             // frontend snippet hit "untyped function calls may not accept type arguments" —
             // the stub had swallowed the whole module.
-            react: [path.join(root, "packages/app/node_modules/react")],
-            "react-dom": [path.join(root, "packages/app/node_modules/react-dom")]
+            // Point at the *types*, not the runtime package: React ships no declarations
+            // of its own, so mapping the JS package leaves every call untyped.
+            react: [path.join(root, "node_modules/.pnpm/node_modules/@types/react")],
+            "react-dom": [path.join(root, "node_modules/.pnpm/node_modules/@types/react-dom")],
+            // Same story for the backend's own dependencies: resolvable from
+            // packages/server, invisible from the scratch directory snippets compile in.
+            "drizzle-orm": [path.join(root, "packages/server/node_modules/drizzle-orm")],
+            "drizzle-orm/*": [path.join(root, "packages/server/node_modules/drizzle-orm/*")],
+            "@hono/node-server": [path.join(root, "packages/server/node_modules/@hono/node-server")]
         }
     };
 
