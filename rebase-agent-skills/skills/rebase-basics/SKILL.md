@@ -645,8 +645,8 @@ import { rebase } from "@rebasepro/server";
 // In a cron job, custom function, or hook:
 
 // Data operations (admin-level, no RLS)
-const posts = await rebase.data.posts.find({ limit: 10 });
-await rebase.data.orders.create({ status: "pending", total: 99.99 });
+const { data: posts } = await rebase.data.collection<Record<string, unknown>>("posts").find({ limit: 10 });
+await rebase.data.collection<Record<string, unknown>>("orders").create({ status: "pending", total: 99.99 });
 
 // Send an email
 await rebase.email?.send({
@@ -663,7 +663,7 @@ if (rebase.sql) {
 
 ### Testing
 
-```typescript
+```typescript no-verify
 import { _setRebaseMock, _resetRebaseMock } from "@rebasepro/server";
 
 // Only works when NODE_ENV=test
