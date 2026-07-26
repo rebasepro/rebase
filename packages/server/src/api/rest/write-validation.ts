@@ -37,7 +37,7 @@ export function assertKnownWriteFields(
     // An owning relation stores its target in a local FK column that usually
     // has no property of its own; writing it directly is legitimate.
     for (const relation of Object.values(resolveCollectionRelations(collection))) {
-        if ((relation as ResolvedBelongsTo).localKey) known.add((relation as ResolvedBelongsTo).localKey);
+        if (relation.kind === "belongsTo") known.add((relation as ResolvedBelongsTo).localKey);
     }
 
     for (const field of options?.extraKnownFields ?? []) known.add(field);

@@ -234,7 +234,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
 
             // If the localKey property is defined elsewhere in the properties, it will be handled there.
             // This logic is for when the relation property itself defines the FK.
-            if (collection.properties[(relation as ResolvedBelongsTo).localKey] && propName !== (relation as ResolvedBelongsTo).localKey) {
+            if (collection.properties[relation.localKey] && propName !== relation.localKey) {
                 return null;
             }
 
@@ -245,7 +245,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
                 return null; // Cannot resolve target
             }
 
-            const fkColumnName = (relation as ResolvedBelongsTo).localKey;
+            const fkColumnName = relation.localKey;
             const targetTableVar = getTableVarName(getTableName(targetCollection));
             const pkProp = getPrimaryKeyProp(targetCollection);
             const targetIdField = pkProp.name;
@@ -265,7 +265,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
                 columnDef += ".notNull()";
             }
 
-            return `    ${(relation as ResolvedBelongsTo).localKey}: ${columnDef}`;
+            return `    ${relation.localKey}: ${columnDef}`;
         }
         case "reference": {
             const refProp = prop as ReferenceProperty;
@@ -407,7 +407,7 @@ const computeSharedRelationName = (
     // column to its Drizzle property key and builds the name from the table
     // that actually owns it.
     if (rel.kind === "belongsTo") {
-        const normalisedKey = resolvePropertyKeyForColumn(sourceCollection, (rel as ResolvedBelongsTo).localKey);
+        const normalisedKey = resolvePropertyKeyForColumn(sourceCollection, rel.localKey);
         return `${getTableName(sourceCollection)}_${normalisedKey}`;
     }
 
@@ -415,7 +415,7 @@ const computeSharedRelationName = (
         // The owning table is the *target*; the column is foreignKeyOnTarget.
         try {
             const targetCollection = rel.target();
-            const normalisedFK = resolvePropertyKeyForColumn(targetCollection, (rel as ResolvedForeignKeyOnTarget).foreignKeyOnTarget);
+            const normalisedFK = resolvePropertyKeyForColumn(targetCollection, rel.foreignKeyOnTarget);
             return `${getTableName(targetCollection)}_${normalisedFK}`;
         } catch {
             return fallback;
@@ -520,7 +520,7 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
         const resolvedRelations = resolveCollectionRelations(collection);
         for (const relation of Object.values(resolvedRelations)) {
             if (isManyToMany(relation)) { // Standard M2M junction table
-                const junctionTableName = (relation as ResolvedManyToMany).through.table;
+                const junctionTableName = relation.through.table;
                 if (!allTablesToGenerate.has(junctionTableName)) {
                     allTablesToGenerate.set(junctionTableName, {
                         collection: {
@@ -545,7 +545,7 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
         sourceCollection
     }] of allTablesToGenerate.entries()) {
         const tableVarName = getTableVarName(tableName);
-        if (isJunction && relation && sourceCollection && (relation as ResolvedManyToMany).through) {
+        if (isJunction && relation && sourceCollection && isManyToMany(relation)) {
             const targetCollection = relation.target();
             const schema = (isPostgresCollectionConfig(targetCollection) ? targetCollection.schema : undefined) || (isPostgresCollectionConfig(sourceCollection) ? sourceCollection.schema : undefined);
             const tableCreator = schema ? `${schema}Schema.table` : "pgTable";
@@ -553,7 +553,7 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
             const {
                 sourceColumn,
                 targetColumn
-            } = (relation as ResolvedManyToMany).through;
+            } = relation.through;
 
             const onDelete = relation.onDelete ?? "cascade";
             const refOptions = `{ onDelete: \"${onDelete}\" }`;
@@ -668,15 +668,15 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
                 }
 
                 // Source side one(): pairs with owning table's many(junctionTable, { relationName })
-                tableRelations.push(`    "${(relation as ResolvedManyToMany).through.sourceColumn}": one(${sourceTableVar}, {\n        fields: [${tableVarName}.${(relation as ResolvedManyToMany).through.sourceColumn}],\n        references: [${sourceTableVar}.${sourceId}],\n        relationName: \"${owningRelationName}\"\n    })`);
+                tableRelations.push(`    "${relation.through.sourceColumn}": one(${sourceTableVar}, {\n        fields: [${tableVarName}.${relation.through.sourceColumn}],\n        references: [${sourceTableVar}.${sourceId}],\n        relationName: \"${owningRelationName}\"\n    })`);
 
                 // Target side one(): pairs with inverse table's many(junctionTable, { relationName })
                 // Always emit a relationName to avoid collisions with the source-side's owningRelationName.
                 // When no inverse relation exists on the target collection, synthesize a unique name.
                 const targetRelationName = inverseRelationName
                     ? inverseRelationName
-                    : `${tableName}_${(relation as ResolvedManyToMany).through.targetColumn}`;
-                tableRelations.push(`    "${(relation as ResolvedManyToMany).through.targetColumn}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${(relation as ResolvedManyToMany).through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: "${targetRelationName}"\n    })`);
+                    : `${tableName}_${relation.through.targetColumn}`;
+                tableRelations.push(`    "${relation.through.targetColumn}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${relation.through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: "${targetRelationName}"\n    })`);
             }
         } else {
             const resolvedRelations = resolveCollectionRelations(collection);

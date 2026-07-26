@@ -34,9 +34,8 @@ export type RelationStyle = "ref" | "inline";
 export function isJunctionRelation(relation: ResolvedRelation): boolean {
     // An explicit `through` says so outright.
     if (isManyToMany(relation)) return true;
-    // A joinPath with an intermediate table is the same thing, spelled longhand.
-    if ((relation as ResolvedVia).joinPath && (relation as ResolvedVia).joinPath.length > 1) return true;
-    return false;
+    // A multi-hop join path is the same thing spelled longhand.
+    return relation.kind === "via" && relation.joinPath.length > 1;
 }
 
 /**

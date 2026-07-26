@@ -1,7 +1,7 @@
 import { eq, and, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, Properties, ResolvedRelation, type ResolvedManyToMany } from "@rebasepro/types";
+import { CollectionConfig, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -99,7 +99,7 @@ export class PersistService {
 
             if (isJunctionBackedRelation(hop.relation)) {
                 // Shared target: drop the link, not the row.
-                if (!(hop.relation as ResolvedManyToMany).through) {
+                if (!isManyToMany(hop.relation)) {
                     throw ApiError.badRequest(
                         `"${collectionPath}" reaches '${hop.targetCollection.slug}' through a multi-hop joinPath, ` +
                         `so there is no single link to remove. Delete the row at "${hop.targetCollection.slug}" ` +
@@ -200,7 +200,7 @@ export class PersistService {
         // If saving under a nested relation path, resolve the relation it ends in.
         let effectiveCollectionPath = collectionPath;
         const effectiveValues: Partial<M> = { ...values };
-        let junctionTableInfo: { parentCollection: CollectionConfig; parentId: string | number; relation: ResolvedRelation; relationKey: string; } | undefined;
+        let junctionTableInfo: { parentCollection: CollectionConfig; parentId: string | number; relation: ResolvedManyToMany; relationKey: string; } | undefined;
 
         const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
 
@@ -213,7 +213,7 @@ export class PersistService {
                 return parseIdValues(hop.parentId, parentPks)[parentPks[0].fieldName];
             };
 
-            if ((hop.relation as ResolvedManyToMany).through) {
+            if (isManyToMany(hop.relation)) {
                 // A junction path addresses set membership, so a write through it
                 // asserts "this row is in this parent's set" — on create *and* on
                 // update. The junction row is written after the main write below,

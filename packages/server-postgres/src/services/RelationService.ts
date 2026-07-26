@@ -1265,7 +1265,9 @@ export class RelationService {
         parentId: string | number,
         updates: Array<{
             relationKey: string;
-            relation: ResolvedRelation;
+            // Only a `via` relation has a join path to write through, and the
+            // caller only collects those.
+            relation: ResolvedVia;
             newTargetId: string | number | null;
         }>
     ) {
@@ -1278,7 +1280,7 @@ export class RelationService {
             const targetIdCol = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
 
             // Determine mapping of columns
-            const { targetFKColName, parentSourceColName } = this.resolveJoinPathWriteMapping(parentCollection, relation as ResolvedVia);
+            const { targetFKColName, parentSourceColName } = this.resolveJoinPathWriteMapping(parentCollection, relation);
             const parentTable = getTableForCollection(parentCollection, this.registry);
             const parentPks = requirePrimaryKeys(parentCollection, this.registry);
             const parentIdInfo = parentPks[0];
@@ -1382,7 +1384,10 @@ parentSourceColName };
         junctionTableInfo: {
             parentCollection: CollectionConfig;
             parentId: string | number;
-            relation: ResolvedRelation;
+            // Only a junction-backed relation has a link to write, and the
+            // caller only builds this for one — stated here so the body needs
+            // no narrowing.
+            relation: ResolvedManyToMany;
             relationKey: string;
         }
     ) {
@@ -1390,14 +1395,14 @@ parentSourceColName };
         const targetCollection = relation.target();
 
         try {
-            const junctionTable = this.registry.getTable((relation as ResolvedManyToMany).through.table);
+            const junctionTable = this.registry.getTable(relation.through.table);
             if (!junctionTable) {
-                logger.warn(`Junction table '${(relation as ResolvedManyToMany).through.table}' not found for relation '${relationKey}'`);
+                logger.warn(`Junction table '${relation.through.table}' not found for relation '${relationKey}'`);
                 return;
             }
 
-            const sourceJunctionColumn = junctionTable[(relation as ResolvedManyToMany).through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-            const targetJunctionColumn = junctionTable[(relation as ResolvedManyToMany).through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
+            const sourceJunctionColumn = junctionTable[relation.through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
+            const targetJunctionColumn = junctionTable[relation.through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
 
             if (!sourceJunctionColumn || !targetJunctionColumn) {
                 logger.warn(`Junction columns not found for relation '${relationKey}'`);

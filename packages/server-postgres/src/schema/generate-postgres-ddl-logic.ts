@@ -252,7 +252,7 @@ export const generatePostgresDdl = async (
         const resolvedRelations = resolveCollectionRelations(collection);
         for (const relation of Object.values(resolvedRelations)) {
             if (isManyToMany(relation)) {
-                const junctionTableName = (relation as ResolvedManyToMany).through.table;
+                const junctionTableName = relation.through.table;
                 if (!allTablesToGenerate.has(junctionTableName)) {
                     allTablesToGenerate.set(junctionTableName, {
                         collection: {
