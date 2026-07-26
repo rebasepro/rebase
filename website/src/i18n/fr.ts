@@ -23,31 +23,29 @@ export const fr = {
   "modes.badge": "Deux produits, un fichier",
   "modes.title": "N'adoptez que <span class=\"text-primary\">ce dont vous avez besoin.</span>",
   "modes.subtitle": "Le backend et le panneau d'administration sont deux produits distincts qui partagent un schéma. Commencez en headless, ajoutez le panneau plus tard — ou jamais. Rien n'est inclus sans votre accord.",
-  "modes.baas.title": "BaaS — seulement le backend",
-  "modes.baas.desc": "REST, auth, stockage, temps réel et sauvegardes sur votre base de données. Pas de fichiers de configuration, pas d'UI, pas de React dans l'arbre de dépendances. Chaque table protégée est servie automatiquement depuis votre schéma.",
+  "modes.baas.title":
+    "Backend",
+  "modes.baas.desc":
+    "REST, auth, stockage, temps réel et sauvegardes au-dessus de votre base — servis directement depuis votre schéma. Aucun fichier de configuration, aucune UI, aucun React dans l'arbre de dépendances.",
   "modes.baas.tag": "Comme Supabase — sur le Postgres que vous utilisez déjà",
-  "modes.cms.title": "CMS — ajoutez le panneau d'administration",
-  "modes.cms.desc": "Définissez des collections en TypeScript et obtenez un back-office piloté par le schéma : édition façon tableur, médias, workflows — extensible avec vos propres composants React.",
+  "modes.cms.title":
+    "Panneau d'administration",
+  "modes.cms.desc":
+    "Un back-office piloté par le schéma : édition tableur, médias et workflows, extensible avec vos propres composants React.",
   "modes.cms.tag": "Comme Payload ou Directus — sans verrouillage de framework",
-  "modes.full.title": "Full — ajoutez le Studio",
-  "modes.full.desc": "Éditeur SQL, visualiseur de schéma, éditeur de politiques RLS, journaux et explorateur d'API en plus de tout le reste. Toute la plateforme, une seule application auto-hébergée.",
+  "modes.full.title":
+    "Studio",
+  "modes.full.desc":
+    "Éditeur SQL, visualiseur de schéma, éditeur de politiques RLS, logs et explorateur d'API — la moitié outillage, par-dessus tout le reste.",
   "modes.full.tag": "Supabase + Payload, contrôlé de bout en bout",
   "modes.link": "Pourquoi nous l'avons conçu ainsi",
-  "modes.heading": "Jusqu'où vous allez",
-  "split.title": 'Un fichier. <span class="text-primary">Deux moitiés.</span>',
-  "split.subtitle":
-    "Une collection décrit vos données. Le bloc <code class=\"font-mono text-surface-300\">admin</code> décrit leur apparence. Le serveur charge le fichier et ne regarde jamais dans <code class=\"font-mono text-surface-300\">admin</code> — votre API, votre auth et le temps réel se comportent à l'identique, qu'un panneau d'administration existe ou non.",
-  "split.tag.backend": "Contrat backend",
-  "split.tag.admin": "Panneau admin uniquement",
-  "split.fact1.title": "Le contrat backend est sans React",
-  "split.fact1.desc":
-    "<code class=\"font-mono text-surface-300\">@rebasepro/types</code> ne contient aucun import React. Une installation backend seule — serveur, driver, SDK — compile sans React et sans rien d'orienté UI dans l'arbre de dépendances.",
-  "split.fact2.title": "La présentation est optionnelle, et le compilateur le garantit",
-  "split.fact2.desc":
-    "Le bloc <code class=\"font-mono text-surface-300\">admin</code> n'existe qu'une fois <code class=\"font-mono text-surface-300\">@rebasepro/admin-types</code> ajouté. Sans lui, une clé <code class=\"font-mono text-surface-300\">admin</code> est une erreur de typage — l'UI ne peut pas s'infiltrer par accident dans un projet headless.",
-  "split.fact3.title": "Supprimez le panneau. Votre API ne s'en aperçoit pas.",
-  "split.fact3.desc":
-    "Le panneau lit et écrit vos données via les mêmes APIs REST, auth et temps réel que vous utilisez, sous la même row-level security. Aucun chemin de données privilégié, aucune seconde source de vérité.",
+  "stack.deps": "Vos dépendances",
+  "stack.capabilities": "Ce que vous obtenez",
+  "stack.always": "toujours actif",
+  "stack.optional": "off",
+  "stack.unchanged": "inchangée",
+  "stack.api.note": "Identique dans toutes les configurations ci-dessus. Les couches changent ce qu'un humain voit — jamais ce que votre app peut appeler.",
+  "stack.hint": "Cliquez sur une couche pour l'ajouter ou la retirer.",
   "paths.title": 'Deux entrées. <span class="text-primary">Le même schéma.</span>',
   "paths.subtitle": "Choisissez la moitié dont vous avez besoin aujourd'hui. L'autre est à une dépendance près.",
   "paths.backend.title": "Rebase Backend",

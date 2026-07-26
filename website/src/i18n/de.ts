@@ -23,31 +23,29 @@ export const de = {
   "modes.badge": "Zwei Produkte, eine Datei",
   "modes.title": "Nutze nur, <span class=\"text-primary\">was du brauchst.</span>",
   "modes.subtitle": "Backend und Admin-Panel sind getrennte Produkte, die sich ein Schema teilen. Starte headless, füge das Panel später hinzu — oder nie. Nichts wird gebündelt, was du nicht angefordert hast.",
-  "modes.baas.title": "BaaS — nur das Backend",
-  "modes.baas.desc": "REST, Auth, Storage, Realtime und Backups über deine Datenbank. Keine Konfigurationsdateien, keine UI, kein React im Abhängigkeitsbaum. Jede geschützte Tabelle wird automatisch bereitgestellt, direkt aus deinem Schema.",
+  "modes.baas.title":
+    "Backend",
+  "modes.baas.desc":
+    "REST, Auth, Storage, Realtime und Backups über deiner Datenbank — direkt aus deinem Schema serviert. Keine Config-Dateien, keine UI, kein React im Dependency-Baum.",
   "modes.baas.tag": "Wie Supabase — auf dem Postgres, das du bereits betreibst",
-  "modes.cms.title": "CMS — Admin-Panel hinzufügen",
-  "modes.cms.desc": "Definiere Collections in TypeScript und erhalte ein schema-getriebenes Backoffice: Tabellenbearbeitung, Medien, Workflows — erweiterbar mit deinen eigenen React-Komponenten.",
+  "modes.cms.title":
+    "Admin-Panel",
+  "modes.cms.desc":
+    "Ein schemagetriebenes Backoffice: Tabellen-Editing, Medien und Workflows, erweiterbar mit deinen eigenen React-Komponenten.",
   "modes.cms.tag": "Wie Payload oder Directus — ohne Framework-Lock-in",
-  "modes.full.title": "Full — Studio hinzufügen",
-  "modes.full.desc": "SQL-Editor, Schema-Visualisierer, RLS-Policy-Editor, Logs und API-Explorer zusätzlich zu allem anderen. Die gesamte Plattform, eine self-hosted App.",
+  "modes.full.title":
+    "Studio",
+  "modes.full.desc":
+    "SQL-Editor, Schema-Visualizer, RLS-Policy-Editor, Logs und API-Explorer — die Tooling-Hälfte, über allem anderen.",
   "modes.full.tag": "Supabase + Payload, von Anfang bis Ende in deiner Hand",
   "modes.link": "Warum wir es so gebaut haben",
-  "modes.heading": "Wie weit du gehst",
-  "split.title": 'Eine Datei. <span class="text-primary">Zwei Hälften.</span>',
-  "split.subtitle":
-    "Eine Collection beschreibt deine Daten. Der <code class=\"font-mono text-surface-300\">admin</code>-Block beschreibt ihr Aussehen. Der Server lädt die Datei und schaut nie in <code class=\"font-mono text-surface-300\">admin</code> hinein — API, Auth und Realtime verhalten sich identisch, ob ein Admin-Panel existiert oder nicht.",
-  "split.tag.backend": "Backend-Vertrag",
-  "split.tag.admin": "Nur Admin-Panel",
-  "split.fact1.title": "Der Backend-Vertrag ist React-frei",
-  "split.fact1.desc":
-    "<code class=\"font-mono text-surface-300\">@rebasepro/types</code> enthält null React-Imports. Eine reine Backend-Installation — Server, Driver, SDK — typprüft ohne React und ohne irgendetwas UI-artiges im Dependency-Baum.",
-  "split.fact2.title": "Präsentation ist optional — und der Compiler setzt das durch",
-  "split.fact2.desc":
-    "Den <code class=\"font-mono text-surface-300\">admin</code>-Block gibt es erst, wenn du <code class=\"font-mono text-surface-300\">@rebasepro/admin-types</code> hinzufügst. Ohne ihn ist ein <code class=\"font-mono text-surface-300\">admin</code>-Key ein Typfehler — UI-Belange können nicht versehentlich in ein headless Projekt sickern.",
-  "split.fact3.title": "Lösch das Panel. Deine API merkt es nicht.",
-  "split.fact3.desc":
-    "Das Panel liest und schreibt deine Daten über dieselben REST-, Auth- und Realtime-APIs, auf denen du baust — unter derselben Row-Level Security. Kein privilegierter Datenpfad, keine zweite Wahrheit.",
+  "stack.deps": "Deine Dependencies",
+  "stack.capabilities": "Was du bekommst",
+  "stack.always": "immer aktiv",
+  "stack.optional": "off",
+  "stack.unchanged": "unverändert",
+  "stack.api.note": "In jeder Konfiguration oben identisch. Die Schichten ändern, was ein Mensch sieht — nie, was deine App aufrufen kann.",
+  "stack.hint": "Klicke eine Schicht an, um sie hinzuzufügen oder zu entfernen.",
   "paths.title": 'Zwei Einstiege. <span class="text-primary">Dasselbe Schema.</span>',
   "paths.subtitle": "Wähle die Hälfte, die du heute brauchst. Die andere ist eine Dependency entfernt.",
   "paths.backend.title": "Rebase Backend",

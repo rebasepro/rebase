@@ -23,31 +23,29 @@ export const es = {
   "modes.badge": "Dos productos, un archivo",
   "modes.title": "Adopta solo <span class=\"text-primary\">lo que necesites.</span>",
   "modes.subtitle": "El backend y el panel de administración son productos separados que comparten un esquema. Empieza de forma headless, añade el panel más tarde — o nunca. No se incluye nada que no hayas pedido.",
-  "modes.baas.title": "BaaS — solo el backend",
-  "modes.baas.desc": "REST, autenticación, almacenamiento, tiempo real y copias de seguridad en tu base de datos. Sin archivos de configuración, sin UI, sin React en el árbol de dependencias. Cada tabla protegida se sirve automáticamente desde tu esquema.",
+  "modes.baas.title":
+    "Backend",
+  "modes.baas.desc":
+    "REST, auth, storage, tiempo real y backups sobre tu base de datos, servidos directamente desde tu esquema. Sin archivos de configuración, sin UI, sin React en el árbol de dependencias.",
   "modes.baas.tag": "Como Supabase — en el Postgres que ya ejecutas",
-  "modes.cms.title": "CMS — añade el panel de administración",
-  "modes.cms.desc": "Define colecciones en TypeScript y obtén un panel de administración basado en esquemas: edición tipo hoja de cálculo, archivos multimedia, flujos de trabajo — extensible con tus propios componentes React.",
+  "modes.cms.title":
+    "Panel de administración",
+  "modes.cms.desc":
+    "Un back office dirigido por el esquema: edición tipo hoja de cálculo, medios y flujos de trabajo, ampliable con tus propios componentes React.",
   "modes.cms.tag": "Como Payload o Directus — sin bloqueo de framework",
-  "modes.full.title": "Full — añade el Studio",
-  "modes.full.desc": "Editor SQL, visualizador de esquemas, editor de políticas RLS, registros y explorador de APIs además de todo lo demás. Toda la plataforma en una sola aplicación autoalojada.",
+  "modes.full.title":
+    "Studio",
+  "modes.full.desc":
+    "Editor SQL, visualizador de esquema, editor de políticas RLS, logs y explorador de API: la mitad de herramientas, encima de todo lo demás.",
   "modes.full.tag": "Supabase + Payload, bajo tu control total",
   "modes.link": "Por qué lo construimos así",
-  "modes.heading": "Hasta dónde lo llevas",
-  "split.title": 'Un archivo. <span class="text-primary">Dos mitades.</span>',
-  "split.subtitle":
-    "Una colección describe tus datos. El bloque <code class=\"font-mono text-surface-300\">admin</code> describe cómo se ven. El servidor carga el archivo y nunca mira dentro de <code class=\"font-mono text-surface-300\">admin</code> — así que tu API, tu auth y el tiempo real se comportan igual exista o no un panel de administración.",
-  "split.tag.backend": "Contrato del backend",
-  "split.tag.admin": "Solo panel admin",
-  "split.fact1.title": "El contrato del backend no lleva React",
-  "split.fact1.desc":
-    "<code class=\"font-mono text-surface-300\">@rebasepro/types</code> no incluye ni un import de React. Una instalación solo-backend — servidor, driver, SDK — compila sin React y sin nada de UI en el árbol de dependencias.",
-  "split.fact2.title": "La presentación es opcional, y el compilador lo garantiza",
-  "split.fact2.desc":
-    "El bloque <code class=\"font-mono text-surface-300\">admin</code> solo existe cuando añades <code class=\"font-mono text-surface-300\">@rebasepro/admin-types</code>. Sin él, una clave <code class=\"font-mono text-surface-300\">admin</code> es un error de tipos — la UI no se cuela en un proyecto headless por accidente.",
-  "split.fact3.title": "Borra el panel. Tu API ni se entera.",
-  "split.fact3.desc":
-    "El panel lee y escribe tus datos a través de las mismas APIs REST, auth y tiempo real sobre las que construyes, bajo la misma row-level security. Sin vía privilegiada ni una segunda fuente de verdad.",
+  "stack.deps": "Tus dependencias",
+  "stack.capabilities": "Lo que obtienes",
+  "stack.always": "siempre activo",
+  "stack.optional": "off",
+  "stack.unchanged": "sin cambios",
+  "stack.api.note": "Idéntica en todas las configuraciones de arriba. Las capas cambian lo que ve una persona, nunca lo que tu app puede llamar.",
+  "stack.hint": "Pulsa una capa para añadirla o quitarla.",
   "paths.title": 'Dos formas de entrar. <span class="text-primary">El mismo esquema.</span>',
   "paths.subtitle": "Elige la mitad que necesitas hoy. La otra está a una dependencia de distancia.",
   "paths.backend.title": "Rebase Backend",

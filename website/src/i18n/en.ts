@@ -27,34 +27,29 @@ export const en = {
   "modes.title": 'Adopt only <span class="text-primary">what you need.</span>',
   "modes.subtitle":
     "The backend and the admin panel are separate products that happen to share a schema. Start headless, add the panel later — or never. Nothing is bundled that you didn't ask for.",
-  "modes.baas.title": "BaaS — just the backend",
+  "modes.baas.title":
+    "Backend",
   "modes.baas.desc":
-    "REST, auth, storage, realtime and backups over your database. No config files, no UI, no React in the dependency tree. Every protected table is served automatically, straight from your schema.",
+    "REST, auth, storage, realtime and backups over your database — served straight from your schema. No config files, no UI, no React in the dependency tree.",
   "modes.baas.tag": "Like Supabase — on the Postgres you already run",
-  "modes.cms.title": "CMS — add the admin panel",
+  "modes.cms.title":
+    "Admin panel",
   "modes.cms.desc":
-    "Define collections in TypeScript and get a schema-driven back office: spreadsheet editing, media, workflows — extensible with your own React components.",
+    "A schema-driven back office: spreadsheet editing, media and workflows, extensible with your own React components.",
   "modes.cms.tag": "Like Payload or Directus — without the framework lock-in",
-  "modes.full.title": "Full — add the Studio",
+  "modes.full.title":
+    "Studio",
   "modes.full.desc":
-    "SQL editor, schema visualizer, RLS policy editor, logs and API explorer on top of everything else. The whole platform, one self-hosted app.",
+    "SQL editor, schema visualizer, RLS policy editor, logs and API explorer — the tooling half, on top of everything else.",
   "modes.full.tag": "Supabase + Payload, owned end to end",
   "modes.link": "Why we built it this way",
-  "modes.heading": "How far you take it",
-  "split.title": 'One file. <span class="text-primary">Two halves.</span>',
-  "split.subtitle":
-    "A collection describes your data. The <code class=\"font-mono text-surface-300\">admin</code> block describes how it looks. The server loads the file and never reads inside <code class=\"font-mono text-surface-300\">admin</code> — so your API, auth and realtime behave identically whether an admin panel exists or not.",
-  "split.tag.backend": "Backend contract",
-  "split.tag.admin": "Admin panel only",
-  "split.fact1.title": "The backend contract is React-free",
-  "split.fact1.desc":
-    "<code class=\"font-mono text-surface-300\">@rebasepro/types</code> ships zero React imports. A backend-only install — server, driver, SDK — typechecks with no React and nothing UI-shaped in the dependency tree.",
-  "split.fact2.title": "Presentation is opt-in, and the compiler enforces it",
-  "split.fact2.desc":
-    "The <code class=\"font-mono text-surface-300\">admin</code> block only exists once you add <code class=\"font-mono text-surface-300\">@rebasepro/admin-types</code>. Without it, an <code class=\"font-mono text-surface-300\">admin</code> key is a type error — UI concerns can't drift into a headless project by accident.",
-  "split.fact3.title": "Delete the panel. Your API won't notice.",
-  "split.fact3.desc":
-    "The panel reads and writes your data through the same REST, auth and realtime APIs you build on, under the same row-level security. No privileged data path, no second source of truth.",
+  "stack.deps": "Your dependencies",
+  "stack.capabilities": "What you get",
+  "stack.always": "always on",
+  "stack.optional": "off",
+  "stack.unchanged": "unchanged",
+  "stack.api.note": "Identical in every configuration above. The layers change what a human can see — never what your app can call.",
+  "stack.hint": "Click a layer to add or remove it.",
   "paths.title": 'Two ways in. <span class="text-primary">Same schema.</span>',
   "paths.subtitle": "Pick the half you need today. The other one is one dependency away.",
   "paths.backend.title": "Rebase Backend",

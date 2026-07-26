@@ -4,7 +4,7 @@ const {
     t
 } = Astro.props;
 import { AdminDemoCarousel } from "../../components/demos/AdminDemoCarousel";
-import { SplitLayerDemo } from "../../components/demos/SplitLayerDemo";
+import { AdoptionStackDemo } from "../../components/demos/AdoptionStackDemo";
 import { BodyPartsDemo } from "../../components/demos/BodyPartsDemo";
 import { ApiMiniDemo } from "../../components/demos/ApiMiniDemo";
 import { SdkMiniDemo } from "../../components/demos/SdkMiniDemo";
@@ -602,194 +602,134 @@ const translatePath = useTranslatedPath(lang);
 
 
     <!-- The split: backend contract vs admin panel, then how far you take it -->
- <section id="s-modes" class="relative z-0 py-28 sm:py-36 overflow-hidden">
+ <section id="s-modes" class="relative isolate z-0 py-24 sm:py-28 overflow-hidden">
+        <!-- Live WebGL gradient, faded at the edges so the section still reads dark -->
+        <div class="absolute inset-0 -z-20 pointer-events-none opacity-80"
+             aria-hidden="true"
+             style="mask-image: radial-gradient(120% 80% at 55% 50%, #000 15%, transparent 78%); -webkit-mask-image: radial-gradient(120% 80% at 55% 50%, #000 15%, transparent 78%);">
+            <NeatBackground variant="b" client:visible/>
+        </div>
+
+        <!-- CSS light, so the section still glows without WebGL (reduced motion, old GPUs) -->
+        <div class="absolute inset-0 -z-10 pointer-events-none" aria-hidden="true"
+             style="background:
+                radial-gradient(46% 42% at 26% 46%, rgba(0,112,244,0.20), transparent 68%),
+                radial-gradient(38% 40% at 82% 40%, rgba(120,80,220,0.14), transparent 70%),
+                radial-gradient(70% 45% at 50% 108%, rgba(0,112,244,0.10), transparent 70%);"></div>
+        <!-- faint dot grid for texture -->
+        <div class="absolute inset-0 -z-10 pointer-events-none opacity-[0.18]" aria-hidden="true"
+             style="background-image: radial-gradient(rgba(255,255,255,0.5) 1px, transparent 1px);
+                    background-size: 34px 34px;
+                    mask-image: radial-gradient(80% 60% at 50% 45%, #000, transparent 72%);
+                    -webkit-mask-image: radial-gradient(80% 60% at 50% 45%, #000, transparent 72%);"></div>
+        <!-- horizon line at the top edge -->
+        <div class="absolute inset-x-0 top-0 h-px pointer-events-none" aria-hidden="true"
+             style="background: linear-gradient(90deg, transparent, rgba(0,112,244,0.55) 35%, rgba(160,120,255,0.45) 65%, transparent);"></div>
+
         <div class="mx-auto max-w-7xl px-6 lg:px-12">
-            <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
-                <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase"><span class="font-mono text-surface-500">04</span><span class="mx-2 text-surface-600">·</span>{t("modes.badge")}</h2>
-                <p class="mt-4 text-3xl md:text-5xl font-semibold tracking-tight text-white"
-                   set:html={t("modes.title")}></p>
-                <p class="mt-5 text-base sm:text-lg text-surface-400 leading-relaxed">
-                    {t("modes.subtitle")}
-                </p>
+            <!-- Editorial split header: the one section on the page that isn't centred -->
+            <div class="mx-auto max-w-6xl mb-10 animate-on-scroll fade-in-up">
+                <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 pb-8 border-b border-white/10">
+                    <div class="max-w-2xl">
+                        <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase"><span class="font-mono text-surface-500">04</span><span class="mx-2 text-surface-600">·</span>{t("modes.badge")}</h2>
+                        <p class="mt-4 text-3xl md:text-[2.75rem] font-semibold tracking-tight text-white leading-[1.08]"
+                           set:html={t("modes.title")}></p>
+                    </div>
+                    <p class="max-w-xs text-sm text-surface-400 leading-relaxed lg:text-right">
+                        {t("modes.subtitle")}
+                    </p>
+                </div>
             </div>
 
-            <div class="mx-auto max-w-5xl">
-                <!-- The split, in code: one file, two halves -->
+            <div class="mx-auto max-w-6xl">
+                <!-- One figure: the layers, what each costs, and the API that never moves -->
                 <div class="animate-on-scroll fade-in-up">
-                    <div class="max-w-3xl mx-auto text-center mb-10">
-                        <p class="text-3xl md:text-4xl font-semibold tracking-tight text-white"
-                           set:html={t("split.title")}></p>
-                        <p class="mt-4 text-base sm:text-lg text-surface-400 leading-relaxed"
-                           set:html={t("split.subtitle")}></p>
-                    </div>
-
-                    <!-- Interactive: toggle the admin layer on and off -->
-                    <SplitLayerDemo client:visible/>
-
-                    <!-- What the split guarantees -->
-                    <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div class="rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-6 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-                            <h3 class="text-white font-semibold text-base">{t("split.fact1.title")}</h3>
-                            <p class="mt-2 text-sm text-surface-400 leading-relaxed" set:html={t("split.fact1.desc")}></p>
-                        </div>
-                        <div class="rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-6 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-                            <h3 class="text-white font-semibold text-base">{t("split.fact2.title")}</h3>
-                            <p class="mt-2 text-sm text-surface-400 leading-relaxed" set:html={t("split.fact2.desc")}></p>
-                        </div>
-                        <div class="rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-6 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-                            <h3 class="text-white font-semibold text-base">{t("split.fact3.title")}</h3>
-                            <p class="mt-2 text-sm text-surface-400 leading-relaxed" set:html={t("split.fact3.desc")}></p>
-                        </div>
-                    </div>
+                    <AdoptionStackDemo
+                        client:visible
+                        backend={{ title: t("modes.baas.title"), desc: t("modes.baas.desc"), tag: t("modes.baas.tag") }}
+                        admin={{ title: t("modes.cms.title"), desc: t("modes.cms.desc"), tag: t("modes.cms.tag") }}
+                        studio={{ title: t("modes.full.title"), desc: t("modes.full.desc"), tag: t("modes.full.tag") }}
+                        labels={{
+                            deps: t("stack.deps"),
+                            capabilities: t("stack.capabilities"),
+                            alwaysOn: t("stack.always"),
+                            optional: t("stack.optional"),
+                            apiNote: t("stack.api.note"),
+                            unchanged: t("stack.unchanged"),
+                            hint: t("stack.hint")
+                        }}
+                    />
                 </div>
 
-
-                <!-- How far you take it -->
-                <div class="mt-20 mb-8 text-center animate-on-scroll fade-in-up">
-                    <p class="text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">{t("modes.heading")}</p>
-                </div>
-
-                <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <!-- Mode 1: BaaS -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up flex flex-col">
-                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                             aria-hidden="true"
-                             style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                        <div class="relative z-10 flex-1">
-                            <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center ring-1 ring-primary/20 mb-4">
-                                <svg class="lucide lucide-server" xmlns="http://www.w3.org/2000/svg" width="20"
-                                     height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <rect width="20" height="8" x="2" y="2" rx="2" ry="2"/>
-                                    <rect width="20" height="8" x="2" y="14" rx="2" ry="2"/>
-                                    <line x1="6" x2="6.01" y1="6" y2="6"/>
-                                    <line x1="6" x2="6.01" y1="18" y2="18"/>
-                                </svg>
-                            </div>
-                            <h3 class="text-white font-semibold text-lg">{t("modes.baas.title")}</h3>
-                            <p class="mt-2 text-sm text-surface-400 leading-relaxed">{t("modes.baas.desc")}</p>
-                        </div>
-                        <div class="relative z-10 mt-5 pt-4 border-t border-white/5">
-                            <span class="text-xs text-surface-500">{t("modes.baas.tag")}</span>
-                        </div>
-                    </div>
-
-                    <!-- Mode 2: CMS -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100 flex flex-col">
-                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                             aria-hidden="true"
-                             style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                        <div class="relative z-10 flex-1">
-                            <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center ring-1 ring-primary/20 mb-4">
-                                <svg class="lucide lucide-layout-dashboard" xmlns="http://www.w3.org/2000/svg"
-                                     width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect width="7" height="9" x="3" y="3" rx="1"/>
-                                    <rect width="7" height="5" x="14" y="3" rx="1"/>
-                                    <rect width="7" height="9" x="14" y="12" rx="1"/>
-                                    <rect width="7" height="5" x="3" y="16" rx="1"/>
-                                </svg>
-                            </div>
-                            <h3 class="text-white font-semibold text-lg">{t("modes.cms.title")}</h3>
-                            <p class="mt-2 text-sm text-surface-400 leading-relaxed">{t("modes.cms.desc")}</p>
-                        </div>
-                        <div class="relative z-10 mt-5 pt-4 border-t border-white/5">
-                            <span class="text-xs text-surface-500">{t("modes.cms.tag")}</span>
-                        </div>
-                    </div>
-
-                    <!-- Mode 3: Full -->
-                    <div class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200 flex flex-col">
-                        <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                             aria-hidden="true"
-                             style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                        <div class="relative z-10 flex-1">
-                            <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center ring-1 ring-primary/20 mb-4">
-                                <svg class="lucide lucide-layers" xmlns="http://www.w3.org/2000/svg" width="20"
-                                     height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/>
-                                    <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/>
-                                    <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>
-                                </svg>
-                            </div>
-                            <h3 class="text-white font-semibold text-lg">{t("modes.full.title")}</h3>
-                            <p class="mt-2 text-sm text-surface-400 leading-relaxed">{t("modes.full.desc")}</p>
-                        </div>
-                        <div class="relative z-10 mt-5 pt-4 border-t border-white/5">
-                            <span class="text-xs text-surface-500">{t("modes.full.tag")}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Two ways in: the backend, or the panel -->
-                <div class="mt-20 animate-on-scroll fade-in-up">
-                    <div class="max-w-2xl mx-auto text-center mb-8">
-                        <p class="text-2xl sm:text-3xl font-semibold tracking-tight text-white"
-                           set:html={t("paths.title")}></p>
-                        <p class="mt-3 text-sm sm:text-base text-surface-400">{t("paths.subtitle")}</p>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <a href={translatePath("/backend")}
-                           class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col">
-                            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                                 aria-hidden="true"
-                                 style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                            <div class="relative z-10 flex-1">
-                                <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center ring-1 ring-primary/20 mb-4 text-primary">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                         stroke-linejoin="round">
-                                        <rect width="20" height="8" x="2" y="2" rx="2" ry="2"/>
-                                        <rect width="20" height="8" x="2" y="14" rx="2" ry="2"/>
-                                        <line x1="6" x2="6.01" y1="6" y2="6"/>
-                                        <line x1="6" x2="6.01" y1="18" y2="18"/>
-                                    </svg>
+                <!-- Two ways in: one lit ribbon, not another pair of grey cards -->
+                <div class="mt-12 animate-on-scroll fade-in-up">
+                    <div class="relative rounded-3xl p-px overflow-hidden"
+                         style="background: linear-gradient(100deg, rgba(0,112,244,0.55), rgba(160,120,255,0.35) 45%, rgba(255,255,255,0.06) 80%);">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 rounded-3xl bg-surface-950/85 backdrop-blur-xl overflow-hidden">
+                            <a href={translatePath("/backend")}
+                               class="group relative px-8 py-8 transition-colors duration-300 hover:bg-white/[0.04]">
+                                <div class="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                     aria-hidden="true"
+                                     style="background: radial-gradient(70% 90% at 20% 0%, rgba(0,112,244,0.22), transparent 70%);"></div>
+                                <div class="relative">
+                                    <div class="flex items-center gap-2.5 mb-3">
+                                        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-inset ring-primary/30 text-primary">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                 stroke-linejoin="round">
+                                                <rect width="20" height="8" x="2" y="2" rx="2"/>
+                                                <rect width="20" height="8" x="2" y="14" rx="2"/>
+                                                <line x1="6" x2="6.01" y1="6" y2="6"/>
+                                                <line x1="6" x2="6.01" y1="18" y2="18"/>
+                                            </svg>
+                                        </span>
+                                        <span class="text-lg font-semibold text-white">{t("paths.backend.title")}</span>
+                                    </div>
+                                    <p class="text-sm text-surface-400 leading-relaxed">{t("paths.backend.desc")}</p>
+                                    <span class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary-light">
+                                        {t("paths.backend.cta")}
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                             stroke-linejoin="round" class="group-hover:translate-x-1 transition-transform duration-300">
+                                            <path d="M5 12h14"/>
+                                            <path d="m12 5 7 7-7 7"/>
+                                        </svg>
+                                    </span>
                                 </div>
-                                <h3 class="text-white font-semibold text-lg">{t("paths.backend.title")}</h3>
-                                <p class="mt-2 text-sm text-surface-400 leading-relaxed">{t("paths.backend.desc")}</p>
-                            </div>
-                            <span class="relative z-10 mt-5 inline-flex items-center gap-2 text-sm font-medium text-primary">
-                                {t("paths.backend.cta")}
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="group-hover:translate-x-0.5 transition-transform">
-                                    <path d="M5 12h14"/>
-                                    <path d="m12 5 7 7-7 7"/>
-                                </svg>
-                            </span>
-                        </a>
+                            </a>
 
-                        <a href={translatePath("/admin")}
-                           class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 flex flex-col">
-                            <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                                 aria-hidden="true"
-                                 style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                            <div class="relative z-10 flex-1">
-                                <div class="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center ring-1 ring-primary/20 mb-4 text-primary">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                         stroke-linejoin="round">
-                                        <rect width="7" height="9" x="3" y="3" rx="1"/>
-                                        <rect width="7" height="5" x="14" y="3" rx="1"/>
-                                        <rect width="7" height="9" x="14" y="12" rx="1"/>
-                                        <rect width="7" height="5" x="3" y="16" rx="1"/>
-                                    </svg>
+                            <a href={translatePath("/admin")}
+                               class="group relative px-8 py-8 transition-colors duration-300 hover:bg-white/[0.04] border-t sm:border-t-0 sm:border-l border-white/10">
+                                <div class="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                     aria-hidden="true"
+                                     style="background: radial-gradient(70% 90% at 80% 0%, rgba(160,120,255,0.20), transparent 70%);"></div>
+                                <div class="relative">
+                                    <div class="flex items-center gap-2.5 mb-3">
+                                        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06] ring-1 ring-inset ring-white/15 text-surface-200">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                 stroke-linejoin="round">
+                                                <rect width="7" height="9" x="3" y="3" rx="1"/>
+                                                <rect width="7" height="5" x="14" y="3" rx="1"/>
+                                                <rect width="7" height="9" x="14" y="12" rx="1"/>
+                                                <rect width="7" height="5" x="3" y="16" rx="1"/>
+                                            </svg>
+                                        </span>
+                                        <span class="text-lg font-semibold text-white">{t("paths.admin.title")}</span>
+                                    </div>
+                                    <p class="text-sm text-surface-400 leading-relaxed">{t("paths.admin.desc")}</p>
+                                    <span class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary-light">
+                                        {t("paths.admin.cta")}
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                             stroke-linejoin="round" class="group-hover:translate-x-1 transition-transform duration-300">
+                                            <path d="M5 12h14"/>
+                                            <path d="m12 5 7 7-7 7"/>
+                                        </svg>
+                                    </span>
                                 </div>
-                                <h3 class="text-white font-semibold text-lg">{t("paths.admin.title")}</h3>
-                                <p class="mt-2 text-sm text-surface-400 leading-relaxed">{t("paths.admin.desc")}</p>
-                            </div>
-                            <span class="relative z-10 mt-5 inline-flex items-center gap-2 text-sm font-medium text-primary">
-                                {t("paths.admin.cta")}
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                     stroke-linejoin="round" class="group-hover:translate-x-0.5 transition-transform">
-                                    <path d="M5 12h14"/>
-                                    <path d="m12 5 7 7-7 7"/>
-                                </svg>
-                            </span>
-                        </a>
+                            </a>
+                        </div>
                     </div>
                 </div>
 
