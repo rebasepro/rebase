@@ -212,7 +212,7 @@ if (report.length > 0) {
             `${report.length} package(s).\n\n` +
             "A core package must not name React or an admin package, even in a type position.\n" +
             "React-flavoured types belong in @rebasepro/admin-types.\n" +
-            "See PLAN-2026-07-25-BAAS-ADMIN-SPLIT.md."
+            "See MODULAR-ARCHITECTURE.md."
     );
     process.exit(1);
 }

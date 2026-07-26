@@ -115,6 +115,14 @@ app/backend/scratch/
 /full_test_results.log
 /test_results.log
 /tsc_results.log
+/eslint_report.json
+/pnpm-publish-summary.json
+
+# Dated audits and plans: point-in-time notes, kept local
+/.reports/
+
+# Local e2e run output
+/e2e-screenshots/
 
 # IDE & AI agent configuration (personal/local)
 .antigravity/
