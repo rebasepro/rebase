@@ -4,6 +4,7 @@ import { CollectionConfig } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 import { PostgresCollectionRegistry } from "./PostgresCollectionRegistry";
 import { warnOnKeysTheAdminCannotResolve } from "../services/collection-helpers";
+import { assertRelationsResolve } from "./validate-relations";
 
 /**
  * Everything a registry is built from: the collections, and the drizzle schema
@@ -54,6 +55,12 @@ export function buildCollectionRegistry(schema: RegistrySchema): PostgresCollect
     // compiles the same collection files into its bundle but never the drizzle
     // schema, and nothing serves it one, so only an edit to the config fixes it.
     warnOnKeysTheAdminCannotResolve(registry.getCollections(), registry);
+
+    // And now that the tables resolve: refuse to start on a relation whose
+    // names do not exist. The union checks a relation's shape at compile time;
+    // only here is there a schema to check its *names* against. Every one of
+    // these used to surface as an empty result at query time and nothing else.
+    assertRelationsResolve(registry.getCollections(), registry);
 
     return registry;
 }

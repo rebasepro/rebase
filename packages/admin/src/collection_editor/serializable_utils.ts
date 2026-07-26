@@ -31,8 +31,17 @@ import type {
     SerializableStorageConfig,
     SerializableStringProperty,
     SerializableStringValidation,
-    SerializableVectorProperty,
+    SerializableVectorProperty
 } from "./serializable_types";
+
+/**
+ * Resolves a collection slug to the collection it names.
+ *
+ * Needed on the way back from JSON: a relation's `target` is a thunk, which
+ * does not serialize, so it travels as a slug and has to be made callable
+ * again against the other collections in the same set.
+ */
+export type CollectionLookup = (slug: string) => AdminCollection | undefined;
 
 // ═══════════════════════════════════════════════════════════════════════
 // PROPERTY CONVERSION: Original → Serializable
@@ -119,7 +128,7 @@ function resolveRelationTarget(target: RelationProperty["relation"] extends infe
  */
 function toSerializableBaseFields(property: Property): Omit<SerializableBaseProperty, "validation"> {
     const result: Partial<Omit<SerializableBaseProperty, "validation">> = {
-        name: property.name,
+        name: property.name
     };
 
     if (property.description) result.description = property.description;
@@ -148,7 +157,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const sp = property as StringProperty;
             const result: SerializableStringProperty = {
                 ...base,
-                type: "string",
+                type: "string"
             };
             if (sp.columnType) result.columnType = sp.columnType;
             if (sp.isId !== undefined) result.isId = sp.isId;
@@ -176,7 +185,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const np = property as NumberProperty;
             const result: SerializableNumberProperty = {
                 ...base,
-                type: "number",
+                type: "number"
             };
             if (np.columnType) result.columnType = np.columnType;
             if (np.validation) result.validation = np.validation;
@@ -189,7 +198,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const bp = property as BooleanProperty;
             const result: SerializableBooleanProperty = {
                 ...base,
-                type: "boolean",
+                type: "boolean"
             };
             if (bp.validation) result.validation = bp.validation;
             return result;
@@ -199,7 +208,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const dp = property as DateProperty;
             const result: SerializableDateProperty = {
                 ...base,
-                type: "date",
+                type: "date"
             };
             if (dp.columnType) result.columnType = dp.columnType;
             if (dp.mode) result.mode = dp.mode;
@@ -232,7 +241,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const gp = property as GeopointProperty;
             const result: SerializableGeopointProperty = {
                 ...base,
-                type: "geopoint",
+                type: "geopoint"
             };
             if (gp.validation) result.validation = gp.validation;
             return result;
@@ -242,7 +251,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const rp = property as ReferenceProperty;
             const result: SerializableReferenceProperty = {
                 ...base,
-                type: "reference",
+                type: "reference"
             };
             if (rp.isId !== undefined) result.isId = rp.isId;
             if (rp.path) result.path = rp.path;
@@ -256,35 +265,68 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const rl = property as RelationProperty;
             const result: SerializableRelationProperty = {
                 ...base,
-                type: "relation",
+                type: "relation"
             };
             if (rl.isId !== undefined) result.isId = rl.isId;
             // The link is one nested object now, so it serializes as one:
             // its `kind` says which fields are even meaningful.
             const link = rl.relation;
             if (link) {
+                // Switched on `kind` and assigned without a cast: the
+                // serialized union mirrors the authored one, so the compiler
+                // checks that each branch writes the fields its kind owns and
+                // no others. This used to be built as an untyped bag and cast
+                // into place — which is how the target interface drifted a
+                // whole refactor behind the code writing to it.
                 const target = resolveRelationTarget(link.target);
-                const serializedLink: Record<string, unknown> = { kind: link.kind };
-                if (target) serializedLink.target = target;
-                if (link.relationName) serializedLink.relationName = link.relationName;
-                if (link.kind === "belongsTo" && link.localKey) serializedLink.localKey = link.localKey;
-                if ((link.kind === "hasOne" || link.kind === "hasMany") && link.foreignKeyOnTarget) {
-                    serializedLink.foreignKeyOnTarget = link.foreignKeyOnTarget;
+                const common = {
+                    ...(target ? { target } : {}),
+                    ...(link.relationName ? { relationName: link.relationName } : {}),
+                    ...(link.onUpdate ? { onUpdate: link.onUpdate } : {}),
+                    ...(link.onDelete ? { onDelete: link.onDelete } : {})
+                };
+                switch (link.kind) {
+                    case "belongsTo":
+                        result.relation = {
+                            kind: "belongsTo",
+                            ...common,
+                            ...(link.localKey ? { localKey: link.localKey } : {})
+                        };
+                        break;
+                    case "hasOne":
+                    case "hasMany":
+                        result.relation = {
+                            kind: link.kind,
+                            ...common,
+                            ...(link.foreignKeyOnTarget ? { foreignKeyOnTarget: link.foreignKeyOnTarget } : {})
+                        };
+                        break;
+                    case "manyToMany":
+                        result.relation = {
+                            kind: "manyToMany",
+                            ...common,
+                            ...(link.through ? { through: link.through } : {})
+                        };
+                        break;
+                    case "via":
+                        result.relation = {
+                            kind: "via",
+                            ...common,
+                            cardinality: link.cardinality,
+                            joinPath: link.joinPath
+                        };
+                        break;
+                    default: {
+                        const exhaustive: never = link;
+                        throw new Error(`Unhandled relation kind: ${JSON.stringify(exhaustive)}`);
+                    }
                 }
-                if (link.kind === "manyToMany" && link.through) serializedLink.through = link.through;
-                if (link.kind === "via") {
-                    serializedLink.joinPath = link.joinPath;
-                    serializedLink.cardinality = link.cardinality;
-                }
-                if (link.onUpdate) serializedLink.onUpdate = link.onUpdate;
-                if (link.onDelete) serializedLink.onDelete = link.onDelete;
-                (result as unknown as Record<string, unknown>).relation = serializedLink;
             }
             if (rl.fixedFilter) result.fixedFilter = rl.fixedFilter;
             if (rl.includeId !== undefined) result.includeId = rl.includeId;
             if (rl.includeEntityLink !== undefined) result.includeEntityLink = rl.includeEntityLink;
             if (rl.widget) result.widget = rl.widget;
-            // overrides and relation (resolved) are dropped
+            // overrides are dropped (may hold a non-serializable CollectionConfig)
             return result;
         }
 
@@ -292,7 +334,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const ap = property as ArrayProperty;
             const result: SerializableArrayProperty = {
                 ...base,
-                type: "array",
+                type: "array"
             };
             if (ap.columnType) result.columnType = ap.columnType;
             if (ap.validation) result.validation = ap.validation;
@@ -311,7 +353,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             // Recursively serialize oneOf properties
             if (ap.oneOf) {
                 result.oneOf = {
-                    properties: toSerializableProperties(ap.oneOf.properties),
+                    properties: toSerializableProperties(ap.oneOf.properties)
                 };
                 if (ap.oneOf.propertiesOrder) result.oneOf.propertiesOrder = ap.oneOf.propertiesOrder;
                 if (ap.oneOf.typeField) result.oneOf.typeField = ap.oneOf.typeField;
@@ -324,7 +366,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const mp = property as MapProperty;
             const result: SerializableMapProperty = {
                 ...base,
-                type: "map",
+                type: "map"
             };
             if (mp.columnType) result.columnType = mp.columnType;
             if (mp.validation) result.validation = mp.validation;
@@ -344,7 +386,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const result: SerializableVectorProperty = {
                 ...base,
                 type: "vector",
-                dimensions: vp.dimensions,
+                dimensions: vp.dimensions
             };
             if (vp.validation) result.validation = vp.validation;
             return result;
@@ -354,7 +396,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             const bp = property as BinaryProperty;
             const result: SerializableBinaryProperty = {
                 ...base,
-                type: "binary",
+                type: "binary"
             };
             if (bp.validation) result.validation = bp.validation;
             return result;
@@ -393,7 +435,7 @@ export function toSerializableCollectionConfig(collection: AdminCollection): Ser
     const result: SerializableCollectionConfig = {
         slug: collection.slug,
         name: collection.name,
-        properties: toSerializableProperties(collection.properties),
+        properties: toSerializableProperties(collection.properties)
     };
 
     // String fields
@@ -474,12 +516,16 @@ export function toSerializableCollectionConfig(collection: AdminCollection): Ser
  * - `validation.matches` (string) stays as string (compatible with Property)
  * - `validation.min/max` on dates: ISO strings → Date objects
  */
-export function fromSerializableProperty(serialized: SerializableProperty): Property {
+export function fromSerializableProperty(
+    serialized: SerializableProperty,
+    lookup?: CollectionLookup
+): Property {
     switch (serialized.type) {
         case "date": {
             const sp = serialized as SerializableDateProperty;
             const { validation: dateValidation, ...dateRest } = sp;
-            const result: Record<string, unknown> = { ...dateRest, type: "date" };
+            const result: Record<string, unknown> = { ...dateRest,
+type: "date" };
             // Convert ISO string dates back to Date objects
             if (dateValidation) {
                 const convertedValidation: Record<string, unknown> = { ...dateValidation };
@@ -500,16 +546,16 @@ export function fromSerializableProperty(serialized: SerializableProperty): Prop
             // Recursively convert "of" property
             if (sp.of) {
                 if (Array.isArray(sp.of)) {
-                    result.of = sp.of.map(fromSerializableProperty);
+                    result.of = sp.of.map(prop => fromSerializableProperty(prop, lookup));
                 } else {
-                    result.of = fromSerializableProperty(sp.of);
+                    result.of = fromSerializableProperty(sp.of, lookup);
                 }
             }
             // Recursively convert oneOf properties
             if (sp.oneOf) {
                 result.oneOf = {
                     ...sp.oneOf,
-                    properties: fromSerializableProperties(sp.oneOf.properties),
+                    properties: fromSerializableProperties(sp.oneOf.properties, lookup)
                 };
             }
             return result;
@@ -520,7 +566,7 @@ export function fromSerializableProperty(serialized: SerializableProperty): Prop
             const result = { ...sp } as unknown as MapProperty;
             // Recursively convert nested properties
             if (sp.properties) {
-                result.properties = fromSerializableProperties(sp.properties);
+                result.properties = fromSerializableProperties(sp.properties, lookup);
             }
             return result;
         }
@@ -529,6 +575,39 @@ export function fromSerializableProperty(serialized: SerializableProperty): Prop
             const sp = serialized as SerializableStringProperty;
             const result = { ...sp } as unknown as StringProperty;
             return result;
+        }
+
+        case "relation": {
+            // The one property whose serialized form is *not* already a valid
+            // Property. `target` survives the round trip as a collection slug,
+            // because a `() => CollectionConfig` thunk cannot be written to
+            // JSON — so it has to be made callable again on the way back.
+            //
+            // Falling through to the pass-through below returned a relation
+            // whose `target` was a string, and every consumer calls `target()`.
+            // Nothing caught it: the cast to `Property` erased the difference.
+            const sp = serialized as SerializableRelationProperty;
+            const { relation, ...rest } = sp;
+            const result = { ...rest,
+type: "relation" } as unknown as RelationProperty;
+            if (relation) {
+                const slug = relation.target;
+                result.relation = {
+                    ...relation,
+                    target: () => {
+                        const found = slug ? lookup?.(slug) : undefined;
+                        if (!found) {
+                            throw new Error(
+                                `Relation "${relation.relationName ?? sp.name}" targets collection "${slug ?? "(none)"}", ` +
+                                "which is not among the collections it was deserialized with. Pass the whole set to " +
+                                "`fromSerializableCollectionConfigs` so slugs can be resolved against each other."
+                            );
+                        }
+                        return found;
+                    }
+                } as unknown as RelationProperty["relation"];
+            }
+            return result as Property;
         }
 
         default:
@@ -540,10 +619,13 @@ export function fromSerializableProperty(serialized: SerializableProperty): Prop
 /**
  * Convert a `SerializableProperties` record back to `Properties`.
  */
-export function fromSerializableProperties(serialized: SerializableProperties): Properties {
+export function fromSerializableProperties(
+    serialized: SerializableProperties,
+    lookup?: CollectionLookup
+): Properties {
     const result: Properties = {};
     for (const [key, property] of Object.entries(serialized)) {
-        result[key] = fromSerializableProperty(property);
+        result[key] = fromSerializableProperty(property, lookup);
     }
     return result;
 }
@@ -559,11 +641,39 @@ export function fromSerializableProperties(serialized: SerializableProperties): 
  * (callbacks, entityActions, etc.) — those must be re-attached by the
  * consumer if needed.
  */
-export function fromSerializableCollectionConfig(serialized: SerializableCollectionConfig): AdminCollection {
+export function fromSerializableCollectionConfig(
+    serialized: SerializableCollectionConfig,
+    lookup?: CollectionLookup
+): AdminCollection {
     const { properties, ...rest } = serialized;
 
     return {
         ...rest,
-        properties: fromSerializableProperties(properties),
+        properties: fromSerializableProperties(properties, lookup)
     } as AdminCollection;
+}
+
+/**
+ * Deserialize a whole set of collections, resolving relation targets against
+ * each other.
+ *
+ * This is the entry point to prefer. A relation's `target` is a slug on the
+ * wire, and a slug only means something relative to the other collections — so
+ * deserializing one at a time cannot rebuild a working thunk, and produces
+ * relations that throw the moment anything resolves them.
+ *
+ * The lookup is consulted lazily, inside the thunk, so the collections may
+ * reference each other in any order, including circularly.
+ */
+export function fromSerializableCollectionConfigs(
+    serialized: SerializableCollectionConfig[]
+): AdminCollection[] {
+    const bySlug = new Map<string, AdminCollection>();
+    const lookup: CollectionLookup = slug => bySlug.get(slug);
+
+    const collections = serialized.map(c => fromSerializableCollectionConfig(c, lookup));
+    for (const collection of collections) {
+        if (collection.slug) bySlug.set(collection.slug, collection);
+    }
+    return collections;
 }

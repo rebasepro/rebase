@@ -27,6 +27,7 @@ export {
     toSerializableProperty,
     toSerializableProperties,
     fromSerializableCollectionConfig,
+    fromSerializableCollectionConfigs,
     fromSerializableProperty,
     fromSerializableProperties,
 } from "./serializable_utils";

@@ -1,5 +1,5 @@
-import { CollectionRegistry } from "@rebasepro/common";
-import { type CollectionConfig, type Relation, getDataSourceCapabilities } from "@rebasepro/types";
+import { CollectionRegistry, resolveCollectionRelations } from "@rebasepro/common";
+import { type CollectionConfig } from "@rebasepro/types";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
 import { CollectionRegistryInterface } from "../interfaces";
@@ -95,8 +95,13 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
      */
     getRelationKeysForCollection(collectionPath: string): string[] {
         const collection = this.getCollectionByPath(collectionPath);
-        if (!collection || !getDataSourceCapabilities(collection.engine).supportsRelations || !collection.relations) return [];
-        return collection.relations!.map((r) => r.relationName ?? "").filter(Boolean);
+        if (!collection) return [];
+        // Resolved, not authored. `relationName` is optional at the authoring
+        // surface and defaults to the property key or the target's slug, so
+        // reading the raw field dropped every relation that relied on the
+        // default — and never saw relations declared inline on a property at
+        // all, since those are not in the `relations` array.
+        return Object.keys(resolveCollectionRelations(collection));
     }
 
 }

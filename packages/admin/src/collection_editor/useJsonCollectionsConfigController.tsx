@@ -12,7 +12,7 @@ import type {
     UpdateKanbanColumnsOrderParams,
 } from "./types/config_controller";
 import type { JsonCollectionStore, SerializableCollectionConfig } from "./serializable_types";
-import { toSerializableCollectionConfig, toSerializableProperty, fromSerializableCollectionConfig } from "./serializable_utils";
+import { toSerializableCollectionConfig, toSerializableProperty, fromSerializableCollectionConfigs } from "./serializable_utils";
 
 export interface UseJsonCollectionsConfigControllerOptions {
     /**
@@ -76,7 +76,9 @@ export function useJsonCollectionsConfigController({
                     storeRef.current.loadNavigationEntries?.() ?? Promise.resolve([]),
                 ]);
                 if (cancelled) return;
-                setCollections(serialized.map(fromSerializableCollectionConfig));
+                // Deserialized as a set: a relation's target is a slug, and a slug only
+                // resolves against the other collections it arrived with.
+                setCollections(fromSerializableCollectionConfigs(serialized));
                 setNavigationEntries(navEntries);
             } catch (e) {
                 console.error("useJsonCollectionsConfigController: failed to load collections", e);

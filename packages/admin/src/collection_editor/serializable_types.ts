@@ -263,36 +263,57 @@ export interface SerializableReferenceProperty extends SerializableBaseProperty 
 }
 
 /**
+ * A `Relation` as JSON: the same tagged union, with `target` narrowed to a
+ * collection slug because a `() => CollectionConfig` thunk cannot be
+ * serialized. `kind` decides which of the remaining fields mean anything.
+ */
+export type SerializableRelation =
+    | { kind: "belongsTo"; target?: string; relationName?: string; localKey?: string; onUpdate?: OnAction; onDelete?: OnAction }
+    | { kind: "hasOne"; target?: string; relationName?: string; foreignKeyOnTarget?: string; onUpdate?: OnAction; onDelete?: OnAction }
+    | { kind: "hasMany"; target?: string; relationName?: string; foreignKeyOnTarget?: string; onUpdate?: OnAction; onDelete?: OnAction }
+    | {
+        kind: "manyToMany";
+        target?: string;
+        relationName?: string;
+        // Optional exactly as authored — resolution fills the gaps, so the
+        // editor must be able to round-trip a partially-specified junction.
+        through?: { table?: string; sourceColumn?: string; targetColumn?: string };
+        onUpdate?: OnAction;
+        onDelete?: OnAction;
+    }
+    | {
+        kind: "via";
+        target?: string;
+        relationName?: string;
+        cardinality: "one" | "many";
+        joinPath: JoinStep[];
+        onUpdate?: OnAction;
+        onDelete?: OnAction;
+    };
+
+/**
  * JSON-serializable `RelationProperty`.
- * `target` is string-only (collection slug). The function variant
- * `() => CollectionConfig` is not serializable.
  */
 export interface SerializableRelationProperty extends SerializableBaseProperty {
     admin?: SerializableAdminRelationOptions;
     type: "relation";
     isId?: boolean;
-    /** Target collection slug. Function variant is not serializable. */
-    target?: string;
-    cardinality?: "one" | "many";
-    direction?: "owning" | "inverse";
-    inverseRelationName?: string;
-    localKey?: string;
-    foreignKeyOnTarget?: string;
-    through?: {
-        table: string;
-        sourceColumn: string;
-        targetColumn: string;
-    };
-    joinPath?: JoinStep[];
-    onUpdate?: OnAction;
-    onDelete?: OnAction;
-    relationName?: string;
+    /**
+     * The link, as one nested object, mirroring the authored union.
+     *
+     * This used to be a flat spread — `target`, `cardinality`, `direction`,
+     * `inverseRelationName` and every join field side by side — and it outlived
+     * the union. The serializer was migrated to write a nested `relation`, but
+     * this interface was not, so it assigned the field through a
+     * `Record<string, unknown>` cast that its own type did not admit. The type
+     * went on describing a shape nothing produced, and the cast hid it.
+     */
+    relation?: SerializableRelation;
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
     includeEntityLink?: boolean;
     widget?: "select" | "dialog";
     // overrides are dropped (can contain non-serializable CollectionConfig fields)
-    // relation (resolved Relation object) is dropped (runtime-only, contains function target)
 }
 
 /** JSON-serializable `ArrayProperty`. */
