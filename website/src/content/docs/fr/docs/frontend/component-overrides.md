@@ -32,12 +32,16 @@ function App() {
 
                 // Wrap Mode: Wrap the login view to insert branding
                 "Auth.LoginView": {
-                    Component: ({ OriginalComponent, ...props }) => (
+                    // `OriginalComponent` is injected at runtime when `wrap: true`; the override
+                    // slot's type does not model it, hence the annotation.
+                    Component: (({ OriginalComponent, ...props }: {
+                        OriginalComponent: React.ComponentType<Record<string, unknown>>
+                    }) => (
                         <div className="login-branding-container">
                             <header className="branding-header">My Custom Brand</header>
                             <OriginalComponent {...props} />
                         </div>
-                    ),
+                    )) as unknown as React.ComponentType<Record<string, unknown>>,
                     wrap: true
                 }
             }}
@@ -71,14 +75,18 @@ const productsCollection = defineCollection({
 
             // Wrap Mode: Wrap the empty state to add quick links
             "Collection.EmptyState": {
-                Component: ({ OriginalComponent, ...props }) => (
+                // `OriginalComponent` is injected at runtime when `wrap: true`; the override
+                    // slot's type does not model it, hence the annotation.
+                    Component: (({ OriginalComponent, ...props }: {
+                        OriginalComponent: React.ComponentType<Record<string, unknown>>
+                    }) => (
                     <div className="empty-state-wrapper">
                         <OriginalComponent {...props} />
                         <button onClick={() => importDemoProducts()}>
                             Load Demo Products
                         </button>
                     </div>
-                ),
+                )) as unknown as React.ComponentType<Record<string, unknown>>,
                 wrap: true
             }
         }

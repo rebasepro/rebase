@@ -18,7 +18,7 @@ import { useRebaseContext } from "@rebasepro/app";
 function MyComponent() {
     const context = useRebaseContext();
 
-    context.dataSource          // Operações de dados
+    context.data          // Operações de dados
     context.storageSource       // Operações de arquivo
     context.authController      // Estado de autenticação
     context.navigation          // Estado de navegação

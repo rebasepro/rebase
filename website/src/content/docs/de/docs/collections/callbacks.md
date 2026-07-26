@@ -385,7 +385,7 @@ const submissionsCollection: PostgresCollectionConfig<Submission> = {
         afterSave: async ({ values, id, previousValues, context }) => {
             // Wenn eine Einreichung genehmigt wird, einen veröffentlichten Job erstellen
             if (values.status === "approved" && previousValues?.status !== "approved") {
-                const newJob = await context.data.collection("jobs").create({
+                const newJob = await context.data.collection<Record<string, unknown>>("jobs").create({
                     title: values.title,
                     description: values.description,
                     company_id: values.company_id,

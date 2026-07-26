@@ -214,7 +214,7 @@ title: Changelog
 
 - **BaaS mode — a REST API over your database with no collections at all** — `mode: "baas"` derives collections from the live database at boot instead of loading config files. Every protected table becomes a REST resource, with types, primary keys and relations read from `information_schema`; the drizzle tables the query layer needs are built in memory, so no generated `schema.generated.ts` is required either. Change the schema with a migration and the API follows. Join tables are skipped, the schema editor is off (it exists to write config files), and no React enters the backend's module graph. `introspectionSchema` on the Postgres adapter selects a schema other than `public`.
 
-- **The SDK works with no collections** — `rebase.data.collection("posts").find()` needs only a table name against a BaaS backend: no collections map, no generated types, nothing to declare. The optional `collections` option exists only to pin non-obvious slugs.
+- **The SDK works with no collections** — `rebase.data.collection<Record<string, unknown>>("posts").find()` needs only a table name against a BaaS backend: no collections map, no generated types, nothing to declare. The optional `collections` option exists only to pin non-obvious slugs.
 
 - **`rebase init --flavor baas`** — scaffolds a headless project: `backend/` alone, no `config/`, no `frontend/`, and no UI package in the install tree. Without `--flavor`, `init` asks: *BaaS + admin* (default) or *BaaS only*.
 
@@ -435,7 +435,7 @@ title: Changelog
 
 - **`installShutdownHandlers`** — New `@rebasepro/server-core` helper that encapsulates graceful shutdown: drains via `backend.shutdown()`, runs `onCleanup` (e.g. closing your database pool), guards against repeated signals, and force-exits if shutdown hangs. Replaces the hand-rolled ~40-line shutdown block in the backend templates — the CLI template previously lacked the re-entry guard and force-exit timer entirely.
 
-- **Honest Realtime Meta** — Added `FindResponse.meta.estimated` flag on realtime first-paint updates. When `listen()` emits its immediate heuristic metadata, the emission now carries `estimated: true`. Redundant second emissions are skipped when the authoritative count matches the heuristic, and count failures no longer silently pretend to be authoritative — the `estimated` flag remains as the signal.
+- **Honest Realtime Meta** — Added `FindResponse.meta.total` flag on realtime first-paint updates. When `listen()` emits its immediate heuristic metadata, the emission now carries `estimated: true`. Redundant second emissions are skipped when the authoritative count matches the heuristic, and count failures no longer silently pretend to be authoritative — the `estimated` flag remains as the signal.
 
 ### Fixes
 
@@ -459,7 +459,7 @@ title: Changelog
 
 ### Changed
 
-- **Strict collection accessors** — When a `collections` dictionary is passed to `createRebaseClient`, unknown property accessors on `client.data` now throw immediately with a nearest-match suggestion instead of silently producing a 404 later. Use `data.collection("slug")` for dynamic slugs.
+- **Strict collection accessors** — When a `collections` dictionary is passed to `createRebaseClient`, unknown property accessors on `client.data` now throw immediately with a nearest-match suggestion instead of silently producing a 404 later. Use `data.collection<Record<string, unknown>>("slug")` for dynamic slugs.
 
 ### Cleanup
 

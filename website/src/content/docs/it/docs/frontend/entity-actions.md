@@ -28,13 +28,10 @@ const articlesCollection = defineCollection({
                 name: "Publish",
                 icon: "publish",
                 onClick: async ({ entity, context }) => {
-                    await context.dataSource.saveEntity({
-                        path: entity.path,
-                        entityId: entity.id,
-                        values: { status: "published", published_at: new Date() },
-                        collection: articlesCollection
-                    });
+                    await context.data.collection<Record<string, unknown>>(entity.path)
+                            .update(entity.id, { status: "published", published_at: new Date() });
                     context.snackbarController.open({
+                        type: "success",
                         message: "Article published!"
                     });
                 }
@@ -44,11 +41,8 @@ const articlesCollection = defineCollection({
                 icon: "content_copy",
                 onClick: async ({ entity, context }) => {
                     const { id, ...values } = entity.values;
-                    await context.dataSource.saveEntity({
-                        path: entity.path,
-                        values: { ...values, name: values.name + " (Copy)" },
-                        collection: articlesCollection
-                    });
+                    await context.data.collection<Record<string, unknown>>(entity.path)
+                            .create({ ...values, name: values.name + " (Copy)" });
                 }
             }
         ]
@@ -67,7 +61,7 @@ function PublishSelectedAction({ selectionController, context }: CollectionActio
     const handlePublish = async () => {
         const selected = selectionController.selectedEntities;
         for (const entity of selected) {
-            await context.dataSource.saveEntity({
+            await context.data.saveEntity({
                 path: entity.path,
                 entityId: entity.id,
                 values: { status: "published" },

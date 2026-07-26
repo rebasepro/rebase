@@ -6,7 +6,7 @@ description: CRUD-Operationen, Fluent-Query-Builder, Filteroperatoren, Paginieru
 
 ## Zugriff auf Collections
 
-Greifen Sie auf jede Collection über `client.data.<collectionName>` (camelCase, automatisch in snake_case umgewandelt) oder `client.data.collection("slug")` (expliziter Slug) zu:
+Greifen Sie auf jede Collection über `client.data.<collectionName>` (camelCase, automatisch in snake_case umgewandelt) oder `client.data.collection<Record<string, unknown>>("slug")` (expliziter Slug) zu:
 
 ```typescript
 // Property-style access (camelCase → snake_case slug)
@@ -14,10 +14,10 @@ client.data.blogPosts       // → slug "blog_posts"
 client.data.users           // → slug "users"
 
 // Dynamic access by slug
-client.data.collection("blog_posts")
+client.data.collection<Record<string, unknown>>("blog_posts")
 ```
 
-> **Strict Mode (generiertes SDK):** Wenn Sie das generierte `collectionsDictionary` an `createRebaseClient` übergeben, validiert der Daten-Proxy Property-Zugriffe zum Zeitpunkt des Zugriffs. Ein Tippfehler wie `client.data.prodcuts` wirft sofort einen Fehler mit einer hilfreichen Meldung und einem Vorschlag für die nächstgelegene Übereinstimmung, anstatt später einen verwirrenden 404 zu erzeugen. Verwenden Sie `client.data.collection("slug")`, um die Validierung für dynamische oder zur Laufzeit bestimmte Slugs zu umgehen.
+> **Strict Mode (generiertes SDK):** Wenn Sie das generierte `collectionsDictionary` an `createRebaseClient` übergeben, validiert der Daten-Proxy Property-Zugriffe zum Zeitpunkt des Zugriffs. Ein Tippfehler wie `client.data.prodcuts` wirft sofort einen Fehler mit einer hilfreichen Meldung und einem Vorschlag für die nächstgelegene Übereinstimmung, anstatt später einen verwirrenden 404 zu erzeugen. Verwenden Sie `client.data.collection<Record<string, unknown>>("slug")`, um die Validierung für dynamische oder zur Laufzeit bestimmte Slugs zu umgehen.
 
 ## CRUD-Operationen
 

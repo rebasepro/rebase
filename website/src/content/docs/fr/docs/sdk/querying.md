@@ -6,7 +6,7 @@ description: Opérations CRUD, constructeur de requêtes fluide, opérateurs de 
 
 ## Accéder aux collections
 
-Accédez à n'importe quelle collection via `client.data.<collectionName>` (camelCase, converti automatiquement en snake_case) ou `client.data.collection("slug")` (slug explicite) :
+Accédez à n'importe quelle collection via `client.data.<collectionName>` (camelCase, converti automatiquement en snake_case) ou `client.data.collection<Record<string, unknown>>("slug")` (slug explicite) :
 
 ```typescript
 // Property-style access (camelCase → snake_case slug)
@@ -14,10 +14,10 @@ client.data.blogPosts       // → slug "blog_posts"
 client.data.users           // → slug "users"
 
 // Dynamic access by slug
-client.data.collection("blog_posts")
+client.data.collection<Record<string, unknown>>("blog_posts")
 ```
 
-> **Mode strict (SDK généré) :** Lorsque vous passez le `collectionsDictionary` généré à `createRebaseClient`, le proxy de données valide les accès aux propriétés au moment de l'accès. Une faute de frappe comme `client.data.prodcuts` lèvera immédiatement une erreur avec un message utile et une suggestion de correspondance la plus proche, au lieu de produire un 404 déroutant plus tard. Utilisez `client.data.collection("slug")` pour contourner la validation avec des slugs dynamiques ou déterminés à l'exécution.
+> **Mode strict (SDK généré) :** Lorsque vous passez le `collectionsDictionary` généré à `createRebaseClient`, le proxy de données valide les accès aux propriétés au moment de l'accès. Une faute de frappe comme `client.data.prodcuts` lèvera immédiatement une erreur avec un message utile et une suggestion de correspondance la plus proche, au lieu de produire un 404 déroutant plus tard. Utilisez `client.data.collection<Record<string, unknown>>("slug")` pour contourner la validation avec des slugs dynamiques ou déterminés à l'exécution.
 
 ## Opérations CRUD
 

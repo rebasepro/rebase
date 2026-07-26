@@ -208,12 +208,16 @@ import { MyAppBar } from "./MyAppBar";
 
         // Wrap Mode: Wrap the default LoginView, adding custom branding
         "Auth.LoginView": {
-            Component: ({ OriginalComponent, ...props }) => (
+            // `OriginalComponent` is injected at runtime when `wrap: true`; the override
+                    // slot's type does not model it, hence the annotation.
+                    Component: (({ OriginalComponent, ...props }: {
+                        OriginalComponent: React.ComponentType<Record<string, unknown>>
+                    }) => (
                 <div className="custom-login-wrapper">
                     <div className="branding">Welcome to My Enterprise App</div>
                     <OriginalComponent {...props} />
                 </div>
-            ),
+            )) as unknown as React.ComponentType<Record<string, unknown>>,
             wrap: true
         }
     }}

@@ -26,16 +26,12 @@ function DashboardView() {
     useEffect(() => {
         async function loadStats() {
             // Use the data source to fetch aggregate data
-            const orders = await context.dataSource.fetchCollection({
-                path: "orders",
-                collection: ordersCollection,
+            const orders = await context.data.collection<Record<string, unknown>>("orders").find({
                 limit: 1000
             });
 
-            const products = await context.dataSource.fetchCollection({
-                path: "products",
-                collection: productsCollection,
-                filter: { active: ["==", true] }
+            const products = await context.data.collection<Record<string, unknown>>("products").find({
+                where: { active: ["==", true] }
             });
 
             setStats({

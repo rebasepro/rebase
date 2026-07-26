@@ -59,7 +59,7 @@ listen(
 
 Quando `listen()` dispara, ele emite atualizações em até duas fases:
 
-1. **Imediata (estimada):** O primeiro callback dispara instantaneamente com as entidades e metadados de paginação heurísticos (`total` = número de entidades retornadas, `hasMore` = se a contagem é igual ao limite solicitado). Essa emissão carrega `meta.estimated: true`.
+1. **Imediata (estimada):** O primeiro callback dispara instantaneamente com as entidades e metadados de paginação heurísticos (`total` = número de entidades retornadas, `hasMore` = se a contagem é igual ao limite solicitado). Essa emissão carrega `meta.total: true`.
 
 2. **Autoritativa (opcional):** Uma consulta de contagem assíncrona é executada em segundo plano. Se o `total` ou `hasMore` autoritativo diferir da estimativa, um segundo callback dispara com metadados corrigidos e **sem** o sinalizador `estimated`. Se os valores coincidirem, a segunda emissão é totalmente ignorada — seu callback dispara apenas uma vez.
 
@@ -69,7 +69,7 @@ Se a consulta de contagem **falhar**, nenhuma segunda emissão ocorre. O sinaliz
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
     (response) => {
-        if (response.meta.estimated) {
+        if (response.meta.total) {
             // First-paint: render immediately, total/hasMore may change
             renderProducts(response.data, { loading: true });
         } else {

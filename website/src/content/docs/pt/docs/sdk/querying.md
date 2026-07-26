@@ -6,7 +6,7 @@ description: Operações CRUD, construtor de consultas fluente, operadores de fi
 
 ## Acessar Coleções
 
-Acesse qualquer coleção através de `client.data.<collectionName>` (camelCase, convertido automaticamente para snake_case) ou `client.data.collection("slug")` (slug explícito):
+Acesse qualquer coleção através de `client.data.<collectionName>` (camelCase, convertido automaticamente para snake_case) ou `client.data.collection<Record<string, unknown>>("slug")` (slug explícito):
 
 ```typescript
 // Property-style access (camelCase → snake_case slug)
@@ -14,10 +14,10 @@ client.data.blogPosts       // → slug "blog_posts"
 client.data.users           // → slug "users"
 
 // Dynamic access by slug
-client.data.collection("blog_posts")
+client.data.collection<Record<string, unknown>>("blog_posts")
 ```
 
-> **Modo estrito (SDK gerado):** Ao passar o `collectionsDictionary` gerado para `createRebaseClient`, o proxy de dados valida os acessos a propriedades no momento do acesso. Um erro de digitação como `client.data.prodcuts` lançará imediatamente um erro com uma mensagem útil e uma sugestão da correspondência mais próxima, em vez de produzir um confuso 404 mais tarde. Use `client.data.collection("slug")` para ignorar a validação com slugs dinâmicos ou determinados em tempo de execução.
+> **Modo estrito (SDK gerado):** Ao passar o `collectionsDictionary` gerado para `createRebaseClient`, o proxy de dados valida os acessos a propriedades no momento do acesso. Um erro de digitação como `client.data.prodcuts` lançará imediatamente um erro com uma mensagem útil e uma sugestão da correspondência mais próxima, em vez de produzir um confuso 404 mais tarde. Use `client.data.collection<Record<string, unknown>>("slug")` para ignorar a validação com slugs dinâmicos ou determinados em tempo de execução.
 
 ## Operações CRUD
 

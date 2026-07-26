@@ -59,7 +59,7 @@ listen(
 
 Wenn `listen()` ausgelöst wird, gibt es Updates in bis zu zwei Phasen aus:
 
-1. **Sofort (geschätzt):** Der erste Callback wird sofort mit den Entitäten und heuristischen Paginierungs-Metadaten ausgelöst (`total` = Anzahl der zurückgegebenen Entitäten, `hasMore` = ob die Anzahl dem angeforderten Limit entspricht). Diese Emission trägt `meta.estimated: true`.
+1. **Sofort (geschätzt):** Der erste Callback wird sofort mit den Entitäten und heuristischen Paginierungs-Metadaten ausgelöst (`total` = Anzahl der zurückgegebenen Entitäten, `hasMore` = ob die Anzahl dem angeforderten Limit entspricht). Diese Emission trägt `meta.total: true`.
 
 2. **Autoritativ (optional):** Eine asynchrone Zählabfrage läuft im Hintergrund. Wenn der autoritative `total`- oder `hasMore`-Wert von der Schätzung abweicht, wird ein zweiter Callback mit korrigierten Metadaten und **ohne** `estimated`-Flag ausgelöst. Stimmen die Werte überein, wird die zweite Emission vollständig übersprungen — Ihr Callback wird nur einmal ausgelöst.
 
@@ -69,7 +69,7 @@ Wenn die Zählabfrage **fehlschlägt**, erfolgt keine zweite Emission. Das `esti
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
     (response) => {
-        if (response.meta.estimated) {
+        if (response.meta.total) {
             // First-paint: render immediately, total/hasMore may change
             renderProducts(response.data, { loading: true });
         } else {

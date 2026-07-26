@@ -977,7 +977,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig<{
         // Runs AFTER saving — trigger side effects, sync other collections
         afterSave: async ({ values, id, previousValues, context }) => {
             if (values.status === "approved" && previousValues?.status !== "approved") {
-                await context.data.collection("jobs").create({
+                await context.data.collection<Record<string, unknown>>("jobs").create({
                     title: values.title,
                     description: values.description,
                     company_id: values.company_id,
@@ -1108,7 +1108,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
                 isEnabled: ({ entity }) => entity?.values.status === "pending",
                 onClick: async ({ entity, context, onCollectionChange }) => {
                     if (!entity) return;
-                    await context.data.collection("job_submissions").update(entity.id, {
+                    await context.data.collection<Record<string, unknown>>("job_submissions").update(entity.id, {
                         status: "approved"
                     });
                     context.snackbarController?.open({

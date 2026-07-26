@@ -59,7 +59,7 @@ listen(
 
 Quando `listen()` si attiva, emette gli aggiornamenti in un massimo di due fasi:
 
-1. **Immediata (stimata):** Il primo callback si attiva istantaneamente con le entità e metadati di paginazione euristici (`total` = numero di entità restituite, `hasMore` = se il conteggio è uguale al limite richiesto). Questa emissione porta `meta.estimated: true`.
+1. **Immediata (stimata):** Il primo callback si attiva istantaneamente con le entità e metadati di paginazione euristici (`total` = numero di entità restituite, `hasMore` = se il conteggio è uguale al limite richiesto). Questa emissione porta `meta.total: true`.
 
 2. **Autorevole (facoltativa):** Una query di conteggio asincrona viene eseguita in background. Se il `total` o `hasMore` autorevole differisce dalla stima, si attiva un secondo callback con metadati corretti e **senza** il flag `estimated`. Se i valori corrispondono, la seconda emissione viene completamente saltata — il tuo callback si attiva una sola volta.
 
@@ -69,7 +69,7 @@ Se la query di conteggio **fallisce**, non si verifica una seconda emissione. Il
 client.data.products.listen(
     { where: { active: ["==", true] }, limit: 50 },
     (response) => {
-        if (response.meta.estimated) {
+        if (response.meta.total) {
             // First-paint: render immediately, total/hasMore may change
             renderProducts(response.data, { loading: true });
         } else {

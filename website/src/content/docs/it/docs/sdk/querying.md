@@ -6,7 +6,7 @@ description: Operazioni CRUD, query builder fluido, operatori di filtro, paginaz
 
 ## Accesso alle collezioni
 
-Accedi a qualsiasi collezione tramite `client.data.<collectionName>` (camelCase, convertito automaticamente in snake_case) o `client.data.collection("slug")` (slug esplicito):
+Accedi a qualsiasi collezione tramite `client.data.<collectionName>` (camelCase, convertito automaticamente in snake_case) o `client.data.collection<Record<string, unknown>>("slug")` (slug esplicito):
 
 ```typescript
 // Property-style access (camelCase → snake_case slug)
@@ -14,10 +14,10 @@ client.data.blogPosts       // → slug "blog_posts"
 client.data.users           // → slug "users"
 
 // Dynamic access by slug
-client.data.collection("blog_posts")
+client.data.collection<Record<string, unknown>>("blog_posts")
 ```
 
-> **Modalità strict (SDK generato):** Quando passi il `collectionsDictionary` generato a `createRebaseClient`, il proxy dei dati convalida gli accessi alle proprietà al momento dell'accesso. Un errore di battitura come `client.data.prodcuts` genererà immediatamente un errore con un messaggio utile e un suggerimento sulla corrispondenza più vicina, invece di produrre un confuso 404 in seguito. Usa `client.data.collection("slug")` per ignorare la convalida con slug dinamici o determinati a runtime.
+> **Modalità strict (SDK generato):** Quando passi il `collectionsDictionary` generato a `createRebaseClient`, il proxy dei dati convalida gli accessi alle proprietà al momento dell'accesso. Un errore di battitura come `client.data.prodcuts` genererà immediatamente un errore con un messaggio utile e un suggerimento sulla corrispondenza più vicina, invece di produrre un confuso 404 in seguito. Usa `client.data.collection<Record<string, unknown>>("slug")` per ignorare la convalida con slug dinamici o determinati a runtime.
 
 ## Operazioni CRUD
 

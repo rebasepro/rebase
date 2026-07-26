@@ -35,7 +35,7 @@ Le client gère automatiquement les jetons d'authentification — une fois qu'un
 
 ## Opérations sur les données
 
-Accédez à toute collection via `client.data.<collectionName>` (camelCase) ou `client.data.collection("slug")` (kebab-case) :
+Accédez à toute collection via `client.data.<collectionName>` (camelCase) ou `client.data.collection<Record<string, unknown>>("slug")` (kebab-case) :
 
 ```typescript
 // Property-style access (auto-converts to kebab-case)

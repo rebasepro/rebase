@@ -84,7 +84,7 @@ const job: CronJobDefinition = {
             });
 
         for (const session of oldSessions) {
-            await ctx.client.data.collection("sessions").delete(session.id);
+            await ctx.client.data.collection<Record<string, unknown>>("sessions").delete(session.id);
         }
 
         ctx.log(`Cleaned up ${oldSessions.length} expired sessions`);
@@ -129,12 +129,12 @@ const job: CronJobDefinition = {
                 });
 
             if (existing.data.length > 0) {
-                await ctx.client.data.collection("exchange_rates").update(existing.data[0].id, {
+                await ctx.client.data.collection<Record<string, unknown>>("exchange_rates").update(existing.data[0].id, {
                     rate: rate as number,
                     updatedAt: new Date().toISOString(),
                 });
             } else {
-                await ctx.client.data.collection("exchange_rates").create({
+                await ctx.client.data.collection<Record<string, unknown>>("exchange_rates").create({
                     currency,
                     rate: rate as number,
                 });
@@ -170,7 +170,7 @@ const job: CronJobDefinition = {
         let sent = 0;
         for (const user of users) {
             const { data: notifications } = await ctx.client.data
-                .collection("notifications")
+                .collection<Record<string, unknown>>("notifications")
                 .find({
                     where: { user_id: ["==", user.id], read: ["==", false] },
                 });
@@ -255,10 +255,11 @@ async handler(ctx) {
     await ctx.client.data.collection("orders").delete(id);
     await ctx.client.data.collection("metrics").create({ key: "daily_total", value: 42 });
 
-    // Filtering and sorting
+    // Filtering and sorting — `where` takes [operator, value] tuples, and the key is
+    // `orderBy`, not `sort`.
     const { data: stale } = await ctx.client.data.collection("tokens").find({
-        filter: { expiresAt: { lt: new Date().toISOString() } },
-        sort: "-createdAt",
+        where: { expires_at: ["<", new Date().toISOString()] },
+        orderBy: ["created_at", "desc"],
         limit: 500,
     });
 

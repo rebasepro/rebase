@@ -35,7 +35,7 @@ El cliente gestiona automáticamente los tokens de autenticación — una vez qu
 
 ## Data Operations
 
-Acceda a cualquier colección a través de `client.data.<collectionName>` (camelCase) o `client.data.collection("slug")` (kebab-case):
+Acceda a cualquier colección a través de `client.data.<collectionName>` (camelCase) o `client.data.collection<Record<string, unknown>>("slug")` (kebab-case):
 
 ```typescript
 // Property-style access (auto-converts to kebab-case)
