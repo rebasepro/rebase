@@ -164,8 +164,7 @@ describe("entity child views", () => {
                     // set, the picker addresses the whole collection.
                     relationName: "featured_tags",
                     target: () => tags,
-                    cardinality: "many",
-                    direction: "owning",
+                    kind: "manyToMany",
                     through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
                 }
             ]

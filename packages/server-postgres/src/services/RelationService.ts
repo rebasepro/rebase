@@ -3,7 +3,7 @@ import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
 import { CollectionConfig, FilterValues, ResolvedRelation, ResolvedManyToMany } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
-import { hasForeignKeyOnTarget } from "@rebasepro/types";
+import { hasForeignKeyOnTarget, isManyToMany, type ResolvedVia } from "@rebasepro/types";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
@@ -425,10 +425,10 @@ export class RelationService {
         hop: NestedPathHop,
         targetId: string | number
     ): Promise<void> {
-        const through = hop.relation.through;
-        if (!through) {
+        if (!isManyToMany(hop.relation)) {
             throw new Error(`Relation '${hop.relationKey}' has no junction table to unlink through`);
         }
+        const through = hop.relation.through;
 
         const junctionTable = this.registry.getTable(through.table);
         if (!junctionTable) {
@@ -607,7 +607,7 @@ export class RelationService {
         this.assertSingleKeyAddressable(
             parentCollection,
             parentPks,
-            relation.foreignKeyOnTarget ?? `${relation.inverseRelationName}_id`
+            hasForeignKeyOnTarget(relation) ? relation.foreignKeyOnTarget : relation.relationName
         );
         let query = this.db.select().from(targetTable).$dynamic();
 
@@ -640,11 +640,13 @@ export class RelationService {
             // Determine the parent ID this result belongs to based on the relation type
             let parentId: string | number | undefined;
 
+            // The parent's key is on the target row, in the relation's own
+            // column. There used to be a second branch here that guessed the
+            // column by appending `_id` to `inverseRelationName`, reached only
+            // when the foreign key had not been resolved — which cannot happen
+            // now that resolution fills it in.
             if (hasForeignKeyOnTarget(relation)) {
                 parentId = targetRow[relation.foreignKeyOnTarget] as string | number | undefined;
-            } else if (relation.direction === "inverse" && relation.cardinality === "one" && relation.inverseRelationName) {
-                const inferredForeignKeyName = `${relation.inverseRelationName}_id`;
-                parentId = targetRow[inferredForeignKeyName] as string | number | undefined;
             }
 
             if (parentId !== undefined && parentIdSet.has(String(parentId))) {
@@ -776,7 +778,7 @@ export class RelationService {
         this.assertSingleKeyAddressable(
             parentCollection,
             parentPks,
-            relation.foreignKeyOnTarget ?? `${relation.inverseRelationName}_id`
+            hasForeignKeyOnTarget(relation) ? relation.foreignKeyOnTarget : relation.relationName
         );
         let query = this.db.select().from(targetTable).$dynamic();
 
@@ -806,16 +808,10 @@ export class RelationService {
 
             let parentId: string | number | undefined;
 
-            if (relation.through && relation.direction === "inverse") {
-                // Inverse many-to-many via junction table: the junction's targetColumn
-                // references the parent (since from the inverse perspective, source/target are swapped).
-                const junctionData = (row[relation.through.table] || row) as Record<string, unknown>;
-                parentId = junctionData[relation.through.targetColumn] as string | number | undefined;
-            } else if (hasForeignKeyOnTarget(relation)) {
+            // Junction-backed relations returned earlier in this method, so
+            // what reaches here names the parent with a column on the target.
+            if (hasForeignKeyOnTarget(relation)) {
                 parentId = targetRow[relation.foreignKeyOnTarget] as string | number | undefined;
-            } else if (relation.direction === "inverse" && relation.inverseRelationName) {
-                const inferredForeignKeyName = `${relation.inverseRelationName}_id`;
-                parentId = targetRow[inferredForeignKeyName] as string | number | undefined;
             }
 
             if (parentId !== undefined && parentIdSet.has(String(parentId))) {
@@ -952,10 +948,6 @@ export class RelationService {
                         await tx.insert(junctionTable).values(newLinks);
                     }
                 }
-            } else if (relation.kind === "manyToMany") {
-                // Inverse M2M relations should be saved from the owning side.
-                // The owning collection manages the junction table rows.
-                logger.warn(`[updateRelationsUsingJoins] Inverse M2M relation '${key}' in collection '${collection.slug}' should be saved from the owning side. Skipping.`);
             } else if (relation.cardinality === "many" && hasForeignKeyOnTarget(relation)) {
                 // Handle one-to-many (inverse) by updating target FK to point to parent
                 const targetTable = getTableForCollection(targetCollection, this.registry);
@@ -1024,8 +1016,7 @@ export class RelationService {
                 const sourcePks = requirePrimaryKeys(sourceCollection, this.registry);
                 const sourceIdInfo = sourcePks[0];
 
-                // Handle inverse relations with joinPath
-                if (relation.direction === "inverse" && relation.kind === "via") {
+                if (relation.kind === "via") {
                     await this.updateInverseJoinPathRelation(
                         tx,
                         sourceCollection,
@@ -1037,42 +1028,31 @@ export class RelationService {
                     continue;
                 }
 
-                // Check if this is a many-to-many inverse relation
-                if (relation.cardinality === "many" && relation.direction === "inverse") {
-                    const targetCollectionRelations = resolveCollectionRelations(targetCollection);
-                    let junctionInfo: { table: string; sourceColumn: string; targetColumn: string } | null = null;
-
-                    for (const [relationKey, targetRelation] of Object.entries(targetCollectionRelations)) {
-                        if (targetRelation.cardinality === "many" &&
-                            targetRelation.direction === "owning" &&
-                            targetRelation.through &&
-                            (targetRelation.relationName === relation.inverseRelationName || relationKey === relation.inverseRelationName)) {
-                            junctionInfo = {
-                                table: targetRelation.through.table,
-                                sourceColumn: targetRelation.through.targetColumn,
-                                targetColumn: targetRelation.through.sourceColumn
-                            };
-                            break;
+                // A many-to-many names its own junction. This used to walk the
+                // *target's* relations looking for an owning side whose
+                // `relationName` matched `inverseRelationName`, and swap its
+                // source/target columns — a search that silently did nothing
+                // when the far side was declared differently than expected.
+                if (isManyToMany(relation)) {
+                    await this.updateManyToManyInverseRelation(
+                        tx,
+                        sourceCollection,
+                        sourceEntityId,
+                        targetCollection,
+                        relation,
+                        newValue,
+                        {
+                            table: relation.through.table,
+                            sourceColumn: relation.through.sourceColumn,
+                            targetColumn: relation.through.targetColumn
                         }
-                    }
-
-                    if (junctionInfo) {
-                        await this.updateManyToManyInverseRelation(
-                            tx,
-                            sourceCollection,
-                            sourceEntityId,
-                            targetCollection,
-                            relation,
-                            newValue,
-                            junctionInfo
-                        );
-                        continue;
-                    }
+                    );
+                    continue;
                 }
 
-                // Handle simple inverse relations
-                if (!relation.foreignKeyOnTarget) {
-                    logger.warn(`Inverse relation '${relation.relationName}' is missing foreignKeyOnTarget property. Skipping.`);
+                // What is left names the parent with a column on the target.
+                if (!hasForeignKeyOnTarget(relation)) {
+                    logger.warn(`Relation '${relation.relationName}' has no column on the target to write. Skipping.`);
                     continue;
                 }
 
@@ -1121,14 +1101,10 @@ export class RelationService {
         sourceCollection: CollectionConfig,
         sourceEntityId: string | number,
         targetCollection: CollectionConfig,
-        relation: ResolvedRelation,
+        relation: ResolvedVia,
         newValue: unknown
     ) {
         try {
-            if (!relation.joinPath || relation.joinPath.length === 0) {
-                logger.warn(`Inverse relation '${relation.relationName}' missing joinPath`);
-                return;
-            }
 
             const sourceTableName = getTableName(sourceCollection);
             const targetTableName = getTableName(targetCollection);
@@ -1302,7 +1278,7 @@ export class RelationService {
             const targetIdCol = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
 
             // Determine mapping of columns
-            const { targetFKColName, parentSourceColName } = this.resolveJoinPathWriteMapping(parentCollection, relation);
+            const { targetFKColName, parentSourceColName } = this.resolveJoinPathWriteMapping(parentCollection, relation as ResolvedVia);
             const parentTable = getTableForCollection(parentCollection, this.registry);
             const parentPks = requirePrimaryKeys(parentCollection, this.registry);
             const parentIdInfo = parentPks[0];
@@ -1367,7 +1343,7 @@ export class RelationService {
      */
     resolveJoinPathWriteMapping(
         parentCollection: CollectionConfig,
-        relation: ResolvedRelation
+        relation: ResolvedVia
     ): { targetFKColName: string; parentSourceColName: string } {
         if (!relation.joinPath || relation.joinPath.length === 0) {
             throw new Error("resolveJoinPathWriteMapping requires a joinPath relation");
@@ -1414,14 +1390,14 @@ parentSourceColName };
         const targetCollection = relation.target();
 
         try {
-            const junctionTable = this.registry.getTable(relation.through!.table);
+            const junctionTable = this.registry.getTable((relation as ResolvedManyToMany).through.table);
             if (!junctionTable) {
-                logger.warn(`Junction table '${relation.through!.table}' not found for relation '${relationKey}'`);
+                logger.warn(`Junction table '${(relation as ResolvedManyToMany).through.table}' not found for relation '${relationKey}'`);
                 return;
             }
 
-            const sourceJunctionColumn = junctionTable[relation.through!.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-            const targetJunctionColumn = junctionTable[relation.through!.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
+            const sourceJunctionColumn = junctionTable[(relation as ResolvedManyToMany).through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
+            const targetJunctionColumn = junctionTable[(relation as ResolvedManyToMany).through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
 
             if (!sourceJunctionColumn || !targetJunctionColumn) {
                 logger.warn(`Junction columns not found for relation '${relationKey}'`);

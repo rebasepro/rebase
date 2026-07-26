@@ -1,4 +1,4 @@
-import { CollectionConfig, Property, Relation } from "@rebasepro/types";
+import { CollectionConfig, Property, ResolvedRelation, isManyToMany, type ResolvedVia } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, createRelationRefWithData } from "@rebasepro/common";
 import { normalizeDbValues } from "../data-transformer";
 import { deriveRowAddress } from "./collection-helpers";
@@ -31,11 +31,11 @@ export type RelationStyle = "ref" | "inline";
  * the query has to nest one level deeper for a junction, and the row walk has
  * to unwrap that same level back out.
  */
-export function isJunctionRelation(relation: Relation): boolean {
+export function isJunctionRelation(relation: ResolvedRelation): boolean {
     // An explicit `through` says so outright.
-    if (relation.through) return true;
+    if (isManyToMany(relation)) return true;
     // A joinPath with an intermediate table is the same thing, spelled longhand.
-    if (relation.joinPath && relation.joinPath.length > 1) return true;
+    if ((relation as ResolvedVia).joinPath && (relation as ResolvedVia).joinPath.length > 1) return true;
     return false;
 }
 

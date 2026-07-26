@@ -8,7 +8,7 @@ import {
     TextField,
     Typography
 } from "@rebasepro/ui";
-import { OnAction, RelationProperty } from "@rebasepro/types";
+import { OnAction, RelationProperty, Relation } from "@rebasepro/types";
 
 import { CollectionsSelect } from "./ReferencePropertyField";
 import type { AdminCollection } from "@rebasepro/admin-types";
@@ -50,41 +50,41 @@ export function RelationPropertyField({
 
     const collectionRegistry = useCollectionRegistryController();
 
-    const relationName = values.relationName ?? "";
-    const targetSlug = getTargetSlug(values.target);
-    const cardinality = values.cardinality ?? "one";
-    const direction = values.direction ?? "owning";
-    const localKey = values.localKey ?? "";
-    const foreignKeyOnTarget = values.foreignKeyOnTarget ?? "";
-    const through = values.through;
+    // The link lives under `relation` now, and its `kind` decides which of the
+    // fields below even exist — which is what drives the conditional sections.
+    const link = (values.relation ?? {}) as Record<string, any>;
+    const kind = (link.kind ?? "belongsTo") as Relation["kind"];
+
+    const relationName = link.relationName ?? "";
+    const targetSlug = getTargetSlug(link.target);
+    const localKey = link.localKey ?? "";
+    const foreignKeyOnTarget = link.foreignKeyOnTarget ?? "";
+    const through = link.through;
     const throughTable = through?.table ?? "";
     const throughSourceColumn = through?.sourceColumn ?? "";
     const throughTargetColumn = through?.targetColumn ?? "";
-    const onUpdate = values.onUpdate ?? "no action";
-    const onDelete = values.onDelete ?? "no action";
+    const onUpdate = link.onUpdate ?? "no action";
+    const onDelete = link.onDelete ?? "no action";
 
-    // Whether to show the junction table section
-    const showThrough = cardinality === "many" && direction === "owning";
-    // Whether to show the local key field
-    const showLocalKey = direction === "owning" && cardinality === "one";
-    // Whether to show the foreign key on target field
-    const showForeignKey = direction === "inverse";
+    const showThrough = kind === "manyToMany";
+    const showLocalKey = kind === "belongsTo";
+    const showForeignKey = kind === "hasOne" || kind === "hasMany";
 
     const updateThrough = useCallback(
         (patch: Record<string, unknown>) => {
-            const currentThrough = values.through ?? { table: "",
+            const currentThrough = link.through ?? { table: "",
 sourceColumn: "",
 targetColumn: "" };
-            setFieldValue("through", { ...currentThrough,
+            setFieldValue("relation.through", { ...currentThrough,
 ...patch });
         },
-        [values.through, setFieldValue]
+        [link.through, setFieldValue]
     );
 
     // Auto-generate relationName from target collection slug
     useEffect(() => {
         if (targetSlug && !relationName) {
-            setFieldValue("relationName", targetSlug);
+            setFieldValue("relation.relationName", targetSlug);
         }
     }, [targetSlug, relationName, setFieldValue]);
 
@@ -99,10 +99,10 @@ targetColumn: "" };
                     pathPath={"target"}
                     value={targetSlug}
                     setFieldValue={(_, value) => {
-                        setFieldValue("target", value);
+                        setFieldValue("relation.target", value);
                         // Auto-generate relation name from target
                         if (!relationName || relationName === targetSlug) {
-                            setFieldValue("relationName", value);
+                            setFieldValue("relation.relationName", value);
                         }
                     }}
                     error={showErrors && !targetSlug ? "You must select a target collection" : undefined}
@@ -119,7 +119,7 @@ targetColumn: "" };
                 <TextField
                     value={relationName}
                     onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                        setFieldValue("relationName", e.target.value)
+                        setFieldValue("relation.relationName", e.target.value)
                     }
                     label={"Relation name"}
                     disabled={disabled}
@@ -135,8 +135,8 @@ targetColumn: "" };
             {/* ─── Cardinality ─── */}
             <div className={"col-span-12 sm:col-span-6"}>
                 <Select
-                    value={cardinality}
-                    onValueChange={(v) => setFieldValue("cardinality", v as "one" | "many")}
+                    value={kind}
+                    onValueChange={(v) => setFieldValue("relation.kind", v as "one" | "many")}
                     label={"Cardinality"}
                     disabled={disabled}
                     fullWidth
@@ -167,8 +167,8 @@ targetColumn: "" };
             {/* ─── Direction ─── */}
             <div className={"col-span-12 sm:col-span-6"}>
                 <Select
-                    value={direction}
-                    onValueChange={(v) => setFieldValue("direction", v as "owning" | "inverse")}
+                    value={kind}
+                    onValueChange={(v) => setFieldValue("relation.kind", v as "owning" | "inverse")}
                     label={"Direction"}
                     disabled={disabled}
                     fullWidth
@@ -202,7 +202,7 @@ targetColumn: "" };
                     <TextField
                         value={localKey}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                            setFieldValue("localKey", e.target.value)
+                            setFieldValue("relation.localKey", e.target.value)
                         }
                         label={"Local key (foreign key column on this table)"}
                         disabled={disabled}
@@ -220,7 +220,7 @@ targetColumn: "" };
                     <TextField
                         value={foreignKeyOnTarget}
                         onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                            setFieldValue("foreignKeyOnTarget", e.target.value)
+                            setFieldValue("relation.foreignKeyOnTarget", e.target.value)
                         }
                         label={"Foreign key on target table"}
                         disabled={disabled}
@@ -289,7 +289,7 @@ targetColumn: "" };
             <div className={"col-span-12 sm:col-span-6"}>
                 <Select
                     value={onUpdate}
-                    onValueChange={(v) => setFieldValue("onUpdate", v as OnAction)}
+                    onValueChange={(v) => setFieldValue("relation.onUpdate", v as OnAction)}
                     label={"On update"}
                     disabled={disabled}
                     fullWidth
@@ -309,7 +309,7 @@ targetColumn: "" };
             <div className={"col-span-12 sm:col-span-6"}>
                 <Select
                     value={onDelete}
-                    onValueChange={(v) => setFieldValue("onDelete", v as OnAction)}
+                    onValueChange={(v) => setFieldValue("relation.onDelete", v as OnAction)}
                     label={"On delete"}
                     disabled={disabled}
                     fullWidth

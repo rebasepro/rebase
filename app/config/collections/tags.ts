@@ -26,9 +26,7 @@ const tagsCollection: PostgresCollectionConfig = {
     },
     relations: [
         {
-            // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-            // Was: cardinality=many direction=inverse
-            kind: "AMBIGUOUS",
+            kind: "manyToMany",
             relationName: "posts",
             target: () => postsCollection,
             }

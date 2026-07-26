@@ -5,6 +5,16 @@ import { z, ZodTypeAny } from "zod";
 import { enumToObjectEntries, isPropertyBuilder } from "@rebasepro/common";
 import { getValueInPath, hydrateRegExp } from "@rebasepro/utils";
 
+/** Whether an authored relation yields many rows. Derived from its kind. */
+function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
+    if (!relation) return undefined;
+    if (relation.kind === "via") return relation.cardinality as "one" | "many" | undefined;
+    if (relation.kind === "hasMany" || relation.kind === "manyToMany") return "many";
+    if (relation.kind === "belongsTo" || relation.kind === "hasOne") return "one";
+    return relation.cardinality as "one" | "many" | undefined;
+}
+
+
 export type CustomFieldValidator = (props: {
     name: string,
     value: unknown,
@@ -361,7 +371,7 @@ function getZodRelationSchema({
     name,
     entityId
 }: PropertyContext<RelationProperty>): ZodTypeAny {
-    const isMany = property.relation?.cardinality === "many";
+    const isMany = relationCardinality(property.relation) === "many";
     let schema: ZodTypeAny = isMany
         ? z.array(z.object({}).passthrough()).nullable().optional()
         : z.object({}).passthrough().nullable().optional();

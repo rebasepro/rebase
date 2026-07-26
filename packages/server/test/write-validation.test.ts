@@ -21,10 +21,9 @@ relationName: "author" }
         },
         relations: [
             {
+                kind: "belongsTo",
                 relationName: "author",
                 target: () => authors,
-                cardinality: "one",
-                direction: "owning",
                 localKey: "author_id"
             }
         ]

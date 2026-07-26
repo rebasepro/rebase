@@ -184,9 +184,7 @@ const ordersCollection: PostgresCollectionConfig = {
     // Headless relation: no property for "order_items", only used for subcollection tab
     relations: [
         {
-            // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-            // Was: cardinality=many direction=inverse
-            kind: "AMBIGUOUS",
+            kind: "hasMany",
             relationName: "order_items",
             target: () => orderItemsCollection,
             overrides: {

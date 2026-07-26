@@ -130,10 +130,13 @@ relationName: "posts" }
             kind: "manyToMany",
             relationName: "posts",
             target: () => postsCollection,
+            // Written from the tags side: `source` names *this* collection.
+            // The old model copied the other side's columns and left the
+            // reader to swap them.
             through: {
                 table: "posts_tags",
-                sourceColumn: "post_id",
-                targetColumn: "tag_id"
+                sourceColumn: "tag_id",
+                targetColumn: "post_id"
             }
         }
     ],

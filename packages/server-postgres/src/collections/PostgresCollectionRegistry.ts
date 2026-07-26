@@ -96,7 +96,7 @@ export class PostgresCollectionRegistry extends CollectionRegistry implements Co
     getRelationKeysForCollection(collectionPath: string): string[] {
         const collection = this.getCollectionByPath(collectionPath);
         if (!collection || !getDataSourceCapabilities(collection.engine).supportsRelations || !collection.relations) return [];
-        return collection.relations!.map((r: Relation) => r.relationName || r.localKey || "").filter(Boolean);
+        return collection.relations!.map((r) => r.relationName ?? "").filter(Boolean);
     }
 
 }

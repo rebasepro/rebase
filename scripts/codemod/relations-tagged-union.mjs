@@ -121,6 +121,11 @@ function migrateObject(src, openBrace) {
     const localKey = readField(body, "localKey");
     const fkOnTarget = readField(body, "foreignKeyOnTarget");
 
+    // A relation literal always names its target. Without one this is some
+    // other object that merely happens to contain a `through:` or a
+    // `cardinality:` — a middleware config, a chart spec — and rewriting it
+    // injects a stray property into unrelated code.
+    if (!/\btarget\s*:/.test(body)) return null;
     if (!cardinality && !through && !joinPath) return null; // not a relation literal
 
     const kind = decideKind({

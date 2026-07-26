@@ -4,6 +4,16 @@ import { EntityRelation, Relation } from "@rebasepro/types";
 import { Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
 import { RelationSelector } from "../../RelationSelector";
 
+/** Whether an authored relation yields many rows. Derived from its kind. */
+function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
+    if (!relation) return undefined;
+    if (relation.kind === "via") return relation.cardinality as "one" | "many" | undefined;
+    if (relation.kind === "hasMany" || relation.kind === "manyToMany") return "many";
+    if (relation.kind === "belongsTo" || relation.kind === "hasOne") return "one";
+    return relation.cardinality as "one" | "many" | undefined;
+}
+
+
 interface RelationFilterFieldProps {
     name: string,
     value?: [VirtualTableWhereFilterOp, EntityRelation | EntityRelation[] | null];
@@ -44,7 +54,7 @@ export function RelationFilterField({
     operators
 }: RelationFilterFieldProps) {
 
-    const manyRelation = relation.cardinality === "many";
+    const manyRelation = relationCardinality(relation) === "many";
 
     let possibleOperations: (keyof typeof operationLabels)[] = manyRelation
         ? ["array-contains", "array-contains-any"]

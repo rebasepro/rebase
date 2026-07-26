@@ -95,7 +95,7 @@ function serializeMatches(matches: string | RegExp | undefined): string | undefi
  * Functions are called to extract the target; AdminCollection objects
  * use their slug.
  */
-function resolveRelationTarget(target: RelationProperty["target"]): string | undefined {
+function resolveRelationTarget(target: RelationProperty["relation"] extends infer R ? R extends { target: infer T } ? T : never : never): string | undefined {
     if (!target) return undefined;
     if (typeof target === "string") return target;
     if (typeof target === "function") {
@@ -259,19 +259,27 @@ export function toSerializableProperty(property: Property): SerializableProperty
                 type: "relation",
             };
             if (rl.isId !== undefined) result.isId = rl.isId;
-            // Resolve target to string
-            const target = resolveRelationTarget(rl.target);
-            if (target) result.target = target;
-            if (rl.cardinality) result.cardinality = rl.cardinality;
-            if (rl.direction) result.direction = rl.direction;
-            if (rl.inverseRelationName) result.inverseRelationName = rl.inverseRelationName;
-            if (rl.localKey) result.localKey = rl.localKey;
-            if (rl.foreignKeyOnTarget) result.foreignKeyOnTarget = rl.foreignKeyOnTarget;
-            if (rl.through) result.through = rl.through;
-            if (rl.joinPath) result.joinPath = rl.joinPath;
-            if (rl.onUpdate) result.onUpdate = rl.onUpdate;
-            if (rl.onDelete) result.onDelete = rl.onDelete;
-            if (rl.relationName) result.relationName = rl.relationName;
+            // The link is one nested object now, so it serializes as one:
+            // its `kind` says which fields are even meaningful.
+            const link = rl.relation;
+            if (link) {
+                const target = resolveRelationTarget(link.target);
+                const serializedLink: Record<string, unknown> = { kind: link.kind };
+                if (target) serializedLink.target = target;
+                if (link.relationName) serializedLink.relationName = link.relationName;
+                if (link.kind === "belongsTo" && link.localKey) serializedLink.localKey = link.localKey;
+                if ((link.kind === "hasOne" || link.kind === "hasMany") && link.foreignKeyOnTarget) {
+                    serializedLink.foreignKeyOnTarget = link.foreignKeyOnTarget;
+                }
+                if (link.kind === "manyToMany" && link.through) serializedLink.through = link.through;
+                if (link.kind === "via") {
+                    serializedLink.joinPath = link.joinPath;
+                    serializedLink.cardinality = link.cardinality;
+                }
+                if (link.onUpdate) serializedLink.onUpdate = link.onUpdate;
+                if (link.onDelete) serializedLink.onDelete = link.onDelete;
+                (result as unknown as Record<string, unknown>).relation = serializedLink;
+            }
             if (rl.fixedFilter) result.fixedFilter = rl.fixedFilter;
             if (rl.includeId !== undefined) result.includeId = rl.includeId;
             if (rl.includeEntityLink !== undefined) result.includeEntityLink = rl.includeEntityLink;

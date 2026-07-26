@@ -1,7 +1,7 @@
 import { eq, and, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, Properties, Relation } from "@rebasepro/types";
+import { CollectionConfig, Properties, ResolvedRelation, type ResolvedManyToMany } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -99,7 +99,7 @@ export class PersistService {
 
             if (isJunctionBackedRelation(hop.relation)) {
                 // Shared target: drop the link, not the row.
-                if (!hop.relation.through) {
+                if (!(hop.relation as ResolvedManyToMany).through) {
                     throw ApiError.badRequest(
                         `"${collectionPath}" reaches '${hop.targetCollection.slug}' through a multi-hop joinPath, ` +
                         `so there is no single link to remove. Delete the row at "${hop.targetCollection.slug}" ` +
@@ -159,30 +159,26 @@ export class PersistService {
      * do, and first — stamped the parent's own foreign key onto the child row.
      */
     private resolveParentForeignKeyColumn(hop: NestedPathHop): string | undefined {
-        const { relation, relationKey, targetCollection } = hop;
+        const { relation } = hop;
 
-        if (relation.foreignKeyOnTarget) return relation.foreignKeyOnTarget;
+        switch (relation.kind) {
+            case "hasOne":
+            case "hasMany":
+                return relation.foreignKeyOnTarget;
 
-        if (relation.joinPath && relation.joinPath.length === 1) {
-            const joinStep = relation.joinPath[0];
-            const targetTableName = getTableName(targetCollection);
-            if (joinStep.table !== targetTableName) {
-                logger.warn(`Join step for relation '${relationKey}' targets '${joinStep.table}', not the target table '${targetTableName}'.`);
-            }
-            return DrizzleConditionBuilder.getColumnNamesFromColumns(joinStep.on.to)[0];
+            case "via":
+                // The link lives in an intermediate table, not in a column on
+                // the target — nothing to stamp.
+                return relation.joinPath.length === 1
+                    ? DrizzleConditionBuilder.getColumnNamesFromColumns(relation.joinPath[0].on.to)[0]
+                    : undefined;
+
+            default:
+                // `belongsTo` names a column on the *parent*, and `manyToMany`
+                // is written as a junction row. Neither is a column here, and
+                // `assertWritableThrough` has already rejected the first.
+                return undefined;
         }
-
-        if (relation.joinPath && relation.joinPath.length > 1) {
-            // Multi-hop: the link lives in an intermediate table, not in a
-            // column on the target. Nothing to stamp.
-            return undefined;
-        }
-
-        throw ApiError.badRequest(
-            `Relation '${relationKey}' on '${hop.parentCollection.slug}' cannot be written through: it declares no ` +
-            "`foreignKeyOnTarget` (the column on " + `'${targetCollection.slug}'` + " that records the parent) and no `joinPath`.",
-            "RELATION_NOT_WRITABLE"
-        );
     }
 
     /**
@@ -204,7 +200,7 @@ export class PersistService {
         // If saving under a nested relation path, resolve the relation it ends in.
         let effectiveCollectionPath = collectionPath;
         const effectiveValues: Partial<M> = { ...values };
-        let junctionTableInfo: { parentCollection: CollectionConfig; parentId: string | number; relation: Relation; relationKey: string; } | undefined;
+        let junctionTableInfo: { parentCollection: CollectionConfig; parentId: string | number; relation: ResolvedRelation; relationKey: string; } | undefined;
 
         const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
 
@@ -217,7 +213,7 @@ export class PersistService {
                 return parseIdValues(hop.parentId, parentPks)[parentPks[0].fieldName];
             };
 
-            if (hop.relation.through) {
+            if ((hop.relation as ResolvedManyToMany).through) {
                 // A junction path addresses set membership, so a write through it
                 // asserts "this row is in this parent's set" — on create *and* on
                 // update. The junction row is written after the main write below,

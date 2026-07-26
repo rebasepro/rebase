@@ -1,4 +1,4 @@
-import { CollectionConfig, Relation } from "@rebasepro/types";
+import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
 import { ApiError } from "@rebasepro/server";
 
@@ -21,7 +21,7 @@ export interface NestedPathHop {
     parentId: string;
     /** The path segment that named the relation (e.g. `posts`). */
     relationKey: string;
-    relation: Relation;
+    relation: ResolvedRelation;
     /** `relation.target()`, resolved once. */
     targetCollection: CollectionConfig;
 }
@@ -103,8 +103,8 @@ export function resolveNestedPath(
  * `joinPath`. The target row is shared with other parents, so writing "through"
  * such a path addresses the *link*, not the row.
  */
-export function isJunctionBackedRelation(relation: Relation): boolean {
-    return Boolean(relation.through) || Boolean(relation.joinPath && relation.joinPath.length > 1);
+export function isJunctionBackedRelation(relation: ResolvedRelation): boolean {
+    return relation.shared;
 }
 
 /**

@@ -291,8 +291,7 @@ name: "Name" } as Property
 
         const categoryRelation = {
             target: () => targetCollection,
-            cardinality: "one" as const,
-            direction: "owning" as const,
+            kind: "belongsTo" as const,
             localKey: "category_id",
             relationName: "category"
         };
@@ -330,8 +329,7 @@ name: "Name" } as Property
 
         const authorRelation = {
             target: () => targetCollection,
-            cardinality: "one" as const,
-            direction: "owning" as const,
+            kind: "belongsTo" as const,
             localKey: "author_id",
             relationName: "author"
         };
@@ -362,8 +360,7 @@ name: "Name" } as Property
 
         const authorRelation = {
             target: () => targetCollection,
-            cardinality: "one" as const,
-            direction: "owning" as const,
+            kind: "belongsTo" as const,
             localKey: "author_id",
             relationName: "author"
         };

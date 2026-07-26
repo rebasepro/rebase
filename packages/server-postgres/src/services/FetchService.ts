@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, getTableName, gt, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, Relation, LogicalCondition } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, ResolvedRelation, LogicalCondition, isManyToMany } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
@@ -73,7 +73,7 @@ export class FetchService {
         let orderByField = table[orderBy as keyof typeof table] as AnyPgColumn;
         if (!orderByField && collection) {
             const property = collection.properties[orderBy];
-            if (property && property.type === "relation" && "relation" in property && property.relation?.direction === "owning") {
+            if (property && property.type === "relation" && "relation" in property && property.resolvedRelation?.kind === "belongsTo") {
                 orderByField = table[`${orderBy}_id` as keyof typeof table] as AnyPgColumn;
             }
         }
@@ -106,7 +106,7 @@ export class FetchService {
             const drizzleRelName = relation.relationName || key;
 
             // Skip relations that use joinPath as they are not mapped in Drizzle schemas
-            if (relation.joinPath && relation.joinPath.length > 0) {
+            if (relation.kind === "via") {
                 continue;
             }
 
@@ -135,8 +135,8 @@ export class FetchService {
      * Get the Drizzle relation name on the junction table that points to the actual target row.
      * For example, for posts_tags junction, this returns "tag_id" (the relation pointing to tags).
      */
-    private getJunctionTargetRelationName(relation: Relation, _collection: CollectionConfig): string | null {
-        if (relation.through) {
+    private getJunctionTargetRelationName(relation: ResolvedRelation, _collection: CollectionConfig): string | null {
+        if (isManyToMany(relation)) {
             // The junction relation on the junction table pointing to the target
             // uses the targetColumn name as the Drizzle relation name
             return relation.through.targetColumn.replace(/_id$/, "_id");
@@ -159,7 +159,7 @@ export class FetchService {
         const resolvedRelations = resolveCollectionRelations(collection);
 
         const promises = Object.entries(resolvedRelations)
-            .filter(([key, relation]) => relation.joinPath && relation.joinPath.length > 0)
+            .filter(([key, relation]) => relation.kind === "via")
             .map(async ([key, relation]) => {
                 try {
                     const relatedRows = await this.relationService.fetchRelatedEntities(
@@ -204,7 +204,7 @@ export class FetchService {
             !include || include.length === 0 || include[0] === "*" || include.includes(key);
 
         const joinPathRelations = Object.entries(resolvedRelations)
-            .filter(([key, relation]) => relation.joinPath && relation.joinPath.length > 0 && propertyKeys.has(key) && shouldInclude(key));
+            .filter(([key, relation]) => relation.kind === "via" && propertyKeys.has(key) && shouldInclude(key));
 
         if (joinPathRelations.length === 0) return;
 
@@ -495,7 +495,7 @@ idColumn };
                 return flatRow;
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    logger.error(`[FetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
                     logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
                 logger.warn(`[FetchService] db.query.findFirst failed for ${collectionPath}, falling back to db.select`, { error: e });
@@ -620,7 +620,7 @@ idColumn };
                 return rows;
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    logger.error(`[FetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
                     logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
                 logger.warn(`[FetchService] db.query.findMany failed for ${collectionPath}, falling back to db.select`, { error: e });
@@ -1040,7 +1040,7 @@ relatedTo: hop }, include
                 return restRows;
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    logger.error(`[FetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
                     logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
                 logger.warn(`[fetchCollectionForRest] db.query.findMany failed for ${collectionPath}, falling back`, { error: e });
@@ -1146,7 +1146,7 @@ relatedTo: hop }, include
                 return restRow;
             } catch (e) {
                 if (e instanceof Error && e.message.includes("not enough information to infer relation")) {
-                    logger.error(`[FetchService] Relation inference error for collection '${collectionPath}': ${e.message}`);
+                    logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
                     logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
                 logger.warn(`[fetchOneForRest] db.query.findFirst failed for ${collectionPath}, falling back`, { error: e });
@@ -1424,7 +1424,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         const relation = resolvedRelations[relationKey];
 
         if (!relation) {
-            logger.warn(`[batchFetchManyRelatedRows] Relation '${relationKey}' not found, skipping`);
+            logger.warn(`[batchFetchManyRelatedRows] ResolvedRelation '${relationKey}' not found, skipping`);
             return new Map();
         }
 

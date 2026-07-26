@@ -1,10 +1,11 @@
+import { isManyToMany } from "@rebasepro/types";
 import path from "path";
 import fs from "fs";
 import { execSync } from "child_process";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { logger } from "@rebasepro/server";
-import type { CollectionConfig, Relation } from "@rebasepro/types";
+import type { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
 
 
@@ -53,8 +54,8 @@ export async function getTableIncludesFromCollections(collections: CollectionCon
         }
 
         const resolvedRelations = resolveCollectionRelations(col);
-        for (const relation of Object.values(resolvedRelations) as Relation[]) {
-            if (relation.through) {
+        for (const relation of Object.values(resolvedRelations) as ResolvedRelation[]) {
+            if (isManyToMany(relation)) {
                 const junctionTableName = relation.through.table;
                 const targetCollection = relation.target();
                 const targetSchema = isPostgresCollectionConfig(targetCollection) && targetCollection.schema ? targetCollection.schema : "public";

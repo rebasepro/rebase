@@ -192,7 +192,7 @@ export function updatePropertyFromWidget(propertyData: any,
             {
                 type: "reference",
                 propertyConfig: "reference"
-            } as Property
+            } as unknown as Property
         );
     } else if (selectedWidgetId === "multi_references") {
         updatedProperty = mergeDeep(
@@ -229,7 +229,7 @@ export function updatePropertyFromWidget(propertyData: any,
                 type: "relation",
                 propertyConfig: "relation",
                 relationName: propertyData.relationName ?? ""
-            } as Property
+            } as unknown as Property
         );
     } else if (selectedWidgetId === "repeat") {
         updatedProperty = mergeDeep(

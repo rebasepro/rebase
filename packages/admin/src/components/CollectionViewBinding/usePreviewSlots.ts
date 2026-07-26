@@ -10,6 +10,16 @@ import { getValueInPath } from "@rebasepro/utils";
 import type { AuthController } from "@rebasepro/admin-types";
 import { ChipColorScheme, CHIP_COLORS } from "@rebasepro/ui";
 
+/** Whether an authored relation yields many rows. Derived from its kind. */
+function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
+    if (!relation) return undefined;
+    if (relation.kind === "via") return relation.cardinality as "one" | "many" | undefined;
+    if (relation.kind === "hasMany" || relation.kind === "manyToMany") return "many";
+    if (relation.kind === "belongsTo" || relation.kind === "hasOne") return "one";
+    return relation.cardinality as "one" | "many" | undefined;
+}
+
+
 // ── Slot types ────────────────────────────────────────────────────────
 
 /**
@@ -372,7 +382,7 @@ value: val };
         const items: RelationChipItem[] = [];
         let totalCount = 0;
 
-        const isMany = prop.cardinality === "many" || prop.relation?.cardinality === "many";
+        const isMany = relationCardinality(prop.relation) === "many";
 
         if (isMany && Array.isArray(val)) {
             // cardinality:"many" → array of EntityRelation
@@ -472,10 +482,10 @@ function resolveRelationDisplayName(
     // Support both EntityRelation instances and plain objects
     const data = "data" in relation ? (relation as EntityRelation).data : undefined;
 
-    // Resolve target collection from either `prop.relation.target()` or `prop.target()` (inline API)
+    // Resolve target collection from either `prop.relation.target()` or `prop.relation?.target()` (inline API)
     let targetCollection: AdminCollection | undefined;
     try {
-        const resolved = prop.relation?.target?.() ?? (typeof prop.target === "function" ? prop.target() : undefined);
+        const resolved = prop.relation?.target?.() ?? (typeof prop.relation?.target === "function" ? prop.relation?.target() : undefined);
         if (resolved && typeof resolved === "object") {
             targetCollection = resolved as AdminCollection;
         }

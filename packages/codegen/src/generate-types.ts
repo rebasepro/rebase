@@ -1,4 +1,4 @@
-import { CollectionConfig, PostgresCollectionConfig, Property, Properties, MapProperty, ArrayProperty, Relation, RelationProperty, StringProperty, NumberProperty } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig, Property, Properties, MapProperty, ArrayProperty, Relation, RelationProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { toPascalCase, toSafeIdentifier } from "./utils";
 
@@ -75,7 +75,7 @@ export function generateTypedefs(collections: CollectionConfig[]): string {
         const properties = (collection.properties ?? {}) as Properties;
 
         // Resolve relations
-        let resolvedRelations: Record<string, Relation> = {};
+        let resolvedRelations: Record<string, ResolvedRelation> = {};
         try {
             resolvedRelations = resolveCollectionRelations(collection);
         } catch { /* ignore */ }
@@ -99,15 +99,15 @@ export function generateTypedefs(collections: CollectionConfig[]): string {
 
         // 2. FK columns from relations
         for (const [relKey, relation] of Object.entries(resolvedRelations)) {
-            if (relation.direction === "owning" && relation.cardinality === "one" && relation.localKey) {
+            if (relation.kind === "belongsTo" && relation.localKey) {
                 const fkKey = relation.localKey;
                 if (emittedKeys.has(fkKey)) continue;
 
                 let fkType = "string | number";
                 try {
-                    let target = relation.target();
+                    let target = relation.target() as CollectionConfig & { default?: CollectionConfig; __esModule?: boolean };
                     if (target && (target.default || target.__esModule)) {
-                        target = target.default || target;
+                        target = (target.default ?? target) as typeof target;
                     }
                     if (target && target.properties) {
                         const idProp = Object.entries(target.properties).find(([_, p]) => (p as Record<string, unknown>).isId);
@@ -155,7 +155,7 @@ export function generateTypedefs(collections: CollectionConfig[]): string {
         }
 
         for (const [relKey, relation] of Object.entries(resolvedRelations)) {
-            if (relation.direction === "owning" && relation.cardinality === "one" && relation.localKey) {
+            if (relation.kind === "belongsTo" && relation.localKey) {
                 const fkKey = relation.localKey;
                 if (emittedKeys.has(fkKey)) continue;
                 const fkType = "string | number";
@@ -178,7 +178,7 @@ export function generateTypedefs(collections: CollectionConfig[]): string {
             emittedKeys.add(key);
         }
         for (const [relKey, relation] of Object.entries(resolvedRelations)) {
-            if (relation.direction === "owning" && relation.cardinality === "one" && relation.localKey) {
+            if (relation.kind === "belongsTo" && relation.localKey) {
                 const fkKey = relation.localKey;
                 if (emittedKeys.has(fkKey)) continue;
                 lines.push(`      ${toSafeIdentifier(fkKey)}?: string | number;`);

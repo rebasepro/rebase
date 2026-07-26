@@ -1,4 +1,4 @@
-import { CollectionConfig, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
+import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, hasForeignKeyOnTarget } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/collection-helpers";
 import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
@@ -224,22 +224,17 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
         case "relation": {
             const refProp = prop as RelationProperty;
             const resolvedRelations = resolveCollectionRelations(collection);
-            const relation = findRelation(resolvedRelations, refProp.relationName ?? propName);
+            const relation = findRelation(resolvedRelations, refProp.relation?.relationName ?? propName);
 
-            // Only owning one-to-one/many-to-one relations create a column here.
-            if (!relation || relation.direction !== "owning" || relation.cardinality !== "one") {
-                return null;
-            }
-
-            // The localKey property is the source of truth for the FK column name.
-            if (!relation.localKey) {
-                logger.warn(`Could not generate column for owning relation '${relation.relationName}' on '${collection.name}': 'localKey' is not defined.`);
+            // Only `belongsTo` puts a column on this table; every other kind
+            // is a column on the target, a junction row, or a join chain.
+            if (!relation || relation.kind !== "belongsTo") {
                 return null;
             }
 
             // If the localKey property is defined elsewhere in the properties, it will be handled there.
             // This logic is for when the relation property itself defines the FK.
-            if (collection.properties[relation.localKey] && propName !== relation.localKey) {
+            if (collection.properties[(relation as ResolvedBelongsTo).localKey] && propName !== (relation as ResolvedBelongsTo).localKey) {
                 return null;
             }
 
@@ -250,7 +245,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
                 return null; // Cannot resolve target
             }
 
-            const fkColumnName = relation.localKey;
+            const fkColumnName = (relation as ResolvedBelongsTo).localKey;
             const targetTableVar = getTableVarName(getTableName(targetCollection));
             const pkProp = getPrimaryKeyProp(targetCollection);
             const targetIdField = pkProp.name;
@@ -270,7 +265,7 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
                 columnDef += ".notNull()";
             }
 
-            return `    ${relation.localKey}: ${columnDef}`;
+            return `    ${(relation as ResolvedBelongsTo).localKey}: ${columnDef}`;
         }
         case "reference": {
             const refProp = prop as ReferenceProperty;
@@ -402,69 +397,33 @@ const generateSinglePolicyCode = (collection: CollectionConfig, rule: SecurityRu
  * Falls back to the local relation name when the counterpart can't be resolved.
  */
 const computeSharedRelationName = (
-    rel: Relation,
+    rel: ResolvedRelation,
     sourceCollection: CollectionConfig,
     _collections: CollectionConfig[]
 ): string => {
     const fallback = rel.relationName ?? toSnakeCase(rel.target().slug);
 
-    // --- owning one (belongs-to) ---
-    if (rel.direction === "owning" && rel.cardinality === "one" && rel.localKey) {
-        // Normalise the localKey to the actual Drizzle property name so that
-        // the owning side produces the same relation name as the inverse side
-        // (which resolves foreignKeyOnTarget via the same helper).
-        const normalisedKey = resolvePropertyKeyForColumn(sourceCollection, rel.localKey);
+    // Both sides of a link must derive the same name, so each resolves the
+    // column to its Drizzle property key and builds the name from the table
+    // that actually owns it.
+    if (rel.kind === "belongsTo") {
+        const normalisedKey = resolvePropertyKeyForColumn(sourceCollection, (rel as ResolvedBelongsTo).localKey);
         return `${getTableName(sourceCollection)}_${normalisedKey}`;
     }
 
-    // --- inverse many (one-to-many has-many) ---
-    if (rel.direction === "inverse" && rel.cardinality === "many" && rel.foreignKeyOnTarget) {
-        // The owning table is the *target*, the FK column is foreignKeyOnTarget.
-        // Resolve to the Drizzle property key on the target so it matches the
-        // owning side's normalised localKey.
+    if (rel.kind === "hasMany" || rel.kind === "hasOne") {
+        // The owning table is the *target*; the column is foreignKeyOnTarget.
         try {
             const targetCollection = rel.target();
-            const normalisedFK = resolvePropertyKeyForColumn(targetCollection, rel.foreignKeyOnTarget);
+            const normalisedFK = resolvePropertyKeyForColumn(targetCollection, (rel as ResolvedForeignKeyOnTarget).foreignKeyOnTarget);
             return `${getTableName(targetCollection)}_${normalisedFK}`;
         } catch {
             return fallback;
         }
     }
 
-    // --- inverse one (one-to-one inverse) ---
-    if (rel.direction === "inverse" && rel.cardinality === "one") {
-        if (rel.foreignKeyOnTarget) {
-            // FK lives on the target table — resolve to Drizzle property key
-            try {
-                const targetCollection = rel.target();
-                const normalisedFK = resolvePropertyKeyForColumn(targetCollection, rel.foreignKeyOnTarget);
-                return `${getTableName(targetCollection)}_${normalisedFK}`;
-            } catch {
-                return fallback;
-            }
-        }
-        // No explicit foreignKeyOnTarget — try to find the corresponding owning relation
-        try {
-            const targetCollection = rel.target();
-            const targetResolvedRelations = resolveCollectionRelations(targetCollection);
-            const correspondingRelation = Object.values(targetResolvedRelations).find(targetRel =>
-                targetRel.direction === "owning" &&
-                targetRel.cardinality === "one" &&
-                targetRel.localKey &&
-                targetRel.target().slug === sourceCollection.slug
-            );
-            if (correspondingRelation && correspondingRelation.localKey) {
-                return `${getTableName(targetCollection)}_${correspondingRelation.localKey}`;
-            }
-        } catch {
-            // ignore
-        }
-        return fallback;
-    }
-
-    // --- M2M owning (through) — keep local name (already shared via junction wiring) ---
-    // --- M2M inverse — keep local name ---
-    // --- joinPath — not emitted as Drizzle relations ---
+    // manyToMany is named through its junction wiring; `via` is not emitted as
+    // a Drizzle relation at all. Both keep the local name.
     return fallback;
 };
 
@@ -521,7 +480,7 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
     const allTablesToGenerate = new Map<string, {
         collection: CollectionConfig,
         isJunction?: boolean,
-        relation?: Relation,
+        relation?: ResolvedRelation,
         sourceCollection?: CollectionConfig
     }>();
 
@@ -560,8 +519,8 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
 
         const resolvedRelations = resolveCollectionRelations(collection);
         for (const relation of Object.values(resolvedRelations)) {
-            if (relation.through) { // Standard M2M junction table
-                const junctionTableName = relation.through.table;
+            if (isManyToMany(relation)) { // Standard M2M junction table
+                const junctionTableName = (relation as ResolvedManyToMany).through.table;
                 if (!allTablesToGenerate.has(junctionTableName)) {
                     allTablesToGenerate.set(junctionTableName, {
                         collection: {
@@ -586,7 +545,7 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
         sourceCollection
     }] of allTablesToGenerate.entries()) {
         const tableVarName = getTableVarName(tableName);
-        if (isJunction && relation && sourceCollection && relation.through) {
+        if (isJunction && relation && sourceCollection && (relation as ResolvedManyToMany).through) {
             const targetCollection = relation.target();
             const schema = (isPostgresCollectionConfig(targetCollection) ? targetCollection.schema : undefined) || (isPostgresCollectionConfig(sourceCollection) ? sourceCollection.schema : undefined);
             const tableCreator = schema ? `${schema}Schema.table` : "pgTable";
@@ -594,7 +553,7 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
             const {
                 sourceColumn,
                 targetColumn
-            } = relation.through;
+            } = (relation as ResolvedManyToMany).through;
 
             const onDelete = relation.onDelete ?? "cascade";
             const refOptions = `{ onDelete: \"${onDelete}\" }`;
@@ -673,7 +632,7 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
 
         if (isJunction) {
             const relationInfo = Array.from(allTablesToGenerate.values()).find(v => v.isJunction && getTableName(v.collection) === tableName);
-            if (relationInfo && relationInfo.relation && relationInfo.sourceCollection && relationInfo.relation.through) {
+            if (relationInfo && relationInfo.relation && relationInfo.sourceCollection && isManyToMany(relationInfo.relation)) {
                 const {
                     relation,
                     sourceCollection
@@ -697,9 +656,9 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
                 try {
                     const targetRelations = resolveCollectionRelations(targetCollection);
                     for (const [, targetRel] of Object.entries(targetRelations)) {
-                        if (targetRel.direction === "inverse" &&
+                        if (targetRel.kind !== "belongsTo" &&
                             targetRel.cardinality === "many" &&
-                            targetRel.inverseRelationName === owningRelationName) {
+                            targetRel.relationName === owningRelationName) {
                             inverseRelationName = targetRel.relationName ?? null;
                             break;
                         }
@@ -709,15 +668,15 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
                 }
 
                 // Source side one(): pairs with owning table's many(junctionTable, { relationName })
-                tableRelations.push(`    "${relation.through.sourceColumn}": one(${sourceTableVar}, {\n        fields: [${tableVarName}.${relation.through.sourceColumn}],\n        references: [${sourceTableVar}.${sourceId}],\n        relationName: \"${owningRelationName}\"\n    })`);
+                tableRelations.push(`    "${(relation as ResolvedManyToMany).through.sourceColumn}": one(${sourceTableVar}, {\n        fields: [${tableVarName}.${(relation as ResolvedManyToMany).through.sourceColumn}],\n        references: [${sourceTableVar}.${sourceId}],\n        relationName: \"${owningRelationName}\"\n    })`);
 
                 // Target side one(): pairs with inverse table's many(junctionTable, { relationName })
                 // Always emit a relationName to avoid collisions with the source-side's owningRelationName.
                 // When no inverse relation exists on the target collection, synthesize a unique name.
                 const targetRelationName = inverseRelationName
                     ? inverseRelationName
-                    : `${tableName}_${relation.through.targetColumn}`;
-                tableRelations.push(`    "${relation.through.targetColumn}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${relation.through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: "${targetRelationName}"\n    })`);
+                    : `${tableName}_${(relation as ResolvedManyToMany).through.targetColumn}`;
+                tableRelations.push(`    "${(relation as ResolvedManyToMany).through.targetColumn}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${(relation as ResolvedManyToMany).through.targetColumn}],\n        references: [${targetTableVar}.${targetId}],\n        relationName: "${targetRelationName}"\n    })`);
             }
         } else {
             const resolvedRelations = resolveCollectionRelations(collection);
@@ -744,54 +703,43 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
                     // Skip if we've already emitted a relation with this drizzleRelationName
                     // for this table — prevents duplicate definitions when
                     // resolveCollectionRelations returns alias entries for the same FK.
-                    const deduplicationKey = `${drizzleRelationName}::${rel.direction}`;
+                    const deduplicationKey = `${drizzleRelationName}::${rel.kind}`;
                     if (emittedRelationNames.has(deduplicationKey)) continue;
                     emittedRelationNames.add(deduplicationKey);
 
-                    if (rel.cardinality === "one") {
-                        if (rel.direction === "owning" && rel.localKey) {
+                    switch (rel.kind) {
+                        case "belongsTo":
                             tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${rel.localKey}],\n        references: [${targetTableVar}.${getPrimaryKeyName(target)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
-                        } else if (rel.direction === "inverse") {
-                            // Inverse one-to-one: the FK lives on the TARGET table, not here.
-                            // Drizzle pairs inverse relations via `relationName` alone — specifying
-                            // `fields`/`references` on the inverse side is invalid and causes
-                            // `normalizeRelation` to crash with "Cannot read properties of
+                            break;
+
+                        case "hasOne":
+                            // The foreign key lives on the TARGET table. Drizzle pairs
+                            // the two sides by `relationName` alone — giving
+                            // `fields`/`references` here is invalid and crashes
+                            // `normalizeRelation` with "Cannot read properties of
                             // undefined (reading 'referencedTable')".
                             tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        relationName: \"${drizzleRelationName}\"\n    })`);
-                        }
-                    } else if (rel.cardinality === "many") {
-                        if (rel.direction === "inverse" && rel.foreignKeyOnTarget) {
-                            // One-to-many inverse relation
+                            break;
+
+                        case "hasMany":
                             tableRelations.push(`    "${relationKey}": many(${targetTableVar}, { relationName: \"${drizzleRelationName}\" })`);
-                        } else if (rel.through) {
-                            // Many-to-many owning relation with explicit junction table
+                            break;
+
+                        case "manyToMany": {
+                            // Both sides point at the junction. This used to have a
+                            // second arm that searched the *target's* relations for an
+                            // owning many-to-many whose name matched, to borrow its
+                            // junction table — unnecessary now that each side names
+                            // its own.
                             const junctionTableVar = getTableVarName(rel.through.table);
                             tableRelations.push(`    "${relationKey}": many(${junctionTableVar}, { relationName: \"${drizzleRelationName}\" })`);
-                        } else if (rel.direction === "inverse" && rel.inverseRelationName) {
-                            // Many-to-many inverse relation - find the corresponding owning relation's junction table
-                            try {
-                                const targetCollection = rel.target();
-                                const targetResolvedRelations = resolveCollectionRelations(targetCollection);
-
-                                // Find the corresponding owning many-to-many relation on the target
-                                const correspondingRelation = Object.values(targetResolvedRelations).find(targetRel =>
-                                    targetRel.direction === "owning" &&
-                                    targetRel.cardinality === "many" &&
-                                    targetRel.through &&
-                                    targetRel.relationName === rel.inverseRelationName
-                                );
-
-                                if (correspondingRelation && correspondingRelation.through) {
-                                    const junctionTableVar = getTableVarName(correspondingRelation.through.table);
-                                    tableRelations.push(`    "${relationKey}": many(${junctionTableVar}, { relationName: \"${drizzleRelationName}\" })`);
-                                } else {
-                                    logger.warn(`Could not find corresponding owning many-to-many relation for inverse relation '${relationKey}' on '${collection.name}'`);
-                                }
-                            } catch (e) {
-                                logger.warn(`Could not resolve inverse many-to-many relation '${relationKey}'`, { error: e });
-                            }
+                            break;
                         }
-                        // joinPath relations don't generate Drizzle relations - they use existing user tables
+
+                        case "via":
+                            // A join chain is resolved at query time, not modelled
+                            // as a Drizzle relation.
+                            break;
                     }
                 } catch (e) {
                     logger.warn(`Could not generate relation ${relationKey} for ${collection.name}`, { error: e });
@@ -804,12 +752,12 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
 
                 const otherRelations = resolveCollectionRelations(otherCollection);
                 for (const [otherKey, otherRel] of Object.entries(otherRelations)) {
-                    if (otherRel.direction === "inverse" && otherRel.foreignKeyOnTarget) {
+                    if (hasForeignKeyOnTarget(otherRel)) {
                         try {
                             const otherTarget = otherRel.target();
                             if (otherTarget.slug === collection.slug) {
                                 const drizzleRelationName = computeSharedRelationName(otherRel, otherCollection, collections);
-                                const deduplicationKey = `${drizzleRelationName}::owning`;
+                                const deduplicationKey = `${drizzleRelationName}::belongsTo`;
 
                                 if (!emittedRelationNames.has(deduplicationKey)) {
                                     const otherTableVar = getTableVarName(getTableName(otherCollection));

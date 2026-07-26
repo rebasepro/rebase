@@ -6,7 +6,7 @@ describe("CollectionRegistry Dual-Layer Store", () => {
         const postsCollection: CollectionConfig = {
             id: "posts",
             name: "Posts",
-            path: "posts", // `get()` resolves against table or slug!
+            slug: "posts", // `get()` resolves against table or slug!
             table: "posts",
             properties: {
                 title: { type: "string" }
@@ -16,29 +16,33 @@ describe("CollectionRegistry Dual-Layer Store", () => {
         const rawAuthorsCollection: CollectionConfig = {
             id: "authors",
             name: "Authors",
-            path: "authors",
+            slug: "authors",
             table: "authors",
             properties: {
                 author_posts: {
                     type: "relation",
-                    relationName: "posts_link",
-                    collectionPath: "posts"
+                    relation: {
+                        kind: "hasMany",
+                        relationName: "posts_link",
+                        target: () => postsCollection,
+                        foreignKeyOnTarget: "author_id"
+                    }
                 },
                 map_field: {
                     type: "map",
                     properties: {
                         nested_relation: {
                             type: "relation",
-                            relationName: "posts_link",
-                            collectionPath: "posts"
+                            relation: {
+                                kind: "hasMany",
+                                relationName: "nested_posts_link",
+                                target: () => postsCollection,
+                                foreignKeyOnTarget: "author_id"
+                            }
                         }
                     }
                 }
-            },
-            relations: [{
-                relationName: "posts_link",
-                collection: postsCollection
-            }]
+            }
         };
 
         const registry = new CollectionRegistry([postsCollection, rawAuthorsCollection]);
@@ -47,24 +51,24 @@ describe("CollectionRegistry Dual-Layer Store", () => {
         const normalizedAuthors = registry.get("authors");
         expect(normalizedAuthors).toBeDefined();
         const authorPostsField = normalizedAuthors!.properties.author_posts as RelationProperty;
-        expect(authorPostsField.relation).toBeDefined();
-        expect(authorPostsField.relation!.collection!.name).toBe("Posts");
+        expect(authorPostsField.resolvedRelation).toBeDefined();
+        expect(authorPostsField.resolvedRelation!.targetSlug).toBe("posts");
 
         const nestedField = normalizedAuthors!.properties.map_field as MapProperty;
-        expect((nestedField.properties!.nested_relation as RelationProperty).relation).toBeDefined();
+        expect((nestedField.properties!.nested_relation as RelationProperty).resolvedRelation).toBeDefined();
 
         // 2. The raw registry should not be mutated! It must exactly match the initial input.
         const pristineAuthors = registry.getRaw("authors");
         expect(pristineAuthors).toBeDefined();
         const pristinePostsField = pristineAuthors!.properties.author_posts as RelationProperty;
-        expect(pristinePostsField.relation).toBeUndefined(); // It should strictly be a string map lookup
+        expect(pristinePostsField.resolvedRelation).toBeUndefined();
 
         const pristineNestedField = pristineAuthors!.properties.map_field as MapProperty;
-        expect((pristineNestedField.properties!.nested_relation as RelationProperty).relation).toBeUndefined();
+        expect((pristineNestedField.properties!.nested_relation as RelationProperty).resolvedRelation).toBeUndefined();
 
         // 3. getRawCollections array should also be protected
         const pristineArr = registry.getRawCollections().find(c => c.name === "Authors");
         const pristineArrField = pristineArr!.properties.author_posts as RelationProperty;
-        expect(pristineArrField.relation).toBeUndefined();
+        expect(pristineArrField.resolvedRelation).toBeUndefined();
     });
 });

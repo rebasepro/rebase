@@ -36,11 +36,12 @@ function postsCollection(authors: CollectionConfig): CollectionConfig {
             author: {
                 name: "Author",
                 type: "relation",
-                relationName: "author",
-                cardinality: "one",
-                direction: "owning",
-                localKey: "author_id",
-                target: () => authors
+                relation: {
+                    kind: "belongsTo",
+                    target: () => authors,
+                    relationName: "author",
+                    localKey: "author_id",
+                }
             }
         }
     } as unknown as CollectionConfig;
@@ -57,9 +58,11 @@ describe("collection contract serialization", () => {
         const restored = deserializeCollections(wire);
 
         const restoredPosts = restored.find(c => c.slug === "posts")!;
+        // The link is nested under `relation` now; the serializer walks by key
+        // so it rebuilds the thunk wherever it sits.
         const relation = (restoredPosts.properties as Record<string, {
-            target?: () => CollectionConfig | undefined;
-        }>).author;
+            relation?: { target?: () => CollectionConfig | undefined };
+        }>).author.relation!;
 
         expect(typeof relation.target).toBe("function");
         expect(relation.target!()?.slug).toBe("authors");
@@ -74,8 +77,8 @@ describe("collection contract serialization", () => {
         const restored = deserializeCollections(wire);
 
         const relation = (restored[0].properties as Record<string, {
-            target?: () => CollectionConfig | undefined;
-        }>).author;
+            relation?: { target?: () => CollectionConfig | undefined };
+        }>).author.relation!;
 
         expect(typeof relation.target).toBe("function");
         expect(relation.target!()).toBeUndefined();

@@ -13,14 +13,14 @@
  *    through relations; they fell to a generic warning. Now emits a
  *    specific, actionable message.
  *
- * 3. 🟢 sanitizeRelation junction table naming convention
+ * 3. 🟢 resolveRelation junction table naming convention
  *    — Verifies that auto-inferred junction table names from sorted slugs
  *    match expectations for various collection name patterns.
  */
 import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { CollectionConfig, Relation } from "@rebasepro/types";
-import { sanitizeRelation } from "@rebasepro/common";
+import { CollectionConfig, Relation, RelationProperty } from "@rebasepro/types";
+import { resolveRelation } from "@rebasepro/common";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ─── Mock Tables ──────────────────────────────────────────────────────
@@ -318,61 +318,9 @@ author_id: "999" }
         expect(results.size).toBe(0);
     });
 
-    it("should handle inferredForeignKeyName path with string IDs", async () => {
-        // Test the `inverseRelationName`-based FK inference path
-        const authorsWithInverseNameOnly: CollectionConfig = {
-            slug: "authors_inr",
-            name: "Authors (inverseRelationName)",
-            table: "authors",
-            properties: {
-                id: { type: "number" },
-                name: { type: "string" }
-            },
-            idField: "id"
-        };
 
-        const postsWithFK: CollectionConfig = {
-            slug: "posts_fk",
-            name: "Posts (FK)",
-            table: "posts",
-            properties: {
-                id: { type: "number" },
-                title: { type: "string" }
-            },
-            idField: "id"
-        };
+    // Removed with the behaviour it covered — the inferred-column path is gone: a hasOne/hasMany always resolves a foreignKeyOnTarget.
 
-        jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
-            if (path?.startsWith("authors_inr")) return authorsWithInverseNameOnly;
-            if (path?.startsWith("posts_fk")) return postsWithFK;
-            return undefined;
-        });
-
-        const relation: Relation = {
-            // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-            // Was: cardinality=one direction=inverse
-            kind: "AMBIGUOUS",
-            relationName: "posts",
-            target: () => postsWithFK,
-            };
-
-        // Drizzle returns author_id as string
-        const resultRows = [
-            { id: 10,
-title: "Post A",
-author_id: "1" }
-        ];
-
-        const { db } = createMockDb(() => resultRows);
-        const service = new RelationService(db, registry);
-
-        const results = await service.batchFetchRelatedEntities(
-            "authors_inr", [1], "posts", relation
-        );
-
-        expect(results.get("1")).toBeDefined();
-        expect(results.get("1")!.values.title).toBe("Post A");
-    });
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -408,30 +356,9 @@ describe("updateRelationsUsingJoins: inverse M2M through warning", () => {
         jest.restoreAllMocks();
     });
 
-    it("should emit a specific warning when attempting to save an inverse M2M through relation", async () => {
-        const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
 
-        const { db } = createMockDb(() => []);
-        const service = new RelationService(db, registry);
+    // Removed with the behaviour it covered — there is no inverse M2M to warn about: both sides are manyToMany and both may be saved.
 
-        // Try to save posts from the tags (inverse) side
-        await service.updateRelationsUsingJoins(
-            db as any,
-            tagsWithInversePosts,
-            1,
-            { posts: [{ id: 10 }, { id: 20 }] }
-        );
-
-        // Should warn about inverse M2M
-        expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining("Inverse M2M relation")
-        );
-        expect(consoleSpy).toHaveBeenCalledWith(
-            expect.stringContaining("should be saved from the owning side")
-        );
-
-        consoleSpy.mockRestore();
-    });
 
     it("should NOT warn for owning M2M through relations (normal save path)", async () => {
         const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
@@ -458,10 +385,10 @@ describe("updateRelationsUsingJoins: inverse M2M through warning", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// 3. sanitizeRelation junction table naming convention
+// 3. resolveRelation junction table naming convention
 // ═══════════════════════════════════════════════════════════════════════
 
-describe("sanitizeRelation: auto-inferred junction table naming", () => {
+describe("resolveRelation: auto-inferred junction table naming", () => {
     it("should produce sorted junction table name: posts + tags → posts_tags", () => {
         const source: CollectionConfig = {
             slug: "posts",
@@ -482,7 +409,7 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
             target: () => target,
             };
 
-        const normalized = sanitizeRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source as any);
 
         expect(normalized.through).toBeDefined();
         expect(normalized.through!.table).toBe("posts_tags"); // ["posts", "tags"].sort().join("_")
@@ -508,7 +435,7 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
             target: () => target,
             };
 
-        const normalized = sanitizeRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source as any);
 
         expect(normalized.through!.table).toBe("articles_tags"); // sorted
     });
@@ -533,7 +460,7 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
             target: () => target,
             };
 
-        const normalized = sanitizeRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source as any);
 
         expect(normalized.through!.table).toBe("blog_posts_labels"); // sorted: blog_posts < labels
     });
@@ -558,7 +485,7 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
             target: () => target,
             };
 
-        const normalized = sanitizeRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source as any);
 
         // sourceColumn derives from source slug (singularized), targetColumn from relationName (singularized)
         // generateForeignKeyName("posts") → "post_id", generateForeignKeyName("tags") → "tag_id"
@@ -591,7 +518,7 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
             }
         };
 
-        const normalized = sanitizeRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source as any);
 
         expect(normalized.through!.table).toBe("custom_junction");
         expect(normalized.through!.sourceColumn).toBe("src_id");
@@ -612,7 +539,7 @@ describe("sanitizeRelation: auto-inferred junction table naming", () => {
             target: () => usersCollection,
             };
 
-        const normalized = sanitizeRelation(relation, usersCollection as any);
+        const normalized = resolveRelation(relation, usersCollection as any);
 
         // Both tables are "users", sorted = ["users", "users"], joined = "users_users"
         expect(normalized.through!.table).toBe("users_users");
@@ -647,7 +574,7 @@ to: "id" } }
             ]
         };
 
-        const normalized = sanitizeRelation(relation, source as any);
+        const normalized = resolveRelation(relation, source as any);
 
         // joinPath takes precedence — no through should be auto-generated
         expect(normalized.through).toBeUndefined();
@@ -782,7 +709,11 @@ email: "f@test.com" }]
         ]);
 
         const service = new RelationService(db, registry);
-        const relation = tasksCollection.properties.client as unknown as Relation;
+        const relation = resolveRelation(
+            (tasksCollection.properties.client as RelationProperty).relation!,
+            tasksCollection,
+            "client"
+        );
 
         const results = await service.batchFetchRelatedEntities(
             "tasks", [taskUuid], "client", relation
@@ -819,7 +750,11 @@ email: "f@test.com" }]
         ]);
 
         const service = new RelationService(db, registry);
-        const relation = tasksCollection.properties.client as unknown as Relation;
+        const relation = resolveRelation(
+            (tasksCollection.properties.client as RelationProperty).relation!,
+            tasksCollection,
+            "client"
+        );
 
         const results = await service.batchFetchRelatedEntities(
             "tasks", [task1, task2], "client", relation
@@ -840,7 +775,11 @@ fkValue: null }]
         ]);
 
         const service = new RelationService(db, registry);
-        const relation = tasksCollection.properties.client as unknown as Relation;
+        const relation = resolveRelation(
+            (tasksCollection.properties.client as RelationProperty).relation!,
+            tasksCollection,
+            "client"
+        );
 
         const results = await service.batchFetchRelatedEntities(
             "tasks", [task1], "client", relation

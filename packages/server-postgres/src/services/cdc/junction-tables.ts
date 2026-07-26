@@ -1,4 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, ResolvedRelation, isManyToMany } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 
 import { PostgresCollectionRegistry } from "../../collections/PostgresCollectionRegistry";
@@ -38,7 +38,7 @@ export function collectJunctionLinks(registry: PostgresCollectionRegistry): Junc
     const seen = new Set<string>();
 
     for (const collection of registry.getCollections()) {
-        let relations: Record<string, { through?: { table: string; sourceColumn: string; targetColumn: string } }>;
+        let relations: Record<string, ResolvedRelation>;
         try {
             relations = resolveCollectionRelations(collection);
         } catch {
@@ -48,8 +48,8 @@ export function collectJunctionLinks(registry: PostgresCollectionRegistry): Junc
         }
 
         for (const [relationKey, relation] of Object.entries(relations)) {
-            const through = relation?.through;
-            if (!through?.table) continue;
+            if (!isManyToMany(relation)) continue;
+            const through = relation.through;
 
             // Same relation registered under both its canonical name and the
             // declaring property key would otherwise notify the same path twice.

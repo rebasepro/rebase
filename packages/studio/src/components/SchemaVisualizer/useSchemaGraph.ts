@@ -2,7 +2,7 @@ import { useMemo, useState, useCallback, useEffect } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { MarkerType } from "@xyflow/react";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
-import type { Relation } from "@rebasepro/types";
+import type { Relation, ResolvedRelation } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { getLayoutedElements, getCardinalityLabel, getTypeLabel, NODE_WIDTH } from "./schema-visualizer.utils";
 import type { LayoutDirection, RelationEdgeData } from "./schema-visualizer.utils";
@@ -84,7 +84,7 @@ const extractColumns = (collection: AdminCollection): ColumnInfo[] => {
         try {
             const resolvedRelations = resolveCollectionRelations(collection);
             for (const rel of Object.values(resolvedRelations)) {
-                if (rel.direction === "owning" && rel.cardinality === "one" && rel.localKey) {
+                if (rel.kind === "belongsTo" && rel.localKey) {
                     // Only add if not already present as a regular column
                     if (!columns.some((c) => c.name === rel.localKey)) {
                         columns.push({
@@ -184,7 +184,7 @@ y: 0 },
         const sourceNodeId = tableToNodeId.get(tableName);
         if (!sourceNodeId) continue;
 
-        let resolvedRelations: Record<string, Relation>;
+        let resolvedRelations: Record<string, ResolvedRelation>;
         try {
             resolvedRelations = resolveCollectionRelations(collection);
         } catch {
@@ -205,19 +205,23 @@ y: 0 },
             const targetNodeId = tableToNodeId.get(targetTable);
             if (!targetNodeId) continue;
 
-            // Skip inverse relations (we only draw owning ones)
-            if (rel.direction === "inverse") continue;
+            // Draw the side that owns the storage: a foreign key on this table,
+            // or the junction. `hasOne`/`hasMany` are the mirror image of a
+            // `belongsTo` that is drawn from the other end, and `via` has no
+            // single edge to draw.
+            if (rel.kind !== "belongsTo" && rel.kind !== "manyToMany") continue;
 
+            const direction = "owning" as const;
             const edgeData: RelationEdgeData = {
                 cardinality: rel.cardinality,
-                direction: rel.direction ?? "owning",
+                direction,
                 relationName: rel.relationName ?? relationKey,
-                hasJunction: Boolean(rel.through),
-                hasJoinPath: Boolean(rel.joinPath),
-                label: getCardinalityLabel(rel.cardinality, rel.direction ?? "owning")
+                hasJunction: rel.kind === "manyToMany",
+                hasJoinPath: false,
+                label: getCardinalityLabel(rel.cardinality, direction)
             };
 
-            if (rel.through && !processedJunctions.has(rel.through.table)) {
+            if (rel.kind === "manyToMany" && !processedJunctions.has(rel.through.table)) {
                 // Many-to-many: create junction node + two edges
                 processedJunctions.add(rel.through.table);
                 const junctionNodeId = `junction-${rel.through.table}`;
@@ -291,8 +295,8 @@ label: "N:1" } as Record<string, unknown>,
 width: 16,
 height: 16 }
                 });
-            } else if (!rel.through) {
-                // Direct relation (one-to-one or many-to-one)
+            } else if (rel.kind === "belongsTo") {
+                // A foreign key on this table.
                 edges.push({
                     id: `edge-${sourceNodeId}-${targetNodeId}-${relationKey}`,
                     source: sourceNodeId,

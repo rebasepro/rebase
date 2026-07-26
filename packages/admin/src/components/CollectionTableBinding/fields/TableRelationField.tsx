@@ -16,6 +16,16 @@ import { EntityPreviewContainer } from "../../EntityPreviewBinding";
 import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
 import { TableMultipleRelationField } from "./TableMultipleRelationField";
 
+/** Whether an authored relation yields many rows. Derived from its kind. */
+function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
+    if (!relation) return undefined;
+    if (relation.kind === "via") return relation.cardinality as "one" | "many" | undefined;
+    if (relation.kind === "hasMany" || relation.kind === "manyToMany") return "many";
+    if (relation.kind === "belongsTo" || relation.kind === "hasOne") return "one";
+    return relation.cardinality as "one" | "many" | undefined;
+}
+
+
 type TableRelationFieldProps = {
     name: string;
     disabled: boolean;
@@ -35,7 +45,7 @@ export function TableRelationField(props: TableRelationFieldProps) {
     const collection = props.relation.target();
 
     // Check if this is a many-to-many relation
-    const manyRelation = props.relation?.cardinality === "many";
+    const manyRelation = relationCardinality(props.relation) === "many";
 
     if (manyRelation) {
         return <TableMultipleRelationField

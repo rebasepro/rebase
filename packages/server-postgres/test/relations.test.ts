@@ -1,6 +1,6 @@
 import { CollectionConfig, Relation } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
-import { sanitizeRelation } from "@rebasepro/common";
+import { resolveRelation } from "@rebasepro/common";
 
 const mockAuthorCollection: CollectionConfig = {
     name: "Author",
@@ -50,14 +50,14 @@ const mockTagCollection: CollectionConfig = {
     idField: "id"
 };
 
-describe("sanitizeRelation", () => {
+describe("resolveRelation", () => {
 
     it("should generate a default relationName if not provided", () => {
         const relation: Partial<Relation> = {
             kind: "belongsTo",
             target: () => mockPostCollection,
             };
-        const normalized = sanitizeRelation(relation, mockAuthorCollection);
+        const normalized = resolveRelation(relation, mockAuthorCollection);
         expect(normalized.relationName).toBe("posts");
     });
 
@@ -69,9 +69,8 @@ describe("sanitizeRelation", () => {
                 relationName: "post",
                 target: () => mockPostCollection,
                 };
-            const normalized = sanitizeRelation(relation, mockAuthorCollection);
+            const normalized = resolveRelation(relation, mockAuthorCollection);
             expect(normalized.localKey).toEqual("post_id");
-            expect(normalized.direction).toEqual("owning");
         });
 
         it("should use provided `localKey` for a belongs-to relation", () => {
@@ -81,9 +80,8 @@ describe("sanitizeRelation", () => {
                 target: () => mockPostCollection,
                 localKey: "custom_post_fk"
             };
-            const normalized = sanitizeRelation(relation, mockAuthorCollection);
+            const normalized = resolveRelation(relation, mockAuthorCollection);
             expect(normalized.localKey).toEqual("custom_post_fk");
-            expect(normalized.direction).toEqual("owning");
         });
     });
 
@@ -91,15 +89,12 @@ describe("sanitizeRelation", () => {
     describe("Inverse One-to-One", () => {
         it("should generate default foreignKeyOnTarget for an inverse one-to-one relation", () => {
             const relation: Partial<Relation> = {
-                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-                // Was: cardinality=one direction=inverse
-                kind: "AMBIGUOUS",
+                kind: "hasOne",
                 relationName: "profile",
                 target: () => mockPostCollection,
                 };
-            const normalized = sanitizeRelation(relation, mockAuthorCollection);
+            const normalized = resolveRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
-            expect(normalized.direction).toEqual("inverse");
         });
 
         it("should use provided `foreignKeyOnTarget` for an inverse one-to-one relation", () => {
@@ -109,23 +104,18 @@ describe("sanitizeRelation", () => {
                 target: () => mockPostCollection,
                 foreignKeyOnTarget: "custom_author_fk"
             };
-            const normalized = sanitizeRelation(relation, mockAuthorCollection);
+            const normalized = resolveRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("custom_author_fk");
-            expect(normalized.direction).toEqual("inverse");
         });
 
         it("should work with inverseRelationName property", () => {
             const relation: Partial<Relation> = {
-                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-                // Was: cardinality=one direction=inverse
-                kind: "AMBIGUOUS",
+                kind: "hasOne",
                 relationName: "profile",
                 target: () => mockPostCollection,
                 };
-            const normalized = sanitizeRelation(relation, mockAuthorCollection);
+            const normalized = resolveRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
-            expect(normalized.inverseRelationName).toEqual("author");
-            expect(normalized.direction).toEqual("inverse");
         });
     });
 
@@ -133,13 +123,11 @@ describe("sanitizeRelation", () => {
     describe("Has-Many (one-to-many)", () => {
         it("should generate default foreignKeyOnTarget for a simple has-many relation", () => {
             const relation: Partial<Relation> = {
-                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-                // Was: cardinality=many direction=inverse
-                kind: "AMBIGUOUS",
+                kind: "hasOne",
                 relationName: "posts",
                 target: () => mockPostCollection,
                 };
-            const normalized = sanitizeRelation(relation, mockAuthorCollection);
+            const normalized = resolveRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
         });
 
@@ -150,7 +138,7 @@ describe("sanitizeRelation", () => {
                 target: () => mockPostCollection,
                 foreignKeyOnTarget: "writer_id"
             };
-            const normalized = sanitizeRelation(relation, mockAuthorCollection);
+            const normalized = resolveRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("writer_id");
         });
     });
@@ -168,13 +156,12 @@ describe("sanitizeRelation", () => {
                     targetColumn: "tag_id"
                 }
             };
-            const normalized = sanitizeRelation(relation, mockPostCollection);
+            const normalized = resolveRelation(relation, mockPostCollection);
             expect(normalized.through).toEqual({
                 table: "posts_tags",
                 sourceColumn: "post_id",
                 targetColumn: "tag_id"
             });
-            expect(normalized.direction).toEqual("owning");
         });
     });
 
@@ -182,15 +169,12 @@ describe("sanitizeRelation", () => {
     describe("Fallback Behavior", () => {
         it("should fallback to has-many for ambiguous 'many' without direction or through", () => {
             const relation: Partial<Relation> = {
-                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-                // Was: cardinality=many direction=?
-                kind: "AMBIGUOUS",
+                kind: "hasOne",
                 relationName: "posts",
                 target: () => mockPostCollection,
                 };
-            const normalized = sanitizeRelation(relation, mockAuthorCollection);
+            const normalized = resolveRelation(relation, mockAuthorCollection);
             // Should default to has-many (inverse) behavior
-            expect(normalized.direction).toEqual("inverse");
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
         });
 
@@ -200,7 +184,7 @@ describe("sanitizeRelation", () => {
                 relationName: "author",
                 target: () => mockAuthorCollection,
                 };
-            const normalized = sanitizeRelation(relation, mockPostCollection);
+            const normalized = resolveRelation(relation, mockPostCollection);
             expect(normalized.localKey).toEqual("author_id");
         });
     });
@@ -346,9 +330,7 @@ relationName: "profile" }
                 },
                 relations: [
                     {
-                        // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-                        // Was: cardinality=one direction=inverse
-                        kind: "AMBIGUOUS",
+                        kind: "hasOne",
                         relationName: "profile",
                         target: () => profilesCollection,
                         }

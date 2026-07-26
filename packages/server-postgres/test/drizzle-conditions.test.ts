@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { eq } from "drizzle-orm";
 import { integer, pgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
 import { CollectionConfig, EntityRelation, Relation } from "@rebasepro/types";
+import { resolveRelation } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { getColumnMeta } from "../src/services/collection-helpers";
@@ -606,275 +607,89 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             expect(() => result).not.toThrow();
         });
 
-        it("should handle inverse many-to-many without explicit through property (real user scenario)", () => {
-            // Create a more realistic mock that simulates the actual scenario
-            const mockPostsCollection = {
-                slug: "posts",
-                table: "posts",
-                relations: [
-                    {
-                        kind: "manyToMany",
-                        relationName: "tags",
-                        through: {
-                            table: "posts_tags",
-                            sourceColumn: "post_id",
-                            targetColumn: "tag_id"
-                        },
-                        target: () => ({ slug: "tags" })
-                    }
-                ]
-            };
 
-            // This is the ACTUAL scenario: inverse relation without through property
-            // but with foreignKeyOnTarget incorrectly added by sanitizeRelation
-            const tagsToPostsRelation: Relation = {
-                kind: "hasMany",
-                relationName: "posts",
-                target: () => mockPostsCollection as unknown as CollectionConfig,
-                foreignKeyOnTarget: "tag_id" // This gets added by sanitizeRelation at runtime
-                // NO through property - this is the key difference
-            };
+        it("cannot reach the state that lookup existed to repair", () => {
 
-            // The fix should handle this case correctly by ignoring the foreignKeyOnTarget
-            // and finding the junction table from the corresponding owning relation
-            const result = DrizzleConditionBuilder.buildRelationConditions(
-                tagsToPostsRelation,
-                23, // tag ID from URL: tags/23/posts (matching the user's log)
-                mockPostsTable, // we want to get posts
-                mockTagsTable, // from the tags collection
-                mockTagsTable.id, // tag ID column
-                mockPostsTable.id, // post ID column
-                mockRegistry
-            );
 
-            // Should successfully find junction table and build conditions
-            expect(result.joinConditions).toHaveLength(1);
-            expect(result.whereConditions).toHaveLength(1);
+            // `sanitizeRelation` used to add a `foreignKeyOnTarget` to what was
 
-            // Verify it used the junction table approach, not the simple relation approach
-            expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
 
-            // Should not throw the "Foreign key column 'tag_id' not found in target table" error
-            expect(() => result).not.toThrow();
+            // really a many-to-many, and the builder had to notice and go hunting
+
+
+            // for a junction. Declaring the kind makes that unrepresentable.
+
+
+            const posts = { slug: "posts", name: "Posts", table: "posts", properties: {} } as unknown as CollectionConfig;
+
+
+            const tags = { slug: "tags", name: "Tags", table: "tags", properties: {} } as unknown as CollectionConfig;
+
+
+
+            const m2m = resolveRelation({ kind: "manyToMany", relationName: "posts", target: () => posts }, tags);
+
+
+            expect(m2m).not.toHaveProperty("foreignKeyOnTarget");
+
+
+
+            const oneToMany = resolveRelation({ kind: "hasMany", relationName: "posts", target: () => posts }, tags);
+
+
+            expect(oneToMany).not.toHaveProperty("through");
+
+
         });
+
     });
 
     // Test the specific fix for findCorrespondingJunctionTable method
-    describe("findCorrespondingJunctionTable - Junction Table Lookup Fix", () => {
-        beforeEach(() => {
-            jest.clearAllMocks();
+
+    describe("a many-to-many names its own junction", () => {
+
+        // Replaces a suite for `findCorrespondingJunctionTable` — a search
+
+        // through the *target's* relations for an owning many-to-many whose
+
+        // name matched, to borrow its junction and swap the columns. Each
+
+        // side declares its own now, so there is nothing to look up.
+
+        const posts = { slug: "posts", name: "Posts", table: "posts", properties: {} } as unknown as CollectionConfig;
+
+        const tags = { slug: "tags", name: "Tags", table: "tags", properties: {} } as unknown as CollectionConfig;
+
+
+        it("uses the junction the relation declares", () => {
+
+            const rel = resolveRelation({
+
+                kind: "manyToMany", relationName: "posts", target: () => posts,
+
+                through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" }
+
+            }, tags);
+
+            expect(rel.kind === "manyToMany" && rel.through).toEqual({
+
+                table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id"
+
+            });
+
         });
 
-        it("should find corresponding junction table for inverse many-to-many relation", () => {
-            // Create real test collections with proper relation configurations
-            const mockTagsCollection = {
-                slug: "tags",
-                table: "tags"
-            };
 
-            const mockPostsCollection = {
-                slug: "posts",
-                table: "posts",
-                relations: [
-                    {
-                        kind: "manyToMany",
-                        relationName: "tags",
-                        through: {
-                            table: "posts_tags",
-                            sourceColumn: "post_id",
-                            targetColumn: "tag_id"
-                        },
-                        target: () => mockTagsCollection
-                    }
-                ]
-            };
+        it("derives one when the relation names none", () => {
 
-            // Create the inverse relation (tags -> posts)
-            const inverseRelation: Relation = {
-                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-                // Was: cardinality=many direction=inverse
-                kind: "AMBIGUOUS",
-                relationName: "posts",
-                target: () => mockPostsCollection as unknown as CollectionConfig,
-                };
+            const rel = resolveRelation({ kind: "manyToMany", relationName: "posts", target: () => posts }, tags);
 
-            // Test the buildRelationConditions with the inverse relation (without explicit through)
-            const result = DrizzleConditionBuilder.buildRelationConditions(
-                inverseRelation,
-                5, // tag ID
-                mockPostsTable, // targetTable (posts)
-                mockTagsTable, // parentTable (tags)
-                mockTagsTable.id, // parentIdColumn (tag.id)
-                mockPostsTable.id, // targetIdColumn (post.id)
-                mockRegistry
-            );
+            expect(rel.kind === "manyToMany" && rel.through.sourceColumn).toBe("tag_id");
 
-            // Should successfully build conditions using the found junction table
-            expect(result.joinConditions).toHaveLength(1);
-            expect(result.whereConditions).toHaveLength(1);
-
-            // Should have looked up the junction table
-            expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
         });
 
-        it("should handle the exact user scenario that was failing", () => {
-            // This is the exact scenario from the user's collection configuration
-            const mockTagsCollection = {
-                slug: "tags",
-                table: "tags"
-            };
-
-            const mockPostsCollection = {
-                slug: "posts",
-                table: "posts",
-                relations: [
-                    {
-                        kind: "manyToMany",
-                        relationName: "tags",
-                        through: {
-                            table: "posts_tags",
-                            sourceColumn: "post_id",
-                            targetColumn: "tag_id"
-                        },
-                        target: () => mockTagsCollection
-                    }
-                ]
-            };
-
-            // The inverse relation from tags collection (this was failing before the fix)
-            const tagsToPostsRelation: Relation = {
-                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-                // Was: cardinality=many direction=inverse
-                kind: "AMBIGUOUS",
-                relationName: "posts",
-                target: () => mockPostsCollection as unknown as CollectionConfig,
-                };
-
-            // This should NOT throw "Foreign key column 'tag_id' not found in target table"
-            const result = DrizzleConditionBuilder.buildRelationConditions(
-                tagsToPostsRelation,
-                42, // tag ID
-                mockPostsTable,
-                mockTagsTable,
-                mockTagsTable.id,
-                mockPostsTable.id,
-                mockRegistry
-            );
-
-            // Should successfully find the junction table and build conditions
-            expect(result.joinConditions).toHaveLength(1);
-            expect(result.whereConditions).toHaveLength(1);
-
-            // Verify it found the junction table correctly
-            expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
-        });
-
-        it("should return appropriate error when no corresponding junction table is found", () => {
-            const mockPostsCollection = {
-                slug: "posts",
-                table: "posts",
-                relations: [] // No relations - should fail to find junction table
-            };
-
-            const inverseRelation: Relation = {
-                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-                // Was: cardinality=many direction=inverse
-                kind: "AMBIGUOUS",
-                relationName: "posts",
-                target: () => mockPostsCollection as unknown as CollectionConfig,
-                };
-
-            // Should fall back to checking foreignKeyOnTarget or throw appropriate error
-            expect(() => {
-                DrizzleConditionBuilder.buildRelationConditions(
-                    inverseRelation,
-                    5,
-                    mockPostsTable,
-                    mockTagsTable,
-                    mockTagsTable.id,
-                    mockPostsTable.id,
-                    mockRegistry
-                );
-            }).toThrow(/Cannot resolve inverse many relation/);
-        });
-
-        it("should swap source and target columns correctly for inverse relations", () => {
-            const mockTagsCollection = {
-                slug: "tags",
-                table: "tags"
-            };
-
-            const mockPostsCollection = {
-                slug: "posts",
-                table: "posts",
-                relations: [
-                    {
-                        kind: "manyToMany",
-                        relationName: "tags",
-                        through: {
-                            table: "posts_tags",
-                            sourceColumn: "post_id", // From posts perspective
-                            targetColumn: "tag_id" // To tags perspective
-                        },
-                        target: () => mockTagsCollection
-                    }
-                ]
-            };
-
-            const inverseRelation: Relation = {
-                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-                // Was: cardinality=many direction=inverse
-                kind: "AMBIGUOUS",
-                relationName: "posts",
-                target: () => mockPostsCollection as unknown as CollectionConfig,
-                };
-
-            const result = DrizzleConditionBuilder.buildRelationConditions(
-                inverseRelation,
-                7, // tag ID
-                mockPostsTable,
-                mockTagsTable,
-                mockTagsTable.id,
-                mockPostsTable.id,
-                mockRegistry
-            );
-
-            // The junction table lookup should swap the columns for inverse direction
-            // From tags perspective: sourceColumn becomes "tag_id", targetColumn becomes "post_id"
-            expect(result.joinConditions).toHaveLength(1);
-            expect(result.whereConditions).toHaveLength(1);
-            expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
-        });
-
-        it("should handle missing inverseRelationName gracefully", () => {
-            const mockPostsCollection = {
-                slug: "posts",
-                table: "posts",
-                relations: []
-            };
-
-            const inverseRelationWithoutInverseName: Relation = {
-                // TODO(relations): ambiguous under the tagged union — declare the kind explicitly.
-                // Was: cardinality=many direction=?
-                kind: "AMBIGUOUS",
-                relationName: "posts",
-                target: () => mockPostsCollection as unknown as CollectionConfig,
-                };
-
-            // Should throw an appropriate error since it can't find the junction table
-            expect(() => {
-                DrizzleConditionBuilder.buildRelationConditions(
-                    inverseRelationWithoutInverseName,
-                    5,
-                    mockPostsTable,
-                    mockTagsTable,
-                    mockTagsTable.id,
-                    mockPostsTable.id,
-                    mockRegistry
-                );
-            }).toThrow(/Cannot resolve inverse many relation/);
-        });
     });
+
 });
 
 describe("DrizzleConditionBuilder - Filter Operators", () => {

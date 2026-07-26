@@ -31,6 +31,16 @@ import { useSidePanel } from "../hooks/useSidePanel";
 import { normalizeToEntityRelation } from "@rebasepro/common";
 import { EmptyValue } from "../preview";
 
+/** Whether an authored relation yields many rows. Derived from its kind. */
+function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
+    if (!relation) return undefined;
+    if (relation.kind === "via") return relation.cardinality as "one" | "many" | undefined;
+    if (relation.kind === "hasMany" || relation.kind === "manyToMany") return "many";
+    if (relation.kind === "belongsTo" || relation.kind === "hasOne") return "one";
+    return relation.cardinality as "one" | "many" | undefined;
+}
+
+
 export interface RelationItem {
     id: string | number;
     label: string;
@@ -92,7 +102,7 @@ export const RelationSelector = React.forwardRef<
         const collection = relation.target();
         const dataClient = useData();
         const sidePanelController = useSidePanel();
-        const multiple = relation.cardinality === "many";
+        const multiple = relationCardinality(relation) === "many";
 
         const [isPopoverOpen, setIsPopoverOpen] = useState(false);
         const isPopoverOpenRef = useRef(false);

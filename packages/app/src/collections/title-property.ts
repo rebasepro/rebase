@@ -80,16 +80,27 @@ function isStorageProperty(property: Property): boolean {
 function getForeignKeyColumns<M extends Record<string, unknown>>(collection: AdminCollection<M>): Set<string> {
     const keys = new Set<string>();
 
-    const addRelationKeys = (relation: Pick<Relation, "localKey" | "through" | "joinPath">) => {
-        if (relation.localKey) keys.add(relation.localKey);
-        if (relation.through?.sourceColumn) keys.add(relation.through.sourceColumn);
-        // Only the first hop of a join path starts on this collection's table.
-        const firstStep = relation.joinPath?.[0];
-        if (firstStep) {
-            const from = firstStep.on?.from;
-            for (const column of Array.isArray(from) ? from : [from]) {
-                if (column) keys.add(column);
+    const addRelationKeys = (relation: Relation) => {
+        switch (relation.kind) {
+            case "belongsTo":
+                // Left to be inferred, the column still takes the conventional
+                // `<relation>_id` name.
+                keys.add(relation.localKey ?? generateForeignKeyName(relation.relationName ?? ""));
+                break;
+            case "manyToMany":
+                if (relation.through?.sourceColumn) keys.add(relation.through.sourceColumn);
+                break;
+            case "via": {
+                // Only the first hop starts on this collection's table.
+                const from = relation.joinPath?.[0]?.on?.from;
+                for (const column of Array.isArray(from) ? from : [from]) {
+                    if (column) keys.add(column);
+                }
+                break;
             }
+            default:
+                // hasOne / hasMany put their column on the *target*.
+                break;
         }
     };
 
@@ -100,12 +111,9 @@ function getForeignKeyColumns<M extends Record<string, unknown>>(collection: Adm
     for (const [key, propertyRaw] of Object.entries(collection.properties ?? {})) {
         const property = propertyRaw as Property | undefined;
         if (!property || isPropertyBuilder(property) || property.type !== "relation") continue;
-        addRelationKeys(property);
-        if (property.relation) addRelationKeys(property.relation);
-        // An owning one-to-one whose localKey was left to be inferred still
-        // consumes a column; assume the conventional `<relation>_id` name.
-        if ((property.cardinality ?? "one") === "one" && (property.direction ?? "owning") === "owning") {
-            keys.add(generateForeignKeyName(property.relationName || key));
+        if (property.relation) {
+            addRelationKeys({ ...property.relation,
+relationName: property.relation.relationName ?? key });
         }
     }
 
@@ -132,7 +140,9 @@ function scoreTitleCandidate(property: Property, key: string, idKeys: Set<string
     if (isStorageProperty(property)) return SCORE.DISQUALIFIED;
 
     if (property.type === "relation") {
-        const isMany = property.cardinality === "many" || property.relation?.cardinality === "many";
+        const isMany = property.resolvedRelation
+            ? property.resolvedRelation.cardinality === "many"
+            : property.relation?.kind === "hasMany" || property.relation?.kind === "manyToMany";
         return isMany ? SCORE.DISQUALIFIED : SCORE.RELATION;
     }
     if (property.type === "reference") {

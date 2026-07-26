@@ -22,15 +22,37 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/forms";
-import { Relation } from "@rebasepro/types";
+import { Relation, JoinStep, OnAction } from "@rebasepro/types";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import type { AdminPostgresCollection } from "@rebasepro/admin-types";
+
+/**
+ * A relation being edited.
+ *
+ * Deliberately not `Partial<Relation>`: `Relation` is a union, and a partial of
+ * a union distributes into "partial of each member", so a draft that has picked
+ * `kind: "manyToMany"` but not yet a junction table does not typecheck as any
+ * member. A form in progress is not a relation — it becomes one on save.
+ */
+type RelationDraft = {
+    kind?: Relation["kind"];
+    relationName?: string;
+    target?: string;
+    localKey?: string;
+    foreignKeyOnTarget?: string;
+    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
+    joinPath?: JoinStep[];
+    cardinality?: "one" | "many";
+    onUpdate?: OnAction;
+    onDelete?: OnAction;
+};
+
 
 export function CollectionRelationsTab() {
     const { values, setFieldValue } = useFormex<AdminPostgresCollection>();
     const { collections } = useCollectionsConfigController();
     const [editingRelationIndex, setEditingRelationIndex] = useState<number | null>(null);
-    const [editingRelationState, setEditingRelationState] = useState<Partial<Relation> | null>(null);
+    const [editingRelationState, setEditingRelationState] = useState<RelationDraft | null>(null);
 
     const getTargetSlug = (target: any) => {
         if (typeof target === "string") {
@@ -63,9 +85,9 @@ export function CollectionRelationsTab() {
 
         const newRelations = [...relations];
         if (editingRelationIndex === -1) {
-            newRelations.push(editingRelationState as Relation);
+            newRelations.push(editingRelationState as unknown as Relation);
         } else if (editingRelationIndex !== null) {
-            newRelations[editingRelationIndex] = editingRelationState as Relation;
+            newRelations[editingRelationIndex] = editingRelationState as unknown as Relation;
         }
         setFieldValue("relations", newRelations);
 
@@ -87,8 +109,7 @@ export function CollectionRelationsTab() {
                         setEditingRelationIndex(-1);
                         setEditingRelationState({ relationName: "",
 target: "",
-cardinality: "many",
-direction: "owning" });
+kind: "hasMany" });
                     }}>
                         ADD RELATION
                     </Button>
@@ -110,7 +131,7 @@ direction: "owning" });
                                               className="cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800"
                                               onClick={() => {
                                                   setEditingRelationIndex(index);
-                                                  setEditingRelationState(relation);
+                                                  setEditingRelationState(relation as unknown as RelationDraft);
                                               }}>
                                         <TableCell style={{ width: "64px" }}>
                                             <IconButton size="small" onClick={(e) => {
@@ -122,8 +143,7 @@ direction: "owning" });
                                         </TableCell>
                                         <TableCell className="font-medium">{relation.relationName}</TableCell>
                                         <TableCell>{getTargetSlug(relation.target) || "Function"}</TableCell>
-                                        <TableCell>{relation.cardinality}</TableCell>
-                                        <TableCell>{relation.direction || "owning"}</TableCell>
+                                        <TableCell>{relation.kind}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -136,8 +156,7 @@ direction: "owning" });
                             setEditingRelationIndex(-1);
                             setEditingRelationState({ relationName: "",
 target: "",
-cardinality: "many",
-direction: "owning" });
+kind: "hasMany" });
                         }}>Create your first relation</Button>
                     </div>
                 )}
@@ -165,10 +184,8 @@ relationName: e.target.value } : null)}
                                         onValueChange={(val) => {
                                             setEditingRelationState(prev => {
                                                 if (!prev) return null;
-                                                const targetFn = () => collections?.find(c => c.slug === val) || { slug: val };
-                                                (targetFn as { slug?: string }).slug = val;
-                                                return { ...prev,
-target: targetFn as Relation["target"] };
+                                                                                                return { ...prev,
+target: val };
                                             });
                                         }}
                                     >
@@ -178,26 +195,19 @@ target: targetFn as Relation["target"] };
                                     </Select>
                                     <Select
                                         fullWidth
-                                        label="Cardinality"
-                                        value={editingRelationState.cardinality || "many"}
+                                        label="Kind"
+                                        value={editingRelationState.kind ?? "hasMany"}
                                         onValueChange={(val) => setEditingRelationState(prev => prev ? { ...prev,
-cardinality: val as Relation["cardinality"] } : null)}
+kind: val as unknown as Relation["kind"] } : null)}
                                     >
-                                        <SelectItem value="many">Many</SelectItem>
-                                        <SelectItem value="one">One</SelectItem>
-                                    </Select>
-                                    <Select
-                                        fullWidth
-                                        label="Direction"
-                                        value={editingRelationState.direction || "owning"}
-                                        onValueChange={(val) => setEditingRelationState(prev => prev ? { ...prev,
-direction: val as Relation["direction"] } : null)}
-                                    >
-                                        <SelectItem value="owning">Owning</SelectItem>
-                                        <SelectItem value="inverse">Inverse</SelectItem>
+                                        <SelectItem value="belongsTo">Belongs to — the key is on this table</SelectItem>
+                                        <SelectItem value="hasOne">Has one — the key is on the target</SelectItem>
+                                        <SelectItem value="hasMany">Has many — the key is on the target</SelectItem>
+                                        <SelectItem value="manyToMany">Many to many — through a junction</SelectItem>
+                                        <SelectItem value="via">Via — an explicit join path</SelectItem>
                                     </Select>
 
-                                    {editingRelationState.cardinality === "many" && editingRelationState.direction === "owning" && (
+                                    {editingRelationState.kind === "manyToMany" && (
                                         <div className={cls("flex flex-col gap-4 mt-4 pt-4 border-t", defaultBorderMixin)}>
                                             <Typography variant="subtitle2" className="text-text-primary">Intermediate Table</Typography>
                                             <Typography variant="body2" className="text-text-secondary -mt-3">

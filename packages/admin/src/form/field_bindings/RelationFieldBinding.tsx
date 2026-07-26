@@ -25,8 +25,8 @@ export function RelationFieldBinding(props: FieldProps<RelationProperty>) {
     if (!collection || !capabilities?.supportsRelations || !("relations" in collection) || !collection.relations) {
         throw Error("RelationFieldBinding expected a collection with relations support");
     }
-    const resolvedProperty = resolveRelationProperty(property, collection.relations, propertyKey);
-    const relation = resolvedProperty.relation;
+    const resolvedProperty = resolveRelationProperty(property, collection, propertyKey);
+    const relation = resolvedProperty;
 
     const manyRelation = relation?.cardinality === "many";
     const widget = property.admin?.widget ?? "select";

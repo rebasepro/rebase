@@ -411,10 +411,11 @@ isId: "increment" }
 isId: "increment" },
                 author: {
                     type: "relation",
-                    target: () => authorsCol,
-                    cardinality: "one",
-                    direction: "owning",
-                    localKey: "author_id"
+                    relation: {
+                        kind: "belongsTo",
+                        target: () => authorsCol,
+                        localKey: "author_id",
+                    }
                 }
             }
         } as unknown as CollectionConfig;
@@ -436,10 +437,14 @@ isId: "increment" },
 isId: "increment" },
                 author: {
                     type: "relation",
-                    target: () => ({ name: "no-properties" }),
-                    cardinality: "one",
-                    direction: "owning",
-                    localKey: "author_id"
+                    relation: {
+                        kind: "belongsTo",
+                        // A real collection whose *primary key* cannot be determined — which is
+                        // what this test is about. A target with no slug at all is now a
+                        // configuration error rather than a silent degradation.
+                        target: () => ({ slug: "no_properties", name: "no-properties" }),
+                        localKey: "author_id",
+                    }
                 }
             }
         } as unknown as CollectionConfig;
@@ -475,10 +480,9 @@ isId: "increment" },
             },
             relations: [
                 {
+                    kind: "belongsTo",
                     relationName: "author_rel",
                     target: () => authorsCol,
-                    cardinality: "one",
-                    direction: "owning",
                     localKey: "author_id",
                     validation: { required: true }
                 }
@@ -510,9 +514,10 @@ isId: "increment" }
 isId: "increment" },
                 tags: {
                     type: "relation",
-                    target: () => tagsCol,
-                    cardinality: "many",
-                    direction: "owning"
+                    relation: {
+                        kind: "manyToMany",
+                        target: () => tagsCol,
+                    }
                 }
             }
         } as unknown as CollectionConfig;

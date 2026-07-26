@@ -46,8 +46,8 @@ export function MultipleRelationFieldBinding({
     if (!parentCollection || !capabilities?.supportsRelations || !("relations" in parentCollection) || !parentCollection.relations) {
         throw Error("RelationFieldBinding expected a collection with relations support");
     }
-    const resolvedProperty = resolveRelationProperty(property, parentCollection.relations, propertyKey)
-    const relation = resolvedProperty.relation;
+    const resolvedProperty = resolveRelationProperty(property, parentCollection, propertyKey)
+    const relation = resolvedProperty;
     if (!relation)
         throw Error(
             "Property relation is required for MultipleRelationFieldBinding"

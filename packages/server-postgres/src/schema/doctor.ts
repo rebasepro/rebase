@@ -12,7 +12,7 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { CollectionConfig, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty } from "@rebasepro/types";
+import { CollectionConfig, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
@@ -387,7 +387,7 @@ export async function checkCollectionsVsDatabase(
 
         for (const collection of postgresCollections) {
             const tableName = getTableName(collection);
-            const schemaName = collection.schema || "public";
+            const schemaName = (collection as { schema?: string }).schema || "public";
             const fullTableName = schemaName === "public" ? tableName : `${schemaName}.${tableName}`;
 
             // Check table existence
@@ -411,10 +411,10 @@ export async function checkCollectionsVsDatabase(
             // Check properties → columns
             for (const [propName, prop] of Object.entries(collection.properties ?? {})) {
                 if (prop.type === "relation") {
-                    // Relation columns are derived from localKey
+                    // ResolvedRelation columns are derived from localKey
                     const resolvedRelations = resolveCollectionRelations(collection);
-                    const relation = findRelation(resolvedRelations, (prop as RelationProperty).relationName ?? propName);
-                    if (relation?.direction === "owning" && relation.cardinality === "one" && relation.localKey) {
+                    const relation = findRelation(resolvedRelations, (prop as RelationProperty).relation?.relationName ?? propName);
+                    if (relation?.kind === "belongsTo") {
                         const fkColName = relation.localKey;
                         if (!dbColumnMap.has(fkColName)) {
                             issues.push({
@@ -434,7 +434,7 @@ export async function checkCollectionsVsDatabase(
                         try {
                             const targetColl = relation.target();
                             targetTableName = getTableName(targetColl);
-                            targetSchemaName = targetColl.schema || "public";
+                            targetSchemaName = (targetColl as { schema?: string }).schema || "public";
                         } catch { /* ignore */ }
 
                         const hasFk = tableFks.some((fk) =>
@@ -568,9 +568,9 @@ export async function checkCollectionsVsDatabase(
             // Also check junction tables for many-to-many relations
             const resolvedRelations = resolveCollectionRelations(collection);
             for (const relation of Object.values(resolvedRelations)) {
-                if (relation.cardinality === "many" && relation.direction === "owning" && relation.through) {
+                if (isManyToMany(relation)) {
                     const junctionTable = relation.through.table;
-                    const junctionSchema = collection.schema || "public";
+                    const junctionSchema = (collection as { schema?: string }).schema || "public";
                     const fullJunctionTable = junctionSchema === "public" ? junctionTable : `${junctionSchema}.${junctionTable}`;
                     if (!existingTables.has(fullJunctionTable)) {
                         issues.push({

@@ -1,7 +1,7 @@
 import { eq, SQL } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, Properties, Property, Relation, RelationProperty, Vector, BinaryProperty } from "@rebasepro/types";
+import { CollectionConfig, Properties, Property, ResolvedRelation, RelationProperty, Vector, BinaryProperty, hasForeignKeyOnTarget, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, type ResolvedVia } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
@@ -31,13 +31,13 @@ export interface SerializedEntityData {
      */
     inverseRelationUpdates: Array<{
         relationKey: string;
-        relation: Relation;
+        relation: ResolvedRelation;
         newValue: unknown;
     }>;
     /** JoinPath relation updates that require multi-hop writes. */
     joinPathRelationUpdates: Array<{
         relationKey: string;
-        relation: Relation;
+        relation: ResolvedRelation;
         newTargetId: string | number | null;
     }>;
 }
@@ -110,19 +110,19 @@ joinPathRelationUpdates: [] };
     // Track inverse relations that need to be handled separately
     const inverseRelationUpdates: Array<{
         relationKey: string;
-        relation: Relation;
+        relation: ResolvedRelation;
         newValue: unknown;
     }> = [];
     const joinPathRelationUpdates: Array<{
         relationKey: string;
-        relation: Relation;
+        relation: ResolvedRelation;
         newTargetId: string | number | null;
     }> = [];
 
     // Pre-calculate all local keys used as foreign keys
     const foreignKeys = new Set<string>();
     Object.values(resolvedRelations).forEach(relation => {
-        if (relation.localKey) foreignKeys.add(relation.localKey);
+        if ((relation as ResolvedBelongsTo).localKey) foreignKeys.add((relation as ResolvedBelongsTo).localKey);
     });
 
     for (const [key, value] of Object.entries(row)) {
@@ -141,15 +141,15 @@ joinPathRelationUpdates: [] };
         if (property.type === "relation" && collection) {
             const relation = findRelation(resolvedRelations, key);
             if (relation) {
-                if (relation.direction === "owning" && relation.localKey) {
+                if (relation.kind === "belongsTo") {
                     // Owning relation: Map relation object to FK column on current table
                     const serializedValue = serializePropertyToServer(effectiveValue, property);
                     if (serializedValue !== undefined) {
-                        result[relation.localKey] = serializedValue;
+                        result[(relation as ResolvedBelongsTo).localKey] = serializedValue;
                     }
                     // Don't add the original relation property to the result
                     continue;
-                } else if (relation.direction === "inverse" && relation.foreignKeyOnTarget) {
+                } else if (hasForeignKeyOnTarget(relation)) {
                     // Inverse relation: Need to update the target table's FK
                     const serializedValue = serializePropertyToServer(effectiveValue, property);
                     inverseRelationUpdates.push({
@@ -159,38 +159,29 @@ joinPathRelationUpdates: [] };
                     });
                     // Don't add the original relation property to the result
                     continue;
-                } else if (relation.direction === "inverse" && relation.joinPath && relation.joinPath.length > 0) {
+                } else if (relation.kind === "via") {
+                    // A join chain is written through its own machinery, one
+                    // row at a time for a to-one and as a set for a to-many.
+                    // There used to be two arms here — "owning" and "inverse"
+                    // joinPath — but a join chain has no owning side, so they
+                    // only ever differed by which list they pushed to.
                     const serializedValue = serializePropertyToServer(effectiveValue, property);
                     if (relation.cardinality === "one") {
-                        // One-to-one inverse joinPath: route through joinPathRelationUpdates.
-                        // The write ordering in PersistService ensures these are processed
-                        // BEFORE the main UPDATE, so parentSourceCol reads the pre-update FK value.
-                        // This prevents stale values from corrupting related rows when an
-                        // intermediate FK (e.g. author_id) changes in the same save.
+                        // Ordering matters: PersistService applies these BEFORE
+                        // the main UPDATE, so the mapping reads the pre-update
+                        // foreign key rather than a value the same save changed.
                         joinPathRelationUpdates.push({
                             relationKey: key,
                             relation,
                             newTargetId: serializedValue as string | number | null
                         });
                     } else {
-                        // Many inverse joinPath: capture as inverse relation update
                         inverseRelationUpdates.push({
                             relationKey: key,
                             relation,
                             newValue: serializedValue
                         });
                     }
-                    // Don't add the original relation property to the result
-                    continue;
-                } else if (relation.cardinality === "one" && relation.direction === "owning" && relation.joinPath && relation.joinPath.length > 0) {
-                    // Owning one-to-one via joinPath: capture as a write intent
-                    const serializedValue = serializePropertyToServer(effectiveValue, property);
-                    joinPathRelationUpdates.push({
-                        relationKey: key,
-                        relation,
-                        newTargetId: serializedValue as string | number | null
-                    });
-                    // Don't include this property directly in payload
                     continue;
                 }
             }
@@ -320,9 +311,9 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
             // Find the normalized relation for this property
             const relation = findRelation(resolvedRelations, propKey);
             if (relation) {
-                if (relation.direction === "owning" && relation.localKey && relation.localKey in data) {
+                if (relation.kind === "belongsTo" && (relation as ResolvedBelongsTo).localKey in data) {
                     // Owning relation: FK is in current table
-                    const fkValue = data[relation.localKey as keyof M];
+                    const fkValue = data[(relation as ResolvedBelongsTo).localKey as keyof M];
                     if (fkValue !== null && fkValue !== undefined) {
                         try {
                             const targetCollection = relation.target();
@@ -331,7 +322,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                             logger.warn(`Could not resolve target collection for relation property: ${propKey}`, { error: e });
                         }
                     }
-                } else if (relation.direction === "inverse" && relation.foreignKeyOnTarget && db && registry) {
+                } else if (hasForeignKeyOnTarget(relation) && db && registry) {
                     // Inverse relation: FK is in target table, need to query for it
                     try {
                         const targetCollection = relation.target();
@@ -340,7 +331,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                         const currentId = buildCompositeId(data, pks);
 
                         if (targetTable && currentId) {
-                            const foreignKeyColumn = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
+                            const foreignKeyColumn = targetTable[(relation as ResolvedForeignKeyOnTarget).foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
                             if (foreignKeyColumn) {
                                 // Query the target table to find row that references this row
                                 const relatedRows = await db
@@ -368,7 +359,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                     } catch (e) {
                         logger.warn(`Could not resolve inverse relation property: ${propKey}`, { error: e });
                     }
-                } else if (relation.direction === "inverse" && relation.joinPath && db && registry) {
+                } else if (relation.kind !== "belongsTo" && (relation as ResolvedVia).joinPath && db && registry) {
                     // Join path relation: Multi-hop relation using joins
                     try {
                         const targetCollection = relation.target();
@@ -387,7 +378,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                             let currentTable = sourceTable;
 
                             // Apply each join in the path
-                            for (const join of relation.joinPath) {
+                            for (const join of (relation as ResolvedVia).joinPath) {
                                 const joinTable = registry.getTable(join.table);
                                 if (!joinTable) {
                                     logger.warn(`Join table not found: ${join.table}`);
@@ -444,7 +435,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
 
                             if (joinResults.length > 0) {
                                 const targetPks = getPrimaryKeys(targetCollection, registry!);
-                                const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
+                                const targetTableName = (relation as ResolvedVia).joinPath[(relation as ResolvedVia).joinPath.length - 1].table;
 
                                 if (relation.cardinality === "one") {
                                     // One-to-one: return single relation object
@@ -547,17 +538,16 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
         case "relation":
             // Transform ID back to relation object with type information
             if (typeof value === "string" || typeof value === "number") {
-                let relationDef: Relation | undefined = (property as RelationProperty).relation;
+                // Normalization stamps the resolved relation onto the property;
+                // fall back to the collection's map for a property that never
+                // went through the registry.
+                let relationDef: ResolvedRelation | undefined = (property as RelationProperty).resolvedRelation;
                 if (!relationDef && propertyKey) {
-                    const resolvedRelations = resolveCollectionRelations(collection);
-                    relationDef = findRelation(resolvedRelations, propertyKey);
-                }
-                if (!relationDef) {
-                    relationDef = collection.relations?.find((rel: Relation) => rel.relationName === (property as RelationProperty).relationName);
+                    relationDef = findRelation(resolveCollectionRelations(collection), propertyKey);
                 }
 
                 if (!relationDef) {
-                    logger.warn(`Relation not defined in property for key: ${propertyKey || "unknown"}`);
+                    logger.warn(`ResolvedRelation not defined in property for key: ${propertyKey || "unknown"}`);
                     return value;
                 }
 
@@ -683,7 +673,7 @@ function normalizeScalarValues<M extends Record<string, unknown>>(
     data: M,
     properties: Properties,
     collection: CollectionConfig,
-    resolvedRelations: Record<string, Relation>,
+    resolvedRelations: Record<string, ResolvedRelation>,
     options: { skipRelations: boolean }
 ): Record<string, unknown> {
     const result: Record<string, unknown> = {};
@@ -691,8 +681,8 @@ function normalizeScalarValues<M extends Record<string, unknown>>(
     // Identify FK columns used only for relations and not exposed as properties
     const internalFKColumns = new Set<string>();
     Object.values(resolvedRelations).forEach(relation => {
-        if (relation.localKey && !properties[relation.localKey]) {
-            internalFKColumns.add(relation.localKey);
+        if ((relation as ResolvedBelongsTo).localKey && !properties[(relation as ResolvedBelongsTo).localKey]) {
+            internalFKColumns.add((relation as ResolvedBelongsTo).localKey);
         }
     });
 

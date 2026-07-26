@@ -1,4 +1,4 @@
-import { CollectionConfig, NumberProperty, Property, Relation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";
+import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo } from "@rebasepro/types";
 import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, getInjectedSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
 
@@ -170,9 +170,9 @@ export const getSqlColumnType = (propName: string, prop: Property, collection: C
         case "relation": {
             const refProp = prop as RelationProperty;
             const resolvedRelations = resolveCollectionRelations(collection);
-            const relation = findRelation(resolvedRelations, refProp.relationName ?? propName);
-            if (!relation || relation.direction !== "owning" || relation.cardinality !== "one") {
-                throw new Error(`Relation ${propName} is not an owning one-to-one/many-to-one relation`);
+            const relation = findRelation(resolvedRelations, refProp.relation?.relationName ?? propName);
+            if (relation?.kind !== "belongsTo") {
+                throw new Error(`Relation ${propName} does not put a column on this table (only \`belongsTo\` does)`);
             }
             let targetCollection: CollectionConfig;
             try {
@@ -238,7 +238,7 @@ export const generatePostgresDdl = async (
     const allTablesToGenerate = new Map<string, {
         collection: CollectionConfig,
         isJunction?: boolean,
-        relation?: Relation,
+        relation?: ResolvedRelation,
         sourceCollection?: CollectionConfig
     }>();
 
@@ -251,8 +251,8 @@ export const generatePostgresDdl = async (
 
         const resolvedRelations = resolveCollectionRelations(collection);
         for (const relation of Object.values(resolvedRelations)) {
-            if (relation.through) {
-                const junctionTableName = relation.through.table;
+            if (isManyToMany(relation)) {
+                const junctionTableName = (relation as ResolvedManyToMany).through.table;
                 if (!allTablesToGenerate.has(junctionTableName)) {
                     allTablesToGenerate.set(junctionTableName, {
                         collection: {
@@ -284,7 +284,7 @@ export const generatePostgresDdl = async (
         const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
         const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
 
-        if (isJunction && relation && sourceCollection && relation.through) {
+        if (isJunction && relation && sourceCollection && isManyToMany(relation)) {
             const targetCollection = relation.target();
             const sourceTable = getTableName(sourceCollection);
             const targetTable = getTableName(targetCollection);
@@ -336,9 +336,9 @@ export const generatePostgresDdl = async (
                 if (prop.type === "relation") {
                     const refProp = prop as RelationProperty;
                     const resolvedRelations = resolveCollectionRelations(collection);
-                    const relInfo = findRelation(resolvedRelations, refProp.relationName ?? propName);
+                    const relInfo = findRelation(resolvedRelations, refProp.relation?.relationName ?? propName);
 
-                    if (!relInfo || relInfo.direction !== "owning" || relInfo.cardinality !== "one" || !relInfo.localKey) {
+                    if (relInfo?.kind !== "belongsTo") {
                         return;
                     }
 

@@ -204,12 +204,13 @@ export function buildCollectionFromTableMetadata(
 ): Partial<AdminCollection> {
     const properties: Record<string, Property> = {};
     const propertiesOrder: string[] = [];
+    // Introspection can only ever produce two shapes: a foreign key on this
+    // table, or a junction between two. Both are named by their kind.
     const relations: Array<{
         id: string;
         relationName: string;
         target: string;
-        cardinality: "one" | "many";
-        direction: "owning" | "inverse";
+        kind: "belongsTo" | "manyToMany";
         localKey?: string;
         through?: { table: string; sourceColumn: string; targetColumn: string };
     }> = [];
@@ -235,8 +236,7 @@ export function buildCollectionFromTableMetadata(
                 id: fk.column_name,
                 relationName: relName,
                 target: fk.foreign_table_name, // Will be hydrated later
-                cardinality: "one",
-                direction: "owning",
+                kind: "belongsTo",
                 localKey: fk.column_name
             });
         }
@@ -250,8 +250,7 @@ export function buildCollectionFromTableMetadata(
                 id: junction.target_table_name + "_relation",
                 relationName: relName,
                 target: junction.target_table_name, // Will be hydrated later
-                cardinality: "many",
-                direction: "owning",
+                kind: "manyToMany",
                 through: {
                     table: junction.junction_table_name,
                     sourceColumn: junction.source_column_name,
@@ -304,7 +303,8 @@ export function buildCollectionFromTableMetadata(
         table: tableName,
         properties: properties as PostgresProperties,
         propertiesOrder,
-        ...(relations.length > 0 ? { relations } : {}),
+        // `target` is still a slug here — the caller hydrates it into a thunk.
+        ...(relations.length > 0 ? { relations: relations as unknown as AdminCollection["relations"] } : {}),
         ...(securityRules.length > 0 ? { securityRules } : {})
     };
 }

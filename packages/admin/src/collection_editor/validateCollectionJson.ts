@@ -113,75 +113,50 @@ function validateProperty(
 
     // Validate relation property
     if (property.type === "relation") {
-        if (property.target !== undefined && typeof property.target !== "string" && typeof property.target !== "function") {
-            errors.push({
-                path: `${path}.target`,
-                message: "Must be a string (collection slug) or a function"
-            });
-        }
-        if (property.cardinality !== undefined && property.cardinality !== "one" && property.cardinality !== "many") {
-            errors.push({
-                path: `${path}.cardinality`,
-                message: "Must be either 'one' or 'many'"
-            });
-        }
-        if (property.direction !== undefined && property.direction !== "owning" && property.direction !== "inverse") {
-            errors.push({
-                path: `${path}.direction`,
-                message: "Must be either 'owning' or 'inverse'"
-            });
-        }
-        if (property.localKey !== undefined && typeof property.localKey !== "string") {
-            errors.push({
-                path: `${path}.localKey`,
-                message: "Must be a string"
-            });
-        }
-        if (property.foreignKeyOnTarget !== undefined && typeof property.foreignKeyOnTarget !== "string") {
-            errors.push({
-                path: `${path}.foreignKeyOnTarget`,
-                message: "Must be a string"
-            });
-        }
-        if (property.through !== undefined) {
-            if (typeof property.through !== "object" || property.through === null) {
+        const link = property.relation as Record<string, unknown> | undefined;
+        if (link !== undefined) {
+            const KINDS = ["belongsTo", "hasOne", "hasMany", "manyToMany", "via"];
+            if (typeof link.kind !== "string" || !KINDS.includes(link.kind)) {
                 errors.push({
-                    path: `${path}.through`,
-                    message: "Must be an object"
+                    path: `${path}.relation.kind`,
+                    message: `Must be one of ${KINDS.join(", ")}`
                 });
-            } else {
-                const throughObj = property.through as Record<string, unknown>;
-                if (throughObj.table !== undefined && typeof throughObj.table !== "string") {
+            }
+
+            if (link.target !== undefined && typeof link.target !== "string" && typeof link.target !== "function") {
+                errors.push({
+                    path: `${path}.relation.target`,
+                    message: "Must be a collection slug or a thunk returning a collection"
+                });
+            }
+
+            // Each kind admits exactly one link field. Anything else on it is
+            // a leftover from another shape and would previously have been
+            // silently honoured by whichever consumer read it first.
+            const allowedByKind: Record<string, string[]> = {
+                belongsTo: ["localKey"],
+                hasOne: ["foreignKeyOnTarget"],
+                hasMany: ["foreignKeyOnTarget"],
+                manyToMany: ["through"],
+                via: ["joinPath", "cardinality"]
+            };
+            const linkFields = ["localKey", "foreignKeyOnTarget", "through", "joinPath", "cardinality"];
+            const allowed = allowedByKind[String(link.kind)] ?? [];
+            for (const field of linkFields) {
+                if (link[field] !== undefined && !allowed.includes(field)) {
                     errors.push({
-                        path: `${path}.through.table`,
-                        message: "Must be a string"
-                    });
-                }
-                if (throughObj.sourceColumn !== undefined && typeof throughObj.sourceColumn !== "string") {
-                    errors.push({
-                        path: `${path}.through.sourceColumn`,
-                        message: "Must be a string"
-                    });
-                }
-                if (throughObj.targetColumn !== undefined && typeof throughObj.targetColumn !== "string") {
-                    errors.push({
-                        path: `${path}.through.targetColumn`,
-                        message: "Must be a string"
+                        path: `${path}.relation.${field}`,
+                        message: `Not valid on a "${String(link.kind)}" relation`
                     });
                 }
             }
-        }
-        if (property.onUpdate !== undefined && typeof property.onUpdate !== "string") {
-            errors.push({
-                path: `${path}.onUpdate`,
-                message: "Must be a string"
-            });
-        }
-        if (property.onDelete !== undefined && typeof property.onDelete !== "string") {
-            errors.push({
-                path: `${path}.onDelete`,
-                message: "Must be a string"
-            });
+
+            if (link.kind === "via" && !Array.isArray(link.joinPath)) {
+                errors.push({
+                    path: `${path}.relation.joinPath`,
+                    message: "A `via` relation requires a joinPath array"
+                });
+            }
         }
     }
 

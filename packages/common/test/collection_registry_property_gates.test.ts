@@ -15,7 +15,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
         const postsCollection: CollectionConfig = {
             id: "posts",
             name: "Posts",
-            path: "posts",
+            slug: "posts",
             table: "posts",
             properties: {
                 title: { type: "string" }
@@ -31,14 +31,14 @@ describe("CollectionRegistry — engine-specific property gates", () => {
                 name: { type: "string" },
                 posts: {
                     type: "relation",
-                    collectionPath: "posts",
-                    relationName: "author_posts_link"
+                    relation: {
+                        kind: "hasMany",
+                        relationName: "author_posts_link",
+                        target: () => postsCollection,
+                        foreignKeyOnTarget: "author_id"
+                    }
                 }
-            },
-            relations: [{
-                relationName: "author_posts_link",
-                collection: postsCollection
-            }]
+            }
         };
 
         const registry = new CollectionRegistry([postsCollection, authorsCollection]);
@@ -50,8 +50,8 @@ describe("CollectionRegistry — engine-specific property gates", () => {
 
         // Normalization should inject the resolved relation
         const relProp = result!.properties.posts as RelationProperty;
-        expect(relProp.relation).toBeDefined();
-        expect(relProp.relation!.collection!.name).toBe("Posts");
+        expect(relProp.resolvedRelation).toBeDefined();
+        expect(relProp.resolvedRelation!.targetSlug).toBe("posts");
     });
 
     it("registers and retrieves a Firestore collection with reference properties", () => {
@@ -153,7 +153,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
         const col: CollectionConfig = {
             id: "items",
             name: "Items",
-            path: "items",
+            slug: "items",
             table: "items",
             properties: {
                 description: {
@@ -178,7 +178,7 @@ describe("CollectionRegistry — engine-specific property gates", () => {
         const postsCollection: CollectionConfig = {
             id: "posts",
             name: "Posts",
-            path: "posts",
+            slug: "posts",
             table: "posts",
             properties: {
                 title: { type: "string" }
@@ -194,14 +194,14 @@ describe("CollectionRegistry — engine-specific property gates", () => {
                 name: { type: "string" },
                 posts: {
                     type: "relation",
-                    collectionPath: "posts",
-                    relationName: "category_posts"
+                    relation: {
+                        kind: "hasMany",
+                        relationName: "category_posts",
+                        target: () => postsCollection,
+                        foreignKeyOnTarget: "category_id"
+                    }
                 }
-            },
-            relations: [{
-                relationName: "category_posts",
-                collection: postsCollection
-            }]
+            }
         };
 
         const registry = new CollectionRegistry([postsCollection, col]);
@@ -213,6 +213,8 @@ describe("CollectionRegistry — engine-specific property gates", () => {
         // Raw should NOT have resolved relation (dual-layer integrity)
         const raw = registry.getRaw("categories");
         expect(raw).toBeDefined();
-        expect((raw!.properties.posts as RelationProperty).relation).toBeUndefined();
+        // The raw layer keeps what the author wrote; only the resolved stamp is absent.
+        expect((raw!.properties.posts as RelationProperty).relation).toBeDefined();
+        expect((raw!.properties.posts as RelationProperty).resolvedRelation).toBeUndefined();
     });
 });

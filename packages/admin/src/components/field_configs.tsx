@@ -269,7 +269,8 @@ get Field() { return MarkdownEditorFieldBinding; } }
         Icon: LinkIcon,
         color: "#ff0042",
         property: {
-            relationName: "",
+            // relationName now lives on the link
+            // relationName: "",
             type: "relation",
             admin: { get Field() { return RelationFieldBinding; } }
         }
