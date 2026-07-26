@@ -2,6 +2,12 @@ import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
 import type { CollectionConfig } from "@rebasepro/types";
+import {
+    AuthSchemaVersionError,
+    assertAuthSchemaCompatible,
+    resolveAuthSchema,
+    stampAuthSchemaVersion
+} from "./schema-version";
 
 
 /**
@@ -13,6 +19,13 @@ import type { CollectionConfig } from "@rebasepro/types";
  */
 export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: CollectionConfig): Promise<void> {
     logger.info("🔍 Checking auth tables...");
+
+    // Before anything else, and deliberately outside the catch below: refuse to
+    // run against a database that a newer framework version has already
+    // migrated. Everything past this point is best-effort by design, which is
+    // exactly the wrong posture for an incompatibility that would otherwise
+    // surface as a fully booted server failing every login.
+    await assertAuthSchemaCompatible(db, resolveAuthSchema(collection));
 
     try {
         // Resolve dynamic user table name and ID type from the collection
@@ -588,8 +601,18 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             );
         }
 
+        // Stamped last, so a boot that died partway through the migrations above
+        // leaves the older stamp in place and the next boot runs them again.
+        await stampAuthSchemaVersion(db, authSchema);
+
         logger.info("✅ Auth tables ready");
     } catch (error) {
+        // The one failure that must not be survived. Continuing here is what
+        // produced a server that answered /health with 200 while every login
+        // returned 500 — the incompatibility is total, so crashing is the
+        // kinder outcome: an orchestrator will not route traffic to a pod that
+        // never came up.
+        if (error instanceof AuthSchemaVersionError) throw error;
         logger.error("❌ Failed to create auth tables", { error });
         logger.warn("⚠️ Continuing without creating auth tables.");
     }

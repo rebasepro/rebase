@@ -127,7 +127,13 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
 
     const [entitiesDisplayedFirst, setEntitiesDisplayedFirst] = useState<Entity<any>[]>([]);
 
-    const selectionController = useSelectionController();
+    // Explicitly `<M>`: the hook defaults to `Record<string, unknown>`, and the
+    // controller is handed to a table typed `SelectionController<M>`. `Entity<M>`
+    // sits on both sides of that interface (`selectedEntities` out,
+    // `toggleEntitySelection` in), so the default was never actually assignable
+    // here — it only looked fine while the surrounding props gave TypeScript no
+    // reason to bind `M` to this component's own parameter.
+    const selectionController = useSelectionController<M>();
 
     // Track whether the selection has been initialized to avoid
     // firing onMultipleEntitiesSelected during the initial mount/fetch.

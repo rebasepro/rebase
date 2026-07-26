@@ -25,7 +25,11 @@ interface PopupFormFieldProps<M extends Record<string, unknown>> {
     entityId: string | number;
     tableKey: string;
     propertyKey?: Extract<keyof M, string>;
-    collection?: AdminCollection<any>;
+    // `AdminCollection<M>`, not `<any>`: the admin block's key-shaped fields
+    // (titleProperty, sort, propertiesOrder) are typed against M, and
+    // `AdminCollection<any>` collapses them to `string` — which then fails to
+    // flow into the `FormContext<M>` built below.
+    collection?: AdminCollection<M>;
     cellRect?: DOMRect;
     open: boolean;
     onClose: () => void;

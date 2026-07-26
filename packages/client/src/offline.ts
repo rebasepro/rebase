@@ -210,7 +210,11 @@ interface Observer {
     settled: boolean;
 }
 
-const MISSING = " missing";
+// `\u0000` as an escape, not a raw NUL byte in the source. The value is
+// identical — an id can never contain it, which is the point — but written raw it
+// made this whole file test as binary, so every `grep` over the repo skipped
+// all 1,700 lines of it in silence.
+const MISSING = "\u0000missing";
 
 export class OfflineManager {
     private readonly store: OfflineStore;
@@ -382,7 +386,7 @@ export class OfflineManager {
         this.inners.set(slug, inner as SDKCollectionClient<AnyRow>);
 
         const wrapped: CollectionClient<M> = {
-            find: async (params?: FindParams): Promise<FindResult<M>> => {
+            find: async (params?: FindParams<M>): Promise<FindResult<M>> => {
                 const state = await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
@@ -567,7 +571,7 @@ export class OfflineManager {
                 this.notifyCollection(slug);
             },
 
-            count: async (params?: FindParams): Promise<number> => {
+            count: async (params?: FindParams<M>): Promise<number> => {
                 await this.ensureCollection(slug);
                 if (this.connectivity.shouldAttempt()) {
                     try {
@@ -590,7 +594,7 @@ export class OfflineManager {
             },
 
             observe: (
-                params: FindParams | undefined,
+                params: FindParams<M> | undefined,
                 onResult: (result: LiveResult<M>) => void,
                 onError?: (error: Error) => void,
                 options?: ObserveOptions
@@ -653,7 +657,7 @@ export class OfflineManager {
         slug: string,
         wrapped: CollectionClient<M>,
         inner: CollectionClient<M>,
-        params: FindParams | undefined,
+        params: FindParams<M> | undefined,
         onResult: (result: LiveResult<M>) => void,
         onError?: (error: Error) => void,
         options?: ObserveOptions

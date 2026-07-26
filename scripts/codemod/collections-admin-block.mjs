@@ -100,7 +100,9 @@ function collectionObjectsIn(sourceFile) {
     const unwrap = (expr) => {
         if (!expr) return undefined;
         if (expr.isKind?.(SyntaxKind.ObjectLiteralExpression)) return expr;
-        // defineCollection({ … }) / buildCollection({ … })
+        // defineCollection({ … }) — and any other single-object-argument
+        // wrapper, including the removed buildCollection, since this codemod
+        // runs against pre-0.11 sources that may still use it.
         if (expr.isKind?.(SyntaxKind.CallExpression)) {
             const [first] = expr.getArguments();
             if (first?.isKind(SyntaxKind.ObjectLiteralExpression)) return first;

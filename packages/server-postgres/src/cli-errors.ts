@@ -113,8 +113,8 @@ function formatConnectionRefusedBanner(databaseUrl: string): string {
         `  The database server is not running or is not accepting\n` +
         `  connections. Common fixes:\n` +
         `\n` +
+        `    • docker compose up -d db          (the service a Rebase scaffold ships)\n` +
         `    • brew services start postgresql@18\n` +
-        `    • docker compose up -d postgres\n` +
         `    • Verify DATABASE_URL in your .env file\n` +
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`

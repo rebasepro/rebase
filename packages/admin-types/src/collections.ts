@@ -16,7 +16,7 @@ import React, { Dispatch, SetStateAction } from "react";
 import type { Entity, EntityStatus, FilterValues, Property, User } from "@rebasepro/types";
 
 import type { RebaseContext } from "./rebase_context";
-import type { AdminCollection } from "@rebasepro/admin-types";
+import type { AdminCollection, PropertyPath } from "@rebasepro/admin-types";
 
 /**
  * Configuration for Kanban board view mode.
@@ -28,6 +28,21 @@ export interface KanbanConfig<M extends Record<string, unknown> = Record<string,
      * Must reference a string property with `enum` values defined.
      * Entities will be grouped into columns based on this property's value.
      * The column order is determined by the order of `enum` values in the property.
+     *
+     * Left permissive on purpose, unlike the *optional* key fields on the admin
+     * block (`titleProperty`, `sort`, `propertiesOrder`, …), which are checked
+     * against `M`.
+     *
+     * This one is **required**, and that is the whole difference: a required
+     * generic-dependent property puts `Extract<keyof M, string>` in an invariant
+     * position, so `AdminCollection<M>` stops being assignable to
+     * `AdminCollection`. The admin package passes collections between those two
+     * forms in roughly fifteen places — `CollectionBoardViewBinding`, the
+     * collection editor, the view bindings — and every one of them breaks.
+     * Tightening this is a worthwhile change, but it is a refactor of those call
+     * sites rather than a type edit. Verified by trying it: `columnProperty:
+     * Extract<keyof M, string>` alone produced ~15 errors, and doing it alongside
+     * `entityViews`/`formView`/`Actions` produced 95.
      */
     columnProperty: Extract<keyof M, string> | (string & {});
 }
@@ -182,8 +197,15 @@ export interface AdditionalFieldDelegate<M extends Record<string, unknown> = Rec
      * e.g. ["name", "surname"]
      * This is a performance optimization, if you don't define dependencies
      * it will be updated in every render.
+     *
+     * A key that is not a property of this collection can never change, so
+     * listing one is always a mistake — it silently pins the column to the
+     * "never re-render" path, which reads as a stale cell rather than a typo.
+     * The `NoInfer` wrappers keep these keys from participating in inference of
+     * `M`; the `(string & {})` arms they used to sit beside made the whole union
+     * `string`, so the wrappers had nothing to protect.
      */
-    dependencies?: NoInfer<Extract<keyof M, string>> | NoInfer<Extract<keyof M, string>>[] | (string & {}) | (string & {})[];
+    dependencies?: NoInfer<PropertyPath<M>> | NoInfer<PropertyPath<M>>[];
 
     /**
      * Use this prop to define the value of the column as a string or number.

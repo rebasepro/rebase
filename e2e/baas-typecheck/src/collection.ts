@@ -68,6 +68,16 @@ const properties = {
 
 export type Post = InferEntityType<typeof properties>;
 
+const authors: PostgresCollectionConfig = {
+    name: "Authors",
+    slug: "authors",
+    table: "authors",
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        name: { name: "Name", type: "string" }
+    }
+};
+
 const posts: PostgresCollectionConfig<Post> = {
     slug: "posts",
     name: "Posts",
@@ -81,7 +91,11 @@ const posts: PostgresCollectionConfig<Post> = {
         {
             kind: "belongsTo",
             relationName: "author",
-            target: () => "authors",
+            // A `target` thunk returns the collection, not its slug. It used to
+            // be typed to allow either, but the resolver reads `.slug` off the
+            // result and throws on anything without one — so a slug-returning
+            // thunk never worked at runtime, it just typechecked.
+            target: () => authors,
             localKey: "author_id",
             onDelete: "cascade"
         }

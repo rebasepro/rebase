@@ -1,0 +1,469 @@
+---
+/**
+ * Client projects carousel.
+ *
+ * Peek-style track: each card is 2/3 of the content width, so the next one is
+ * always partially visible. Native scroll-snap does the scrolling (touch swipe,
+ * trackpad and momentum come for free); the script only wires the arrow pill,
+ * pointer-drag on desktop, keyboard, and the counter.
+ */
+const { t } = Astro.props;
+
+const cases = [
+    {
+        id: "dadaki",
+        key: "case0",
+        href: "https://dadaki.com",
+        host: "dadaki.com",
+        glow: "from-violet-500/25 via-primary/15 to-transparent"
+    },
+    {
+        id: "medicalmotion",
+        key: "case2",
+        href: "https://medicalmotion.com",
+        host: "app.medicalmotion.com",
+        logo: "/img/logos/medicalmotion_white.svg",
+        glow: "from-rose-500/25 via-primary/15 to-transparent"
+    },
+    {
+        id: "sustentalent",
+        key: "case",
+        href: "https://sustentalent.com",
+        host: "talent.sustentalent.com",
+        logo: "/img/logos/sustentalent_white.svg",
+        glow: "from-emerald-500/25 via-primary/15 to-transparent"
+    }
+];
+---
+
+<section id="s-case-study" class="relative z-0 py-28 sm:py-36">
+
+    <!-- Header: heading left, supporting copy right -->
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="grid gap-x-12 gap-y-6 lg:grid-cols-2 animate-on-scroll fade-in-up">
+            <div>
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <span class="font-mono text-surface-500">09</span><span
+                        class="mx-2 text-surface-600">·</span>{t("showcase.badge")}
+                </p>
+                <h2 class="mt-4 text-3xl sm:text-5xl font-bold tracking-tight text-white text-balance">
+                    {t("showcase.title.part1")} <span class="text-primary font-bold">{t("showcase.title.part2")}</span>
+                </h2>
+            </div>
+            <p class="text-lg leading-8 text-surface-400 lg:self-end lg:pb-1"
+               set:html={t("showcase.subtitle")}></p>
+        </div>
+    </div>
+
+    <div class="cs-carousel mt-14 sm:mt-16 animate-on-scroll fade-in-up delay-100"
+         role="region"
+         aria-roledescription="carousel"
+         aria-label={t("showcase.title.part1") + " " + t("showcase.title.part2")}>
+
+        <div class="cs-track" id="case-track" tabindex="0">
+            {cases.map((c, i) => (
+                <article class="cs-slide group" aria-roledescription="slide"
+                         aria-label={`${i + 1} / ${cases.length}`}>
+
+                    <!-- 16:9 media -->
+                    <div class="cs-media">
+                        <div class={`pointer-events-none absolute -inset-8 bg-gradient-to-tr ${c.glow} blur-3xl opacity-60`}></div>
+
+                        <div class="relative h-full w-full flex flex-col rounded-2xl overflow-hidden ring-1 ring-white/10 bg-surface-950/90 shadow-[0_24px_60px_-15px_rgba(0,0,0,0.7)]">
+                            <!-- browser chrome -->
+                            <div class="flex-none px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-900/60">
+                                <div class="flex gap-1.5">
+                                    <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                                    <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                                </div>
+                                <div class="ml-4 text-xs font-mono text-surface-500 truncate">{c.host}</div>
+                            </div>
+
+                            {c.id === "dadaki" && (
+                                <img src="/img/showcase/dadaki_editor.png"
+                                     alt="The Dadaki vector editor running in the browser"
+                                     class="min-h-0 flex-1 w-full object-cover object-top"
+                                     loading="lazy" width="1600" height="1000"/>
+                            )}
+
+                            {c.id === "medicalmotion" && (
+                                <div class="min-h-0 flex-1 flex bg-gradient-to-b from-surface-900/40 to-transparent">
+                                    <div class="flex-1 min-w-0 p-4 space-y-2.5">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-semibold text-white">Today's Therapy</span>
+                                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/20">3 pending</span>
+                                        </div>
+                                        <div class="rounded-lg border border-white/5 bg-surface-900/60 p-2.5 flex items-center gap-3">
+                                            <div class="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center flex-none">
+                                                <span class="text-rose-400 text-xs font-bold">N</span>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="text-xs font-medium text-white truncate">Neck Mobility Routine</div>
+                                                <div class="text-[10px] text-surface-500">10 mins · Video guide</div>
+                                            </div>
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary ring-1 ring-primary/20">Start</span>
+                                        </div>
+                                        <div class="rounded-lg border border-white/5 bg-surface-900/60 p-2.5 flex items-center gap-3">
+                                            <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-none">
+                                                <span class="text-primary text-xs font-bold">P</span>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="text-xs font-medium text-white truncate">Posture Correction</div>
+                                                <div class="text-[10px] text-surface-500">5 mins · Audio guide</div>
+                                            </div>
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-800 text-surface-400 ring-1 ring-white/10">Next</span>
+                                        </div>
+                                    </div>
+                                    <div class="w-2/5 flex-none border-l border-white/5 p-4 bg-surface-950/40 hidden sm:block">
+                                        <div class="text-[10px] uppercase tracking-[0.18em] text-surface-500">Adherence</div>
+                                        <div class="mt-1 text-2xl font-semibold text-white tabular-nums">87<span class="text-surface-500 text-base">%</span></div>
+                                        <div class="mt-3 flex items-end gap-1 h-10">
+                                            <div class="flex-1 rounded-sm bg-primary/25" style="height:45%"></div>
+                                            <div class="flex-1 rounded-sm bg-primary/35" style="height:65%"></div>
+                                            <div class="flex-1 rounded-sm bg-primary/25" style="height:40%"></div>
+                                            <div class="flex-1 rounded-sm bg-primary/55" style="height:85%"></div>
+                                            <div class="flex-1 rounded-sm bg-primary/40" style="height:70%"></div>
+                                            <div class="flex-1 rounded-sm bg-primary" style="height:100%"></div>
+                                        </div>
+                                        <div class="mt-2 text-[10px] text-surface-500">Last 6 weeks</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {c.id === "sustentalent" && (
+                                <div class="min-h-0 flex-1 flex flex-col bg-gradient-to-b from-surface-900/40 to-transparent">
+                                    <div class="flex-none px-4 py-3 flex items-center justify-between">
+                                        <span class="text-sm font-semibold text-white">Companies</span>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">12 new</span>
+                                    </div>
+                                    <div class="flex-none px-4 py-2 flex items-center gap-4 text-[10px] font-medium text-surface-500 border-y border-white/5 bg-surface-950/40">
+                                        <span class="w-28">Company</span>
+                                        <span class="flex-1">Status</span>
+                                        <span class="w-12 text-right">Jobs</span>
+                                    </div>
+                                    <div class="min-h-0 flex-1 divide-y divide-white/5">
+                                        <div class="px-4 py-2.5 flex items-center gap-4">
+                                            <span class="w-28 text-xs text-white truncate">EcoVentures</span>
+                                            <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
+                                            <span class="w-12 text-right text-xs text-surface-400 tabular-nums">24</span>
+                                        </div>
+                                        <div class="px-4 py-2.5 flex items-center gap-4">
+                                            <span class="w-28 text-xs text-white truncate">GreenTech AG</span>
+                                            <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Pending</span></span>
+                                            <span class="w-12 text-right text-xs text-surface-400 tabular-nums">8</span>
+                                        </div>
+                                        <div class="px-4 py-2.5 flex items-center gap-4">
+                                            <span class="w-28 text-xs text-white truncate">SolarWind EU</span>
+                                            <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
+                                            <span class="w-12 text-right text-xs text-surface-400 tabular-nums">15</span>
+                                        </div>
+                                        <div class="px-4 py-2.5 flex items-center gap-4">
+                                            <span class="w-28 text-xs text-white truncate">Hydro Nordic</span>
+                                            <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
+                                            <span class="w-12 text-right text-xs text-surface-400 tabular-nums">6</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <!-- Text column, deliberately narrower than the media -->
+                    <div class="mt-7 max-w-xl">
+                        <p class="text-xs font-medium tracking-[0.14em] uppercase text-surface-500">
+                            {t(`showcase.${c.key}.badge`)}
+                        </p>
+
+                        <h3 class="mt-3 flex items-center gap-3 min-h-9">
+                            {c.logo ? (
+                                <img src={c.logo} alt={t(`showcase.${c.key}.title`)}
+                                     class="h-7 sm:h-8 w-auto" loading="lazy"/>
+                            ) : (
+                                <span class="text-2xl font-semibold text-white tracking-tight">
+                                    {t(`showcase.${c.key}.title`)}
+                                </span>
+                            )}
+                        </h3>
+
+                        <p class="mt-4 text-base leading-relaxed text-surface-400">
+                            {t(`showcase.${c.key}.desc`)}
+                        </p>
+
+                        <a href={c.href} target="_blank" rel="noopener noreferrer"
+                           class="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-white/80 hover:text-primary transition-colors">
+                            {c.host.replace(/^app\.|^talent\./, "")}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round" aria-hidden="true"
+                                 class="transition-transform group-hover:translate-x-0.5">
+                                <path d="M7 7h10v10"/>
+                                <path d="M7 17 17 7"/>
+                            </svg>
+                        </a>
+                    </div>
+                </article>
+            ))}
+        </div>
+
+        <!-- Controls, aligned to the content gutter -->
+        <div class="cs-controls">
+            <div class="inline-flex items-center rounded-full border border-surface-700/70 bg-surface-900/70 p-1 backdrop-blur-sm">
+                <button id="case-prev" type="button"
+                        class="cs-arrow" aria-controls="case-track" aria-label="Previous project">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true">
+                        <path d="m15 18-6-6 6-6"/>
+                    </svg>
+                </button>
+                <button id="case-next" type="button"
+                        class="cs-arrow" aria-controls="case-track" aria-label="Next project">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         aria-hidden="true">
+                        <path d="m9 18 6-6-6-6"/>
+                    </svg>
+                </button>
+            </div>
+
+            <p class="text-sm font-mono text-surface-500 tabular-nums">
+                <span id="case-current" class="text-white">01</span>
+                <span class="mx-1 text-surface-700">/</span>
+                <span>{String(cases.length).padStart(2, "0")}</span>
+            </p>
+        </div>
+
+        <p class="sr-only" aria-live="polite" id="case-live"></p>
+    </div>
+</section>
+
+<style>
+    .cs-carousel {
+        /* Distance from the viewport edge to the content column, so the track's
+           first card lines up with every other section on the page. */
+        --cs-gutter: max(1.5rem, calc((100vw - 80rem) / 2 + 2rem));
+        --cs-gap: 1.5rem;
+        --cs-content: min(76rem, calc(100vw - var(--cs-gutter) * 2));
+        --cs-slide: min(85vw, 30rem);
+    }
+
+    @media (min-width: 768px) {
+        .cs-carousel {
+            --cs-slide: min(calc(var(--cs-content) * 0.6667 - var(--cs-gap)), 46rem);
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .cs-carousel {
+            --cs-gutter: max(2rem, calc((100vw - 80rem) / 2 + 2rem));
+            --cs-gap: 3rem;
+        }
+    }
+
+    .cs-track {
+        display: flex;
+        gap: var(--cs-gap);
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x mandatory;
+        scroll-behavior: smooth;
+        padding-inline: var(--cs-gutter);
+        scroll-padding-inline-start: var(--cs-gutter);
+        /* room for the card shadows */
+        padding-block: 1rem;
+        margin-block: -1rem;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .cs-track::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Trailing spacer so the last card can scroll all the way to the left
+       gutter. 100% resolves against the track's content box, which is exactly
+       the content column width. */
+    .cs-track::after {
+        content: "";
+        flex: 0 0 max(0px, calc(100% - var(--cs-slide) - var(--cs-gap)));
+    }
+
+    .cs-slide {
+        flex: 0 0 var(--cs-slide);
+        scroll-snap-align: start;
+    }
+
+    .cs-media {
+        position: relative;
+        aspect-ratio: 16 / 9;
+    }
+
+    .cs-controls {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 2.5rem;
+        padding-inline: var(--cs-gutter);
+    }
+
+    .cs-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.25rem;
+        border-radius: 9999px;
+        color: white;
+        transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+    }
+
+    .cs-arrow:hover:not(:disabled) {
+        background-color: var(--color-surface-800, #27272a);
+    }
+
+    .cs-arrow:disabled {
+        opacity: 0.25;
+        cursor: default;
+    }
+
+    /* While pointer-dragging, snapping and smooth scrolling would fight the drag. */
+    .cs-track.is-dragging {
+        scroll-snap-type: none;
+        scroll-behavior: auto;
+        cursor: grabbing;
+        user-select: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .cs-track {
+            scroll-behavior: auto;
+        }
+    }
+</style>
+
+<script>
+    const setupCaseCarousel = () => {
+        const track = document.getElementById("case-track");
+        const prevBtn = document.getElementById("case-prev") as HTMLButtonElement | null;
+        const nextBtn = document.getElementById("case-next") as HTMLButtonElement | null;
+        const current = document.getElementById("case-current");
+        const live = document.getElementById("case-live");
+
+        if (!track || !prevBtn || !nextBtn || !current || !live) return;
+
+        const slides = Array.from(track.querySelectorAll<HTMLElement>(".cs-slide"));
+        if (slides.length === 0) return;
+
+        const origin = () => slides[0].offsetLeft;
+        const offsetOf = (i: number) => slides[i].offsetLeft - origin();
+
+        const nearestIndex = () => {
+            const x = track.scrollLeft;
+            let best = 0;
+            let bestDist = Infinity;
+            slides.forEach((_, i) => {
+                const dist = Math.abs(offsetOf(i) - x);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = i;
+                }
+            });
+            return best;
+        };
+
+        let index = 0;
+
+        const render = () => {
+            current.textContent = String(index + 1).padStart(2, "0");
+            live.textContent = `Slide ${index + 1} of ${slides.length}`;
+            prevBtn.disabled = index === 0;
+            nextBtn.disabled = index === slides.length - 1;
+        };
+
+        const goTo = (i: number) => {
+            const clamped = Math.max(0, Math.min(i, slides.length - 1));
+            // Reflect the target straight away — the scroll listener would only
+            // catch up once the smooth scroll is under way.
+            index = clamped;
+            render();
+            track.scrollTo({ left: offsetOf(clamped) });
+        };
+
+        prevBtn.addEventListener("click", () => goTo(nearestIndex() - 1));
+        nextBtn.addEventListener("click", () => goTo(nearestIndex() + 1));
+
+        let frame = 0;
+        track.addEventListener("scroll", () => {
+            if (frame) return;
+            frame = requestAnimationFrame(() => {
+                frame = 0;
+                index = nearestIndex();
+                render();
+            });
+        }, { passive: true });
+
+        track.addEventListener("keydown", (event) => {
+            if (event.key === "ArrowRight") {
+                event.preventDefault();
+                goTo(nearestIndex() + 1);
+            } else if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                goTo(nearestIndex() - 1);
+            }
+        });
+
+        // Pointer drag for mouse users; touch already scrolls natively.
+        let dragging = false;
+        let startX = 0;
+        let startScroll = 0;
+        let moved = 0;
+
+        track.addEventListener("pointerdown", (event) => {
+            if (event.pointerType === "touch" || event.button !== 0) return;
+            dragging = true;
+            moved = 0;
+            startX = event.clientX;
+            startScroll = track.scrollLeft;
+            track.classList.add("is-dragging");
+        });
+
+        track.addEventListener("pointermove", (event) => {
+            if (!dragging) return;
+            const dx = event.clientX - startX;
+            moved = Math.max(moved, Math.abs(dx));
+            if (moved > 4) track.setPointerCapture(event.pointerId);
+            track.scrollLeft = startScroll - dx;
+        });
+
+        const endDrag = () => {
+            if (!dragging) return;
+            dragging = false;
+            track.classList.remove("is-dragging");
+            goTo(nearestIndex());
+        };
+
+        track.addEventListener("pointerup", endDrag);
+        track.addEventListener("pointercancel", endDrag);
+
+        // A drag that ends on a link must not navigate.
+        track.addEventListener("click", (event) => {
+            if (moved > 4) {
+                event.preventDefault();
+                event.stopPropagation();
+                moved = 0;
+            }
+        }, true);
+
+        // Card widths are viewport-derived, so offsets change on resize.
+        window.addEventListener("resize", () => {
+            goTo(index);
+            render();
+        });
+
+        render();
+    };
+
+    setupCaseCarousel();
+    document.addEventListener("astro:after-swap", setupCaseCarousel);
+</script>

@@ -1,7 +1,9 @@
 import {
     ADMIN_COLLECTION_KEYS,
+    defineCollection,
     resolveAdminCollection,
     toAdminCollectionConfig,
+    type AdditionalFieldKey,
     type AdminCollection
 } from "../src/admin_collection";
 // There is no separate admin authoring type: `augment.ts` declares `admin` onto
@@ -139,5 +141,122 @@ describe("toAdminCollectionConfig", () => {
         const authoring = toAdminCollectionConfig(flat) as unknown as Record<string, unknown>;
         expect(authoring.strictWrites).toBe(true);
         expect(authoring.admin).toEqual({ icon: "FileText" });
+    });
+});
+
+/**
+ * The admin block's key-shaped fields must be checked against the collection's
+ * own properties.
+ *
+ * This is a *type* test — the assertions are the `@ts-expect-error` comments,
+ * which `tsconfig.tests.json` verifies; the runtime body only exists to give
+ * jest something to run. It is here because this guarantee was silently absent
+ * for the entire life of the feature and nothing noticed: `augment.ts` declared
+ * `admin?: AdminCollectionOptions` with no type arguments, so `M` fell back to
+ * `Record<string, unknown>`, `Extract<keyof M, string>` widened to `string`, and
+ * every field below accepted any string. `defineCollection` computed the
+ * inference and it was dropped one line short of the field that needed it.
+ *
+ * Delete an argument from that declaration and the `@ts-expect-error`s below go
+ * unused, which is itself an error — so the seam cannot reopen quietly.
+ */
+describe("admin key fields are checked against the collection's properties", () => {
+    const properties = {
+        title: { name: "Title", type: "string" },
+        score: { name: "Score", type: "number" },
+        profile: { name: "Profile", type: "map", properties: {} }
+    } as const;
+
+    const base = { name: "Posts", slug: "posts", table: "posts", properties } as const;
+
+    it("accepts every legitimate form", () => {
+        const good = defineCollection({
+            ...base,
+            admin: {
+                titleProperty: "title",
+                sort: ["score", "desc"],
+                propertiesOrder: [
+                    "title",
+                    "profile.displayName",              // dotted path into a map
+                    "subcollection:comments",           // child-collection column
+                    "computed" as AdditionalFieldKey    // additionalFields[].key
+                ],
+                listProperties: ["title", "score"]
+            }
+        });
+        expect(good.admin?.titleProperty).toBe("title");
+    });
+
+    // One bad key per call, deliberately. With several in one object literal,
+    // overload resolution reports a single TS2769 against the *call* and the
+    // per-property directives below it all read as unused — so the assertions
+    // would pass for the wrong reason.
+    it("rejects a misspelled titleProperty", () => {
+        // @ts-expect-error — "titel" is not a property of this collection
+        defineCollection({ ...base, admin: { titleProperty: "titel" } });
+    });
+
+    it("rejects a misspelled sort key", () => {
+        // @ts-expect-error — "scoer" is not a property of this collection
+        defineCollection({ ...base, admin: { sort: ["scoer", "desc"] } });
+    });
+
+    it("rejects a propertiesOrder entry that is not a property, path, or cast", () => {
+        // @ts-expect-error — "nope" is neither a property, a dotted path, a
+        // subcollection id, nor cast as an AdditionalFieldKey
+        defineCollection({ ...base, admin: { propertiesOrder: ["title", "nope"] } });
+    });
+
+    it("rejects a misspelled listProperties entry", () => {
+        // @ts-expect-error — "titel" is not a property of this collection
+        defineCollection({ ...base, admin: { listProperties: ["titel"] } });
+    });
+
+    it("rejects a misspelled orderProperty", () => {
+        // @ts-expect-error — the reorder handler *writes* to this property
+        defineCollection({ ...base, admin: { orderProperty: "oder" } });
+    });
+
+    it("rejects a misspelled filter key", () => {
+        // @ts-expect-error — "titl" is not a property of this collection
+        defineCollection({ ...base, admin: { fixedFilter: { titl: ["==", "x"] } } });
+    });
+
+    it("rejects a misspelled defaultFilter key", () => {
+        // @ts-expect-error — "scor" is not a property of this collection
+        defineCollection({ ...base, admin: { defaultFilter: { scor: [">", 1] } } });
+    });
+
+    it("rejects a misspelled filterPreset key", () => {
+        defineCollection({
+            ...base,
+            admin: {
+                filterPresets: [{
+                    label: "Bad",
+                    // @ts-expect-error — "stauts" is not a property of this collection
+                    filterValues: { stauts: ["==", "published"] }
+                }]
+            }
+        });
+    });
+
+    it("accepts a dotted filter path into a map property", () => {
+        const ok = defineCollection({
+            ...base,
+            admin: { fixedFilter: { "profile.city": ["==", "Berlin"] } }
+        });
+        expect(ok.admin?.fixedFilter).toEqual({ "profile.city": ["==", "Berlin"] });
+    });
+
+    // `columnProperty` is deliberately NOT checked — it is a required field, so a
+    // generic-dependent type breaks `AdminCollection<M>` -> `AdminCollection`
+    // assignability across ~15 call sites in the admin package. Documented as
+    // remaining work rather than left looking like an oversight.
+    it("does not yet check kanban columnProperty", () => {
+        const loose = defineCollection({
+            ...base,
+            admin: { kanban: { columnProperty: "not_a_property" } }
+        });
+        expect(loose.admin?.kanban?.columnProperty).toBe("not_a_property");
     });
 });

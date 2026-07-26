@@ -26,6 +26,11 @@ value };
 }
 
 export class QueryBuilder<M extends Record<string, unknown> = Record<string, unknown>> implements QueryBuilderInterface<M> {
+    // Keyed by plain `string` on purpose: it is written in place by the
+    // methods below, whose own parameters are typed against `M`, and a
+    // `Partial<Record<FieldPath<M>, …>>` is read-only under a generic `M`
+    // (TS2862). The typing users see is on the methods; this is the buffer
+    // behind them, cast once at each handoff.
     private params: FindParams = { where: {} };
 
     constructor(private collection: CollectionAccessor<M>) {}
@@ -125,7 +130,7 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
      * Execute the find query and return the results.
      */
     async find(): Promise<FindResponse<M>> {
-        return this.collection.find(this.params) as Promise<FindResponse<M>>;
+        return this.collection.find(this.params as FindParams<M>) as Promise<FindResponse<M>>;
     }
 
     /**
@@ -135,6 +140,6 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
         if (!this.collection.listen) {
             throw new Error("Listen is only available when RebaseClient is configured with a websocketUrl.");
         }
-        return this.collection.listen(this.params, onUpdate, onError);
+        return this.collection.listen(this.params as FindParams<M>, onUpdate, onError);
     }
 }

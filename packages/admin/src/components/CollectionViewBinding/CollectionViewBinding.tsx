@@ -670,7 +670,12 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             if (localPropertiesOrder && localPropertiesOrder !== resolvedCollection.propertiesOrder) {
                 return {
                     ...resolvedCollection,
-                    propertiesOrder: localPropertiesOrder
+                    // Runtime column order, not authored config: these ids come
+                    // from the user dragging columns and include additional-field
+                    // and `subcollection:` ids minted below. `propertiesOrder` is
+                    // typed against the collection's properties for *authoring*,
+                    // so widening back to that type is the intent here.
+                    propertiesOrder: localPropertiesOrder as typeof resolvedCollection.propertiesOrder
                 };
             }
             return resolvedCollection;

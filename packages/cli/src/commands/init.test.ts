@@ -214,7 +214,12 @@ describe("template collections", () => {
         expect(basenames).toContain("users");
     });
 
-    it("each blog collection file exports a valid CollectionConfig shape", () => {
+    // The template is the first Rebase code anyone reads, so it has to model the
+    // idiom we actually recommend. A bare `const x: CollectionConfig = {…}`
+    // annotation typechecks but infers nothing, which costs completion on
+    // `admin.titleProperty` / `sort` / `propertiesOrder` — the whole reason
+    // `defineCollection` exists.
+    it("each blog collection is declared with defineCollection", () => {
         const collectionsDir = path.join(TEMPLATE_DIR, "config", "collections");
         const files = fs.readdirSync(collectionsDir).filter(f => f.endsWith(".ts") && f !== "index.ts");
 
@@ -222,7 +227,11 @@ describe("template collections", () => {
             const content = fs.readFileSync(path.join(collectionsDir, file), "utf-8");
             expect(content).toContain("name:");
             expect(content).toContain("properties:");
-            expect(content).toContain("CollectionConfig");
+            expect(content).toContain("defineCollection(");
+            expect(content).toContain("@rebasepro/admin-types");
+            // Removed in 0.11 — a template must never reintroduce them.
+            expect(content).not.toContain("buildCollection");
+            expect(content).not.toContain("buildProperty");
         }
     });
 
@@ -252,7 +261,10 @@ describe("template collections", () => {
         const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
         const content = fs.readFileSync(postsPath, "utf-8");
         expect(content).toContain("tagsCollection");
-        expect(content).toContain("\"many\"");
+        // The kind, not the old `cardinality: "many"` string it replaced —
+        // which `"many"` also matched inside `manyToMany`, so this assertion
+        // would have kept passing on a half-migrated template.
+        expect(content).toContain('kind: "manyToMany"');
     });
 });
 

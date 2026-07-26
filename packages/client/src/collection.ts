@@ -63,7 +63,7 @@ export interface CollectionClient<
     I = Partial<M>,
     U = Partial<M>
 > extends SDKCollectionClient<M, I, U> {
-    count(params?: FindParams): Promise<number>;
+    count(params?: FindParams<M>): Promise<number>;
 
     /**
      * Subscribe to a query's results.
@@ -81,7 +81,7 @@ export interface CollectionClient<
      * @returns An unsubscribe function.
      */
     observe(
-        params: FindParams | undefined,
+        params: FindParams<M> | undefined,
         onResult: (result: LiveResult<M>) => void,
         onError?: (error: Error) => void,
         options?: ObserveOptions
@@ -100,7 +100,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
     const basePath = `/data/${slug}`;
 
     const client: CollectionClient<M> = {
-        async find(params?: FindParams): Promise<FindResult<M>> {
+        async find(params?: FindParams<M>): Promise<FindResult<M>> {
             const qs = buildQueryString(params);
             const raw = await transport.request<{
                 data: Record<string, unknown>[];
@@ -167,8 +167,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             });
         },
 
-        async count(params?: FindParams): Promise<number> {
-            const countParams: FindParams = {
+        async count(params?: FindParams<M>): Promise<number> {
+            const countParams: FindParams<M> = {
                 ...params,
                 limit: undefined,
                 offset: undefined
@@ -182,7 +182,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         // to read from, so this is a fetch plus — when realtime is available —
         // the live subscription that keeps it current.
         observe(
-            params: FindParams | undefined,
+            params: FindParams<M> | undefined,
             onResult: (result: LiveResult<M>) => void,
             onError?: (error: Error) => void,
             options?: ObserveOptions
@@ -253,7 +253,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
     };
 
     if (ws) {
-        client.listen = (params: FindParams | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void) => {
+        client.listen = (params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void) => {
             let active = true;
             let lastUpdateId = 0;
             const unsub = ws.listenCollection(

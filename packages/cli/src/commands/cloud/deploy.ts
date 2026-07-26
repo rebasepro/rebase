@@ -4,6 +4,12 @@
  * `deploy` triggers the control-plane `deploy` function, then tails the build
  * logs from the deployment record until it succeeds or fails. `logs` shows the
  * latest build log, or runtime logs with `--runtime`.
+ *
+ * There are three deploys behind the one verb, and which one runs depends on the
+ * flags: `--bundle` builds and uploads a managed bundle, `--source .` uploads
+ * this directory as a build context, and the bare form uploads nothing and asks
+ * the control plane to rebuild what it already holds. That last one is the
+ * dangerous one — see `planBareDeploy`.
  */
 import arg from "arg";
 import chalk from "chalk";
@@ -176,6 +182,8 @@ async function deployBundle(opts: {
     projectRef: string;
     bundleDir?: string;
     message?: string;
+    /** Compile without type checking, exactly as `rebase build` does. */
+    skipTypeCheck?: boolean;
 }): Promise<void> {
     const { client, url, projectId, projectRef } = opts;
     const projectRoot = requireProjectRoot();
@@ -200,6 +208,7 @@ async function deployBundle(opts: {
             appName: backend!.name,
             app: backend!.app,
             runtimeRange: loaded.manifest.runtime,
+            skipTypeCheck: opts.skipTypeCheck,
             log: (m: string) => console.log(chalk.gray(m))
         });
         bundleDir = result.outDir;
@@ -294,6 +303,171 @@ async function deployBundle(opts: {
     }
 }
 
+/* ─── what a deploy with nothing attached is actually going to build ─────────
+ *
+ * `rebase cloud deploy` with neither `--source` nor `--bundle` uploads nothing.
+ * It asks the control plane to rebuild what it already holds — a git checkout,
+ * or the newest source archive some earlier `--source` deploy left in object
+ * storage. Both are legitimate; neither is this working directory, and the
+ * command said nothing about which one it meant, so a deploy that shipped
+ * month-old code was indistinguishable from one that shipped today's.
+ *
+ * For a project on the managed runtime it is worse than stale: a successful
+ * source build sets `runtimeMode: "custom"` server-side, so the bare form
+ * silently swaps a managed project back onto a container image. That one is a
+ * refusal rather than a note — `--bundle` is what was meant, and `--force`
+ * ejects on purpose.
+ */
+
+/** A project row, reduced to what says how it deploys (camel or snake columns). */
+export interface DeployProjectRow {
+    runtimeMode?: string;
+    runtime_mode?: string;
+    gitRepoUrl?: string;
+    git_repo_url?: string;
+    gitBranch?: string;
+    git_branch?: string;
+}
+
+/** A deployment row, reduced to what says what it was built from. */
+export interface DeploySourceRow {
+    id?: string | number;
+    status?: string;
+    createdAt?: string | Date;
+    created_at?: string | Date;
+    sourceRef?: string;
+    source_ref?: string;
+    bundleId?: string;
+    bundle_id?: string;
+}
+
+export interface BareDeployPlan {
+    /**
+     * Whether the project runs the platform runtime — in which case any source
+     * build here ejects it back onto a container image.
+     */
+    managed: boolean;
+    /**
+     * `git` — the control plane will clone the configured repository.
+     * `snapshot` — it will rebuild the newest uploaded source archive.
+     * `none` — it holds neither, and will refuse.
+     */
+    source: "git" | "snapshot" | "none";
+    /** Lines describing the build, printed before it is triggered. */
+    lines: string[];
+}
+
+function pick(row: Record<string, unknown> | undefined, ...keys: string[]): string | undefined {
+    for (const key of keys) {
+        const raw = row?.[key];
+        if (typeof raw === "string" && raw.trim() !== "") return raw.trim();
+    }
+    return undefined;
+}
+
+/** Rough age of a timestamp, for "…uploaded 6d ago". Undefined if unreadable. */
+export function timeAgo(value: string | Date | undefined, now: Date): string | undefined {
+    if (value === undefined) return undefined;
+    const then = value instanceof Date ? value.getTime() : new Date(value).getTime();
+    if (Number.isNaN(then)) return undefined;
+    const ms = now.getTime() - then;
+    // A clock skewed into the future is not an age; saying nothing beats a lie.
+    if (ms < 0) return undefined;
+    const minutes = Math.floor(ms / 60_000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+}
+
+/**
+ * Whether this project runs on the managed runtime.
+ *
+ * `runtimeMode` on the project row is the authority — the control plane writes
+ * it. The bundle-id fallback covers a control plane that does not return the
+ * field: a successful deploy that served a bundle only happens on the managed
+ * path.
+ */
+export function isManagedProject(
+    project: DeployProjectRow | undefined,
+    latest: DeploySourceRow | undefined
+): boolean {
+    if (pick(project as Record<string, unknown> | undefined, "runtimeMode", "runtime_mode") === "managed") return true;
+    return latest?.status === "success"
+        && pick(latest as Record<string, unknown> | undefined, "bundleId", "bundle_id") !== undefined;
+}
+
+/** What a `deploy` with nothing attached will build, in the words to print. */
+export function planBareDeploy(
+    project: DeployProjectRow | undefined,
+    latest: DeploySourceRow | undefined,
+    now: Date
+): BareDeployPlan {
+    const projectRow = project as Record<string, unknown> | undefined;
+    const deploymentRow = latest as Record<string, unknown> | undefined;
+    const managed = isManagedProject(project, latest);
+
+    const repo = pick(projectRow, "gitRepoUrl", "git_repo_url");
+    if (repo) {
+        const branch = pick(projectRow, "gitBranch", "git_branch");
+        return { managed, source: "git", lines: [`Building from git: ${repo}${branch ? ` (${branch})` : ""}.`] };
+    }
+
+    if (pick(deploymentRow, "sourceRef", "source_ref")) {
+        const age = timeAgo((latest?.createdAt ?? latest?.created_at) as string | Date | undefined, now);
+        return {
+            managed,
+            source: "snapshot",
+            lines: [
+                `Rebuilding the stored source archive${latest?.id !== undefined ? ` from deployment ${latest.id}` : ""}` +
+                    `${age ? `, uploaded ${age}` : ""}.`,
+                "This directory is NOT uploaded — pass `--source .` to build what is on disk."
+            ]
+        };
+    }
+
+    return {
+        managed,
+        source: "none",
+        lines: [
+            "This project has no git repository configured and no stored source archive to rebuild.",
+            "Upload this directory with `--source .`, or set a repository URL in the project settings."
+        ]
+    };
+}
+
+/** The one sentence that says a source build undoes `runtimeMode: managed`. */
+function ejectWarning(projectRef: string): string {
+    return `⚠ ${projectRef} runs on the managed runtime — a source build ejects it to a custom container.`;
+}
+
+/**
+ * Read the two rows the preflight needs.
+ *
+ * Best effort by construction: a preflight that cannot read is a preflight that
+ * says nothing, never a deploy that fails. The managed refusal rides on the same
+ * read, so an unreadable project falls through to the old behaviour rather than
+ * blocking a deploy on a lookup.
+ */
+async function readDeployContext(
+    client: CloudClient,
+    projectId: string
+): Promise<{ project?: DeployProjectRow; latest?: DeploySourceRow }> {
+    try {
+        const [project, latest] = await Promise.all([
+            client.data.collection("projects").findById(projectId),
+            latestDeployment(client, projectId)
+        ]);
+        return {
+            project: project as unknown as DeployProjectRow | undefined,
+            latest: latest as unknown as DeploySourceRow | undefined
+        };
+    } catch {
+        return {};
+    }
+}
+
 export async function deployCommand(rawArgs: string[], projectRef: string): Promise<void> {
     const args = arg(
         { "--no-follow": Boolean,
@@ -301,6 +475,13 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
 "--message": String,
 "--bundle": Boolean,
 "--bundle-dir": String,
+/* Same flag `rebase build` has, for the same reason. Without it here, the
+   only way to deploy a bundle without type checking was to run the build
+   by hand and then point `--bundle-dir` at the result. */
+"--skip-type-check": Boolean,
+/* Deploy a source build even for a project that runs on the managed
+   runtime — an eject, done deliberately. See the refusal below. */
+"--force": Boolean,
 "-m": "--message" },
         { argv: rawArgs.slice(2),
 permissive: true }
@@ -322,9 +503,41 @@ permissive: true }
             projectId,
             projectRef,
             bundleDir: args["--bundle-dir"],
-            message: args["--message"]
+            message: args["--message"],
+            skipTypeCheck: args["--skip-type-check"] === true
         });
         return;
+    }
+
+    // Everything below builds a container image from source. Say what that
+    // source is before anything is uploaded or triggered, and refuse the one
+    // case where the command would quietly undo the project's runtime.
+    const { project, latest } = await readDeployContext(client, projectId);
+    const plan = planBareDeploy(project, latest, new Date());
+
+    if (!args["--source"]) {
+        if (plan.managed && args["--force"] !== true) {
+            fail(
+                `${projectRef} runs on the managed runtime, and a plain \`rebase cloud deploy\` builds a ` +
+                    "container image instead — ejecting it from managed, from source the control plane " +
+                    "already holds rather than this directory.",
+                "Redeploy it with `rebase cloud deploy --bundle`. To eject on purpose, pass `--source .` " +
+                    "to build this directory, or `--force` to build what the control plane holds.",
+                "managed_project"
+            );
+        }
+        if (!isJsonMode()) {
+            console.log("");
+            if (plan.managed) console.log(chalk.yellow(`  ${ejectWarning(projectRef)}`));
+            for (const line of plan.lines) console.log(chalk.gray(`  ${line}`));
+        }
+    } else if (plan.managed && !isJsonMode()) {
+        // Explicit `--source` is a deliberate build, so it proceeds — but a
+        // successful one rewrites `runtimeMode` to `custom` server-side, and
+        // that is not something to discover from a runtime version going blank.
+        console.log("");
+        console.log(chalk.yellow(`  ${ejectWarning(projectRef)}`));
+        console.log(chalk.gray("    Use `rebase cloud deploy --bundle` to stay on managed."));
     }
 
     // Optional fly-style local source upload: `deploy --source .`

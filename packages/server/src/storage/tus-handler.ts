@@ -326,7 +326,11 @@ export class TusHandler {
             const fileName = upload.key || upload.metadata.filename || upload.id;
             const mimeType = upload.metadata.contentType || upload.metadata.filetype || "application/octet-stream";
 
-            const file = new File([data], fileName, { type: mimeType });
+            // `new Uint8Array(buffer)` rather than the Buffer directly: a Node
+            // `Buffer` is typed `Buffer<ArrayBufferLike>`, and `ArrayBufferLike`
+            // admits `SharedArrayBuffer`, which is not a `BlobPart`. This copies
+            // into a plain ArrayBuffer, which is.
+            const file = new File([new Uint8Array(data)], fileName, { type: mimeType });
 
             await targetController.putObject({
                 file,

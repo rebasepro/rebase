@@ -28,6 +28,7 @@ import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegi
 import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server";
 import { getTableName as getCollectionTableName } from "@rebasepro/common";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
+import { probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
 import { HistoryService } from "./history/HistoryService";
@@ -631,7 +632,10 @@ table: fullCheckName });
             return { userService,
 roleService: userService,
 emailService,
-authRepository };
+authRepository,
+// Bound to the same schema `ensureAuthTablesExist` just migrated, so the
+// health endpoint reports on the tables auth actually reads.
+schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) };
         },
 
         async initializeHistory(config: HistoryConfig, driverResult: InitializedDriver): Promise<{ historyService: HistoryService } | undefined> {

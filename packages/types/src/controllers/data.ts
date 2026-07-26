@@ -1,5 +1,5 @@
 import { Entity, EntityValues } from "../types/entities";
-import { WhereFilterOp, FilterValues, OrderByTuple } from "../types/filter-operators";
+import { WhereFilterOp, FieldPath, FilterValues, OrderByTuple } from "../types/filter-operators";
 
 export type WhereValue<T> = T | T[] | null;
 
@@ -43,7 +43,7 @@ export interface FilterCondition {
  *
  * @group Data
  */
-export interface FindParams {
+export interface FindParams<M extends Record<string, unknown> = Record<string, unknown>> {
     /** Maximum number of items to return (default: 20). */
     limit?: number;
     /**
@@ -69,7 +69,7 @@ export interface FindParams {
      * { role: ["in", ["admin", "editor"]] }
      * { age: [[">=", 18], ["<", 65]] }
      */
-    where?: FilterValues<string>;
+    where?: FilterValues<FieldPath<M>>;
     /**
      * Logical grouping conditions (AND/OR). Use this for anything `where`
      * can't express — notably OR-ing conditions. AND-ed with `where` and
@@ -80,8 +80,14 @@ export interface FindParams {
      * Sort order as a `[field, direction]` tuple.
      * @example orderBy: ["created_at", "desc"]
      */
-    orderBy?: OrderByTuple;
-    /** Relations to include in the response */
+    orderBy?: OrderByTuple<FieldPath<M>>;
+    /**
+     * Relations to include in the response.
+     *
+     * Deliberately `string[]` and not checked against `M`: a relation name
+     * comes from the collection's `relations`, not from its columns, so nothing
+     * in a generated row type can validate one.
+     */
     include?: string[];
     /**
      * Full-text search string. Matched (OR-ed) across the collection's
@@ -146,7 +152,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     /**
      * Find multiple records with optional filtering, pagination, and sorting.
      */
-    find(params?: FindParams): Promise<FindResponse<M>>;
+    find(params?: FindParams<M>): Promise<FindResponse<M>>;
 
     /**
      * Find a single record by its ID.
@@ -184,7 +190,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
      * Subscribe to a collection for real-time updates.
      * Optional method, may not be supported by all implementations (like stateless HTTP clients).
      */
-    listen?(params: FindParams | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void): () => void;
+    listen?(params: FindParams<M> | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void): () => void;
 
     /**
      * Subscribe to a single record for real-time updates.
@@ -195,7 +201,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     /**
      * Count the number of records matching the given filter.
      */
-    count?(params?: FindParams): Promise<number>;
+    count?(params?: FindParams<M>): Promise<number>;
 
     // Fluent Query Builder
     where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): QueryBuilderInterface<M>;
@@ -292,7 +298,7 @@ export interface SDKCollectionClient<
     /**
      * Find multiple records with optional filtering, pagination, and sorting.
      */
-    find(params?: FindParams): Promise<FindResult<M>>;
+    find(params?: FindParams<M>): Promise<FindResult<M>>;
 
     /**
      * Find a single record by its ID.
@@ -356,7 +362,7 @@ export interface SDKCollectionClient<
     /**
      * Subscribe to a collection for real-time updates.
      */
-    listen?(params: FindParams | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
+    listen?(params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
 
     /**
      * Subscribe to a single record for real-time updates.
@@ -366,7 +372,7 @@ export interface SDKCollectionClient<
     /**
      * Count the number of records matching the given filter.
      */
-    count?(params?: FindParams): Promise<number>;
+    count?(params?: FindParams<M>): Promise<number>;
 
     // Fluent Query Builder
     where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): SDKQueryBuilderInterface<M>;

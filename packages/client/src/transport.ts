@@ -67,8 +67,13 @@ export interface RebaseClientConfig {
 
 /**
  * Re-export from `@rebasepro/types` for backward compatibility.
+ *
+ * Forwards the row type: without the parameter this alias flattened
+ * `FindParams<M>` back to its `Record<string, unknown>` default, and `where` /
+ * `orderBy` went back to accepting any column name — the alias, not the
+ * definition, was where the typing was lost.
  */
-export type FindParams = TypesFindParams;
+export type FindParams<M extends Record<string, unknown> = Record<string, unknown>> = TypesFindParams<M>;
 export type FindResponse<T> = TypesFindResponse<T extends Record<string, unknown> ? T : Record<string, unknown>>;
 
 export function buildQueryString(params?: FindParams): string {

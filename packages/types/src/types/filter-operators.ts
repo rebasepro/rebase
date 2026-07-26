@@ -107,6 +107,27 @@ export type FilterValues<Key extends string> =
     Partial<Record<Key, [WhereFilterOp, unknown] | [WhereFilterOp, unknown][]>>;
 
 /**
+ * The field names a query may address on a row type: every column, plus a
+ * dotted path reaching inside one.
+ *
+ * Only the **root** of a dotted path is checked. `"meta.tag"` requires a `meta`
+ * column and says nothing about what is under it, because what is under it is a
+ * `map`/jsonb value whose shape the row type does not describe — and rejecting
+ * paths we cannot verify would make jsonb columns unqueryable.
+ *
+ * When `M` is left at its default `Record<string, unknown>`, `keyof M` is
+ * `string` and a template literal over `string` is itself assignable to
+ * `string`, so this collapses to `string` and every query stays permissive.
+ * That is what keeps an untyped `createRebaseClient()` behaving exactly as it
+ * did before the row type was threaded through.
+ *
+ * @group Models
+ */
+export type FieldPath<M extends Record<string, unknown> = Record<string, unknown>> =
+    | Extract<keyof M, string>
+    | `${Extract<keyof M, string>}.${string}`;
+
+/**
  * Relaxed filter type that also accepts pre-serialized PostgREST strings.
  * **Internal only** — used at the wire-format boundary
  * (`serializeFilter` / `deserializeFilter` in `@rebasepro/common`).

@@ -1622,7 +1622,14 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     logger.info("Rebase Backend Initialized");
 
     // ── Deep Health Check ─────────────────────────────────────────────────
-    const healthCheck = createHealthCheck(defaultDriver);
+    // The auth probe is only available when a driver bootstrapped auth — an
+    // AuthAdapter or a deployment without auth leaves it undefined, and the
+    // health check falls back to the database probe alone.
+    const authSchemaCheck = authConfigResult?.schemaHealthCheck;
+    const healthCheck = createHealthCheck(
+        defaultDriver,
+        authSchemaCheck ? () => authSchemaCheck.call(authConfigResult) : undefined
+    );
 
     // ── Graceful Shutdown ─────────────────────────────────────────────────
     const shutdown = createShutdown({

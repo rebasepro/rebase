@@ -850,4 +850,28 @@ export interface BootstrappedAuth {
     emailService?: unknown;
     /** Combined Auth Repository for unified token and user management. */
     authRepository?: unknown;
+    /**
+     * Whether the auth schema in the database is one this runtime can serve.
+     *
+     * Folded into `healthCheck()` so a schema mismatch shows up as a degraded
+     * health response. Without it, a server whose auth is entirely broken still
+     * reports healthy — the database connection it probes is fine, and the
+     * mismatch is only discovered one failed login at a time.
+     */
+    schemaHealthCheck?(): Promise<AuthSchemaHealth>;
+}
+
+/**
+ * Result of {@link BootstrappedAuth.schemaHealthCheck}.
+ * @group Lifecycle
+ */
+export interface AuthSchemaHealth {
+    /** False when this runtime cannot be trusted to serve auth against this database. */
+    healthy: boolean;
+    /** Human-readable descriptions of each mismatch found. Empty when healthy. */
+    problems: string[];
+    /** Auth schema version recorded in the database, when it records one. */
+    databaseVersion?: number | null;
+    /** Auth schema version this runtime expects. */
+    runtimeVersion?: number;
 }

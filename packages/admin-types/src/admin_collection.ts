@@ -48,6 +48,54 @@ import type { ExportConfig } from "./types/export_import";
 import type { CollectionComponentOverrideMap } from "./types/component_overrides";
 
 /**
+ * A key naming one of `M`'s fields, or a dotted path into a `map` field.
+ *
+ * Both forms are resolved with `getValueInPath`, so `"profile.displayName"` is
+ * as valid as `"title"`. Only the *root* is checked — the path below it is a
+ * nested `Properties` object this type has no view of — which is enough to
+ * reject the mistake that actually happens: a misspelled or removed field.
+ *
+ * When `M` is the default `Record<string, unknown>` — the plain
+ * `const x: PostgresCollectionConfig = { … }` annotation, which infers nothing —
+ * `Extract<keyof M, string>` is `string` and this accepts anything, exactly as
+ * before. `defineCollection` is what supplies a real `M` and turns the check on.
+ */
+export type PropertyPath<M> =
+    | Extract<keyof M, string>
+    | `${Extract<keyof M, string>}.${string}`;
+
+/**
+ * A key naming a *column* in the list view: a property path, a child-collection
+ * column, or the `key` of one of this collection's `additionalFields`.
+ *
+ * `AdditionalFieldDelegate.key` is a plain `string`, and the block is not
+ * generic over its own `additionalFields`, so there is no type-level channel
+ * carrying those keys here. Accepting any string to cover them is what made this
+ * field unchecked in the first place; instead the two provable arms are closed
+ * and {@link AdditionalFieldKey} is the explicit, castable escape.
+ */
+export type ColumnKey<M> =
+    | PropertyPath<M>
+    | `subcollection:${string}`
+    | AdditionalFieldKey;
+
+/**
+ * Opt-out for a `propertiesOrder` / `listProperties` entry that names an
+ * `additionalFields` key rather than a property.
+ *
+ * The brand is **required**, which is the entire mechanism: a bare `"score"` is
+ * not assignable, so the entry has to be written `"score" as AdditionalFieldKey`
+ * — a visible admission that this key is not a property. An optional brand
+ * (`__additionalFieldKey?: never`) would be satisfied by every string and put us
+ * straight back to accepting typos.
+ *
+ * ```ts
+ * propertiesOrder: ["title", "score" as AdditionalFieldKey]
+ * ```
+ */
+export type AdditionalFieldKey = string & { readonly __additionalFieldKey: true };
+
+/**
  * Admin-panel presentation and behaviour for a collection.
  *
  * A `type` rather than an `interface`, and that is load-bearing: TypeScript gives
@@ -94,20 +142,20 @@ export type AdminCollectionOptions<
     /**
      * Default preview properties displayed when this collection is referenced to.
      */
-    previewProperties?: string[];
+    previewProperties?: Extract<keyof M, string>[];
 
     /**
      * Properties to display as columns in the list view.
      * If not specified, the list view uses a smart default (Title, Status, Date).
      */
-    listProperties?: string[];
+    listProperties?: ColumnKey<M>[];
 
     /**
      * Title property of the entity. This is the property that will be used
      * as the title in entity related views and references.
      * If not specified, the first property simple text property will be used.
      */
-    readonly titleProperty?: Extract<keyof M, string> | (string & {});
+    readonly titleProperty?: PropertyPath<M>;
 
     /**
      * When editing a entity, you can choose to open the entity in a side dialog
@@ -155,7 +203,7 @@ export type AdminCollectionOptions<
      *       with `many` cardinality) each get a column with id
      *       `subcollection:<slug>`, e.g. `subcollection:orders`.
      */
-    propertiesOrder?: (Extract<keyof M, string> | (string & {}) | string | `subcollection:${string}`)[];
+    propertiesOrder?: ColumnKey<M>[];
 
     /**
      * If enabled, content is loaded in batches. If `false` all entities in the
@@ -181,7 +229,7 @@ export type AdminCollectionOptions<
      * e.g. `fixedFilter: { age: [">", 18] }`
      * e.g. `fixedFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
      */
-    readonly fixedFilter?: FilterValues<Extract<keyof M, string> | (string & {})>;
+    readonly fixedFilter?: FilterValues<PropertyPath<M>>;
 
     /**
      * Initial filters applied to the collection this collection is related to.
@@ -189,7 +237,12 @@ export type AdminCollectionOptions<
      * e.g. `defaultFilter: { age: [">", 18] }`
      * e.g. `defaultFilter: { related_user: ["==", new EntityReference("sdc43dsw2", "users")] }`
      */
-    readonly defaultFilter?: FilterValues<Extract<keyof M, string> | (string & {})>; // setting FilterValues<M> can break defining collections by code
+    // Keyed by property *path*, not by `FilterValues<M>` — the latter types each
+    // value against that property's own type, which is what the old note here
+    // warned breaks code-defined collections (an `EntityReference` filter on a
+    // relation, a `Date` on a string column). Narrowing the key is independent
+    // of that, and a dotted path still reaches into a `map`/jsonb column.
+    readonly defaultFilter?: FilterValues<PropertyPath<M>>;
 
     /**
      * Pre-defined filter presets that appear as quick-access options in the
@@ -208,7 +261,7 @@ export type AdminCollectionOptions<
      * ]
      * ```
      */
-    readonly filterPresets?: FilterPreset<Extract<keyof M, string> | (string & {})>[];
+    readonly filterPresets?: FilterPreset<PropertyPath<M>>[];
 
     /**
      * Default sort applied to this collection.
@@ -216,7 +269,7 @@ export type AdminCollectionOptions<
      * applied in the collection.
      * e.g. `sort: ["order", "asc"]`
      */
-    readonly sort?: OrderByTuple<Extract<keyof M, string> | (string & {})>;
+    readonly sort?: OrderByTuple<PropertyPath<M>>;
 
     /**
      * You can add additional fields to the collection view by implementing
@@ -338,7 +391,7 @@ export type AdminCollectionOptions<
      * Used by Kanban view for ordering within columns
      * and can be used for general ordering purposes.
      */
-    readonly orderProperty?: Extract<keyof M, string> | (string & {});
+    readonly orderProperty?: Extract<keyof M, string>;
 
     /**
      * Actions that can be performed on the entities in this collection.

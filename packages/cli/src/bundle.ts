@@ -698,6 +698,38 @@ stdio: "pipe" }
 }
 
 /**
+ * A hand-written server entrypoint that a bundle does not use.
+ *
+ * `rebase dev` runs `backend/src/index.ts` whenever a project has one, so for
+ * the whole of local development that file *is* the server and every route
+ * written in it works. A bundle has no entrypoint of its own: the runtime boots
+ * the bundle and mounts what the manifest points at — the config package,
+ * functions, crons and the schema. The file is not compiled, not shipped, and
+ * never imported.
+ *
+ * Nothing said so. A project with custom routes in its entrypoint built clean,
+ * deployed green, and answered 404 on every one of them, with the file still
+ * sitting in the repository looking exactly like the server.
+ *
+ * A project that means to keep its own entrypoint declares the app as
+ * `"type": "custom"`, which builds the repository's Dockerfile instead — which
+ * is what {@link synthesizeManifest} already infers for a manifest-less repo
+ * carrying one. The warning names that route rather than implying the file is
+ * a mistake.
+ */
+export function findUnusedServerEntry(projectRoot: string, functionsDir: string): string | undefined {
+    // A project that relocated its functions keeps the entrypoint beside them,
+    // so the second candidate is derived rather than only the default known.
+    const candidates = [
+        path.join("backend", "src", "index.ts"),
+        path.join(path.dirname(functionsDir), "src", "index.ts")
+    ];
+
+    const found = candidates.find(candidate => fs.existsSync(path.join(projectRoot, candidate)));
+    return found ? found.split(path.sep).join("/") : undefined;
+}
+
+/**
  * Compile and assemble a bundle.
  */
 export async function buildBundle(options: BuildBundleOptions): Promise<BuildBundleResult> {
@@ -733,6 +765,22 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
     // to be on disk — stale by exactly the edits just made.
     if (paths.mode === "cms" && options.skipSchema !== true) {
         await regenerateSchema(projectRoot, paths.config, options);
+    }
+
+    // Say out loud what this build is NOT going to include. See
+    // `findUnusedServerEntry` for why silence here was expensive.
+    const unusedEntry = findUnusedServerEntry(projectRoot, paths.functions);
+    if (unusedEntry) {
+        const parts = [
+            ...(paths.mode === "cms" ? [`${paths.config}/`] : []),
+            `${paths.functions}/`,
+            "the schema"
+        ];
+        const compiled = `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+        console.log(chalk.yellow(`  ⚠ ${unusedEntry} is not the bundle's entry point — it is not compiled or shipped.`));
+        console.log(chalk.dim(`      The runtime boots the bundle itself and mounts ${compiled}.`));
+        console.log(chalk.dim(`      Routes defined there will not exist once deployed: move them to ${paths.functions}/,`));
+        console.log(chalk.dim(`      or declare this app as "type": "custom" in rebase.json to keep your own entrypoint.`));
     }
 
     log(options, chalk.dim(`  compiling ${includes.length} source group(s) → ${path.relative(projectRoot, outDir)}/`));

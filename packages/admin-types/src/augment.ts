@@ -35,12 +35,31 @@ import type {
     AdminVectorOptions
 } from "./types/property_options";
 import type { AdminCollectionOptions } from "./admin_collection";
+// Named in the merged declaration's parameter list, which must match core's.
+import type { User } from "@rebasepro/types";
 
 declare module "@rebasepro/types" {
 
-    /** Presentation and behaviour for a collection in the admin panel. */
-    interface BaseCollectionConfig {
-        admin?: AdminCollectionOptions;
+    /**
+     * Presentation and behaviour for a collection in the admin panel.
+     *
+     * The type parameters are repeated here verbatim because declaration
+     * merging requires an identical parameter list — and they have to be
+     * *forwarded* to `AdminCollectionOptions`, which is the part that was
+     * missing. Written as a bare `admin?: AdminCollectionOptions`, `M` fell
+     * back to its default `Record<string, unknown>`, so `Extract<keyof M,
+     * string>` widened to `string` and every key-shaped field in the block —
+     * `titleProperty`, `sort`, `propertiesOrder`, `listProperties` — silently
+     * accepted any string. The completion `defineCollection` advertises is
+     * derived from `M`, so it never appeared: the inference was computed,
+     * carried to this seam, and dropped one line short of the field that
+     * needed it.
+     */
+    interface BaseCollectionConfig<
+        M extends Record<string, unknown> = Record<string, unknown>,
+        USER extends User = User
+    > {
+        admin?: AdminCollectionOptions<M, USER>;
     }
 
     interface BaseProperty<CustomProps = unknown> {

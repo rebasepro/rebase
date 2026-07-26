@@ -6,6 +6,7 @@ import {
     collectDeclaredDependencies,
     detectNativeDependencies,
     detectStorageAuthorize,
+    findUnusedServerEntry,
     foldStaticIntoBundle,
     normalizeEsmSpecifiers
 } from "./bundle";
@@ -240,6 +241,28 @@ describe("detectNativeDependencies", () => {
         write("node_modules/b/package.json", JSON.stringify({ name: "b", dependencies: { a: "1" } }));
 
         expect(detectNativeDependencies(scratch, { a: "^1.0.0" })).toEqual([]);
+    });
+});
+
+/**
+ * `rebase dev` runs `backend/src/index.ts` when a project has one; a bundle
+ * never does. A project with routes in that file therefore worked locally,
+ * built clean and 404'd in production, with nothing said anywhere.
+ */
+describe("detecting a server entrypoint the bundle ignores", () => {
+    it("finds the conventional entrypoint", () => {
+        write("backend/src/index.ts", "export default {};");
+        expect(findUnusedServerEntry(scratch, "backend/functions")).toBe("backend/src/index.ts");
+    });
+
+    it("finds one beside relocated functions", () => {
+        write("api/src/index.ts", "export default {};");
+        expect(findUnusedServerEntry(scratch, "api/functions")).toBe("api/src/index.ts");
+    });
+
+    it("says nothing when the project has no entrypoint of its own", () => {
+        write("backend/functions/hello.ts", "export default {};");
+        expect(findUnusedServerEntry(scratch, "backend/functions")).toBeUndefined();
     });
 });
 

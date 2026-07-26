@@ -101,7 +101,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
     getPks: () => PrimaryKeyInfo[] = () => []
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
-        async find(params?: FindParams): Promise<FindResponse<M>> {
+        async find(params?: FindParams<M>): Promise<FindResponse<M>> {
             // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
             const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
             const limit = params?.limit ?? 20;
@@ -191,7 +191,7 @@ values: {} as Record<string, unknown> }
         },
 
         count: driver.count
-            ? async (params?: FindParams): Promise<number> => {
+            ? async (params?: FindParams<M>): Promise<number> => {
                 const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
                 return driver.count!({
                     path: slug,
@@ -201,7 +201,7 @@ values: {} as Record<string, unknown> }
             : undefined,
 
         listen: driver.listenCollection
-            ? (params: FindParams | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
+            ? (params: FindParams<M> | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
                 const limit = params?.limit ?? 20;
                 const offset = params?.offset ?? 0;
                 return driver.listenCollection!<M>({
@@ -370,18 +370,18 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
     include(...relations: string[]): this { this.params.include = relations; return this; }
 
     async find(): Promise<FindResult<M>> {
-        return this.client.find(this.params);
+        return this.client.find(this.params as FindParams<M>);
     }
 
     async count(): Promise<number> {
-        return this.client.count ? this.client.count(this.params) : 0;
+        return this.client.count ? this.client.count(this.params as FindParams<M>) : 0;
     }
 
     listen(onUpdate: (data: FindResult<M>) => void, onError?: (error: Error) => void): () => void {
         if (!this.client.listen) {
             throw new Error("Listen is only available when the driver supports realtime.");
         }
-        return this.client.listen(this.params, onUpdate, onError);
+        return this.client.listen(this.params as FindParams<M>, onUpdate, onError);
     }
 }
 
@@ -394,7 +394,7 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
     snap: CollectionAccessor<M>
 ): SDKCollectionClient<M> {
     const client: SDKCollectionClient<M> = {
-        async find(params?: FindParams): Promise<FindResult<M>> {
+        async find(params?: FindParams<M>): Promise<FindResult<M>> {
             const res = await snap.find(params);
             return { data: res.data.map(entityToRow), meta: res.meta };
         },
@@ -425,9 +425,9 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
         delete(id: string | number): Promise<void> {
             return snap.delete(id);
         },
-        count: snap.count ? (params?: FindParams) => snap.count!(params) : undefined,
+        count: snap.count ? (params?: FindParams<M>) => snap.count!(params) : undefined,
         listen: snap.listen
-            ? (params: FindParams | undefined, onUpdate: (r: FindResult<M>) => void, onError?: (e: Error) => void) =>
+            ? (params: FindParams<M> | undefined, onUpdate: (r: FindResult<M>) => void, onError?: (e: Error) => void) =>
                 snap.listen!(params, (res) => onUpdate({ data: res.data.map(entityToRow), meta: res.meta }), onError)
             : undefined,
         listenById: snap.listenById
@@ -461,7 +461,7 @@ function toEntityAccessor<M extends Record<string, unknown>>(
     getPks: () => PrimaryKeyInfo[] = () => []
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
-        async find(params?: FindParams): Promise<FindResponse<M>> {
+        async find(params?: FindParams<M>): Promise<FindResponse<M>> {
             const res = await sdk.find(params);
             return { data: res.data.map((row) => rowToEntity<M>(row, slug, getPks())), meta: res.meta };
         },
@@ -480,9 +480,9 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         delete(id: string | number): Promise<void> {
             return sdk.delete(id);
         },
-        count: sdk.count ? (params?: FindParams) => sdk.count!(params) : undefined,
+        count: sdk.count ? (params?: FindParams<M>) => sdk.count!(params) : undefined,
         listen: sdk.listen
-            ? (params: FindParams | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>
+            ? (params: FindParams<M> | undefined, onUpdate: (r: FindResponse<M>) => void, onError?: (e: Error) => void) =>
                 sdk.listen!(params, (res) => onUpdate({ data: res.data.map((row) => rowToEntity<M>(row, slug, getPks())), meta: res.meta }), onError)
             : undefined,
         listenById: sdk.listenById

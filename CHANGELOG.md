@@ -4,6 +4,50 @@
 
 ### Breaking
 
+- **`buildCollection` and `buildProperty` are removed** — not deprecated, removed. Both were FireCMS-migration shims that had been superseded by `defineCollection`, and keeping a deprecated alias around in a framework that has not shipped 1.0 only buys two ways to write the same thing.
+
+  `buildCollection` was a plain identity function whose generic had to be supplied by hand, so it gave up the property inference that is the entire reason to wrap a collection literal at all. `defineCollection` uses a `const` type parameter to capture the literal, which is what puts your property keys into completion for `admin.titleProperty`, `admin.sort` and `admin.propertiesOrder`. `buildProperty` wrapped a single property in a conditional type that resolved to the type the property already had — a no-op once the surrounding collection is inferred.
+
+  ```diff
+  - import { buildCollection, buildProperty } from "@rebasepro/common";
+  + import { defineCollection } from "@rebasepro/admin-types";
+
+  - export default buildCollection({
+  + export default defineCollection({
+        name: "Posts",
+        slug: "posts",
+        table: "posts",
+  -     properties: { title: buildProperty({ name: "Title", type: "string" }) }
+  +     properties: { title: { name: "Title", type: "string" } }
+    });
+  ```
+
+  A plain `const posts: CollectionConfig = { … }` annotation still works and is still typechecked — it just infers nothing, so prefer `defineCollection` in new code. The scaffold templates and every docs example now use it.
+
+- **`where` and `orderBy` are now checked against the row type** — `FindParams` was not generic, so its `where` was `FilterValues<string>` and its `orderBy` an untyped `OrderByTuple`. Passing a generated `Database` to `createRebaseClient` typed the *rows* correctly but not the *query*: `find({ where: { nonexistent_column: ["==", 1] } })` compiled, then came back as a 400 from the API — or matched nothing at all, which is worse. `FindParams<M>` now carries the row type, and a column that does not exist is a compile error.
+
+  A dotted path (`"meta.tag"`) still works for reaching into a `map`/jsonb column; its **root** must be a real column. `include` is unchanged — relation names come from `relations`, not from the row type, so nothing in `Database` can check them.
+
+  `M` defaults to `Record<string, unknown>` all the way through, so an untyped `createRebaseClient()` behaves exactly as before. The chain that has to stay intact is `createRebaseClient<DB>` → `SDKCollectionClient<M>` → `FindParams<M>` → `FilterValues<FieldPath<M>>`; a non-generic alias anywhere along it silently flattens `M` back to the default, which is precisely how the re-export in `client/src/transport.ts` (`export type FindParams = TypesFindParams`) hid this. `e2e/baas-typecheck/src/sdk.ts` now pins it with `@ts-expect-error`, so `pnpm check:baas-types` fails if the check ever comes back off.
+
+  The fluent builder is unaffected: `.where("status", "==", "draft")` was already typed on its parameters. Its internal accumulator stays keyed by `string`, because a `Partial<Record<FieldPath<M>, …>>` is read-only under a generic `M` (TS2862) and cannot be built up in place.
+
+- **The `admin` block's key fields are now checked against the collection's properties** — `titleProperty`, `sort`, `propertiesOrder` and `listProperties` reject a name that is not one of your properties. Previously they accepted any string, so a removed or misspelled field was found by noticing a column had quietly vanished from the panel.
+
+  The cause was one line. `augment.ts` merged the block on as `admin?: AdminCollectionOptions` with **no type arguments**, so `M` fell back to its default `Record<string, unknown>`, `Extract<keyof M, string>` widened to `string`, and every key-shaped field accepted anything. `defineCollection` computed the property-key inference correctly the whole time; it was dropped at that seam, one line short of the field that needed it. The completion those fields' docs promised had therefore never worked.
+
+  Three non-property forms are still accepted: a dotted path into a `map` property (`"profile.displayName"` — the root is checked, the path below it is not), a child-collection column (`"subcollection:orders"`), and an `additionalFields` key. That last one needs an explicit cast, because `AdditionalFieldDelegate.key` is a plain `string` and nothing carries those keys into the type:
+
+  ```diff
+  + import type { AdditionalFieldKey } from "@rebasepro/admin-types";
+  -     propertiesOrder: ["title", "score"]
+  +     propertiesOrder: ["title", "score" as AdditionalFieldKey]
+  ```
+
+  Only `defineCollection` turns the check on — it is what supplies `M`. A plain `const x: PostgresCollectionConfig = { … }` annotation infers nothing, so these fields stay permissive there, exactly as before. A type-level test in `packages/admin-types/test/admin_collection.test.ts` now pins all four fields with `@ts-expect-error`, so the seam cannot reopen without a build failure.
+
+- **`CollectionConfig` reports Postgres in its type errors** — `CollectionConfig` is a union discriminated on `engine`, and Postgres collections omit `engine` because it defaults to `"postgres"`. An incomplete Postgres literal therefore matched no member, and TypeScript elaborated the failure against the last constituent — MongoDB. Leaving out `name`, the most common mistake there is, told a Postgres user of a Postgres-first framework that they were missing `engine` on a `MongoDBCollectionConfig`. Postgres is now last in the union, so the same mistake names `PostgresCollectionConfig` and only the field actually missing. No runtime or assignability change; error text only.
+
 - **Admin-panel presentation moved into an `admin` block** — a collection carried two unrelated concerns in one flat object: what the data *is* (table, schema, properties, relations, validation, security rules, callbacks) and how an admin panel should *draw* it (`icon`, `group`, `listProperties`, `kanban`, entity views, selection controllers, …). Ninety-five fields of the second kind sat beside the first, and twelve React view-model types were exported from `collections.ts` — so a backend that never renders anything still pulled the React layer into its type graph, and `@rebasepro/types` could not be a backend contract while it depended on React.
 
   `@rebasepro/types` is now the React-free BaaS contract; the presentation layer lives in a new `@rebasepro/admin-types` that depends on it, and nothing in core depends back. `pnpm check:baas-types` typechecks a full BaaS project — backend, driver, collection file, SDK reads and writes — with `react` mapped to a stub, which is the invariant that keeps it that way.
@@ -30,7 +74,57 @@
 
   The backend loads the block and never reads inside it, so a project with no admin panel can drop these fields entirely. For completion and checking inside `admin`, author with `defineCollection` from `@rebasepro/admin-types` — it captures the property literals, so `admin.titleProperty`, `admin.sort` and `admin.propertiesOrder` complete over your own property keys instead of `string`.
 
+- **A relation declares a `kind`, and carries only the fields that kind uses** — a relation was one open interface with every join field optional at once: `cardinality`, `direction`, `localKey`, `foreignKeyOnTarget`, `through`, `joinPath`, `inverseRelationName`. Nothing stopped you combining fields that cannot coexist, so the type accepted several relations that could not work — and two of them corrupted data rather than erroring. `cardinality: "many"` with a `localKey` wrote the foreign key onto the *parent* row, because a to-many has no single row to point at; a many-to-many carrying `foreignKeyOnTarget` claimed a column on the target that the junction table owns. Both compiled, and both were shipped.
+
+  `Relation` is now a closed union discriminated on `kind`, and the link moves under a `relation` field on the property:
+
+  ```diff
+   author: {
+       name: "Author",
+       type: "relation",
+  -    target: () => usersCollection,
+  -    cardinality: "one",
+  -    direction: "owning",
+  -    localKey: "author_id"
+  +    relation: {
+  +        kind: "belongsTo",
+  +        target: () => usersCollection,
+  +        localKey: "author_id"
+  +    }
+   }
+  ```
+
+  The five kinds, and where each keeps its key: **`belongsTo`** (one row, key on this table, `localKey`), **`hasOne`** / **`hasMany`** (one or many rows, key on the target, `foreignKeyOnTarget`), **`manyToMany`** (many rows through a junction, `through`), and **`via`** (reached by joining across several tables, `joinPath`). Offering a field its kind does not own is now a compile error, so the two corrupting shapes above are unrepresentable rather than merely discouraged.
+
+  `via` is the only kind that still states a `cardinality`, because a join chain cannot imply one, and it is read-only — Rebase will not guess which hop of a chain a write belongs to. `direction` is gone: which side holds the key is what the kind says. `inverseRelationName` is gone with it; the schema generator finds the counterpart by scanning the target's relations.
+
+  `scripts/codemod/relations-tagged-union.mjs` migrates a codebase — it rewrote 232 declarations across 46 files here. It refuses to guess: anything it cannot decide is marked `kind: "AMBIGUOUS"` for you to resolve, rather than being given a plausible default.
+
+  Internally this splits the authored surface from a resolved form. Every consumer now reads a `ResolvedRelation` with defaults already filled in and `writable` / `shared` decided once, instead of each site re-deriving them from optional fields — which is how the write guard and the admin had drifted into disagreeing about whether a `via` could be written through.
+
+- **A relation whose names do not exist now fails at boot instead of returning nothing** — the union settles a relation's *shape*; it cannot know whether `posts_tags` is a table, whether `author_id` is a column, or whether a `joinPath` actually connects the tables it names. Those are facts about the database. Nothing checked them until a query ran, and the failures were the quiet kind: a missing junction table logged a warning and returned no rows, so `posts/1/tags` answered `[]` — the same answer a correct relation gives for a post with no tags. The tab rendered, the tab was empty, and nothing said why.
+
+  The registry now validates every resolved relation against the schema it will run on and refuses to start if any of them cannot resolve, listing all of them at once with the columns actually available and the edit that fixes each. Fatal rather than a warning deliberately: a server that will not boot costs a minute, and a relation that quietly answers "nothing" costs however long it takes someone to notice their data is missing.
+
+  It fails open wherever it cannot see enough to be sure — a collection with no registered table, a target belonging to another backend — because blocking boot on a working project is worse than missing one bad relation. The sharpest case it catches is the junction default: `through.table` is derived from the two table names sorted and joined, so renaming a table silently re-points the relation at a name that was never created.
+
 ### Added
+
+- **`rebase-rls-check` — audit row-level security on any Postgres** — a standalone, read-only CLI that reads a database's catalog and reports what is actually exposed. It runs against any Postgres — Supabase, Neon, RDS, a self-managed server — and needs no Rebase project, which is the point: it has to be worth running for someone who will never adopt the framework.
+
+  Fourteen checks, three of them taken straight from bugs this codebase shipped and debugged: a bare column inside an `EXISTS` subquery binding to the inner table, junction tables left open while both endpoints were locked, and RLS enabled with no policies serving an empty collection for weeks.
+
+  Two constraints the design treats as non-negotiable. **False positives are worse than misses** — checks that cannot see intent are marked heuristic, rendered separately and phrased as questions, and severity is calibrated per platform (`policy-anonymous-tautology` is critical on Rebase and PostgREST but only low on Supabase, where `auth.uid()` genuinely returns NULL for anonymous callers, so flagging it there would fire on nearly every Supabase database alive). And **credentials never surface** — the connection string is redacted everywhere including the auth-failure path, and the redactor refuses to guess when an unencoded `@` or `/` makes the authority boundary ambiguous rather than printing part of a password as a host.
+
+  See [RLS Check](https://rebase.pro/docs/rls-check).
+
+- **Existing rows can be attached to a many-to-many tab** — a junction-backed relation reads as set membership on write: `PUT parent/:id/child/:childId` links a row idempotently. Previously the junction row was written only alongside an insert, so a linked tab could create new rows and never attach one that already existed. Unlike an owning foreign key this takes the row from nobody — its other parents keep it — which is why linking is safe here where reparenting would not be. The admin surfaces it as **Add existing** on a linked tab, opening the picker over the whole target collection.
+
+- **`geopoint` and `binary` are real field types in the admin panel** — both were in the property model with nothing behind them. `geopoint` was missing from the widget lookup altogether, so it resolved to no field: the column never rendered on a form, and its property dialog opened showing a name, a description and no type-specific settings — indistinguishable from a property that has none. `binary` resolved to the plain text field, which offers multiline, markdown and email (none of which mean anything for bytes) and whose editor merges `type: "string"`, so touching a binary property's widget silently changed its type.
+
+  Both now have a field binding, a widget config and a place in the property picker. Geopoint is two coordinate inputs rather than a map, because a map needs a tile provider, an API key and a network, none of which belong in a field that has to work offline; it holds a half-typed location rather than committing it, since sending the empty side through `Number("")` yields a perfectly finite `0` and would drop the point in the Gulf of Guinea. Binary shows a collapsed card with the decoded size and expands only when someone wants to edit the base64.
+
+  `vector_input` joins them in the picker. It had a binding and an editor already and was simply never listed, so a vector property rendered correctly once it existed but could only be created by writing code.
 
 - **A project is a bundle, and the runtime is the platform's** — `rebase build` now emits `dist-bundle/`: compiled collections, functions, crons and schema plus a generated `manifest.json` recording the runtime range it needs, a `schemaVersion` hash, its declared dependencies, and whether it uses native modules. `@rebasepro/server` boots it (`bootFromBundle`, bin `rebase-server`), and `docker/server.Dockerfile` publishes that as an image. The consequence is the point: **the engine can be replaced under a project without rebuilding it** — upgrading is a new image tag against the same bundle — and self-hosting becomes "run the image with your bundle" rather than "build and maintain your own container". `docker/docker-compose.selfhost.yml` is that, ready to run.
 
@@ -64,11 +158,33 @@
 
 ### Fixed
 
+- **`rebase db pull` wrote collection files that would not compile** — introspection emits collection *source code* as template strings, which put it outside every check the relations refactor relied on: the codemod rewrites real declarations and never saw these, `tsc` checks the generator rather than the code it prints, and the existing tests asserted with `toContain`, which passes happily on a field the type no longer has. So introspection went on writing `cardinality`, `direction` and a top-level `target` long after `Relation` stopped accepting any of them.
+
+  Fixed at every emission site, and the many-to-many case got simpler rather than merely renamed: with no owning and inverse side to choose between, it no longer guesses one from table-name ordering, and no longer hands the losing side a relation with no `through` and a comment asking the reader to finish it by hand. Introspection knows both junction columns already; each side now names them from its own end.
+
+- **The relation editor wrote kinds that do not exist** — the relation property form still carried its pre-union `Cardinality` (one/many) and `Direction` (owning/inverse) selects. Both had been pointed at `relation.kind` without the controls being rethought, so their options went on writing the old vocabulary: choosing "One (has-one)" set `kind: "one"`, choosing "Owning" set `kind: "owning"`. Both also rendered from `value={kind}` while comparing against `"one"`, so a `belongsTo` relation displayed as "Many (has-many)" *and* "Inverse" at once — the form disagreed with itself, disagreed with the stored value, and offered no way to pick a real kind.
+
+  It is one Kind select now, driven by a table shared with the relations tab so the two surfaces cannot describe the same thing differently, and typed so a sixth kind cannot be added to the union without failing to compile there. Three more in the same dialog: saving cast the draft straight to a `Relation`, so a junction table filled in and then abandoned by switching to "Belongs to" was persisted alongside a `localKey` — exactly the shape the union exists to forbid, smuggled past it by a cast; picking "Via" offered no way to enter a join path while Save stayed enabled, producing a relation with an empty `joinPath` that joins nothing; and the relations table declared five header cells while rendering four, so `kind` appeared under a "Cardinality" heading and "Direction" had no cell at all.
+
+  The JSON path was never affected — `validateCollectionJson` checks `kind` against the union and rejects fields a kind does not own. Only the form drifted, because nothing typechecks a select's option values against what its handler writes.
+
+- **The collection editor could not round-trip a relation** — `target` is a `() => CollectionConfig` thunk, which cannot be written to JSON, so it travels as a collection slug. Nothing rebuilt it on the way back: the deserializer had no branch for relations, so one fell through to the pass-through default and returned with `target` still a *string*, while every consumer in the codebase calls `target()`. The cast to `Property` at the end of that function erased the difference, so it compiled and shipped. Serialization is now switched on `kind` and assigned without a cast, and `fromSerializableCollectionConfigs` rebuilds the thunks against the whole set — resolving lazily, so collections may reference each other in any order.
+
+- **Generated OpenAPI documented none of a collection's subcollections** — the spec read `relationName` straight off the authored `relations` array. That name is optional and defaults to the property key or the target's slug, so every relation relying on the default was skipped, and relations declared inline on a property were never seen at all, since they are not in that array. A collection could show three subcollection tabs in the admin panel and document zero. The routes now come from the resolved relations — the same names the nested-path router matches — in a second pass after every component schema exists, which also fixes subcollections whose target appeared later in the array silently degrading to an untyped `object`. To-one relations are left out: `posts/1/author` resolves, but documenting it as a paginated list describes a response the client never gets.
+
 - **A custom `Field` or `Preview` attached as a lazy import rendered nothing** — the documented way to attach one is `admin: { Preview: () => import("./MyPreview") }`. JavaScript names an anonymous function after the property key it is assigned to, so that arrow's name is `"Preview"`, and component detection treated "zero arguments, starts with a capital letter" as proof of a component — which is true of every loader written that way. The thunk went to React as a component, React called it, got a Promise, and rendered nothing: an empty cell with no console error. Detection now leads with what the function does — a dynamic module load in the body outranks the name — and matches both `import(...)` and the `require(...)` that CommonJS transforms produce.
 
 - **`rebase dev` could print a URL served by a different process** — when the first port was busy, the port-retry helper bound the next one but reported the port it had just *failed* to bind. It passed its success handler to `server.listen(port, host, cb)`, and that form registers the handler as a one-shot `listening` listener which a failed attempt never removes; the next attempt's success then ran both, and the earliest won. So with something already on 3001, the server listened on 3002 and announced `http://localhost:3001`. Whatever was already there answered normally, out of its own database, and nothing logged a warning.
 
   Two consequences are fixed with it. The port file recorded the wrong number as well, and port *affinity* from that file used to outrank an explicitly requested port — so setting `PORT` in `.env` had no effect while a file from an earlier run existed. The file now records the bound port and the requested one, affinity applies only when the same port is requested again, and this matches the precedence the CLI already used (`--port`, then `PORT`, then affinity).
+
+- **A bundle build said nothing about ignoring `backend/src/index.ts`** — `rebase dev` runs that file whenever a project has one, so throughout local development it *is* the server and every route in it works. A bundle has no entrypoint of its own: the runtime boots the bundle and mounts what the manifest points at — the config package, functions, crons and the schema. So a project with custom routes in its entrypoint built clean, deployed green, and answered 404 on every one of them, with the file still sitting in the repository looking exactly like the server. `rebase build` and `deploy --bundle` now name the file, say it is neither compiled nor shipped, and give the two ways forward: move the routes into `backend/functions/`, or declare the app as `"type": "custom"` to keep your own entrypoint (which is already what a manifest-less repo carrying one is inferred as).
+
+- **`rebase cloud deploy` with no flags did not say what it was about to build** — the bare form uploads nothing. It asks the control plane to rebuild what it already holds: a git checkout, or the newest source archive some earlier `--source` deploy left in object storage. Both are legitimate and neither is the working directory, so a deploy shipping month-old code was indistinguishable from one shipping today's. It now prints the source first — the repository and branch, or the archive's deployment id and age, with a reminder that `--source .` is what uploads this directory — and says plainly when the control plane holds neither.
+
+  On a managed project it was worse than stale. A successful source build sets `runtimeMode: "custom"` server-side, so the bare form silently swapped a project off the platform runtime and back onto a container image. That case is now a refusal naming `--bundle` as what was meant; `--source .` and the new `--force` both eject deliberately, and an explicit `--source` deploy of a managed project warns before it does.
+
+- **`deploy --bundle` could not skip type checking** — `rebase build` has `--skip-type-check` and `buildBundle` already accepted the option; only the deploy argument spec lacked it, so iterating meant building by hand and then pointing `--bundle-dir` at the result. The flag is accepted on `deploy` now and threaded through.
 
 ### Testing
 

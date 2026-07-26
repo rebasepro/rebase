@@ -22,6 +22,11 @@ import {
  * console.log(data[0].title); // flat access
  */
 export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, unknown>> implements SDKQueryBuilderInterface<M> {
+    // The accumulator stays keyed by plain `string`: it is written through
+    // `where()` / `orderBy()` below, whose own parameters are typed against `M`,
+    // and a `Partial<Record<FieldPath<M>, …>>` is read-only under a generic `M`
+    // (TS2862) so it cannot be built up in place. The typing users see is on the
+    // methods; this field is the buffer behind them, cast once on the way out.
     private params: FindParams = { where: {} };
 
     constructor(private collection: SDKCollectionClient<M>) {}
@@ -113,7 +118,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * Execute the find query and return the results as flat rows.
      */
     async find(): Promise<FindResult<M>> {
-        return this.collection.find(this.params);
+        return this.collection.find(this.params as FindParams<M>);
     }
 
     /**
@@ -123,7 +128,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
         if (!this.collection.count) {
             throw new Error("count() is not supported by this collection client.");
         }
-        return this.collection.count(this.params);
+        return this.collection.count(this.params as FindParams<M>);
     }
 
     /**
@@ -136,6 +141,6 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
                 "and not when it was created with realtime: false."
             );
         }
-        return this.collection.listen(this.params, onUpdate, onError);
+        return this.collection.listen(this.params as FindParams<M>, onUpdate, onError);
     }
 }

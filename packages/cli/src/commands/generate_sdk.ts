@@ -252,6 +252,33 @@ function mayUseAmbientKey(target: string, cwd: string): boolean {
     }
 }
 
+/**
+ * The base URL to show in the printed usage example.
+ *
+ * `rebase dev` binds a port derived from the project path, not 3001, and writes
+ * the one it actually got to `.rebase/state.json`. Printing a hardcoded
+ * `localhost:3001` sent people to a port nothing was listening on — or, with
+ * several projects on one machine, to a different project's backend. Prefer the
+ * port this project last ran on; fall back to the literal only when the project
+ * has never been started.
+ */
+export function resolveExampleBaseUrl(cwd: string): string {
+    const projectRoot = findProjectRoot(cwd) ?? cwd;
+    try {
+        const state = JSON.parse(fs.readFileSync(path.join(projectRoot, ".rebase", "state.json"), "utf-8"));
+        if (typeof state.baseUrl === "string" && state.baseUrl) return state.baseUrl;
+        if (typeof state.port === "number") return `http://localhost:${state.port}`;
+    } catch {
+        // Never started, or the file is unreadable — fall through.
+    }
+    return "http://localhost:3001";
+}
+
+/** Whether a slug can be written as `rebase.data.<slug>` rather than a lookup. */
+export function isIdentifierLike(slug: string): boolean {
+    return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(slug);
+}
+
 /** Resolve `--from` into a base URL, following the link file when asked. */
 function resolveSchemaSource(from: string, cwd: string): string {
     if (from !== "link") {
@@ -391,15 +418,28 @@ export const GENERATED_AT = ${JSON.stringify(new Date().toISOString())};
     console.log("");
     console.log(chalk.green.bold("  ✓ SDK generated successfully!"));
     console.log("");
+    const typesImport = `./${path.relative(cwd, path.join(resolvedOutput, "database.types"))}`;
+    const exampleSlug = collections[0]?.slug || "my_collection";
+
     console.log(chalk.gray("  Usage:"));
     console.log(chalk.gray("    import { createRebaseClient } from '@rebasepro/client';"));
-    console.log(chalk.gray(`    import type { Database } from './${path.relative(cwd, path.join(resolvedOutput, "database.types"))}';`));
+    console.log(chalk.gray(`    import { collectionsDictionary, type Database } from '${typesImport}';`));
     console.log("");
     console.log(chalk.gray("    const rebase = createRebaseClient<Database>({"));
-    console.log(chalk.gray("        baseUrl: 'http://localhost:3001',"));
+    console.log(chalk.gray(`        baseUrl: '${resolveExampleBaseUrl(cwd)}',`));
+    // Without the dictionary a hyphenated slug is not resolvable from the
+    // property name alone, and the request 404s at runtime.
+    console.log(chalk.gray("        collections: collectionsDictionary,"));
     console.log(chalk.gray("        // token: 'your-jwt-token',"));
     console.log(chalk.gray("    });"));
     console.log("");
-    console.log(chalk.gray(`    const { data } = await rebase.collection('${collections[0]?.slug || "my_collection"}').find();`));
+    // `rebase.data.…` is the typed surface. `rebase.collection(slug)` exists
+    // too, but it is generic over `Record<string, unknown>` and has no link to
+    // `Database` — printing it here would advertise the one call shape that
+    // throws away the types this command just generated.
+    console.log(chalk.gray(`    const { data } = await rebase.data.collection('${exampleSlug}').find();`));
+    if (isIdentifierLike(exampleSlug)) {
+        console.log(chalk.gray(`    // …or in property style: rebase.data.${exampleSlug}.find()`));
+    }
     console.log("");
 }
