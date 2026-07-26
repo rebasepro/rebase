@@ -151,6 +151,7 @@ import { Rebase } from "@rebasepro/app";
 import { RebaseAdmin, RebaseShell } from "@rebasepro/admin";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 import { RebaseStudio } from "@rebasepro/studio";
+import React from "react";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 
@@ -571,7 +572,7 @@ import { StudioBridgeProvider } from "@rebasepro/studio";
 
 <StudioBridgeProvider value={{
     collectionRegistry: useCollectionRegistryController(),
-    sideEntityController: useSidePanel(),
+    sidePanelController: useSidePanel(),
     urlController: useUrlController(),
     navigationState: useNavigationStateController(),
     breadcrumbs: useBreadcrumbsController(),

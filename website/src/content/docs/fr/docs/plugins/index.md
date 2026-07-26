@@ -83,7 +83,7 @@ function useMyPlugin(): RebasePlugin {
     return {
         key: "my_plugin",
 
-        collectionView: {
+        slots: {
             CollectionActions: [MyToolbarAction]
         },
 
