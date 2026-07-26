@@ -159,12 +159,12 @@ const instance = await initializeRebaseBackend(config);
 instance.driver              // Default data driver
 instance.driverRegistry      // All drivers (for multi-database)
 instance.realtimeService     // Default realtime service
-instance.userService         // User management
-instance.roleService         // Role management
+instance.auth?.userService       // User management
+instance.auth?.roleService       // Role management
 instance.storageController   // Default storage
 instance.storageRegistry     // All storage backends
 instance.collectionRegistry  // Collection metadata
-instance.historyService      // Entity history
+instance.history?.historyService // Entity history
 instance.cronScheduler       // Cron job scheduler (when cronsDir is set)
 ```
 

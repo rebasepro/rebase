@@ -26,17 +26,19 @@ function DashboardView() {
     useEffect(() => {
         async function loadStats() {
             // Use the data source to fetch aggregate data
-            const orders = await context.data.collection<Record<string, unknown>>("orders").find({
-                limit: 1000
-            });
+            // `find` resolves to { data, meta } — the rows are on `data`, and they are
+            // flat, so it is `o.total` rather than `o.values.total`.
+            const { data: orders } = await context.data
+                .collection<{ total: number }>("orders")
+                .find({ limit: 1000 });
 
-            const products = await context.data.collection<Record<string, unknown>>("products").find({
-                where: { active: ["==", true] }
-            });
+            const { data: products } = await context.data
+                .collection<Record<string, unknown>>("products")
+                .find({ where: { active: ["==", true] } });
 
             setStats({
                 totalOrders: orders.length,
-                totalRevenue: orders.reduce((sum, o) => sum + (o.values.total ?? 0), 0),
+                totalRevenue: orders.reduce((sum, o) => sum + (o.total ?? 0), 0),
                 activeProducts: products.length,
                 recentOrders: orders.slice(0, 5)
             });
