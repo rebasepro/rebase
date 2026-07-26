@@ -47,7 +47,7 @@ const unsubscribe = client.data.orders.listen(
 
 ### Assinatura
 
-```typescript
+```typescript no-verify
 listen(
     params: FindParams | undefined,
     onUpdate: (response: FindResponse<M>) => void,

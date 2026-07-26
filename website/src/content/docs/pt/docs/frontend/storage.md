@@ -113,6 +113,9 @@ import type { RebaseStorageSource } from "@rebasepro/app";
         { key: "firebase", engine: "firebase", transport: "direct", source: firebaseStorageSource }
     ]}
 >
+    {/* your app */}
+    …
+</Rebase>
 ```
 
 | Propriedade | Tipo | Descrição |
@@ -134,15 +137,14 @@ import { useStorageSource } from "@rebasepro/app";
 // Returns the default storage source
 const storageSource = useStorageSource();
 
-// Upload a file
-const result = await storageSource.uploadFile({
+// Upload a file — the object is addressed by `key`
+const result = await storageSource.putObject({
     file,
-    fileName: "my-file.pdf",
-    path: "documents"
+    key: "documents/my-file.pdf"
 });
 
-// Get download URL
-const url = await storageSource.getDownloadURL(result.path);
+// Get a download URL
+const { url } = await storageSource.getSignedUrl(result.key);
 ```
 
 :::tip
