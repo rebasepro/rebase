@@ -1,0 +1,21 @@
+{
+  "//rootDir": "Deliberately unset here: the unit tests import shared fixtures from `test/`, which sits outside `src/` and would be a TS6059 under a src-only rootDir. Emit is not this config's job — `tsconfig.prod.json` pins rootDir and excludes tests for the declaration build.",
+  "compilerOptions": {
+    "ignoreDeprecations": "6.0",
+    "outDir": "dist",
+    "lib": ["esnext"],
+    "module": "ESNEXT",
+    "target": "ESNEXT",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "types": ["node"]
+  },
+  "include": ["src", "test"]
+}

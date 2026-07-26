@@ -1,0 +1,826 @@
+/**
+ * The command line: argument parsing, connection resolution, error translation
+ * and exit codes. Everything a stranger's first thirty seconds with this tool
+ * touches.
+ *
+ * Three invariants, in order of importance:
+ *
+ * 1. {@link runCli} never throws and never calls `process.exit`. `bin/rls-check.js`
+ *    assigns its return value to `process.exitCode`, so an escaping exception
+ *    would surface as a stack trace and exit code 1 — which CI would read as
+ *    "findings", not "broken".
+ *
+ * 2. Exit 1 and exit 2 are never conflated. 1 means the database has a problem;
+ *    2 means the scan did not happen. A pipeline that treats a DNS failure as a
+ *    clean bill of health is worse than no tool at all.
+ *
+ * 3. The connection string never reaches an output stream. Every string that
+ *    could have come from `pg`, Node or the user goes through `redactSecrets`
+ *    on its way out.
+ */
+
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { CHECKS, runChecks } from "./checks";
+import { introspect } from "./introspect";
+import { formatEndpoint, parseConnectionString, redactSecrets } from "./redact";
+import { exceedsThreshold, renderCheckCatalog, renderJson, renderReport } from "./report";
+import type { DbSnapshot, Finding, ScanResult, Severity } from "./types";
+import { SEVERITIES } from "./types";
+
+/** Clean, or nothing at or above `--fail-on`. */
+export const EXIT_OK = 0;
+/** Findings at or above `--fail-on`. */
+export const EXIT_FINDINGS = 1;
+/** The scan did not happen: bad arguments, bad connection, timeout. */
+export const EXIT_ERROR = 2;
+
+const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_FAIL_ON: Severity = "high";
+
+const TABLE_KINDS = new Set(["table", "partitioned_table"]);
+
+// ---------------------------------------------------------------------------
+// Programmatic API
+// ---------------------------------------------------------------------------
+
+export interface ScanOptions {
+    connectionString: string;
+    /** Restrict to these schemas. Empty or omitted means "every user schema". */
+    schemas?: string[];
+    /** Run only these check ids. */
+    only?: string[];
+    /** Skip these check ids. */
+    skip?: string[];
+    statementTimeoutMs?: number;
+    /** Injectable so callers (and tests) control the `scannedAt` stamp. */
+    now?: Date;
+}
+
+/**
+ * Connect, introspect, run the checks, and assemble a {@link ScanResult}.
+ *
+ * The one impure step in the pipeline. Everything downstream of `introspect`
+ * is a pure function of the snapshot, which is why the checks have unit tests
+ * and this has an integration test.
+ */
+export async function scan(options: ScanOptions): Promise<ScanResult> {
+    const snapshot = await introspect({
+        connectionString: options.connectionString,
+        schemas: options.schemas && options.schemas.length > 0 ? options.schemas : undefined,
+        statementTimeoutMs: options.statementTimeoutMs ?? DEFAULT_TIMEOUT_MS
+    });
+
+    const findings = runChecks(snapshot, { only: options.only, skip: options.skip });
+
+    return buildScanResult(snapshot, findings, {
+        connectionString: options.connectionString,
+        checksRun: selectCheckIds(options).length,
+        scannedAt: (options.now ?? new Date()).toISOString()
+    });
+}
+
+/**
+ * The check ids `runChecks` will actually execute for these options.
+ *
+ * Recomputed here rather than reported back by `runChecks`, because
+ * {@link ScanResult.stats} needs the count and the contract has no channel for
+ * it. Same filter, same order, so the number in the report is the number that
+ * ran — as long as `runChecks` keeps `only` as a whitelist and `skip` as a
+ * blacklist applied after it.
+ */
+export function selectCheckIds(options: { only?: string[]; skip?: string[] }): string[] {
+    const skip = new Set(options.skip ?? []);
+    const only = options.only && options.only.length > 0 ? new Set(options.only) : null;
+
+    return CHECKS.filter((check) => (only === null || only.has(check.id)) && !skip.has(check.id)).map(
+        (check) => check.id
+    );
+}
+
+function buildScanResult(
+    snapshot: DbSnapshot,
+    findings: Finding[],
+    meta: { connectionString: string; checksRun: number; scannedAt: string }
+): ScanResult {
+    const target = parseConnectionString(meta.connectionString);
+    const tables = snapshot.relations.filter((relation) => TABLE_KINDS.has(relation.kind));
+
+    return {
+        scannedAt: meta.scannedAt,
+        // Host and database only — never the user, password or full URL.
+        database: {
+            host: target?.host ?? "unknown",
+            name: target?.database && target.database.length > 0 ? target.database : "unknown"
+        },
+        serverVersion: snapshot.serverVersion,
+        platform: snapshot.platform,
+        scannerIsPrivileged: snapshot.scannerIsPrivileged,
+        stats: {
+            schemas: snapshot.schemas.length,
+            tables: tables.length,
+            policies: snapshot.policies.length,
+            tablesWithoutRls: tables.filter((relation) => !relation.rlsEnabled).length,
+            checksRun: meta.checksRun
+        },
+        findings
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Argument parsing
+// ---------------------------------------------------------------------------
+
+export interface CliOptions {
+    connectionString: string | null;
+    json: boolean;
+    schemas: string[];
+    failOn: Severity | "none";
+    skip: string[];
+    only: string[];
+    listChecks: boolean;
+    /** `null` = decide from NO_COLOR / TTY. */
+    color: boolean | null;
+    quiet: boolean;
+    timeoutMs: number;
+    help: boolean;
+    version: boolean;
+}
+
+export type ParseResult = { ok: true; options: CliOptions } | { ok: false; message: string };
+
+const FAIL_ON_VALUES = [...SEVERITIES, "none"] as const;
+
+function emptyOptions(): CliOptions {
+    return {
+        connectionString: null,
+        json: false,
+        schemas: [],
+        failOn: DEFAULT_FAIL_ON,
+        skip: [],
+        only: [],
+        listChecks: false,
+        color: null,
+        quiet: false,
+        timeoutMs: DEFAULT_TIMEOUT_MS,
+        help: false,
+        version: false
+    };
+}
+
+/** `--schema a,b --schema c` and `--schema a --schema b` mean the same thing. */
+function splitList(value: string): string[] {
+    return value
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+}
+
+export function parseArgs(argv: readonly string[]): ParseResult {
+    const options = emptyOptions();
+    let positionals = 0;
+
+    for (let index = 0; index < argv.length; index += 1) {
+        const arg = argv[index];
+
+        // Everything after `--` is positional, so a connection string that
+        // somehow starts with a dash still works.
+        if (arg === "--") {
+            for (const rest of argv.slice(index + 1)) {
+                positionals += 1;
+                // Never echo the value: the extra argument is usually a second
+                // connection string, and this message goes to a terminal.
+                if (positionals > 1) {
+                    return { ok: false, message: "Unexpected extra argument. Only one connection string is accepted." };
+                }
+                options.connectionString = rest;
+            }
+            break;
+        }
+
+        if (!arg.startsWith("-")) {
+            positionals += 1;
+            if (positionals > 1) {
+                return {
+                    ok: false,
+                    message: `Unexpected extra argument. Only one connection string is accepted; quote it if it contains a "?" or "&".`
+                };
+            }
+            options.connectionString = arg;
+            continue;
+        }
+
+        // --flag=value and --flag value are both accepted.
+        const eq = arg.indexOf("=");
+        const flag = eq === -1 ? arg : arg.slice(0, eq);
+        const inlineValue = eq === -1 ? null : arg.slice(eq + 1);
+
+        const takeValue = (): string | null => {
+            if (inlineValue !== null) return inlineValue;
+            const next = argv[index + 1];
+            if (next === undefined || (next.startsWith("-") && next.length > 1)) return null;
+            index += 1;
+
+            return next;
+        };
+
+        switch (flag) {
+            case "-h":
+            case "--help":
+                options.help = true;
+                break;
+            case "-v":
+            case "--version":
+                options.version = true;
+                break;
+            case "--json":
+                options.json = true;
+                break;
+            case "--quiet":
+            case "-q":
+                options.quiet = true;
+                break;
+            case "--list-checks":
+                options.listChecks = true;
+                break;
+            case "--no-color":
+            case "--no-colour":
+                options.color = false;
+                break;
+            case "--color":
+            case "--colour":
+                options.color = true;
+                break;
+            case "--schema": {
+                const value = takeValue();
+                if (value === null) return { ok: false, message: "--schema needs a schema name." };
+                options.schemas.push(...splitList(value));
+                break;
+            }
+            case "--skip": {
+                const value = takeValue();
+                if (value === null) return { ok: false, message: "--skip needs a check id. See --list-checks." };
+                options.skip.push(...splitList(value));
+                break;
+            }
+            case "--only": {
+                const value = takeValue();
+                if (value === null) return { ok: false, message: "--only needs a check id. See --list-checks." };
+                options.only.push(...splitList(value));
+                break;
+            }
+            case "--fail-on": {
+                const value = takeValue();
+                if (value === null) {
+                    return { ok: false, message: `--fail-on needs one of: ${FAIL_ON_VALUES.join(", ")}.` };
+                }
+                const normalised = value.toLowerCase();
+                if (!(FAIL_ON_VALUES as readonly string[]).includes(normalised)) {
+                    return {
+                        ok: false,
+                        message: `--fail-on ${value} is not a severity. Use one of: ${FAIL_ON_VALUES.join(", ")}.`
+                    };
+                }
+                options.failOn = normalised as Severity | "none";
+                break;
+            }
+            case "--timeout": {
+                const value = takeValue();
+                if (value === null) return { ok: false, message: "--timeout needs a number of milliseconds." };
+                const ms = Number(value);
+                if (!Number.isFinite(ms) || ms <= 0) {
+                    return { ok: false, message: `--timeout ${value} is not a positive number of milliseconds.` };
+                }
+                options.timeoutMs = Math.floor(ms);
+                break;
+            }
+            default:
+                return { ok: false, message: `Unknown option: ${flag}. Run --help for the full list.` };
+        }
+    }
+
+    return { ok: true, options };
+}
+
+// ---------------------------------------------------------------------------
+// Connection resolution
+// ---------------------------------------------------------------------------
+
+export interface ResolvedConnection {
+    connectionString: string;
+    /** Where it came from, for the "using DATABASE_URL from .env" line. */
+    source: string;
+}
+
+/**
+ * A three-line .env reader. Deliberately not `dotenv`: the whole promise of
+ * this package is that `npx` installs `pg` and nothing else, and a transitive
+ * dependency is a supply-chain surface on a tool people point at production.
+ *
+ * Handles what a Postgres URL actually needs: `export` prefixes, `#` comments,
+ * and single or double quotes. It does not do variable interpolation.
+ */
+export function readDotEnv(directory: string): Map<string, string> {
+    const values = new Map<string, string>();
+
+    let raw: string;
+    try {
+        raw = readFileSync(join(directory, ".env"), "utf8");
+    } catch {
+        return values;
+    }
+
+    for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (trimmed.length === 0 || trimmed.startsWith("#")) continue;
+
+        const body = trimmed.startsWith("export ") ? trimmed.slice("export ".length).trim() : trimmed;
+        const eq = body.indexOf("=");
+        if (eq <= 0) continue;
+
+        const key = body.slice(0, eq).trim();
+        let value = body.slice(eq + 1).trim();
+
+        const quoted =
+            (value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"));
+        if (quoted && value.length >= 2) {
+            value = value.slice(1, -1);
+        } else {
+            // An unquoted trailing comment. `#` inside a password is why this
+            // only strips a `#` that follows whitespace.
+            const comment = value.search(/\s#/);
+            if (comment !== -1) value = value.slice(0, comment).trim();
+        }
+
+        if (key.length > 0) values.set(key, value);
+    }
+
+    return values;
+}
+
+export function resolveConnection(
+    positional: string | null,
+    env: NodeJS.ProcessEnv,
+    cwd: string
+): ResolvedConnection | null {
+    if (positional && positional.trim().length > 0) {
+        return { connectionString: positional.trim(), source: "the command line" };
+    }
+
+    if (env.DATABASE_URL && env.DATABASE_URL.trim().length > 0) {
+        return { connectionString: env.DATABASE_URL.trim(), source: "$DATABASE_URL" };
+    }
+
+    if (env.POSTGRES_URL && env.POSTGRES_URL.trim().length > 0) {
+        return { connectionString: env.POSTGRES_URL.trim(), source: "$POSTGRES_URL" };
+    }
+
+    const dotenv = readDotEnv(cwd);
+    for (const key of ["DATABASE_URL", "POSTGRES_URL"]) {
+        const value = dotenv.get(key);
+        if (value && value.trim().length > 0) {
+            return { connectionString: value.trim(), source: `${key} in .env` };
+        }
+    }
+
+    return null;
+}
+
+// ---------------------------------------------------------------------------
+// Error translation
+// ---------------------------------------------------------------------------
+
+export interface FriendlyError {
+    headline: string;
+    hint?: string;
+    /** The driver's own words, redacted. Kept short — this is not a stack trace. */
+    detail?: string;
+}
+
+/** `pg` sets `code` to either an errno string or a five-character SQLSTATE. */
+function errorCode(error: unknown): string | undefined {
+    let current: unknown = error;
+    for (let depth = 0; depth < 5 && current !== null && current !== undefined; depth += 1) {
+        const code = (current as { code?: unknown }).code;
+        if (typeof code === "string" && code.length > 0) return code;
+        current = (current as { cause?: unknown }).cause;
+    }
+
+    return undefined;
+}
+
+function errorMessage(error: unknown): string {
+    if (error instanceof Error) return error.message;
+
+    return String(error);
+}
+
+/**
+ * Turn a driver failure into one sentence a human can act on.
+ *
+ * Deliberately covers the failures that account for nearly every first run:
+ * wrong host, wrong password, wrong database, TLS, and a firewall that drops
+ * rather than refuses. Anything unmapped still prints a redacted one-liner
+ * rather than a stack trace.
+ */
+export function explainError(
+    error: unknown,
+    context: { endpoint: string; timeoutMs: number; connectionString?: string }
+): FriendlyError {
+    const code = errorCode(error);
+    const raw = errorMessage(error);
+    const message = redactSecrets(raw, context.connectionString).replace(/\s+/g, " ").trim();
+    const detail = code ? `${code}: ${message}` : message;
+    const at = context.endpoint;
+
+    const friendly = (headline: string, hint?: string): FriendlyError => ({ headline, hint, detail });
+
+    switch (code) {
+        case "ECONNREFUSED":
+            return friendly(
+                `Nothing is accepting connections at ${at}.`,
+                "Check the host and port, that the server is running, and that you are on the network it allows — a VPN, an SSH tunnel or an IP allowlist is the usual cause."
+            );
+        case "ENOTFOUND":
+        case "EAI_AGAIN":
+            return friendly(
+                `The host in the connection string does not resolve (${at}).`,
+                "Check it for a typo. A Supabase host looks like db.<project-ref>.supabase.co; a Neon host ends in .neon.tech."
+            );
+        case "ETIMEDOUT":
+        case "ENETUNREACH":
+        case "EHOSTUNREACH":
+            return friendly(
+                `Timed out reaching ${at}.`,
+                "Packets are being dropped rather than refused, which almost always means a firewall or an IP allowlist. Add this machine's address to the database's allowed list."
+            );
+        case "ECONNRESET":
+            return friendly(
+                `${at} closed the connection before the handshake finished.`,
+                "Most often TLS. Try appending ?sslmode=require to the connection string; managed providers reject plaintext."
+            );
+        case "EPROTO":
+        case "DEPTH_ZERO_SELF_SIGNED_CERT":
+        case "SELF_SIGNED_CERT_IN_CHAIN":
+        case "UNABLE_TO_VERIFY_LEAF_SIGNATURE":
+        case "ERR_TLS_CERT_ALTNAME_INVALID":
+            return friendly(
+                `The TLS certificate presented by ${at} could not be verified.`,
+                "Append ?sslmode=no-verify to connect without verifying it, or point sslrootcert at your provider's CA bundle if you would rather keep verification on."
+            );
+        case "28P01":
+            return friendly(
+                `Password authentication failed on ${at}.`,
+                "Check the password. If it contains @ : / ? or #, it has to be percent-encoded inside a URL — that is the single most common cause of this error."
+            );
+        case "28000":
+            return friendly(
+                `${at} refused the connection for this role.`,
+                "Either the role does not exist, or pg_hba.conf has no rule matching this host, user and database combination."
+            );
+        case "3D000":
+            return friendly(
+                "That database does not exist on the server.",
+                "The database name is the last path segment of the connection string. On Supabase it is usually `postgres`."
+            );
+        case "42501":
+            return friendly(
+                "The connected role is not allowed to read the catalogs this scan needs.",
+                "Run it as the database owner or another role that can read pg_policies and pg_class. The scan itself only issues SELECTs."
+            );
+        case "53300":
+            return friendly(
+                `${at} has no connection slots left.`,
+                "Retry when the pool frees up, or point the scan at a direct connection rather than a saturated pooler."
+            );
+        case "57014":
+            return friendly(
+                `A catalog query exceeded the ${context.timeoutMs}ms statement timeout.`,
+                "Databases with tens of thousands of relations need longer: re-run with --timeout 60000."
+            );
+        case "08006":
+        case "08001":
+        case "08004":
+            return friendly(
+                `Could not establish a connection to ${at}.`,
+                "Check the host, port and TLS mode. Managed providers usually need ?sslmode=require."
+            );
+        default:
+            break;
+    }
+
+    if (/does not support SSL/i.test(raw)) {
+        return friendly(
+            `${at} is not configured for TLS.`,
+            "Append ?sslmode=disable if this is a local database you trust the network path to."
+        );
+    }
+    if (/self.signed certificate|certificate/i.test(raw) && /SSL|TLS|certificate/i.test(raw)) {
+        return friendly(
+            `The TLS certificate presented by ${at} could not be verified.`,
+            "Append ?sslmode=no-verify, or point sslrootcert at your provider's CA bundle."
+        );
+    }
+    if (/timeout/i.test(raw)) {
+        return friendly(
+            `Timed out talking to ${at}.`,
+            `The scan uses a ${context.timeoutMs}ms statement timeout; raise it with --timeout <ms>, or check for a firewall dropping the connection.`
+        );
+    }
+    if (/Connection terminated/i.test(raw)) {
+        return friendly(
+            `The connection to ${at} was closed unexpectedly.`,
+            "A pooler or proxy in front of the database is the usual cause. Try a direct connection."
+        );
+    }
+
+    return friendly(`The scan against ${at} failed.`);
+}
+
+// ---------------------------------------------------------------------------
+// Presentation of operational failures
+// ---------------------------------------------------------------------------
+
+function formatFriendlyError(error: FriendlyError, color: boolean): string {
+    const bold = (value: string): string => (color ? `\u001B[1m${value}\u001B[22m` : value);
+    const dim = (value: string): string => (color ? `\u001B[2m${value}\u001B[22m` : value);
+    const red = (value: string): string => (color ? `\u001B[31m${value}\u001B[39m` : value);
+
+    const lines = [`${red("Error")}  ${bold(error.headline)}`];
+    if (error.hint) lines.push(`       ${error.hint}`);
+    if (error.detail) lines.push(`       ${dim(truncate(error.detail, 240))}`);
+
+    return `${lines.join("\n")}\n`;
+}
+
+function truncate(value: string, max: number): string {
+    return value.length <= max ? value : `${value.slice(0, max - 1)}…`;
+}
+
+// ---------------------------------------------------------------------------
+// Static text
+// ---------------------------------------------------------------------------
+
+function helpText(version: string): string {
+    return `rls-check ${version} — audit Row-Level Security on any PostgreSQL database.
+
+Usage
+  npx @rebasepro/rls-check [connection-string] [options]
+
+The connection string is taken from, in order: the argument, $DATABASE_URL,
+$POSTGRES_URL, then DATABASE_URL in a .env file in the current directory.
+
+Options
+  --json                 Machine-readable ScanResult on stdout, and nothing else.
+  --schema <name>        Restrict the scan to a schema. Repeatable or comma-separated.
+  --fail-on <severity>   Exit 1 at or above this severity: info, low, medium, high,
+                         critical, or none to never fail. Default: high.
+  --only <id>            Run only these checks. Repeatable or comma-separated.
+  --skip <id>            Skip these checks. Repeatable or comma-separated.
+  --list-checks          Print the check catalog and exit.
+  --timeout <ms>         Statement timeout for each catalog query. Default: 15000.
+  --quiet                Findings only: no banner, no summary.
+  --no-color             Disable ANSI colour. NO_COLOR and a non-TTY stdout are
+                         honoured automatically; --color forces it back on.
+  -h, --help             Show this text.
+  -v, --version          Print the version.
+
+Exit codes
+  0  Clean, or nothing at or above --fail-on.
+  1  Findings at or above --fail-on.
+  2  The scan did not run: bad arguments, connection refused, auth failed, timeout.
+
+Examples
+  npx @rebasepro/rls-check "postgresql://user:pass@db.abcdef.supabase.co:5432/postgres"
+  npx @rebasepro/rls-check --schema public --schema billing --fail-on medium
+  npx @rebasepro/rls-check --json > rls-report.json
+
+It is read-only: it issues SELECTs against the system catalogs, writes nothing,
+and sends nothing anywhere.
+`;
+}
+
+function usageText(): string {
+    return `rls-check needs a PostgreSQL connection string.
+
+  npx @rebasepro/rls-check "postgresql://user:password@host:5432/database"
+
+Or set DATABASE_URL (or POSTGRES_URL) in the environment, or put DATABASE_URL in
+a .env file in this directory.
+
+It is read-only — it reads the system catalogs and writes nothing. Run with
+--help for all options.
+`;
+}
+
+/**
+ * Read the version out of the package manifest at runtime rather than inlining
+ * it at build time, so a published tarball and a `pnpm build` never disagree.
+ * `../package.json` is correct from both `src/cli.ts` and `dist/index.es.js`.
+ */
+export function resolveVersion(): string {
+    for (const candidate of ["../package.json", "../../package.json"]) {
+        try {
+            const raw = readFileSync(new URL(candidate, import.meta.url), "utf8");
+            const parsed = JSON.parse(raw) as { name?: string; version?: string };
+            if (parsed.name === "@rebasepro/rls-check" && typeof parsed.version === "string") {
+                return parsed.version;
+            }
+        } catch {
+            // Fall through: a missing manifest must never break a scan.
+        }
+    }
+
+    return "unknown";
+}
+
+// ---------------------------------------------------------------------------
+// runCli
+// ---------------------------------------------------------------------------
+
+export interface CliIo {
+    stdout(text: string): void;
+    stderr(text: string): void;
+    env: NodeJS.ProcessEnv;
+    cwd: string;
+    /** Whether stdout is a terminal; drives colour when nothing else decides. */
+    isTty: boolean;
+    columns?: number;
+}
+
+function defaultIo(): CliIo {
+    return {
+        stdout: (text) => process.stdout.write(text),
+        stderr: (text) => process.stderr.write(text),
+        env: process.env,
+        cwd: process.cwd(),
+        isTty: Boolean(process.stdout.isTTY),
+        columns: process.stdout.columns
+    };
+}
+
+/**
+ * Colour is on only when every signal agrees: not JSON, not NO_COLOR, not a
+ * dumb terminal, and either a TTY or an explicit --color.
+ */
+export function resolveColor(explicit: boolean | null, json: boolean, env: NodeJS.ProcessEnv, isTty: boolean): boolean {
+    if (json) return false;
+    if (explicit !== null) return explicit;
+    if (typeof env.NO_COLOR === "string" && env.NO_COLOR !== "") return false;
+    if (env.TERM === "dumb") return false;
+    if (typeof env.FORCE_COLOR === "string" && env.FORCE_COLOR !== "" && env.FORCE_COLOR !== "0") return true;
+
+    return isTty;
+}
+
+/**
+ * The entry point `bin/rls-check.js` calls. Returns the process exit code and
+ * never throws — an unexpected failure becomes exit 2 with a redacted message.
+ */
+export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): Promise<number> {
+    let connectionString: string | undefined;
+
+    try {
+        const parsed = parseArgs(argv);
+        if (!parsed.ok) {
+            io.stderr(formatFriendlyError({ headline: parsed.message }, resolveColor(null, false, io.env, io.isTty)));
+
+            return EXIT_ERROR;
+        }
+
+        const options = parsed.options;
+        const color = resolveColor(options.color, options.json, io.env, io.isTty);
+        const version = resolveVersion();
+
+        if (options.help) {
+            io.stdout(helpText(version));
+
+            return EXIT_OK;
+        }
+
+        if (options.version) {
+            io.stdout(`${version}\n`);
+
+            return EXIT_OK;
+        }
+
+        if (options.listChecks) {
+            if (options.json) {
+                io.stdout(
+                    `${JSON.stringify(
+                        CHECKS.map((check) => ({ id: check.id, title: check.title, description: check.description })),
+                        null,
+                        2
+                    )}\n`
+                );
+            } else {
+                io.stdout(renderCheckCatalog(CHECKS, { color, width: io.columns }));
+            }
+
+            return EXIT_OK;
+        }
+
+        const unknownIds = [...options.only, ...options.skip].filter(
+            (id) => !CHECKS.some((check) => check.id === id)
+        );
+        if (unknownIds.length > 0) {
+            io.stderr(
+                formatFriendlyError(
+                    {
+                        headline: `Unknown check ${unknownIds.length === 1 ? "id" : "ids"}: ${unknownIds.join(", ")}.`,
+                        hint: "Run --list-checks for the catalog. Ids are stable, so a typo here silently weakens the scan rather than failing it — which is why this is an error."
+                    },
+                    color
+                )
+            );
+
+            return EXIT_ERROR;
+        }
+
+        const resolved = resolveConnection(options.connectionString, io.env, io.cwd);
+        if (!resolved) {
+            io.stderr(usageText());
+
+            return EXIT_ERROR;
+        }
+        connectionString = resolved.connectionString;
+
+        const target = parseConnectionString(connectionString);
+        const endpoint = formatEndpoint(target);
+
+        if (!target) {
+            io.stderr(
+                formatFriendlyError(
+                    {
+                        headline: "That does not look like a PostgreSQL connection string.",
+                        hint: "Expected postgresql://user:password@host:5432/database, or a libpq keyword string such as host=… dbname=…. If the password contains @ : / ? or #, percent-encode it — otherwise the URL is ambiguous and neither this tool nor libpq can tell where the credential ends."
+                    },
+                    color
+                )
+            );
+
+            return EXIT_ERROR;
+        }
+
+        // There is no way to abort an in-flight libpq query from Node, so the
+        // handler exits directly rather than unwinding. 130 is the shell's
+        // convention for SIGINT and keeps it distinct from 1 and 2.
+        const onSigint = (): void => {
+            io.stderr("\nInterrupted. Nothing was written — the scan is read-only.\n");
+            process.exit(130);
+        };
+        process.on("SIGINT", onSigint);
+
+        let result: ScanResult;
+        try {
+            result = await scan({
+                connectionString,
+                schemas: options.schemas,
+                only: options.only,
+                skip: options.skip,
+                statementTimeoutMs: options.timeoutMs
+            });
+        } catch (error) {
+            io.stderr(
+                formatFriendlyError(explainError(error, { endpoint, timeoutMs: options.timeoutMs, connectionString }), color)
+            );
+
+            return EXIT_ERROR;
+        } finally {
+            process.removeListener("SIGINT", onSigint);
+        }
+
+        if (options.json) {
+            io.stdout(`${renderJson(result)}\n`);
+        } else {
+            io.stdout(
+                renderReport(result, {
+                    color,
+                    quiet: options.quiet,
+                    failOn: options.failOn,
+                    width: io.columns,
+                    endpoint,
+                    version
+                })
+            );
+        }
+
+        return exceedsThreshold(result.findings, options.failOn) ? EXIT_FINDINGS : EXIT_OK;
+    } catch (error) {
+        // Anything that escapes the expected paths. Exit 2, never 1: a crash is
+        // not a clean bill of health and it is not a finding either.
+        io.stderr(
+            formatFriendlyError(
+                {
+                    headline: "rls-check failed before it could report.",
+                    hint: "This is a bug — please open an issue at https://github.com/rebasepro/rebase/issues.",
+                    detail: redactSecrets(errorMessage(error), connectionString)
+                },
+                false
+            )
+        );
+
+        return EXIT_ERROR;
+    }
+}
