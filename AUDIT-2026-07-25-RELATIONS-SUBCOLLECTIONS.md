@@ -262,11 +262,15 @@ does the wrong thing for m2m:
 So an m2m subcollection view can only ever create brand-new target rows, and its delete is a
 global delete.
 
-**Delete is fixed.** A junction-backed relation now unlinks — `RelationService.unlinkRelatedEntity`
+**Fixed, both halves.** A junction-backed relation now unlinks — `RelationService.unlinkRelatedEntity`
 removes the junction row and leaves the shared target alone. A multi-hop `joinPath`, which has
 no single link to remove, is rejected with a 400 rather than falling through to a row delete.
-**Still open:** linking an *existing* row through the path (`PUT` does not create a junction
-row; it now requires membership instead of silently updating a foreign row).
+
+And a junction path now reads as *set membership* on write: `PUT parent/id/child/childId`
+links the row if it is not linked yet, idempotently, which is how an **existing** row gets
+attached. Unlike an owning foreign key this takes the row from nobody — its other parents keep
+it — which is why linking is safe here where reparenting is not. The admin surfaces it as
+**Add existing** on a linked tab, opening the picker over the whole target collection.
 
 ---
 
@@ -313,19 +317,28 @@ each call site — so the gate is re-implemented per caller rather than enforced
 path so it reaches the collection view, the entity form and a deep link alike: a junction-backed
 tab offers "Remove from this record", not "Delete".
 
-Minor, related: `extractRelationsFromProperties` recurses into `map` properties
-([CollectionRegistry.ts:328](packages/common/src/collections/CollectionRegistry.ts:328)) and
-hoists nested relations to the collection's top-level `relations[]`. A many-relation declared
-inside a map therefore becomes a top-level subcollection tab, keyed by the inner property key.
+Minor, related — **also fixed**: `extractRelationsFromProperties` recurses into `map`
+properties ([CollectionRegistry.ts:328](packages/common/src/collections/CollectionRegistry.ts:328))
+and hoists nested relations to the collection's top-level `relations[]`, so a many-relation
+declared inside a map became a top-level tab keyed by the inner property key. The hoisting is
+still needed to stamp the nested property, so `getEntityChildViews` now excludes identities
+that appear *only* below the top level — the shape of `properties` being the last remaining
+evidence of which is which.
 
 ---
 
-## K. None of this is documented
+## K. None of this is documented — **FIXED**
 
 [relations.md](website/src/content/docs/docs/collections/relations.md) (304 lines) never
 mentions that a many-relation becomes a subcollection, that nested REST paths exist, or what
 the path segment must be. `docs/data-sources.md` mentions "relations vs subcollections" only
 as an engine-capability axis.
+
+**Fixed.** A "Relations in the admin panel" section now covers the tab projection, that the
+path segment is the relation *name* (with the inline-property case spelled out), the
+owned-versus-shared table with what create / add-existing / remove each mean, the nested REST
+surface and its enforcement, and what does not become a tab. `pnpm verify:docs` reports no new
+findings for the file.
 
 ---
 
@@ -354,14 +367,16 @@ Also covered by [entity_child_views.test.ts](packages/common/test/entity_child_v
 one target staying apart, the target-not-name lookup, `owned` vs `linked`, and a Firestore
 subcollection staying containment.
 
+- ~~Link an existing row through a many-to-many tab (H)~~
+- ~~Stop map-nested relations becoming top-level tabs (J)~~
+- ~~Document the projection and the path grammar (K)~~
+
 ### Still open
 
-1. **Link an existing row through a many-to-many tab.** `POST` creates-and-links; there is
-   still no add-existing. The mode is now in the UI's hands, so the affordance has somewhere
-   to live.
-2. **`extractRelationsFromProperties` hoists relations declared inside `map` properties** to
-   the collection's top level, so one becomes a tab keyed by the inner property key.
-3. Document the projection and the path grammar (K).
+Nothing from this audit. The `Relation` type itself remains over-general — five overlapping
+ways to express a link, resolved by ~200 lines of inference in `sanitizeRelation` — which is a
+design question rather than a defect; a tagged union (`belongsTo | hasMany | hasOne |
+manyToMany | via`) would state in the type what its JSDoc currently states in prose.
 
 ---
 

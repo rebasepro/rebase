@@ -445,6 +445,7 @@ export const en: RebaseTranslations = {
     initialize: "Initialize",
     confirm_multiple_delete: "Confirm multiple delete?",
     delete_entity_confirm_title: "Would you like to delete this {{entityName}}?",
+    add_existing: "Add existing",
     unlink_entity_confirm_title: "Remove this {{entityName}} from this record?",
     unlink_entity_confirm_body: "It stays in {{collectionName}} and remains available to other records.",
     confirm_multiple_unlink: "remove these from this record?",

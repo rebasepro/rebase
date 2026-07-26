@@ -80,6 +80,8 @@ import { useCollectionRegistryController } from "../../hooks/navigation/contexts
 import { useSidePanel } from "../../hooks/useSidePanel";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useChildViewSource } from "../../hooks/useChildViewSource";
+import { useSelectionDialog } from "../../hooks/useSelectionDialog";
+import { saveEntityWithCallbacks } from "@rebasepro/app";
 
 const EMPTY_ARRAY: never[] = [];
 
@@ -186,6 +188,9 @@ const CollectionViewBindingInner = React.memo(
          */
         const childViewSource = useChildViewSource(path);
         const isLinkedChildView = childViewSource?.kind === "relation" && childViewSource.mode === "linked";
+        const linkedTargetSlug = isLinkedChildView && childViewSource.kind === "relation"
+            ? childViewSource.targetSlug
+            : undefined;
 
         const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -385,6 +390,48 @@ const CollectionViewBindingInner = React.memo(
                 onClose: unselectNavigatedEntity
             })
         }, [path, sidePanelController]);
+
+        /**
+         * Attach rows that already exist to this parent.
+         *
+         * Writing to the row's own address under this parent — `PUT
+         * posts/1/tags/5` — is what asserts membership; the backend writes the
+         * junction row idempotently. Sending no values keeps it a pure link:
+         * the target's own fields are none of this tab's business.
+         */
+        const linkExistingEntities = useCallback(async (entities: Entity<M>[]) => {
+            const alreadyLinked = new Set(tableController.data.map(e => String(e.id)));
+            const toLink = entities.filter(e => !alreadyLinked.has(String(e.id)));
+            if (toLink.length === 0) return;
+
+            try {
+                await Promise.all(toLink.map(entity =>
+                    saveEntityWithCallbacks<M>({
+                        path,
+                        entityId: entity.id,
+                        values: {} as Partial<M>,
+                        status: "existing",
+                        collection,
+                        data: dataClient,
+                        context
+                    })
+                ));
+                setLastDeleteTimestamp(Date.now());
+            } catch (e) {
+                context.snackbarController?.open({
+                    type: "error",
+                    message: e instanceof Error ? e.message : String(e)
+                });
+            }
+        }, [dataClient, path, tableController.data, collection, context]);
+
+        const selectionDialog = useSelectionDialog<M>({
+            // The whole target collection, not this parent's slice of it —
+            // otherwise the picker could only ever show rows already linked.
+            path: linkedTargetSlug ?? false,
+            multiselect: true,
+            onMultipleEntitiesSelected: linkExistingEntities
+        });
 
         const openNewDocument = useCallback((defaultValues?: Record<string, unknown>) => {
             const collection = collectionRef.current;
@@ -927,6 +974,7 @@ parentEntityIds,
                         tableController={tableController}
                         onMultipleDeleteClick={onMultipleDeleteClick}
                         onNewClick={onNewClick}
+                    onAddExistingClick={linkedTargetSlug ? selectionDialog.open : undefined}
                         openNewDocument={openNewDocument}
                         path={path}
                         relativePath={getCollectionDataPath(collection)}

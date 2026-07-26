@@ -480,7 +480,8 @@ singularName: customName } : {})
             source: {
                 kind: "relation",
                 relationKey,
-                mode: isJunctionBackedRelation(relation) ? "linked" : "owned"
+                mode: isJunctionBackedRelation(relation) ? "linked" : "owned",
+                targetSlug: target.slug
             }
         });
     }

@@ -492,6 +492,8 @@ export interface RebaseTranslations {
      * through a junction. The row is not deleted — the parent's link to it is —
      * so this copy must not promise deletion.
      */
+    /** Attach a row that already exists to this parent, on a junction-backed tab. */
+    add_existing: string;
     unlink_entity_confirm_title: string;
     unlink_entity_confirm_body: string;
     confirm_multiple_unlink: string;

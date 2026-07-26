@@ -410,8 +410,12 @@ export class PersistService {
                     await this.relationService.updateRelationsUsingJoins(tx, collection, currentId, relationValues);
                 }
 
-                // Handle junction table creation for many-to-many path-based saves
-                if (junctionTableInfo && !id) {
+                // Attach the row to the parent's set. Runs for updates as well as
+                // creates — it used to be gated on `!id`, which is why a row that
+                // already existed could never be added to a parent through its
+                // path. The insert is idempotent, so re-asserting a link is a
+                // no-op rather than a duplicate-key error.
+                if (junctionTableInfo) {
                     await this.relationService.handleJunctionTableCreation(tx, currentId, junctionTableInfo);
                 }
 

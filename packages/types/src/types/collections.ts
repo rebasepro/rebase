@@ -472,7 +472,19 @@ export function getDeclaredSubcollections<M extends Record<string, unknown> = Re
  */
 export type ChildViewSource =
     | { kind: "subcollection" }
-    | { kind: "relation"; relationKey: string; mode: "owned" | "linked" };
+    | {
+        kind: "relation";
+        relationKey: string;
+        mode: "owned" | "linked";
+        /**
+         * Slug of the collection the rows actually live in.
+         *
+         * Distinct from the view's `key`, which is the relation. A `linked` view
+         * needs both: the key addresses the parent's set, and this addresses the
+         * whole collection to pick an existing row out of.
+         */
+        targetSlug: string;
+    };
 
 /**
  * A list of rows rendered inside an entity view — the tab under a record.

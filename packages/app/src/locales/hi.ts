@@ -426,6 +426,7 @@ export const hi: RebaseTranslations = {
     initialize: "प्रारंभ करें",
     confirm_multiple_delete: "एकाधिक विलोपन की पुष्टि करें?",
     delete_entity_confirm_title: "क्या आप इस {{entityName}} को हटाना चाहेंगे?",
+    add_existing: "मौजूदा जोड़ें",
     unlink_entity_confirm_title: "इस {{entityName}} को इस रिकॉर्ड से हटाएँ?",
     unlink_entity_confirm_body: "यह {{collectionName}} में बना रहेगा और अन्य रिकॉर्ड के लिए उपलब्ध रहेगा।",
     confirm_multiple_unlink: "क्या इन्हें इस रिकॉर्ड से हटाना है?",

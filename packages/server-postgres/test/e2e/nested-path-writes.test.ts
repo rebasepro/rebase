@@ -262,6 +262,49 @@ describe("Nested path writes (E2E)", () => {
         expect(await one("SELECT * FROM public.tags WHERE id = 't-2'")).toBeDefined();
     });
 
+    it("links a target that already exists, without touching its other parents", async () => {
+        // t-2 exists and is linked to nobody; p-1 is linked to t-1.
+        await driver.save({
+            path: "posts/p-1/tags",
+            id: "t-2",
+            values: {},
+            status: "existing"
+        } as never);
+
+        expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-1' ORDER BY tag_id"))
+            .toEqual([
+                { post_id: "p-1", tag_id: "t-1" },
+                { post_id: "p-1", tag_id: "t-2" }
+            ]);
+        // Linking is additive: p-2 keeps t-1.
+        expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-2'")).toHaveLength(1);
+    });
+
+    it("is idempotent — linking twice is not a duplicate-key error", async () => {
+        const link = () => driver.save({
+            path: "posts/p-1/tags", id: "t-2", values: {}, status: "existing"
+        } as never);
+
+        await link();
+        await link();
+
+        expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-1' AND tag_id = 't-2'"))
+            .toHaveLength(1);
+    });
+
+    it("links and updates in one write", async () => {
+        await driver.save({
+            path: "posts/p-1/tags",
+            id: "t-2",
+            values: { label: "mathematics" },
+            status: "existing"
+        } as never);
+
+        expect((await one("SELECT * FROM public.tags WHERE id = 't-2'"))?.label).toBe("mathematics");
+        expect(await rows("SELECT * FROM public.posts_tags WHERE post_id = 'p-1' AND tag_id = 't-2'"))
+            .toHaveLength(1);
+    });
+
     it("still creates and links a new many-to-many target", async () => {
         await driver.save({
             path: "posts/p-1/tags",

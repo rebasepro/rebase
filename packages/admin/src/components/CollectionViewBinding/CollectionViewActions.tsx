@@ -5,7 +5,7 @@ import React, { lazy, Suspense } from "react";
 import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
 import { Button, IconButton, Tooltip, Popover, iconSize } from "@rebasepro/ui";
-import { ErrorBoundary, MoreVerticalIcon, PlusIcon, Trash2Icon } from "@rebasepro/ui";
+import { ErrorBoundary, Link2Icon, MoreVerticalIcon, PlusIcon, Trash2Icon } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/app";
 import { toArray } from "@rebasepro/utils";
 // Lazy-load import/export — pulls in exceljs only on demand
@@ -22,6 +22,11 @@ export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
     parentCollectionSlugs: string[], parentEntityIds: string[];
     selectionEnabled: boolean;
     onNewClick: () => void;
+    /**
+     * Attach a row that already exists to this parent. Only supplied for a
+     * junction-backed tab, where the parent owns the link rather than the row.
+     */
+    onAddExistingClick?: () => void;
     onMultipleDeleteClick: () => void;
     selectionController: SelectionController<M>;
     tableController: EntityTableController<M>;
@@ -36,6 +41,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     relativePath,
     parentCollectionSlugs, parentEntityIds,
     onNewClick,
+    onAddExistingClick,
     onMultipleDeleteClick,
     selectionEnabled,
     path,
@@ -79,6 +85,31 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
             >
                 <PlusIcon size={iconSize.small}/>
             </Button>);
+
+    // On a junction-backed tab, creating a row is only half of what "add" means:
+    // the far more common act is attaching one that already exists. There was no
+    // way to do that at all — the junction row was only ever written alongside an
+    // insert — so a shared vocabulary could only ever grow.
+    const linkButton = onAddExistingClick && (largeLayout && !compact
+        ? <Button
+            id={`link_entity_${path}`}
+            onClick={onAddExistingClick}
+            startIcon={<Link2Icon size={iconSize.small}/>}
+            size="small"
+            variant="outlined"
+            color="primary">
+            {t("add_existing") ?? "Add existing"}
+        </Button>
+        : <Tooltip title={t("add_existing") ?? "Add existing"}>
+            <Button
+                id={`link_entity_${path}`}
+                onClick={onAddExistingClick}
+                variant="outlined"
+                color={compact ? "neutral" : "primary"}
+                size="small">
+                <Link2Icon size={iconSize.small}/>
+            </Button>
+        </Tooltip>);
 
     const multipleDeleteEnabled = canDelete(collection, path, null);
 
@@ -183,6 +214,7 @@ parentEntityIds,
                 </Popover>
             )}
             {multipleDeleteButton}
+            {linkButton}
             {addButton}
         </div>
     );
