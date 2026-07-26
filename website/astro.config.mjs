@@ -122,7 +122,8 @@ export default defineConfig({
                     items: [
                         { label: "CLI Commands", slug: "docs/cli" },
                         { label: "Schema Generation", slug: "docs/cli/schema" },
-                        { label: "Studio", slug: "docs/studio" }
+                        { label: "Studio", slug: "docs/studio" },
+                        { label: "rls-check (RLS audit)", slug: "docs/rls-check" }
                     ]
                 },
                 {
