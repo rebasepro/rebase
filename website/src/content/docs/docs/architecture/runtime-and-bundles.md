@@ -55,15 +55,25 @@ before it agrees to boot:
 
 ```jsonc
 {
-  "bundleFormat": 1,
+  "bundleFormat": 2,
   "runtime": { "range": "^1", "builtAgainst": "0.11.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
-  "mode": "cms",
-  "entry": { "config": "config", "functions": "backend/functions" },
+  "kind": "backend",
+  "entry": {
+    "config": "config",
+    "functions": "backend/functions",
+    "static": [{ "path": "/", "dir": "static/admin", "spa": true }]
+  },
   "hooks": { "native": false },
   "deps": { "declared": { "zod": "^4.4.3" } }
 }
 ```
+
+`kind` is either `backend` — boot the server, plus any static apps in
+`entry.static` — or `static`, which serves those assets and nothing else: no
+database, no auth. Whether a backend declares its collections in code or
+introspects them from the live database is not a third kind; it is simply
+whether `entry.config` is there.
 
 ## Running a bundle
 
@@ -83,8 +93,11 @@ Two version numbers govern whether a bundle and a runtime can work together, and
 they are deliberately not the package version.
 
 **`bundleFormat`** is the on-disk layout. A runtime accepts any bundle whose
-format is less than or equal to its own. An older bundle on a newer runtime must
-keep working — that is the entire point of the separation.
+format is less than or equal to its own, and refuses a newer one rather than
+half-loading it. An older bundle on a newer runtime must keep working — that is
+the entire point of the separation, so a runtime reads every format it has ever
+shipped. Format 1 bundles, which named this field `mode` and carried a single
+static directory, still boot unchanged.
 
 **`runtime.contract`** is the interface between a bundle and the engine. Within
 one contract major, any bundle that validated keeps validating. Patches and

@@ -1,7 +1,7 @@
 ---
 title: Apps and Repositories
 sidebar_label: Apps & Repositories
-description: A project is a backend plus the apps that talk to it — web, admin and mobile — which can each live in their own repository.
+description: A project is a backend plus the apps that talk to it, which can each live in their own repository.
 ---
 
 ## Projects and apps
@@ -12,10 +12,22 @@ functions. An **app** is something that talks to it.
 | Type | What it is |
 | --- | --- |
 | `backend` | The collections, hooks and functions that define the API. Exactly one per project. |
-| `static` | A built client bundle — an SPA or static site. |
-| `admin` | The Rebase admin panel, hosted for you or built into your repository. |
-| `mobile` | A native app. Registered for configuration; never built or hosted here. |
-| `custom` | An arbitrary container image built from your own Dockerfile. |
+| `static` | A built client bundle — an SPA or static site, served at its own path. |
+
+That is the whole list. The admin panel is a `static` app like any other: it is
+built in your repository, against your collections, which is why custom fields
+and custom views work in it on day one.
+
+Who owns the server process is a property of the backend, not a separate app
+type:
+
+| `runtime` | What it means |
+| --- | --- |
+| `managed` | The platform's runtime image runs your bundle. You supply collections, functions, crons and schema. |
+| `custom` | You supply the server: your own Dockerfile and entrypoint. `rebase eject` sets this up. |
+
+This is independent of *where* it runs. Both run on Rebase Cloud and both
+self-host — the destination lives in `.rebase/cloud.json`, not in the manifest.
 
 The important part is what *owns* the list. A repository declares only the apps
 it contains; the project owns the set of apps that exist. Two repositories never
@@ -30,20 +42,45 @@ and functions stay in TypeScript where a type system can check them.
 
 ```jsonc
 {
-  "runtime": "^1",
+  "rebase": "^1",
   "apps": {
-    "backend": { "type": "backend" },
-    "web": {
+    "backend": { "type": "backend", "runtime": "managed" },
+    "site": {
       "type": "static",
       "root": "frontend",
       "build": "npm run build --workspace frontend",
       "output": "frontend/dist",
-      "spa": true
+      "path": "/"
     },
-    "admin": { "type": "admin", "mode": "hosted" }
+    "admin": {
+      "type": "static",
+      "root": "admin",
+      "build": "npm run build --workspace admin",
+      "output": "admin/dist",
+      "path": "/admin"
+    }
   }
 }
 ```
+
+One process serves all of it: the API at `/api`, the site at `/`, the admin at
+`/admin`. That is the self-hosting story, and a perfectly good small tier on
+Rebase Cloud.
+
+`path` is a **build-time** input as well as a serving one. An app mounted at
+`/admin` has to be *built* for `/admin`, or `index.html` loads and every asset
+404s — a blank page with no error anywhere. `rebase build` passes the value as
+`REBASE_APP_BASE`, which your bundler reads as its base path:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  base: process.env.REBASE_APP_BASE ?? "/",
+  // …
+});
+```
+
+and refuses to ship a build that ignored it.
 
 An existing project does not need one. The CLI infers the same layout from the
 directory structure, and `rebase apps init` writes it down when you want it
@@ -59,7 +96,7 @@ rebase apps init      # write an inferred rebase.json
 ```bash
 rebase build              # every app in this repository
 rebase build backend      # just the bundle
-rebase build web          # just the static assets
+rebase build admin        # just that app's static assets
 ```
 
 The backend builds first, because a client app's build may consume an SDK
@@ -67,9 +104,9 @@ generated from its collections.
 
 ## Multiple repositories
 
-The monorepo stays the default: one repository with a backend, a web app and the
-admin panel is the simplest thing that works, and `rebase init` scaffolds it.
-Splitting up is the graduation step, not a requirement.
+The monorepo stays the default: one repository with a backend and an admin panel
+is the simplest thing that works, and `rebase init` scaffolds it. Splitting up is
+the graduation step, not a requirement.
 
 In a separate frontend repository you need two things — a manifest declaring
 what this repository contributes, and a link to the project:
@@ -77,7 +114,7 @@ what this repository contributes, and a link to the project:
 ```jsonc
 // rebase.json
 {
-  "runtime": "^1",
+  "rebase": "^1",
   "apps": {
     "marketing": {
       "type": "static",
