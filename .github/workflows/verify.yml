@@ -113,6 +113,12 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # The agent harness's own tests. They need neither a database nor a build,
+      # and nothing else covers `scripts/harness/` — including the deploy
+      # preflight that AGENT.md describes as an enforced gate.
+      - name: Harness tests
+        run: pnpm run test:harness
+
   e2e:
     needs: checks
     runs-on: ubuntu-latest
@@ -176,6 +182,27 @@ jobs:
         run: npx tsx e2e/tests/cli-init-baas-e2e.ts
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # The self-host acceptance run: build a real bundle from the reference
+      # app's collections, fold two static apps in at different paths, boot it
+      # against a real database and fetch it as a browser would.
+      #
+      # `scripts/verify-selfhost.mts` says to run it when you touch the manifest,
+      # the bundle format, folding or serveSPA — and until now nothing did, so
+      # the entire multi-app serving path had no automated proof at any tier.
+      # It reuses the Postgres service above; the script pushes the schema
+      # itself, but the database has to exist first.
+      #
+      # `always()` for the same reason as its neighbours: it covers different
+      # ground, and still fails the job on its own.
+      - name: Self-host acceptance
+        if: always()
+        run: |
+          docker exec rebase-postgres createdb -U rebase rebase_acceptance
+          pnpm run verify:selfhost
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+          ACCEPTANCE_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_acceptance
 
       # The product's real security coverage, orphaned until now (this suite ran
       # in NO pipeline, so a change breaking RLS shipped green — AUDIT P0 #2).
