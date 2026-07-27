@@ -117,7 +117,7 @@ export default probe;
 }
 
 /**
- * Lay out the BaaS flavour the way `applyFlavor` does: drop `frontend/`, `config/`
+ * Lay out the headless scaffold the way `applyHeadless` does: drop `frontend/`, `config/`
  * and the generated schema, then copy the overlay over the top.
  *
  * This is the only template *backend* that can be typechecked standalone — the CMS
@@ -128,7 +128,7 @@ export default probe;
  */
 function materializeBaas(into) {
     copyDir(templateRoot, into);
-    // Mirrors `applyFlavor` in commands/init.ts. It deletes the collections, NOT
+    // Mirrors `applyHeadless` in commands/init.ts. It deletes the collections, NOT
     // the config package: storage is not under row-level security, so the
     // headless flavour still needs somewhere to put `storageAuthorize`, and the
     // overlay replaces config/index.ts with one that exports only that.

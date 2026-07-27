@@ -150,7 +150,7 @@ describe("the template's storageAuthorize", () => {
 /**
  * The headless flavour has the same exposure and less covering it.
  *
- * `applyFlavor` deletes `config/collections` — headless derives collections from the
+ * `applyHeadless` deletes `config/collections` — headless derives collections from the
  * live database — but keeps the config *package*, because that is the only place the
  * managed runtime looks for the hook. The overlay ships no docker-compose.yml of its
  * own either, so it *inherits* the one that sets `NODE_ENV: production` and
