@@ -727,6 +727,68 @@ test:
 
 ---
 
+## 4.11 How this holds when things change
+
+The cloud service depends on these contracts, and three things ship on their own
+cadences: the **CLI** that writes a bundle, the **runtime image** that boots one,
+and the **control plane** that intakes one. They cannot be released atomically,
+and the control plane cannot even import the CLI's types. So the arrangement
+survives on rules, not on coordination.
+
+### Rule 1 — additive changes must be a non-event
+
+Adding a field to the bundle manifest must never break a reader. If it did, no
+field could be added without releasing three things in lockstep, and in practice
+that means fields stop being added.
+
+Both readers ignore what they do not recognise, and both now have a test that
+says so with a manifest full of invented fields:
+`packages/server/src/boot/bundle-compat.test.ts` and
+`saas/backend/src/managed/bundle-manifest.test.ts`. Those tests are the contract;
+if either starts failing, the change being made is not additive.
+
+### Rule 2 — only an unreadable change earns a format bump
+
+`bundleFormat` means "an older reader cannot make sense of this", not "something
+changed". `mode` → `kind` qualified: the field an older reader looks for simply
+is not there, and its absence reads as `undefined` rather than as an error.
+
+### Rule 3 — a format bump ships control plane first
+
+The control plane is the side that **rejects**. Release a CLI ahead of it and
+every deploy becomes `MALFORMED_MANIFEST` or `BUNDLE_FORMAT_TOO_NEW`, with a
+message that blames the user's manifest for a mistake we made. Order:
+
+1. Teach the runtime to read the **old** shape (`upgradeLegacyManifest`). This is
+   the direction nothing else checks — a missing field is not an error, it is a
+   gate that silently stops firing.
+2. Raise `SUPPORTED_BUNDLE_FORMAT` and teach `parseBundleManifest` both shapes.
+3. **Ship the control plane.**
+4. Then the CLI and the runtime image.
+
+The version constants have a test whose only job is to fail when they change, so
+that step 1 cannot be skipped by someone who did not know it existed.
+
+### What is deliberately not guarded, and why
+
+- **The control plane's hand-copied `BundleManifest`.** It cannot import
+  `@rebasepro/types` — that is the point of the copy, and no test on either side
+  can see the other. Rule 1 is what makes the copy safe to be stale: it only has
+  to understand the fields it uses. Its header now says so, instead of promising
+  a drift test that was never written.
+- **Unknown fields in `rebase.json` warn rather than fail.** A typo (`pathh`)
+  would otherwise be silently dropped — the app builds for `/`, mounts at `/`,
+  and the only symptom is that it is not where you put it. But an unknown field
+  is also what an *older* CLI sees in a newer manifest, so failing would make
+  every future field breaking. It names the field, suggests the near-miss, and
+  carries on.
+- **A future app type reaching an older control plane.** `declaredAppsFrom` sends
+  `backend` or `static` and nothing else, so a type added later arrives as
+  `static` rather than as a rejected registration. Mislabelled beats a failed
+  deploy; revisit when there is a third type worth naming.
+
+---
+
 ## 5. Execution plan
 
 Phases are ordered by dependency. Do not start a phase before the previous one's

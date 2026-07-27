@@ -149,6 +149,60 @@ message: "must stay inside the project directory" });
     return value;
 }
 
+/** Fields each app type understands. Anything else is a typo or a newer CLI. */
+const KNOWN_APP_FIELDS: Record<string, readonly string[]> = {
+    backend: ["type", "runtime", "config", "functions", "crons", "schema",
+        "usersCollection", "dockerfile", "context", "port"],
+    static: ["type", "root", "build", "output", "path", "spa"]
+};
+
+/**
+ * Report a field this CLI does not recognise.
+ *
+ * A warning rather than an error, and the distinction matters in both
+ * directions. `"pathh": "/admin"` is a typo that would otherwise be silently
+ * dropped — the app builds for `/`, mounts at `/`, and the only symptom is that
+ * it is not where you put it. But an unknown field is also what an *older* CLI
+ * sees when it opens a manifest written for a newer one, and refusing to build
+ * over a field that is simply from the future would make every manifest addition
+ * a breaking change.
+ *
+ * So: name it, suggest the near-miss, and carry on.
+ */
+function warnUnknownFields(name: string, raw: Record<string, unknown>, type: string): void {
+    const known = KNOWN_APP_FIELDS[type];
+    if (!known) return;
+
+    for (const field of Object.keys(raw)) {
+        if (known.includes(field)) continue;
+        const suggestion = known.find(candidate => isNearMiss(candidate, field));
+        console.warn(
+            `⚠ rebase.json: apps.${name}.${field} is not a field this CLI knows.` +
+            (suggestion ? ` Did you mean "${suggestion}"?` : " It is ignored — your CLI may be older than this manifest.")
+        );
+    }
+}
+
+/** One edit apart, ignoring case: enough for a typo, tight enough to stay quiet. */
+function isNearMiss(a: string, b: string): boolean {
+    const x = a.toLowerCase();
+    const y = b.toLowerCase();
+    if (x === y) return true;
+    if (Math.abs(x.length - y.length) > 1) return false;
+
+    const [shorter, longer] = x.length <= y.length ? [x, y] : [y, x];
+    let i = 0;
+    let j = 0;
+    let edits = 0;
+    while (i < shorter.length && j < longer.length) {
+        if (shorter[i] === longer[j]) { i++; j++; continue; }
+        if (++edits > 1) return false;
+        if (shorter.length === longer.length) i++;
+        j++;
+    }
+    return edits + (longer.length - j) + (shorter.length - i) <= 1;
+}
+
 function validateApp(
     name: string,
     raw: unknown,
@@ -175,6 +229,8 @@ message: `"${type}" is no longer an app type — ${REMOVED_APP_TYPES[type]}` });
         });
         return undefined;
     }
+
+    warnUnknownFields(name, raw, type);
 
     switch (type) {
         case "backend": {

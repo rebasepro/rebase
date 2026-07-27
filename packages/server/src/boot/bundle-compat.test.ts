@@ -195,3 +195,82 @@ describe("a newer format than this runtime understands", () => {
         expect(() => readBundleManifest(dir)).toThrow(/understands up to/);
     });
 });
+
+/**
+ * Additive changes must never break a reader.
+ *
+ * This is the property that makes the whole arrangement survivable. A bundle is
+ * produced by one release and read by two others — this runtime, and a control
+ * plane that ships on its own cadence and cannot import these types at all. If
+ * adding a field required every reader to be updated first, the format could
+ * never move without a synchronised release of three things.
+ *
+ * So: unknown fields are ignored, at the same format version. Only a change that
+ * makes an existing field unreadable earns a `bundleFormat` bump.
+ */
+describe("a same-format bundle carrying fields this runtime does not know", () => {
+    const futureBundle = () => writeBundle({
+        bundleFormat: BUNDLE_FORMAT_VERSION,
+        runtime,
+        schemaVersion: "abc",
+        app: "backend",
+        kind: "backend",
+        entry: {
+            config: "config",
+            static: [{ path: "/", dir: "static/site", spa: true, preload: ["/app.js"] }],
+            // A future entry kind this runtime has never heard of.
+            workers: "workers"
+        },
+        hooks: { native: false },
+        deps: { declared: {} },
+        // Whole sections added by a later CLI.
+        telemetry: { sampleRate: 0.1 },
+        edge: { regions: ["fra1"] }
+    }, ["static/site/index.html"]);
+
+    it("loads, ignoring what it does not recognise", () => {
+        const bundle = loadBundle(futureBundle());
+        expect(bundle.manifest.kind).toBe("backend");
+        expect(bundle.staticApps).toHaveLength(1);
+    });
+
+    it("still reads every field it does know", () => {
+        const bundle = loadBundle(futureBundle());
+        expect(bundle.manifest.entry?.config).toBe("config");
+        expect(bundle.staticApps[0]).toMatchObject({ path: "/",
+spa: true });
+    });
+});
+
+/**
+ * Changing either version number is a coordinated release, not an edit.
+ *
+ * These constants are the contract between three independently-shipped things,
+ * and one of them — the control plane — keeps a hand-written copy of this shape
+ * because it cannot depend on this package. Nothing can make that copy update
+ * itself. What this test can do is make the bump impossible to perform by
+ * accident: it fails, and the failure is the checklist.
+ *
+ * Raising BUNDLE_FORMAT_VERSION means, in this order:
+ *
+ *   1. Teach `upgradeLegacyManifest` (boot/bundle.ts) to read the OLD shape.
+ *      Old bundles booting on new runtimes is the reason the number exists, and
+ *      it is the direction nothing else checks — a missing field simply reads as
+ *      undefined and every gate keyed on it skips, silently.
+ *   2. Raise SUPPORTED_BUNDLE_FORMAT in the control plane
+ *      (saas/backend/src/managed/bundle-manifest.ts) and teach
+ *      `parseBundleManifest` to accept BOTH shapes.
+ *   3. SHIP THE CONTROL PLANE FIRST. It rejects a format it does not know, so a
+ *      CLI released ahead of it turns every deploy into MALFORMED_MANIFEST or
+ *      BUNDLE_FORMAT_TOO_NEW, and the message blames the user's manifest.
+ *   4. Then release the CLI and the runtime image.
+ *
+ * Raising RUNTIME_CONTRACT_VERSION additionally invalidates every project's
+ * `rebase` range, so it is a major of the whole product, not a format tweak.
+ */
+describe("the version constants", () => {
+    it("are what every current consumer was written against", () => {
+        expect(BUNDLE_FORMAT_VERSION).toBe(2);
+        expect(RUNTIME_CONTRACT_VERSION).toBe(1);
+    });
+});

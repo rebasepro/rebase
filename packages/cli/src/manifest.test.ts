@@ -259,6 +259,85 @@ describe("validateManifest", () => {
     });
 });
 
+/**
+ * Unknown fields are warned about, never fatal.
+ *
+ * Both halves matter. A typo silently dropped is the blank-page class of bug —
+ * `pathh` builds for `/`, mounts at `/`, and the only symptom is the app not
+ * being where you put it. But an unknown field is also exactly what an older
+ * CLI sees in a manifest written for a newer one, and failing there would make
+ * every future field a breaking change.
+ */
+describe("unknown fields", () => {
+    let warnings: string[];
+    let warn: typeof console.warn;
+
+    beforeEach(() => {
+        warnings = [];
+        warn = console.warn;
+        console.warn = (msg?: unknown) => { warnings.push(String(msg)); };
+    });
+    afterEach(() => { console.warn = warn; });
+
+    const validate = (app: Record<string, unknown>) =>
+        validateManifest({ rebase: "^1",
+apps: { admin: app } });
+
+    it("names a typo and suggests the field it nearly is", () => {
+        const { issues } = validate({ type: "static",
+root: "a",
+output: "a/dist",
+pathh: "/admin" });
+
+        expect(issues).toEqual([]);           // not fatal
+        expect(warnings.join(" ")).toMatch(/apps\.admin\.pathh/);
+        expect(warnings.join(" ")).toMatch(/Did you mean "path"/);
+    });
+
+    it("still accepts a field from the future, saying it is ignored", () => {
+        const { manifest, issues } = validate({
+            type: "static",
+            root: "a",
+            output: "a/dist",
+            edgeRegions: ["fra1"]
+        });
+
+        expect(issues).toEqual([]);
+        expect(manifest?.apps.admin).toBeDefined();
+        expect(warnings.join(" ")).toMatch(/older than this manifest/);
+    });
+
+    it("says nothing about a manifest that uses only known fields", () => {
+        // A guard that cries wolf gets ignored, and then it is not a guard.
+        validateManifest({
+            rebase: "^1",
+            apps: {
+                backend: { type: "backend",
+runtime: "custom",
+dockerfile: "Dockerfile",
+context: ".",
+port: 8080 },
+                admin: { type: "static",
+root: "a",
+build: "x",
+output: "a/dist",
+path: "/admin",
+spa: true }
+            }
+        });
+
+        expect(warnings).toEqual([]);
+    });
+
+    it("does not suggest a wildly different field", () => {
+        validate({ type: "static",
+root: "a",
+output: "a/dist",
+somethingElseEntirely: 1 });
+        expect(warnings.join(" ")).not.toMatch(/Did you mean/);
+    });
+});
+
 describe("synthesizeManifest", () => {
     it("infers the stock template layout", () => {
         mkdir("config/collections");
