@@ -10,7 +10,13 @@ import type { CollectionConfig } from "@rebasepro/types";
  * version's auth queries would break against the migrated shape. Additive
  * changes (a new nullable column nobody older references) do not need a bump.
  *
- * History:
+ * History. Note that 1 is a label for an era, not a value any database holds:
+ * stamping did not exist then, so an era-1 database reads as unstamped
+ * (`null`), and 2 is the first version ever actually written. The numbering
+ * starts at 2 only because two schema eras already existed when it was
+ * introduced; it could just as well have started at 1. It is not worth
+ * renumbering now — deployed databases already carry 2, and lowering the
+ * constant would make them look newer than the runtime and refuse the boot.
  *
  *   1 — Device-session refresh tokens. A row *was* a session, identified by
  *       `unique_device_session UNIQUE (uid, user_agent, ip_address)`, and
