@@ -103,6 +103,14 @@ jobs:
       - name: Package name guard
         run: pnpm run check:names
 
+      # Nothing in any pipeline ran ESLint. `verify-quality.sh` does, but that is
+      # a script a human chooses to run, so a lint error could sit on main
+      # indefinitely — and one was: a `no-control-regex` error in
+      # packages/rls-check. `--quiet` (errors only) matches what that script
+      # treats as a hard failure; warnings stay advisory.
+      - name: Lint
+        run: npx eslint . --quiet
+
       - name: Build packages
         run: pnpm run build
         env:
