@@ -95,17 +95,19 @@ if (fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModules)) {
 // different version was never actually running that version — it just got a
 // second, dead one alongside it.
 //
-// Only packages this image itself provides are redirected; everything else the
-// project declared is left exactly as installed.
-const RUNTIME_PROVIDED = [
-    "@rebasepro/server",
-    "@rebasepro/server-postgres",
-    "@rebasepro/types",
-    "@rebasepro/utils",
-    "@rebasepro/common",
-    "@rebasepro/client",
-    "@rebasepro/codegen"
-];
+// ONLY `@rebasepro/server`, deliberately — not every package the image happens
+// to ship. The image installs the narrow set of dependencies the runtime itself
+// needs, while the bundle's `npm install` resolved each package's FULL
+// dependency tree; redirecting a package to the image's copy therefore risks
+// pointing it at a tree that is missing something. `@rebasepro/server-postgres`
+// is the proof: the image's copy has no `chokidar`, so redirecting it took the
+// database driver down and the pod crash-looped.
+//
+// `@rebasepro/server` is the one package where the redirect is both necessary
+// and provably safe — necessary because it holds the singleton, and safe
+// because this very file imports it from the image below. If the image's copy
+// could not load, the runtime would not be running at all.
+const RUNTIME_PROVIDED = ["@rebasepro/server"];
 
 const imageModules = path.join(path.dirname(fileURLToPath(import.meta.url)), "node_modules");
 
