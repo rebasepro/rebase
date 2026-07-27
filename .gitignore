@@ -43,7 +43,11 @@ report.**.json
 !.yarn/sdks
 !.yarn/versions
 /.yarn/install-state.gz
-/website-astro-v2/.firebase/hosting.ZGlzdA.cache
+# Firebase Hosting's per-deploy upload cache. The path was
+# /website-astro-v2/.firebase/... until the directory was renamed to website/,
+# after which nothing matched and the cache was committed by accident.
+# Directory-wide, so a differently-named site cache cannot slip through again.
+/website/.firebase/
 app/frontend/debug_trace**
 .rebase-dev-port
 .rebase/
