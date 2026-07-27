@@ -201,8 +201,16 @@ export interface ManagedCompatibility {
  * not read. A runtime accepts any bundle whose `bundleFormat` is less than or
  * equal to its own — old bundles keep booting on new runtimes, which is the
  * whole point of separating the artifact from the engine.
+ *
+ * - **1** — `mode: "cms" | "baas" | "static"`, `entry.static` a single directory
+ *   string, `entry.admin` for a bundled admin panel.
+ * - **2** — `kind: "backend" | "static"`, `entry.static` a list of
+ *   {@link RebaseBundleStatic}, `entry.admin` removed. A format-1 runtime reading
+ *   one of these would find no `mode` and an array where it expects a string, so
+ *   the bump is what turns that into a refusal to boot instead of a bundle that
+ *   starts and serves nothing.
  */
-export const BUNDLE_FORMAT_VERSION = 1;
+export const BUNDLE_FORMAT_VERSION = 2;
 
 /**
  * The runtime contract major.

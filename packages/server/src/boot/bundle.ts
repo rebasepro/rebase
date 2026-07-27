@@ -52,6 +52,48 @@ export interface LoadedStaticApp {
 const MANIFEST_FILENAME = "manifest.json";
 
 /**
+ * Bring a format-1 manifest up to the shape the rest of this runtime expects.
+ *
+ * Old bundles booting on a new runtime is the case the format version exists to
+ * protect, so this is not a courtesy — it is the contract. A project built
+ * before the rename ships `mode` and a single `entry.static` directory string,
+ * and without this it would boot with no `kind` (so every gate keyed on
+ * `kind === "backend"` would skip) and an `entry.static` the loader would try to
+ * iterate as a list.
+ *
+ * In place, and only ever filling in what is absent, so a format-2 manifest
+ * passes through untouched.
+ */
+function upgradeLegacyManifest(manifest: RebaseBundleManifest): void {
+    const legacy = manifest as RebaseBundleManifest & {
+        mode?: string;
+        entry?: { static?: unknown; admin?: unknown };
+    };
+
+    if (!legacy.kind) {
+        // `cms` and `baas` were both backends — the distinction between them is
+        // derived from `entry.config` now.
+        legacy.kind = legacy.mode === "static" ? "static" : "backend";
+    }
+
+    const entry = legacy.entry;
+    if (!entry) return;
+
+    if (typeof entry.static === "string") {
+        entry.static = [{ path: "/",
+dir: entry.static,
+spa: true }];
+    } else if (!entry.static && typeof entry.admin === "string") {
+        // A format-1 bundled admin panel was served at the root, exactly as a
+        // static app was — `staticDir ?? adminDir`, one or the other.
+        entry.static = [{ path: "/",
+dir: entry.admin,
+spa: true }];
+    }
+    delete entry.admin;
+}
+
+/**
  * Read and validate a bundle's manifest.
  *
  * The checks here are the runtime half of the compatibility contract, and they
@@ -92,6 +134,8 @@ export function readBundleManifest(bundleDir: string): RebaseBundleManifest {
             "Upgrade the runtime image, or rebuild the bundle with a matching CLI."
         );
     }
+
+    upgradeLegacyManifest(manifest);
 
     const contract = manifest.runtime?.contract;
     if (typeof contract === "number" && contract !== RUNTIME_CONTRACT_VERSION) {
