@@ -1,3 +1,4 @@
+import { fileURLToPath } from "url";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -404,5 +405,31 @@ spa: true }]);
         const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
         expect(() => fold(bundleDir, path.join(bundleDir, "nope")))
             .toThrow(/No built assets/i);
+    });
+});
+
+/**
+ * A custom runtime's artifact is an image, not a bundle.
+ *
+ * `rebase build` had no `runtime` check, so an ejected project still got a
+ * `dist-bundle/` built for it — one it never deploys. That is worse than doing
+ * nothing, because it looks like the thing that ships.
+ */
+describe("what `rebase build` does with each runtime", () => {
+    function read(relative: string): string {
+        const here = path.dirname(fileURLToPath(import.meta.url));
+        return fs.readFileSync(path.join(here, relative), "utf8");
+    }
+
+    it("skips the bundle for a custom backend", () => {
+        const source = read("commands/build.ts");
+        expect(source).toMatch(/app\.type === "backend" && app\.runtime === "custom"/);
+        // …and the skip must come BEFORE the branch that bundles, or it never runs.
+        expect(source.indexOf('app.runtime === "custom"'))
+            .toBeLessThan(source.indexOf("const result = await buildBundle("));
+    });
+
+    it("still bundles a managed backend", () => {
+        expect(read("commands/build.ts")).toContain("const result = await buildBundle(");
     });
 });

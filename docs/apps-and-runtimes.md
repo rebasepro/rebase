@@ -761,6 +761,40 @@ forever (§4.3).
 
 ---
 
+### 4.10b Can a custom self-hosted project ignore `rebase.json`?
+
+Yes — and that already works, because a missing manifest is never an error.
+`loadManifest` synthesizes one from the directory layout, and
+`synthesizeManifest` infers `runtime: "custom"` from a Dockerfile, so deleting
+the file preserves behaviour rather than changing it.
+
+What the manifest is actually *for*, per consumer:
+
+| Command | What it reads it for | Needed by custom + self-hosted? |
+|---|---|---|
+| `build` | which apps to build, bundle entry paths, folding | **No** — it builds an image |
+| `dev` | where `config`/`functions`/`crons`/`schema` live | Only if they are not in the conventional places |
+| `eject` | find the backend, flip `runtime` | One-time |
+| `apps list` / `apps config` | inspection | No |
+| `cloud deploy` | app registration, runtime routing | Cloud only |
+| `db`, `schema`, `generate-sdk` | **nothing — they never read it** | No |
+
+So for a custom, self-hosted project the manifest earns exactly one thing:
+directory overrides for `rebase dev`. Everything else it declares is about
+building a bundle, and that project does not build one.
+
+**The bug this question surfaced.** `rebase build` had no `runtime` check, so an
+ejected project still got a `dist-bundle/` built for it — one it never deploys.
+That is worse than doing nothing: it looks like the thing that ships. A custom
+backend is now skipped, with the two commands that *do* build it named
+(`npm run build --workspace backend`, then `docker build`).
+
+The honest summary for a self-hoster on the custom runtime: **keep the file only
+if your directories are unconventional, or if you may go back to `managed`.**
+Otherwise delete it; nothing will miss it.
+
+---
+
 ---
 
 ## 4.11 How this holds when things change

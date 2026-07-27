@@ -126,6 +126,18 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
     for (const { name, app } of targets) {
         console.log(chalk.cyan(`▸ ${name}`) + chalk.dim(` (${app.type})`));
 
+        if (app.type === "backend" && app.runtime === "custom") {
+            // An ejected backend's artifact is an IMAGE, not a bundle. Building
+            // one anyway produced a `dist-bundle/` the project never deploys,
+            // which is worse than doing nothing: it looks like the thing that
+            // ships. The workspace's own `build` script compiles this app, and
+            // the Dockerfile turns it into the image.
+            console.log(chalk.dim("  custom runtime — this project builds its own image, not a bundle"));
+            console.log(chalk.dim(`    ${chalk.cyan(`npm run build --workspace ${name}`)}  then  ${chalk.cyan(`docker build -f ${app.dockerfile ?? "Dockerfile"} .`)}`));
+            console.log("");
+            continue;
+        }
+
         if (app.type === "backend") {
             const result = await buildBundle({
                 projectRoot,
