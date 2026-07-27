@@ -119,17 +119,22 @@ export interface DatabaseAdapterInitConfig {
     /** The shared collection registry to register into. */
     collectionRegistry: CollectionRegistryInterface;
     /**
-     * How the server is being run — see `RebaseBackendConfig.mode`.
+     * Whether this driver should describe its own schema.
      *
-     * In `"baas"` mode `collections` is empty by design: a driver that can
-     * describe its own schema should introspect the database and report the
-     * collections it found back on `InitializedDriver.collections`. Drivers
-     * that cannot introspect may ignore this.
+     * True when the project declared no collections, so there is nothing to
+     * serve unless the driver reads the live database and reports what it found
+     * on `InitializedDriver.collections`. Drivers that cannot introspect may
+     * ignore it — `initializeRebaseBackend` fails the boot with their name
+     * rather than serving nothing.
+     *
+     * This was a `mode: "cms" | "baas"` flag, which was never independent of
+     * `collections`: every consumer already required the list to be empty
+     * before acting on it, so the flag could only ever agree or contradict.
      */
-    mode?: "cms" | "baas";
+    introspectCollections?: boolean;
     /**
-     * `baas`-mode options — see `RebaseBackendConfig.baas`. Drivers that
-     * introspect should honour `unprotectedTables`.
+     * Options for an introspecting driver — see `RebaseBackendConfig.baas`.
+     * Drivers that introspect should honour `unprotectedTables`.
      */
     baas?: { unprotectedTables?: "exclude" | "serve" };
 }

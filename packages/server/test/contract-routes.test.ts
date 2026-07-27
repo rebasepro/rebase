@@ -31,8 +31,7 @@ describe("contract routes", () => {
     it("serves the version recorded at build time", async () => {
         const app = mount({
             collectionRegistry: { getRawCollections: () => [collection("posts")] },
-            schemaVersion: "v1:deadbeefdeadbeef",
-            mode: "cms"
+            schemaVersion: "v1:deadbeefdeadbeef"
         });
 
         const response = await app.request("/api/meta/schema-version");
@@ -44,23 +43,19 @@ describe("contract routes", () => {
     });
 
     it("computes the version from live collections when the build recorded none", async () => {
-        // This is `baas` mode: the collections are introspected from the
+        // Collections introspected from the
         // database at boot, so the build genuinely could not know them. Quoting
         // a build-time stamp there would publish the hash of an empty list as
         // the identity of whatever the runtime actually found.
         const collections = [collection("posts"), collection("authors")];
         const app = mount({
             collectionRegistry: { getRawCollections: () => collections },
-            schemaVersion: "",
-            mode: "baas"
+            schemaVersion: ""
         });
 
         const body = await (await app.request("/api/meta/schema-version")).json() as {
             schemaVersion: string;
-            mode: string;
         };
-
-        expect(body.mode).toBe("baas");
         expect(body.schemaVersion).toBe(computeSchemaVersion(collections));
         expect(body.schemaVersion).not.toBe(computeSchemaVersion([]));
     });
@@ -76,8 +71,7 @@ describe("contract routes", () => {
                     reads++;
                     return [collection("posts")];
                 }
-            },
-            mode: "baas"
+            }
         });
 
         const first = await (await app.request("/api/meta/schema-version")).json() as { schemaVersion: string };
@@ -100,8 +94,7 @@ describe("contract routes", () => {
 
         const app = mount({
             collectionRegistry: { getRawCollections: () => [withRules] },
-            schemaVersion: "v1:0000000000000000",
-            mode: "cms"
+            schemaVersion: "v1:0000000000000000"
         });
 
         const raw = await (await app.request("/api/meta/contract")).text();
@@ -114,8 +107,7 @@ describe("contract routes", () => {
     it("reports the collection slugs it serves", async () => {
         const app = mount({
             collectionRegistry: { getRawCollections: () => [collection("posts"), collection("authors")] },
-            schemaVersion: "v1:0000000000000000",
-            mode: "cms"
+            schemaVersion: "v1:0000000000000000"
         });
 
         const body = await (await app.request("/api/meta/contract")).json() as {

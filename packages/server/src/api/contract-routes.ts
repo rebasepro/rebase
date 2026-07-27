@@ -37,7 +37,6 @@ export interface ContractRoutesConfig {
      * at boot, so there was nothing to hash when it was built.
      */
     schemaVersion?: string;
-    mode: "cms" | "baas";
     /** Runtime package version, surfaced so a client can report what it built against. */
     runtimeVersion?: string;
 }
@@ -100,7 +99,6 @@ export function createContractRoutes(config: ContractRoutesConfig): Hono<HonoEnv
                 version: config.runtimeVersion ?? "unknown",
                 contract: RUNTIME_CONTRACT_VERSION
             },
-            mode: config.mode,
             collections: serialized,
             collectionSlugs: collections
                 .map(collection => collection.slug)
@@ -124,8 +122,7 @@ export function createContractRoutes(config: ContractRoutesConfig): Hono<HonoEnv
     router.get("/schema-version", (c) => {
         const schemaVersion = schemaVersionOf(config.collectionRegistry.getRawCollections());
         c.header(SCHEMA_VERSION_HEADER, schemaVersion);
-        return c.json({ schemaVersion,
-mode: config.mode });
+        return c.json({ schemaVersion, });
     });
 
     logger.debug("Contract routes mounted");

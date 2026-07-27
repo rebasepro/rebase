@@ -57,15 +57,22 @@ export type TemplatePreset = "blog" | "ecommerce" | "blank";
  * values match `RebaseBackendConfig.mode`, which is what the generated backend
  * sets — the labels below are what users actually read.
  */
-export type TemplateFlavor = "cms" | "baas";
-
-const FLAVOR_CHOICES: Array<{ name: string; value: TemplateFlavor; short: string }> = [
-    { name: "BaaS + admin  — API plus an admin UI, driven by collections you define (like Payload/Directus)",
-value: "cms",
-short: "BaaS + admin" },
-    { name: "BaaS only     — headless API over your database. No collections, no UI (like Supabase)",
-value: "baas",
-short: "BaaS only" }
+/**
+ * Whether to scaffold the admin panel alongside the backend.
+ *
+ * A boolean, not a named pair. It was `--flavor cms|baas`, and neither word
+ * survived what they described: "cms" is a product category rather than a thing
+ * this tool builds, and "baas" was the same value that used to appear as
+ * `backend.mode` — which is now derived from whether collections are declared.
+ * What is left is one question: does this project get an admin UI?
+ */
+const HEADLESS_CHOICES: Array<{ name: string; value: boolean; short: string }> = [
+    { name: "Backend + admin  — API plus an admin UI, driven by collections you define (like Payload/Directus)",
+value: false,
+short: "Backend + admin" },
+    { name: "Backend only     — headless API over your database. No collections, no UI (like Supabase)",
+value: true,
+short: "Backend only" }
 ];
 
 const PRESET_CHOICES: Array<{ name: string; value: TemplatePreset; short: string }> = [
@@ -93,7 +100,8 @@ export interface InitOptions {
     /** Whether `preset` came from an explicit --template rather than the default. */
     explicitPreset?: boolean;
     /** Which parts of Rebase to scaffold. */
-    flavor: TemplateFlavor;
+    /** Scaffold the backend alone, with no admin panel and no collections. */
+    headless: boolean;
     /** Detected package manager (pnpm or npm). */
     pm: PackageManager;
     /** Command helpers for the detected PM. */
@@ -109,7 +117,7 @@ export interface InitOptions {
 export interface BuildQuestionsParams {
     nameArg?: string;
     templateArg?: TemplatePreset;
-    flavorArg?: TemplateFlavor;
+    headlessArg?: boolean;
     hasGitFlag: boolean;
     hasInstallFlag: boolean;
     pm: PackageManager;
@@ -121,7 +129,7 @@ export interface BuildQuestionsParams {
  * types registered by the installed version of inquirer.
  */
 export function buildInitQuestions(params: BuildQuestionsParams): Record<string, unknown>[] {
-    const { nameArg, templateArg, flavorArg, hasGitFlag, hasInstallFlag, pm } = params;
+    const { nameArg, templateArg, headlessArg, hasGitFlag, hasInstallFlag, pm } = params;
     const questions: Record<string, unknown>[] = [];
 
     if (!nameArg) {
@@ -134,13 +142,13 @@ export function buildInitQuestions(params: BuildQuestionsParams): Record<string,
         });
     }
 
-    if (!flavorArg) {
+    if (headlessArg === undefined) {
         questions.push({
             type: "select",
-            name: "flavor",
+            name: "headless",
             message: "What do you want to build?",
-            choices: FLAVOR_CHOICES,
-            default: "cms"
+            choices: HEADLESS_CHOICES,
+            default: false
         });
     }
 
@@ -152,7 +160,7 @@ export function buildInitQuestions(params: BuildQuestionsParams): Record<string,
             choices: PRESET_CHOICES,
             default: "blog",
             // BaaS has no collection files, so a collections preset is moot.
-            when: (answers: Record<string, unknown>) => (flavorArg ?? answers.flavor) !== "baas"
+            when: (answers: Record<string, unknown>) => !(headlessArg ?? answers.headless)
         });
     }
 
@@ -222,7 +230,7 @@ ${chalk.bold("Usage")}
 
 ${chalk.bold("Options")}
   ${chalk.blue("-t, --template")} ${chalk.gray("<preset>")}   blog | ecommerce | blank ${chalk.gray("(default: blog)")}
-  ${chalk.blue("-f, --flavor")} ${chalk.gray("<flavor>")}     cms | baas ${chalk.gray("(default: cms)")}
+  ${chalk.blue("--headless")}                Backend only — no admin panel, no collections
   ${chalk.blue("-y, --yes")}                 Accept defaults, never prompt ${chalk.gray("(required for CI / non-TTY)")}
   ${chalk.blue("-i, --install")}             Install dependencies after scaffolding
   ${chalk.blue("-g, --git")}                 Initialize a git repository and make an initial commit
@@ -231,14 +239,14 @@ ${chalk.bold("Options")}
   ${chalk.blue("--project")} ${chalk.gray("<slug>")}          Link the scaffold to a Rebase Cloud project
   ${chalk.blue("--setup-key")} ${chalk.gray("<key>")}         One-time key authenticating the cloud link ${chalk.gray("(use with --project)")}
 
-${chalk.bold("Flavors")}
-  ${chalk.blue("cms")}   BaaS + admin UI, driven by collections you define ${chalk.gray("(like Payload/Directus)")}
-  ${chalk.blue("baas")}  Headless API over your database — no collections, no UI ${chalk.gray("(like Supabase)")}
-        ${chalk.gray("--template has no effect on this flavor.")}
+${chalk.bold("What gets scaffolded")}
+  ${chalk.gray("default")}     Backend + an admin UI, driven by collections you define ${chalk.gray("(like Payload/Directus)")}
+  ${chalk.blue("--headless")}  Backend only, over your existing database ${chalk.gray("(like Supabase)")}
+              ${chalk.gray("--template has no effect: there are no collections to seed.")}
 
 ${chalk.bold("Examples")}
   ${chalk.gray("$")} rebase init my-shop --template ecommerce --install
-  ${chalk.gray("$")} rebase init my-api --flavor baas --yes
+  ${chalk.gray("$")} rebase init my-api --headless --yes
   ${chalk.gray("$")} rebase init . --yes --git
 `);
 }
@@ -266,14 +274,13 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             "--database-url": String,
             "--introspect": Boolean,
             "--template": String,
-            "--flavor": String,
+            "--headless": Boolean,
             "--project": String,
             "--setup-key": String,
             "--yes": Boolean,
             "-g": "--git",
             "-i": "--install",
             "-t": "--template",
-            "-f": "--flavor",
             "-y": "--yes"
         },
         {
@@ -305,11 +312,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         process.exit(1);
     }
 
-    const flavorArg = args["--flavor"] as TemplateFlavor | undefined;
-    if (flavorArg && !FLAVOR_CHOICES.some(f => f.value === flavorArg)) {
-        console.error(chalk.red(`Unknown flavor "${flavorArg}". Available: ${FLAVOR_CHOICES.map(f => f.value).join(", ")}`));
-        process.exit(1);
-    }
+    const headlessArg = args["--headless"] === true ? true : undefined;
 
     if (isNonInteractive) {
         const projectName = nameArg || "my-rebase-app";
@@ -327,7 +330,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
             introspect: args["--introspect"] || false,
             preset: templateArg || "blog",
             explicitPreset: !!templateArg,
-            flavor: flavorArg || "cms",
+            headless: headlessArg ?? false,
             pm,
             pmCommands,
             cloudProject: args["--project"] || undefined,
@@ -342,15 +345,15 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
     if (!process.stdin.isTTY) {
         console.error(chalk.red("Cannot prompt: this is a non-interactive terminal (no TTY)."));
         console.error(chalk.yellow("  Re-run with --yes to accept defaults, passing any choices as flags, e.g.:"));
-        console.error(chalk.yellow(`    rebase init ${nameArg || "my-app"} --yes --template blog --flavor cms`));
-        console.error(chalk.gray("  Options: --template <blog|ecommerce|blank>  --flavor <cms|baas>  --database-url <url>  --install  --git"));
+        console.error(chalk.yellow(`    rebase init ${nameArg || "my-app"} --yes --template blog`));
+        console.error(chalk.gray("  Options: --template <blog|ecommerce|blank>  --headless  --database-url <url>  --install  --git"));
         process.exit(1);
     }
 
     const questions = buildInitQuestions({
         nameArg,
         templateArg,
-        flavorArg,
+        headlessArg,
         hasGitFlag: !!args["--git"],
         hasInstallFlag: !!args["--install"],
         pm
@@ -376,7 +379,7 @@ async function promptForOptions(rawArgs: string[], pm: PackageManager): Promise<
         // Only a flag is "explicit" here: the interactive path never asks for a
         // preset once baas is chosen, so it can't produce a conflicting answer.
         explicitPreset: !!templateArg,
-        flavor: flavorArg || (answers.flavor as TemplateFlavor) || "cms",
+        headless: headlessArg ?? Boolean(answers.headless),
         pm,
         pmCommands,
         cloudProject: args["--project"] || undefined,
@@ -484,12 +487,12 @@ async function createProject(options: InitOptions) {
     }
 
     // Apply the selected template preset (swap collection files)
-    if (options.flavor === "baas" && options.explicitPreset) {
+    if (options.headless && options.explicitPreset) {
         // baas has no collections, so there is nothing for a preset to swap.
         // Say so rather than accepting the flag and silently dropping it.
-        console.log(chalk.yellow(`  Ignoring --template ${options.preset}: the baas flavor has no collections.`));
+        console.log(chalk.yellow(`  Ignoring --template ${options.preset}: a headless project declares no collections.`));
     }
-    if (options.flavor !== "baas") {
+    if (!options.headless) {
         // When introspecting, the database is the source of truth: start from
         // the blank preset so example collections never register on top of
         // tables the database doesn't have.
@@ -499,8 +502,8 @@ async function createProject(options: InitOptions) {
         await applyPreset(options.targetDirectory, options.introspect ? "blank" : options.preset);
     }
 
-    // Reduce the project to the selected flavor
-    await applyFlavor(options.targetDirectory, options.flavor);
+    // Reduce the project to the selected shape
+    await applyHeadless(options.targetDirectory, options.headless);
 
     // Replace placeholder project name in package.json files
     await replacePlaceholders(options);
@@ -611,7 +614,7 @@ async function createProject(options: InitOptions) {
     console.log("");
     const runDev = pmCommands.run("dev");
     const runDbPush = pmCommands.run("db:push");
-    const isBaas = options.flavor === "baas";
+    const isBaas = options.headless;
     // The path the user has to type, not the project's basename: `init
     // apps/my-app` must say `cd apps/my-app`, and `init .` needs no cd at all
     // because they are already standing in the project.
@@ -698,9 +701,9 @@ async function createProject(options: InitOptions) {
  * presets directory so the final project is clean.
  */
 /**
- * Reduce the scaffolded project to the chosen flavor.
+ * Reduce the scaffolded project to the chosen shape.
  *
- * The base template is the full triad. `baas` drops the frontend and the
+ * The base template is the full triad. `--headless` drops the frontend and the
  * declared collections — there is nothing to define, since the server derives
  * its API from the database — and overlays the files that differ.
  *
@@ -712,8 +715,8 @@ async function createProject(options: InitOptions) {
  * docker-compose.yml enables storage — so the first `docker compose up` would
  * crash-loop.
  */
-async function applyFlavor(targetDirectory: string, flavor: TemplateFlavor): Promise<void> {
-    if (flavor !== "baas") return;
+async function applyHeadless(targetDirectory: string, headless: boolean): Promise<void> {
+    if (!headless) return;
 
     fs.rmSync(path.join(targetDirectory, "frontend"), { recursive: true, force: true });
     // Collections only. `rebase build` reads the absence of this directory as

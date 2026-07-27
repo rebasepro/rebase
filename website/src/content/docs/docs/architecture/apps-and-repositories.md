@@ -171,7 +171,7 @@ version stamp reveals nothing about the schema it stands for:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","mode":"cms"}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a"}
 ```
 
 Comparing the two in CI turns a silent mismatch into a failed check. The stamp

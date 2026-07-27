@@ -191,10 +191,6 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         server,
         app,
         basePath: env.REBASE_BASE_PATH,
-        // Where collections come from is derived, not declared: a bundle that
-        // ships a config package has them, one that does not introspects the
-        // live database at boot.
-        mode: bundle.collectionsDir ? "cms" : "baas",
         collectionsDir: bundle.collectionsDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,

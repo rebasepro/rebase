@@ -31,7 +31,7 @@ const tsc = path.join(repoRoot, "node_modules/.bin/tsc");
 /** Presets offered by `rebase init`, from TemplatePreset. */
 const PRESETS = ["blog", "ecommerce", "blank"];
 
-/** The `--flavor baas` scaffold, checked as its own variant. */
+/** The `--headless` scaffold, checked as its own variant. */
 const BAAS = "baas";
 
 /** Files the blog preset owns; other presets replace them. Mirrors applyPreset. */

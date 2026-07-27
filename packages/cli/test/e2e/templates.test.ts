@@ -139,7 +139,6 @@ async function scaffold(name: string, preset: string, flavor: string, databaseUr
         cliBin, "init", name,
         "--yes",
         "--template", preset,
-        "--flavor", flavor,
         "--database-url", databaseUrl
     ], { cwd: tempDir, env });
 

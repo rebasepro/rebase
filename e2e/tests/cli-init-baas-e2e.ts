@@ -1,5 +1,5 @@
 /**
- * End-to-end for the BaaS flavor: `rebase init --flavor baas`.
+ * End-to-end for the headless scaffold: `rebase init --headless`.
  *
  * Scaffolds a headless project the way a user would, installs it from real
  * tarballs, points it at a database whose tables it has never been told about,
@@ -122,14 +122,13 @@ async function run() {
 
     try {
         // ── 1. Scaffold ──────────────────────────────────────────────────
-        console.log("\n📦 Step 1: Scaffolding a BaaS project via CLI init --flavor baas...");
+        console.log("\n📦 Step 1: Scaffolding a headless project via CLI init --headless...");
         await execa("node", [
             cliBin,
             "init",
             path.basename(projectPath),
             "--yes",
-            "--flavor",
-            "baas",
+            "--headless",
             "--database-url",
             container.connectionString
         ], { cwd: rootDir, env: cleanEnv, stdio: "inherit" });
@@ -137,12 +136,22 @@ async function run() {
         // ── 2. Structure ─────────────────────────────────────────────────
         console.log("\n🔍 Step 2: Checking the scaffolded structure...");
         check("no frontend/ directory", !fs.existsSync(path.join(projectPath, "frontend")));
-        check("no config/ directory", !fs.existsSync(path.join(projectPath, "config")));
+        check("no declared collections", !fs.existsSync(path.join(projectPath, "config", "collections")));
         check("no generated drizzle schema", !fs.existsSync(path.join(projectPath, "backend", "src", "schema.generated.ts")));
 
-        const backendEntry = fs.readFileSync(path.join(projectPath, "backend", "src", "index.ts"), "utf8");
-        check("backend runs in baas mode", backendEntry.includes('mode: "baas"'));
-        check("backend does not serve an SPA", !backendEntry.includes("serveSPA("));
+        // The config PACKAGE survives, holding storageAuthorize and nothing
+        // else. Storage is not under row-level security, so deleting it would
+        // leave the boot guard nothing to find and the scaffold's own
+        // docker-compose.yml — which enables storage — would crash-loop.
+        const configIndex = path.join(projectPath, "config", "index.ts");
+        check("config package exports the storage hook",
+            fs.existsSync(configIndex) && fs.readFileSync(configIndex, "utf8").includes("storageAuthorize"));
+
+        // There is no entrypoint to inspect: a managed project does not have
+        // one, and where collections come from is derived from the absence of
+        // config/collections rather than declared by a `mode` anywhere.
+        check("no stranded server entrypoint",
+            !fs.existsSync(path.join(projectPath, "backend", "src", "index.ts")));
 
         // ── 3. Install from real tarballs ────────────────────────────────
         console.log("\n📥 Step 3: Installing dependencies from local tarballs...");

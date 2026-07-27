@@ -672,11 +672,12 @@ The deploy still *decides* rather than obeying a stored mode (`saas`
 `deploy-plan.ts` documents why at length): shipping a bundle is what earns
 `managed`. The manifest is now what makes shipping one the default.
 
-**Not changed: `RebaseProjectContract.mode`.** `GET /api/meta/contract` still
-serves `mode: "cms" | "baas"`. It is a wire contract consumed by SDK generation,
-it describes the *running server's* collections source rather than anything in
-the manifest, and renaming it would break generation against older servers for
-no gain. It is the last `cms` in the product and it is deliberate.
+**Also removed: `RebaseProjectContract.mode`.** I first kept this, on the
+grounds that `GET /api/meta/contract` is a wire contract consumed by SDK
+generation. It is not consumed: nothing in the CLI, codegen, client or console
+reads the field. It was emitted and ignored, so it is gone from both
+`/api/meta/contract` and `/api/meta/schema-version`. Under Rule 1 (§4.11) a
+reader that ignored it is unaffected, and there was no reader that did not.
 
 ### 4.10 What `rebase init` scaffolds for self-hosting
 
@@ -724,6 +725,39 @@ test:
 - **`FORCE_LOCAL_STORAGE` only alongside a durable mount.** The flag exists to
   acknowledge a volume; set without one, every uploaded file is destroyed on the
   next restart, which is the failure it was invented to prevent.
+
+### 4.9b `mode: "cms" | "baas"` is gone from the server too
+
+Deleting `backend.mode` from the manifest (D5) left the same pair standing one
+layer down, in `RebaseBackendConfig.mode` — authored by anyone who ejects, and
+passed to every driver. It is now derived everywhere, from one question: **did
+any collections resolve?**
+
+The flag was never independent of that. `PostgresBootstrapper` already guarded
+`mode === "baas" && collections.length === 0`, so it could only ever agree with
+the collections or contradict them — and when it contradicted, the server warned
+and threw the declared collections away. That state cannot be expressed now.
+
+- `RebaseBackendConfig.mode` — deleted. `introspectCollections` is derived after
+  the collections directory is loaded, so a `collectionsDir` pointing at nothing
+  falls through to introspection rather than serving an empty API.
+- `DriverInitConfig.mode` → `introspectCollections: boolean`. A driver may now
+  only contribute collections when it was asked to describe the schema; it can
+  no longer inject whatever the database happens to contain into a project that
+  declared its own.
+- `REBASE_DEV_MODE` — deleted. `createSourceBundle` already drops a config
+  directory that does not exist, so the env var said it a second time, and a
+  second place to say it is a second place for it to disagree.
+- `rebase init --flavor cms|baas` → `--headless` (§4.8, finally implemented).
+  Neither word survived what it described: "cms" is a product category rather
+  than a thing this tool builds, and "baas" was the manifest value that is now
+  derived.
+
+What legitimately remains: `templates/overlays/baas/` as a directory name, and
+`saas`'s reader for format-1 bundles, which must keep understanding `cms`/`baas`
+forever (§4.3).
+
+---
 
 ---
 

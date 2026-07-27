@@ -45,7 +45,7 @@ describe("rebase init --help", () => {
     it("documents every flag init accepts", async () => {
         const out = await init(["--help"]);
         for (const flag of [
-            "--template", "--flavor", "--yes", "--install", "--git",
+            "--template", "--headless", "--yes", "--install", "--git",
             "--database-url", "--introspect", "--project", "--setup-key"
         ]) {
             expect(out).toContain(flag);
@@ -101,7 +101,7 @@ describe("--introspect reporting", () => {
 
 describe("--template against the baas flavor", () => {
     it("says the preset is ignored instead of silently dropping it", async () => {
-        const out = await init(["baas-with-template", "--yes", "--template", "ecommerce", "--flavor", "baas"]);
+        const out = await init(["baas-with-template", "--yes", "--template", "ecommerce", "--headless"]);
         expect(out).toContain("Ignoring --template ecommerce");
 
         // The COLLECTIONS are what a preset supplies, and this flavour declares

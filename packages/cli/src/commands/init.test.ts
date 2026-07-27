@@ -916,31 +916,34 @@ describe("buildInitQuestions", () => {
     });
 });
 
-describe("template flavors", () => {
-    it("asks what to build when --flavor is not given", () => {
+describe("what gets scaffolded", () => {
+    it("asks when --headless is not given", () => {
         const questions = buildInitQuestions({
             nameArg: "x", hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
         });
 
-        const flavor = questions.find((q) => q.name === "flavor");
-        expect(flavor).toBeDefined();
-        expect((flavor as { choices: { value: string }[] }).choices.map((c) => c.value).sort())
-            .toEqual(["baas", "cms"]);
-        // BaaS + admin is the safer thing to land on for someone unsure.
-        expect((flavor as { default: string }).default).toBe("cms");
+        const q = questions.find((q) => q.name === "headless");
+        expect(q).toBeDefined();
+        // A boolean, not a named pair: "cms" was a product category rather than
+        // a thing this tool builds, and "baas" was the manifest value that is
+        // now derived from whether collections exist.
+        expect((q as { choices: { value: boolean }[] }).choices.map((c) => c.value).sort())
+            .toEqual([false, true]);
+        // Backend + admin is the safer thing to land on for someone unsure.
+        expect((q as { default: boolean }).default).toBe(false);
     });
 
-    it("does not ask when --flavor is given", () => {
+    it("does not ask when --headless is given", () => {
         const questions = buildInitQuestions({
-            nameArg: "x", flavorArg: "baas", hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
+            nameArg: "x", headlessArg: true, hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
         });
 
-        expect(questions.find((q) => q.name === "flavor")).toBeUndefined();
+        expect(questions.find((q) => q.name === "headless")).toBeUndefined();
     });
 
-    it("skips the collections preset for baas, which has no collection files", () => {
+    it("skips the collections preset when headless, which declares none", () => {
         const questions = buildInitQuestions({
-            nameArg: "x", flavorArg: "baas", hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
+            nameArg: "x", headlessArg: true, hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
         });
 
         const preset = questions.find((q) => q.name === "preset") as
@@ -948,16 +951,15 @@ describe("template flavors", () => {
         expect(preset?.when?.({})).toBe(false);
     });
 
-    it("asks for a preset once the answer is cms", () => {
+    it("asks for a preset once the answer is not headless", () => {
         const questions = buildInitQuestions({
             nameArg: "x", hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
         });
 
         const preset = questions.find((q) => q.name === "preset") as
             { when?: (a: Record<string, unknown>) => boolean } | undefined;
-        // `when` reads the flavor answer, since --flavor was not supplied.
-        expect(preset?.when?.({ flavor: "cms" })).toBe(true);
-        expect(preset?.when?.({ flavor: "baas" })).toBe(false);
+        expect(preset?.when?.({ headless: false })).toBe(true);
+        expect(preset?.when?.({ headless: true })).toBe(false);
     });
 });
 
@@ -1038,16 +1040,16 @@ describe("init --help", () => {
         // error. If a new one is added to promptForOptions, document it here too.
         const text = helpText();
         for (const flag of [
-            "--template", "--flavor", "--yes", "--install", "--git",
+            "--template", "--headless", "--yes", "--install", "--git",
             "--database-url", "--introspect", "--project", "--setup-key"
         ]) {
             expect(text).toContain(flag);
         }
     });
 
-    it("lists the valid template and flavor values", () => {
+    it("lists the valid template values, and no retired flavor names", () => {
         const text = helpText();
-        for (const value of ["blog", "ecommerce", "blank", "cms", "baas"]) {
+        for (const value of ["blog", "ecommerce", "blank", "--headless"]) {
             expect(text).toContain(value);
         }
     });

@@ -112,10 +112,10 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
         async initializeDriver(config: unknown): Promise<InitializedDriver> {
             // config is passed from coordinator, we merge it with our internal pgConfig if needed
             // Currently config from init.ts is `{ collections, collectionRegistry, mode }`
-            const { collections, collectionRegistry, mode, baas } = config as {
+            const { collections, collectionRegistry, introspectCollections, baas } = config as {
                 collections?: CollectionConfig[];
                 collectionRegistry?: unknown;
-                mode?: "cms" | "baas";
+                introspectCollections?: boolean;
                 baas?: { unprotectedTables?: "exclude" | "serve" };
             };
             // Secure by default: a table with no RLS is not served.
@@ -126,13 +126,13 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 ? (connection as Record<string, unknown>).$client
                 : connection) as import("pg").Pool;
 
-            // ── BaaS mode: derive the schema from the database ───────────────
+            // ── No declared collections: derive the schema from the database ──
             // No collection files and no generated drizzle schema exist, so read
             // the live database and build both from what is actually there.
             let introspectedCollections: CollectionConfig[] | undefined;
             let introspectedTables: Record<string, PgTable> | undefined;
             let introspectedRelations: Record<string, Relations> | undefined;
-            if (mode === "baas" && (!collections || collections.length === 0)) {
+            if (introspectCollections && (!collections || collections.length === 0)) {
                 const pgSchemaName = pgConfig.introspectionSchema ?? "public";
                 const schema = await introspectSchema(rawClient, pgSchemaName);
 

@@ -31,7 +31,6 @@ const bundle = createSourceBundle({
     functions: optional(process.env.REBASE_DEV_FUNCTIONS),
     crons: optional(process.env.REBASE_DEV_CRONS),
     schema: optional(process.env.REBASE_DEV_SCHEMA),
-    mode: process.env.REBASE_DEV_MODE === "baas" ? "baas" : "cms",
     app: optional(process.env.REBASE_DEV_APP)
 });
 

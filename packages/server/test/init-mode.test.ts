@@ -87,10 +87,9 @@ afterEach(() => {
     jest.restoreAllMocks();
 });
 
-describe("mode: baas", () => {
+describe("no declared collections — derived from the database", () => {
     it("serves the collections the driver derived from the database", async () => {
         const { app, backend } = await boot({
-            mode: "baas",
             bootstrappers: [fakeBootstrapper([collection("posts")])]
         });
 
@@ -102,8 +101,9 @@ describe("mode: baas", () => {
     });
 
     it("does not mount the schema editor — there are no collection files to edit", async () => {
+        // A collectionsDir that does not exist declares nothing, so there is
+        // nothing to write back to disk.
         const { app } = await boot({
-            mode: "baas",
             collectionsDir: "/tmp/does-not-matter",
             bootstrappers: [fakeBootstrapper([collection("posts")])]
         });
@@ -111,32 +111,33 @@ describe("mode: baas", () => {
         expect(await mounted(app, "/api/schema-editor/collection/save", "POST")).toBe(false);
     });
 
-    it("ignores configured collections rather than silently serving them", async () => {
+    it("serves declared collections when there ARE any, rather than discarding them", async () => {
+        // This used to be the reverse: `mode: "baas"` alongside declared
+        // collections warned and threw them away. That state cannot be
+        // expressed now — declaring collections IS what makes them served, so
+        // the flag and the data can no longer disagree.
         const { backend } = await boot({
-            mode: "baas",
             collections: [collection("from_config")],
             bootstrappers: [fakeBootstrapper([collection("from_database")])]
         });
 
-        expect(backend.collectionRegistry.getCollections().map(c => c.slug)).toEqual(["from_database"]);
+        expect(backend.collectionRegistry.getCollections().map(c => c.slug)).toEqual(["from_config"]);
     });
 
     it("fails at boot when the driver cannot introspect, instead of serving nothing", async () => {
-        // A driver reporting `undefined` never looked at the schema — baas mode
-        // could only ever 404, so it must not boot "successfully".
+        // A driver reporting `undefined` never looked at the schema, so this
+        // server could only ever 404 — it must not boot "successfully".
         await expect(
             boot({
-                mode: "baas",
                 bootstrappers: [fakeBootstrapper(undefined)]
             })
-        ).rejects.toThrow(/does not support baas mode/);
+        ).rejects.toThrow(/cannot derive collections from the database schema/);
     });
 
     it("warns, but still boots, when the database has no tables yet", async () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
 
         const { app } = await boot({
-            mode: "baas",
             bootstrappers: [fakeBootstrapper([])]
         });
 
@@ -146,8 +147,8 @@ describe("mode: baas", () => {
     });
 });
 
-describe("mode: cms (default)", () => {
-    it("defaults to cms and serves collections from config", async () => {
+describe("declared collections", () => {
+    it("serves collections from config", async () => {
         const { app } = await boot({
             collections: [collection("posts")],
             bootstrappers: [fakeBootstrapper(undefined)]
@@ -181,7 +182,7 @@ describe("mode: cms (default)", () => {
 });
 
 describe("schemaEditor override", () => {
-    it("can be forced off in cms mode", async () => {
+    it("can be forced off", async () => {
         const { app } = await boot({
             collections: [collection("posts")],
             collectionsDir: "/tmp/rebase-init-mode-test",

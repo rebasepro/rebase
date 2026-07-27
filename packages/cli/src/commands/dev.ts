@@ -83,8 +83,7 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
         REBASE_DEV_CONFIG: "config",
         REBASE_DEV_FUNCTIONS: "backend/functions",
         REBASE_DEV_CRONS: "backend/crons",
-        REBASE_DEV_SCHEMA: "backend/src/schema.generated.ts",
-        REBASE_DEV_MODE: "cms"
+        REBASE_DEV_SCHEMA: "backend/src/schema.generated.ts"
     };
 
     try {
@@ -103,13 +102,11 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
         // the conventional layout rather than refusing to start.
     }
 
-    // A project with no config package is serving an introspected database.
-    // This is the only place the distinction is decided — it was never an
-    // independent choice, which is why `backend.mode` no longer exists.
-    if (!fs.existsSync(path.join(projectRoot, result.REBASE_DEV_CONFIG))) {
-        result.REBASE_DEV_MODE = "baas";
-    }
-
+    // Nothing here says whether collections are declared or introspected, and
+    // nothing should: `createSourceBundle` drops a config directory that does
+    // not exist, and the server derives the answer from that. A REBASE_DEV_MODE
+    // env var said it a second time, and a second place to say it is a second
+    // place for it to disagree.
     return result;
 }
 

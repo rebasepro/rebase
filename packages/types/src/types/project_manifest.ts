@@ -364,7 +364,6 @@ export interface RebaseProjectContract {
         version: string;
         contract: number;
     };
-    mode: "cms" | "baas";
     /** Full collection definitions, serialized — the input to SDK generation. */
     collections: unknown[];
     /** Collection slugs, for cheap inspection without parsing the definitions. */

@@ -239,22 +239,6 @@ export interface RebaseBackendConfig {
      */
     rateLimit?: DataRateLimitConfig;
 
-    /**
-     * How much of Rebase to run.
-     *
-     * - `"cms"` (default) — collections come from `collections`/`collectionsDir`
-     *   and describe both the API and the admin UI. The schema editor is
-     *   available outside production.
-     * - `"baas"` — no collection config at all. Collections are derived from the
-     *   live database at boot (see `BackendBootstrapper.introspectCollections`),
-     *   so every table is served over REST with nothing to define. The schema
-     *   editor is off, since it exists to write collection files back to disk.
-     *
-     * Both modes serve the same control plane: auth, storage, realtime,
-     * backups, cron, functions and OpenAPI. Neither serves the admin SPA —
-     * that is the application's call, via `serveSPA`.
-     */
-    mode?: "cms" | "baas";
 
     /**
      * Force the schema-editor routes on or off.
@@ -265,7 +249,7 @@ export interface RebaseBackendConfig {
      */
     schemaEditor?: boolean;
 
-    /** Options that only apply in `baas` mode. */
+    /** Options that only apply when collections are derived from the database. */
     baas?: BaasOptions;
 
     /**
@@ -581,29 +565,31 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     if (config.callbacks) {
         collectionRegistry.setGlobalCallbacks(config.callbacks);
     }
-    const mode = config.mode ?? "cms";
-    logger.info(
-        mode === "baas"
-            ? "Starting in baas mode — collections derived from the database schema"
-            : "Starting in cms mode — collections from config"
-    );
     let activeCollections = config.collections || [];
-    if (mode === "baas") {
-        // Collections come from the database itself, after the driver connects.
-        if (activeCollections.length > 0 || config.collectionsDir) {
-            logger.warn(
-                "Ignoring configured collections: baas mode derives them from the database schema. " +
-                "Remove `collections`/`collectionsDir`, or use mode: \"cms\" to serve them."
-            );
-            activeCollections = [];
-        }
-    } else if (config.collectionsDir && activeCollections.length === 0) {
+    if (config.collectionsDir && activeCollections.length === 0) {
         activeCollections = await loadCollectionsFromDirectory(config.collectionsDir);
         logger.info("Auto-discovered collections", {
             count: activeCollections.length,
             dir: config.collectionsDir
         });
     }
+
+    // Declared collections, or the database's own schema.
+    //
+    // This was a `mode` flag the caller set, which could disagree with the
+    // collections it was set alongside — the server then warned and threw the
+    // collections away. There is no such state now: declaring collections is
+    // what makes them served.
+    //
+    // Derived from what actually RESOLVED, not from what was configured: a
+    // `collectionsDir` pointing at nothing declares nothing, and treating that
+    // as "declared" would serve an empty API and never look at the database.
+    const introspectCollections = activeCollections.length === 0;
+    logger.info(
+        introspectCollections
+            ? "No collections declared — deriving them from the database schema"
+            : "Serving declared collections"
+    );
 
     // Directory-level `defaultSecurityRules` are applied by the collection
     // loader, so the server and `db push` agree on what a collection's rules
@@ -654,7 +640,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         const driverResult = await bootstrapper.initializeDriver({
             collections: activeCollections,
             collectionRegistry,
-            mode,
+            introspectCollections,
             baas: config.baas
         });
         delegates[b.id || bootstrapper.type] = driverResult.driver;
@@ -663,13 +649,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // `undefined` means it never looked — it has no introspection support,
         // so baas mode can only ever serve nothing. Say so at boot rather than
         // letting every request 404 against a server that claims to be healthy.
-        if (mode === "baas") {
+        if (introspectCollections) {
             const driverName = b.id || bootstrapper.type;
             if (!driverResult.collections) {
                 throw new Error(
-                    `Driver "${driverName}" does not support baas mode: it cannot derive collections ` +
-                    "from the database schema. Use mode: \"cms\" and declare collections explicitly, " +
-                    "or use a driver that implements introspection (e.g. @rebasepro/server-postgres)."
+                    `Driver "${driverName}" cannot derive collections from the database schema, ` +
+                    "and this project declared none. Declare collections, or use a driver that " +
+                    "implements introspection (e.g. @rebasepro/server-postgres)."
                 );
             }
             if (driverResult.collections.length === 0) {
@@ -680,8 +666,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             }
         }
 
-        // These never passed through the config-time steps above, so apply them here.
-        if (driverResult.collections?.length) {
+        // These never passed through the config-time steps above, so apply them
+        // here — but only when the driver was asked to describe the schema. A
+        // project that declared its own collections must not have more injected
+        // into it by whatever the database happens to contain.
+        if (introspectCollections && driverResult.collections?.length) {
             activeCollections = [...activeCollections, ...driverResult.collections];
         }
 
@@ -1070,7 +1059,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // The schema editor rewrites collection files, so it needs a collectionsDir
     // to write to and is off in baas mode (no files) and in production.
     const schemaEditorEnabled =
-        config.schemaEditor ?? (!!config.collectionsDir && process.env.NODE_ENV !== "production" && mode === "cms");
+        config.schemaEditor ?? (!!config.collectionsDir && !introspectCollections && process.env.NODE_ENV !== "production");
     if (schemaEditorEnabled && !config.collectionsDir) {
         logger.warn("schemaEditor is enabled but no collectionsDir is set — the schema editor has nowhere to write. Skipping.");
     }
@@ -1602,7 +1591,6 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         contractRouter.route("/", createContractRoutes({
             collectionRegistry,
             schemaVersion: config.schemaVersion,
-            mode,
             runtimeVersion: config.runtimeVersion
         }));
 
