@@ -6,6 +6,8 @@ title: Changelog
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-27
+
 ### Breaking
 
 - **`buildCollection` and `buildProperty` are removed** — not deprecated, removed. Both were FireCMS-migration shims that had been superseded by `defineCollection`, and keeping a deprecated alias around in a framework that has not shipped 1.0 only buys two ways to write the same thing.
@@ -151,6 +153,28 @@ title: Changelog
   Writes are decided locally: once the client knows the connection is gone it stops attempting requests, so an offline write costs nothing instead of a timeout, and it applies immediately and replays in order when connectivity returns. A write the server *rejects* is rolled back, along with the queued edits that were built on it — but not a later create or delete for the same row, which stands on its own. Temporary failures (429, 503, a dropped connection) are retried on an exponential backoff instead, up to `maxRetries`.
 
   `observe()` / `observeById()` are the new reactive reads, on every collection client: local-first, de-duplicated, and re-emitted on any local write, replay, rollback, realtime event, or change from another tab. Each result carries `fromCache`, `hasPendingWrites` and `partial`, so an interface can say what it is showing. Tabs share the local database and the outbox over a `BroadcastChannel`, and only one replays the queue at a time. `client.offline` gained `status()` and `onStatusChange()` for a sync indicator, and `isOfflineError()` distinguishes "offline with nothing local to answer with" from a request that genuinely failed.
+
+  A replayed write is recognised rather than repeated. The queue names each
+  mutation with an idempotency key, and the server records what that key
+  answered, so a create whose response was lost to a dropped connection comes
+  back with the row it already made instead of inserting a second one — the case
+  the client cannot detect for itself on a table with a server-assigned id,
+  which is what the scaffold's collections use. Keys are scoped to the
+  authenticated user and honoured for 24 hours; a backend that cannot store them
+  ignores the header rather than refusing the write, and auth signups are
+  excluded because their response can carry a temporary password.
+
+  Writes made while another is in flight are safe too: an edit is no longer
+  folded into a request already on the wire (where it was dropped, unsent, when
+  that request was acknowledged), a delete no longer cancels out a create the
+  server is in the middle of reading, and an update or delete now queues behind
+  a pending write for the same row instead of racing ahead of it to a server
+  that has not seen the row yet.
+
+  **Not yet:** conflicting concurrent edits are still last-write-wins — there is
+  no row version, so two clients editing the same row overwrite each other with
+  no conflict reported. `createMany` is not keyed, only `create`. Where
+  `navigator.locks` is unavailable two tabs may both replay the queue.
 
   See [Offline & Local-First Sync](https://rebase.pro/docs/sdk/offline).
 

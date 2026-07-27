@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-27
+
 ### Breaking
 
 - **`buildCollection` and `buildProperty` are removed** — not deprecated, removed. Both were FireCMS-migration shims that had been superseded by `defineCollection`, and keeping a deprecated alias around in a framework that has not shipped 1.0 only buys two ways to write the same thing.
