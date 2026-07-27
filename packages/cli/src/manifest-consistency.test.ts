@@ -1,0 +1,149 @@
+/**
+ * Every `rebase.json` in this repository must agree with the files beside it.
+ *
+ * These are not unit tests — nothing here calls a function. They assert that two
+ * *artifacts* do not contradict each other, which is the shape almost every bug
+ * in this area has taken. A function returning the wrong value gets caught by a
+ * unit test; a manifest quietly disagreeing with the Dockerfile next to it does
+ * not, because neither file is wrong on its own.
+ *
+ * What they would have caught, both of which reached a user-facing broken state:
+ *
+ *  - The scaffolded template declared `runtime: "managed"` while shipping a
+ *    `backend/Dockerfile` whose `CMD` ran an entrypoint that had been moved
+ *    behind `rebase eject`. `docker compose up` on a fresh project built an
+ *    image around a file that no longer existed.
+ *  - `app/`, the reference project, was labelled `managed` while owning a
+ *    177-line entrypoint and a Dockerfile that `cloudbuild.yaml` builds and
+ *    Cloud Run runs. Once `rebase cloud deploy` started honouring the declared
+ *    runtime, that would have switched the demo from its image to a bundle.
+ */
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { describe, expect, it } from "vitest";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(here, "../../..");
+
+/** Every committed `rebase.json`, by the directory that owns it. */
+const MANIFESTS = [
+    { name: "app (reference project)", dir: path.join(repoRoot, "app") },
+    { name: "init template", dir: path.join(repoRoot, "packages/cli/templates/template") },
+    { name: "headless overlay", dir: path.join(repoRoot, "packages/cli/templates/overlays/baas") }
+];
+
+interface Backend {
+    type: string;
+    runtime?: string;
+    dockerfile?: string;
+}
+
+function backendOf(dir: string): Backend | undefined {
+    const file = path.join(dir, "rebase.json");
+    if (!fs.existsSync(file)) return undefined;
+    const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+    return Object.values(manifest.apps ?? {}).find(
+        (app): app is Backend => (app as Backend)?.type === "backend"
+    );
+}
+
+describe.each(MANIFESTS)("$name", ({ dir }) => {
+    const backend = backendOf(dir);
+    const has = (relative: string): boolean => fs.existsSync(path.join(dir, relative));
+
+    it("declares a runtime at all", () => {
+        // Undefined would mean the manifest predates the field, which validation
+        // rejects — so finding one here means something wrote it that way.
+        expect(backend?.runtime === "managed" || backend?.runtime === "custom").toBe(true);
+    });
+
+    it("does not claim `managed` while carrying an entrypoint the runtime never loads", () => {
+        if (backend?.runtime !== "managed") return;
+        expect(has("backend/src/index.ts")).toBe(false);
+    });
+
+    it("does not claim `managed` while shipping an image build", () => {
+        // An image is what a `custom` runtime produces. Under `managed` it is
+        // built by nothing and deployed by nothing, and it is exactly what makes
+        // the project's own `docker compose up` disagree with its manifest.
+        if (backend?.runtime !== "managed") return;
+        for (const candidate of ["Dockerfile", "backend/Dockerfile", "frontend/Dockerfile"]) {
+            expect({ candidate,
+present: has(candidate) }).toEqual({ candidate,
+present: false });
+        }
+    });
+
+    it("points `dockerfile` at a file that exists, when it claims `custom`", () => {
+        if (backend?.runtime !== "custom") return;
+        expect(has(backend.dockerfile ?? "Dockerfile")).toBe(true);
+    });
+});
+
+/**
+ * A scaffolded project's own files must reference things that exist.
+ *
+ * `main` is the specific field that broke: `backend/package.json` declared
+ * `"main": "src/index.ts"` and `"start": "node dist/backend/src/index.js"` after
+ * the entrypoint had been moved to the eject payload. Nothing read `main`, so
+ * nothing failed — until the Dockerfile's `CMD ["pnpm", "start"]` ran in a
+ * container, fifteen minutes into a build.
+ */
+describe("the scaffolded project references only files it contains", () => {
+    const template = path.join(repoRoot, "packages/cli/templates/template");
+
+    const packageJsons = (root: string): string[] => {
+        const found: string[] = [];
+        const walk = (dir: string): void => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                if (entry.name === "node_modules" || entry.name === "dist") continue;
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) walk(full);
+                else if (entry.name === "package.json") found.push(full);
+            }
+        };
+        walk(root);
+        return found;
+    };
+
+    it("has no `main` pointing at a SOURCE file that is not there", () => {
+        // Build outputs are exempt: a package that compiles legitimately points
+        // `main` at `dist/index.js`, which a template does not ship. What must
+        // exist is anything checked in — and `main: "src/index.ts"` outliving
+        // the file it names is precisely the break this guards.
+        const isBuildOutput = (p: string): boolean => /^(\.\/)?(dist|build|lib|out)\//.test(p);
+        const broken: string[] = [];
+        for (const file of packageJsons(template)) {
+            const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+            if (typeof pkg.main !== "string" || isBuildOutput(pkg.main)) continue;
+            if (!fs.existsSync(path.join(path.dirname(file), pkg.main))) {
+                broken.push(`${path.relative(repoRoot, file)} → main: "${pkg.main}"`);
+            }
+        }
+        expect(broken).toEqual([]);
+    });
+
+    it("builds only Dockerfiles that exist, in its compose file", () => {
+        const compose = path.join(template, "docker-compose.yml");
+        if (!fs.existsSync(compose)) return;
+        const source = fs.readFileSync(compose, "utf8");
+
+        const missing: string[] = [];
+        for (const match of source.matchAll(/^\s*dockerfile:\s*(\S+)\s*$/gm)) {
+            if (!fs.existsSync(path.join(template, match[1]))) missing.push(match[1]);
+        }
+        expect(missing).toEqual([]);
+    });
+
+    it("mounts a bundle directory that `rebase build` actually produces", () => {
+        // The managed compose mounts ./dist-bundle at /bundle. If DEFAULT_BUNDLE_DIR
+        // ever changes, the mount silently becomes an empty directory and the
+        // runtime boots with no bundle — which reads as a corrupt image.
+        const compose = path.join(template, "docker-compose.yml");
+        if (!fs.existsSync(compose)) return;
+        const source = fs.readFileSync(compose, "utf8");
+        if (!source.includes(":/bundle")) return;
+        expect(source).toContain("./dist-bundle:/bundle");
+    });
+});
