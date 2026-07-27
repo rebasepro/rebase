@@ -64,8 +64,8 @@ Define your schema in TypeScript, and Rebase automatically generates:
 `;
   }
 
-  if (page === "why-rebase") {
-    return `# Why Rebase
+  if (page === "compare") {
+    return `# Rebase compared to the alternatives
 
 Rebase eliminates the custom boilerplate work between database, API, and UI by generating your admin panel and type-safe APIs directly from your database schema.
 
@@ -75,21 +75,6 @@ Rebase eliminates the custom boilerplate work between database, API, and UI by g
   - **${cleanHtml(tr("showcase.sync.tab2.title"))}**: ${cleanHtml(tr("showcase.sync.tab2.desc"))}
   - **${cleanHtml(tr("showcase.sync.tab3.title"))}**: ${cleanHtml(tr("showcase.sync.tab3.desc"))}
   - **${cleanHtml(tr("showcase.sync.tab4.title"))}**: ${cleanHtml(tr("showcase.sync.tab4.desc"))}
-`;
-  }
-
-  if (page === "features") {
-    return `# Rebase Features
-
-Define your schema once in TypeScript, and Rebase automatically generates your admin views, forms, database schema, APIs, and TypeScript SDK.
-
-- **${cleanHtml(tr("features.kanban.title"))}** (${cleanHtml(tr("features.kanban.badge"))}): ${cleanHtml(tr("features.kanban.desc"))}
-- **${cleanHtml(tr("features.customization.title"))}** (${cleanHtml(tr("features.customization.badge"))}): ${cleanHtml(tr("features.customization.desc"))}
-- **${cleanHtml(tr("features.history.title"))}** (${cleanHtml(tr("features.history.badge"))}): ${cleanHtml(tr("features.history.desc"))}
-- **${cleanHtml(tr("features.import.title"))}** (${cleanHtml(tr("features.import.badge"))}): ${cleanHtml(tr("features.import.desc"))}
-- **${cleanHtml(tr("features.api.title"))}** (${cleanHtml(tr("features.api.badge"))}): ${cleanHtml(tr("features.api.desc"))}
-- **${cleanHtml(tr("features.sdk.title"))}** (${cleanHtml(tr("features.sdk.badge"))}): ${cleanHtml(tr("features.sdk.desc"))}
-- **${cleanHtml(tr("features.realtime.title"))}** (${cleanHtml(tr("features.realtime.badge"))}): ${cleanHtml(tr("features.realtime.desc"))}
 `;
   }
 

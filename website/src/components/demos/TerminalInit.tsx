@@ -26,13 +26,13 @@ export function TerminalInit() {
             {/* Terminal Body */}
             <div className="p-5 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 text-surface-300">
-                    <span className="text-primary font-bold select-none">&gt;</span>
+                    <span className="text-primary font-semibold select-none">&gt;</span>
                     <span className="text-white font-medium select-all">{command}</span>
                     <span className="w-1.5 h-4 bg-primary animate-pulse inline-block align-middle select-none"></span>
                 </div>
                 <button
                     onClick={handleCopy}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-md border text-[10px] font-bold tracking-wide uppercase transition-all duration-300 cursor-pointer ${
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-md border text-[10px] font-semibold tracking-wide uppercase transition-all duration-300 cursor-pointer ${
                         copied
                             ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 ring-1 ring-emerald-500/20"
                             : "bg-surface-900 text-surface-400 border-surface-800 hover:text-white hover:border-surface-700 active:scale-95"

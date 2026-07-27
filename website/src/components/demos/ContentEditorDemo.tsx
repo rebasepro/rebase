@@ -47,7 +47,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 function EditorContent({ step }: { step: number }) {
     return (
         <div className="space-y-4 font-sans">
-            <div className="text-2xl font-bold text-surface-900 dark:text-white leading-tight">Building a Modern CMS with Rebase</div>
+            <div className="text-2xl font-semibold text-surface-900 dark:text-white leading-tight">Building a Modern CMS with Rebase</div>
             <p className="text-sm text-surface-600 dark:text-surface-300 leading-relaxed">
                 Rebase gives your team a Notion-style editor that writes directly to Postgres. No more disconnected content tools — every block is stored as structured JSON.
             </p>

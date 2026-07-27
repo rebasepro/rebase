@@ -109,7 +109,7 @@ export function DeveloperPlayground() {
                                 }`}>
                                     {tab.icon}
                                 </span>
-                                <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md ${
+                                <span className={`text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-md ${
                                     isActive
                                         ? "bg-primary/20 text-primary-light border border-primary/30"
                                         : "bg-surface-900 text-surface-500 border border-surface-800/60"
@@ -155,7 +155,7 @@ export function DeveloperPlayground() {
                             {/* Code side */}
                             <div className="lg:col-span-6 border-b lg:border-b-0 lg:border-r border-surface-800/50 bg-[#0f0f11] p-5 font-mono text-[11px] leading-relaxed flex flex-col justify-between">
                                 <div className="space-y-4">
-                                    <div className="text-[10px] font-bold text-surface-500 uppercase tracking-wider mb-2">TypeScript Model definition</div>
+                                    <div className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider mb-2">TypeScript Model definition</div>
                                     <pre className="text-surface-300">
                                         <span className="text-purple-400">import type</span> &#123; <span className="text-blue-300">PostgresCollectionConfig</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"@rebasepro/types"</span>;{"\n\n"}
                                         <span className="text-purple-400">export const</span> postsCollection: <span className="text-blue-300">PostgresCollectionConfig</span> = &#123;{"\n"}
@@ -191,8 +191,8 @@ export function DeveloperPlayground() {
                             <div className="lg:col-span-6 bg-[#09090b] p-5 flex flex-col justify-between">
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between border-b border-surface-800/50 pb-2.5">
-                                        <span className="text-[10px] font-bold text-surface-500 uppercase tracking-wider">Visual Studio Schema Editor</span>
-                                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${
+                                        <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Visual Studio Schema Editor</span>
+                                        <span className={`text-[8px] font-semibold px-1.5 py-0.5 rounded border ${
                                             schemaStatus === "synced"
                                                 ? "bg-emerald-950/30 text-emerald-400 border-emerald-900/40"
                                                 : "bg-amber-950/30 text-amber-400 border-amber-900/40 animate-pulse"
@@ -207,7 +207,7 @@ export function DeveloperPlayground() {
                                 </div>
                                 <div className="text-[10px] text-surface-500 font-mono bg-surface-900/40 px-3 py-2 rounded border border-surface-800/40">
                                     <span>Active Engine: </span>
-                                    <code className="text-amber-400 font-bold">drizzle-kit push:postgres</code>
+                                    <code className="text-amber-400 font-semibold">drizzle-kit push:postgres</code>
                                 </div>
                             </div>
                         </>
@@ -219,8 +219,8 @@ export function DeveloperPlayground() {
                             {/* Code side */}
                             <div className="lg:col-span-7 border-b lg:border-b-0 lg:border-r border-surface-800/50 bg-[#0f0f11] flex flex-col">
                                 <div className="p-4 border-b border-surface-800/40 flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-surface-500 uppercase tracking-wider">Universal SDK Console</span>
-                                    <span className="text-[8px] text-blue-400 font-bold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">Isomorphic Drizzle client</span>
+                                    <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Universal SDK Console</span>
+                                    <span className="text-[8px] text-blue-400 font-semibold bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">Isomorphic Drizzle client</span>
                                 </div>
                                 <div className="flex-1 min-h-[320px]">
                                     <SdkMiniDemo />
@@ -229,8 +229,8 @@ export function DeveloperPlayground() {
                             {/* API inspector side */}
                             <div className="lg:col-span-5 bg-[#09090b] flex flex-col">
                                 <div className="p-4 border-b border-surface-800/40 flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-surface-500 uppercase tracking-wider">Generated REST Endpoint</span>
-                                    <span className="text-[8px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">Instant API</span>
+                                    <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Generated REST Endpoint</span>
+                                    <span className="text-[8px] text-green-400 font-semibold bg-green-500/10 px-1.5 py-0.5 rounded border border-green-500/20">Instant API</span>
                                 </div>
                                 <div className="flex-1 min-h-[320px]">
                                     <ApiMiniDemo />
@@ -245,7 +245,7 @@ export function DeveloperPlayground() {
                             {/* Registration code side */}
                             <div className="lg:col-span-6 border-b lg:border-b-0 lg:border-r border-surface-800/50 bg-[#0f0f11] p-5 font-mono text-[11px] leading-relaxed flex flex-col justify-between">
                                 <div className="space-y-4">
-                                    <div className="text-[10px] font-bold text-surface-500 uppercase tracking-wider">Custom widget registration</div>
+                                    <div className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Custom widget registration</div>
                                     <pre className="text-surface-300">
                                         <span className="text-purple-400">import type</span> &#123; <span className="text-blue-300">NumberProperty</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"@rebasepro/types"</span>;{"\n"}
                                         <span className="text-purple-400">import</span> &#123; <span className="text-blue-300">RatingField</span> &#125; <span className="text-purple-400">from</span> <span className="text-green-400">"./widgets"</span>;{"\n\n"}
@@ -277,8 +277,8 @@ export function DeveloperPlayground() {
                     {activeTab === "security" && (
                         <div className="lg:col-span-12 bg-[#09090b] flex flex-col">
                             <div className="p-4 border-b border-surface-800/40 flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-surface-500 uppercase tracking-wider">Visual row-level security policy builder</span>
-                                <span className="text-[8px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">DB Level Security</span>
+                                <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">Visual row-level security policy builder</span>
+                                <span className="text-[8px] text-emerald-400 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">DB Level Security</span>
                             </div>
                             <div className="p-4">
                                 <RLSEditorDemo />

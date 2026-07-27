@@ -29,7 +29,7 @@ export function SchemaBuilderMiniDemo() {
             <div className="flex items-center justify-between mb-3 border-b border-surface-800/60 pb-2">
                 <div className="flex items-center gap-1.5">
                     <svg className="w-3.5 h-3.5 text-surface-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                    <span className="text-[11px] font-bold text-white">Posts Scheme</span>
+                    <span className="text-[11px] font-semibold text-white">Posts Scheme</span>
                 </div>
                 <div className={`transition-all duration-300 w-5 h-5 rounded-full ${step >= 1 ? "bg-primary/20 ring-1 ring-primary/40 text-primary" : "bg-surface-800 text-surface-400"} flex items-center justify-center`}>
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>

@@ -1,0 +1,60 @@
+---
+// A terminal rendering of an actual `rls-check` run.
+//
+// The layout, the check ids, the severity words and the fix SQL are all taken
+// from `packages/rls-check/src/report.ts` and `src/checks/*` — this is what the
+// tool really prints, not a dramatisation. Keep it that way: the whole point of
+// the section is that the claim above it is testable.
+const rule = "─".repeat(64);
+---
+
+<div class="rounded-2xl overflow-hidden ring-1 ring-white/10 bg-[#09090b] shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+    <div class="px-4 py-2.5 border-b border-white/5 flex items-center gap-2 bg-surface-900/50">
+        <div class="flex gap-1.5">
+            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+        </div>
+        <div class="ml-4 text-xs font-mono text-surface-500">rls-check · production</div>
+    </div>
+
+    <div class="p-5 sm:p-6 overflow-x-auto">
+        <pre class="font-mono text-[11px] sm:text-xs leading-[1.65] text-surface-300 min-w-[46rem]"><span class="text-white">$</span> npx @rebasepro/rls-check $DATABASE_URL
+
+<span class="text-white">rls-check 0.1.2</span><span class="text-surface-600">  ·  read-only Row-Level Security audit</span>
+<span class="text-surface-700">{rule}</span>
+
+<span class="text-surface-600">Database  </span>db.acme.internal:5432/production
+<span class="text-surface-600">Server    </span>PostgreSQL 16.4
+<span class="text-surface-600">Platform  </span>Supabase
+<span class="text-surface-600">Scanned   </span>3 schemas · 41 tables · 26 policies · 14 checks
+
+<span class="text-rose-400">CRITICAL</span>
+<span class="text-surface-700">{rule}</span>
+
+  <span class="text-rose-400">[critical]</span> <span class="text-white">rls-disabled</span>  <span class="text-cyan-300">public.invoices</span>
+      public.invoices has row-level security disabled and is
+      granted to anon and authenticated
+      <span class="text-white">Impact</span>  Any client holding the anon key can read — and
+              write — every row in this table.
+      <span class="text-white">Fix</span>
+          <span class="text-emerald-400">ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;</span>
+
+  <span class="text-rose-400">[critical]</span> <span class="text-white">policy-always-true</span>  <span class="text-cyan-300">public.documents, policy "documents_read"</span>
+      USING (true) grants every row to every role the policy
+      applies to.
+
+<span class="text-amber-400">HIGH</span>
+<span class="text-surface-700">{rule}</span>
+
+  <span class="text-amber-400">[high]</span> <span class="text-white">view-bypasses-rls</span>  <span class="text-cyan-300">public.billing_overview</span>
+      The view runs as its owner, so it reads past the RLS on
+      public.invoices.
+
+<span class="text-surface-700">{rule}</span>
+<span class="text-white">Summary</span>
+
+  <span class="text-rose-400">2 critical</span> · <span class="text-amber-400">1 high</span> · <span class="text-yellow-300">3 medium</span> · <span class="text-surface-600">0 low</span>
+</pre>
+    </div>
+</div>

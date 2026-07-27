@@ -9,7 +9,7 @@ const translatePath = useTranslatedPath(lang);
 
 <style>
     #manifesto-banner {
-        max-height: 800px;
+        max-height: 200px;
         transition: max-height 350ms cubic-bezier(0.4, 0, 0.2, 1), 
                     min-height 350ms cubic-bezier(0.4, 0, 0.2, 1),
                     opacity 250ms cubic-bezier(0.4, 0, 0.2, 1), 
@@ -35,21 +35,16 @@ const translatePath = useTranslatedPath(lang);
     }
 </style>
 
-<div 
-    id="manifesto-banner" 
-    class="relative w-full min-h-[60vh] sm:min-h-[70vh] flex flex-col justify-center bg-[#0070f4] border-b border-white/10 z-50 text-white select-none py-24 sm:py-32 md:py-40"
+<div
+    id="manifesto-banner"
+    class="relative w-full bg-[#0070f4] border-b border-white/10 z-50 text-white select-none py-3"
     role="complementary"
     aria-label="Rebase Manifesto"
 >
-    <!-- Background subtle grid pattern for a high-fidelity visual look -->
-    <div class="absolute inset-0 banner-grid-pattern pointer-events-none opacity-40"></div>
-    <div class="absolute inset-0 bg-gradient-to-br from-primary-dark/30 via-transparent to-primary-dark/30 pointer-events-none"></div>
+    <div class="absolute inset-0 banner-grid-pattern pointer-events-none opacity-30"></div>
 
-    <div class="relative max-w-4xl mx-auto px-4 sm:px-6 flex flex-col items-center text-center gap-6 sm:gap-8">
-        
-
-        <!-- Large Editorial Banner Text -->
-        <h2 class="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight text-white max-w-3xl mx-auto font-sans">
+    <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-center gap-x-4 gap-y-1 flex-wrap pr-12 text-center">
+        <p class="text-sm sm:text-[15px] leading-6 text-white">
             <ABVariant experiment="manifesto-banner-text" variant="control" class="inline">
                 <span set:html={t("banner.title.control")} />
             </ABVariant>
@@ -59,35 +54,30 @@ const translatePath = useTranslatedPath(lang);
             <ABVariant experiment="manifesto-banner-text" variant="founders" class="inline">
                 {t("banner.title.founders")}
             </ABVariant>
-        </h2>
-        
-        <!-- Subtitle -->
-        <p class="text-lg sm:text-xl text-white/85 max-w-2xl mx-auto font-normal leading-relaxed">
-            {t("banner.subtitle")}
         </p>
 
-        <!-- Call to Action -->
         <a
             href={translatePath("/manifesto")}
             id="manifesto-banner-cta"
-            class="inline-flex items-center justify-center gap-2 bg-white text-[#0070f4] hover:bg-neutral-50 font-extrabold px-6 py-3.5 rounded-xl text-sm sm:text-base shadow-lg transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] cursor-pointer"
+            class="inline-flex items-center gap-1.5 text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white transition-colors whitespace-nowrap"
         >
             {t("banner.cta")}
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
             </svg>
         </a>
     </div>
 
-    <!-- Absolute-positioned Dismiss Button -->
     <button
         id="manifesto-banner-close"
         type="button"
-        class="absolute top-4 right-4 sm:top-6 sm:right-6 text-white/70 hover:text-white hover:bg-white/15 p-2.5 rounded-full transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white outline-none focus:outline-none cursor-pointer z-50"
+        class="absolute top-1/2 -translate-y-1/2 right-3 sm:right-5 text-white/70 hover:text-white hover:bg-white/15 p-1.5 rounded-full transition-all duration-200 focus-visible:ring-2 focus-visible:ring-white outline-none focus:outline-none cursor-pointer z-50"
         aria-label="Dismiss banner"
     >
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+             stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
         </svg>
     </button>
 </div>

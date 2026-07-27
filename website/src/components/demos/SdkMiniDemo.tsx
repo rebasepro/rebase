@@ -56,7 +56,7 @@ export function SdkMiniDemo() {
                 <div className="p-3 relative flex-1 overflow-hidden">
                     {/* Import line (always visible) */}
                     <div className="text-[#858585] mb-2 leading-[1.4]">
-                        <span className="text-[#c586c0]">import</span> {"{"} <span className="text-[#9cdcfe]">rebase</span> {"}"} <span className="text-[#c586c0]">from</span> <span className="text-[#ce9178]">&apos;@rebase/sdk&apos;</span>;
+                        <span className="text-[#c586c0]">import</span> {"{"} <span className="text-[#9cdcfe]">createRebaseClient</span> {"}"} <span className="text-[#c586c0]">from</span> <span className="text-[#ce9178]">&apos;@rebasepro/client&apos;</span>;
                     </div>
                     <div className="text-[#858585] mb-3 leading-[1.4]">&nbsp;</div>
 

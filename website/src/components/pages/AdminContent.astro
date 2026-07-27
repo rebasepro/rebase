@@ -2,13 +2,12 @@
 const { lang, t } = Astro.props;
 
 import { AdminDemoCarousel } from '../../components/demos/AdminDemoCarousel';
+import { StorageViewDemo } from '../../components/demos/StorageViewDemo';
+import { CustomFieldsDemo } from '../../components/demos/CustomFieldsDemo';
+import { ReactExtMiniDemo } from '../../components/demos/ReactExtMiniDemo';
 import { NeatBackground } from '../../components/NeatBackground';
-import SpotlightCard from '../../components/SpotlightCard.astro';
+import ScreenshotsMarquee from '../../components/ScreenshotsMarquee.astro';
 import { useTranslatedPath } from '../../i18n/ui';
-import {
-    Table2, KanbanSquare, FileText, Images, History, ArrowDownUp,
-    Users, Link2, Search
-} from 'lucide-react';
 
 const translatePath = useTranslatedPath(lang);
 
@@ -42,29 +41,40 @@ const customComponentCode = `<span class="text-blue-300">status</span>: {
     <span class="text-blue-300">Preview</span>: <span class="text-green-400">"./components/StatusChip"</span>,
   },
 },`;
+
+// What the panel does that a database dashboard does not.
+const capabilities = [
+    { title: "Every view, no code", desc: "The same rows as a data grid, cards, a list or a Kanban board. Switch layout, filter live, edit in place." },
+    { title: "Relations as navigation", desc: "Foreign keys and many-to-many joins become tabs. Attach existing rows or create related records without leaving the entity." },
+    { title: "Media that belongs to a row", desc: "Uploads land in your storage bucket and resolve inline — thumbnails in the list, previews in the form." },
+    { title: "History and revert", desc: "Who changed what, when. Compare two versions side by side and roll one back." },
+    { title: "Users, roles and what they can reach", desc: "The same roles your RLS policies read, managed by people who will never open psql." },
+    { title: "Import, export, bulk edit", desc: "CSV, JSON or Excel in with field mapping; one click out. Thousands of rows without a migration script." },
+];
 ---
 
 <div class="flex flex-col isolate">
 
-    <!-- Hero -->
-    <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+    <!-- ═══════════════════════ HERO ═══════════════════════ -->
+    <section class="relative isolate overflow-hidden pt-24 pb-12 sm:pt-32 sm:pb-16 lg:pt-40">
         <NeatBackground client:idle/>
 
         <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
             <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
-                <span class="text-sm font-medium">React 19 · Optional layer · Bring your own components</span>
+                <span class="text-sm font-medium">Optional layer · React 19 · Bring your own components</span>
             </div>
             <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
                 The admin panel,<br/><span class="text-primary">as a separate product.</span>
             </h1>
             <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
-                A complete back office generated from the collections your backend already uses. It is a layer on
-                top — not a part of the backend. Add it when a human needs to touch the data, skip it when nobody
-                does, and remove it without your API noticing.
+                A complete back office, generated from the collections your backend already uses. It is a layer
+                on top — not part of the backend. Add it when a human needs to touch the data, skip it when
+                nobody does, and remove it without your API noticing.
             </p>
             <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
                 <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
+                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow"
+                   data-track id="admin-hero-demo">
                     Open the live demo
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -85,14 +95,178 @@ const customComponentCode = `<span class="text-blue-300">status</span>: {
         </div>
     </section>
 
-    <!-- A layer, not a lock-in -->
+    <!-- Real back offices, running -->
+    <section class="relative z-0 pb-16 sm:pb-24 overflow-hidden">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8 mb-8">
+            <p class="text-center text-sm text-surface-500">Back offices teams run on Rebase every day</p>
+        </div>
+        <div class="h-72">
+            <ScreenshotsMarquee/>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ 01 · THE TOUR ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="mx-auto max-w-3xl text-center mb-12">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <span class="font-mono text-surface-500">01</span>
+                    <span class="mx-2 text-surface-600">·</span>The tour
+                </p>
+                <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    Not a table viewer. A place to work.
+                </h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">
+                    Everything below is generated from the same collection definitions your API is served from.
+                    Nobody drew these screens.
+                </p>
+            </div>
+
+            <div style="min-height: 700px;">
+                <AdminDemoCarousel client:load/>
+            </div>
+        </div>
+    </section>
+
+    <!-- Neat gradient divider -->
+    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+        <NeatBackground variant="a" client:visible/>
+    </div>
+
+    <!-- ═══════════════════════ 02 · WHAT YOUR TEAM GETS ═══════════════════════ -->
     <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+                <div class="lg:col-span-5">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                        <span class="font-mono text-surface-500">02</span>
+                        <span class="mx-2 text-surface-600">·</span>Day to day
+                    </p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-8">
+                        What the people who are not developers actually get
+                    </h2>
+                    <div class="space-y-5">
+                        {capabilities.map(item => (
+                                <div class="flex gap-3">
+                                    <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60"></span>
+                                    <p class="text-sm text-surface-400 leading-relaxed">
+                                        <span class="text-white">{item.title}.</span> {item.desc}
+                                    </p>
+                                </div>
+                        ))}
+                    </div>
+                    <div class="mt-8 flex flex-col items-start gap-3">
+                        <a href={translatePath("/editing")}
+                           class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                            The editing experience
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <path d="M5 12h14"/>
+                                <path d="m12 5 7 7-7 7"/>
+                            </svg>
+                        </a>
+                        <a href={translatePath("/studio")}
+                           class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                            Studio, for whoever writes the schema
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <path d="M5 12h14"/>
+                                <path d="m12 5 7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-7">
+                    <StorageViewDemo client:visible/>
+                    <p class="mt-4 text-sm text-surface-500">
+                        File storage, in the panel — the same bucket your API writes to, not a second one.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ 03 · IT IS A REACT APP ═══════════════════════ -->
+    <section class="py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <span class="font-mono text-surface-500">03</span>
+                    <span class="mx-2 text-surface-600">·</span>Yours to extend
+                </p>
+                <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    It is a React app. Treat it like one.
+                </h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">
+                    Point a property at your own component and the generated form gets out of the way. Custom
+                    fields, custom previews, whole custom entity views, extra actions in the toolbar — written in
+                    the React you already write, referenced from the
+                    <code class="font-mono text-surface-300">admin</code> block by path.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
+                        <span class="font-mono text-xs text-surface-400">a property with your components</span>
+                    </div>
+                    <pre class="p-5 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={customComponentCode}></code></pre>
+                    <div class="px-5 pb-5 mt-auto">
+                        <div inert aria-hidden="true">
+                            <ReactExtMiniDemo client:visible/>
+                        </div>
+                        <p class="text-sm text-surface-400 -mt-2">
+                            Your component renders in the form and in the list, with the entity, the collection and
+                            the SDK handed to it as props.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
+                        <span class="font-mono text-xs text-surface-400">field widgets, configured</span>
+                    </div>
+                    <div class="h-[420px]" inert aria-hidden="true">
+                        <CustomFieldsDemo client:visible/>
+                    </div>
+                    <div class="px-5 pb-5">
+                        <p class="text-sm text-surface-400">
+                            Twenty-odd field types ship with the panel. Everything beyond them is a component you
+                            write, not a feature request you file.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8">
+                <a href={translatePath("/ui")}
+                   class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                    The component library the panel is built from
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ 04 · A LAYER, NOT A LOCK-IN ═══════════════════════ -->
+    <section class="py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14">
-                <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">A layer, not a lock-in</h2>
-                <p class="mt-4 text-lg text-surface-400">
-                    Rebase split the admin panel out of the backend contract. What is left is a clean line you can
-                    see in your own project: the backend half of a collection, and the
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <span class="font-mono text-surface-500">04</span>
+                    <span class="mx-2 text-surface-600">·</span>The cost of adding it
+                </p>
+                <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">A layer, not a lock-in</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">
+                    Rebase split the admin panel out of the backend contract, and the line is visible in your own
+                    project: the backend half of a collection, and the
                     <code class="font-mono text-surface-300">admin</code> half the server never reads.
                 </p>
             </div>
@@ -125,7 +299,8 @@ const customComponentCode = `<span class="text-blue-300">status</span>: {
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
                     <h3 class="text-lg font-semibold text-white mb-2">Same APIs as your app</h3>
                     <p class="text-sm text-surface-400">The panel reads and writes through the same REST, auth and
-                        realtime endpoints you build on, under the same row-level security. No privileged data path.</p>
+                        realtime endpoints you build on, under the same row-level security. No privileged data
+                        path.</p>
                 </div>
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
                     <h3 class="text-lg font-semibold text-white mb-2">Same schema, one source</h3>
@@ -134,151 +309,62 @@ const customComponentCode = `<span class="text-blue-300">status</span>: {
                 </div>
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
                     <h3 class="text-lg font-semibold text-white mb-2">Standalone or embedded</h3>
-                    <p class="text-sm text-surface-400">Deploy it as its own SPA, or mount it inside an existing React
-                        application. It ships as npm packages, not as a framework you move into.</p>
+                    <p class="text-sm text-surface-400">Deploy it as its own SPA, or mount it inside an existing
+                        React application. It ships as npm packages, not a framework you move into.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Neat gradient divider -->
-    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-        <NeatBackground variant="a" client:visible/>
-    </div>
-
-    <!-- The tour -->
-    <section class="relative z-0 py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <!-- ═══════════════════════ 05 · WHERE IT FITS ═══════════════════════ -->
+    <section class="py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-12">
-                <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">What your team actually gets</h2>
-                <p class="mt-4 text-lg text-surface-400">
-                    Not a table viewer. A back office your non-technical colleagues can live in all day.
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <span class="font-mono text-surface-500">05</span>
+                    <span class="mx-2 text-surface-600">·</span>Where it fits
                 </p>
-            </div>
-
-            <div style="min-height: 700px;">
-                <AdminDemoCarousel client:load/>
-            </div>
-        </div>
-    </section>
-
-    <!-- Feature grid -->
-    <section class="py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <SpotlightCard icon={Table2} title="Every view, zero code"
-                               description="The same rows as a data grid, cards, a list or a Kanban board. Switch layouts on the fly, filter live, edit inline."/>
-                <SpotlightCard icon={FileText} title="Rich content editing"
-                               description="A Notion-style block editor, Markdown fields, and structured content — writing straight into your Postgres columns."/>
-                <SpotlightCard icon={Images} title="Media & storage"
-                               description="Upload, preview and organize files against your own storage bucket. Images resolve inline in list and form views."/>
-                <SpotlightCard icon={KanbanSquare} title="Kanban workflows"
-                               description="Drag a card between columns and the status field updates in place. Realtime, so your team sees it immediately."/>
-                <SpotlightCard icon={History} title="History & audit"
-                               description="Who changed what, when. Compare versions side by side and revert — for any collection with history enabled."/>
-                <SpotlightCard icon={ArrowDownUp} title="Import & export"
-                               description="CSV, JSON or Excel in with automatic field mapping; one-click export out. Bulk edits without a migration script."/>
-                <SpotlightCard icon={Users} title="Users & roles"
-                               description="Manage accounts, assign roles and see exactly what each role can reach — the same roles your RLS policies read."/>
-                <SpotlightCard icon={Link2} title="Relations & subcollections"
-                               description="Follow foreign keys and many-to-many joins as tabs. Attach existing rows or create related records without leaving the entity."/>
-                <SpotlightCard icon={Search} title="Filtering & search"
-                               description="Type-aware filters per property, full-text search, and saved views — all pushed down to Postgres, not the browser."/>
-            </div>
-        </div>
-    </section>
-
-    <!-- Extend it with your own React -->
-    <section class="py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                <div>
-                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Yours to extend</p>
-                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">
-                        It is a React app. Treat it like one.
-                    </h2>
-                    <p class="text-lg text-surface-400 leading-relaxed mb-6">
-                        Point a property at your own component and the generated form gets out of the way. Custom
-                        fields, custom previews, whole custom entity views, extra actions in the toolbar — written in
-                        the same React you already write, referenced from the
-                        <code class="font-mono text-surface-300">admin</code> block by path.
-                    </p>
-                    <div class="flex flex-wrap gap-3">
-                        <a href={translatePath("/ui")}
-                           class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                            The UI component library
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                 stroke-linejoin="round">
-                                <path d="M5 12h14"/>
-                                <path d="m12 5 7 7-7 7"/>
-                            </svg>
-                        </a>
-                        <span class="text-surface-700">·</span>
-                        <a href={translatePath("/editing")}
-                           class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-                            The editing experience
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                 stroke-linejoin="round">
-                                <path d="M5 12h14"/>
-                                <path d="m12 5 7 7-7 7"/>
-                            </svg>
-                        </a>
-                    </div>
-                </div>
-
-                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                        <span class="font-mono text-xs text-surface-400">a property with your components</span>
-                    </div>
-                    <pre class="p-5 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={customComponentCode}></code></pre>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Where it fits -->
-    <section class="py-16 sm:py-24">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="mx-auto max-w-3xl text-center mb-12">
-                <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Where the panel fits</h2>
-                <p class="mt-4 text-lg text-surface-400">Three layers, adopted in any order you like.</p>
+                <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Three layers, adopted in any order</h2>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <a href={translatePath("/backend")}
                    class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
                     <p class="text-xs font-mono text-surface-500 mb-2">layer 01</p>
-                    <h3 class="text-lg font-semibold text-white mb-2">Rebase Backend</h3>
-                    <p class="text-sm text-surface-400">REST, auth, storage, realtime and RLS over your Postgres.
-                        Headless and React-free. Everything else is optional.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">The backend</h3>
+                    <p class="text-sm text-surface-400">REST, a typed SDK, auth, storage, realtime and RLS over your
+                        Postgres. Headless and React-free. Everything else is optional.</p>
                 </a>
                 <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-primary/30">
                     <p class="text-xs font-mono text-primary/80 mb-2">layer 02 · you are here</p>
-                    <h3 class="text-lg font-semibold text-white mb-2">Rebase Admin</h3>
-                    <p class="text-sm text-surface-400">The generated back office for the humans on your team, driven
-                        by the <code class="font-mono text-surface-300">admin</code> block in your collections.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">The admin panel</h3>
+                    <p class="text-sm text-surface-400">The generated back office for the humans on your team,
+                        driven by the <code class="font-mono text-surface-300">admin</code> block in your
+                        collections.</p>
                 </div>
                 <a href={translatePath("/studio")}
                    class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 hover:ring-primary/30 transition-all duration-300 block">
                     <p class="text-xs font-mono text-surface-500 mb-2">layer 03</p>
-                    <h3 class="text-lg font-semibold text-white mb-2">Rebase Studio</h3>
-                    <p class="text-sm text-surface-400">SQL editor, schema visualizer, RLS policy editor and API
-                        explorer — the tooling half, for the people who write the schema.</p>
+                    <h3 class="text-lg font-semibold text-white mb-2">Studio</h3>
+                    <p class="text-sm text-surface-400">SQL editor, schema visualizer, RLS policy editor, branches
+                        and API explorer — the tooling half, for whoever writes the schema.</p>
                 </a>
             </div>
         </div>
     </section>
 
-    <!-- CTA -->
+    <!-- ═══════════════════════ CTA ═══════════════════════ -->
     <section class="py-24 sm:py-32">
         <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-8">
+            <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
                 Add a back office in one dependency
             </h2>
+            <p class="text-lg text-surface-400 mb-10 max-w-2xl mx-auto">
+                Or open the live demo first — it is a real Rebase project, with a real database behind it.
+            </p>
             <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
                 <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
+                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow"
+                   data-track id="admin-cta-demo">
                     Try the live demo
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -286,9 +372,10 @@ const customComponentCode = `<span class="text-blue-300">status</span>: {
                         <path d="m12 5 7 7-7 7"/>
                     </svg>
                 </a>
-                <a href={translatePath("/docs")}
-                   class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
-                    Read the docs
+                <a href="/docs/frontend"
+                   class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold"
+                   data-track id="admin-cta-docs">
+                    Admin panel docs
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14"/>

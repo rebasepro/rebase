@@ -44,7 +44,7 @@ export function EditorPreviewDemo() {
         const lines = typingText.split('\n');
         return lines.map((line, idx) => {
             if (line.startsWith('## ')) {
-                return <h2 key={idx} className="text-2xl font-bold text-white mt-4 mb-2">{line.replace('## ', '')}</h2>;
+                return <h2 key={idx} className="text-2xl font-semibold text-white mt-4 mb-2">{line.replace('## ', '')}</h2>;
             } else if (line.trim() === '') {
                 return <br key={idx} />;
             } else {
@@ -70,7 +70,7 @@ export function EditorPreviewDemo() {
                     
                     {/* Formatting Toolbar - pops up when text is selected */}
                     <div className={`absolute top-14 left-1/2 -translate-x-1/2 bg-surface-800 border border-surface-700 shadow-xl rounded-lg px-2 py-1 flex items-center gap-1 transition-all duration-300 ${step >= 2 ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
-                        <div className={`w-7 h-7 rounded flex items-center justify-center text-sm font-bold ${step === 3 ? 'bg-primary/20 text-primary' : 'text-surface-300'}`}>B</div>
+                        <div className={`w-7 h-7 rounded flex items-center justify-center text-sm font-semibold ${step === 3 ? 'bg-primary/20 text-primary' : 'text-surface-300'}`}>B</div>
                         <div className="w-7 h-7 rounded flex items-center justify-center text-sm italic text-surface-300">I</div>
                         <div className="w-7 h-7 rounded flex items-center justify-center text-sm line-through text-surface-300">S</div>
                         <div className="w-px h-4 bg-surface-700 mx-1"></div>

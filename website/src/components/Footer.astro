@@ -5,16 +5,24 @@ const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 const translatePath = useTranslatedPath(lang);
 
+// Grouped by the two layers, same as the header — see website/SITE-STORY.md.
 const footerNavs = [
     {
-        title: t("footer.product"),
+        title: t("nav.col.backend"),
         links: [
-            { label: t("footer.features"), url: "/product" },
-            { label: t("footer.studio"), url: "/studio" },
+            { label: t("nav.overview"), url: "/product" },
             { label: t("footer.backend"), url: "/backend" },
-            { label: t("footer.admin"), url: "/admin" },
-            { label: t("footer.ai"), url: "/ai" },
+            { label: t("nav.security"), url: "/security" },
+            { label: t("nav.ai"), url: "/ai" },
             { label: t("footer.pricing"), url: "/pricing" },
+        ],
+    },
+    {
+        title: t("nav.col.admin"),
+        links: [
+            { label: t("footer.admin"), url: "/admin" },
+            { label: t("nav.studio"), url: "/studio" },
+            { label: t("nav.editing"), url: "/editing" },
             { label: t("footer.demo"), url: "https://demo.rebase.pro", external: true },
         ],
     },
@@ -24,17 +32,8 @@ const footerNavs = [
             { label: t("footer.devOverview"), url: "/developers" },
             { label: t("footer.sdk"), url: "/sdk" },
             { label: t("footer.cli"), url: "/cli" },
-            { label: t("footer.security"), url: "/security" },
-            { label: t("footer.ui"), url: "/ui" },
+            { label: t("nav.docs"), url: "/docs", plain: true },
             { label: "llms.txt", url: "/llms.txt", external: true },
-        ],
-    },
-    {
-        title: t("footer.solutions"),
-        links: [
-            { label: t("footer.startups"), url: "/startups" },
-            { label: t("footer.agencies"), url: "/agencies" },
-            { label: t("footer.whyRebase"), url: "/why-rebase" },
         ],
     },
     {
@@ -48,6 +47,7 @@ const footerNavs = [
             { label: t("footer.vsFirebase"), url: "/rebase-vs-firebase" },
             { label: t("footer.vsHasura"), url: "/rebase-vs-hasura" },
             { label: t("footer.vsDjango"), url: "/rebase-vs-django" },
+            { label: t("footer.allComparisons"), url: "/compare" },
         ],
     },
     {
@@ -55,6 +55,8 @@ const footerNavs = [
         links: [
             { label: t("footer.about"), url: "/about" },
             { label: t("footer.blog"), url: "/blog", plain: true },
+            { label: t("footer.startups"), url: "/startups" },
+            { label: t("footer.agencies"), url: "/agencies" },
             { label: t("footer.contact"), url: "/contact" },
             { label: t("footer.kitDigital"), url: "/kit-digital" },
             { label: t("footer.bookCall"), url: "https://calendar.app.google/UDSmMagx6AEwar8P8", external: true },
@@ -63,9 +65,11 @@ const footerNavs = [
     {
         title: t("footer.legal"),
         links: [
-            { label: t("footer.privacy"), url: "/policy/privacy_policy" },
-            { label: t("footer.terms"), url: "/policy/terms_conditions" },
-            { label: t("footer.cookies"), url: "/policy/cookies_policy" },
+            // The policy pages are not localized — they exist only at the root, so
+            // `plain` keeps translatePath from prefixing a language segment that 404s.
+            { label: t("footer.privacy"), url: "/policy/privacy_policy", plain: true },
+            { label: t("footer.terms"), url: "/policy/terms_conditions", plain: true },
+            { label: t("footer.cookies"), url: "/policy/cookies_policy", plain: true },
             // `plain` so the mailto: is emitted verbatim — translatePath would
             // otherwise prefix it with the language segment.
             { label: t("footer.reportVulnerability"), url: "mailto:security@rebase.pro", plain: true },

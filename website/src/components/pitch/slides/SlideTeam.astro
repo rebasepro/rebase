@@ -23,7 +23,7 @@ const founders = [
 ---
 <PitchSlide id="slide-team" slideNumber={2} totalSlides={TOTAL}>
     <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase mb-4">The Team</p>
-    <h2 class="text-4xl font-bold text-white mb-3">Built by developers who've <span class="text-primary">shipped at scale.</span></h2>
+    <h2 class="text-4xl font-semibold text-white mb-3">Built by developers who've <span class="text-primary">shipped at scale.</span></h2>
     <p class="text-surface-300 text-sm mb-8 max-w-3xl">The team behind <a href="https://firecms.co" target="_blank" rel="noopener" class="text-white font-semibold hover:text-primary transition-colors">FireCMS</a> (10,000+ projects, 1,200+ GitHub stars). Now building the next-generation open-source app platform for Europe.</p>
 
     <div class="grid grid-cols-2 gap-8 mb-8">
@@ -35,7 +35,7 @@ const founders = [
                         <img src={f.photo} alt={f.name} class="w-20 h-20 rounded-xl object-cover ring-2 ring-surface-700" />
                     ) : (
                         <div class="w-20 h-20 rounded-xl bg-surface-800 ring-2 ring-surface-700 flex items-center justify-center">
-                            <span class="text-2xl font-bold text-surface-400">{f.initials}</span>
+                            <span class="text-2xl font-semibold text-surface-400">{f.initials}</span>
                         </div>
                     )}
                 </div>
@@ -60,19 +60,19 @@ const founders = [
 
     <div class="grid grid-cols-4 gap-4">
         <div class="rounded-xl border border-surface-700 bg-surface-900/30 p-4 text-center">
-            <div class="text-2xl font-bold text-primary mb-1">5+</div>
+            <div class="text-2xl font-semibold text-primary mb-1">5+</div>
             <p class="text-xs text-surface-300">Years building dev tools</p>
         </div>
         <div class="rounded-xl border border-surface-700 bg-surface-900/30 p-4 text-center">
-            <div class="text-2xl font-bold text-emerald-400 mb-1">10K+</div>
+            <div class="text-2xl font-semibold text-emerald-400 mb-1">10K+</div>
             <p class="text-xs text-surface-300">FireCMS projects shipped</p>
         </div>
         <div class="rounded-xl border border-surface-700 bg-surface-900/30 p-4 text-center">
-            <div class="text-2xl font-bold text-amber-400 mb-1">🇪🇺</div>
+            <div class="text-2xl font-semibold text-amber-400 mb-1">🇪🇺</div>
             <p class="text-xs text-surface-300">HQ in Spain</p>
         </div>
         <div class="rounded-xl border border-surface-700 bg-surface-900/30 p-4 text-center">
-            <div class="text-2xl font-bold text-violet-400 mb-1">8–12</div>
+            <div class="text-2xl font-semibold text-violet-400 mb-1">8–12</div>
             <p class="text-xs text-surface-300">Planned EU hires</p>
         </div>
     </div>

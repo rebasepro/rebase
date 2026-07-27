@@ -624,7 +624,7 @@ sql: DEFAULT_SQL }];
                     <div className="flex-1 flex flex-col min-h-0 bg-surface-950">
                         {/* Results header */}
                         <div className="p-2 px-4 bg-surface-900/60 border-b border-surface-800/40 flex items-center shrink-0">
-                            <span className="font-bold text-surface-500 uppercase tracking-widest text-[10px]">QUERY RESULTS</span>
+                            <span className="font-semibold text-surface-500 uppercase tracking-widest text-[10px]">QUERY RESULTS</span>
                         </div>
 
                         {/* Results content */}
@@ -673,18 +673,18 @@ sql: DEFAULT_SQL }];
                                     <div className="p-2 px-4 border-t border-surface-800/40 bg-surface-900/40 flex justify-between items-center shrink-0">
                                         <div className="flex space-x-4">
                                             <div className="flex items-center text-[10px]">
-                                                <span className="font-bold text-surface-600 mr-2 uppercase tracking-tighter">ROWS</span>
+                                                <span className="font-semibold text-surface-600 mr-2 uppercase tracking-tighter">ROWS</span>
                                                 <span className="font-mono text-surface-400">{result.rowCount}</span>
                                             </div>
                                             <div className="flex items-center text-[10px]">
-                                                <span className="font-bold text-surface-600 mr-2 uppercase tracking-tighter">TIME</span>
+                                                <span className="font-semibold text-surface-600 mr-2 uppercase tracking-tighter">TIME</span>
                                                 <span className="font-mono text-surface-400">{result.execTime}ms</span>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button className="text-[10px] text-surface-500 hover:text-surface-300 uppercase font-bold transition-colors">Copy MD</button>
-                                            <button className="text-[10px] text-surface-500 hover:text-surface-300 uppercase font-bold transition-colors">Export JSON</button>
-                                            <button className="text-[10px] text-surface-500 hover:text-surface-300 uppercase font-bold transition-colors">Export CSV</button>
+                                            <button className="text-[10px] text-surface-500 hover:text-surface-300 uppercase font-semibold transition-colors">Copy MD</button>
+                                            <button className="text-[10px] text-surface-500 hover:text-surface-300 uppercase font-semibold transition-colors">Export JSON</button>
+                                            <button className="text-[10px] text-surface-500 hover:text-surface-300 uppercase font-semibold transition-colors">Export CSV</button>
                                         </div>
                                     </div>
                                 </div>

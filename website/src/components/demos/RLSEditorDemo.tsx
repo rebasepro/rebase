@@ -281,7 +281,7 @@ function VisualRuleBuilder({
     return (
         <div className="space-y-2 p-3 rounded-lg bg-surface-900/60 border border-surface-800/40">
             <div className="flex items-center justify-between">
-                <span className="text-[10px] text-surface-400 uppercase font-bold tracking-wider">{label}</span>
+                <span className="text-[10px] text-surface-400 uppercase font-semibold tracking-wider">{label}</span>
                 <div className="flex gap-1 bg-surface-950 p-0.5 rounded border border-surface-800/30 text-[10px]">
                     <button
                         type="button"
@@ -691,7 +691,7 @@ export function RLSEditorDemo() {
                                                     <div className="flex items-center gap-2">
                                                         <svg className="h-3.5 w-3.5 text-surface-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
                                                         <span className="text-sm text-white font-semibold">{policy.name}</span>
-                                                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold uppercase ${cmdStyle.bg} ${cmdStyle.text} border ${cmdStyle.text.replace("text-", "border-").replace("300", "800/40")}`}>
+                                                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-semibold uppercase ${cmdStyle.bg} ${cmdStyle.text} border ${cmdStyle.text.replace("text-", "border-").replace("300", "800/40")}`}>
                                                             {policy.command}
                                                         </span>
                                                     </div>
@@ -718,17 +718,17 @@ export function RLSEditorDemo() {
 
                                                 <div className="flex flex-wrap gap-1.5">
                                                     <div className="flex items-center gap-1 px-2 py-1 rounded bg-surface-800/60 text-[10px]">
-                                                        <span className="text-surface-500 uppercase font-bold">USING:</span>
+                                                        <span className="text-surface-500 uppercase font-semibold">USING:</span>
                                                         <code className="text-amber-300 font-mono font-semibold">{policy.using}</code>
                                                     </div>
                                                     {policy.withCheck && (
                                                         <div className="flex items-center gap-1 px-2 py-1 rounded bg-surface-800/60 text-[10px]">
-                                                            <span className="text-surface-500 uppercase font-bold">CHECK:</span>
+                                                            <span className="text-surface-500 uppercase font-semibold">CHECK:</span>
                                                             <code className="text-amber-300 font-mono font-semibold">{policy.withCheck}</code>
                                                         </div>
                                                     )}
                                                     <div className="flex items-center gap-1 px-2 py-1 rounded bg-surface-800/60 text-[10px]">
-                                                        <span className="text-surface-500 uppercase font-bold">Roles:</span>
+                                                        <span className="text-surface-500 uppercase font-semibold">Roles:</span>
                                                         <span className="text-surface-300 font-mono font-medium">{policy.roles.join(", ")}</span>
                                                     </div>
                                                 </div>
@@ -743,7 +743,7 @@ export function RLSEditorDemo() {
                                                 
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div>
-                                                        <label className="text-[10px] text-surface-500 uppercase font-bold block mb-1">Policy Name</label>
+                                                        <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-1">Policy Name</label>
                                                         <input
                                                             type="text"
                                                             className="w-full px-2.5 py-1.5 rounded bg-surface-800/60 border border-surface-700/40 text-[11px] font-mono text-surface-200 outline-none focus:border-primary transition-all"
@@ -753,7 +753,7 @@ export function RLSEditorDemo() {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] text-surface-500 uppercase font-bold block mb-1">Command / Action</label>
+                                                        <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-1">Command / Action</label>
                                                         <select
                                                             className="w-full px-2.5 py-1.5 rounded bg-surface-800/60 border border-surface-700/40 text-[11px] font-mono text-surface-200 outline-none focus:border-primary transition-all cursor-pointer"
                                                             value={editCommand}
@@ -770,7 +770,7 @@ export function RLSEditorDemo() {
 
                                                 {/* Roles multi-select */}
                                                 <div className="flex flex-col gap-1">
-                                                    <label className="text-[10px] text-surface-500 uppercase font-bold block mb-0.5">Target Roles</label>
+                                                    <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-0.5">Target Roles</label>
                                                     <div className="flex flex-wrap gap-1.5">
                                                         {["public", "authenticated", "anon", "admin"].map(role => {
                                                             const isSelected = editRoles.includes(role);
@@ -820,7 +820,7 @@ export function RLSEditorDemo() {
                                                 <div className="flex gap-2 pt-1 border-t border-surface-800/30">
                                                     <button
                                                         onClick={() => savePolicy(policy.id)}
-                                                        className="px-3 py-1 rounded bg-primary text-white text-[10px] font-bold hover:bg-primary/80 transition-colors cursor-pointer"
+                                                        className="px-3 py-1 rounded bg-primary text-white text-[10px] font-semibold hover:bg-primary/80 transition-colors cursor-pointer"
                                                     >
                                                         Save Changes
                                                     </button>
@@ -846,7 +846,7 @@ export function RLSEditorDemo() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <label className="text-[10px] text-surface-500 uppercase font-bold block mb-1">Name</label>
+                                            <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-1">Name</label>
                                             <input
                                                 type="text"
                                                 className="w-full px-2.5 py-1.5 rounded bg-surface-800/60 border border-surface-700/40 text-[11px] font-mono text-surface-200 outline-none focus:border-primary transition-all"
@@ -856,7 +856,7 @@ export function RLSEditorDemo() {
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-surface-500 uppercase font-bold block mb-1">Command / Action</label>
+                                            <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-1">Command / Action</label>
                                             <select
                                                 className="w-full px-2.5 py-1.5 rounded bg-surface-800/60 border border-surface-700/40 text-[11px] font-mono text-surface-200 outline-none focus:border-primary transition-all cursor-pointer"
                                                 value={newPolicyCommand}
@@ -873,7 +873,7 @@ export function RLSEditorDemo() {
 
                                     {/* Roles Selector */}
                                     <div className="flex flex-col gap-1">
-                                        <label className="text-[10px] text-surface-500 uppercase font-bold block mb-0.5">Target Roles</label>
+                                        <label className="text-[10px] text-surface-500 uppercase font-semibold block mb-0.5">Target Roles</label>
                                         <div className="flex flex-wrap gap-1.5">
                                             {["public", "authenticated", "anon", "admin"].map(role => {
                                                 const isSelected = newPolicyRoles.includes(role);
@@ -924,7 +924,7 @@ export function RLSEditorDemo() {
                                         <button
                                             onClick={addPolicy}
                                             disabled={!newPolicyName.trim()}
-                                            className="px-3 py-1.5 rounded bg-primary text-white text-[10px] font-bold hover:bg-primary/80 disabled:opacity-50 transition-colors cursor-pointer"
+                                            className="px-3 py-1.5 rounded bg-primary text-white text-[10px] font-semibold hover:bg-primary/80 disabled:opacity-50 transition-colors cursor-pointer"
                                         >
                                             Create Policy
                                         </button>

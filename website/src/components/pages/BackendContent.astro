@@ -1,15 +1,40 @@
 ---
 const { lang, t } = Astro.props;
 
-import { languages, defaultLang, useTranslations, useTranslatedPath } from '../../i18n/ui';
+import { useTranslatedPath } from '../../i18n/ui';
 import { NeatBackground } from '../../components/NeatBackground';
 import HeroConnectionWidget from '../demos/HeroConnectionWidget';
 import { SplitLayerDemo } from '../demos/SplitLayerDemo';
+import { ApiMiniDemo } from '../demos/ApiMiniDemo';
+import { SdkMiniDemo } from '../demos/SdkMiniDemo';
+import { RealtimeMiniDemo } from '../demos/RealtimeMiniDemo';
 
 const translatePath = useTranslatedPath(lang);
 
+// Whitespace matters inside <pre>, so every sample lives in frontmatter.
 
+const sdkCode = `<span class="text-surface-500">// generated once by \`rebase generate-sdk\`</span>
+<span class="text-primary-light">import type</span> { Database } <span class="text-primary-light">from</span> <span class="text-green-400">"./generated/sdk/database.types"</span>;
 
+<span class="text-primary-light">const</span> client = <span class="text-amber-400">createRebaseClient</span>&lt;Database&gt;({
+  <span class="text-blue-300">baseUrl</span>: <span class="text-green-400">"https://api.example.com"</span>,
+});
+
+<span class="text-surface-500">// collection names, field names and return types all autocomplete</span>
+<span class="text-primary-light">const</span> { data } = <span class="text-primary-light">await</span> client.data.orders
+  .<span class="text-amber-400">find</span>({
+    <span class="text-blue-300">filter</span>: { status: [<span class="text-green-400">"eq"</span>, <span class="text-green-400">"paid"</span>] },
+    <span class="text-blue-300">include</span>: [<span class="text-green-400">"customer"</span>],
+    <span class="text-blue-300">limit</span>: <span class="text-orange-300">50</span>,
+  });`;
+
+const restCode = `<span class="text-amber-400">GET</span>  /api/data/orders?status=eq.paid&amp;total=gt.100
+<span class="text-amber-400">GET</span>  /api/data/orders?or=(status.eq.paid,total.gt.500)
+<span class="text-amber-400">GET</span>  /api/data/orders/42?include=customer,items
+<span class="text-amber-400">GET</span>  /api/data/customers/7/orders
+<span class="text-amber-400">POST</span> /api/data/orders
+<span class="text-amber-400">PUT</span>  /api/data/orders/42
+<span class="text-amber-400">DEL</span>  /api/data/orders/42`;
 
 const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBackend } <span class="text-blue-400">from</span> <span class="text-emerald-400">"@rebasepro/server"</span>;
 <span class="text-blue-400">import</span> { createPostgresBootstrapper } <span class="text-blue-400">from</span> <span class="text-emerald-400">"@rebasepro/server-postgres"</span>;
@@ -23,149 +48,198 @@ const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBa
       schema: { tables, enums, relations },
     })
   ],
-  auth: {
-    jwtSecret: process.env.<span class="text-amber-400">JWT_SECRET</span>,
-  },
+  auth: { jwtSecret: process.env.<span class="text-amber-400">JWT_SECRET</span> },
   storage: { type: <span class="text-emerald-400">"local"</span>, basePath: <span class="text-emerald-400">"./uploads"</span> },
 });
-<span class="text-surface-500">// ✅ REST, WebSocket, Auth, Storage — all ready</span>
-<span class="text-surface-500">// Data:    /api/data/:collection</span>
-<span class="text-surface-500">// Auth:    /api/auth/*</span>
-<span class="text-surface-500">// Storage: /api/storage/*</span>`;
+<span class="text-surface-500">// it's a Hono app — mount it, wrap it, add your own middleware</span>`;
 
-const drizzleCode = `<span class="text-surface-500">// Your collection definition:</span>
-<span class="text-blue-400">const</span> postsCollection = {
+const drizzleCode = `<span class="text-surface-500">// one collection, one relation</span>
+<span class="text-blue-400">const</span> posts = {
   slug: <span class="text-emerald-400">"posts"</span>,
   properties: { title: { type: <span class="text-emerald-400">"string"</span> } },
   relations: [{
     relationName: <span class="text-emerald-400">"author"</span>,
-    target: () =&gt; usersCollection,
+    target: () =&gt; users,
     cardinality: <span class="text-emerald-400">"one-to-one"</span>
   }]
 };
 
-<span class="text-surface-500">// Generates Drizzle schema + REST API:</span>
-<span class="text-amber-400">GET</span> /api/posts?include=author
-<span class="text-surface-500">// → Single query, no N+1</span>`;
+<span class="text-surface-500">// GET /api/data/posts?include=author</span>
+<span class="text-surface-500">// → one query via db.query.findMany, not 1 + N</span>`;
+
+const rulesCode = `<span class="text-primary-light">export const</span> <span class="text-white">orders</span> = {
+  slug: <span class="text-green-400">"orders"</span>,
+  table: <span class="text-green-400">"orders"</span>,
+
+  <span class="text-blue-300">securityRules</span>: [
+    <span class="text-surface-500">// customers see their own orders…</span>
+    { operation: <span class="text-green-400">"select"</span>, ownerField: <span class="text-green-400">"customer_id"</span> },
+
+    <span class="text-surface-500">// …support can read and update all of them</span>
+    { operations: [<span class="text-green-400">"select"</span>, <span class="text-green-400">"update"</span>],
+      roles: [<span class="text-green-400">"support"</span>] },
+  ],
+};`;
+
+const policyCode = `<span class="text-surface-500">-- rebase schema generate → db push</span>
+<span class="text-primary-light">ALTER TABLE</span> orders <span class="text-primary-light">ENABLE ROW LEVEL SECURITY</span>;
+
+<span class="text-primary-light">CREATE POLICY</span> orders_select_1f4c9ab <span class="text-primary-light">ON</span> orders
+  <span class="text-primary-light">FOR SELECT TO</span> rebase_user
+  <span class="text-primary-light">USING</span> (customer_id = <span class="text-amber-400">auth.uid</span>());
+
+<span class="text-primary-light">CREATE POLICY</span> orders_update_8b02e13 <span class="text-primary-light">ON</span> orders
+  <span class="text-primary-light">FOR UPDATE TO</span> rebase_user
+  <span class="text-primary-light">USING</span> (<span class="text-amber-400">string_to_array</span>(<span class="text-amber-400">auth.roles</span>(), <span class="text-green-400">','</span>)
+         &amp;&amp; <span class="text-primary-light">ARRAY</span>[<span class="text-green-400">'support'</span>]);
+
+<span class="text-surface-500">-- no policy for INSERT or DELETE:</span>
+<span class="text-surface-500">-- nobody can insert or delete. Closed by default.</span>`;
+
+// The routes the server actually mounts. Nothing aspirational in this list.
+const routes = [
+    { path: "/api/data/:collection", note: "CRUD, filters, sorting, pagination, relation includes, nested subcollections" },
+    { path: "/api/auth/*", note: "sign-up, login, refresh, password reset, OAuth, MFA, roles" },
+    { path: "/api/storage/*", note: "upload, download, signed access — local, S3-compatible or GCS" },
+    { path: "/api/functions/:name", note: "your own Hono routes, auto-mounted from functions/" },
+    { path: "/api/cron/*", note: "scheduled jobs with run history and manual triggers" },
+    { path: "/api/docs · /api/swagger", note: "OpenAPI 3.0 spec, plus an explorer in dev" },
+    { path: "/api/meta", note: "the runtime contract: collections, properties, capabilities" },
+    { path: "/health", note: "readiness for your orchestrator — asserts the auth schema, not just TCP" },
+    { path: "WebSocket", note: "row subscriptions, broadcast channels and presence on the same server" },
+];
+
+const alsoShipped = [
+    { title: "Webhooks", desc: "HMAC-signed outbound calls on insert, update and delete, with retries." },
+    { title: "Entity history", desc: "An audit trail per collection: who changed what, when, and a revert." },
+    { title: "Database branching", desc: "Isolated copies of the whole database for a feature or a test run." },
+    { title: "Email", desc: "SMTP for verification, password reset and your own transactional templates." },
+    { title: "Backups", desc: "Role-complete dumps and restores, driven from the CLI or the admin API." },
+    { title: "Multiple sources", desc: "Route different collections to different databases from one server." },
+];
 ---
 
-  <div class="flex flex-col isolate">
-    <!-- Hero -->
- <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-     <NeatBackground client:idle />
+<div class="flex flex-col isolate">
 
-      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
-        <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
-          <span class="text-sm font-medium">Hono · Drizzle · PostgreSQL · React-free</span>
+    <!-- ═══════════════════════ HERO ═══════════════════════ -->
+    <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+        <NeatBackground client:idle/>
+
+        <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+            <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
+                <span class="text-sm font-medium">Hono · Drizzle · PostgreSQL · React-free</span>
+            </div>
+            <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
+                The backend,<br/><span class="text-primary">on its own.</span>
+            </h1>
+            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
+                Point it at a Postgres database and you get REST, a typed SDK, realtime over WebSocket, auth,
+                storage and an OpenAPI spec — with every access rule enforced by the database itself.
+                No admin panel required. No React in the dependency tree.
+            </p>
+            <div class="mt-4 max-w-xl mx-auto">
+                <HeroConnectionWidget client:load/>
+            </div>
         </div>
-        <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-          The backend,<br/><span class="text-primary">on its own.</span>
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
-          A production-ready API server over your Postgres: REST, WebSocket realtime, JWT auth, storage, and
-          auto-generated OpenAPI docs. Point it at an existing database and every protected table is served
-          automatically — no config files — or define collections in TypeScript when you want full control.
-          No admin panel required, and no React in the dependency tree.
-        </p>
-        <div class="mt-4 max-w-xl mx-auto">
-          <HeroConnectionWidget client:load />
-        </div>
-        <p class="mt-8 text-sm text-surface-400">
-          Want the back office too?
-          <a href={translatePath("/admin")} class="text-primary hover:underline">Rebase Admin</a>
-          is the optional layer on top.
-        </p>
-      </div>
     </section>
 
-    <!-- Architecture Overview -->
- <section class="relative z-0 py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="mx-auto max-w-3xl text-center mb-16">
-          <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">One definition, three APIs</h2>
-          <p class="mt-4 text-lg text-surface-400">Every collection you define automatically generates REST, WebSocket, and OpenAPI endpoints. Zero config.</p>
+    <!-- ═══════════════════════ 01 · THE API APPEARS ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+                <div class="lg:col-span-5">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                        <span class="font-mono text-surface-500">01</span>
+                        <span class="mx-2 text-surface-600">·</span>REST, without writing it
+                    </p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
+                        Every table you expose becomes an endpoint
+                    </h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">
+                        No controllers, no serializers, no validation middleware. Filtering, sorting, pagination
+                        and relation loading are query parameters, in a PostgREST-compatible syntax your team
+                        probably already knows.
+                    </p>
+                    <p class="text-base text-surface-400 leading-relaxed">
+                        Nested relations are addressable as paths, so a customer's orders are a URL rather than
+                        a join you hand-wrote.
+                    </p>
+                </div>
+                <div class="lg:col-span-7 space-y-5">
+                    <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                            <div class="ml-2 text-[10px] font-mono text-surface-400">api.yourapp.com</div>
+                        </div>
+                        <div class="h-[260px] w-full overflow-hidden" inert aria-hidden="true">
+                            <ApiMiniDemo client:visible/>
+                        </div>
+                    </div>
+                    <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                        <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
+                            <span class="font-mono text-xs text-surface-400">the generated surface</span>
+                        </div>
+                        <pre class="p-5 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={restCode}></code></pre>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <div class="mx-auto h-14 w-14 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
-              
-<svg
-  class="lucide lucide-globe"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <circle cx="12" cy="12" r="10" />
-  <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
-  <path d="M2 12h20" />
-</svg>
+    </section>
 
+    <!-- ═══════════════════════ 02 · TYPED SDK ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+                <div class="lg:col-span-5 lg:order-last">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                        <span class="font-mono text-surface-500">02</span>
+                        <span class="mx-2 text-surface-600">·</span>The typed client
+                    </p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
+                        Autocomplete that comes from your schema
+                    </h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">
+                        <code class="font-mono text-surface-300">rebase generate-sdk</code> turns your collections
+                        into a <code class="font-mono text-surface-300">Database</code> type. Pass it to the client and
+                        collection names, field names, filter operators and return shapes are all checked at compile
+                        time — including the fields you asked for in <code class="font-mono text-surface-300">include</code>.
+                    </p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-6">
+                        Rename a column in the collection and the call sites turn red before anything ships.
+                    </p>
+                    <a href={translatePath("/sdk")}
+                       class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                        The full SDK tour
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14"/>
+                            <path d="m12 5 7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+                <div class="lg:col-span-7 space-y-5">
+                    <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                            <div class="ml-2 text-[10px] font-mono text-surface-400">app.ts</div>
+                        </div>
+                        <div class="h-[260px] w-full flex items-center justify-center overflow-hidden" inert aria-hidden="true">
+                            <SdkMiniDemo client:visible/>
+                        </div>
+                    </div>
+                    <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                        <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
+                            <span class="font-mono text-xs text-surface-400">src/orders.ts</span>
+                        </div>
+                        <pre class="p-5 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={sdkCode}></code></pre>
+                    </div>
+                </div>
             </div>
-            <h3 class="text-lg font-semibold text-white mb-2">REST API</h3>
-            <p class="text-sm text-surface-400">Full CRUD endpoints with pagination, filtering, sorting, and relation loading.</p>
-          </div>
-
-          <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <div class="mx-auto h-14 w-14 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4">
-              
-<svg
-  class="lucide lucide-antenna"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M2 12 7 2" />
-  <path d="m7 12 5-10" />
-  <path d="m12 12 5-10" />
-  <path d="m17 12 5-10" />
-  <path d="M4.5 7h15" />
-  <path d="M12 16v6" />
-</svg>
-
-            </div>
-            <h3 class="text-lg font-semibold text-white mb-2">Realtime Engine</h3>
-            <p class="text-sm text-surface-400">Data subscriptions, broadcast channels, and presence tracking — with auth, RLS, and auto-reconnect built in.</p>
-          </div>
-          <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <div class="mx-auto h-14 w-14 rounded-full bg-amber-500/10 flex items-center justify-center mb-4">
-              
-<svg
-  class="lucide lucide-file-text"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
-  <path d="M14 2v5a1 1 0 0 0 1 1h5" />
-  <path d="M10 9H8" />
-  <path d="M16 13H8" />
-  <path d="M16 17H8" />
-</svg>
-
-            </div>
-            <h3 class="text-lg font-semibold text-white mb-2">OpenAPI/Swagger</h3>
-            <p class="text-sm text-surface-400">Auto-generated OpenAPI 3.0 spec with a built-in Swagger UI for testing.</p>
-          </div>
         </div>
-      </div>
     </section>
 
     <!-- Neat gradient divider -->
@@ -173,268 +247,282 @@ const drizzleCode = `<span class="text-surface-500">// Your collection definitio
         <NeatBackground variant="a" client:visible/>
     </div>
 
-    <!-- Hono Server -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20">
-              Powered by Hono
+    <!-- ═══════════════════════ 03 · REALTIME ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+                <div class="lg:col-span-5">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                        <span class="font-mono text-surface-500">03</span>
+                        <span class="mx-2 text-surface-600">·</span>Realtime
+                    </p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
+                        Changes arrive, however they were made
+                    </h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">
+                        <code class="font-mono text-surface-300">listen()</code> on any collection and every insert,
+                        update and delete lands on the client over WebSocket. Subscriptions respect the same
+                        row-level security as a read, so a subscriber is never pushed a row they could not have
+                        fetched.
+                    </p>
+                    <p class="text-base text-surface-400 leading-relaxed">
+                        Writes made outside the API count too — a row changed from
+                        <code class="font-mono text-surface-300">psql</code>, a cron job or Studio's SQL editor emits
+                        the same event, because change capture happens in the database. Across replicas, fan-out
+                        rides Postgres <code class="font-mono text-surface-300">LISTEN/NOTIFY</code>.
+                    </p>
+                </div>
+                <div class="lg:col-span-7">
+                    <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_18px_60px_rgba(0,0,0,0.55)]"
+                         inert aria-hidden="true">
+                        <RealtimeMiniDemo client:visible/>
+                    </div>
+                </div>
             </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Built on Hono</h2>
-            <p class="text-lg text-surface-400 mb-6">The Rebase backend is a composable Hono application. Mount it standalone or embed it into your existing app. Add custom middleware, routes, and business logic.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Composable middleware (CORS, secure headers, auth)</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Mount as a sub-app on your existing Hono server</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Deploy on Node.js, Docker, Railway, Fly.io, or bare metal</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> SPA static serving built in</li>
-            </ul>
-          </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-            <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={honoCode}/></pre>
-          </div>
         </div>
-      </div>
     </section>
 
-    <!-- Drizzle ORM -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div class="lg:order-last">
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20">
-              Zero N+1 Queries
+    <!-- ═══════════════════════ 04 · AUTHORIZATION ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <span class="font-mono text-surface-500">04</span>
+                    <span class="mx-2 text-surface-600">·</span>Authorization
+                </p>
+                <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    The rules live in Postgres, not in this server
+                </h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">
+                    Requests execute as a restricted database role. Your <code class="font-mono text-surface-300">securityRules</code>
+                    compile to real row-level security policies, so a query that should return nothing returns
+                    nothing — whether it arrives through the SDK, a REST call, the admin panel, an agent's API key
+                    or a psql session. A collection with no policy serves no rows: the default is closed, not open.
+                </p>
             </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Drizzle Relational Queries</h2>
-            <p class="text-lg text-surface-400 mb-6">Collections generate Drizzle ORM schemas with full relation support. The query engine uses <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">db.query.findMany</code> with nested includes — zero N+1 queries, maximum performance.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Auto-generated Drizzle schema from collections</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> One-to-one, one-to-many, many-to-many relations</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Field-level selection (only fetch what you need)</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Cursor and offset pagination</li>
-            </ul>
-          </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-            <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={drizzleCode}/></pre>
-          </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
+                        <span class="font-mono text-xs text-surface-400">config/collections/orders.ts</span>
+                        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">what you write</span>
+                    </div>
+                    <pre class="p-5 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={rulesCode}></code></pre>
+                </div>
+
+                <div class="rounded-2xl border border-primary/20 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col relative">
+                    <div class="pointer-events-none absolute inset-0" aria-hidden="true"
+                         style="background: radial-gradient(500px 260px at 70% 0%, rgba(0,112,244,0.10), transparent 70%);"></div>
+                    <div class="relative px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
+                        <span class="font-mono text-xs text-surface-400">psql — what the database enforces</span>
+                        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">generated</span>
+                    </div>
+                    <pre class="relative p-5 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={policyCode}></code></pre>
+                </div>
+            </div>
+
+            <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+                <a href={translatePath("/security")}
+                   class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                    The whole security model
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+                <span class="text-surface-700">·</span>
+                <span class="text-sm text-surface-500">
+                    Already on Postgres? <code class="font-mono text-surface-400">npx @rebasepro/rls-check $DATABASE_URL</code>
+                    audits it without installing anything.
+                </span>
+            </div>
         </div>
-      </div>
     </section>
 
-    <!-- Storage & Email -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="mx-auto max-w-2xl text-center mb-16">
-          <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Batteries Included</h2>
-          <p class="mt-4 text-lg text-surface-400">Storage, email, and auth — everything you need for production, built in.</p>
+    <!-- ═══════════════════════ 05 · WHAT'S MOUNTED ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+                <div class="lg:col-span-5">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                        <span class="font-mono text-surface-500">05</span>
+                        <span class="mx-2 text-surface-600">·</span>One server
+                    </p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
+                        Everything mounted, nothing assembled
+                    </h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-6">
+                        This is the routing table of a default project — one process, one deployment, no service
+                        mesh to draw. Each of these exists because building it yourself is a week you would
+                        rather spend elsewhere.
+                    </p>
+                    <div class="space-y-4">
+                        {alsoShipped.map(item => (
+                                <div class="flex gap-3">
+                                    <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/60"></span>
+                                    <p class="text-sm text-surface-400 leading-relaxed">
+                                        <span class="text-white">{item.title}.</span> {item.desc}
+                                    </p>
+                                </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div class="lg:col-span-7">
+                    <div class="rounded-2xl border border-white/5 bg-surface-950/90 overflow-hidden shadow-[0_18px_60px_rgba(0,0,0,0.55)]">
+                        <div class="px-4 py-3 flex items-center gap-1.5 border-b border-surface-800/80 bg-surface-900/50">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                            <span class="ml-2 font-mono text-xs text-surface-400">rebase dev — mounted routes</span>
+                        </div>
+                        <ul class="divide-y divide-surface-800/60">
+                            {routes.map(route => (
+                                    <li class="px-5 py-4 flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-5 hover:bg-surface-900/40 transition-colors">
+                                        <code class="font-mono text-xs sm:text-[13px] text-primary-light shrink-0 sm:w-[15.5rem]">{route.path}</code>
+                                        <span class="text-sm text-surface-400 leading-relaxed">{route.note}</span>
+                                    </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-            
-<svg
-  class="lucide lucide-hard-drive"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M10 16h.01" />
-  <path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
-  <path d="M21.946 12.013H2.054" />
-  <path d="M6 16h.01" />
-</svg>
-
-            <h3 class="text-lg font-semibold text-white mb-2">File Storage</h3>
-            <p class="text-sm text-surface-400">Local, S3-compatible, and GCS/Firebase Storage with multi-backend support. Route different fields to different storage backends.</p>
-          </div>
-          <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-            
-<svg
-  class="lucide lucide-mail"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" />
-  <rect x="2" y="4" width="20" height="16" rx="2" />
-</svg>
-
-            <h3 class="text-lg font-semibold text-white mb-2">Email Service</h3>
-            <p class="text-sm text-surface-400">Built-in SMTP integration for password reset, email verification, and custom transactional emails.</p>
-          </div>
-          <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-            
-<svg
-  class="lucide lucide-shield-check"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
-  <path d="m9 12 2 2 4-4" />
-</svg>
-
-            <h3 class="text-lg font-semibold text-white mb-2">JWT Authentication</h3>
-            <p class="text-sm text-surface-400">Custom JWT auth with access/refresh tokens, Google OAuth, role-based access control, and session management.</p>
-          </div>
-          <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-            
-<svg
-  class="lucide lucide-git-branch"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M15 6a9 9 0 0 0-9 9V3" />
-  <circle cx="18" cy="6" r="3" />
-  <circle cx="6" cy="18" r="3" />
-</svg>
-
-            <h3 class="text-lg font-semibold text-white mb-2">Database Branching</h3>
-            <p class="text-sm text-surface-400">Create instant, isolated copies of your entire database for dev, staging, or testing. Like git branches, but for your data.</p>
-          </div>
-          <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-            
-<svg
-  class="lucide lucide-zap"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
-</svg>
-
-            <h3 class="text-lg font-semibold text-white mb-2">Custom Functions</h3>
-            <p class="text-sm text-surface-400">Drop a Hono route file in <code class="text-xs bg-surface-800 px-1 py-0.5 rounded">functions/</code> and it auto-mounts at <code class="text-xs bg-surface-800 px-1 py-0.5 rounded">/api/functions/&lt;name&gt;</code>. Zero config.</p>
-          </div>
-          <div class="p-7 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-            
-<svg
-  class="lucide lucide-history"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-  <path d="M3 3v5h5" />
-  <path d="M12 7v5l4 2" />
-</svg>
-
-            <h3 class="text-lg font-semibold text-white mb-2">Entity History</h3>
-            <p class="text-sm text-surface-400">Full audit trail for every data change. Track who changed what, when, and restore previous versions.</p>
-          </div>
-        </div>
-      </div>
     </section>
 
-    <!-- Where the admin panel fits -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="mx-auto max-w-3xl text-center mb-12">
-          <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Headless by default</h2>
-          <p class="mt-4 text-lg text-surface-400">
-            The admin panel is a separate product. Toggle it on below — the project gains a dependency and a nested
-            <code class="font-mono text-surface-300">admin</code> block, and the API response does not move.
-          </p>
+    <!-- ═══════════════════════ 06 · HONO + DRIZZLE ═══════════════════════ -->
+    <section class="py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <span class="font-mono text-surface-500">06</span>
+                    <span class="mx-2 text-surface-600">·</span>Underneath
+                </p>
+                <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    Boring technology, on purpose
+                </h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">
+                    A Hono app and a Drizzle schema. Two things your team can read, debug and extend without
+                    learning a framework — and without waiting for us to expose a hook.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
+                        <span class="font-mono text-xs text-surface-400">backend/src/index.ts</span>
+                        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 ring-1 ring-inset ring-orange-500/20">Hono</span>
+                    </div>
+                    <pre class="p-5 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={honoCode}></code></pre>
+                    <ul class="px-5 pb-5 space-y-2 text-sm text-surface-400">
+                        <li class="flex gap-2.5"><span class="text-primary">✓</span> Mount it as a sub-app on a server you already run</li>
+                        <li class="flex gap-2.5"><span class="text-primary">✓</span> Your middleware, your routes, your error handling</li>
+                        <li class="flex gap-2.5"><span class="text-primary">✓</span> Node, Docker, Railway, Fly.io or bare metal</li>
+                    </ul>
+                </div>
+
+                <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
+                    <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
+                        <span class="font-mono text-xs text-surface-400">relations, resolved in one query</span>
+                        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20">Drizzle</span>
+                    </div>
+                    <pre class="p-5 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={drizzleCode}></code></pre>
+                    <ul class="px-5 pb-5 space-y-2 text-sm text-surface-400">
+                        <li class="flex gap-2.5"><span class="text-primary">✓</span> One-to-one, one-to-many and many-to-many</li>
+                        <li class="flex gap-2.5"><span class="text-primary">✓</span> Field selection — fetch the columns you asked for</li>
+                        <li class="flex gap-2.5"><span class="text-primary">✓</span> Cursor and offset pagination</li>
+                    </ul>
+                </div>
+            </div>
         </div>
-        <SplitLayerDemo client:visible/>
-        <div class="mt-8 text-center">
-          <a href={translatePath("/admin")}
-             class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
-            See what the admin panel gives you
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 12h14"/>
-              <path d="m12 5 7 7-7 7"/>
-            </svg>
-          </a>
-        </div>
-      </div>
     </section>
 
-    <!-- CTA -->
- <section class="py-24 sm:py-32">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
-        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-8">Deploy your backend in minutes</h2>
-        <div class="flex items-center justify-center gap-x-6">
-          <a href="/developers"
-             class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
-            Developer Guide
-            
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
-          </a>
-          <a href="/sdk" class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
-            Client SDK
-            
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
-          </a>
+    <!-- ═══════════════════════ 07 · HEADLESS BY DEFAULT ═══════════════════════ -->
+    <section class="py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto max-w-3xl text-center mb-12">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <span class="font-mono text-surface-500">07</span>
+                    <span class="mx-2 text-surface-600">·</span>The other half
+                </p>
+                <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">Headless by default</h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">
+                    The admin panel is a separate product. Toggle it on below: the project gains one dependency
+                    and a nested <code class="font-mono text-surface-300">admin</code> block, a back office appears —
+                    and the API response on the right does not move.
+                </p>
+            </div>
+            <SplitLayerDemo client:visible/>
+            <div class="mt-10 text-center">
+                <a href={translatePath("/admin")}
+                   class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                    See what the admin panel gives your team
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
         </div>
-      </div>
     </section>
-  </div>
 
+    <!-- ═══════════════════════ CTA ═══════════════════════ -->
+    <section class="py-24 sm:py-32">
+        <div class="mx-auto max-w-3xl px-6 lg:px-8 text-center">
+            <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
+                A backend in about a minute
+            </h2>
+            <p class="text-lg text-surface-400 mb-10">
+                Scaffold a project, point it at a database, and read the OpenAPI spec it generates.
+            </p>
+
+            <div class="group relative max-w-md mx-auto mb-10">
+                <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
+                     aria-hidden="true"></div>
+                <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
+                    <div class="px-5 py-4 flex items-center justify-between">
+                        <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
+                            <span class="text-primary mr-3">~</span>
+                            <span class="text-white">pnpm dlx @rebasepro/cli init</span>
+                        </div>
+                        <button data-track-copy="backend-cta" data-command="pnpm dlx @rebasepro/cli init"
+                                class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                aria-label="Copy command" title="Copy to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+                <a href={translatePath("/developers")}
+                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
+                   data-track id="backend-cta-developers">
+                    How you build with it
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+                <a href="/docs/backend"
+                   class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold"
+                   data-track id="backend-cta-docs">
+                    Backend docs
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </section>
+</div>

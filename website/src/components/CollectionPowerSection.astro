@@ -2,6 +2,10 @@
 import { TableProperties, LayoutDashboard, Database, Code, Globe, GitFork } from "lucide-react";
 import { getLangFromUrl, useTranslations } from '../i18n/ui';
 
+// `index` renders the numbered eyebrow used by the home page's beat sequence;
+// deep pages pass nothing and get a plain badge.
+const { index } = Astro.props;
+
 const lang = getLangFromUrl(Astro.url);
 const t = useTranslations(lang);
 
@@ -38,8 +42,8 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
     {/* Layout overhaul applied: BG grid lines removed, sticky positioning removed. */}
     {/* Header — keep centred with a soft max-width just for the text */}
     <div class="mx-auto max-w-2xl text-center px-6 mb-16 animate-on-scroll fade-in-up">
-        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">02</span><span class="mx-2 text-surface-600">·</span>{t('power.badge')}</p>
-        <h2 class="text-3xl font-bold tracking-tight text-white sm:text-5xl leading-tight" set:html={t('power.title')}></h2>
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">{index && (<><span class="font-mono text-surface-500">{index}</span><span class="mx-2 text-surface-600">·</span></>)}{t('power.badge')}</p>
+        <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-5xl leading-tight" set:html={t('power.title')}></h2>
         <p class="mt-6 text-lg text-surface-400">
             {t('power.subtitle')}
         </p>
@@ -442,7 +446,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
 </svg>
 
                     <span class="text-[11px] uppercase tracking-wider font-semibold text-surface-400 font-mono">Typed SDK</span>
-                    <span class="ml-auto text-[10px] font-bold text-blue-400 font-mono">TS</span>
+                    <span class="ml-auto text-[10px] font-semibold text-blue-400 font-mono">TS</span>
                 </div>
                 <div class="p-4 font-mono text-[11px] leading-relaxed text-surface-400">
                     <pre set:html={`<span class="text-primary-light">import</span> <span class="text-white">{ createClient }</span> <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/client"</span>;
@@ -499,7 +503,7 @@ const codeHtml = `<span class="text-primary-light">import type</span> { Postgres
                             { method: "DELETE", color: "bg-red-950 text-red-300 border-red-800/40",          path: "/api/products/:id" },
                         ].map(ep => (
                             <div class="flex items-center justify-between px-3 py-2.5">
-                                <span class={`flex-shrink-0 text-[8px] font-bold border px-1.5 py-0.5 rounded font-mono ${ep.color}`}>{ep.method}</span>
+                                <span class={`flex-shrink-0 text-[8px] font-semibold border px-1.5 py-0.5 rounded font-mono ${ep.color}`}>{ep.method}</span>
                                 <span class="font-mono text-[9px] text-surface-400 truncate text-right">{ep.path}</span>
                             </div>
                         ))}

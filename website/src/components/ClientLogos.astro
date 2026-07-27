@@ -195,7 +195,7 @@ const initialLogos = filteredLogos.slice(0, 5);
                         ]}
                 />}
                 {logo.text && <span
-                        class="text-2xl font-bold text-surface-400 hover:text-white transition-colors">{logo.text}</span>}
+                        class="text-2xl font-semibold text-surface-400 hover:text-white transition-colors">{logo.text}</span>}
             </a>
     ))}
 </div>
@@ -268,7 +268,7 @@ const initialLogos = filteredLogos.slice(0, 5);
                     newElement.appendChild(img);
                 } else if (newLogo.text) {
                     const span = document.createElement('span');
-                    span.className = 'text-2xl font-bold text-surface-400 hover:text-white transition-colors';
+                    span.className = 'text-2xl font-semibold text-surface-400 hover:text-white transition-colors';
                     span.textContent = newLogo.text;
                     newElement.appendChild(span);
                 }

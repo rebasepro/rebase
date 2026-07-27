@@ -258,7 +258,7 @@ code: "// New script\n" }]);
                     <div className="flex shrink-0 items-center gap-1.5 pr-2">
                         {/* User avatar */}
                         <div className="flex items-center gap-1 px-2 py-1 rounded bg-surface-800/60 text-[10px] text-surface-400 cursor-pointer">
-                            <div className="w-4 h-4 rounded-full bg-indigo-500/30 flex items-center justify-center text-[8px] text-indigo-300 font-bold">A</div>
+                            <div className="w-4 h-4 rounded-full bg-indigo-500/30 flex items-center justify-center text-[8px] text-indigo-300 font-semibold">A</div>
                             <span>Run as Admin</span>
                         </div>
                         <div className="h-4 w-px bg-surface-800 mx-1"/>
@@ -311,7 +311,7 @@ code: "// New script\n" }]);
                     {/* Results */}
                     <div className="flex-1 flex flex-col min-h-0 bg-surface-950">
                         <div className="p-2 px-4 bg-surface-900/60 border-b border-surface-800/40 flex items-center shrink-0">
-                            <span className="font-bold text-surface-500 uppercase tracking-widest text-[10px]">RESULTS</span>
+                            <span className="font-semibold text-surface-500 uppercase tracking-widest text-[10px]">RESULTS</span>
                             {result && (
                                 <>
                                     <div className="flex-grow"/>

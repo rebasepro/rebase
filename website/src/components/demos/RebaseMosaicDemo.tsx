@@ -425,7 +425,7 @@ export default function RebaseMosaicDemo() {
                                     <span className="text-neutral-700">/</span>
                                     <span className="text-neutral-400">spec</span>
                                 </div>
-                                <div className="text-lg font-bold text-white font-sans">Rebase Setup Spec</div>
+                                <div className="text-lg font-semibold text-white font-sans">Rebase Setup Spec</div>
                             </div>
 
                             {/* Block elements list */}
@@ -555,7 +555,7 @@ export default function RebaseMosaicDemo() {
                         {/* Header */}
                         <div className="p-4 pb-2 flex items-center justify-between">
                             <div>
-                                <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-1.5">
+                                <h3 className="text-sm font-semibold text-neutral-100 flex items-center gap-1.5">
                                     <User size={14} className="text-primary"/> Users
                                 </h3>
                             </div>
@@ -646,7 +646,7 @@ export default function RebaseMosaicDemo() {
                         <pre className="text-neutral-400">
               <span className="text-purple-400">import</span> &#123; rebase &#125; <span
                             className="text-purple-400">from</span> <span
-                            className="text-green-400">"@rebase/sdk"</span>;{"\n"}
+                            className="text-green-400">"@rebasepro/client"</span>;{"\n"}
                             {"\n"}
                             <span className="text-purple-400">const</span> client = rebase.<span
                             className="text-blue-400">init</span>(&#123;{"\n"}
@@ -777,7 +777,7 @@ export default function RebaseMosaicDemo() {
                             <div className="border-r border-neutral-800 p-3 space-y-3 bg-neutral-950/30 text-[10px]">
                                 {/* Title field */}
                                 <div className="relative rounded bg-neutral-900/50 border border-neutral-800 p-1.5">
-                                    <span className="text-[8px] font-bold text-neutral-500 uppercase">Page Title</span>
+                                    <span className="text-[8px] font-semibold text-neutral-500 uppercase">Page Title</span>
                                     <div
                                         className="pt-1 font-medium text-neutral-300 leading-normal truncate">{currentLivePreviewText}</div>
                                 </div>
@@ -786,7 +786,7 @@ export default function RebaseMosaicDemo() {
                                 <div
                                     className="relative rounded bg-neutral-900/50 border border-neutral-800 p-1.5 flex items-center justify-between">
                                     <div>
-                                        <span className="text-[8px] font-bold text-neutral-500 uppercase">Status</span>
+                                        <span className="text-[8px] font-semibold text-neutral-500 uppercase">Status</span>
                                         <div className="pt-0.5 font-medium text-emerald-400">Published</div>
                                     </div>
                                     <Check size={10} className="text-emerald-500"/>
@@ -798,7 +798,7 @@ export default function RebaseMosaicDemo() {
                                     <ImageIcon size={14} className="text-neutral-600"/>
                                     <div className="truncate">
                                         <span
-                                            className="text-[8px] font-bold text-neutral-500 uppercase block leading-none">Banner Image</span>
+                                            className="text-[8px] font-semibold text-neutral-500 uppercase block leading-none">Banner Image</span>
                                         <span className="text-neutral-400">banner.webp</span>
                                     </div>
                                 </div>
@@ -812,7 +812,7 @@ export default function RebaseMosaicDemo() {
                                     className="absolute inset-2 border border-dashed border-primary/40 rounded-lg pointer-events-none animate-pulse"/>
 
                                 <div className="text-center space-y-1.5 max-w-[130px]">
-                                    <h4 className="text-[10px] font-bold tracking-tight text-white leading-tight">
+                                    <h4 className="text-[10px] font-semibold tracking-tight text-white leading-tight">
                                         {currentLivePreviewText}
                                     </h4>
                                     <div className="h-0.5 w-6 bg-primary mx-auto rounded"/>
@@ -837,7 +837,7 @@ export default function RebaseMosaicDemo() {
 
                         {/* Header */}
                         <div className="p-4 pb-2 border-b border-neutral-800/60 bg-neutral-900/10">
-                            <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-1.5">
+                            <h3 className="text-sm font-semibold text-neutral-100 flex items-center gap-1.5">
                                 <MessageSquare size={14} className="text-primary"/> Feedback
                             </h3>
                         </div>

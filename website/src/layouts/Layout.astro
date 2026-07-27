@@ -78,7 +78,10 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
 
             // 2. Experiments definition
             var experiments = [
-                { id: "navigation-structure", variants: ["control", "flat-nav"], weights: [50, 50] },
+                // The nav is where the two-layer story is taught (backend column /
+                // admin-panel column), so the flat variant is parked at 0% rather
+                // than deleted — flip the weights back to split-test it again.
+                { id: "navigation-structure", variants: ["control", "flat-nav"], weights: [100, 0] },
                 { id: "manifesto-banner-text", variants: ["control", "mission", "founders"], weights: [34, 33, 33] }
             ];
 

@@ -11,12 +11,32 @@
     "redirects": [
       {
         "source": "/f/backend_extension",
-        "destination": "/features",
+        "destination": "/backend",
         "type": 301
       },
       {
         "source": "/openai",
-        "destination": "/features",
+        "destination": "/ai",
+        "type": 301
+      },
+      {
+        "source": "/features",
+        "destination": "/product",
+        "type": 301
+      },
+      {
+        "source": "/:lang(es|de|fr)/features",
+        "destination": "/:lang/product",
+        "type": 301
+      },
+      {
+        "source": "/why-rebase",
+        "destination": "/compare",
+        "type": 301
+      },
+      {
+        "source": "/:lang(es|de|fr)/why-rebase",
+        "destination": "/:lang/compare",
         "type": 301
       }
     ],

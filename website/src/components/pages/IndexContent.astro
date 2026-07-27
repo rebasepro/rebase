@@ -12,9 +12,9 @@ import { RealtimeMiniDemo } from "../../components/demos/RealtimeMiniDemo";
 import { RLSEditorDemo } from "../../components/demos/RLSEditorDemo";
 import AiAppDevelopmentDemo from "../../components/demos/AiAppDevelopmentDemo";
 import { AgentConsoleDemo } from "../../components/demos/AgentConsoleDemo";
-import RebaseMosaicDemo from "../../components/demos/RebaseMosaicDemo";
 import CollectionPowerSection from "../../components/CollectionPowerSection.astro";
 import RoadmapSection from "../../components/RoadmapSection.astro";
+import RlsCheckReport from "../../components/RlsCheckReport.astro";
 import { NeatBackground } from '../../components/NeatBackground';
 
 
@@ -49,7 +49,7 @@ const translatePath = useTranslatedPath(lang);
             <!-- Headline -->
             <div class="relative">
 
-                <h1 class="relative mb-6 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
+                <h1 class="relative mb-6 text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
                     {t("hero.title.part1")}<br/><span class="text-primary">{t("hero.title.part2")}</span>
                 </h1>
             </div>
@@ -91,7 +91,7 @@ const translatePath = useTranslatedPath(lang);
                     <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
                         <div class="px-5 py-4 flex items-center justify-between">
                             <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                <span class="text-primary font-bold mr-3">~</span>
+                                <span class="text-primary font-semibold mr-3">~</span>
                                 <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                             </div>
                             <button data-track-copy="hero" data-command="pnpm dlx @rebasepro/cli init"
@@ -116,65 +116,6 @@ const translatePath = useTranslatedPath(lang);
         </div>
     </section>
 
-    <!-- Free tool — the zero-commitment entry point.
-         Placed immediately after the hero and ahead of social proof on purpose:
-         every other CTA on this page (live demo, GitHub, `cli init`) assumes the
-         visitor already wants to adopt something. This one asks for nothing, runs
-         against the database they already have, and turns the hero's claim about
-         RLS into something testable in ten seconds. -->
- <section id="s-rls-check" class="relative z-10 py-16 sm:py-20">
-        <div class="mx-auto max-w-4xl px-6 lg:px-8">
-            <div class="rounded-2xl border border-surface-700/80 bg-surface-900/60 px-6 py-10 sm:px-10 sm:py-12 animate-on-scroll fade-in-up">
-                <div class="text-center">
-                    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-xs font-medium text-primary">
-                        {t("rlscheck.badge")}
-                    </span>
-                    <h2 class="mt-5 text-2xl sm:text-3xl font-bold tracking-tight text-white">{t("rlscheck.title")}</h2>
-                    <p class="mt-4 text-base leading-7 text-surface-400">{t("rlscheck.subtitle")}</p>
-                </div>
-
-                <!-- Same command-card idiom as the hero CLI block, deliberately -->
-                <div class="mt-8 group relative">
-                    <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
-                         aria-hidden="true"></div>
-                    <div class="relative rounded-xl bg-surface-950/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
-                        <div class="px-5 py-4 flex items-center justify-between">
-                            <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                <span class="text-primary font-bold mr-3">~</span>
-                                <span class="text-white">npx @rebasepro/rls-check $DATABASE_URL</span>
-                            </div>
-                            <button data-track-copy="rls-check" data-command="npx @rebasepro/rls-check $DATABASE_URL"
-                                    class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                    aria-label="Copy command" title="Copy to clipboard">
-                                <svg class="lucide lucide-copy" xmlns="http://www.w3.org/2000/svg" width="18"
-                                     height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <p class="mt-5 text-center text-xs leading-6 text-surface-500">{t("rlscheck.note")}</p>
-
-                <div class="mt-6 text-center">
-                    <a href="https://github.com/rebasepro/rebase/tree/main/packages/rls-check"
-                       target="_blank" rel="noopener noreferrer"
-                       class="inline-flex items-center gap-x-2 text-sm font-medium text-primary hover:underline">
-                        {t("rlscheck.cta")}
-                        <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="16"
-                             height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                             stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M5 12h14"/>
-                            <path d="m12 5 7 7-7 7"/>
-                        </svg>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
 
     <!-- Social proof -->
  <section id="s-social-proof" class="relative z-0 py-20 sm:py-28">
@@ -233,7 +174,7 @@ const translatePath = useTranslatedPath(lang);
                             <div>
                                 <div class="flex gap-3 items-center justify-between">
                                     <div class="flex gap-3 items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-primary font-semibold">~</span>
                                         <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                                     </div>
                                     <button data-track-copy="demo-terminal" data-command="pnpm dlx @rebasepro/cli init"
@@ -264,7 +205,7 @@ const translatePath = useTranslatedPath(lang);
                             <div>
                                 <div class="flex gap-3 items-center justify-between">
                                     <div class="flex gap-3 items-center">
-                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-primary font-semibold">~</span>
                                         <span class="text-white">pnpm rebase db push</span>
                                     </div>
                                     <button data-track-copy="demo-db-push" data-command="pnpm rebase db push"
@@ -295,7 +236,7 @@ const translatePath = useTranslatedPath(lang);
                             <div>
                                 <div class="flex gap-3 items-center justify-between">
                                     <div class="flex gap-3 items-center">
-                                        <span class="text-primary font-bold">~</span>
+                                        <span class="text-primary font-semibold">~</span>
                                         <span class="text-white">pnpm dev</span>
                                     </div>
                                     <button data-track-copy="demo-dev" data-command="pnpm dev"
@@ -338,7 +279,7 @@ const translatePath = useTranslatedPath(lang);
 
     <div id="s-collection-power" class="relative z-0">
         <!-- One Collection. Everything. -->
-        <CollectionPowerSection/>
+        <CollectionPowerSection index="02"/>
     </div>
 
     <!-- The backend underneath: SDK / REST / realtime proof -->
@@ -346,7 +287,7 @@ const translatePath = useTranslatedPath(lang);
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">03</span><span class="mx-2 text-surface-600">·</span>{t("engine.badge")}</p>
-                <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">{t("engine.title")}</h2>
+                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">{t("engine.title")}</h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("engine.subtitle")}</p>
             </div>
 
@@ -390,118 +331,8 @@ const translatePath = useTranslatedPath(lang);
                     </div>
                 </div>
 
-                <!-- Data history & audit -->
-                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-100">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
-                        <!-- Window controls -->
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                        </div>
-                        <div class="relative flex-1 w-full overflow-hidden">
-                            <img
-                                    src="/img/history.webp"
-                                    alt="Data history and audit view"
-                                    width="800"
-                                    height="600"
-                                    loading="lazy"
-                                    class="w-full h-full object-cover object-top"/>
-                        </div>
-                    </div>
-                    <div class="relative z-10 p-5">
-                        <div class="flex items-center gap-2 mb-2">
-                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-
-                                <svg
-                                        class="lucide lucide-history"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                >
-                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                                    <path d="M3 3v5h5"/>
-                                    <path d="M12 7v5l4 2"/>
-                                </svg>
-
-                            </div>
-                            <h3 class="text-base font-semibold text-white">{t("features.history.title")}</h3>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
-                                    {t("features.history.badge")}
-                                </span>
-                        </div>
-                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.history.desc")}</p>
-                    </div>
-                </div>
-
-                <!-- Import & export -->
-                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-200">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
-                        <!-- Window controls -->
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                        </div>
-                        <div class="relative flex-1 w-full overflow-hidden">
-                            <video
-                                    class="w-full h-full object-cover object-top"
-                                    style="pointer-events: none;"
-                                    width="800"
-                                    height="600"
-                                    loop
-                                    autoplay
-                                    muted
-                                    playsinline>
-                                <source src="/img/import.webm" type="video/webm"/>
-                            </video>
-                        </div>
-                    </div>
-                    <div class="relative z-10 p-5">
-                        <div class="flex items-center gap-2 mb-2">
-                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-
-                                <svg
-                                        class="lucide lucide-upload"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                >
-                                    <path d="M12 3v12"/>
-                                    <path d="m17 8-5-5-5 5"/>
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                </svg>
-
-                            </div>
-                            <h3 class="text-base font-semibold text-white">{t("features.import.title")}</h3>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
-                                    {t("features.import.badge")}
-                                </span>
-                        </div>
-                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.import.desc")}</p>
-                    </div>
-                </div>
-
                 <!-- Instant REST API -->
-                <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-100">
+                <div class="md:col-span-1 lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-100">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
@@ -551,47 +382,8 @@ const translatePath = useTranslatedPath(lang);
                     </div>
                 </div>
 
-                <!-- Extreme Customization -->
-                <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-200">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
-                         aria-hidden="true"
-                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
-                        <!-- Window controls -->
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                        </div>
-                        <div class="relative flex-1 w-full overflow-hidden" inert aria-hidden="true">
-                            <BodyPartsDemo client:load/>
-                        </div>
-                    </div>
-                    <div class="relative z-10 p-5">
-                        <div class="flex items-center gap-2 mb-2">
-                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                                <svg class="lucide lucide-palette" xmlns="http://www.w3.org/2000/svg" width="20"
-                                     height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="13.5" cy="6.5" r=".5"/>
-                                    <circle cx="17.5" cy="10.5" r=".5"/>
-                                    <circle cx="8.5" cy="7.5" r=".5"/>
-                                    <circle cx="6.5" cy="12.5" r=".5"/>
-                                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
-                                </svg>
-                            </div>
-                            <h3 class="text-base font-semibold text-white">{t("features.customization.title")}</h3>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
-                                    {t("features.customization.badge")}
-                                </span>
-                        </div>
-                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.customization.desc")}</p>
-
-                    </div>
-                </div>
-
                 <!-- Real-time everywhere -->
-                <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-300">
+                <div class="lg:col-span-6 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-300">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
@@ -787,7 +579,7 @@ const translatePath = useTranslatedPath(lang);
                 </div>
 
                 <div class="mt-10 text-center animate-on-scroll fade-in-up delay-300">
-                    <a href={translatePath("/why-rebase")}
+                    <a href={translatePath("/compare")}
                        class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors group">
                         {t("modes.link")}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
@@ -807,7 +599,7 @@ const translatePath = useTranslatedPath(lang);
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center mb-12 animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">05</span><span class="mx-2 text-surface-600">·</span>{t("see.badge")}</p>
-                <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">{t("see.title")}</h2>
+                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">{t("see.title")}</h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("see.subtitle")}</p>
             </div>
 
@@ -817,6 +609,174 @@ const translatePath = useTranslatedPath(lang);
             <p class="mt-2 text-center text-xs sm:text-sm text-surface-400">
                 A quick tour of the generated Rebase admin panel — one dependency on top of the backend above.
             </p>
+
+            <!-- The panel-side capabilities that used to sit in the backend beat above.
+                 History, import/export and custom React are things the admin layer gives
+                 you — they belong here, not in the list of what the API serves. -->
+            <div class="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 max-w-5xl mx-auto">
+                <!-- Data history & audit -->
+                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-100">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
+                        <!-- Window controls -->
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                        </div>
+                        <div class="relative flex-1 w-full overflow-hidden">
+                            <img
+                                    src="/img/history.webp"
+                                    alt="Data history and audit view"
+                                    width="800"
+                                    height="600"
+                                    loading="lazy"
+                                    class="w-full h-full object-cover object-top"/>
+                        </div>
+                    </div>
+                    <div class="relative z-10 p-5">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+
+                                <svg
+                                        class="lucide lucide-history"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                >
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                    <path d="M12 7v5l4 2"/>
+                                </svg>
+
+                            </div>
+                            <h3 class="text-base font-semibold text-white">{t("features.history.title")}</h3>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                    {t("features.history.badge")}
+                                </span>
+                        </div>
+                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.history.desc")}</p>
+                    </div>
+                </div>
+
+                <!-- Import & export -->
+                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-200">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
+                        <!-- Window controls -->
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                        </div>
+                        <div class="relative flex-1 w-full overflow-hidden">
+                            <video
+                                    class="w-full h-full object-cover object-top"
+                                    style="pointer-events: none;"
+                                    width="800"
+                                    height="600"
+                                    loop
+                                    autoplay
+                                    muted
+                                    playsinline>
+                                <source src="/img/import.webm" type="video/webm"/>
+                            </video>
+                        </div>
+                    </div>
+                    <div class="relative z-10 p-5">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+
+                                <svg
+                                        class="lucide lucide-upload"
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="20"
+                                        height="20"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                >
+                                    <path d="M12 3v12"/>
+                                    <path d="m17 8-5-5-5 5"/>
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                </svg>
+
+                            </div>
+                            <h3 class="text-base font-semibold text-white">{t("features.import.title")}</h3>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                    {t("features.import.badge")}
+                                </span>
+                        </div>
+                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.import.desc")}</p>
+                    </div>
+                </div>
+
+                <!-- Extreme Customization -->
+                <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-200">
+                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
+                         aria-hidden="true"
+                         style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
+                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
+                        <!-- Window controls -->
+                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
+                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
+                        </div>
+                        <div class="relative flex-1 w-full overflow-hidden" inert aria-hidden="true">
+                            <BodyPartsDemo client:load/>
+                        </div>
+                    </div>
+                    <div class="relative z-10 p-5">
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+                                <svg class="lucide lucide-palette" xmlns="http://www.w3.org/2000/svg" width="20"
+                                     height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                     stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="13.5" cy="6.5" r=".5"/>
+                                    <circle cx="17.5" cy="10.5" r=".5"/>
+                                    <circle cx="8.5" cy="7.5" r=".5"/>
+                                    <circle cx="6.5" cy="12.5" r=".5"/>
+                                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-base font-semibold text-white">{t("features.customization.title")}</h3>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                    {t("features.customization.badge")}
+                                </span>
+                        </div>
+                        <p class="text-surface-400 text-sm leading-relaxed">{t("features.customization.desc")}</p>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="mt-10 text-center animate-on-scroll fade-in delay-300">
+                <a href={translatePath("/admin")}
+                   class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors group">
+                    Everything the admin panel adds
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                         class="group-hover:translate-x-0.5 transition-transform">
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
         </div>
     </section>
 
@@ -896,11 +856,11 @@ const translatePath = useTranslatedPath(lang);
                             </div>
                             <div class="px-5 py-5 font-mono text-[13px] sm:text-sm space-y-3 bg-gradient-to-b from-surface-900/50 to-transparent">
                                 <div class="flex items-center gap-3 whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                                    <span class="text-primary font-bold">~</span>
+                                    <span class="text-primary font-semibold">~</span>
                                     <span class="text-white">git clone github.com/rebasepro/rebase</span>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <span class="text-primary font-bold">~</span>
+                                    <span class="text-primary font-semibold">~</span>
                                     <span class="text-white">docker compose up -d</span>
                                 </div>
                                 <div class="text-surface-400 text-xs ml-6">✔ Postgres ready on :5432</div>
@@ -912,7 +872,7 @@ const translatePath = useTranslatedPath(lang);
                                     </span>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    <span class="text-primary font-bold">~</span>
+                                    <span class="text-primary font-semibold">~</span>
                                     <span class="w-[2px] h-4 bg-primary animate-pulse"></span>
                                 </div>
                             </div>
@@ -950,13 +910,73 @@ const translatePath = useTranslatedPath(lang);
                                 <path d="m12 5 7 7-7 7"/>
                             </svg>
                         </a>
-                        <a href={translatePath("/why-rebase")}
+                        <a href={translatePath("/compare")}
                            class="inline-flex items-center gap-2 text-sm font-semibold text-surface-400 hover:text-white transition-colors">
                             {t("opensource.link2")}
                         </a>
                     </div>
                 </div>
             </div>
+
+            <!-- Row 3: the free audit. It sits inside the security beat rather than
+                 up near the hero, because it only means something once the claim it
+                 tests has been made. -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+                <div class="lg:col-span-5 animate-on-scroll fade-in-up lg:pt-6">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-primary text-sm font-medium mb-6">
+                        {t("rlscheck.badge")}
+                    </div>
+                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
+                        {t("rlscheck.title")}
+                    </h2>
+                    <p class="text-lg text-surface-400 leading-relaxed mb-6">
+                        {t("rlscheck.subtitle")}
+                    </p>
+
+                    <div class="group relative max-w-md">
+                        <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
+                             aria-hidden="true"></div>
+                        <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
+                            <div class="px-5 py-4 flex items-center justify-between">
+                                <div class="font-mono text-sm flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
+                                    <span class="text-primary mr-3">~</span>
+                                    <span class="text-white">npx @rebasepro/rls-check $DATABASE_URL</span>
+                                </div>
+                                <button data-track-copy="rls-check" data-command="npx @rebasepro/rls-check $DATABASE_URL"
+                                        class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                        aria-label="Copy command" title="Copy to clipboard">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round">
+                                        <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="mt-5 text-sm leading-6 text-surface-500">{t("rlscheck.note")}</p>
+
+                    <div class="mt-6">
+                        <a href="/docs/rls-check"
+                           class="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-primary transition-colors">
+                            {t("rlscheck.cta")}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <path d="M5 12h14"/>
+                                <path d="m12 5 7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-7 animate-on-scroll fade-in-up delay-100">
+                    <RlsCheckReport/>
+                </div>
+            </div>
+
 
         </div>
     </section>
@@ -966,7 +986,7 @@ const translatePath = useTranslatedPath(lang);
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">07</span><span class="mx-2 text-surface-600">·</span>Built for the agent era</p>
-                <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">
+                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">
                     The backend an agent <span class="text-primary">can't screw up</span>
                 </h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">
@@ -1027,25 +1047,8 @@ const translatePath = useTranslatedPath(lang);
         </div>
     </section>
 
-    <!-- Visual Mosaic Showcase -->
- <section id="s-mosaic-showcase"
-             class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">08</span><span class="mx-2 text-surface-600">·</span>{t("mosaic.badge")}</p>
-                <h2 class="mt-4 text-3xl font-bold tracking-tight text-white sm:text-5xl">
-                    {t("mosaic.title")}
-                </h2>
-                <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">
-                    {t("mosaic.subtitle")}
-                </p>
-            </div>
-
-            <div class="max-w-7xl mx-auto animate-on-scroll fade-in-up delay-100" style="min-height: 760px;" inert aria-hidden="true">
-                <RebaseMosaicDemo client:visible/>
-            </div>
-        </div>
-    </section>
+    <!-- The mosaic (everything on one screen) now lives on /product — the home page
+         already earns that point with the split and the panel tour above. -->
 
 
         <!-- Neat gradient divider -->
@@ -1158,7 +1161,7 @@ const translatePath = useTranslatedPath(lang);
                         </div>
                         <div class="px-5 py-4 flex items-center justify-between bg-gradient-to-b from-surface-900/50 to-transparent">
                             <div class="font-mono text-sm flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                <span class="text-primary font-bold mr-3">~</span>
+                                <span class="text-primary font-semibold mr-3">~</span>
                                 <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                             </div>
                             <button data-track-copy="bottom-cta" data-command="pnpm dlx @rebasepro/cli init"

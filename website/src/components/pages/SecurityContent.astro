@@ -17,8 +17,12 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
             <NeatBackground client:idle />
 
             <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+                <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+                    <a href="/backend" class="hover:text-primary transition-colors">The backend</a>
+                    <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">Security &amp; RLS</span>
+                </p>
                 <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
-                    <span class="text-sm font-medium">Open Source · Self-Hosted · Rebase Cloud (coming soon)</span>
+                    <span class="text-sm font-medium">Open source · self-hosted · Rebase Cloud (not launched)</span>
                 </div>
                 <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
                     Secured by the database.<br/>Not by middleware.
@@ -29,9 +33,9 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                     you self-host the open-source stack, and it will hold on Rebase Cloud when it launches.
                 </p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                    <a href="/docs"
+                    <a href="#rls"
                        class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow">
-                        Get Started
+                        See how it works
                         <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
                     </a>
                     <a href="https://demo.rebase.pro"
@@ -44,158 +48,73 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
             </div>
         </section>
 
-        <!-- Deployment Models Section -->
-        <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="mx-auto max-w-3xl text-center mb-12">
-                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Two deployment models, two security stories</h2>
-                    <p class="mt-4 text-lg leading-8 text-surface-400">
-                        Read this first — almost every claim on this page depends on which one you run.
-                        Self-hosted, we never see your data. Rebase Cloud, where we would host it for you,
-                        <b class="text-white">has not launched yet</b> — everything below describes how it is being
-                        built, so you can evaluate it before you join the waitlist.
+
+        <!-- Free tool: rls-check -->
+        <section class="relative z-0 py-16 sm:py-24">
+            <div class="mx-auto max-w-4xl px-6 lg:px-8">
+                <div class="rounded-2xl border border-surface-700/80 bg-surface-900/60 px-6 py-10 sm:px-10 sm:py-12">
+                    <div class="text-center">
+                        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/30 bg-primary/10 text-xs font-medium text-primary">
+                            Free tool · no signup · nothing installed
+                        </span>
+                        <h2 class="mt-5 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                            Check the database you already have
+                        </h2>
+                        <p class="mt-4 text-base leading-7 text-surface-400">
+                            You do not have to take any of this on faith. <code class="font-mono text-surface-300">rls-check</code>
+                            reads your database's own catalog and reports what is actually exposed: tables served with
+                            row-level security switched off, policies that evaluate to true for everyone, views that read
+                            straight past the RLS on their base tables. It works on any Postgres — Supabase, Neon, RDS or
+                            your own server.
+                        </p>
+                    </div>
+
+                    <div class="mt-8 group relative">
+                        <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
+                             aria-hidden="true"></div>
+                        <div class="relative rounded-xl bg-surface-950/80 border border-surface-700/80 overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
+                            <div class="px-5 py-4 flex items-center justify-between">
+                                <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
+                                    <span class="text-primary mr-3">~</span>
+                                    <span class="text-white">npx @rebasepro/rls-check $DATABASE_URL</span>
+                                </div>
+                                <button data-track-copy="security-rls-check" data-command="npx @rebasepro/rls-check $DATABASE_URL"
+                                        class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                        aria-label="Copy command" title="Copy to clipboard">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round">
+                                        <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                        <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="mt-5 text-center text-xs leading-6 text-surface-500">
+                        Read-only by construction: it opens a read-only transaction and runs catalog queries. It writes
+                        nothing, and no data leaves your machine.
                     </p>
-                </div>
-                <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
-                        <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20 font-medium">
-                            <svg class="lucide lucide-server" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
-                            Self-hosted / open source
-                        </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">You run everything</h3>
-                        <p class="text-surface-400 mb-4">
-                            You install the open-source Rebase server and point it at a PostgreSQL database you own.
-                            Your data never touches our servers, there is no third-party processor in the path, and
-                            you are the sole data controller.
-                        </p>
-                        <p class="text-surface-500 text-sm">
-                            The Data Sovereignty and Deploy&nbsp;on&nbsp;Your&nbsp;Terms sections below describe this model.
-                        </p>
-                    </div>
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
-                        <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
-                            <svg class="lucide lucide-cloud" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9" /></svg>
-                            Rebase Cloud · Not launched yet
-                        </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">We would run it for you</h3>
-                        <p class="text-surface-400 mb-4">
-                            Rebase Cloud is our managed hosting, still in development and not yet open to customers.
-                            When it launches we will host your database and your application on our infrastructure,
-                            which means <b class="text-white">Rebase would act as a data processor</b> on your behalf,
-                            with Google Cloud as a sub-processor. Nothing on this page pretends otherwise.
-                        </p>
-                        <p class="text-surface-500 text-sm">
-                            The Rebase&nbsp;Cloud section below describes exactly where that data lives and how it is isolated.
-                        </p>
+
+                    <div class="mt-6 text-center">
+                        <a href="/docs/rls-check"
+                           class="inline-flex items-center gap-x-2 text-sm font-medium text-primary hover:underline">
+                            See all 14 checks
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round">
+                                <path d="M5 12h14"/>
+                                <path d="m12 5 7 7-7 7"/>
+                            </svg>
+                        </a>
                     </div>
                 </div>
             </div>
         </section>
-
-        <!-- Core Pillars Section -->
- <section class="py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="mx-auto max-w-3xl text-center mb-16">
-                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Security Principles</h2>
-                    <p class="mt-4 text-lg leading-8 text-surface-400">
-                        Three pillars that define how Rebase handles your data.
-                    </p>
-                </div>
-                <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-                    <!-- Pillar 1: Data Ownership -->
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
-                        <div class="flex items-center gap-4 mb-6">
-                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10">
-                                <svg class="lucide lucide-database text-blue-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
-                            </div>
-                        </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">One Database, No Copies</h3>
-                        <p class="text-surface-400">Rebase talks to a PostgreSQL database directly — it never ingests a second copy of your data into a proprietary store. Self-hosted, that database is yours and never leaves your infrastructure. On Rebase Cloud, once it launches, it will be a dedicated Postgres cluster we run for you and nobody else.</p>
-                    </div>
-                    <!-- Pillar 2: Enforced at Database Level -->
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
-                        <div class="flex items-center gap-4 mb-6">
-                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10">
-                                <svg class="lucide lucide-shield-check text-orange-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-                            </div>
-                        </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">Database-Level Enforcement</h3>
-                        <p class="text-surface-400">Row-Level Security policies, role-based access control, and JWT authentication — defined in code, enforced by PostgreSQL.</p>
-                    </div>
-                    <!-- Pillar 3: Open Source -->
-                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
-                        <div class="flex items-center gap-4 mb-6">
-                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10">
-                                <svg class="lucide lucide-eye text-emerald-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></svg>
-                            </div>
-                        </div>
-                        <h3 class="text-2xl font-semibold text-white mb-4">Fully Auditable</h3>
-                        <p class="text-surface-400">The Rebase server is open-source under the MIT license. Audit the code, inspect every query, verify every permission check. No black boxes.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Neat gradient divider -->
-        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-            <NeatBackground variant="a" client:visible/>
-        </div>
-
-        <!-- Data Sovereignty Section -->
- <section class="relative z-0 py-16 sm:py-24">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-                <div class="grid lg:grid-cols-2 gap-12 items-center">
-                    <div>
-                        <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
-                            <svg class="lucide lucide-database" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
-                            Data Sovereignty · Self-hosted
-                        </div>
-                        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Your Data, Your Infrastructure</h2>
-                        <p class="text-lg text-surface-300 mb-8">
-                            This section describes the <b>self-hosted</b> model. Unlike SaaS platforms that ingest and
-                            control your data, the open-source Rebase server connects directly to <b>your own</b>
-                            PostgreSQL database, on infrastructure you operate. It is the only model available
-                            today. If you are waiting on <b>Rebase Cloud</b> instead, skip to the Rebase Cloud
-                            section below.
-                        </p>
-                        <div class="space-y-6">
-                            <div class="flex items-start gap-3">
-                                <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-                                <div>
-                                    <h4 class="font-semibold text-white">No Data Migration Required</h4>
-                                    <p class="text-surface-400">Rebase introspects and adapts to your existing schema.</p>
-                                </div>
-                            </div>
-                            <div class="flex items-start gap-3">
-                                <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-                                <div>
-                                    <h4 class="font-semibold text-white">Zero Vendor Lock-in</h4>
-                                    <p class="text-surface-400">Stop using Rebase anytime — your data stays exactly where it is.</p>
-                                </div>
-                            </div>
-                            <div class="flex items-start gap-3">
-                                <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-                                <div>
-                                    <h4 class="font-semibold text-white">Direct Infrastructure Access</h4>
-                                    <p class="text-surface-400">Full control over your PostgreSQL database, backups, and infrastructure.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="w-full">
-                        <HeroConnectionWidget client:load />
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Neat gradient divider -->
-        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-            <NeatBackground variant="b" client:visible/>
-        </div>
 
         <!-- Row-Level Security Section -->
- <section class="relative z-0 py-16 sm:py-24">
+ <section id="rls" class="relative z-0 py-16 sm:py-24">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
                 <div class="space-y-8">
                     <div class="max-w-3xl">
@@ -228,6 +147,61 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                         </div>
                         <div class="p-6 bg-[#09090b]">
                             <RLSEditorDemo client:only="react" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- Fail closed -->
+        <section class="py-16 sm:py-24">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+                    <div class="lg:col-span-5">
+                        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">The default</p>
+                        <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
+                            A table with no policy serves no rows
+                        </h2>
+                        <p class="text-base text-surface-400 leading-relaxed mb-4">
+                            Most systems in this category are permissive until you remember to lock them down. Rebase is
+                            the other way round: requests run as a restricted Postgres role that owns nothing, so a table
+                            you forgot to write a policy for is refused rather than leaked.
+                        </p>
+                        <p class="text-base text-surface-400 leading-relaxed">
+                            That applies to every entrance at once — the REST API, the typed SDK, the admin panel, an
+                            agent's scoped key and a psql session all meet the same policies, because the policies are
+                            not in the server.
+                        </p>
+                    </div>
+                    <div class="lg:col-span-7">
+                        <div class="rounded-2xl border border-surface-800/80 bg-surface-950/60 overflow-hidden">
+                            <ul class="divide-y divide-surface-800/60">
+                                <li class="px-7 py-5">
+                                    <p class="text-sm font-semibold text-white mb-1">No blanket bypass role</p>
+                                    <p class="text-sm text-surface-400 leading-relaxed">User traffic never runs as the
+                                        table owner. There is no "service" key that quietly turns policies off for
+                                        convenience.</p>
+                                </li>
+                                <li class="px-7 py-5">
+                                    <p class="text-sm font-semibold text-white mb-1">Privileged columns protected by default</p>
+                                    <p class="text-sm text-surface-400 leading-relaxed">Auth collections get policies
+                                        injected so a user cannot promote themselves by writing their own roles column.
+                                        Opting out is explicit and named.</p>
+                                </li>
+                                <li class="px-7 py-5">
+                                    <p class="text-sm font-semibold text-white mb-1">Junction tables inherit their endpoints</p>
+                                    <p class="text-sm text-surface-400 leading-relaxed">Many-to-many joins are the classic
+                                        hole. Their policies are derived from both sides of the relation rather than left
+                                        for you to remember.</p>
+                                </li>
+                                <li class="px-7 py-5">
+                                    <p class="text-sm font-semibold text-white mb-1">Drift is detectable</p>
+                                    <p class="text-sm text-surface-400 leading-relaxed">The policy editor compares what is
+                                        in your code with what is in the database and flags anything that has moved —
+                                        including permissive rules that look safe and are not.</p>
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -286,6 +260,103 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
             <NeatBackground variant="a" client:visible/>
         </div>
 
+        <!-- Core Pillars Section -->
+ <section class="py-16 sm:py-24">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="mx-auto max-w-3xl text-center mb-16">
+                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Security Principles</h2>
+                    <p class="mt-4 text-lg leading-8 text-surface-400">
+                        Three pillars that define how Rebase handles your data.
+                    </p>
+                </div>
+                <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                    <!-- Pillar 1: Data Ownership -->
+                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/10">
+                                <svg class="lucide lucide-database text-blue-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4">One Database, No Copies</h3>
+                        <p class="text-surface-400">Rebase talks to a PostgreSQL database directly — it never ingests a second copy of your data into a proprietary store. Self-hosted, that database is yours and never leaves your infrastructure. On Rebase Cloud, once it launches, it will be a dedicated Postgres cluster we run for you and nobody else.</p>
+                    </div>
+                    <!-- Pillar 2: Enforced at Database Level -->
+                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-500/10">
+                                <svg class="lucide lucide-shield-check text-orange-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4">Database-Level Enforcement</h3>
+                        <p class="text-surface-400">Row-Level Security policies, role-based access control, and JWT authentication — defined in code, enforced by PostgreSQL.</p>
+                    </div>
+                    <!-- Pillar 3: Open Source -->
+                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                        <div class="flex items-center gap-4 mb-6">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10">
+                                <svg class="lucide lucide-eye text-emerald-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></svg>
+                            </div>
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4">Fully Auditable</h3>
+                        <p class="text-surface-400">The Rebase server is open-source under the MIT license. Audit the code, inspect every query, verify every permission check. No black boxes.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Neat gradient divider -->
+        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+            <NeatBackground variant="b" client:visible/>
+        </div>
+
+        <!-- Data Sovereignty Section -->
+ <section class="relative z-0 py-16 sm:py-24">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="grid lg:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
+                            <svg class="lucide lucide-database" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
+                            Data Sovereignty · Self-hosted
+                        </div>
+                        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Your Data, Your Infrastructure</h2>
+                        <p class="text-lg text-surface-300 mb-8">
+                            This section describes the <b>self-hosted</b> model. Unlike SaaS platforms that ingest and
+                            control your data, the open-source Rebase server connects directly to <b>your own</b>
+                            PostgreSQL database, on infrastructure you operate. It is the only model available
+                            today. If you are waiting on <b>Rebase Cloud</b> instead, skip to the Rebase Cloud
+                            section below.
+                        </p>
+                        <div class="space-y-6">
+                            <div class="flex items-start gap-3">
+                                <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
+                                <div>
+                                    <h4 class="font-semibold text-white">No Data Migration Required</h4>
+                                    <p class="text-surface-400">Rebase introspects and adapts to your existing schema.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
+                                <div>
+                                    <h4 class="font-semibold text-white">Zero Vendor Lock-in</h4>
+                                    <p class="text-surface-400">Stop using Rebase anytime — your data stays exactly where it is.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <svg class="lucide lucide-circle-check-big text-emerald-400 mt-0.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
+                                <div>
+                                    <h4 class="font-semibold text-white">Direct Infrastructure Access</h4>
+                                    <p class="text-surface-400">Full control over your PostgreSQL database, backups, and infrastructure.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="w-full">
+                        <HeroConnectionWidget client:load />
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Self-Hosted Architecture Section -->
  <section class="relative z-0 py-16 sm:py-24">
             <div class="mx-auto max-w-7xl px-6 lg:px-8">
@@ -320,6 +391,59 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                         </div>
                         <h3 class="text-xl font-semibold text-white mb-3">Your Rules</h3>
                         <p class="text-surface-400 text-sm">Auth, RLS policies, and API permissions live in your codebase. Review them in PRs, version them in Git, enforce them in CI.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Neat gradient divider -->
+        <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+            <NeatBackground variant="a" client:visible/>
+        </div>
+
+        <!-- Deployment Models Section -->
+        <section class="py-16 sm:py-24">
+            <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                <div class="mx-auto max-w-3xl text-center mb-12">
+                    <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Two deployment models, two security stories</h2>
+                    <p class="mt-4 text-lg leading-8 text-surface-400">
+                        Read this first — almost every claim on this page depends on which one you run.
+                        Self-hosted, we never see your data. Rebase Cloud, where we would host it for you,
+                        <b class="text-white">has not launched yet</b> — everything below describes how it is being
+                        built, so you can evaluate it before you join the waitlist.
+                    </p>
+                </div>
+                <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                        <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20 font-medium">
+                            <svg class="lucide lucide-server" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
+                            Self-hosted / open source
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4">You run everything</h3>
+                        <p class="text-surface-400 mb-4">
+                            You install the open-source Rebase server and point it at a PostgreSQL database you own.
+                            Your data never touches our servers, there is no third-party processor in the path, and
+                            you are the sole data controller.
+                        </p>
+                        <p class="text-surface-500 text-sm">
+                            The Data Sovereignty and Deploy&nbsp;on&nbsp;Your&nbsp;Terms sections below describe this model.
+                        </p>
+                    </div>
+                    <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">
+                        <div class="inline-flex items-center gap-2 py-1.5 px-3 mb-4 text-xs rounded-full bg-blue-500/10 text-blue-400 ring-1 ring-inset ring-blue-500/20 font-medium">
+                            <svg class="lucide lucide-cloud" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9" /></svg>
+                            Rebase Cloud · Not launched yet
+                        </div>
+                        <h3 class="text-2xl font-semibold text-white mb-4">We would run it for you</h3>
+                        <p class="text-surface-400 mb-4">
+                            Rebase Cloud is our managed hosting, still in development and not yet open to customers.
+                            When it launches we will host your database and your application on our infrastructure,
+                            which means <b class="text-white">Rebase would act as a data processor</b> on your behalf,
+                            with Google Cloud as a sub-processor. Nothing on this page pretends otherwise.
+                        </p>
+                        <p class="text-surface-500 text-sm">
+                            The Rebase&nbsp;Cloud section below describes exactly where that data lives and how it is isolated.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -496,9 +620,10 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
         <!-- Final CTA Section -->
         <section class="py-16 sm:py-24">
             <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
-                <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-8">Ready to Give It a Try?</h2>
+                <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-8">Audit yours in ten seconds</h2>
                 <p class="text-lg text-surface-300 mb-8 max-w-2xl mx-auto">
-                    Use Rebase to keep your data sovereign while delivering powerful content management.
+                    <code class="font-mono text-surface-400">npx @rebasepro/rls-check $DATABASE_URL</code> — no signup,
+                    nothing installed, and it works whether or not you ever adopt Rebase.
                 </p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
                     <a href="https://demo.rebase.pro"
@@ -515,4 +640,6 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                 </div>
             </div>
         </section>
+
+
     </div>

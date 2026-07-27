@@ -24,86 +24,124 @@ const iconSvgPaths: Record<string, string> = {
     "edit-note": "M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z",
 };
 
-// Full dropdown navigation structure (control variant)
+// ── Navigation ─────────────────────────────────────────────────────────────
+// The nav itself has to teach the product: Rebase is a backend, and the admin
+// panel is a layer you opt into. So the Product menu is two labelled columns,
+// backend on the left, panel on the right — not six overlapping links.
+// See website/SITE-STORY.md.
 const dropdownNavLinks = [
     {
         href: translatePath("/product"),
         label: t("nav.product"),
-        dropdown: [
-            [
-                {
-                    href: translatePath("/product"),
-                    label: t("nav.features"),
-                    description: t("nav.features.desc"),
-                    icon: "layers"
-                },
-                {
-                    href: translatePath("/studio"),
-                    label: t("nav.studio"),
-                    description: t("nav.studio.desc"),
-                    icon: "layout-dashboard"
-                },
-                {
-                    href: translatePath("/editing"),
-                    label: t("nav.editing"),
-                    description: t("nav.editing.desc"),
-                    icon: "edit-note"
-                },
-            ],
-            [
-                {
-                    href: translatePath("/backend"),
-                    label: t("nav.backend"),
-                    description: t("nav.backend.desc"),
-                    icon: "server"
-                },
-                {
-                    href: translatePath("/admin"),
-                    label: t("nav.admin"),
-                    description: t("nav.admin.desc"),
-                    icon: "layout-dashboard"
-                },
-                {
-                    href: translatePath("/ai"),
-                    label: t("nav.ai"),
-                    description: t("nav.ai.desc"),
-                    icon: "bot"
-                },
-            ],
+        columns: [
+            {
+                heading: t("nav.col.backend"),
+                items: [
+                    {
+                        href: translatePath("/backend"),
+                        label: t("nav.backend"),
+                        description: t("nav.backend.desc"),
+                        icon: "server"
+                    },
+                    {
+                        href: translatePath("/security"),
+                        label: t("nav.security"),
+                        description: t("nav.security.desc"),
+                        icon: "shield-check"
+                    },
+                    {
+                        href: translatePath("/ai"),
+                        label: t("nav.ai"),
+                        description: t("nav.ai.desc"),
+                        icon: "bot"
+                    },
+                ]
+            },
+            {
+                heading: t("nav.col.admin"),
+                items: [
+                    {
+                        href: translatePath("/admin"),
+                        label: t("nav.admin"),
+                        description: t("nav.admin.desc"),
+                        icon: "layout-dashboard"
+                    },
+                    {
+                        href: translatePath("/studio"),
+                        label: t("nav.studio"),
+                        description: t("nav.studio.desc"),
+                        icon: "square-terminal"
+                    },
+                    {
+                        href: translatePath("/editing"),
+                        label: t("nav.editing"),
+                        description: t("nav.editing.desc"),
+                        icon: "edit-note"
+                    },
+                ]
+            },
+        ],
+        footer: [
+            {
+                href: translatePath("/product"),
+                label: t("nav.overview"),
+                description: t("nav.overview.desc"),
+                icon: "layers"
+            },
+            {
+                href: translatePath("/compare"),
+                label: t("nav.compare"),
+                description: t("nav.compare.desc"),
+                icon: "git-compare-arrows"
+            },
         ]
     },
     {
         href: translatePath("/developers"),
         label: t("nav.developers"),
-        dropdown: [
-            [
-                {
-                    href: translatePath("/developers"),
-                    label: t("nav.devOverview"),
-                    description: t("nav.devOverview.desc"),
-                    icon: "code"
-                },
-                {
-                    href: translatePath("/sdk"),
-                    label: t("nav.sdk"),
-                    description: t("nav.sdk.desc"),
-                    icon: "terminal"
-                },
-            ],
-            [
-                {
-                    href: translatePath("/cli"),
-                    label: t("nav.cli"),
-                    description: t("nav.cli.desc"),
-                    icon: "square-terminal"
-                },
-                {
-                    href: translatePath("/security"),
-                    label: t("nav.security"),
-                    description: t("nav.security.desc"),
-                    icon: "shield-check"
-                },
-            ],
+        columns: [
+            {
+                heading: t("nav.col.build"),
+                items: [
+                    {
+                        href: translatePath("/developers"),
+                        label: t("nav.devOverview"),
+                        description: t("nav.devOverview.desc"),
+                        icon: "code"
+                    },
+                    {
+                        href: translatePath("/sdk"),
+                        label: t("nav.sdk"),
+                        description: t("nav.sdk.desc"),
+                        icon: "terminal"
+                    },
+                ]
+            },
+            {
+                heading: t("nav.col.ship"),
+                items: [
+                    {
+                        href: translatePath("/cli"),
+                        label: t("nav.cli"),
+                        description: t("nav.cli.desc"),
+                        icon: "square-terminal"
+                    },
+                    {
+                        href: "/docs/deployment/self-hosting",
+                        label: t("nav.selfHost"),
+                        description: t("nav.selfHost.desc"),
+                        icon: "rocket"
+                    },
+                ]
+            },
+        ],
+        footer: [
+            {
+                href: "/docs",
+                label: t("nav.docs"),
+                description: t("nav.docs.desc"),
+                icon: "briefcase"
+            },
         ]
     },
 
@@ -133,12 +171,13 @@ const flatNavLinks = [
             <!-- ═══ CONTROL: Dropdown mega-nav ═══ -->
             <div class="hidden lg:flex items-center gap-2 text-sm font-semibold" id="nav-desktop-control">
                 {dropdownNavLinks.map(link => (
-                    link.dropdown ? (
+                    link.columns ? (
                             <NavigationDropdown title={link.label} href={link.href}>
-                                <div class="grid grid-cols-2 gap-x-8 gap-y-4 max-w-3xl">
-                                    {link.dropdown.map(column => (
-                                            <div class="flex flex-col gap-4 ">
-                                                {column.map(subLink => (
+                                <div class="grid grid-cols-2 gap-x-10 gap-y-4 max-w-3xl">
+                                    {link.columns.map(column => (
+                                            <div class="flex flex-col gap-1">
+                                                <p class="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-surface-500">{column.heading}</p>
+                                                {column.items.map(subLink => (
                                                         <a href={subLink.href}
                                                            class="flex items-start gap-4 p-3 rounded-lg hover:bg-surface-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
                                                             <svg class="w-6 h-6 text-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -153,6 +192,22 @@ const flatNavLinks = [
                                             </div>
                                     ))}
                                 </div>
+                                {link.footer && (
+                                        <div class="mt-6 pt-5 border-t border-surface-800/80 grid grid-cols-2 gap-x-10 max-w-3xl">
+                                            {link.footer.map(subLink => (
+                                                    <a href={subLink.href}
+                                                       class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60">
+                                                        <svg class="w-5 h-5 text-surface-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                            <path d={iconSvgPaths[subLink.icon] || ""} />
+                                                        </svg>
+                                                        <span class="text-sm text-surface-300">
+                                                            <span class="text-white font-medium">{subLink.label}</span>
+                                                            <span class="text-surface-500"> — {subLink.description}</span>
+                                                        </span>
+                                                    </a>
+                                            ))}
+                                        </div>
+                                )}
                             </NavigationDropdown>
                     ) : (
                             <a
@@ -246,7 +301,7 @@ const flatNavLinks = [
         <div class="flex flex-col items-center justify-center min-h-screen px-6 py-20 bg-black/95 backdrop-blur-lg">
             <nav class="flex flex-col items-center space-y-8 w-full max-w-md">
                 {dropdownNavLinks.map((link, index) => (
-                    link.dropdown ? (
+                    link.columns ? (
                             <div class="w-full text-center">
                                 <button
                                         type="button"
@@ -262,7 +317,7 @@ const flatNavLinks = [
                                 </button>
                                 <div class="hidden flex-col items-center space-y-4 mt-4"
                                      id={`mobile-submenu-${index}`}>
-                                    {link.dropdown.flat().map(subLink => (
+                                    {[...link.columns.flatMap(c => c.items), ...(link.footer ?? [])].map(subLink => (
                                             <a
                                                     href={subLink.href}
                                                     class={`block text-xl font-medium transition-colors w-full text-center py-2 rounded-lg ${

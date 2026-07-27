@@ -21,11 +21,17 @@ import { UIReferenceView } from '@rebasepro/app';
      <NeatBackground client:idle />
 
       <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+          <a href="/admin" class="hover:text-primary transition-colors">The admin panel</a>
+          <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">Component library</span>
+        </p>
         <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-          Build Beautifully, Build Fast
+          The components<br/><span class="text-primary">the panel is built from.</span>
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
-          A comprehensive collection of <b>beautiful, accessible React components</b> built for modern web applications.
+          <code class="font-mono text-surface-200">@rebasepro/ui</code> is the React library the admin panel renders
+          itself with — and the one your custom fields, previews and entity views should use, so an extension looks
+          like it belongs rather than like a bolt-on.
         </p>
         <div class="mx-auto max-w-md" inert aria-hidden="true">
           <ReactExtMiniDemo client:visible />

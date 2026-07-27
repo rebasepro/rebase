@@ -3,8 +3,7 @@ import { languages, defaultLang } from "../../i18n/ui";
 import { generateMarkdownForPage } from "../../utils/markdownGenerator";
 
 const PAGES = [
-  "why-rebase",
-  "features",
+  "compare",
   "cli",
   "sdk",
   "security",

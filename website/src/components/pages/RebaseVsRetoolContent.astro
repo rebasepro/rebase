@@ -57,13 +57,13 @@ import VsHeroLockup from '../../components/VsHeroLockup.astro';
 
                     Pricing Model
                   </div>
-                  <h3 class="text-2xl font-bold text-white">Per-Seat Tax vs Open Source</h3>
+                  <h3 class="text-2xl font-semibold text-white">Per-Seat Tax vs Open Source</h3>
                 </div>
               </div>
               
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
                 <!-- VS Badge -->
-                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-semibold text-surface-400 z-10 shadow-xl">VS</div>
                 
                 <!-- Competitor Card -->
                 <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
@@ -199,13 +199,13 @@ import VsHeroLockup from '../../components/VsHeroLockup.astro';
 
                     Extensibility & Logic
                   </div>
-                  <h3 class="text-2xl font-bold text-white">Low-Code Walls vs Native React</h3>
+                  <h3 class="text-2xl font-semibold text-white">Low-Code Walls vs Native React</h3>
                 </div>
               </div>
               
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
                 <!-- VS Badge -->
-                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-semibold text-surface-400 z-10 shadow-xl">VS</div>
                 
                 <!-- Competitor Card -->
                 <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
@@ -344,13 +344,13 @@ import VsHeroLockup from '../../components/VsHeroLockup.astro';
 
                     Source Control & DevOps
                   </div>
-                  <h3 class="text-2xl font-bold text-white">Proprietary XML vs True Schema-as-Code</h3>
+                  <h3 class="text-2xl font-semibold text-white">Proprietary XML vs True Schema-as-Code</h3>
                 </div>
               </div>
               
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
                 <!-- VS Badge -->
-                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-bold text-surface-400 z-10 shadow-xl">VS</div>
+                <div class="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full border border-surface-700 bg-surface-900 items-center justify-center text-xs font-semibold text-surface-400 z-10 shadow-xl">VS</div>
                 
                 <!-- Competitor Card -->
                 <div class="bg-surface-800/20 rounded-xl p-6 border border-surface-700/50 relative overflow-hidden">
@@ -503,5 +503,36 @@ import VsHeroLockup from '../../components/VsHeroLockup.astro';
         </div>
       </div>
     </section>
-  </div>
+    <!-- Back to the comparison hub -->
+    <section id="compare-hub-footer" class="py-16 sm:py-20 border-t border-surface-800/60">
+      <div class="mx-auto max-w-4xl px-6 lg:px-8 text-center">
+        <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Keep comparing</p>
+        <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-4">
+          Not the comparison you needed?
+        </h2>
+        <p class="text-base text-surface-400 mb-8 max-w-2xl mx-auto">
+          The hub explains the four kinds of tool Rebase gets confused with, the five questions that actually
+          differ, and the cases where you should pick something else.
+        </p>
+        <a href="/compare"
+           class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow mb-8">
+          All comparisons
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"/>
+            <path d="m12 5 7 7-7 7"/>
+          </svg>
+        </a>
+        <div class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+                    <a href="/rebase-vs-supabase" class="text-sm text-surface-400 hover:text-primary transition-colors">vs Supabase</a>
+                    <a href="/rebase-vs-firebase" class="text-sm text-surface-400 hover:text-primary transition-colors">vs Firebase</a>
+                    <a href="/rebase-vs-hasura" class="text-sm text-surface-400 hover:text-primary transition-colors">vs Hasura</a>
+                    <a href="/rebase-vs-directus" class="text-sm text-surface-400 hover:text-primary transition-colors">vs Directus</a>
+                    <a href="/rebase-vs-strapi" class="text-sm text-surface-400 hover:text-primary transition-colors">vs Strapi</a>
+                    <a href="/rebase-vs-payload" class="text-sm text-surface-400 hover:text-primary transition-colors">vs Payload</a>
+                    <a href="/rebase-vs-django" class="text-sm text-surface-400 hover:text-primary transition-colors">vs Django</a>
+        </div>
+      </div>
+    </section>
 
+  </div>

@@ -14,15 +14,15 @@ const t = useTranslations(currentLang as keyof typeof languages);
 
 import Layout from '../../layouts/Layout.astro';
 
-const title = t("why-rebase.meta.title");
-const description = t("why-rebase.meta.description");
+const title = "Rebase compared — Supabase, Directus, Strapi, Retool and the rest";
+const description = "An honest side-by-side: where Rebase wins, where a competitor is the better call, and what the trade-offs actually are.";
 
-import WhyRebaseContent from '../../components/pages/WhyRebaseContent.astro';
+import CompareContent from '../../components/pages/CompareContent.astro';
 const breadcrumbs = [
     { name: "Home", url: "https://rebase.pro" },
-    { name: "Why Rebase", url: "https://rebase.pro/why-rebase" }
+    { name: "Compare", url: "https://rebase.pro/compare" }
 ];
 ---
 <Layout title={title} description={description} breadcrumbs={breadcrumbs}>
-    <WhyRebaseContent lang={currentLang} t={t} />
+    <CompareContent lang={currentLang} t={t} />
 </Layout>

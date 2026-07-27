@@ -20,7 +20,7 @@ export default function AiAppDevelopmentDemo() {
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold ring-1 ring-primary/20 mb-2">
             <Zap className="w-3.5 h-3.5" /> Decoupled Architectures
           </span>
-          <h3 className="text-2xl font-bold text-white tracking-tight">Decoupled AI Engine</h3>
+          <h3 className="text-2xl font-semibold text-white tracking-tight">Decoupled AI Engine</h3>
           <p className="text-surface-400 text-sm mt-1">Implement intelligent features seamlessly without cluttering your core codebase.</p>
         </div>
 
@@ -70,7 +70,7 @@ export default function AiAppDevelopmentDemo() {
               }`}>
                 <Terminal className="w-4 h-4" />
               </div>
-              <h4 className="font-bold text-white text-sm">CLI Recipes</h4>
+              <h4 className="font-semibold text-white text-sm">CLI Recipes</h4>
               <span className="ml-auto text-[10px] text-surface-500 font-mono">Option 1</span>
             </div>
             <p className="text-surface-400 text-xs leading-relaxed">
@@ -94,7 +94,7 @@ export default function AiAppDevelopmentDemo() {
               }`}>
                 <Settings className="w-4 h-4" />
               </div>
-              <h4 className="font-bold text-white text-sm">Event Pipelines</h4>
+              <h4 className="font-semibold text-white text-sm">Event Pipelines</h4>
               <span className="ml-auto text-[10px] text-surface-500 font-mono">Option 2</span>
             </div>
             <p className="text-surface-400 text-xs leading-relaxed">
@@ -127,7 +127,7 @@ export default function AiAppDevelopmentDemo() {
               
               {activeMode === "recipes" ? (
                 <div className="flex items-center gap-2 font-mono text-[10px] text-slate-500 bg-[#09090b] px-3 py-1 rounded border border-surface-800">
-                  <span className="text-primary font-bold">$</span> npx rebase ext add ai-extractor
+                  <span className="text-primary font-semibold">$</span> npx rebase ext add ai-extractor
                 </div>
               ) : (
                 <span className="text-[10px] font-mono text-slate-500">Rebase Studio · Webhook Designer</span>
@@ -214,13 +214,13 @@ export default function AiAppDevelopmentDemo() {
                       <div><span className="text-slate-500">-- migrations/0015_add_ai_fields.sql</span></div>
                       <div className="h-2"></div>
                       <div>
-                        <span className="text-sky-400 font-bold">ALTER TABLE</span> <span className="text-teal-300">"feedbacks"</span>
+                        <span className="text-sky-400 font-semibold">ALTER TABLE</span> <span className="text-teal-300">"feedbacks"</span>
                       </div>
                       <div>
-                        <span className="text-sky-400 font-bold">ADD COLUMN</span> <span className="text-teal-300">"ai_sentiment"</span> text,
+                        <span className="text-sky-400 font-semibold">ADD COLUMN</span> <span className="text-teal-300">"ai_sentiment"</span> text,
                       </div>
                       <div>
-                        <span className="text-sky-400 font-bold">ADD COLUMN</span> <span className="text-teal-300">"ai_tags"</span> text[];
+                        <span className="text-sky-400 font-semibold">ADD COLUMN</span> <span className="text-teal-300">"ai_tags"</span> text[];
                       </div>
                     </div>
                   )}

@@ -42,11 +42,17 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
         <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
           <span class="text-sm font-medium">Visual · Code-backed · Extensible</span>
         </div>
+        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
+          <a href="/admin" class="hover:text-primary transition-colors">The admin panel</a>
+          <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">Studio</span>
+        </p>
         <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-          Rebase Studio
+          The database half<br/><span class="text-primary">of the panel.</span>
         </h1>
         <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
-          A full-featured admin panel that generates real TypeScript code. Edit visually, ship as code, extend with React.
+          A SQL console, a visual schema builder, the row-level-security policy editor, database branches, cron and
+          logs — for the people who write the schema rather than the ones editing rows. Everything it does visually,
+          it writes back as TypeScript you commit.
         </p>
         <div class="flex items-center justify-center gap-x-4">
           <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
@@ -159,7 +165,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 12h18" /></svg>
-                <span class="text-[10px] font-bold text-white">Spreadsheet View</span>
+                <span class="text-[10px] font-semibold text-white">Spreadsheet View</span>
               </div>
               <div class="flex flex-col gap-1 flex-1">
                 <div class="flex gap-1 text-[8px] text-surface-500 font-mono border-b border-surface-800/50 pb-1">
@@ -184,7 +190,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>
-                <span class="text-[10px] font-bold text-white">Entity History</span>
+                <span class="text-[10px] font-semibold text-white">Entity History</span>
               </div>
               <div class="flex flex-col gap-2 flex-1">
                 <div class="flex items-center gap-2">
@@ -218,7 +224,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                <span class="text-[10px] font-bold text-white">Users & Roles</span>
+                <span class="text-[10px] font-semibold text-white">Users & Roles</span>
               </div>
               <div class="flex flex-col gap-1.5 flex-1">
                 <div class="flex items-center gap-2 text-[8px] font-mono">
@@ -246,7 +252,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
-                <span class="text-[10px] font-bold text-white">Import & Export</span>
+                <span class="text-[10px] font-semibold text-white">Import & Export</span>
               </div>
               <div class="flex flex-col gap-1.5 flex-1">
                 <div class="flex items-center gap-2 text-[8px] font-mono">
@@ -275,7 +281,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v6"/><path d="M12 15v6"/><path d="M3 12h6"/><path d="M15 12h6"/><path d="m5.6 5.6 4.3 4.3"/><path d="m14.1 14.1 4.3 4.3"/><path d="m5.6 18.4 4.3-4.3"/><path d="m14.1 9.9 4.3-4.3"/></svg>
-                <span class="text-[10px] font-bold text-white">Schema Visualizer</span>
+                <span class="text-[10px] font-semibold text-white">Schema Visualizer</span>
               </div>
               <div class="flex flex-col gap-1 flex-1 items-center justify-center">
                 <div class="flex items-center gap-3">
@@ -298,7 +304,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
-                <span class="text-[10px] font-bold text-white">Database Branches</span>
+                <span class="text-[10px] font-semibold text-white">Database Branches</span>
               </div>
               <div class="flex flex-col gap-1.5 flex-1">
                 <div class="flex items-center gap-2 text-[8px] font-mono">
@@ -326,7 +332,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                <span class="text-[10px] font-bold text-white">JS Console</span>
+                <span class="text-[10px] font-semibold text-white">JS Console</span>
               </div>
               <div class="flex flex-col gap-1 flex-1 font-mono text-[7px]">
                 <div class="text-blue-300">const sdk = rebase();</div>
@@ -344,7 +350,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span class="text-[10px] font-bold text-white">Cron Jobs</span>
+                <span class="text-[10px] font-semibold text-white">Cron Jobs</span>
               </div>
               <div class="flex flex-col gap-1.5 flex-1">
                 <div class="flex items-center gap-2 text-[8px] font-mono">
@@ -372,7 +378,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import type</span
             <div class="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 overflow-hidden flex flex-col pointer-events-none select-none p-3">
               <div class="flex items-center gap-2 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                <span class="text-[10px] font-bold text-white">API Explorer</span>
+                <span class="text-[10px] font-semibold text-white">API Explorer</span>
               </div>
               <div class="flex flex-col gap-1.5 flex-1">
                 <div class="flex items-center gap-1 text-[8px] font-mono">

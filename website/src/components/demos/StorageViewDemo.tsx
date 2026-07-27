@@ -312,10 +312,10 @@ path: prev ? `${prev}/${part}` : part });
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-surface-800/40 text-left text-[10px] uppercase tracking-wider text-surface-600">
-                                    <th className="px-3 py-2 font-bold">Name</th>
-                                    <th className="px-3 py-2 font-bold w-20">Type</th>
-                                    <th className="px-3 py-2 font-bold w-24 text-right">Size</th>
-                                    <th className="px-3 py-2 font-bold w-24 text-right">Updated</th>
+                                    <th className="px-3 py-2 font-semibold">Name</th>
+                                    <th className="px-3 py-2 font-semibold w-20">Type</th>
+                                    <th className="px-3 py-2 font-semibold w-24 text-right">Size</th>
+                                    <th className="px-3 py-2 font-semibold w-24 text-right">Updated</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -418,7 +418,7 @@ path: prev ? `${prev}/${part}` : part });
                     </div>
                     <div className="p-3 space-y-3 overflow-y-auto flex-1">
                         <div>
-                            <span className="text-[10px] text-surface-600 uppercase tracking-wider font-bold block mb-1">File Info</span>
+                            <span className="text-[10px] text-surface-600 uppercase tracking-wider font-semibold block mb-1">File Info</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                             <div>

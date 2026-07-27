@@ -1,602 +1,338 @@
 ---
 const { lang, t } = Astro.props;
 
-import { languages, defaultLang, useTranslations } from '../../i18n/ui';
-
 import { NeatBackground } from '../../components/NeatBackground';
-import ClientLogos from '../../components/ClientLogos.astro';
-import SpotlightCard from '../../components/SpotlightCard.astro';
-import { ApiMiniDemo } from '../../components/demos/ApiMiniDemo';
-import { DeveloperPlayground } from '../../components/demos/DeveloperPlayground';
+import { useTranslatedPath } from '../../i18n/ui';
+import { RLSEditorDemo } from '../../components/demos/RLSEditorDemo';
+
+const translatePath = useTranslatedPath(lang);
+
+// Four archetypes, because "what is Rebase like?" has four different honest
+// answers depending on which tool the visitor is already holding.
+const families = [
+    {
+        kind: "A backend-as-a-service",
+        blurb: "You want APIs, auth and realtime over a database without writing a server.",
+        theirModel: "Postgres or a proprietary store, plus a dashboard built for you — the developer — not for the people who run the business.",
+        ourModel: "The same APIs, plus an admin panel your non-technical team lives in, generated from the collections you already wrote.",
+        tools: [
+            { name: "Supabase", href: "/rebase-vs-supabase", logo: "/img/competitors/supabase-logo-wordmark-dark.svg", cls: "h-4" },
+            { name: "Firebase", href: "/rebase-vs-firebase", logo: "/img/competitors/firebase-lockup-dark.svg", cls: "h-5" },
+            { name: "Hasura", href: "/rebase-vs-hasura", logo: "/img/competitors/hasura-logo-primary-darkbg.svg", cls: "h-4" },
+        ],
+    },
+    {
+        kind: "A headless CMS",
+        blurb: "You want editors to manage content without touching the database.",
+        theirModel: "The CMS owns the schema. Your tables are its tables, in its shape, reachable through its API and its permission engine.",
+        ourModel: "Your Postgres schema stays yours — including the tables that existed before Rebase. Access control is RLS on those tables, readable by any Postgres client.",
+        tools: [
+            { name: "Directus", href: "/rebase-vs-directus", logo: "/img/competitors/directus-logo-light.svg", cls: "h-5" },
+            { name: "Strapi", href: "/rebase-vs-strapi", logo: "/img/competitors/strapi-full-logo-light.svg", cls: "h-5" },
+            { name: "Payload", href: "/rebase-vs-payload", logo: "/img/competitors/payload-logo-light.svg", cls: "h-5" },
+        ],
+    },
+    {
+        kind: "An internal-tool builder",
+        blurb: "You want a back office fast and you don't care how it's built.",
+        theirModel: "A hosted canvas that connects to your database over a credential you hand it. Screens are drawn by hand, per screen, forever.",
+        ourModel: "Screens are generated from the schema, so a new column shows up everywhere at once — and the tool runs on your infrastructure with no outbound connection.",
+        tools: [
+            { name: "Retool", href: "/rebase-vs-retool", logo: "/img/competitors/Retool_Logo_0.svg", cls: "h-5" },
+        ],
+    },
+    {
+        kind: "A framework admin",
+        blurb: "You already have a backend and want the batteries-included admin that comes with it.",
+        theirModel: "Excellent admin, tied to one language and one ORM. Your React frontend still needs an API you write and maintain by hand.",
+        ourModel: "The admin and the typed API come from the same definition, and the API is a first-class product rather than an afterthought.",
+        tools: [
+            { name: "Django", href: "/rebase-vs-django", logo: "/img/competitors/django-logo-negative.svg", cls: "h-5" },
+        ],
+    },
+];
+
+// The axes where the answers genuinely differ. No feature checklists — every
+// product in this market has tables, forms and an API.
+const axes = [
+    {
+        axis: "Where authorization is enforced",
+        rebase: "In Postgres. Every request runs as a restricted role under row-level security, generated from your collection definition.",
+        others: "In the application layer, by a permission engine in front of the database. Reach the data another way and the rules are gone.",
+    },
+    {
+        axis: "Who owns the schema",
+        rebase: "You do. Point Rebase at a database that already exists; it reads your tables and never demands its own shape.",
+        others: "Usually the tool. Content types are created through its UI, in its migration format, in tables it manages.",
+    },
+    {
+        axis: "Who the back office is for",
+        rebase: "Your team. Roles, media, workflows — and your own React components wherever the generated defaults don't fit.",
+        others: "Either the developer (a database dashboard) or the editor (a CMS) — rarely both, and rarely extensible in the framework you already use.",
+    },
+    {
+        axis: "How many copies of your data exist",
+        rebase: "One. The panel talks to the same public API as your app, under the same policies. No sync, no mirror, no cache to reconcile.",
+        others: "Often two: the source database and the tool's own store, kept in step by a connector you have to watch.",
+    },
+    {
+        axis: "What happens if you stop using it",
+        rebase: "The database keeps working — policies, constraints and data exactly where they were. The panel was a dependency you can delete.",
+        others: "Depends how deep the tool went into your schema. If it created the tables, leaving means a migration.",
+    },
+];
+
+const headToHead = [
+    { name: "Supabase", href: "/rebase-vs-supabase" },
+    { name: "Firebase", href: "/rebase-vs-firebase" },
+    { name: "Hasura", href: "/rebase-vs-hasura" },
+    { name: "Directus", href: "/rebase-vs-directus" },
+    { name: "Strapi", href: "/rebase-vs-strapi" },
+    { name: "Payload", href: "/rebase-vs-payload" },
+    { name: "Retool", href: "/rebase-vs-retool" },
+    { name: "Django", href: "/rebase-vs-django" },
+];
 ---
 
 <div class="flex flex-col isolate">
 
-    <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 1 — HERO
-         ═══════════════════════════════════════════════════════════════ -->
- <section class="relative isolate overflow-hidden -mt-20 pt-52 pb-24 sm:pt-56 sm:pb-28 lg:pt-60 lg:pb-32">
-        <!-- Radial glow for readability -->
-        <NeatBackground client:idle />
+    <!-- ═══════════════════════ HERO ═══════════════════════ -->
+    <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
+        <NeatBackground client:idle/>
 
-        <div class="px-4 mx-auto max-w-7xl text-center lg:px-8 relative z-10 mt-8">
-            <!-- Badge -->
-            <div class="mb-8 flex items-center justify-center gap-3 animate-on-scroll fade-in">
-                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400">
-                    <img src="/img/postgresql-logo.svg" alt="PostgreSQL" class="h-4 w-auto" />
-                    Open-source · Postgres-native · Built in Europe
-                </span>
-            </div>
-
-            <!-- Headline -->
-            <div class="relative">
-                <h1 class="relative mb-6 text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
-                    Why developers choose<br /><span class="text-primary">Rebase</span>
-                </h1>
-            </div>
-            <p class="mb-4 text-lg leading-8 text-surface-400 lg:text-xl sm:px-10 xl:px-40 animate-on-scroll fade-in-up">
-                Connect your existing Postgres database.<br class="hidden sm:inline" />
-                Get a full admin panel, SQL editor, and RLS management — without giving up control of your data or code.
+        <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
+            <p class="mb-6 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Compare</p>
+            <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
+                Rebase, next to<br/><span class="text-primary">the tool you already use.</span>
+            </h1>
+            <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-10 xl:px-40">
+                Most of these products are good. They are also solving a different problem than we are.
+                Below: what actually differs, which tool wins in which situation, and the cases where
+                you should not pick Rebase.
             </p>
-
-            <!-- CLI command widget -->
-            <div class="mt-12 max-w-md mx-auto animate-on-scroll fade-in-up">
-                <div class="group relative">
-                    <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
-                         aria-hidden="true"></div>
-                    <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
-                        <div class="px-5 py-4 flex items-center justify-between">
-                            <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                <span class="text-primary font-bold mr-3">~</span>
-                                <span class="text-white">pnpm dlx @rebasepro/cli init</span>
-                            </div>
-                            <button data-track-copy="why-hero" data-command="pnpm dlx @rebasepro/cli init"
-                                    class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                    aria-label="Copy command" title="Copy to clipboard">
-                                <svg class="lucide lucide-copy" xmlns="http://www.w3.org/2000/svg" width="18"
-                                     height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                                </svg>
-                            </button>
-                        </div>
-                        <div class="px-5 pb-3 -mt-1">
-                            <span class="font-mono text-xs text-surface-400">or: npx @rebasepro/cli init</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Hero CTAs -->
-            <div class="mt-8 mb-10 flex flex-wrap items-center justify-center gap-y-4 gap-x-6 sm:gap-x-8 animate-on-scroll fade-in-up">
-                <a href="https://demo.rebase.pro"
-                   target="_blank" rel="noopener noreferrer"
-                   id="why-hero-try-demo"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
-                    Try the Demo
-                    <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                </a>
-                <a href="https://github.com/rebasepro/rebase"
-                   target="_blank" rel="noopener noreferrer"
-                   id="why-hero-view-github"
-                   class="inline-flex items-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 transition-all duration-200 ease-in-out">
-                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" /></svg>
-                    View on GitHub
-                </a>
-            </div>
         </div>
     </section>
 
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 2 — SOCIAL PROOF
-         ═══════════════════════════════════════════════════════════════ -->
- <section id="why-social-proof" class="relative z-0 py-20 sm:py-28">
+    <!-- ═══════════════════════ FOUR FAMILIES ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <p class="text-center text-sm text-surface-400 mb-8 animate-on-scroll fade-in">Trusted by developers and teams at</p>
-            <ClientLogos />
-        </div>
-    </section>
-
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 3 — NEAT GRADIENT DIVIDER
-         ═══════════════════════════════════════════════════════════════ -->
-    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-        <NeatBackground variant="a" client:visible />
-    </div>
-
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 4 — "SEE IT IN ACTION" — PRODUCT SHOWCASE BENTO GRID
-         ═══════════════════════════════════════════════════════════════ -->
- <section id="why-showcase" class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="mx-auto max-w-2xl text-center mb-16 animate-on-scroll fade-in-up">
-                <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase">See it in action</h2>
-                <p class="mt-4 text-3xl md:text-5xl font-semibold tracking-tight text-white">Everything you need,<br />out of the box</p>
-                <p class="mt-5 text-base sm:text-lg text-surface-400 leading-relaxed">
-                    A full admin panel, SQL editor, schema builder, and API layer — auto-generated from your Postgres database.
+            <div class="max-w-3xl mb-14 animate-on-scroll fade-in-up">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Start here</p>
+                <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    What are you actually shopping for?
+                </h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">
+                    Rebase sits across four categories, which is why one-line comparisons never land.
+                    Find the row that matches what is open in your other tab.
                 </p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 max-w-5xl mx-auto">
-
-                <!-- Card: Admin Panel (span-4) -->
-                <div class="md:col-span-2 lg:col-span-4 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10 flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <div class="ml-2 text-[10px] font-mono text-surface-400">admin.rebase.pro</div>
-                        </div>
-                        <div class="relative flex-1 w-full overflow-hidden">
-                            <img src="/img/demo_products.png" alt="Rebase admin panel showing a products table with inline editing" width="800" height="600" loading="lazy" class="w-full h-full object-cover object-top" />
-                        </div>
-                    </div>
-                    <div class="relative z-10 p-5 flex flex-col justify-between h-full min-h-[140px]">
-                        <div>
-                            <div class="flex items-center gap-2 mb-2">
-                                <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                                    <svg class="lucide lucide-layout-dashboard text-primary" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></svg>
+            <div class="space-y-4">
+                {families.map((family, i) => (
+                        <div class="group relative overflow-hidden rounded-2xl border border-surface-800/80 bg-surface-950/60 animate-on-scroll fade-in-up">
+                            <div class="grid grid-cols-1 lg:grid-cols-12">
+                                <!-- Left: the archetype -->
+                                <div class="lg:col-span-4 p-7 lg:border-r border-surface-800/80">
+                                    <p class="font-mono text-xs text-surface-600 mb-2">0{i + 1}</p>
+                                    <h3 class="text-xl font-semibold text-white mb-2">{family.kind}</h3>
+                                    <p class="text-sm text-surface-400 leading-relaxed">{family.blurb}</p>
+                                    <div class="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
+                                        {family.tools.map(tool => (
+                                                <a href={translatePath(tool.href)}
+                                                   aria-label={`Rebase vs ${tool.name}`}
+                                                   class="inline-flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                                                    <img src={tool.logo} alt={tool.name} class={`${tool.cls} w-auto`}/>
+                                                </a>
+                                        ))}
+                                    </div>
                                 </div>
-                                <h3 class="text-base font-semibold text-white">Complete Admin Panel</h3>
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">Auto-generated</span>
-                            </div>
-                            <p class="text-surface-400 text-sm leading-relaxed">Point Rebase at your Postgres database and get a fully functional admin panel instantly. No schemas to define, no config files to write.</p>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Card: REST API (span-2) -->
-                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-100">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10 flex flex-col aspect-[5/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <div class="ml-2 text-[10px] font-mono text-surface-400">api.demo.rebase.dev</div>
-                        </div>
-                        <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center">
-                            <ApiMiniDemo client:load />
-                        </div>
-                    </div>
-                    <div class="relative z-10 p-5 flex flex-col justify-between h-full min-h-[140px]">
-                        <div>
-                            <div class="flex items-center gap-2 mb-2">
-                                <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                                    <svg class="lucide lucide-webhook text-primary" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2" /><path d="m6 17 3.13-5.78c.53-.97.1-2.18-.5-3.1a4 4 0 1 1 6.89-4.06" /><path d="m12 6 3.13 5.73C15.66 12.7 16.9 13 18 13a4 4 0 0 1 0 8" /></svg>
+                                <!-- Middle: how they model it -->
+                                <div class="lg:col-span-4 p-7 lg:border-r border-surface-800/80">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-surface-500 mb-3">
+                                        How they model it
+                                    </p>
+                                    <p class="text-sm text-surface-400 leading-relaxed">{family.theirModel}</p>
                                 </div>
-                                <h3 class="text-base font-semibold text-white">Instant REST APIs</h3>
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">Auto-generated</span>
-                            </div>
-                            <p class="text-surface-400 text-sm leading-relaxed">Every collection gets type-safe REST endpoints automatically. Filtering, sorting, pagination — zero config.</p>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Card: Entity Detail View (span-3) -->
-                <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-200">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                        </div>
-                        <div class="relative flex-1 w-full overflow-hidden">
-                            <img src="/img/product_details_view.webp" alt="Rich entity detail view showing product information with images and fields" width="800" height="600" loading="lazy" class="w-full h-full object-cover object-top" />
-                        </div>
-                    </div>
-                    <div class="relative z-10 p-5">
-                        <div class="flex items-center gap-2 mb-2">
-                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                                <svg class="lucide lucide-file-text text-primary" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /><path d="M10 9H8" /><path d="M16 13H8" /><path d="M16 17H8" /></svg>
+                                <!-- Right: how we model it -->
+                                <div class="lg:col-span-4 p-7 relative">
+                                    <div class="pointer-events-none absolute inset-0"
+                                         aria-hidden="true"
+                                         style="background: radial-gradient(420px 220px at 80% 0%, rgba(0,112,244,0.10), transparent 70%);"></div>
+                                    <div class="relative">
+                                        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80 mb-3">
+                                            How Rebase models it
+                                        </p>
+                                        <p class="text-sm text-surface-300 leading-relaxed">{family.ourModel}</p>
+                                    </div>
+                                </div>
                             </div>
-                            <h3 class="text-base font-semibold text-white">Rich Entity Views</h3>
                         </div>
-                        <p class="text-surface-400 text-sm leading-relaxed">Beautiful detail pages with images, rich text, relations, and 30+ field types. Fully customizable with React.</p>
-                    </div>
-                </div>
-
-                <!-- Card: Custom Fields (span-3) -->
-                <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in-up delay-300">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 border-b border-surface-800/80">
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                        </div>
-                        <div class="relative flex-1 w-full overflow-hidden">
-                            <video class="w-full h-full object-cover object-top" style="pointer-events: none;" width="800" height="600" loop autoplay muted playsinline>
-                                <source src="/img/custom_fields_dark.mp4" type="video/mp4" />
-                            </video>
-                        </div>
-                    </div>
-                    <div class="relative z-10 p-5">
-                        <div class="flex items-center gap-2 mb-2">
-                            <div class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                                <svg class="lucide lucide-puzzle text-primary" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z" /></svg>
-                            </div>
-                            <h3 class="text-base font-semibold text-white">Extreme Customization</h3>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">React</span>
-                        </div>
-                        <p class="text-surface-400 text-sm leading-relaxed">Not a low-code black box. Custom fields, entity views, or entire pages — build it in React, drop it into Rebase.</p>
-                    </div>
-                </div>
-
+                ))}
             </div>
 
-            <!-- Interactive developer playground -->
-            <div class="mt-16 max-w-6xl mx-auto animate-on-scroll fade-in-up">
-                <div class="text-center mb-8">
-                    <h3 class="text-2xl font-semibold tracking-tight text-white">Don't take our word for it — poke at it.</h3>
-                    <p class="mt-2 text-surface-400">Schema-as-code, the typed SDK, custom fields and visual RLS, in one interactive tour.</p>
-                </div>
-                <DeveloperPlayground client:visible />
+            <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                <span class="text-surface-500">Head to head:</span>
+                {headToHead.map(link => (
+                        <a href={translatePath(link.href)}
+                           class="text-primary hover:underline">Rebase vs {link.name}</a>
+                ))}
             </div>
         </div>
     </section>
 
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 5 — DATA OWNERSHIP: "YOUR POSTGRES. YOUR RULES."
-         ═══════════════════════════════════════════════════════════════ -->
- <section id="why-data-ownership" class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="grid grid-cols-1 gap-12 lg:grid-cols-12 items-center">
-                <!-- Text side -->
-                <div class="lg:col-span-5 animate-on-scroll fade-in-up">
-                    <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase mb-4">Data ownership</h2>
-                    <p class="text-3xl md:text-4xl font-semibold tracking-tight text-white mb-4">Your Postgres.<br />Your rules.</p>
-                    <p class="text-lg text-surface-400 mb-8 leading-relaxed">Rebase connects directly to your database. No hidden middle-tier, no vendor lock-in, no data copying. Your data never leaves your infrastructure.</p>
-                    <ul class="space-y-5">
-                        <li class="flex gap-4 items-start">
-                            <div class="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-none ring-1 ring-primary/20 mt-0.5">
-                                <svg class="lucide lucide-database text-primary" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></svg>
-                            </div>
-                            <div>
-                                <h4 class="text-white font-semibold text-sm">Direct connection</h4>
-                                <p class="text-surface-400 text-sm">Connect to your existing PostgreSQL — no data migration needed</p>
-                            </div>
-                        </li>
-                        <li class="flex gap-4 items-start">
-                            <div class="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-none ring-1 ring-primary/20 mt-0.5">
-                                <svg class="lucide lucide-shield-check text-primary" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-                            </div>
-                            <div>
-                                <h4 class="text-white font-semibold text-sm">Built-in RLS policy editor</h4>
-                                <p class="text-surface-400 text-sm">Manage row-level security policies from a visual UI</p>
-                            </div>
-                        </li>
-                        <li class="flex gap-4 items-start">
-                            <div class="h-9 w-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center flex-none ring-1 ring-primary/20 mt-0.5">
-                                <svg class="lucide lucide-server text-primary" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
-                            </div>
-                            <div>
-                                <h4 class="text-white font-semibold text-sm">Self-host anywhere</h4>
-                                <p class="text-surface-400 text-sm">Deploy on Docker, Railway, Fly, or bare metal</p>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- Visual side — Architecture diagram -->
-                <div class="lg:col-span-7 animate-on-scroll fade-in-up delay-200">
-                    <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
-                        <!-- Connection flow diagram -->
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
-                            <div class="group/step">
-                                <div class="mx-auto h-16 w-16 rounded-2xl bg-primary/10 border border-primary/20 ring-1 ring-primary/20 flex items-center justify-center mb-4 group-hover/step:bg-primary/20 transition-colors duration-300">
-                                    <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" /></svg>
-                                </div>
-                                <h3 class="text-white font-semibold mb-1">Your Browser</h3>
-                                <p class="text-surface-400 text-sm">Rebase runs as a React SPA</p>
-                            </div>
-                            <div class="group/step flex flex-col items-center">
-                                <!-- Arrow connectors (visible on sm+) -->
-                                <div class="hidden sm:flex absolute left-[33%] top-1/2 -translate-y-1/2 items-center">
-                                    <div class="w-12 h-px bg-gradient-to-r from-primary/40 to-primary/20"></div>
-                                    <svg class="text-primary/40 -ml-1" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m12 5 7 7-7 7" /></svg>
-                                </div>
-                                <div class="mx-auto h-16 w-16 rounded-2xl bg-primary/10 border border-primary/20 ring-1 ring-primary/20 flex items-center justify-center mb-4 group-hover/step:bg-primary/20 transition-colors duration-300">
-                                    <svg class="text-primary" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-                                </div>
-                                <div class="hidden sm:flex absolute right-[33%] top-1/2 -translate-y-1/2 items-center">
-                                    <div class="w-12 h-px bg-gradient-to-r from-primary/40 to-primary/20"></div>
-                                    <svg class="text-primary/40 -ml-1" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="m12 5 7 7-7 7" /></svg>
-                                </div>
-                                <h3 class="text-white font-semibold mb-1">Rebase Backend</h3>
-                                <p class="text-surface-400 text-sm">Auth, RLS, API layer</p>
-                            </div>
-                            <div class="group/step">
-                                <div class="mx-auto h-16 w-16 rounded-2xl bg-primary/10 border border-primary/20 ring-1 ring-primary/20 flex items-center justify-center mb-4 group-hover/step:bg-primary/20 transition-colors duration-300">
-                                    <img src="/img/postgresql-logo.svg" alt="PostgreSQL" class="h-7 w-auto" />
-                                </div>
-                                <h3 class="text-white font-semibold mb-1">Your Database</h3>
-                                <p class="text-surface-400 text-sm">Data never leaves your infra</p>
-                            </div>
-                        </div>
-                        <!-- Caption -->
-                        <p class="text-center text-xs text-surface-500 mt-6 pt-6 border-t border-surface-800/50">No data proxying. No vendor lock-in. Direct Postgres connection.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 6 — NEAT GRADIENT DIVIDER
-         ═══════════════════════════════════════════════════════════════ -->
+    <!-- Neat gradient divider -->
     <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
-        <NeatBackground variant="b" client:visible />
+        <NeatBackground variant="a" client:visible/>
     </div>
 
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 7 — REBASE VS THE ALTERNATIVES
-         ═══════════════════════════════════════════════════════════════ -->
- <section id="why-alternatives" class="relative z-0 py-28 sm:py-36 overflow-hidden">
+    <!-- ═══════════════════════ THE FIVE AXES ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
-                <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase mb-4">How we compare</h2>
-                <p class="text-3xl md:text-5xl font-semibold tracking-tight text-white">Rebase vs the alternatives</p>
-                <p class="mt-4 text-lg leading-8 text-surface-400">See how Rebase stacks up against common Postgres admin tools.</p>
+            <div class="max-w-3xl mb-12 animate-on-scroll fade-in-up">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">The real differences</p>
+                <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    Five questions, not a feature checklist
+                </h2>
+                <p class="mt-5 text-lg leading-8 text-surface-400">
+                    Everything in this market has tables, forms and an API. These are the five answers
+                    that change what your system looks like in two years.
+                </p>
             </div>
 
-            <div class="grid grid-cols-1 gap-5 md:grid-cols-2 max-w-5xl mx-auto">
-                <!-- vs Retool -->
-                <a href="/rebase-vs-retool" class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 block animate-on-scroll fade-in-up">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <img src="/img/competitors/Retool_Logo_0.svg" alt="Retool" class="h-5 opacity-60" loading="lazy" />
-                            <span class="text-surface-500 text-xs">vs</span>
-                            <img src="/img/rebase_logo.svg" alt="Rebase" class="h-5 opacity-80" loading="lazy" />
-                        </div>
-                        <h3 class="text-white font-semibold mb-3">Rebase wins against Retool if you need…</h3>
-                        <ul class="text-surface-300 space-y-2 text-sm">
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> Complete control with React & TypeScript (no low-code lock-in)</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> Freedom from expensive per-seat licensing</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> Clean, version-controlled code backing your UI</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> Built-in cron jobs, webhooks, and custom functions</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> A true open-source foundation</li>
-                        </ul>
-                        <span class="inline-flex items-center gap-1 mt-5 text-xs font-semibold text-primary group-hover:text-primary-light transition-colors">
-                            Read full comparison
-                            <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                        </span>
-                    </div>
-                </a>
-
-                <!-- vs Supabase -->
-                <a href="/rebase-vs-supabase" class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 block animate-on-scroll fade-in-up delay-100">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <img src="/img/competitors/supabase-icon-5uqgeeqeknngv9las8zeef.webp" alt="Supabase" class="h-5 opacity-60" loading="lazy" />
-                            <span class="text-surface-500 text-xs">vs</span>
-                            <img src="/img/rebase_logo.svg" alt="Rebase" class="h-5 opacity-80" loading="lazy" />
-                        </div>
-                        <h3 class="text-white font-semibold mb-3">Rebase wins against Supabase Studio if you need…</h3>
-                        <ul class="text-surface-300 space-y-2 text-sm">
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> To connect to YOUR existing Postgres (not a managed platform)</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> Deep UI customization and custom React views</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> A full back-office framework, not just a data browser</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> Full admin panel with spreadsheet editing, not just a data browser</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> Zero platform lock-in — deploy anywhere</li>
-                        </ul>
-                        <span class="inline-flex items-center gap-1 mt-5 text-xs font-semibold text-primary group-hover:text-primary-light transition-colors">
-                            Read full comparison
-                            <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                        </span>
-                    </div>
-                </a>
-
-                <!-- vs Directus & Strapi -->
-                <a href="/rebase-vs-directus" class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 block animate-on-scroll fade-in-up delay-200">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <img src="/img/competitors/strapi-full-logo-light.svg" alt="Strapi" class="h-4 opacity-60" loading="lazy" />
-                            <span class="text-surface-500 text-xs">vs</span>
-                            <img src="/img/rebase_logo.svg" alt="Rebase" class="h-5 opacity-80" loading="lazy" />
-                        </div>
-                        <h3 class="text-white font-semibold mb-3">Rebase wins against Directus & Strapi if you need…</h3>
-                        <ul class="text-surface-300 space-y-2 text-sm">
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> A true Postgres-native schema without opaque data wrappers</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> To build upon an existing database instead of starting from scratch</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> Visual SQL query editing and built-in EXPLAIN plans</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> Native Postgres Row-Level Security (RLS) instead of app-level permissions</li>
-                        </ul>
-                        <span class="inline-flex items-center gap-1 mt-5 text-xs font-semibold text-primary group-hover:text-primary-light transition-colors">
-                            Read full comparison
-                            <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                        </span>
-                    </div>
-                </a>
-
-                <!-- vs Django & Laravel -->
-                <a href="/rebase-vs-django" class="group relative overflow-hidden rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-7 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 block animate-on-scroll fade-in-up delay-300">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300" aria-hidden="true" style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10">
-                        <div class="flex items-center gap-3 mb-4">
-                            <span class="text-surface-400 text-sm font-semibold opacity-60">Django</span>
-                            <span class="text-surface-500 text-xs">vs</span>
-                            <img src="/img/rebase_logo.svg" alt="Rebase" class="h-5 opacity-80" loading="lazy" />
-                        </div>
-                        <h3 class="text-white font-semibold mb-3">Rebase wins against Django & Laravel Nova if you need…</h3>
-                        <ul class="text-surface-300 space-y-2 text-sm">
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> An admin panel instantly inferred from your database schema</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> A modern, snappy React UI instead of full-page server reloads</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> Built-in realtime updates and websockets without extra setup</li>
-                            <li class="flex gap-2"><span class="text-primary shrink-0">✓</span> A decoupled architecture (standalone React SPA + Node API)</li>
-                        </ul>
-                        <span class="inline-flex items-center gap-1 mt-5 text-xs font-semibold text-primary group-hover:text-primary-light transition-colors">
-                            Read full comparison
-                            <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                        </span>
-                    </div>
-                </a>
-            </div>
-        </div>
-    </section>
-
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 8 — "CHOOSE YOUR PATH" — PERSONA CARDS
-         ═══════════════════════════════════════════════════════════════ -->
- <section id="why-personas" class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="mx-auto max-w-2xl text-center mb-14 animate-on-scroll fade-in-up">
-                <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase mb-4">Explore deeper</h2>
-                <p class="text-3xl md:text-5xl font-semibold tracking-tight text-white">Dive into what matters<br class="hidden sm:inline" /> most to you</p>
-            </div>
-            <div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto">
-                <a href="/developers" class="group relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800 transition-all duration-300 hover:ring-primary/30 block animate-on-scroll scale-in" data-spotlight-card>
-                    <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" data-spotlight></div>
-                    <div class="relative z-10">
-                        <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                            <svg class="text-primary w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6" /><path d="m8 6-6 6 6 6" /></svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">For Developers</h3>
-                        <p class="text-surface-400 mb-6">Built for developers, by developers. Ultimate flexibility with React and TypeScript.</p>
-                        <span class="inline-flex items-center gap-x-2 text-primary-light group-hover:text-primary font-semibold transition-colors">
-                            Learn more
-                            <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                        </span>
-                    </div>
-                </a>
-
-                <a href="/startups" class="group relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800 transition-all duration-300 hover:ring-primary/30 block animate-on-scroll scale-in delay-100" data-spotlight-card>
-                    <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" data-spotlight></div>
-                    <div class="relative z-10">
-                        <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                            <svg class="text-primary w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09" /><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05" /></svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">For Startups</h3>
-                        <p class="text-surface-400 mb-6">Launch your project faster than ever and scale with confidence.</p>
-                        <span class="inline-flex items-center gap-x-2 text-primary-light group-hover:text-primary font-semibold transition-colors">
-                            Learn more
-                            <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                        </span>
-                    </div>
-                </a>
-
-                <a href="/agencies" class="group relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800 transition-all duration-300 hover:ring-primary/30 block animate-on-scroll scale-in delay-200" data-spotlight-card>
-                    <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" data-spotlight></div>
-                    <div class="relative z-10">
-                        <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                            <svg class="text-primary w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /><rect width="20" height="14" x="2" y="6" rx="2" /></svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">For Agencies</h3>
-                        <p class="text-surface-400 mb-6">Deliver amazing, bespoke projects to your clients.</p>
-                        <span class="inline-flex items-center gap-x-2 text-primary-light group-hover:text-primary font-semibold transition-colors">
-                            Learn more
-                            <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                        </span>
-                    </div>
-                </a>
-
-                <a href="/security" class="group relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800 transition-all duration-300 hover:ring-primary/30 block animate-on-scroll scale-in delay-100" data-spotlight-card>
-                    <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" data-spotlight></div>
-                    <div class="relative z-10">
-                        <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                            <svg class="text-primary w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">Security</h3>
-                        <p class="text-surface-400 mb-6">Keep your data safe with RLS policies and granular access control.</p>
-                        <span class="inline-flex items-center gap-x-2 text-primary-light group-hover:text-primary font-semibold transition-colors">
-                            Learn more
-                            <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                        </span>
-                    </div>
-                </a>
-
-                <a href="/ui" class="group relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800 transition-all duration-300 hover:ring-primary/30 block animate-on-scroll scale-in delay-200" data-spotlight-card>
-                    <div class="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" data-spotlight></div>
-                    <div class="relative z-10">
-                        <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
-                            <svg class="text-primary w-5 h-5" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></svg>
-                        </div>
-                        <h3 class="text-xl font-semibold text-white mb-4">User Interface</h3>
-                        <p class="text-surface-400 mb-6">A beautiful and intuitive user interface your team will love.</p>
-                        <span class="inline-flex items-center gap-x-2 text-primary-light group-hover:text-primary font-semibold transition-colors">
-                            Learn more
-                            <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                        </span>
-                    </div>
-                </a>
-            </div>
-        </div>
-    </section>
-
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         SECTION 9 — FINAL CTA
-         ═══════════════════════════════════════════════════════════════ -->
- <section id="why-cta" class="relative z-0 py-28 sm:py-36 overflow-hidden">
-        <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
-            <div class="animate-on-scroll fade-in-up">
-                <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase mb-4">Get started</h2>
-                <p class="text-3xl md:text-5xl font-semibold tracking-tight text-white mb-4">Ready to try Rebase?</p>
-                <p class="text-lg text-surface-400 max-w-2xl mx-auto mb-10">Start building your admin panel in under a minute. Connect your Postgres, get everything auto-generated, extend with React.</p>
-            </div>
-
-            <!-- CLI command -->
-            <div class="max-w-md mx-auto mb-10 animate-on-scroll fade-in-up">
-                <div class="group relative">
-                    <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
-                         aria-hidden="true"></div>
-                    <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
-                        <div class="px-5 py-4 flex items-center justify-between">
-                            <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                <span class="text-primary font-bold mr-3">~</span>
-                                <span class="text-white">pnpm dlx @rebasepro/cli init</span>
+            <div class="overflow-hidden rounded-2xl border border-surface-800/80 bg-surface-950/60">
+                <div class="hidden md:grid grid-cols-12 border-b border-surface-800/80 bg-surface-900/40">
+                    <p class="col-span-3 px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-surface-500">The question</p>
+                    <p class="col-span-4 px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-surface-500">Most of the category</p>
+                    <p class="col-span-5 px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/80">Rebase</p>
+                </div>
+                {axes.map((row, i) => (
+                        <div class={`grid grid-cols-1 md:grid-cols-12 ${i > 0 ? "border-t border-surface-800/60" : ""}`}>
+                            <div class="md:col-span-3 px-6 pt-5 pb-2 md:py-5">
+                                <p class="text-sm font-semibold text-white">{row.axis}</p>
                             </div>
-                            <button data-track-copy="why-cta" data-command="pnpm dlx @rebasepro/cli init"
-                                    class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                    aria-label="Copy command" title="Copy to clipboard">
-                                <svg class="lucide lucide-copy" xmlns="http://www.w3.org/2000/svg" width="18"
-                                     height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                                </svg>
-                            </button>
+                            <div class="md:col-span-4 px-6 py-3 md:py-5 md:border-l border-surface-800/60">
+                                <p class="text-sm text-surface-500 leading-relaxed">{row.others}</p>
+                            </div>
+                            <div class="md:col-span-5 px-6 pt-3 pb-5 md:py-5 md:border-l border-surface-800/60 bg-primary/[0.03]">
+                                <p class="text-sm text-surface-300 leading-relaxed">{row.rebase}</p>
+                            </div>
                         </div>
+                ))}
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ THE PROOF ═══════════════════════ -->
+    <section class="py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+                <div class="lg:col-span-4">
+                    <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Row one, in practice</p>
+                    <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-5">
+                        Policies are a file, not a setting
+                    </h2>
+                    <p class="text-base text-surface-400 leading-relaxed mb-4">
+                        The first row of that table is the one that matters most, so here it is as a screen
+                        rather than a claim. Access rules live next to the collection that owns them, compile
+                        to real Postgres policies, and the editor tells you when the database and the code
+                        have drifted apart.
+                    </p>
+                    <p class="text-base text-surface-400 leading-relaxed mb-6">
+                        A tool that enforces permissions in its own middleware cannot show you this screen,
+                        because the rules are not in the database to be shown.
+                    </p>
+                    <a href={translatePath("/security")}
+                       class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+                        How the security model works
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14"/>
+                            <path d="m12 5 7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+                <div class="lg:col-span-8">
+                    <div class="rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-950 shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
+                        <RLSEditorDemo client:visible/>
                     </div>
                 </div>
             </div>
+        </div>
+    </section>
 
-            <!-- CTA buttons -->
-            <div class="flex flex-wrap items-center justify-center gap-y-4 gap-x-6 sm:gap-x-8 animate-on-scroll fade-in-up">
-                <a href="https://demo.rebase.pro"
-                   target="_blank" rel="noopener noreferrer"
-                   id="why-cta-try-demo"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
-                    Try the Demo
-                    <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-                </a>
-                <a href="/docs"
-                   class="inline-flex items-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 transition-all duration-200 ease-in-out">
-                    Read the Docs
-                </a>
-                <a href="https://github.com/rebasepro/rebase"
-                   target="_blank" rel="noopener noreferrer"
-                   id="why-cta-view-github"
-                   class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
-                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd" /></svg>
-                    View on GitHub
-                </a>
+    <!-- ═══════════════════════ WHEN NOT TO PICK US ═══════════════════════ -->
+    <section class="py-16 sm:py-24">
+        <div class="mx-auto max-w-4xl px-6 lg:px-8">
+            <div class="rounded-2xl border border-surface-700/80 bg-surface-900/40 p-8 sm:p-12 animate-on-scroll fade-in-up">
+                <p class="mb-4 text-xs font-semibold tracking-[0.25em] text-surface-500 uppercase">The honest part</p>
+                <h2 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-6">
+                    Four times you should not pick Rebase
+                </h2>
+                <ul class="space-y-5 text-surface-400 leading-relaxed">
+                    <li class="flex gap-4">
+                        <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-600"></span>
+                        <span><span class="text-white">You are not on Postgres and don't intend to be.</span>
+                            The whole security model is Postgres row-level security. On MySQL or Mongo, none of
+                            the interesting part applies.</span>
+                    </li>
+                    <li class="flex gap-4">
+                        <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-600"></span>
+                        <span><span class="text-white">You want a managed platform with a support contract today.</span>
+                            Rebase Cloud has not launched. Right now this is software you run — Docker, Railway,
+                            Fly.io or your own metal. If you need someone else on call, a hosted competitor is the
+                            right answer this quarter.</span>
+                    </li>
+                    <li class="flex gap-4">
+                        <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-600"></span>
+                        <span><span class="text-white">You need a marketing-website CMS.</span>
+                            Page builders, visual layout and publishing workflows are what a content platform is
+                            for. Rebase manages application data, not landing pages.</span>
+                    </li>
+                    <li class="flex gap-4">
+                        <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-600"></span>
+                        <span><span class="text-white">You want to draw every screen by hand.</span>
+                            Rebase generates the back office from your schema and lets you replace pieces with your
+                            own React. If the point is a bespoke canvas per screen, an internal-tool builder will
+                            feel better.</span>
+                    </li>
+                </ul>
             </div>
         </div>
     </section>
 
+    <!-- ═══════════════════════ CTA ═══════════════════════ -->
+    <section class="relative z-0 py-24 sm:py-32">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
+            <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4">
+                Easier to try than to compare
+            </h2>
+            <p class="text-lg text-surface-400 mb-10 max-w-2xl mx-auto">
+                The live demo is a real Rebase backend with its generated panel on top. No signup.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all btn-glow"
+                   data-track id="compare-cta-demo">
+                    See the live demo
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+                <a href={translatePath("/product")}
+                   class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white hover:bg-surface-700 transition-all"
+                   data-track id="compare-cta-product">
+                    See what you get
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"/>
+                        <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </section>
 </div>

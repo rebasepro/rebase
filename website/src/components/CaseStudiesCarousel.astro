@@ -15,6 +15,9 @@ const cases = [
         key: "case0",
         href: "https://dadaki.com",
         host: "dadaki.com",
+        // No wordmark asset; falls back to the text title.
+        logo: null as string | null,
+        logoClass: "",
         glow: "from-violet-500/25 via-primary/15 to-transparent"
     },
     {
@@ -23,6 +26,8 @@ const cases = [
         href: "https://medicalmotion.com",
         host: "app.medicalmotion.com",
         logo: "/img/logos/medicalmotion_white.svg",
+        // Artwork is tightly cropped in its viewBox.
+        logoClass: "h-7 sm:h-8",
         glow: "from-rose-500/25 via-primary/15 to-transparent"
     },
     {
@@ -31,6 +36,9 @@ const cases = [
         href: "https://sustentalent.com",
         host: "talent.sustentalent.com",
         logo: "/img/logos/sustentalent_white.svg",
+        // Artwork occupies only the middle 50% of its viewBox, so it needs
+        // roughly double the box height to read at the same optical size.
+        logoClass: "h-14 sm:h-16 -my-3",
         glow: "from-emerald-500/25 via-primary/15 to-transparent"
     }
 ];
@@ -46,8 +54,8 @@ const cases = [
                     <span class="font-mono text-surface-500">09</span><span
                         class="mx-2 text-surface-600">·</span>{t("showcase.badge")}
                 </p>
-                <h2 class="mt-4 text-3xl sm:text-5xl font-bold tracking-tight text-white text-balance">
-                    {t("showcase.title.part1")} <span class="text-primary font-bold">{t("showcase.title.part2")}</span>
+                <h2 class="mt-4 text-3xl sm:text-5xl font-semibold tracking-tight text-white text-balance">
+                    {t("showcase.title.part1")} <span class="text-primary">{t("showcase.title.part2")}</span>
                 </h2>
             </div>
             <p class="text-lg leading-8 text-surface-400 lg:self-end lg:pb-1"
@@ -88,15 +96,15 @@ const cases = [
                             )}
 
                             {c.id === "medicalmotion" && (
-                                <div class="min-h-0 flex-1 flex bg-gradient-to-b from-surface-900/40 to-transparent">
-                                    <div class="flex-1 min-w-0 p-4 space-y-2.5">
+                                <div class="relative min-h-0 flex-1 flex bg-gradient-to-b from-surface-900/40 to-transparent">
+                                    <div class="flex-1 min-w-0 p-4 flex flex-col gap-2.5">
                                         <div class="flex items-center justify-between">
                                             <span class="text-sm font-semibold text-white">Today's Therapy</span>
                                             <span class="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/20">3 pending</span>
                                         </div>
                                         <div class="rounded-lg border border-white/5 bg-surface-900/60 p-2.5 flex items-center gap-3">
                                             <div class="h-8 w-8 rounded-lg bg-rose-500/10 flex items-center justify-center flex-none">
-                                                <span class="text-rose-400 text-xs font-bold">N</span>
+                                                <span class="text-rose-400 text-xs font-semibold">N</span>
                                             </div>
                                             <div class="flex-1 min-w-0">
                                                 <div class="text-xs font-medium text-white truncate">Neck Mobility Routine</div>
@@ -106,7 +114,7 @@ const cases = [
                                         </div>
                                         <div class="rounded-lg border border-white/5 bg-surface-900/60 p-2.5 flex items-center gap-3">
                                             <div class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-none">
-                                                <span class="text-primary text-xs font-bold">P</span>
+                                                <span class="text-primary text-xs font-semibold">P</span>
                                             </div>
                                             <div class="flex-1 min-w-0">
                                                 <div class="text-xs font-medium text-white truncate">Posture Correction</div>
@@ -114,11 +122,42 @@ const cases = [
                                             </div>
                                             <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-800 text-surface-400 ring-1 ring-white/10">Next</span>
                                         </div>
+                                        <div class="rounded-lg border border-white/5 bg-surface-900/60 p-2.5 flex items-center gap-3">
+                                            <div class="h-8 w-8 rounded-lg bg-violet-500/10 flex items-center justify-center flex-none">
+                                                <span class="text-violet-400 text-xs font-semibold">L</span>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="text-xs font-medium text-white truncate">Lower Back Release</div>
+                                                <div class="text-[10px] text-surface-500">12 mins · Video guide</div>
+                                            </div>
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-800 text-surface-400 ring-1 ring-white/10">Next</span>
+                                        </div>
+
+                                        <div class="rounded-lg border border-white/5 bg-surface-900/60 p-2.5 flex items-center gap-3">
+                                            <div class="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-none">
+                                                <span class="text-emerald-400 text-xs font-semibold">S</span>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="text-xs font-medium text-white truncate">Shoulder Stability</div>
+                                                <div class="text-[10px] text-surface-500">8 mins · Video guide</div>
+                                            </div>
+                                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-800 text-surface-400 ring-1 ring-white/10">Next</span>
+                                        </div>
+
+                                        <div class="mt-auto pt-1">
+                                            <div class="flex items-center justify-between text-[10px] text-surface-500 mb-1.5">
+                                                <span>Weekly goal</span>
+                                                <span class="tabular-nums">4 / 6 sessions</span>
+                                            </div>
+                                            <div class="h-1.5 rounded-full bg-surface-800 overflow-hidden">
+                                                <div class="h-full w-2/3 rounded-full bg-primary"></div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="w-2/5 flex-none border-l border-white/5 p-4 bg-surface-950/40 hidden sm:block">
+                                    <div class="w-2/5 flex-none border-l border-white/5 p-4 bg-surface-950/40 hidden sm:flex flex-col">
                                         <div class="text-[10px] uppercase tracking-[0.18em] text-surface-500">Adherence</div>
                                         <div class="mt-1 text-2xl font-semibold text-white tabular-nums">87<span class="text-surface-500 text-base">%</span></div>
-                                        <div class="mt-3 flex items-end gap-1 h-10">
+                                        <div class="mt-4 h-16 flex items-end gap-1.5">
                                             <div class="flex-1 rounded-sm bg-primary/25" style="height:45%"></div>
                                             <div class="flex-1 rounded-sm bg-primary/35" style="height:65%"></div>
                                             <div class="flex-1 rounded-sm bg-primary/25" style="height:40%"></div>
@@ -127,12 +166,27 @@ const cases = [
                                             <div class="flex-1 rounded-sm bg-primary" style="height:100%"></div>
                                         </div>
                                         <div class="mt-2 text-[10px] text-surface-500">Last 6 weeks</div>
+
+                                        <div class="mt-auto pt-4 space-y-2.5 border-t border-white/5">
+                                            <div class="flex items-baseline justify-between">
+                                                <span class="text-[10px] text-surface-500">Sessions</span>
+                                                <span class="text-xs text-white tabular-nums">128</span>
+                                            </div>
+                                            <div class="flex items-baseline justify-between">
+                                                <span class="text-[10px] text-surface-500">Avg. pain score</span>
+                                                <span class="text-xs text-emerald-400 tabular-nums">−38%</span>
+                                            </div>
+                                        </div>
                                     </div>
+
+                                    <!-- Fades any row the frame cuts off, so it
+                                         reads as a scrolled view, not a crop. -->
+                                    <div class="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-surface-950 to-transparent"></div>
                                 </div>
                             )}
 
                             {c.id === "sustentalent" && (
-                                <div class="min-h-0 flex-1 flex flex-col bg-gradient-to-b from-surface-900/40 to-transparent">
+                                <div class="relative min-h-0 flex-1 flex flex-col bg-gradient-to-b from-surface-900/40 to-transparent">
                                     <div class="flex-none px-4 py-3 flex items-center justify-between">
                                         <span class="text-sm font-semibold text-white">Companies</span>
                                         <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20">12 new</span>
@@ -163,7 +217,24 @@ const cases = [
                                             <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
                                             <span class="w-12 text-right text-xs text-surface-400 tabular-nums">6</span>
                                         </div>
+                                        <div class="px-4 py-2.5 flex items-center gap-4">
+                                            <span class="w-28 text-xs text-white truncate">Circular Labs</span>
+                                            <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">Pending</span></span>
+                                            <span class="w-12 text-right text-xs text-surface-400 tabular-nums">3</span>
+                                        </div>
+                                        <div class="px-4 py-2.5 flex items-center gap-4">
+                                            <span class="w-28 text-xs text-white truncate">Terra Mobility</span>
+                                            <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
+                                            <span class="w-12 text-right text-xs text-surface-400 tabular-nums">11</span>
+                                        </div>
+                                        <div class="px-4 py-2.5 flex items-center gap-4">
+                                            <span class="w-28 text-xs text-white truncate">BioLoop Iberia</span>
+                                            <span class="flex-1"><span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Verified</span></span>
+                                            <span class="w-12 text-right text-xs text-surface-400 tabular-nums">9</span>
+                                        </div>
                                     </div>
+
+                                    <div class="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-surface-950 to-transparent"></div>
                                 </div>
                             )}
                         </div>
@@ -178,7 +249,7 @@ const cases = [
                         <h3 class="mt-3 flex items-center gap-3 min-h-9">
                             {c.logo ? (
                                 <img src={c.logo} alt={t(`showcase.${c.key}.title`)}
-                                     class="h-7 sm:h-8 w-auto" loading="lazy"/>
+                                     class={`${c.logoClass} w-auto`} loading="lazy"/>
                             ) : (
                                 <span class="text-2xl font-semibold text-white tracking-tight">
                                     {t(`showcase.${c.key}.title`)}
@@ -296,7 +367,15 @@ const cases = [
 
     .cs-media {
         position: relative;
-        aspect-ratio: 16 / 9;
+        /* Narrow cards get a taller frame, otherwise the mocked UIs are
+           squeezed to a couple of rows. */
+        aspect-ratio: 4 / 3;
+    }
+
+    @media (min-width: 768px) {
+        .cs-media {
+            aspect-ratio: 16 / 9;
+        }
     }
 
     .cs-controls {
@@ -393,14 +472,16 @@ const cases = [
         prevBtn.addEventListener("click", () => goTo(nearestIndex() - 1));
         nextBtn.addEventListener("click", () => goTo(nearestIndex() + 1));
 
-        let frame = 0;
+        // Only sync once scrolling settles. Sampling every frame would report
+        // the outgoing slide as "nearest" mid-animation and flick the counter
+        // backwards before it lands.
+        let settle = 0;
         track.addEventListener("scroll", () => {
-            if (frame) return;
-            frame = requestAnimationFrame(() => {
-                frame = 0;
+            clearTimeout(settle);
+            settle = window.setTimeout(() => {
                 index = nearestIndex();
                 render();
-            });
+            }, 120);
         }, { passive: true });
 
         track.addEventListener("keydown", (event) => {

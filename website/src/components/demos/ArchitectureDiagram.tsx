@@ -51,7 +51,7 @@ function Mono({ children, tip }: { children: ReactNode; tip?: string }) {
 /* ─── Section label ──────────────────────────────────────────────────────────── */
 
 function Label({ children, color = "text-surface-500" }: { children: ReactNode; color?: string }) {
-    return <div className={`text-[10px] font-bold uppercase tracking-[0.1em] mb-2 ${color}`}>{children}</div>;
+    return <div className={`text-[10px] font-semibold uppercase tracking-[0.1em] mb-2 ${color}`}>{children}</div>;
 }
 
 /* ─── Connector ──────────────────────────────────────────────────────────────── */
@@ -69,7 +69,7 @@ function Conn() {
 function Stat({ value, label }: { value: string; label: string }) {
     return (
         <div className="text-center px-2">
-            <div className="text-sm font-bold text-white leading-none">{value}</div>
+            <div className="text-sm font-semibold text-white leading-none">{value}</div>
             <div className="text-[9px] text-surface-600 uppercase tracking-wider mt-0.5">{label}</div>
         </div>
     );
@@ -93,7 +93,7 @@ export function ArchitectureDiagram() {
                             <div className="h-7 w-7 rounded-lg bg-surface-800/50 border border-surface-700/40 flex items-center justify-center">
                                 <svg className="w-4 h-4 text-surface-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
                             </div>
-                            <span className="text-sm font-bold text-white">Database Layer</span>
+                            <span className="text-sm font-semibold text-white">Database Layer</span>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2.5">
@@ -103,7 +103,7 @@ export function ArchitectureDiagram() {
                                     <img src="/img/postgresql-logo.svg" alt="PostgreSQL" className="h-6 w-auto" />
                                 </div>
                                 <div>
-                                    <div className="text-xs font-bold text-white">PostgreSQL</div>
+                                    <div className="text-xs font-semibold text-white">PostgreSQL</div>
                                     <div className="text-[11px] text-surface-500 leading-snug">Drizzle ORM · Pooling · Read replicas</div>
                                 </div>
                             </div>
@@ -113,7 +113,7 @@ export function ArchitectureDiagram() {
                                     <img src="/img/mongodb-logo.svg" alt="MongoDB" className="h-6 w-auto" />
                                 </div>
                                 <div>
-                                    <div className="text-xs font-bold text-white">MongoDB</div>
+                                    <div className="text-xs font-semibold text-white">MongoDB</div>
                                     <div className="text-[11px] text-surface-500 leading-snug">v7 document driver</div>
                                 </div>
                             </div>
@@ -134,7 +134,7 @@ export function ArchitectureDiagram() {
                             <div className="h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                                 <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                             </div>
-                            <span className="text-sm font-bold text-white">BaaS Core</span>
+                            <span className="text-sm font-semibold text-white">BaaS Core</span>
                             <code className="text-[10px] bg-surface-900/60 border border-surface-800/60 px-1.5 py-0.5 rounded text-surface-500 font-mono">server</code>
                         </div>
 
@@ -200,14 +200,14 @@ export function ArchitectureDiagram() {
                                         <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-surface-800/40 bg-surface-900/20">
                                             <svg className="w-3.5 h-3.5 text-violet-400/60 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                                             <div>
-                                                <div className="text-[11px] font-bold text-surface-300">Cron Scheduler</div>
+                                                <div className="text-[11px] font-semibold text-surface-300">Cron Scheduler</div>
                                                 <div className="text-[10px] text-surface-600">5-field parser, DB logs</div>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-surface-800/40 bg-surface-900/20">
                                             <svg className="w-3.5 h-3.5 text-violet-400/60 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                                             <div>
-                                                <div className="text-[11px] font-bold text-surface-300">Custom Functions</div>
+                                                <div className="text-[11px] font-semibold text-surface-300">Custom Functions</div>
                                                 <div className="text-[10px] text-surface-600">Hono routes, auth + DB</div>
                                             </div>
                                         </div>
@@ -231,7 +231,7 @@ export function ArchitectureDiagram() {
                             <div className="h-7 w-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                                 <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
                             </div>
-                            <span className="text-sm font-bold text-white">API Layer</span>
+                            <span className="text-sm font-semibold text-white">API Layer</span>
                             <span className="text-[10px] text-surface-600 font-mono">auto-generated from schema</span>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -241,7 +241,7 @@ export function ArchitectureDiagram() {
                                 ["OpenAPI", "3.0 spec + Swagger UI"],
                             ] as const).map(([title, desc]) => (
                                 <div key={title} className="rounded-lg border border-surface-800/40 bg-[#0f0f11] p-3 hover:border-blue-500/20 transition-colors">
-                                    <div className="text-xs font-bold text-white leading-tight">{title}</div>
+                                    <div className="text-xs font-semibold text-white leading-tight">{title}</div>
                                     <div className="text-[10px] text-surface-500 leading-snug mt-0.5">{desc}</div>
                                 </div>
                             ))}
@@ -256,7 +256,7 @@ export function ArchitectureDiagram() {
                             <div className="h-7 w-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                                 <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                             </div>
-                            <span className="text-sm font-bold text-white">Typed SDK</span>
+                            <span className="text-sm font-semibold text-white">Typed SDK</span>
                             <code className="text-[10px] bg-blue-500/5 border border-blue-500/15 px-1.5 py-0.5 rounded text-blue-300/70 font-mono">@rebasepro/client</code>
                             <span className="ml-auto text-[10px] text-surface-600">Browser · Node · Serverless · Edge</span>
                         </div>
@@ -291,7 +291,7 @@ export function ArchitectureDiagram() {
                         <div className="h-6 w-6 rounded-lg bg-surface-800/50 border border-surface-700/30 flex items-center justify-center">
                             <svg className="w-3.5 h-3.5 text-surface-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
                         </div>
-                        <span className="text-xs font-bold text-white">CLI</span>
+                        <span className="text-xs font-semibold text-white">CLI</span>
                     </div>
                     <code className="text-[9px] text-surface-600 font-mono mb-3">@rebasepro/cli</code>
                     <div className="flex-1 font-mono text-[10px] leading-[22px] text-surface-400">
@@ -331,7 +331,7 @@ export function ArchitectureDiagram() {
                         <div className="h-7 w-7 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
                             <svg className="w-4 h-4 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
                         </div>
-                        <span className="text-sm font-bold text-white">Frontend Layer</span>
+                        <span className="text-sm font-semibold text-white">Frontend Layer</span>
                     </div>
 
                     {/* Rebase Platform + Your Application */}
@@ -340,7 +340,7 @@ export function ArchitectureDiagram() {
                     {/* Rebase Platform: Studio + Admin */}
                     <div className="rounded-lg border border-surface-800/30 bg-[#0c0c0e] p-3">
                         <div className="flex items-center gap-2 mb-2.5">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-surface-500">Rebase Platform</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-surface-500">Rebase Platform</span>
                             <div className="flex-1 h-px bg-surface-800/30" />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -348,7 +348,7 @@ export function ArchitectureDiagram() {
                             <div className="rounded-lg border border-emerald-500/10 bg-[#0f0f11] p-3.5">
                                 <div className="flex items-center gap-1.5 mb-2.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                    <span className="text-xs font-bold text-emerald-400">Rebase Studio</span>
+                                    <span className="text-xs font-semibold text-emerald-400">Rebase Studio</span>
                                     <span className="text-[9px] text-surface-600 font-mono ml-auto">dev tools</span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-1.5">
@@ -374,7 +374,7 @@ export function ArchitectureDiagram() {
                             <div className="rounded-lg border border-violet-500/10 bg-[#0f0f11] p-3.5">
                                 <div className="flex items-center gap-1.5 mb-2.5">
                                     <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
-                                    <span className="text-xs font-bold text-violet-400">Rebase Admin</span>
+                                    <span className="text-xs font-semibold text-violet-400">Rebase Admin</span>
                                     <span className="text-[9px] text-surface-600 font-mono ml-auto">CMS</span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-1.5">
@@ -405,7 +405,7 @@ export function ArchitectureDiagram() {
                             <div className="h-6 w-6 rounded-lg bg-surface-800/40 border border-surface-700/30 flex items-center justify-center">
                                 <svg className="w-3.5 h-3.5 text-surface-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                             </div>
-                            <span className="text-xs font-bold text-white">Your Application</span>
+                            <span className="text-xs font-semibold text-white">Your Application</span>
                         </div>
                         <div className="text-[10px] text-surface-600 mb-2.5">built with the SDK + UI Kit</div>
                         <div className="grid grid-cols-2 gap-1.5 flex-1 content-start">
@@ -433,7 +433,7 @@ export function ArchitectureDiagram() {
                     {/* UI Kit */}
                     <div className="rounded-lg border border-surface-800/40 bg-[#0f0f11] p-3.5 mb-2.5">
                         <div className="flex items-center gap-2 mb-2.5">
-                            <span className="text-xs font-bold text-primary-light">UI Kit</span>
+                            <span className="text-xs font-semibold text-primary-light">UI Kit</span>
                             <code className="text-[10px] bg-primary/5 border border-primary/15 px-1.5 py-0.5 rounded text-primary-light/70 font-mono">@rebasepro/ui</code>
                             <div className="ml-auto flex items-center gap-2">
                                 <Stat value="55+" label="components" />

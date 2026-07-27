@@ -28,7 +28,7 @@ export function RbacMiniDemo() {
         <div className="h-32 w-full bg-surface-950 rounded-lg border border-surface-800 mb-6 flex flex-col pointer-events-none select-none p-3 overflow-hidden relative">
             <div className="flex items-center gap-2 mb-3">
                 <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                <span className="text-[11px] font-bold text-white">Row Level Security</span>
+                <span className="text-[11px] font-semibold text-white">Row Level Security</span>
             </div>
 
             <div className="bg-surface-900/50 rounded border border-surface-800/50 flex flex-col divide-y divide-surface-800/50">

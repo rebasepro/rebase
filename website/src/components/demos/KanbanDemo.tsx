@@ -67,7 +67,7 @@ y });
                             <div className="text-xs text-white font-medium mb-1 line-clamp-2">Homepage redesign mockup</div>
                             <div className="flex justify-between items-center mt-2">
                                 <span className="text-[9px] text-surface-500 font-mono">ui-32</span>
-                                <div className="w-4 h-4 rounded-full bg-purple-500 text-[8px] flex items-center justify-center text-white font-bold tracking-tighter">FK</div>
+                                <div className="w-4 h-4 rounded-full bg-purple-500 text-[8px] flex items-center justify-center text-white font-semibold tracking-tighter">FK</div>
                             </div>
                         </div>
 
@@ -93,7 +93,7 @@ y });
                                     <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span>
                                     <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
                                 </div>
-                                <div className="w-4 h-4 rounded-full bg-emerald-500 text-[8px] flex items-center justify-center text-white font-bold tracking-tighter">AJ</div>
+                                <div className="w-4 h-4 rounded-full bg-emerald-500 text-[8px] flex items-center justify-center text-white font-semibold tracking-tighter">AJ</div>
                             </div>
                         </div>
                     </div>
@@ -117,7 +117,7 @@ y });
                             <div className="text-xs text-white font-medium mb-1 line-clamp-2">Payment gateway tests</div>
                             <div className="flex justify-between items-center mt-2">
                                 <span className="text-[9px] text-surface-500 font-mono">pay-17</span>
-                                <div className="w-4 h-4 rounded-full bg-sky-500 text-[8px] flex items-center justify-center text-white font-bold tracking-tighter">MR</div>
+                                <div className="w-4 h-4 rounded-full bg-sky-500 text-[8px] flex items-center justify-center text-white font-semibold tracking-tighter">MR</div>
                             </div>
                         </div>
                     </div>
@@ -135,14 +135,14 @@ y });
                             <div className="text-xs text-surface-400 font-medium mb-1 line-clamp-2">Database migration v2</div>
                             <div className="flex justify-between items-center mt-2">
                                 <span className="text-[9px] text-surface-600 font-mono">db-08</span>
-                                <div className="w-4 h-4 rounded-full bg-orange-500 text-[8px] flex items-center justify-center text-white font-bold tracking-tighter">LS</div>
+                                <div className="w-4 h-4 rounded-full bg-orange-500 text-[8px] flex items-center justify-center text-white font-semibold tracking-tighter">LS</div>
                             </div>
                         </div>
                         <div className="bg-surface-800/60 rounded-lg p-2 ring-1 ring-surface-700/30 shadow-sm">
                             <div className="text-xs text-surface-400 font-medium mb-1 line-clamp-2">Role permissions audit</div>
                             <div className="flex justify-between items-center mt-2">
                                 <span className="text-[9px] text-surface-600 font-mono">sec-11</span>
-                                <div className="w-4 h-4 rounded-full bg-purple-500 text-[8px] flex items-center justify-center text-white font-bold tracking-tighter">FK</div>
+                                <div className="w-4 h-4 rounded-full bg-purple-500 text-[8px] flex items-center justify-center text-white font-semibold tracking-tighter">FK</div>
                             </div>
                         </div>
                         <div className="bg-surface-800/60 rounded-lg p-2 ring-1 ring-surface-700/30 shadow-sm">

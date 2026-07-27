@@ -239,7 +239,7 @@ await client.orders.update("${activeOrder.id}", {
             <div className="lg:col-span-5 flex flex-col h-full bg-[#0c0c0e]">
                 {/* Tabs */}
                 <div className="px-4 py-2.5 border-b border-surface-800 bg-[#0f0f11] flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-surface-500 uppercase tracking-wider font-mono">Live API inspector</span>
+                    <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider font-mono">Live API inspector</span>
                     
                     <div className="flex items-center gap-1 bg-surface-950 border border-surface-800 p-0.5 rounded-md">
                         <button 

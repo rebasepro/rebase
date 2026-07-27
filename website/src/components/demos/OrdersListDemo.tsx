@@ -72,7 +72,7 @@ function KPICard({ title, subtitle, value, change, icon, isHighlighted = false }
         <div className="text-surface-400 dark:text-surface-500">{icon}</div>
       </div>
       <div className="flex items-baseline gap-2">
-        <div className="text-lg font-bold text-surface-900 dark:text-white tracking-tight">{value}</div>
+        <div className="text-lg font-semibold text-surface-900 dark:text-white tracking-tight">{value}</div>
         {change && (
           <div className={`flex items-center gap-0.5 text-[10px] font-medium ${change.positive ? "text-emerald-500" : "text-red-400"}`}>
             {change.positive ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
@@ -434,7 +434,7 @@ export function OrdersListDemo({ height = 600 }: { height?: number } = {}) {
               {!panelOpen && (
                 <>
                   <div className="px-4 sm:px-6 pt-4 pb-3 max-w-3xl mx-auto w-full">
-                    <div className="text-lg font-bold text-surface-900 dark:text-white mb-3">Orders</div>
+                    <div className="text-lg font-semibold text-surface-900 dark:text-white mb-3">Orders</div>
                     <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                       <KPICard title="Confirmed" subtitle="" value="15.0"
                         change={{ value: "+18.0%", positive: true }} icon={<Info size={14} />}

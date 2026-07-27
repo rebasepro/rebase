@@ -37,9 +37,10 @@ import { fileURLToPath } from "url";
     
     const marketingPages = [
         { name: "Home", path: "/" },
-        { name: "Why Rebase", path: "/why-rebase" },
-        { name: "Features", path: "/features" },
+        { name: "Compare Rebase", path: "/compare" },
+        { name: "Admin panel", path: "/admin" },
         { name: "Rebase Studio", path: "/studio" },
+        { name: "Content editing", path: "/editing" },
         { name: "Client SDK", path: "/sdk" },
         { name: "CLI Tooling", path: "/cli" },
         { name: "Backend & APIs", path: "/backend" },

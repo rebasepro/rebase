@@ -37,7 +37,9 @@ export const EXPERIMENTS: Experiment[] = [
     {
         id: "navigation-structure",
         variants: ["control", "flat-nav"],
-        weights: [50, 50],
+        // Parked at 0%: the mega-nav carries the backend / admin-panel split that the
+        // rest of the site is built around, and the flat variant hides it.
+        weights: [100, 0],
         expires: "2026-08-01",
     },
     {
