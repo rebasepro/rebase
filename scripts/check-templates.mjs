@@ -128,8 +128,14 @@ export default probe;
  */
 function materializeBaas(into) {
     copyDir(templateRoot, into);
-    for (const dir of ["frontend", "config"]) {
-        fs.rmSync(path.join(into, dir), { recursive: true, force: true });
+    // Mirrors `applyFlavor` in commands/init.ts. It deletes the collections, NOT
+    // the config package: storage is not under row-level security, so the
+    // headless flavour still needs somewhere to put `storageAuthorize`, and the
+    // overlay replaces config/index.ts with one that exports only that.
+    fs.rmSync(path.join(into, "frontend"), { recursive: true, force: true });
+    fs.rmSync(path.join(into, "config/collections"), { recursive: true, force: true });
+    for (const stray of ["admin.d.ts", "frontend-assets.d.ts"]) {
+        fs.rmSync(path.join(into, "config", stray), { force: true });
     }
     fs.rmSync(path.join(into, "backend/src/schema.generated.ts"), { force: true });
     copyDir(baasOverlay, into);
@@ -310,7 +316,14 @@ try {
             path.join(dir, "tsconfig.check.json"),
             JSON.stringify(
                 preset === BAAS
-                    // The BaaS flavour has no config/; check its backend instead.
+                    // The BaaS flavour keeps a config package — holding
+                    // `storageAuthorize` and nothing else — so it is checked the
+                    // same way every other variant is. It used to be narrowed to
+                    // `backend/src/**/*.ts` on the premise that there was no
+                    // config/ at all; that premise stopped being true, and the
+                    // narrowed include then matched an EMPTY directory, which tsc
+                    // reports as TS18003 rather than as "nothing to do".
+                    //
                     // Note this program can still *resolve* @rebasepro/admin-types,
                     // and deliberately so — dropping the `paths` entry changes
                     // nothing, because resolution falls through to the pnpm store
@@ -318,7 +331,7 @@ try {
                     // out of this flavour is `checkBaasHasNoAdminTypes` below, and
                     // the guarantee that writing `admin` is an error is asserted by
                     // its own program in `e2e/baas-typecheck`.
-                    ? { ...TSCONFIG, include: ["backend/src/**/*.ts"] }
+                    ? { ...TSCONFIG }
                     : TSCONFIG,
                 null,
                 4

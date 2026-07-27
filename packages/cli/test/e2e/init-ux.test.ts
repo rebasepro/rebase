@@ -103,7 +103,26 @@ describe("--template against the baas flavor", () => {
     it("says the preset is ignored instead of silently dropping it", async () => {
         const out = await init(["baas-with-template", "--yes", "--template", "ecommerce", "--flavor", "baas"]);
         expect(out).toContain("Ignoring --template ecommerce");
-        expect(fs.existsSync(path.join(tempDir, "baas-with-template", "config"))).toBe(false);
+
+        // The COLLECTIONS are what a preset supplies, and this flavour declares
+        // none — it introspects them from the live database instead.
+        const project = path.join(tempDir, "baas-with-template");
+        expect(fs.existsSync(path.join(project, "config", "collections"))).toBe(false);
+    });
+
+    it("keeps a config package for the storage hook, and only that", async () => {
+        // Storage is not under row-level security, so the server refuses to boot
+        // with storage enabled and no access model — and the scaffold's own
+        // docker-compose.yml enables it. Deleting the config package outright
+        // (which this flavour used to do) left the boot guard nothing to find,
+        // and the first `docker compose up` crash-looped.
+        const project = path.join(tempDir, "baas-with-template");
+        const config = path.join(project, "config");
+
+        expect(fs.existsSync(config)).toBe(true);
+        expect(fs.readFileSync(path.join(config, "index.ts"), "utf8")).toContain("storageAuthorize");
+        expect(fs.existsSync(path.join(config, "storage.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(project, "frontend"))).toBe(false);
     });
 });
 

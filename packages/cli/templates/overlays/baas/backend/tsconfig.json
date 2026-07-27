@@ -5,7 +5,6 @@
     "moduleResolution": "node",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -15,5 +14,12 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src/**/*"]
+  // `functions/` as well as `src/`, because this flavour has nothing in src:
+  // it declares no collections, so there is no generated schema, and the server
+  // entrypoint lives behind `rebase eject`. An include matching only an empty
+  // directory is TS18003 — tsc reports "no inputs" as an error, not a no-op.
+  //
+  // No `rootDir`: it would have to be `.` for both, and letting tsc infer the
+  // common root gets there without a second place to keep in sync.
+  "include": ["src/**/*", "functions/**/*"]
 }
