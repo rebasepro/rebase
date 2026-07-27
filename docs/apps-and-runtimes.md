@@ -700,13 +700,17 @@ publish, since another agent's push carries it).
 | 5 — folding + bundle manifest | done | plus `bundleFormat` 2 and format-1 compat (§4.3) |
 | 6 — `saas` | done, unmerged | §4.9; migration 0032; saas backend 1504 tests green |
 
-**Not run: the self-host acceptance test in Phase 5.** Docker was unavailable.
-What stands in for it is `packages/server/src/serve-spa.test.ts` (two apps
-mounted exactly as `bootFromBundle` mounts them) and
-`packages/server/src/boot/bundle-compat.test.ts` (manifest → loader →
-`staticApps`, both formats). Those cover every seam between the manifest and the
-routing table; what they do not cover is the container actually starting, so
-**the compose run in Phase 5 is still worth doing before this ships.**
+**The self-host acceptance test passes**, as `pnpm verify:selfhost`
+(`scripts/verify-selfhost.mts`). Docker was unavailable, so it runs everything
+the compose file runs except the container: a real bundle built from the
+reference app's 11 collections, two static apps folded in at `/` and `/admin`, a
+real `rebase db push` into Postgres, a real `bootFromBundle`, and real requests
+through the booted app — including `/api/data/posts` returning rows from the
+tables the push created, out of the same process serving the SPAs.
+
+What it does not cover is the container itself: the published image, the volume
+mount, and the bundle's own `npm install` at first start. Worth one manual
+`docker compose -f docker/docker-compose.selfhost.yml up` before release.
 
 One deviation from the phase boundaries: the type changes in
 `project_manifest.ts` are a single unit, so `entry.static` becoming a list and
@@ -834,6 +838,10 @@ docker compose -f ../docker/docker-compose.selfhost.yml up
 
 `/` and `/admin` must both load in a browser, and the admin must list
 collections. This is the self-hosting acceptance test for the whole document.
+
+`pnpm verify:selfhost` does all of it except the container — same build, same
+push, same boot, same requests — so run that first and keep the compose run for
+what only it can prove.
 
 ### Phase 6 — `saas`
 

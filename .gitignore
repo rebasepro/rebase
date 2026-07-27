@@ -149,6 +149,8 @@ e2e/.auth/
 
 # Built project bundles (`rebase build`) and the generated tsconfig it uses.
 dist-bundle/
+# Produced by scripts/verify-selfhost.mts
+dist-bundle-acceptance/
 .rebase/
 
 # Agent harness: session traces and preflight stamps (local, per-machine)
