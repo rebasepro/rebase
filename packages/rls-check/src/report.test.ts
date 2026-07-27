@@ -95,6 +95,10 @@ function leakedFragment(haystack: string, secret: string): string | null {
     return null;
 }
 
+// An ANSI colour code *is* an escape sequence, so matching one necessarily
+// matches a control character. That is what the rule guards against, and here
+// it is the point — this asserts the report strips its own colouring.
+// eslint-disable-next-line no-control-regex
 const ANSI = /\u001B\[[0-9;]*m/;
 
 // ---------------------------------------------------------------------------
