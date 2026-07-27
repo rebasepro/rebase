@@ -81,7 +81,17 @@ jobs:
       # — semver excludes prereleases unless the range names one.
       - name: Set canary version
         run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          # `g` for git, as in `git describe` (v1.0.0-2-gabc1234).
+          #
+          # It is not decoration. A semver prerelease identifier made only of
+          # digits is a NUMERIC identifier, and numeric identifiers may not carry
+          # a leading zero — so a commit whose short sha happens to be all digits
+          # starting with 0 produces an invalid version and the whole canary
+          # publish dies with `invalid semver`. That is roughly one commit in
+          # every few hundred, which is exactly often enough to look random and
+          # rare enough that nobody connects it to the sha. It happened on
+          # 0946568. The prefix makes the identifier alphanumeric every time.
+          SHORT_SHA="g$(echo "${{ github.sha }}" | cut -c1-7)"
 
           LATEST_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
           if [ -z "$LATEST_TAG" ]; then
