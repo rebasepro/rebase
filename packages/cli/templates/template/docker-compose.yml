@@ -1,16 +1,31 @@
-# ─── Rebase — Production Docker Compose ──────────────────────────────
+# ─── Self-hosting this project ───────────────────────────────────────
 #
-# Quick start:
-#   cp .env.example .env    # Edit with your secrets
-#   docker compose up -d    # Start everything
+# Two containers: PostgreSQL, and the Rebase runtime with your built project
+# mounted into it. There is no application image to build here — the runtime is
+# the same published image every Rebase deployment runs, and your project
+# travels as a bundle.
 #
-# This runs:
-#   1. PostgreSQL 18 with persistent data
-#   2. Backend (Node.js / Hono) with health checks
-#   3. Frontend (nginx) serving the Vite build
+# That is the point: the artifact you self-host is the artifact Rebase Cloud
+# runs. Nothing about this repository changes when you move between them; only
+# the destination does, and that lives in `.rebase/cloud.json`, which is not
+# committed.
+#
+#   rebase build              # produces ./dist-bundle
+#   docker compose up -d db
+#   rebase db push            # create the collection tables, once
+#   docker compose up
+#
+# One container then serves the API at /api and the admin at / — same origin, so
+# there is no CORS to configure between them and no second web server.
 #
 # For development, use `rebase dev` instead.
+#
+# To upgrade Rebase, change REBASE_VERSION and restart. Your bundle is untouched.
+# To run your OWN server code instead, `rebase eject` — it writes the entrypoint,
+# a Dockerfile and a compose file that builds them.
 # ─────────────────────────────────────────────────────────────────────
+
+name: {{PROJECT_NAME}}
 
 services:
   # ── PostgreSQL ───────────────────────────────────────────────────────
@@ -21,20 +36,25 @@ services:
       POSTGRES_USER: rebase
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
       POSTGRES_DB: rebase
+    # Published so `rebase db push` can reach it from the host. Remove this
+    # mapping once the schema is in place if the database should not be
+    # reachable from outside the compose network.
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
+      # The runtime must not start before the database can answer, or its first
+      # boot fails on a connection refused and the container restarts for no
+      # reason a reader would understand.
       test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
-    # Production tuning (adjust for your workload)
     command:
       - "postgres"
-      - "-c" 
+      - "-c"
       - "shared_buffers=256MB"
       - "-c"
       - "max_connections=100"
@@ -45,44 +65,48 @@ services:
       - "-c"
       - "log_min_duration_statement=1000"
 
-  # ── Backend ──────────────────────────────────────────────────────────
-  backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+  # ── The Rebase runtime, booting your bundle ──────────────────────────
+  api:
+    image: rebasepro/server:${REBASE_VERSION:-latest}
     restart: unless-stopped
-    ports:
-      - "${PORT:-3001}:3001"
-    env_file: .env
-    environment:
-      # Override DATABASE_URL to point to the Docker network service
-      DATABASE_URL: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
-      ADMIN_CONNECTION_STRING: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
-      NODE_ENV: production
-      PORT: "3001"
-      # The server refuses to boot with local storage under NODE_ENV=production,
-      # because the container filesystem is destroyed on the next restart and
-      # uploads go with it. That does not apply here: the `uploads` volume below
-      # is a durable named volume mounted at the storage path, which is exactly
-      # the case the check tells you to acknowledge with this flag. Switch to
-      # STORAGE_TYPE=s3 or gcs and drop this line if you move storage off-box.
-      FORCE_LOCAL_STORAGE: "true"
     depends_on:
       db:
         condition: service_healthy
-    volumes:
-      - uploads:/app/backend/uploads
-
-  # ── Frontend ─────────────────────────────────────────────────────────
-  frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    restart: unless-stopped
     ports:
-      - "80:80"
-    depends_on:
-      - backend
+      - "${PORT:-3001}:3001"
+    environment:
+      DATABASE_URL: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
+      ADMIN_CONNECTION_STRING: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env — `rebase init` generates one}
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY:?set REBASE_SERVICE_KEY in .env — `rebase init` generates one}
+      NODE_ENV: production
+      PORT: "3001"
+
+      # The origins a browser will load the admin from. With the admin folded
+      # into the bundle it is served from this very container, so this is just
+      # your own address — but it is still required, because an API that guesses
+      # its allowed origins is one that eventually allows the wrong one.
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origin you browse to, e.g. http://localhost:3001}
+
+      # Auth tables are created at boot. Collection tables are not: run
+      # `rebase db push` once, against the database above. A container restart
+      # must not be able to change a schema as a side effect.
+      REBASE_MIGRATE_ON_BOOT: ${REBASE_MIGRATE_ON_BOOT:-ensure}
+
+      # Uploads land on the named volume below, which survives restarts. That is
+      # the case FORCE_LOCAL_STORAGE exists to acknowledge — without a durable
+      # mount the server refuses local storage in production, because the
+      # container filesystem is destroyed on the next deploy and every uploaded
+      # file goes with it. Switch to STORAGE_TYPE=s3 or gcs and drop both lines
+      # if you move storage off-box.
+      STORAGE_PATH: /uploads
+      FORCE_LOCAL_STORAGE: "true"
+    volumes:
+      # Your built project. Writable, because the runtime installs the bundle's
+      # declared dependencies into it on first start — `rebase build` emits a
+      # package.json but not a node_modules.
+      - ./dist-bundle:/bundle
+      - uploads:/uploads
 
 volumes:
   postgres_data:

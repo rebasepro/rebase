@@ -678,6 +678,53 @@ it describes the *running server's* collections source rather than anything in
 the manifest, and renaming it would break generation against older servers for
 no gain. It is the last `cms` in the product and it is deliberate.
 
+### 4.10 What `rebase init` scaffolds for self-hosting
+
+Self-hosting is the *first* thing that has to be right — for a while it is the
+only option — and the scaffold was contradicting the manifest it wrote.
+
+A new project declared `runtime: "managed"` and shipped a `docker-compose.yml`
+that built **two custom images**: `backend/Dockerfile`, whose `CMD` ran the
+entrypoint the managed runtime never loads, and `frontend/Dockerfile`, an nginx
+image serving the SPA the runtime now serves itself. §4.8 removed the entrypoint
+from the scaffold, which left that compose file not merely inconsistent but
+**broken**: `docker compose up` on a fresh project built an image around a file
+that no longer existed.
+
+The scaffolded compose runs the managed shape instead — Postgres, plus
+`rebasepro/server` with `./dist-bundle` mounted at `/bundle`:
+
+```
+rebase build              # produces ./dist-bundle
+docker compose up -d db
+rebase db push            # create the collection tables, once
+docker compose up
+```
+
+One container, serving the API at `/api` and the admin at `/`. Same origin, so
+there is no CORS between them and no second web server. No application image is
+built at any point.
+
+That is the property worth protecting: **the artifact you self-host is the
+artifact Rebase Cloud runs.** Nothing in the repository changes when a project
+moves between them — the destination lives in `.rebase/cloud.json`, which is not
+committed — so "works self-hosted" and "works on Cloud" stop being two things
+that can drift apart.
+
+The image-building path moves behind `rebase eject`, which now writes
+`Dockerfile` **and** `docker-compose.custom.yml` together, and deliberately does
+not touch the scaffolded `docker-compose.yml`: going back should stay a one-line
+change in `rebase.json` rather than a restore from git.
+
+Two things the scaffold must keep getting right, both of which have their own
+test:
+
+- **No `build:` key in the scaffolded compose.** One would mean the project
+  contradicts its own manifest again.
+- **`FORCE_LOCAL_STORAGE` only alongside a durable mount.** The flag exists to
+  acknowledge a volume; set without one, every uploaded file is destroyed on the
+  next restart, which is the failure it was invented to prevent.
+
 ---
 
 ## 5. Execution plan

@@ -1,0 +1,71 @@
+# ─── Self-hosting an ejected project ─────────────────────────────────
+#
+# `rebase eject` wrote this. It builds the image described by ./Dockerfile and
+# runs YOUR backend/src/index.ts, rather than mounting a bundle into the
+# published Rebase runtime.
+#
+#   docker compose -f docker-compose.custom.yml up -d db
+#   rebase db push                                    # once
+#   docker compose -f docker-compose.custom.yml up --build
+#
+# What you gave up by ejecting: the platform no longer upgrades the server
+# underneath you, and CORS, auth wiring, storage and shutdown are configured in
+# your entrypoint rather than by the runtime. What you gained: it is your
+# process, and you can put anything you like in it.
+#
+# `docker-compose.yml` is still here and still runs the managed shape. Nothing
+# stops you going back — set `runtime: "managed"` in rebase.json, `rebase build`,
+# and use that file instead.
+# ─────────────────────────────────────────────────────────────────────
+
+name: {{PROJECT_NAME}}
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rebase
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
+      POSTGRES_DB: rebase
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3001}:3001"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
+      ADMIN_CONNECTION_STRING: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
+      NODE_ENV: production
+      PORT: "3001"
+      # Your entrypoint serves the built frontend itself (see the `serveSPA`
+      # call in backend/src/index.ts), so this is one container, same origin.
+      CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS to the origin you browse to}
+      # A durable named volume, which is the case this flag acknowledges.
+      STORAGE_PATH: /uploads
+      FORCE_LOCAL_STORAGE: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - uploads:/uploads
+
+volumes:
+  postgres_data:
+    driver: local
+  uploads:
+    driver: local

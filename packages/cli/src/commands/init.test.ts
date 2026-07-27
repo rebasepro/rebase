@@ -149,9 +149,20 @@ path: "/" });
         expect(functions.length).toBeGreaterThan(0);
     });
 
-    it("contains Dockerfiles for production deployment", () => {
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "Dockerfile"))).toBe(true);
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, "frontend", "Dockerfile"))).toBe(true);
+    it("scaffolds NO Dockerfiles, because a managed project builds no image", () => {
+        // `rebase build` produces a bundle and the published runtime boots it —
+        // the artifact you self-host is the artifact Rebase Cloud runs. The
+        // template used to ship a backend image whose CMD ran an entrypoint the
+        // managed runtime never loads, and a second nginx image for the SPA the
+        // runtime now serves itself.
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "Dockerfile"))).toBe(false);
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "frontend", "Dockerfile"))).toBe(false);
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "frontend", "nginx.conf"))).toBe(false);
+
+        // They live behind `rebase eject`, with the compose file that runs them.
+        const payload = path.resolve(__dirname, "..", "..", "templates", "eject");
+        expect(fs.existsSync(path.join(payload, "Dockerfile"))).toBe(true);
+        expect(fs.existsSync(path.join(payload, "docker-compose.custom.yml"))).toBe(true);
     });
 });
 
@@ -698,11 +709,25 @@ describe(".env.example", () => {
 // =============================================================================
 
 describe("docker-compose.yml", () => {
-    it("defines db, backend, and frontend services", () => {
+    it("runs the published runtime on the bundle, with nothing to build", () => {
         const compose = fs.readFileSync(path.join(TEMPLATE_DIR, "docker-compose.yml"), "utf-8");
         expect(compose).toContain("db:");
-        expect(compose).toContain("backend:");
-        expect(compose).toContain("frontend:");
+        expect(compose).toContain("api:");
+        expect(compose).toContain("rebasepro/server:");
+        expect(compose).toContain("./dist-bundle:/bundle");
+        // A `build:` here would mean the scaffold contradicts its own manifest,
+        // which declares runtime: managed.
+        expect(compose).not.toMatch(/^\s*build:/m);
+    });
+
+    it("mounts a durable volume wherever it acknowledges local storage", () => {
+        // FORCE_LOCAL_STORAGE without a durable mount is how uploads get
+        // silently destroyed on the next restart.
+        const compose = fs.readFileSync(path.join(TEMPLATE_DIR, "docker-compose.yml"), "utf-8");
+        if (compose.includes("FORCE_LOCAL_STORAGE")) {
+            expect(compose).toContain("STORAGE_PATH: /uploads");
+            expect(compose).toContain("uploads:/uploads");
+        }
     });
 
     it("backend depends on healthy db", () => {

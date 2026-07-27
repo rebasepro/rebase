@@ -60,19 +60,26 @@ server). Pin a port with `rebase dev --port 3001` if you need a stable one.
 ## Project Structure
 
 ```
-├── frontend/           # React frontend (Vite)
-│   ├── Dockerfile      # Production build → nginx
-│   └── nginx.conf      # SPA routing + compression
-├── backend/            # Hono backend with PostgreSQL
-│   ├── Dockerfile      # Multi-stage production build
+├── frontend/           # Your admin panel (React + Vite)
+├── backend/            # Server code
 │   ├── functions/      # Custom API endpoints (auto-discovered)
-│   └── src/
+│   └── src/            # Generated database schema
 ├── config/             # Shared collection definitions
 │   └── collections/    # Schema-as-Code TypeScript files
-├── docker-compose.yml  # Production stack (Postgres + Backend + Frontend)
+├── rebase.json         # Which apps this repository contains
+├── docker-compose.yml  # Self-hosting stack (Postgres + the Rebase runtime)
 ├── .env.example        # Environment variable reference
 └── package.json        # Root workspace config
 ```
+
+There is no Dockerfile, and that is deliberate: `rebase build` produces a
+**bundle** — your compiled collections, functions, crons and admin assets — and
+the published `rebasepro/server` image boots it. The artifact you self-host is
+the artifact Rebase Cloud runs, so moving between them changes nothing in this
+repository.
+
+If you would rather run your own server process, `rebase eject` writes the
+entrypoint, a Dockerfile and a compose file that builds them.
 
 ### Custom Functions
 
@@ -105,23 +112,28 @@ All configuration is managed through a single `.env` file in the project root. B
 
 `init` already generated your `.env`. See the comments in `.env.example` for details on each variable, and edit `.env` directly to change any of them.
 
-## Production Deployment
+## Self-hosting
 
-The full stack — PostgreSQL, backend, and frontend — runs from
-`docker compose`. The backend image builds and boots, but it does **not**
-create your collection tables on its own, so push the schema once the
-database is up before (or right after) starting the rest of the stack.
+Two containers: PostgreSQL, and the Rebase runtime with your built project
+mounted into it. There is no application image to build.
+
+The runtime creates its auth tables at boot but **not** your collection tables —
+a container restart must not be able to change a schema as a side effect — so
+push the schema once, while the database is up.
 
 ```bash
-# 1. Start the database and create the tables from your collections
+# 1. Build your project into ./dist-bundle
+pnpm run build          # or: npm run build
+
+# 2. Start the database and create the tables from your collections
 docker compose up -d db
 pnpm run db:push        # or: npm run db:push
 
-# 2. Build and start the backend + frontend
-docker compose up -d --build
+# 3. Start the runtime
+docker compose up -d
 
 # View logs
-docker compose logs -f backend
+docker compose logs -f api
 
 # Stop
 docker compose down
@@ -129,6 +141,12 @@ docker compose down
 # Stop and remove data
 docker compose down -v
 ```
+
+One container now serves the API at `/api` and the admin at `/` — same origin,
+so there is no CORS between them and no second web server to run.
+
+To upgrade Rebase, set `REBASE_VERSION` in `.env` and restart. Your bundle is
+untouched.
 
 > `docker compose` reads the generated `.env` as-is. Set production values
 > (a strong `DATABASE_PASSWORD`, `JWT_SECRET`, storage credentials, …) by

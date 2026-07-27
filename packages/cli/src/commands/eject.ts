@@ -51,11 +51,33 @@ overwrite: true },
     { from: "backend/src/env.ts",
 to: "backend/src/env.ts",
 overwrite: true },
-    // Never overwritten: a Dockerfile someone already wrote is theirs.
+    // Never overwritten: a Dockerfile someone already wrote is theirs, and so is
+    // a compose file they have edited. The scaffolded `docker-compose.yml` is
+    // deliberately left alone — it runs the managed shape, and going back should
+    // stay a one-line change rather than a restore from git.
     { from: "Dockerfile",
 to: "Dockerfile",
+overwrite: false },
+    { from: "docker-compose.custom.yml",
+to: "docker-compose.custom.yml",
 overwrite: false }
 ];
+
+/**
+ * The project's name, for the `{{PROJECT_NAME}}` the payload carries.
+ *
+ * Falls back to the directory name — a compose project name is cosmetic, and a
+ * missing or unreadable package.json is not a reason to refuse to eject.
+ */
+function projectNameOf(projectRoot: string): string {
+    try {
+        const pkg = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8"));
+        if (typeof pkg.name === "string" && pkg.name.trim()) return pkg.name.trim();
+    } catch {
+        // fall through
+    }
+    return path.basename(projectRoot);
+}
 
 function printHelp(): void {
     console.log(`
@@ -184,11 +206,15 @@ permissive: true }
         return;
     }
 
+    const projectName = projectNameOf(projectRoot);
     for (const [index, file] of PAYLOAD.entries()) {
         if (planned[index].action === "keep") continue;
         const destination = path.join(projectRoot, file.to);
         fs.mkdirSync(path.dirname(destination), { recursive: true });
-        fs.copyFileSync(path.join(payloadDir, file.from), destination);
+        const contents = fs
+            .readFileSync(path.join(payloadDir, file.from), "utf8")
+            .replace(/\{\{PROJECT_NAME\}\}/g, projectName);
+        fs.writeFileSync(destination, contents, "utf8");
     }
 
     const dockerfile = app.dockerfile ?? "Dockerfile";
@@ -208,13 +234,17 @@ permissive: true }
     console.log("");
     console.log(chalk.green(`✓ Ejected "${appName}" to a custom runtime.`));
     console.log("");
-    console.log(`  ${chalk.cyan("backend/src/index.ts")}   your entrypoint — the runtime no longer boots the bundle`);
-    console.log(`  ${chalk.cyan("backend/src/env.ts")}     the environment it reads`);
-    console.log(`  ${chalk.cyan(dockerfile.padEnd(20))}   your image`);
-    console.log(`  ${chalk.cyan("rebase.json".padEnd(20))}   runtime: custom`);
+    console.log(`  ${chalk.cyan("backend/src/index.ts".padEnd(26))} your entrypoint — the runtime no longer boots the bundle`);
+    console.log(`  ${chalk.cyan("backend/src/env.ts".padEnd(26))} the environment it reads`);
+    console.log(`  ${chalk.cyan(dockerfile.padEnd(26))} your image`);
+    console.log(`  ${chalk.cyan("docker-compose.custom.yml".padEnd(26))} runs it`);
+    console.log(`  ${chalk.cyan("rebase.json".padEnd(26))} runtime: custom`);
     console.log("");
     console.log(chalk.yellow("  You now own CORS, auth wiring, storage and shutdown. Platform runtime"));
     console.log(chalk.yellow("  upgrades no longer reach this project."));
+    console.log("");
+    console.log(chalk.dim(`  ${chalk.cyan("docker compose -f docker-compose.custom.yml up --build")}`));
+    console.log(chalk.dim("  docker-compose.yml is untouched — it still runs the managed shape if you go back."));
     console.log("");
 }
 

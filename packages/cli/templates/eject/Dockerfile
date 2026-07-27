@@ -1,55 +1,83 @@
-# Your image.
+# ─── Your image ───────────────────────────────────────────────────────
 #
-# `rebase eject` wrote this file, and it is now yours — nothing regenerates or
+# `rebase eject` wrote this file, and it is yours now — nothing regenerates or
 # updates it. The platform runtime is no longer involved: this image compiles
-# backend/src/index.ts and runs it, so CORS, auth wiring, storage and shutdown
-# are configured there rather than by the runtime.
+# and runs backend/src/index.ts, so CORS, auth wiring, storage and shutdown are
+# configured there rather than by the runtime, and Rebase runtime upgrades do
+# not reach this project.
 #
-# Build from the repository root:
-#   docker build -t {{PROJECT_NAME}} .
+# Assumes pnpm, which is what `rebase init` scaffolds a workspace for. On npm,
+# swap the three pnpm lines below for `npm ci` and `npm run build --workspace`.
+#
+# Build context: the project root (where pnpm-workspace.yaml lives)
+# Usage:
+#   docker build -t my-app .
+#   docker compose -f docker-compose.custom.yml up
+#
+# The managed alternative — no image to build, your project mounted into the
+# published runtime — is docker-compose.yml, which is still here and still
+# works if you change `runtime` back to "managed" in rebase.json.
 
-# ── Stage 1: install and build ───────────────────────────────────────────────
+# ── Stage 1: Install + Build ─────────────────────────────────────────
 FROM node:22-alpine AS builder
 
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+
+# Native dependencies for bcrypt, pg, etc.
+RUN apk add --no-cache python3 make g++ curl ca-certificates
+
 WORKDIR /app
 
-# Copied wholesale rather than package.json-first: a scaffolded project may or
-# may not have a frontend or a config package, and a COPY of a path that does
-# not exist fails the build. Layer caching is the thing traded away.
-COPY . .
+# Copy workspace root files first (cache-friendly layer)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 
-RUN npm install
+# Copy workspace packages
+COPY backend ./backend
+COPY config ./config
 
-# Collections → Drizzle schema → compiled JavaScript.
-RUN npm run build --workspace backend
+# Install all deps (including devDependencies for build)
+RUN pnpm install --frozen-lockfile
 
-# The SPA, if this project has one. REBASE_APP_BASE must match the `path` the
-# app declares in rebase.json, or index.html loads and every asset 404s.
-RUN if [ -d frontend ]; then REBASE_APP_BASE=/ npm run build --workspace frontend; fi
+# Build config first, then backend
+RUN pnpm --filter "*-config" run build
+RUN pnpm --filter "*-backend" run build
 
-RUN npm prune --omit=dev
+# Prune dev dependencies for a smaller runtime
+RUN CI=true pnpm install --frozen-lockfile --prod
 
-# ── Stage 2: runtime ─────────────────────────────────────────────────────────
+# ── Stage 2: Production Runtime ──────────────────────────────────────
 FROM node:22-alpine AS runtime
 
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 ENV NODE_ENV=production
-ENV PORT=8080
+ENV CI=true
+
+RUN corepack enable
+
+# Security: run as non-root
+RUN addgroup -g 1001 rebase && adduser -u 1001 -G rebase -s /bin/sh -D rebase
 
 WORKDIR /app
 
-# Run as a non-root user.
-RUN addgroup -g 1001 rebase && adduser -u 1001 -G rebase -s /bin/sh -D rebase
+# Copy only production artifacts
+COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/.npmrc ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/backend ./backend
+COPY --from=builder /app/config ./config
 
-COPY --from=builder /app ./
-RUN chown -R rebase:rebase /app
+# Create uploads directory
+RUN mkdir -p /app/backend/uploads && chown -R rebase:rebase /app
 
 USER rebase
 
-EXPOSE 8080
+WORKDIR /app/backend
+EXPOSE 3001
 
+# Health check for orchestrators (Docker Compose, ECS, k8s)
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
 
-# Delegates to the backend workspace's own `start` script, so this line does not
-# need to know where tsc happened to put the output.
-CMD ["npm", "start", "--workspace", "backend"]
+CMD ["pnpm", "start"]

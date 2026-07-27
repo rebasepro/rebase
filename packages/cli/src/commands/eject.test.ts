@@ -91,6 +91,34 @@ describe("rebase eject", () => {
         });
     });
 
+    it("writes a compose file that builds the image, and leaves the managed one alone", async () => {
+        // Going back should stay a one-line change in rebase.json, not a
+        // restore from git — so the scaffolded docker-compose.yml is untouched
+        // and the ejected shape lands beside it.
+        fs.writeFileSync(path.join(scratch, "docker-compose.yml"), "# managed shape\n");
+        manifestWith("managed");
+
+        await run();
+
+        expect(fs.readFileSync(path.join(scratch, "docker-compose.yml"), "utf8")).toBe("# managed shape\n");
+        const custom = fs.readFileSync(path.join(scratch, "docker-compose.custom.yml"), "utf8");
+        expect(custom).toContain("build:");
+        expect(custom).toContain("dockerfile: Dockerfile");
+    });
+
+    it("substitutes the project name into the payload", async () => {
+        // The payload carries {{PROJECT_NAME}}; shipping that literal would put
+        // a broken project name in every `docker compose ps`.
+        fs.writeFileSync(path.join(scratch, "package.json"), JSON.stringify({ name: "my-cool-app" }));
+        manifestWith("managed");
+
+        await run();
+
+        const custom = fs.readFileSync(path.join(scratch, "docker-compose.custom.yml"), "utf8");
+        expect(custom).toContain("name: my-cool-app");
+        expect(custom).not.toContain("{{PROJECT_NAME}}");
+    });
+
     it("leaves a manifest that still validates", async () => {
         // The rewrite goes through the same validator every other command uses,
         // so an eject that produced an unloadable manifest would be caught here
