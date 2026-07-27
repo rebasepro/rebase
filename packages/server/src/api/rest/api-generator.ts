@@ -7,6 +7,7 @@ import { assertKnownWriteFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
+import { createIdempotencyStore, IDEMPOTENCY_HEADER, type IdempotencyStore } from "./idempotency";
 
 /**
  * Parse a JSON request body for a create/update. An empty body yields `{}`
@@ -58,6 +59,16 @@ export class RestApiGenerator {
             maxLimit: listLimits.maxLimit ?? MAX_LIST_LIMIT
         };
         this.router = new Hono<HonoEnv>();
+    }
+
+    /**
+     * Built on first use rather than in the constructor: it probes the driver
+     * for SQL support and creates a table, and most requests never send a key.
+     */
+    private idempotencyStore?: IdempotencyStore | null;
+    private idempotency(): IdempotencyStore | undefined {
+        this.idempotencyStore ??= createIdempotencyStore(this.driver) ?? null;
+        return this.idempotencyStore ?? undefined;
     }
 
     /**
@@ -386,6 +397,20 @@ values: entity as Record<string, unknown> },
                     }, 201);
                 }
 
+                // Deliberately not applied to the auth-signup branch above: that
+                // response can carry a temporary password, and handing it out
+                // again on a replayed key is a credential disclosure the plain
+                // data path has no equivalent of.
+                const idempotencyKey = c.req.header(IDEMPOTENCY_HEADER);
+                const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
+                const store = this.idempotency();
+                if (idempotencyKey && store) {
+                    const already = await store.recall(idempotencyKey, uid);
+                    // `null` is a legitimate stored body, so presence is the
+                    // test — not truthiness.
+                    if (already !== undefined) return c.json(already as never, 201);
+                }
+
                 const entity = await driver.save({
                     path,
                     values: body,
@@ -395,7 +420,9 @@ values: entity as Record<string, unknown> },
 
                 const response = this.formatResponse(entity);
 
-
+                if (idempotencyKey && store) {
+                    await store.remember(idempotencyKey, uid, response);
+                }
 
                 return c.json(response, 201);
             } catch (error) {

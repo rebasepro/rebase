@@ -290,6 +290,27 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
  *
  * @group Data
  */
+/**
+ * Per-request options for a write.
+ * @group Data
+ */
+export interface WriteOptions {
+    /**
+     * Names this write, so re-sending it is recognised instead of repeated.
+     *
+     * A client that does not see a response cannot know whether the write
+     * committed. Retrying is therefore the only option, and without a key the
+     * server has no way to tell a retry from a second, genuinely new write — so
+     * it performs it again. On a table with a server-assigned id that is a
+     * duplicate row, because the id the client chose was never used.
+     *
+     * Set by the offline queue on every replay. Honoured for 24 hours and scoped
+     * to the authenticated user; a server that cannot store keys ignores it
+     * rather than refusing the write.
+     */
+    idempotencyKey?: string;
+}
+
 export interface SDKCollectionClient<
     M extends Record<string, unknown> = Record<string, unknown>,
     I = Partial<M>,
@@ -315,7 +336,7 @@ export interface SDKCollectionClient<
      *   columns.
      * @returns The created row
      */
-    create(data: I, id?: string | number): Promise<M>;
+    create(data: I, id?: string | number, options?: WriteOptions): Promise<M>;
 
     /**
      * Write many records in a single request and a single transaction.

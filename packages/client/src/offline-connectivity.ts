@@ -45,6 +45,22 @@ export function isRetryableError(error: unknown): boolean {
     return false;
 }
 
+/**
+ * Did this write fail because the row is already there?
+ *
+ * Matched on the SQLSTATE the server passes through (`23505`, unique_violation)
+ * and on 409, never on the message — a duplicate-key message names the
+ * constraint and the values, so it is neither stable nor safe to parse.
+ *
+ * The queue uses this to recognise its own earlier attempt. A create whose
+ * response was lost is replayed, and for a row carrying an id the SDK generated
+ * the server can only be rejecting it because the first attempt actually landed.
+ */
+export function isDuplicateKeyError(error: unknown): boolean {
+    if (!(error instanceof RebaseApiError)) return false;
+    return error.code === "23505" || error.status === 409;
+}
+
 export interface ConnectivityOptions {
     /** First retry delay after a failure. Defaults to 1 000 ms. */
     initialBackoffMs?: number;

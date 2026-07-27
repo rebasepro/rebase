@@ -3,7 +3,7 @@ import { FindResult, LogicalCondition, SDKCollectionClient, WhereFilterOp, Where
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateRow, hydrateRow } from "./offline-codec";
-import { ConnectivityMonitor, isNetworkError, isRetryableError } from "./offline-connectivity";
+import { ConnectivityMonitor, isDuplicateKeyError, isNetworkError, isRetryableError } from "./offline-connectivity";
 import {
     IndexedDBOfflineStore,
     MemoryOfflineStore,
@@ -231,6 +231,25 @@ export class OfflineManager {
     private collections = new Map<string, CollectionState>();
     /** In-memory mirror of the current scope's queue, in replay order. */
     private queue: PendingMutation[] = [];
+    /**
+     * The mutation currently on the wire, if any.
+     *
+     * `flush` awaits `replay(op)` with `op` still at the head of `queue`, so for
+     * the whole duration of that request the in-flight op is also the queue's
+     * *tail* whenever it is the only entry. Both shortcuts in `enqueue` reach
+     * for the tail, and neither may touch an op the server is already reading:
+     *
+     * - Coalescing an update into it mutates a payload that has already been
+     *   serialized and sent, and `drop` then removes the whole entry on ACK —
+     *   so the second edit is neither sent nor kept. A silently lost write.
+     * - Cancelling it out against a delete assumes the server never saw the
+     *   create. It is seeing it right now, so the row would be created and the
+     *   delete never queued — an orphan row nothing will ever remove.
+     *
+     * Guarding on the id rather than on a boolean keeps this correct if the
+     * flush loop ever sends more than one op at a time.
+     */
+    private inFlightId: string | null = null;
     private queueLoad?: Promise<void>;
     /** Serializes enqueues so concurrent writes keep the order the app made them. */
     private enqueueChain: Promise<unknown> = Promise.resolve();
@@ -520,7 +539,13 @@ export class OfflineManager {
 
             update: async (id: string | number, data: Partial<M>) => {
                 await this.ensureCollection(slug);
-                if (this.connectivity.shouldAttempt()) {
+                // Never overtake a write already queued for this row. The
+                // reads already respect the queue; the writes did not, so an
+                // edit made while the row's own create was still pending went
+                // straight to a server that had never heard of the row and came
+                // back 404 — the caller's edit failing on a row they could see.
+                // Queuing keeps the order the app issued the writes in.
+                if (this.connectivity.shouldAttempt() && !this.hasPending(slug, id)) {
                     try {
                         const row = await inner.update(id, data);
                         this.connectivity.markSuccess();
@@ -548,7 +573,10 @@ export class OfflineManager {
 
             delete: async (id: string | number) => {
                 await this.ensureCollection(slug);
-                if (this.connectivity.shouldAttempt()) {
+                // As in `update`: a delete must not overtake this row's own
+                // queued create, or it 404s and the create then lands behind
+                // it, leaving the row the caller just deleted.
+                if (this.connectivity.shouldAttempt() && !this.hasPending(slug, id)) {
                     try {
                         await inner.delete(id);
                         this.connectivity.markSuccess();
@@ -1212,6 +1240,7 @@ export class OfflineManager {
             if (mutation.type === "update") {
                 const tail = this.queue[this.queue.length - 1];
                 if (tail
+                    && tail.mutationId !== this.inFlightId
                     && tail.collection === mutation.collection
                     && (tail.type === "create" || tail.type === "update")
                     && tail.id === mutation.id) {
@@ -1233,14 +1262,19 @@ export class OfflineManager {
             // the delete must still remove), and neither do rows queued inside
             // a createMany (the bulk op replays first, then the delete).
             if (mutation.type === "delete") {
+                // An in-flight create disqualifies the shortcut entirely: the
+                // server is being told about the row as we speak, so "it never
+                // saw it" is false and the delete has to replay after it.
                 const hasPendingCreate = this.queue.some((m) =>
                     m.collection === mutation.collection && m.type === "create"
-                    && m.id === mutation.id && m.generatedId === true);
+                    && m.id === mutation.id && m.generatedId === true
+                    && m.mutationId !== this.inFlightId);
                 if (hasPendingCreate) {
                     const doomed = this.queue.filter((m) =>
                         m.collection === mutation.collection
                         && m.id === mutation.id
-                        && (m.type === "create" || m.type === "update"));
+                        && (m.type === "create" || m.type === "update")
+                        && m.mutationId !== this.inFlightId);
                     for (const op of doomed) await this.store.dequeue(this.queueKey(op));
                     this.queue = this.queue.filter((m) => !doomed.includes(m));
                     this.afterQueueChange();
@@ -1332,31 +1366,40 @@ export class OfflineManager {
             while (this.queue.length > 0 && !this.disposed) {
                 const op = this.queue[0];
                 touched.add(op.collection);
+                // Held across `drop` as well as `replay`: between the ACK and
+                // the dequeue the op is still in `queue`, still the tail, and
+                // still about to be removed — coalescing into it there loses
+                // the write exactly as coalescing during the request does.
+                this.inFlightId = op.mutationId;
                 try {
-                    await this.replay(op);
-                } catch (error) {
-                    if (isNetworkError(error)) {
-                        // Still offline — keep the op and everything behind it.
-                        this.connectivity.markFailure();
-                        break;
+                    try {
+                        await this.replay(op);
+                    } catch (error) {
+                        if (isNetworkError(error)) {
+                            // Still offline — keep the op and everything behind it.
+                            this.connectivity.markFailure();
+                            break;
+                        }
+                        op.attempts = (op.attempts ?? 0) + 1;
+                        op.lastError = (error as Error)?.message ?? String(error);
+                        if (isRetryableError(error) && op.attempts < this.maxRetries) {
+                            // The server is busy, not unhappy. Keep the op — and
+                            // its place in line, since later writes may depend on
+                            // it — and come back after a backoff.
+                            await this.store.enqueue(this.queueKey(op), op).catch(() => undefined);
+                            this.connectivity.deferRetry();
+                            this.patchStatus({ lastError: op.lastError });
+                            break;
+                        }
+                        await this.rejectMutation(op, error as Error);
+                        continue;
                     }
-                    op.attempts = (op.attempts ?? 0) + 1;
-                    op.lastError = (error as Error)?.message ?? String(error);
-                    if (isRetryableError(error) && op.attempts < this.maxRetries) {
-                        // The server is busy, not unhappy. Keep the op — and
-                        // its place in line, since later writes may depend on
-                        // it — and come back after a backoff.
-                        await this.store.enqueue(this.queueKey(op), op).catch(() => undefined);
-                        this.connectivity.deferRetry();
-                        this.patchStatus({ lastError: op.lastError });
-                        break;
-                    }
-                    await this.rejectMutation(op, error as Error);
-                    continue;
+                    this.connectivity.markSuccess();
+                    await this.drop(op);
+                    flushed++;
+                } finally {
+                    this.inFlightId = null;
                 }
-                this.connectivity.markSuccess();
-                await this.drop(op);
-                flushed++;
             }
         } finally {
             this.patchStatus({ syncing: false });
@@ -1382,7 +1425,36 @@ export class OfflineManager {
         const inner = this.innerFor(op.collection);
         if (op.type === "create") {
             // The queued row already carries its (client-generated) id.
-            const row = await inner.create(op.data as AnyRow);
+            let row: AnyRow | undefined;
+            try {
+                // The mutation id names this write, so a server that stores keys
+                // recognises a replay instead of inserting a second row. This is
+                // the only defence for a table with a server-assigned id: the id
+                // the client chose was never used, so a duplicate is invisible
+                // from here. Ignored by servers that do not support it.
+                row = await inner.create(op.data as AnyRow, undefined, { idempotencyKey: op.mutationId });
+            } catch (error) {
+                // A lost response, not a rejection. The request reached the
+                // server and committed; only the ACK went missing, so the
+                // replay finds the row already there.
+                //
+                // Restricted to ids the SDK minted: a fresh uuid cannot name a
+                // row anyone else created, so a duplicate under it is
+                // necessarily this mutation's own first attempt. A
+                // caller-supplied id carries no such guarantee — it may well
+                // collide with a row that was already there, which is a real
+                // conflict the caller has to hear about.
+                //
+                // Without this, `rejectMutation` rolled the write back and
+                // DELETED the local row — the one case where the row does exist
+                // on the server. The user watched their own saved record vanish.
+                if (!(op.generatedId === true && isDuplicateKeyError(error))) throw error;
+                row = await inner.findById(op.id!).catch(() => undefined) as AnyRow | undefined;
+                // The read can fail on its own (offline again, RLS). The row is
+                // known to exist, so keep the local copy rather than rolling
+                // back; the next refresh reconciles it.
+                if (!row) return;
+            }
             await this.adoptServerRow(op, op.id, row);
         } else if (op.type === "createMany") {
             const queued = (op.data as AnyRow[]) ?? [];

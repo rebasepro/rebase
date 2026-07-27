@@ -6,7 +6,8 @@ import {
     SDKCollectionClient,
     SDKQueryBuilderInterface,
     WhereFilterOp,
-    WhereValue
+    WhereValue,
+    WriteOptions
 } from "@rebasepro/types";
 
 import { SDKQueryBuilder } from "./sdk_query_builder";
@@ -125,14 +126,17 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             }
         },
 
-        async create(data: Partial<M>, id?: string | number) {
+        async create(data: Partial<M>, id?: string | number, options?: WriteOptions) {
             const body: Record<string, unknown> = { ...data };
             if (id !== undefined) {
                 body.id = id;
             }
             const raw = await transport.request<Record<string, unknown>>(basePath, {
                 method: "POST",
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
+                ...(options?.idempotencyKey
+                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
+                    : {})
             });
             return raw as M;
         },

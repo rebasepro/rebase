@@ -31,11 +31,24 @@ function createFakeServer() {
         return tables.get(slug)!;
     }
 
+    /**
+     * Requests parked mid-flight, keyed `${op}:${id}`. Holding a request open is
+     * the only way to reproduce anything that goes wrong *while* an op is on the
+     * wire — the queue treats an in-flight op differently from a queued one, and
+     * a fake that returns immediately can never be in that state.
+     */
+    const gates = new Map<string, Promise<void>>();
+
     function guard(slug: string, op: string, id?: unknown) {
         calls.push({ collection: slug, op, id });
         if (!state.online) throw new TypeError("fetch failed");
         const rejection = rejections.get(`${op}:${String(id)}`) ?? rejections.get(`${op}:*`);
         if (rejection) throw rejection;
+    }
+
+    /** Await after `guard`, so a parked request has already been counted. */
+    function hold(op: string, id?: unknown): Promise<void> | undefined {
+        return gates.get(`${op}:${String(id)}`);
     }
 
     function client(slug: string): CollectionClient<Row> {
@@ -51,6 +64,7 @@ function createFakeServer() {
             async create(data: Row, id?: string | number) {
                 const wanted = id ?? data.id;
                 guard(slug, "create", wanted);
+                await hold("create", wanted);
                 const rowId = idRewrites.get(String(wanted)) ?? wanted ?? `srv-${table(slug).size + 1}`;
                 const row = { ...data, id: rowId };
                 table(slug).set(String(rowId), row);
@@ -92,6 +106,7 @@ function createFakeServer() {
         client,
         rejections,
         idRewrites,
+        gates,
         countCalls: (op: string) => calls.filter((c) => c.op === op).length
     };
 }
@@ -723,5 +738,120 @@ describe("counts", () => {
         server.state.online = false;
         await posts.delete("p1");
         expect(await posts.count()).toBe(1);
+    });
+});
+
+describe("a write made while another is on the wire", () => {
+    /**
+     * `flush` awaits `replay(op)` with `op` still sitting at the head of the
+     * queue, so for the whole duration of that request the in-flight op is also
+     * the tail — and both of `enqueue`'s shortcuts reach for the tail.
+     */
+    it("does not swallow an edit that lands mid-request", async () => {
+        const server = createFakeServer();
+        const { wrap, manager } = createManager(server);
+        const posts = wrap("posts");
+
+        server.state.online = false;
+        await posts.create({ title: "first" }, "p1");
+
+        // Park the create so the edit below arrives while it is in flight.
+        let release!: () => void;
+        server.gates.set("create:p1", new Promise<void>((resolve) => { release = resolve; }));
+
+        server.state.online = true;
+        const syncing = manager.sync();
+        await settle();
+
+        await posts.update("p1", { title: "edited" });
+        release();
+        await syncing;
+        await manager.sync();
+
+        // Coalesced into the in-flight create, this edit was dropped with it on
+        // ACK: never sent, and gone from the queue. The user's second keystroke
+        // vanished with no error anywhere.
+        expect(server.table("posts").get("p1")).toMatchObject({ title: "edited" });
+    });
+
+    it("does not strand a row when a delete cancels out an in-flight create", async () => {
+        const server = createFakeServer();
+        const { wrap, manager } = createManager(server);
+        const posts = wrap("posts");
+
+        server.state.online = false;
+        const created = await posts.create({ title: "doomed" });
+        const id = String((created as Row).id);
+
+        let release!: () => void;
+        server.gates.set(`create:${id}`, new Promise<void>((resolve) => { release = resolve; }));
+
+        server.state.online = true;
+        const syncing = manager.sync();
+        await settle();
+
+        // Cancel-out assumes the server never saw the create. It is reading it
+        // right now, so the row lands — and if the delete is discarded with it,
+        // nothing will ever remove it.
+        await posts.delete(id);
+        release();
+        await syncing;
+        await manager.sync();
+
+        expect(server.table("posts").has(id)).toBe(false);
+    });
+});
+
+describe("replaying a create whose response was lost", () => {
+    it("keeps the row when the server says it is already there", async () => {
+        const server = createFakeServer();
+        const errors: Error[] = [];
+        const { wrap, manager } = createManager(server, {
+            onSyncError: (error) => errors.push(error)
+        });
+        const posts = wrap("posts");
+
+        server.state.online = false;
+        const created = await posts.create({ title: "saved" });
+        const id = String((created as Row).id);
+
+        // The first attempt committed; only the ACK was lost. The replay
+        // therefore finds the row already present.
+        server.table("posts").set(id, { id, title: "saved" });
+        server.rejections.set(`create:${id}`, new RebaseApiError("duplicate key", { status: 409, code: "23505" }));
+
+        server.state.online = true;
+        await manager.sync();
+
+        // Read with the network down, or this falls through to the server and
+        // passes on the row seeded above no matter what the local store did —
+        // which is exactly how this test first passed against the bug.
+        server.state.online = false;
+        // The old behaviour rolled the write back and deleted the local row —
+        // the one case where the row genuinely exists on the server.
+        expect(await posts.findById(id)).toMatchObject({ title: "saved" });
+        expect(errors).toHaveLength(0);
+        expect(manager.api.status().pending).toBe(0);
+    });
+
+    it("still reports a real conflict on a caller-supplied id", async () => {
+        const server = createFakeServer();
+        const errors: Error[] = [];
+        const { wrap, manager } = createManager(server, {
+            onSyncError: (error) => errors.push(error)
+        });
+        const posts = wrap("posts");
+
+        server.state.online = false;
+        // The caller chose this id, so a duplicate may well be someone else's
+        // row. Swallowing that would hide a genuine collision.
+        await posts.create({ title: "mine" }, "chosen-1");
+        server.rejections.set("create:chosen-1", new RebaseApiError("duplicate key", { status: 409, code: "23505" }));
+
+        server.state.online = true;
+        await manager.sync();
+
+        expect(errors).toHaveLength(1);
+        expect(manager.api.status().pending).toBe(0);
     });
 });
