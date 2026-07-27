@@ -47,17 +47,6 @@ export function validateProjectName(name: string): string | null {
 export type TemplatePreset = "blog" | "ecommerce" | "blank";
 
 /**
- * How much of Rebase to scaffold.
- *
- * `cms` is the full triad (config + backend + frontend). `baas` is the backend
- * alone, serving the database over REST with no collection files and no UI.
- */
-/**
- * `cms` scaffolds BaaS + the admin UI; `baas` scaffolds the API alone. The
- * values match `RebaseBackendConfig.mode`, which is what the generated backend
- * sets — the labels below are what users actually read.
- */
-/**
  * Whether to scaffold the admin panel alongside the backend.
  *
  * A boolean, not a named pair. It was `--flavor cms|baas`, and neither word
@@ -99,7 +88,6 @@ export interface InitOptions {
     preset: TemplatePreset;
     /** Whether `preset` came from an explicit --template rather than the default. */
     explicitPreset?: boolean;
-    /** Which parts of Rebase to scaffold. */
     /** Scaffold the backend alone, with no admin panel and no collections. */
     headless: boolean;
     /** Detected package manager (pnpm or npm). */
@@ -159,7 +147,7 @@ export function buildInitQuestions(params: BuildQuestionsParams): Record<string,
             message: "Choose a starter template:",
             choices: PRESET_CHOICES,
             default: "blog",
-            // BaaS has no collection files, so a collections preset is moot.
+            // A headless project has no collection files, so a preset is moot.
             when: (answers: Record<string, unknown>) => !(headlessArg ?? answers.headless)
         });
     }
@@ -726,7 +714,7 @@ async function applyHeadless(targetDirectory: string, headless: boolean): Promis
     for (const stray of ["admin.d.ts", "frontend-assets.d.ts"]) {
         fs.rmSync(path.join(targetDirectory, "config", stray), { force: true });
     }
-    // Generated from collection files in cms mode; baas reads the live schema.
+    // Generated from collection files; a headless project reads the live schema.
     fs.rmSync(path.join(targetDirectory, "backend", "src", "schema.generated.ts"), { force: true });
 
     const overlayDir = path.resolve(cliRoot!, "templates", "overlays", "baas");
