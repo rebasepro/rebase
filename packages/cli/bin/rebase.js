@@ -65,6 +65,27 @@ try {
     /* ignore */
 }
 
+/**
+ * `dist/` is gitignored, so in a fresh clone it does not exist until someone
+ * runs a build — and `rebase` is reached long before that: CONTRIBUTING's
+ * getting-started steps call `db push` and `dev` through it. Importing a
+ * missing module raises a bare ERR_MODULE_NOT_FOUND stack trace naming an
+ * internal path, which reads as a broken repository rather than a missing step.
+ *
+ * stderr, like the staleness warning above, so `--json` output stays parseable.
+ */
+if (!existsSync(distEntry)) {
+    const dev = existsSync(srcDir);
+    process.stderr.write(
+        `\x1b[31m✗ rebase CLI: not built yet — ${distEntry} is missing.\x1b[0m\n` +
+        (dev
+            ? "  Build it with: pnpm --filter @rebasepro/cli build\n" +
+              "  (or `pnpm build` from the repo root to build every package)\n"
+            : "  This install looks incomplete; try reinstalling @rebasepro/cli.\n")
+    );
+    process.exit(1);
+}
+
 const { entry } = await import("../dist/index.es.js");
 
 entry(process.argv);

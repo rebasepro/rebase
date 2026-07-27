@@ -19,26 +19,38 @@ git clone https://github.com/<your-username>/rebase.git
 cd rebase
 ```
 
-2. **Install dependencies**:
+2. **Install dependencies and build the packages**. The build is not optional:
+   the `rebase` CLI used by the next steps runs from `packages/cli/dist`, which
+   is not checked in.
 
 ```bash
 pnpm install
+pnpm run build
 ```
 
-3. **Start the database** and push the schema:
+3. **Start the database**. The compose file belongs to the example app, so run it
+   from there:
 
 ```bash
-docker compose up -d db
-pnpm run db:push
+cd app/backend && docker compose up -d db && cd ../..
 ```
 
-4. **Launch the dev server**:
+4. **Push the schema**. `db:push` reads `app/config/collections`, so it runs from
+   `app/`:
+
+```bash
+cd app && pnpm run db:push && cd ..
+```
+
+5. **Launch the dev server**:
 
 ```bash
 pnpm run dev
 ```
 
-The admin panel runs at `http://localhost:5173` and the API at `http://localhost:3001`.
+`rebase dev` picks a free port per project rather than fixed ones, and prints the
+admin panel and API URLs it settled on. Read them from its output — they differ
+between checkouts, and `PORT` / `VITE_API_URL` apply to `rebase start`, not here.
 
 ## Project Structure
 
