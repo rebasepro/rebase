@@ -71,28 +71,28 @@ afterEach(() => {
     fs.rmSync(scratch, { recursive: true, force: true });
 });
 
-describe("serveSPA with two apps in one process", () => {
-    function twoApps(): Hono {
-        return mount([
-            {
-                path: "/",
-                spa: true,
-                dir: writeApp("site", {
-                    "index.html": "SITE_INDEX",
-                    "assets/x.js": "SITE_ASSET"
-                })
-            },
-            {
-                path: "/admin",
-                spa: true,
-                dir: writeApp("admin", {
-                    "index.html": "ADMIN_INDEX",
-                    "assets/x.js": "ADMIN_ASSET"
-                })
-            }
-        ]);
-    }
+function twoApps(): Hono {
+    return mount([
+        {
+            path: "/",
+            spa: true,
+            dir: writeApp("site", {
+                "index.html": "SITE_INDEX",
+                "assets/x.js": "SITE_ASSET"
+            })
+        },
+        {
+            path: "/admin",
+            spa: true,
+            dir: writeApp("admin", {
+                "index.html": "ADMIN_INDEX",
+                "assets/x.js": "ADMIN_ASSET"
+            })
+        }
+    ]);
+}
 
+describe("serveSPA with two apps in one process", () => {
     it("serves the site at the root", async () => {
         expect((await get(twoApps(), "/")).body).toBe("SITE_INDEX");
     });
@@ -154,6 +154,26 @@ describe("serveSPA edge cases", () => {
 
         expect((await get(app, "/admin")).body).toBe("ADMIN_INDEX");
         expect((await get(app, "/admin/deep")).body).toBe("ADMIN_INDEX");
+    });
+
+    // Exclusion is by path segment, not by string prefix. As a `startsWith`
+    // these all 404'd: the root app's SPA fallback declined them and nothing
+    // else claims the path. The `/api` case needs no sibling app at all, so it
+    // reached single-SPA setups too.
+    it.each([
+        ["/administrators", "a sibling app's name"],
+        ["/apidocs", "the API base path"],
+        ["/health-tips", "an excluded probe path"]
+    ])("serves %s — it only shares a prefix with %s", async (route) => {
+        expect((await get(twoApps(), route)).body).toBe("SITE_INDEX");
+    });
+
+    it("still excludes the segment itself and everything under it", async () => {
+        const app = twoApps();
+        expect((await get(app, "/admin")).body).toBe("ADMIN_INDEX");
+        expect((await get(app, "/admin/deep/link")).body).toBe("ADMIN_INDEX");
+        expect((await get(app, "/health")).body).toBe('{"status":"ok"}');
+        expect((await get(app, "/api/things")).body).toBe('{"ok":true}');
     });
 
     it("disables itself, without throwing, when the directory is missing", async () => {

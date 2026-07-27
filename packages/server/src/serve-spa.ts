@@ -45,6 +45,10 @@ export interface ServeSPAConfig {
      * app's catch-all and be answered with the *site's* index.html under the
      * admin's URL — which reads as an admin bug for a long time.
      *
+     * Each entry excludes a path *segment*, not a string prefix: "/admin"
+     * excludes "/admin" and "/admin/x" but not "/administrators", which is an
+     * ordinary route of the app rooted at "/".
+     *
      * @example ["/health", "/ws", "/metrics", "/admin"]
      */
     excludePaths?: string[];
@@ -61,6 +65,23 @@ export interface ServeSPAConfig {
      * generator emitted a real file per route.
      */
     spa?: boolean;
+}
+
+/**
+ * Is `requestPath` the excluded path `prefix`, or something beneath it?
+ *
+ * Segment-aware on purpose. A plain `startsWith` reads "/api" as excluding
+ * "/apidocs", and "/admin" as excluding "/administrators" — both ordinary
+ * client-side routes of the app rooted at "/", both then answered with a 404
+ * because the SPA fallback declined them and nothing else claims the path.
+ * `apiBasePath` is always in the exclusion list, so this reached single-app
+ * setups too, not just the multi-app ones the list was added for.
+ */
+function isUnderPath(requestPath: string, prefix: string): boolean {
+    // "/" would exclude everything below it, which is every request.
+    const trimmed = prefix.replace(/\/+$/, "");
+    if (trimmed === "") return true;
+    return requestPath === trimmed || requestPath.startsWith(`${trimmed}/`);
 }
 
 /**
@@ -133,7 +154,7 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
     // SPA fallback - serve index.html for all non-excluded routes under basePath
     app.get(scope, async (c, next) => {
         // Skip excluded paths (API, health checks, sibling apps).
-        if (allExcludePaths.some(p => c.req.path.startsWith(p))) {
+        if (allExcludePaths.some(p => isUnderPath(c.req.path, p))) {
             return next();
         }
 
