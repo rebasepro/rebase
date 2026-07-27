@@ -1,13 +1,43 @@
 import type { RebaseServerClient } from "@rebasepro/types";
 
-let _instance: RebaseServerClient | null = null;
+/**
+ * The backing instance lives on a process-global slot, NOT in a module-local
+ * variable — because more than one copy of this module can be loaded into one
+ * process, and a module-local would leave every copy but the booting one dead.
+ *
+ * That is the normal layout under the managed runtime, not an edge case: the
+ * image ships the framework at `/app/node_modules`, while a project's bundle
+ * installs its own dependencies into `/bundle/node_modules` — and every custom
+ * function imports `defineFunction` from `@rebasepro/server`, which resolves to
+ * the bundle's transitively-installed copy. `initializeRebaseBackend()` then ran
+ * against `/app`'s copy while every function held `/bundle`'s, so `rebase.data`,
+ * `rebase.storage` and `rebase.dataAsAdmin` threw "server not initialized yet"
+ * on EVERY request, forever, in an otherwise healthy process.
+ *
+ * `Symbol.for` is the fix because its registry is per-process rather than
+ * per-module: whichever copy boots publishes here, and every other copy — same
+ * version or not — reads the same live client.
+ */
+const INSTANCE_SLOT = Symbol.for("@rebasepro/server:singleton-instance");
+
+type GlobalWithInstance = typeof globalThis & {
+    [INSTANCE_SLOT]?: RebaseServerClient | null;
+};
+
+function getInstance(): RebaseServerClient | null {
+    return (globalThis as GlobalWithInstance)[INSTANCE_SLOT] ?? null;
+}
+
+function setInstance(client: RebaseServerClient | null): void {
+    (globalThis as GlobalWithInstance)[INSTANCE_SLOT] = client;
+}
 
 /**
  * @internal Called once during server initialization to set the backing instance.
  * This is invoked by `initializeRebaseBackend()` — never call it manually.
  */
 export function _initRebase(client: RebaseServerClient): void {
-    _instance = client;
+    setInstance(client);
 }
 
 /**
@@ -18,8 +48,8 @@ export function _setRebaseMock(mockInstance: Partial<RebaseServerClient>): void 
     if (process.env.NODE_ENV !== "test") {
         throw new Error("_setRebaseMock can only be called in a test environment (NODE_ENV=test).");
     }
-    _instance = { ...(_instance || {} as RebaseServerClient),
-...mockInstance } as RebaseServerClient;
+    setInstance({ ...(getInstance() || {} as RebaseServerClient),
+...mockInstance } as RebaseServerClient);
 }
 
 /**
@@ -29,7 +59,7 @@ export function _resetRebaseMock(): void {
     if (process.env.NODE_ENV !== "test") {
         throw new Error("_resetRebaseMock can only be called in a test environment.");
     }
-    _instance = null;
+    setInstance(null);
 }
 
 /**
@@ -69,13 +99,14 @@ export function _resetRebaseMock(): void {
  */
 export const rebase: RebaseServerClient = new Proxy({} as RebaseServerClient, {
     get(_, prop) {
-        if (!_instance) {
+        const instance = getInstance();
+        if (!instance) {
             throw new Error(
                 `rebase.${String(prop)}: server not initialized yet. ` +
                 "The singleton is available after Rebase starts — don't call it at import time."
             );
         }
-        return _instance[prop as keyof RebaseServerClient];
+        return instance[prop as keyof RebaseServerClient];
     },
     set(_, prop) {
         throw new Error(

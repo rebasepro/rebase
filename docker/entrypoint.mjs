@@ -7,6 +7,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const BUNDLE = process.env.REBASE_BUNDLE || "/bundle";
@@ -68,6 +69,74 @@ if (fs.existsSync(bundlePackageJson) && !fs.existsSync(bundleModules)) {
                 "Pre-install them into the bundle at build time, or bake them into a derived image."
             );
         }
+    }
+}
+
+// ── 2b. One copy of the framework, not two ───────────────────────────────────
+//
+// The install above can leave a SECOND copy of a package this image already
+// ships inside `/bundle/node_modules` — `@rebasepro/server` arrives that way as
+// a transitive dependency of `@rebasepro/admin` and `@rebasepro/server-postgres`,
+// which nearly every project declares.
+//
+// That is not merely wasteful, it is a silent, total breakage of custom
+// functions. Every function imports `defineFunction` from `@rebasepro/server`,
+// so it resolves the BUNDLE's copy — a different module instance from the one
+// `runFromBundle` boots below. The framework singleton initialized down there is
+// invisible up here, so `rebase.data`, `rebase.dataAsAdmin` and `rebase.storage`
+// throw "server not initialized yet" on every request, in a process that is
+// otherwise perfectly healthy and reports itself ready. (Seen in production as
+// every `doc-content` route 500ing while `/api/data/*` served fine.)
+//
+// Replacing the duplicate with a symlink to the image's copy collapses the two
+// back into one module instance, because Node resolves a module's identity by
+// its real path. It is also the honest version of what was already true: the
+// image's copy is the one that boots and owns the process, so a bundle pinning a
+// different version was never actually running that version — it just got a
+// second, dead one alongside it.
+//
+// Only packages this image itself provides are redirected; everything else the
+// project declared is left exactly as installed.
+const RUNTIME_PROVIDED = [
+    "@rebasepro/server",
+    "@rebasepro/server-postgres",
+    "@rebasepro/types",
+    "@rebasepro/utils",
+    "@rebasepro/common",
+    "@rebasepro/client",
+    "@rebasepro/codegen"
+];
+
+const imageModules = path.join(path.dirname(fileURLToPath(import.meta.url)), "node_modules");
+
+for (const pkg of RUNTIME_PROVIDED) {
+    const provided = path.join(imageModules, pkg);
+    const inBundle = path.join(BUNDLE, "node_modules", pkg);
+
+    // Nothing to dedupe unless the image provides it AND the bundle installed
+    // its own real copy (an existing symlink is already this fix, re-applied).
+    if (!fs.existsSync(provided)) continue;
+    let stat;
+    try {
+        stat = fs.lstatSync(inBundle);
+    } catch {
+        continue;
+    }
+    if (stat.isSymbolicLink()) continue;
+
+    try {
+        fs.rmSync(inBundle, { recursive: true, force: true });
+        fs.symlinkSync(provided, inBundle, "dir");
+        log(`deduped ${pkg} → the runtime's own copy`);
+    } catch (err) {
+        // Non-fatal on purpose: a project with no custom functions is unaffected
+        // by the duplicate, and refusing to boot over it would turn a degraded
+        // deploy into an outage. Loud, because the degradation is subtle.
+        console.error(
+            `[entrypoint] WARNING: could not dedupe ${pkg} (${err.message}). ` +
+            "Custom functions using the `rebase` singleton may fail with " +
+            "\"server not initialized yet\"."
+        );
     }
 }
 
