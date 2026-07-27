@@ -49,9 +49,9 @@ There is **no separate admin URL** — the admin panel is part of your frontend,
 
 | Project type | What the root URL shows | Where the admin is |
 |--------------|------------------------|--------------------|
-| Default scaffold (`rebase init`, cms flavor) | The admin panel itself (login / bootstrap) | `/` — the frontend **is** the admin |
+| Default scaffold (`rebase init`) | The admin panel itself (login / bootstrap) | `/` — the frontend **is** the admin |
 | Custom product frontend | Your product app | Wherever you mount it — commonly `/admin` (see below) |
-| Backend-only (`--flavor backend`) | Nothing (API only) | Not deployed |
+| Backend-only (`rebase init --headless`) | Nothing (API only) | Not deployed |
 
 > **IMPORTANT FOR AGENTS:** On the **first visit** to a freshly deployed project's admin, Rebase shows the bootstrap screen ("Create your admin account"). The earliest-registered account receives admin privileges — the project owner should claim it immediately after deploying. Never fill this form on the user's behalf.
 

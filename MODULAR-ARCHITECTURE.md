@@ -293,11 +293,11 @@ from the framework. BaaS deployments simply never call it.
 ## Scaffolding
 
 ```bash
-rebase init my-app --flavor baas   # BaaS only:    backend/ alone, introspected
-rebase init my-app --flavor cms    # BaaS + admin: config/ + backend/ + frontend/ (default)
+rebase init my-app --headless      # backend alone, collections introspected
+rebase init my-app                 # backend + admin: config/ + backend/ + frontend/ (default)
 ```
 
-Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a missing
+Without `--headless`, `rebase init` asks. `dev`, `build`, and `start` detect a missing
 `frontend/` and run backend-only.
 
 ---
@@ -327,7 +327,7 @@ Without `--flavor`, `rebase init` asks. `dev`, `build`, and `start` detect a mis
   `SERVER_PACKAGES` in `scripts/headless-guard/check.mjs`.
   Imports that TypeScript elides because they are unused do not trip it, which
   matches runtime: backends run this same TS through tsx.
-- `e2e/tests/cli-init-baas-e2e.ts` — scaffolds `--flavor baas`, installs it from real
+- `e2e/tests/cli-init-baas-e2e.ts` — scaffolds `--headless`, installs it from real
   tarballs, creates tables the project was never told about, and checks the API serves
   them. This is the only place a scaffolded project is installed and booted
   (`workspace:*` deps resolve nowhere else), so it's what proves the template rather

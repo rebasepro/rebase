@@ -168,7 +168,7 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 
 | Option | Alias | Description |
 |--------|-------|-------------|
-| `--flavor` | `-f` | `baas` or `cms`. Picks what you get — see below. Prompts when omitted |
+| `--headless` | — | Backend only: no admin panel, no collections. Prompts when omitted |
 | `--template` | `-t` | Starter template to scaffold from |
 | `--git` | `-g` | Initialize a git repository |
 | `--install` | `-i` | Install dependencies with the detected PM |
@@ -176,14 +176,14 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 | `--introspect` | — | Auto-introspect the database after init |
 | `--yes` | `-y` | Non-interactive mode (use all defaults) |
 
-#### Flavors
+#### What gets scaffolded
 
 ```bash
-rebase init my-api   --flavor baas   # backend/ alone — REST, auth, storage, realtime, backups. No config files, no UI, no React
-rebase init my-app   --flavor cms    # config/ + backend/ + frontend/ — BaaS plus the admin panel (default)
+rebase init my-api   --headless   # backend/ alone — REST, auth, storage, realtime, backups. No collections, no UI, no React
+rebase init my-app                # config/ + backend/ + frontend/ — the backend plus the admin panel (default)
 ```
 
-`baas` introspects the collections from the database at boot rather than reading
+`--headless` introspects the collections from the database at boot rather than reading
 config files, so there is nothing to declare and nothing to keep in sync. It
 serves only tables with `ENABLE ROW LEVEL SECURITY` — a table without RLS has no
 authorization model, so serving it would hand every row to every logged-in user.
@@ -452,8 +452,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server"
 |----------|------|---------|-------------|
 | `server` | `Server` (Node `http.Server`) | — | **Required.** The HTTP server instance |
 | `app` | `Hono<HonoEnv>` | — | **Required.** The Hono application instance |
-| `mode` | `"cms" \| "baas"` | `"cms"` | How much of Rebase to run. `cms` takes collections from `collections`/`collectionsDir`; `baas` takes no collection config at all and derives them from the live database at boot, so every RLS-protected table is served with nothing to define. The schema editor is off in `baas` — it exists to write collection files back to disk. Both serve the same control plane (auth, storage, realtime, backups, cron, functions, OpenAPI); neither serves the admin SPA, which is the application's call via `serveSPA` |
-| `collections` | `CollectionConfig[]` | `[]` | Inline collection definitions |
+| `collections` | `CollectionConfig[]` | `[]` | Inline collection definitions. Declaring **none** (and no `collectionsDir`) is what makes the server derive them from the live database instead, so every RLS-protected table is served with nothing to define. There is no `mode` flag — it was removed, because it could only ever agree with this or contradict it |
 | `collectionsDir` | `string` | — | Directory to auto-discover collection files (used if `collections` is empty) |
 | `basePath` | `string` | `"/api"` | Base path for all API routes |
 | `database` | `DatabaseAdapter` | — | Database adapter (takes precedence over `bootstrappers`) |

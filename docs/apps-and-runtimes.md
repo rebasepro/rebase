@@ -905,7 +905,15 @@ the one thing the original audit got wrong.
 
 **Verify:** extend `packages/cli/src/manifest.test.ts` with a case per validation
 rule in §4.1, including each rejection message. `rebase apps list` on the
-reference app (`app/`) prints two apps and `✓ Eligible for the managed runtime.`
+reference app (`app/`) prints two apps.
+
+Note that `app/` is **`runtime: "custom"`**, not managed, and that is correct: it
+has its own 177-line `backend/src/index.ts` and `backend/Dockerfile`, built by
+`cloudbuild.yaml` and run on Cloud Run. It was briefly mislabelled `managed`
+during this work, which — once `rebase cloud deploy` started honouring the
+declared runtime (§4.9) — would have quietly switched the demo from its image to
+a bundle. Migrating the demo to the managed runtime is worth doing, and is its
+own deliberate change rather than a side effect of a manifest edit.
 
 ### Phase 2 — the template contradiction and `rebase eject`
 

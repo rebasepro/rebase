@@ -711,11 +711,10 @@ stdio: "pipe" }
  * deployed green, and answered 404 on every one of them, with the file still
  * sitting in the repository looking exactly like the server.
  *
- * A project that means to keep its own entrypoint declares the app as
- * `"type": "custom"`, which builds the repository's Dockerfile instead — which
- * is what {@link synthesizeManifest} already infers for a manifest-less repo
- * carrying one. The warning names that route rather than implying the file is
- * a mistake.
+ * A project that means to keep its own entrypoint runs `rebase eject`, which
+ * writes the entrypoint, a Dockerfile and a compose file together and flips the
+ * backend to `runtime: "custom"`. The warning names that route rather than
+ * implying the file is a mistake.
  */
 export function findUnusedServerEntry(projectRoot: string, functionsDir: string): string | undefined {
     // A project that relocated its functions keeps the entrypoint beside them,

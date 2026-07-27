@@ -89,7 +89,7 @@ Your admin panel is running at `http://localhost:5173` and the API at `http://lo
 Rebase is modular — take only the parts you want:
 
 ```bash
-pnpm dlx @rebasepro/cli init my-api --flavor baas
+pnpm dlx @rebasepro/cli init my-api --headless
 ```
 
 That scaffolds a headless backend: REST, auth, storage, realtime and backups over

@@ -4,7 +4,9 @@
     "apps": {
         "backend": {
             "type": "backend",
-            "runtime": "managed",
+            "runtime": "custom",
+            "dockerfile": "backend/Dockerfile",
+            "port": 3001,
             "config": "config",
             "functions": "backend/functions",
             "crons": "backend/crons",

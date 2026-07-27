@@ -71,7 +71,7 @@ pnpm add @rebasepro/admin
 | `useSelectionController` | Row selection state for tables |
 | `useHistory` | Snapshot change history and version revert |
 | `useBreadcrumbsController` | Breadcrumb navigation state |
-| `useCMSContext` | Access the CMS-level context |
+| `useAdminContext` | Access the admin-level context |
 | `useResolvedNavigationFrom` | Resolve navigation tree from collection configs |
 
 ### Data Import/Export

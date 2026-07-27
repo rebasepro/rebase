@@ -1,11 +1,11 @@
 ---
 name: rebase-admin
-description: Guide for navigating the Rebase admin CMS, opening entities in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open a entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access CMS-specific controllers.
+description: Guide for navigating the Rebase admin CMS, opening entities in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open a entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access admin-specific controllers.
 ---
 
 # Rebase Admin (`@rebasepro/admin`)
 
-The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles collection views, entity editing, navigation, side panels (drawers), URL routing, breadcrumbs, and the full CMS context. This skill covers the **programmatic APIs** for navigating and interacting with the admin.
+The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles collection views, entity editing, navigation, side panels (drawers), URL routing, breadcrumbs, and the full admin context. This skill covers the **programmatic APIs** for navigating and interacting with the admin.
 
 > **IMPORTANT FOR AGENTS:** All hooks in this skill must be called **inside** the `<RebaseShell>` component tree. They rely on React contexts provided by `<RebaseNavigation>`, `<SideEntityProvider>`, and `<RebaseRouteDefs>`.
 
@@ -24,7 +24,7 @@ The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles col
 | Open a entity selection dialog | `useSelectionDialog()` | `@rebasepro/admin` |
 | Open a custom side dialog | `useSideDialogsController()` | `@rebasepro/admin` |
 | Set breadcrumbs | `useBreadcrumbsController()` | `@rebasepro/admin` |
-| Access full CMS context | `useCMSContext()` | `@rebasepro/admin` |
+| Access full admin context | `useAdminContext()` | `@rebasepro/admin` |
 | Access navigation state & views | `useNavigationStateController()` | `@rebasepro/admin` |
 
 ---
@@ -538,10 +538,10 @@ type NavigationStateController = {
 
 ## 9. CMS Context (All-in-One)
 
-Use `useCMSContext()` to get the full CMS context combining the core `RebaseContext` with all CMS-specific controllers.
+Use `useAdminContext()` to get the full admin context combining the core `RebaseContext` with all admin-specific controllers.
 
 ```typescript
-import { useCMSContext } from "@rebasepro/admin";
+import { useAdminContext } from "@rebasepro/admin";
 ```
 
 ### CMSContext Type
@@ -559,7 +559,7 @@ type CMSContext = RebaseContext & {
 ### Example
 
 ```tsx
-const context = useCMSContext();
+const context = useAdminContext();
 
 // Access any controller
 context.sideEntityController.open({ path: "products", entityId: "abc" });
@@ -569,7 +569,7 @@ context.authController; // from RebaseContext
 context.data;           // DataSource from RebaseContext
 ```
 
-> **TIP:** Use `useCMSContext()` instead of `useRebaseContext()` when you need CMS controllers (side panels, navigation, URL). Use `useRebaseContext()` from `@rebasepro/app` when you only need core context (auth, data, storage).
+> **TIP:** Use `useAdminContext()` instead of `useRebaseContext()` when you need admin controllers (side panels, navigation, URL). Use `useRebaseContext()` from `@rebasepro/app` when you only need core context (auth, data, storage).
 
 ---
 
@@ -860,7 +860,7 @@ The admin package exports the following components (from `@rebasepro/admin`):
 | `useNavigationStateController()` | Access navigation state |
 | `useCollectionRegistryController()` | Look up collections by slug |
 | `useBreadcrumbsController()` | Read/set breadcrumbs |
-| `useCMSContext()` | Full CMS context (core + CMS controllers) |
+| `useAdminContext()` | Full CMS context (core + admin controllers) |
 | `useSelectionDialog()` | Open entity selection dialog |
 | `useSelectionController()` | Multi-select controller |
 | `useHistory()` | Entity version history |
