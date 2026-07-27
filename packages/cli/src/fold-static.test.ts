@@ -2,56 +2,90 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
-import { selectFoldableApp } from "./fold-static";
+import { assertBuiltForPath, foldableApps } from "./fold-static";
 
-describe("choosing which frontend to serve from the backend", () => {
+describe("choosing which frontends to serve from the backend", () => {
     it("folds the single static app", () => {
-        const { app, reason } = selectFoldableApp({
+        const { apps, skipped } = foldableApps({
             apps: {
                 backend: { type: "backend" },
                 web: { type: "static", build: "pnpm build", output: "frontend/dist" }
             }
         });
-        expect(reason).toBeUndefined();
-        expect(app?.name).toBe("web");
-        expect(app?.output).toBe("frontend/dist");
+        expect(skipped).toEqual([]);
+        expect(apps).toHaveLength(1);
+        expect(apps[0]).toMatchObject({ name: "web",
+output: "frontend/dist",
+path: "/",
+spa: true });
     });
 
-    it("declines rather than silently picking between two websites", () => {
-        const { app, reason } = selectFoldableApp({
+    it("folds every static app rather than picking one", () => {
+        // Folding used to refuse when it found two, so a project with a site and
+        // an admin panel deployed with neither.
+        const { apps } = foldableApps({
             apps: {
-                web: { type: "static", output: "a/dist" },
-                marketing: { type: "static", output: "b/dist" }
+                site: { type: "static", output: "a/dist" },
+                admin: { type: "static", output: "b/dist", path: "/admin" }
             }
         });
-        expect(app).toBeUndefined();
-        expect(reason).toMatch(/2 static apps/);
-        expect(reason).toMatch(/web/);
-        expect(reason).toMatch(/marketing/);
+        expect(apps.map(a => a.name).sort()).toEqual(["admin", "site"]);
+    });
+
+    it("orders longest path first, with the root app last", () => {
+        // The "/"-rooted app's catch-all claims everything registered after it.
+        const { apps } = foldableApps({
+            apps: {
+                site: { type: "static", output: "a/dist", path: "/" },
+                admin: { type: "static", output: "b/dist", path: "/admin" },
+                docs: { type: "static", output: "c/dist", path: "/docs/api" }
+            }
+        });
+        expect(apps.map(a => a.path)).toEqual(["/docs/api", "/admin", "/"]);
     });
 
     it("says nothing at all for a backend-only project", () => {
         // The common case. It is not a problem and must not be reported as one.
-        const { app, reason } = selectFoldableApp({ apps: { backend: { type: "backend" } } });
-        expect(app).toBeUndefined();
-        expect(reason).toBeUndefined();
+        const { apps, skipped } = foldableApps({ apps: { backend: { type: "backend" } } });
+        expect(apps).toEqual([]);
+        expect(skipped).toEqual([]);
     });
 
     it("explains a static app that declares no output", () => {
-        const { app, reason } = selectFoldableApp({ apps: { web: { type: "static", build: "x" } } });
-        expect(app).toBeUndefined();
-        expect(reason).toMatch(/no output directory/i);
+        const { apps, skipped } = foldableApps({ apps: { web: { type: "static", build: "x" } } });
+        expect(apps).toEqual([]);
+        expect(skipped[0].reason).toMatch(/no output directory/i);
+    });
+});
+
+describe("assertBuiltForPath", () => {
+    // An app mounted at /admin but built with base "/" serves index.html fine
+    // and 404s every asset: a blank page, no server error, nothing in the logs.
+    const withAssets = (src: string): string =>
+        `<!doctype html><html><head><script type="module" src="${src}"></script></head><body></body></html>`;
+
+    it("passes when the assets carry the declared prefix", () => {
+        expect(() => assertBuiltForPath(withAssets("/admin/assets/x.js"), "/admin", "admin"))
+            .not.toThrow();
     });
 
-    it("ignores admin and custom apps when choosing", () => {
-        const { app } = selectFoldableApp({
-            apps: {
-                admin: { type: "admin", output: "admin/dist" },
-                legacy: { type: "custom" },
-                web: { type: "static", output: "frontend/dist" }
-            }
-        });
-        expect(app?.name).toBe("web");
+    it("fails, naming the offending reference, when they do not", () => {
+        expect(() => assertBuiltForPath(withAssets("/assets/x.js"), "/admin", "admin"))
+            .toThrow(/declared at \/admin.*\/assets\/x\.js/s);
+    });
+
+    it("says nothing for a root-mounted app, where any absolute path is right", () => {
+        expect(() => assertBuiltForPath(withAssets("/assets/x.js"), "/", "site")).not.toThrow();
+    });
+
+    it("ignores relative references, which a sub-path build may legitimately emit", () => {
+        expect(() => assertBuiltForPath(withAssets("./assets/x.js"), "/admin", "admin"))
+            .not.toThrow();
+    });
+
+    it("does not flag author-written anchors — only script/link references", () => {
+        const html = '<!doctype html><html><body><a href="/">home</a></body></html>';
+        expect(() => assertBuiltForPath(html, "/admin", "admin")).not.toThrow();
     });
 });
 

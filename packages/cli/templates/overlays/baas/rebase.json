@@ -1,14 +1,10 @@
 {
     "$schema": "https://rebase.pro/schemas/rebase.json",
-    "runtime": "^1",
+    "rebase": "^1",
     "apps": {
         "backend": {
             "type": "backend",
-            "mode": "baas"
-        },
-        "admin": {
-            "type": "admin",
-            "mode": "hosted"
+            "runtime": "managed"
         }
     }
 }

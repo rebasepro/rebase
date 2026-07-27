@@ -91,12 +91,11 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
         const loaded = loadManifest(projectRoot);
         const backend = findBackendApp(loaded.manifest);
         if (backend) {
-            const paths = resolveBackendPaths(backend.app);
+            const paths = resolveBackendPaths(backend.app, projectRoot);
             result.REBASE_DEV_CONFIG = paths.config;
             result.REBASE_DEV_FUNCTIONS = paths.functions;
             result.REBASE_DEV_CRONS = paths.crons;
             result.REBASE_DEV_SCHEMA = paths.schema;
-            result.REBASE_DEV_MODE = paths.mode;
             result.REBASE_DEV_APP = backend.name;
         }
     } catch {
@@ -105,6 +104,8 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
     }
 
     // A project with no config package is serving an introspected database.
+    // This is the only place the distinction is decided — it was never an
+    // independent choice, which is why `backend.mode` no longer exists.
     if (!fs.existsSync(path.join(projectRoot, result.REBASE_DEV_CONFIG))) {
         result.REBASE_DEV_MODE = "baas";
     }

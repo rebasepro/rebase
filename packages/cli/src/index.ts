@@ -4,6 +4,7 @@ export * from "./commands/schema";
 export * from "./commands/db";
 export * from "./commands/dev";
 export * from "./commands/build";
+export * from "./commands/eject";
 export * from "./commands/start";
 export * from "./commands/auth";
 export * from "./commands/doctor";

@@ -207,7 +207,7 @@ async function deployBundle(opts: {
             projectRoot,
             appName: backend!.name,
             app: backend!.app,
-            runtimeRange: loaded.manifest.runtime,
+            runtimeRange: loaded.manifest.rebase,
             skipTypeCheck: opts.skipTypeCheck,
             log: (m: string) => console.log(chalk.gray(m))
         });
@@ -226,8 +226,10 @@ async function deployBundle(opts: {
                 bundleDir,
                 log: (m: string) => console.log(m)
             });
-            if (folded) {
-                console.log(chalk.gray(`  folded ${folded.appName} in (${folded.fileCount} file(s), served at /)`));
+            for (const outcome of folded) {
+                console.log(chalk.gray(
+                    `  folded ${outcome.appName} in (${outcome.fileCount} file(s), served at ${outcome.path})`
+                ));
             }
         } catch (err) {
             fail(

@@ -17,12 +17,12 @@ import path from "path";
 import arg from "arg";
 import chalk from "chalk";
 import { execa } from "execa";
-import type { RebaseAppConfig, RebaseStaticAppConfig, RebaseAdminAppConfig } from "@rebasepro/types";
+import type { RebaseAppConfig, RebaseStaticAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { buildableApps, findBackendApp, loadManifest, ManifestError } from "../manifest";
 import { buildBundle, buildStaticBundle, DEFAULT_BUNDLE_DIR } from "../bundle";
-import { foldFrontendIntoBundle } from "../fold-static";
+import { assertBuiltForPath, foldFrontendIntoBundle } from "../fold-static";
 
 function printHelp(): void {
     console.log(`
@@ -132,7 +132,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 appName: name,
                 app,
                 outDir: args["--out"],
-                runtimeRange: manifest.runtime,
+                runtimeRange: manifest.rebase,
                 skipTypeCheck: args["--skip-type-check"],
                 skipSchema: args["--skip-schema"]
             });
@@ -145,10 +145,10 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 console.log(chalk.dim("      These cannot run on the managed runtime. See `rebase doctor`."));
             }
 
-            /* Fold the project's frontend into the backend bundle, so ONE runtime
-               serves the site at `/` and the API at `/api` — the shape the
-               scaffolded template produces and the shape a custom container
-               already had.
+            /* Fold the project's static apps into the backend bundle, so ONE
+               runtime serves the site at `/`, the admin at `/admin` and the API
+               at `/api` — the shape the scaffolded template produces and the
+               shape a custom container already had.
 
                Without this, moving a project to the managed runtime silently
                removed its website: the API answered perfectly and every page
@@ -169,17 +169,15 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                     console.error(chalk.red(`    ✗ ${err instanceof Error ? err.message : String(err)}`));
                     process.exit(1);
                 });
-                if (folded) {
+                for (const outcome of folded ?? []) {
                     console.log(
-                        chalk.green(`    ✓ ${folded.appName} folded in`) +
-                        chalk.dim(` (${folded.fileCount} file(s) → served at /)`)
+                        chalk.green(`    ✓ ${outcome.appName} folded in`) +
+                        chalk.dim(` (${outcome.fileCount} file(s) → served at ${outcome.path})`)
                     );
                 }
             }
-        } else if (app.type === "static" || app.type === "admin") {
-            await buildAssetApp(projectRoot, name, app, manifest.runtime, args["--out"]);
-        } else if (app.type === "custom") {
-            console.log(chalk.dim("  custom container — built at deploy time from its Dockerfile"));
+        } else if (app.type === "static") {
+            await buildAssetApp(projectRoot, name, app, manifest.rebase, args["--out"]);
         }
 
         console.log("");
@@ -189,10 +187,10 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
 }
 
 /**
- * Build a static or bundled-admin app and package it into a static bundle.
+ * Build a static app and package it into a static bundle.
  *
  * Runs the app's own build command, checks it produced the declared output, then
- * packages that output into a `static`-mode bundle — the same deployable shape as
+ * packages that output into a `static`-kind bundle — the same deployable shape as
  * a backend bundle, so a frontend or admin app deploys through the identical
  * path and runs on the identical image, just serving files instead of an API.
  */
@@ -203,12 +201,8 @@ async function buildAssetApp(
     runtimeRange: string,
     outOverride?: string
 ): Promise<void> {
-    const asset = app as RebaseStaticAppConfig | RebaseAdminAppConfig;
-
-    if (app.type === "admin" && (app as RebaseAdminAppConfig).mode !== "bundled") {
-        console.log(chalk.dim("  hosted admin panel — nothing to build"));
-        return;
-    }
+    const asset = app as RebaseStaticAppConfig;
+    const basePath = asset.path ?? "/";
 
     if (!asset.build) {
         console.log(chalk.dim("  no build command declared — skipping"));
@@ -219,7 +213,13 @@ async function buildAssetApp(
         await execa(asset.build, {
             cwd: projectRoot,
             stdio: "inherit",
-            shell: true
+            shell: true,
+            // See `assertBuiltForPath` — the declared path is a build input.
+            env: {
+                REBASE_APP_PATH: basePath,
+                REBASE_APP_BASE: basePath === "/" ? "/" : `${basePath}/`,
+                REBASE_APP_NAME: name
+            }
         });
     } catch {
         console.error(chalk.red(`  ✗ build command failed for "${name}"`));
@@ -239,14 +239,37 @@ async function buildAssetApp(
         process.exit(1);
     }
 
+    // The assets were built for `basePath`; refusing here is the difference
+    // between a build error and a blank page nobody can diagnose.
+    const indexHtml = path.join(outputPath, "index.html");
+    if (fs.existsSync(indexHtml)) {
+        try {
+            assertBuiltForPath(fs.readFileSync(indexHtml, "utf8"), basePath, name);
+        } catch (err) {
+            console.error(chalk.red(`  ✗ ${err instanceof Error ? err.message : String(err)}`));
+            process.exit(1);
+        }
+    }
+
     // Per-app bundle directory, so a project's several static apps do not clobber
     // one another or the backend's `dist-bundle`.
     const outDir = outOverride
         ? path.resolve(process.cwd(), outOverride)
         : path.join(projectRoot, `dist-bundle-${name}`);
-    const result = buildStaticBundle({ projectRoot, appName: name, assetsDir: outputPath, outDir, runtimeRange });
+    const result = buildStaticBundle({
+        projectRoot,
+        appName: name,
+        assetsDir: outputPath,
+        outDir,
+        runtimeRange,
+        path: basePath,
+        spa: asset.spa ?? true
+    });
     const rel = path.relative(projectRoot, result.outDir);
-    console.log(chalk.green(`  ✓ static bundle → ${rel}/`) + chalk.dim(` (${result.fileCount} file(s))`));
+    console.log(
+        chalk.green(`  ✓ static bundle → ${rel}/`) +
+        chalk.dim(` (${result.fileCount} file(s) → served at ${basePath})`)
+    );
 }
 
 /** The pre-manifest behaviour: build every workspace package. */

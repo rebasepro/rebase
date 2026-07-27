@@ -2,12 +2,9 @@
     "name": "{{PROJECT_NAME}}-backend",
     "version": "1.0.0",
     "description": "Rebase backend with PostgreSQL",
-    "main": "src/index.ts",
     "type": "module",
     "scripts": {
-        "dev": "tsx watch --include=\"../config/**/*\" --include=\"./functions/**/*\" src/index.ts",
-        "build": "rebase schema generate --collections ../config/collections && tsc",
-        "start": "node dist/backend/src/index.js"
+        "build": "rebase schema generate --collections ../config/collections && tsc"
     },
     "dependencies": {
         "{{PROJECT_NAME}}-config": "*",

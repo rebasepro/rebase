@@ -1,5 +1,6 @@
 packages:
   - "backend"
+  - "config"
 linkWorkspacePackages: true
 blockExoticSubdeps: false
 minimumReleaseAge: 0

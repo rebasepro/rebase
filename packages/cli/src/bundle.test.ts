@@ -315,43 +315,94 @@ describe("folding a frontend into the backend bundle", () => {
         return dir;
     }
 
+    const fold = (bundleDir: string, assetsDir: string, over: Partial<{
+        appName: string;
+        path: string;
+        spa: boolean;
+    }> = {}) => foldStaticIntoBundle({
+        bundleDir,
+        assetsDir,
+        appName: over.appName ?? "web",
+        path: over.path ?? "/",
+        spa: over.spa ?? true
+    });
+
     it("copies the assets in and records them in the manifest", () => {
         // The runtime finds the site through `entry.static`, not by guessing a
         // directory name — so copying without recording serves nothing.
         const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: { config: "config" } });
         const assetsDir = assets({ "index.html": "<html>", "assets/app.js": "//", "assets/logo.svg": "<svg>" });
 
-        const { fileCount } = foldStaticIntoBundle({ bundleDir, assetsDir });
+        const { fileCount } = fold(bundleDir, assetsDir);
 
         expect(fileCount).toBe(3);
-        expect(fs.existsSync(path.join(bundleDir, "static", "index.html"))).toBe(true);
-        expect(fs.existsSync(path.join(bundleDir, "static", "assets", "app.js"))).toBe(true);
+        expect(fs.existsSync(path.join(bundleDir, "static", "web", "index.html"))).toBe(true);
+        expect(fs.existsSync(path.join(bundleDir, "static", "web", "assets", "app.js"))).toBe(true);
         const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
-        expect(manifest.entry.static).toBe("static");
+        expect(manifest.entry.static).toEqual([{ path: "/",
+dir: "static/web",
+spa: true }]);
         // And it does not lose what was already there.
         expect(manifest.entry.config).toBe("config");
     });
 
-    it("replaces a previous fold rather than merging into it", () => {
+    it("appends a second app instead of replacing the first", () => {
+        // `entry.static` used to be one string and folding overwrote it, so the
+        // second app silently replaced the first — in the tree AND the manifest
+        // — and the bundle deployed looking complete.
+        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
+        fold(bundleDir, assets({ "index.html": "site" }), { appName: "site", path: "/" });
+        fold(bundleDir, assets({ "index.html": "admin" }), { appName: "admin", path: "/admin" });
+
+        expect(fs.readFileSync(path.join(bundleDir, "static", "site", "index.html"), "utf8")).toBe("site");
+        expect(fs.readFileSync(path.join(bundleDir, "static", "admin", "index.html"), "utf8")).toBe("admin");
+
+        const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
+        expect(manifest.entry.static).toEqual([
+            { path: "/", dir: "static/site", spa: true },
+            { path: "/admin", dir: "static/admin", spa: true }
+        ]);
+    });
+
+    it("replaces a previous fold of the SAME app rather than merging into it", () => {
         // A stale asset from the last build served alongside the new ones is a
         // cache bug that survives a deploy, which is the worst kind.
         const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
-        foldStaticIntoBundle({ bundleDir, assetsDir: assets({ "old.html": "old" }) });
-        foldStaticIntoBundle({ bundleDir, assetsDir: assets({ "new.html": "new" }) });
+        fold(bundleDir, assets({ "old.html": "old" }));
+        fold(bundleDir, assets({ "new.html": "new" }));
 
-        expect(fs.existsSync(path.join(bundleDir, "static", "new.html"))).toBe(true);
-        expect(fs.existsSync(path.join(bundleDir, "static", "old.html"))).toBe(false);
+        expect(fs.existsSync(path.join(bundleDir, "static", "web", "new.html"))).toBe(true);
+        expect(fs.existsSync(path.join(bundleDir, "static", "web", "old.html"))).toBe(false);
+
+        const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
+        expect(manifest.entry.static).toHaveLength(1);
+    });
+
+    it("does not disturb a sibling app when one is rebuilt", () => {
+        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
+        fold(bundleDir, assets({ "index.html": "admin" }), { appName: "admin", path: "/admin" });
+        fold(bundleDir, assets({ "index.html": "site v2" }), { appName: "site", path: "/" });
+
+        expect(fs.readFileSync(path.join(bundleDir, "static", "admin", "index.html"), "utf8")).toBe("admin");
+    });
+
+    it("records spa: false so a static site keeps its 404s", () => {
+        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
+        fold(bundleDir, assets({ "index.html": "site" }), { appName: "docs", path: "/docs", spa: false });
+
+        const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
+        expect(manifest.entry.static[0].spa).toBe(false);
     });
 
     it("refuses a bundle that has not been built", () => {
         const empty = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-fold-empty-"));
-        expect(() => foldStaticIntoBundle({ bundleDir: empty, assetsDir: assets({ "a.html": "a" }) }))
+        expect(() => fold(empty, assets({ "a.html": "a" })))
             .toThrow(/build the backend bundle first/i);
     });
 
     it("refuses assets that do not exist, rather than shipping an empty site", () => {
         const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
-        expect(() => foldStaticIntoBundle({ bundleDir, assetsDir: path.join(bundleDir, "nope") }))
+        expect(() => fold(bundleDir, path.join(bundleDir, "nope")))
             .toThrow(/No built assets/i);
     });
 });

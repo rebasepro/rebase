@@ -81,15 +81,11 @@ permissive: true }
 function describeApp(app: RebaseAppConfig): string {
     switch (app.type) {
         case "backend":
-            return `config: ${app.config ?? "config"}, mode: ${app.mode ?? "cms"}`;
+            return app.runtime === "custom"
+                ? `custom runtime — ${app.dockerfile ?? "Dockerfile"}`
+                : `managed runtime, config: ${app.config ?? "config"}`;
         case "static":
-            return `${app.root} → ${app.output}`;
-        case "admin":
-            return app.mode === "bundled" ? `bundled → ${app.output ?? "?"}` : "hosted by the platform";
-        case "mobile":
-            return app.platform;
-        case "custom":
-            return app.dockerfile ?? "Dockerfile";
+            return `${app.root} → ${app.output} @ ${app.path ?? "/"}`;
         default:
             return "";
     }
@@ -104,7 +100,7 @@ async function listApps(asJson: boolean): Promise<void> {
         console.log(JSON.stringify(
             {
                 source: loaded.source,
-                runtime: loaded.manifest.runtime,
+                rebase: loaded.manifest.rebase,
                 apps: loaded.manifest.apps,
                 managed: compatibility
             },
@@ -119,7 +115,7 @@ async function listApps(asJson: boolean): Promise<void> {
         console.log(chalk.dim(`Run ${chalk.cyan("rebase apps init")} to write it down.\n`));
     }
 
-    console.log(chalk.bold(`Runtime  ${loaded.manifest.runtime}`));
+    console.log(chalk.bold(`Rebase   ${loaded.manifest.rebase}`));
     console.log("");
 
     const entries = Object.entries(loaded.manifest.apps);

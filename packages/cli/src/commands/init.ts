@@ -700,15 +700,28 @@ async function createProject(options: InitOptions) {
 /**
  * Reduce the scaffolded project to the chosen flavor.
  *
- * The base template is the full CMS triad. `baas` drops the frontend and the
- * collections config entirely — there is nothing to define, since the server
- * derives its API from the database — and overlays the files that differ.
+ * The base template is the full triad. `baas` drops the frontend and the
+ * declared collections — there is nothing to define, since the server derives
+ * its API from the database — and overlays the files that differ.
+ *
+ * The config *package* stays, holding only `storageAuthorize`. Storage is not
+ * under row-level security, so a deployment with file storage enabled and no
+ * access model serves every user's files to every signed-in user; the server
+ * refuses to boot in that state. Deleting the package outright would leave a
+ * headless project with nowhere to put the hook, and the scaffold's own
+ * docker-compose.yml enables storage — so the first `docker compose up` would
+ * crash-loop.
  */
 async function applyFlavor(targetDirectory: string, flavor: TemplateFlavor): Promise<void> {
     if (flavor !== "baas") return;
 
-    for (const dir of ["frontend", "config"]) {
-        fs.rmSync(path.join(targetDirectory, dir), { recursive: true, force: true });
+    fs.rmSync(path.join(targetDirectory, "frontend"), { recursive: true, force: true });
+    // Collections only. `rebase build` reads the absence of this directory as
+    // "introspect from the database", and the overlay replaces config/index.ts
+    // with one that exports the storage hook alone.
+    fs.rmSync(path.join(targetDirectory, "config", "collections"), { recursive: true, force: true });
+    for (const stray of ["admin.d.ts", "frontend-assets.d.ts"]) {
+        fs.rmSync(path.join(targetDirectory, "config", stray), { force: true });
     }
     // Generated from collection files in cms mode; baas reads the live schema.
     fs.rmSync(path.join(targetDirectory, "backend", "src", "schema.generated.ts"), { force: true });

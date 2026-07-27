@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 
 import { detectStorageAuthorize } from "../bundle";
 import { storageAuthorize } from "../../templates/template/config/storage";
-import { storageAuthorize as baasStorageAuthorize } from "../../templates/overlays/baas/backend/src/storage";
+import { storageAuthorize as baasStorageAuthorize } from "../../templates/overlays/baas/config/storage";
 import type { StorageAuthorizeContext } from "@rebasepro/types";
 
 /**
@@ -43,11 +43,15 @@ describe("the scaffolded project declares a storage access model", () => {
         expect(detectStorageAuthorize(path.join(templateRoot, "config"))).toBe(true);
     });
 
-    it("passes it to initializeRebaseBackend", () => {
+    it("passes it to initializeRebaseBackend once ejected", () => {
         // Exporting it is what the host checks; passing it is what actually stops
         // the boot guard. They are separate mistakes.
+        //
+        // A managed project has no entrypoint of its own — the runtime reads the
+        // export above. The entrypoint exists only after `rebase eject`, and it
+        // has to wire the hook itself, so the payload is what is checked here.
         const backend = fs.readFileSync(
-            path.join(templateRoot, "backend/src/index.ts"),
+            path.resolve(here, "../../templates/eject/backend/src/index.ts"),
             "utf8"
         );
         expect(backend).toMatch(/^\s*storageAuthorize,?\s*$/m);
@@ -144,29 +148,31 @@ describe("the template's storageAuthorize", () => {
 });
 
 /**
- * The BaaS flavour has the same exposure and less covering it.
+ * The headless flavour has the same exposure and less covering it.
  *
- * `applyFlavor` deletes `config/` — BaaS derives collections from the live database —
- * so the hook cannot live in a config package and has to sit in `backend/src/`. The
- * overlay ships no docker-compose.yml of its own either, so it *inherits* the one
- * that sets `NODE_ENV: production` and `FORCE_LOCAL_STORAGE: true`, and the boot
- * guard applies exactly as it does to the CMS flavour.
+ * `applyFlavor` deletes `config/collections` — headless derives collections from the
+ * live database — but keeps the config *package*, because that is the only place the
+ * managed runtime looks for the hook. The overlay ships no docker-compose.yml of its
+ * own either, so it *inherits* the one that sets `NODE_ENV: production` and
+ * `FORCE_LOCAL_STORAGE: true`, and the boot guard applies exactly as it does to the
+ * full flavour.
  *
  * Nothing exercises this: `cli-init-baas-e2e.ts` boots the project directly and never
  * runs `docker compose up`, so the crash-loop would only ever be found by a user.
  */
 describe("the scaffolded BaaS project declares a storage access model", () => {
-    const overlayBackend = path.resolve(here, "../../templates/overlays/baas/backend/src");
+    const overlayConfig = path.resolve(here, "../../templates/overlays/baas/config");
 
-    it("passes storageAuthorize to initializeRebaseBackend", () => {
-        const index = fs.readFileSync(path.join(overlayBackend, "index.ts"), "utf8");
-        expect(index).toMatch(/^\s*storageAuthorize,?\s*$/m);
-        expect(index).toContain('from "./storage.js"');
+    it("exports storageAuthorize from the config package the runtime reads", () => {
+        // The real detector, exactly as in the full flavour above.
+        expect(detectStorageAuthorize(overlayConfig)).toBe(true);
     });
 
-    it("does not rely on a config package, which this flavour deletes", () => {
-        const index = fs.readFileSync(path.join(overlayBackend, "index.ts"), "utf8");
-        expect(index).not.toContain("../../config/");
+    it("declares no collections, which is what makes this flavour headless", () => {
+        // `rebase build` reads the absence of this directory as "introspect from
+        // the live database". The config package itself must survive.
+        expect(fs.existsSync(path.join(overlayConfig, "collections"))).toBe(false);
+        expect(fs.existsSync(path.join(overlayConfig, "index.ts"))).toBe(true);
     });
 
     const ask = (

@@ -2,12 +2,9 @@
     "name": "{{PROJECT_NAME}}-backend",
     "version": "1.0.0",
     "description": "Rebase BaaS — headless PostgreSQL API",
-    "main": "src/index.ts",
     "type": "module",
     "scripts": {
-        "dev": "tsx watch --include=\"./functions/**/*\" src/index.ts",
-        "build": "tsc",
-        "start": "node dist/index.js"
+        "build": "tsc"
     },
     "dependencies": {
         "@rebasepro/server": "workspace:*",

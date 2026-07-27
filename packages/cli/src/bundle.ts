@@ -734,7 +734,7 @@ export function findUnusedServerEntry(projectRoot: string, functionsDir: string)
  */
 export async function buildBundle(options: BuildBundleOptions): Promise<BuildBundleResult> {
     const { projectRoot, app, appName } = options;
-    const paths = resolveBackendPaths(app);
+    const paths = resolveBackendPaths(app, projectRoot);
     const outDir = path.resolve(projectRoot, options.outDir ?? DEFAULT_BUNDLE_DIR);
 
     const includes: string[] = [];
@@ -742,7 +742,9 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
         if (fs.existsSync(path.join(projectRoot, relative))) includes.push(pattern);
     };
 
-    if (paths.mode === "cms") {
+    // The whole config package, not just its collections: a headless project
+    // has no `config/collections` but still ships `storageAuthorize` here.
+    if (paths.hasConfig) {
         addIfExists(paths.config, `${paths.config}/**/*.ts`);
     }
     addIfExists(paths.functions, `${paths.functions}/**/*.ts`);
@@ -763,7 +765,7 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
     // The template's backend build did this, so a project moving to the bundle
     // flow would otherwise silently ship whatever `schema.generated.ts` happened
     // to be on disk — stale by exactly the edits just made.
-    if (paths.mode === "cms" && options.skipSchema !== true) {
+    if (paths.hasCollections && options.skipSchema !== true) {
         await regenerateSchema(projectRoot, paths.config, options);
     }
 
@@ -772,7 +774,7 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
     const unusedEntry = findUnusedServerEntry(projectRoot, paths.functions);
     if (unusedEntry) {
         const parts = [
-            ...(paths.mode === "cms" ? [`${paths.config}/`] : []),
+            ...(paths.hasCollections ? [`${paths.config}/`] : []),
             `${paths.functions}/`,
             "the schema"
         ];
@@ -780,7 +782,7 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
         console.log(chalk.yellow(`  ⚠ ${unusedEntry} is not the bundle's entry point — it is not compiled or shipped.`));
         console.log(chalk.dim(`      The runtime boots the bundle itself and mounts ${compiled}.`));
         console.log(chalk.dim(`      Routes defined there will not exist once deployed: move them to ${paths.functions}/,`));
-        console.log(chalk.dim(`      or declare this app as "type": "custom" in rebase.json to keep your own entrypoint.`));
+        console.log(chalk.dim(`      or run \`rebase eject\` to make this file the entrypoint and own the image.`));
     }
 
     log(options, chalk.dim(`  compiling ${includes.length} source group(s) → ${path.relative(projectRoot, outDir)}/`));
@@ -824,13 +826,14 @@ stdio: "inherit" });
     const compiledCollectionsDir = path.join(compiledConfigDir, "collections");
 
     let collections: CollectionConfig[] = [];
-    if (paths.mode === "cms") {
+    if (paths.hasCollections) {
         collections = await loadSourceCollections(path.join(projectRoot, paths.config, "collections"));
         if (collections.length === 0) {
             throw new Error(
                 "No collections were found in " +
                 `${path.join(paths.config, "collections")}. ` +
-                "A cms-mode project must define at least one collection."
+                "Define at least one collection there, or remove the directory to have the " +
+                "runtime introspect collections from the live database instead."
             );
         }
         if (!fs.existsSync(compiledCollectionsDir)) {
@@ -856,21 +859,21 @@ stdio: "inherit" });
             builtAgainst: resolveServerVersion(projectRoot),
             contract: RUNTIME_CONTRACT_VERSION
         },
-        // A `baas` build genuinely does not know the schema — collections are
-        // introspected from the live database at boot. Recording a version here
-        // would stamp the hash of an empty list, and the runtime would then
-        // serve that as the identity of whatever it actually found. Empty means
-        // "ask the runtime", which is the honest answer.
-        schemaVersion: paths.mode === "baas" ? "" : computeSchemaVersion(collections),
+        // A build with no config directory genuinely does not know the schema —
+        // collections are introspected from the live database at boot. Recording
+        // a version here would stamp the hash of an empty list, and the runtime
+        // would then serve that as the identity of whatever it actually found.
+        // Empty means "ask the runtime", which is the honest answer.
+        schemaVersion: paths.hasCollections ? computeSchemaVersion(collections) : "",
         app: appName,
-        mode: paths.mode,
+        kind: "backend",
         entry: {
-            config: paths.mode === "cms" ? relative(paths.config) : undefined,
-            collections: paths.mode === "cms" ? relative(path.join(paths.config, "collections")) : undefined,
+            config: paths.hasConfig ? relative(paths.config) : undefined,
+            collections: paths.hasCollections ? relative(path.join(paths.config, "collections")) : undefined,
             functions: relative(paths.functions),
             crons: relative(paths.crons),
             schema: relative(schemaOut),
-            usersCollection: paths.mode === "cms"
+            usersCollection: paths.hasCollections
                 ? relative(path.join(paths.config, `${paths.usersCollection}.js`))
                 : undefined
         },
@@ -961,8 +964,14 @@ export function foldStaticIntoBundle(options: {
     bundleDir: string;
     /** Directory of built frontend assets (the static app's `output`). */
     assetsDir: string;
-}): { fileCount: number } {
-    const { bundleDir, assetsDir } = options;
+    /** The app's name in `rebase.json`. Names its directory inside the bundle. */
+    appName: string;
+    /** Public base path this app is served under. */
+    path: string;
+    /** Serve `index.html` for unmatched paths under `path`. */
+    spa: boolean;
+}): { fileCount: number; dir: string } {
+    const { bundleDir, assetsDir, appName, path: basePath, spa } = options;
     const manifestPath = path.join(bundleDir, "manifest.json");
     if (!fs.existsSync(manifestPath)) {
         throw new Error(`No manifest at ${manifestPath} — build the backend bundle first.`);
@@ -971,15 +980,20 @@ export function foldStaticIntoBundle(options: {
         throw new Error(`No built assets at ${assetsDir}.`);
     }
 
-    const staticOut = path.join(bundleDir, "static");
+    // Each app gets its own directory, and only its own is cleared. Folding used
+    // to wipe `static/` wholesale and write a single `entry.static` string, so a
+    // second app silently replaced the first — both in the tree and in the
+    // manifest — and the bundle deployed looking complete.
+    const dir = path.posix.join("static", appName);
+    const staticOut = path.join(bundleDir, "static", appName);
     fs.rmSync(staticOut, { recursive: true, force: true });
     fs.mkdirSync(staticOut, { recursive: true });
     fs.cpSync(assetsDir, staticOut, { recursive: true });
 
     let fileCount = 0;
-    const count = (dir: string): void => {
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-            if (entry.isDirectory()) count(path.join(dir, entry.name));
+    const count = (target: string): void => {
+        for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
+            if (entry.isDirectory()) count(path.join(target, entry.name));
             else fileCount++;
         }
     };
@@ -988,10 +1002,17 @@ export function foldStaticIntoBundle(options: {
     // Record it, because the runtime finds the assets through the manifest —
     // not by guessing a directory name.
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as RebaseBundleManifest;
-    manifest.entry = { ...manifest.entry, static: "static" };
+    const existing = (manifest.entry?.static ?? []).filter(entry => entry.dir !== dir);
+    manifest.entry = {
+        ...manifest.entry,
+        static: [...existing, { path: basePath,
+dir,
+spa }]
+    };
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
-    return { fileCount };
+    return { fileCount,
+dir };
 }
 
 export function buildStaticBundle(options: {
@@ -1000,8 +1021,13 @@ export function buildStaticBundle(options: {
     assetsDir: string;
     outDir: string;
     runtimeRange: string;
+    /** Public base path. Default `/` — a standalone bundle owns its origin. */
+    path?: string;
+    /** Serve `index.html` for unmatched paths. Default `true`. */
+    spa?: boolean;
 }): { outDir: string; manifest: RebaseBundleManifest; fileCount: number } {
     const { projectRoot, appName, assetsDir, outDir, runtimeRange } = options;
+    const basePath = options.path ?? "/";
 
     cleanOutDir(projectRoot, outDir);
 
@@ -1028,8 +1054,14 @@ export function buildStaticBundle(options: {
         // A static app has no collections and therefore no schema contract.
         schemaVersion: "",
         app: appName,
-        mode: "static",
-        entry: { static: "static" },
+        kind: "static",
+        // Normally `/` — a standalone bundle owns its origin. It carries the
+        // app's declared path rather than hardcoding one so that the bundle
+        // agrees with what the assets were actually *built* for; serving a
+        // `/admin`-built app at `/` is the blank-page failure in reverse.
+        entry: { static: [{ path: basePath,
+dir: "static",
+spa: options.spa ?? true }] },
         hooks: { native: false },
         // Nothing to install beside a static bundle — it is just files.
         deps: { declared: {} },

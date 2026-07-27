@@ -30,25 +30,43 @@
  *
  * - `backend` — the collections/hooks/functions that define the project's API.
  *   Exactly one per *project* (not per repository); the registry enforces it.
- * - `static`  — a pre-built client bundle (SPA, static site) served over CDN.
- * - `admin`   — the Rebase admin panel, either hosted by the platform or built
- *   into this repository.
- * - `mobile`  — a native app. Registration only: it gets client credentials and
- *   configuration, and is never built or hosted here.
- * - `custom`  — an arbitrary container image built from a Dockerfile. The eject
- *   hatch: full control, no managed-runtime guarantees.
+ * - `static`  — a pre-built client bundle (SPA, static site), served from the
+ *   backend process at its declared `path` or from a CDN. The admin panel is
+ *   one of these: it is an app in the user's repository like any other.
+ *
+ * That is the whole list. Ownership of the server process is a property of the
+ * backend app ({@link RebaseBackendAppConfig.runtime}), not an app type.
  */
-export type RebaseAppType = "backend" | "static" | "admin" | "mobile" | "custom";
+export type RebaseAppType = "backend" | "static";
 
 /**
  * The backend app: the project's API surface.
  *
  * Paths are relative to the directory holding `rebase.json`. The defaults match
  * the layout `rebase init` scaffolds, so a stock project may declare simply
- * `{ "type": "backend" }`.
+ * `{ "type": "backend", "runtime": "managed" }`.
  */
 export interface RebaseBackendAppConfig {
     type: "backend";
+    /**
+     * Who owns the process this backend runs in.
+     *
+     * - `managed` — the platform's runtime image boots this project's bundle.
+     *   You supply collections, functions, crons and schema; Rebase supplies the
+     *   server.
+     * - `custom` — this repository builds its own image and entrypoint. The
+     *   escape hatch: full control, no managed-runtime guarantees.
+     *
+     * Independent of *where* it runs. Both run on Rebase Cloud and both
+     * self-host — the destination lives in `.rebase/cloud.json`, not here. See
+     * `docker/docker-compose.selfhost.yml`, which boots a managed bundle on a
+     * developer's own Docker host.
+     *
+     * This is authored rather than inferred on purpose. It is the single most
+     * consequential fact about a deployment, and inferring it is what used to
+     * land projects on the custom runtime without anyone choosing it.
+     */
+    runtime: "managed" | "custom";
     /** Directory of the config package (collections + index). Default `config`. */
     config?: string;
     /** Directory of server functions. Default `backend/functions`. */
@@ -61,22 +79,24 @@ export interface RebaseBackendAppConfig {
      */
     schema?: string;
     /**
-     * Which collections source the runtime uses.
-     *
-     * - `cms` (default) — collections come from the config package.
-     * - `baas` — collections are introspected from the live database at boot and
-     *   the config package is not required.
-     */
-    mode?: "cms" | "baas";
-    /**
      * Module path (relative to `config`) exporting the auth users collection as
      * its default export. Default `collections/users`.
      */
     usersCollection?: string;
+
+    /**
+     * `runtime: "custom"` only. Dockerfile path relative to the repository root.
+     * Default `Dockerfile`.
+     */
+    dockerfile?: string;
+    /** `runtime: "custom"` only. Build context relative to the root. Default `.`. */
+    context?: string;
+    /** `runtime: "custom"` only. Port the container listens on. Default 8080. */
+    port?: number;
 }
 
 /**
- * A static client bundle — SPA or static site — built here and served from CDN.
+ * A static client bundle — SPA or static site — built here and served at `path`.
  */
 export interface RebaseStaticAppConfig {
     type: "static";
@@ -87,63 +107,28 @@ export interface RebaseStaticAppConfig {
     /** Directory of built assets, relative to the repository root. */
     output: string;
     /**
-     * Serve `index.html` for unmatched paths (client-side routing).
+     * Public base path this app is served under. Default `/`.
+     *
+     * Several static apps run in one process, each at its own path — the API at
+     * `/api`, a site at `/`, the admin at `/admin` — which is what keeps a
+     * self-hosted deployment a single container.
+     *
+     * **This is a build-time input, not only a serving concern.** An app mounted
+     * at `/admin` must be *built* for `/admin` (Vite's `base`), or `index.html`
+     * loads and every asset 404s: a blank page with no server error. `rebase
+     * build` passes it as `REBASE_APP_BASE` and asserts the emitted HTML honours
+     * it. Changing this value requires rebuilding the app.
+     */
+    path?: string;
+    /**
+     * Serve `index.html` for unmatched paths under `path` (client-side routing).
      * Default `true` — the overwhelmingly common case for a client app, and a
      * static *site* generator emits real files for its routes anyway.
      */
     spa?: boolean;
 }
 
-/**
- * The admin panel.
- *
- * `hosted` is the default and means the platform serves it — nothing is built
- * into this repository and nothing ships in the bundle. `bundled` builds it here,
- * which is what a self-hosted or air-gapped deployment wants.
- */
-export interface RebaseAdminAppConfig {
-    type: "admin";
-    mode?: "hosted" | "bundled";
-    /** Only for `bundled`: package directory containing the admin sources. */
-    root?: string;
-    /** Only for `bundled`: build command. */
-    build?: string;
-    /** Only for `bundled`: directory of built assets. */
-    output?: string;
-}
-
-/**
- * A native app. Registered for credentials and configuration; never built here.
- */
-export interface RebaseMobileAppConfig {
-    type: "mobile";
-    platform: "ios" | "android" | "other";
-}
-
-/**
- * An app built from a Dockerfile into an arbitrary image.
- *
- * This is the deliberate escape hatch. A project containing one is not eligible
- * for the managed runtime — the platform cannot make guarantees about an image
- * it did not build — but it still deploys, and nothing else about the project
- * changes.
- */
-export interface RebaseCustomAppConfig {
-    type: "custom";
-    /** Dockerfile path relative to the repository root. */
-    dockerfile?: string;
-    /** Build context relative to the repository root. Default `.`. */
-    context?: string;
-    /** Port the container listens on. Default 8080. */
-    port?: number;
-}
-
-export type RebaseAppConfig =
-    | RebaseBackendAppConfig
-    | RebaseStaticAppConfig
-    | RebaseAdminAppConfig
-    | RebaseMobileAppConfig
-    | RebaseCustomAppConfig;
+export type RebaseAppConfig = RebaseBackendAppConfig | RebaseStaticAppConfig;
 
 /**
  * `rebase.json` — the authored project manifest.
@@ -152,13 +137,17 @@ export interface RebaseProjectManifest {
     /** JSON Schema URL, for editor completion. Ignored by the tooling. */
     $schema?: string;
     /**
-     * The runtime **major** this project targets, as a semver range
+     * The runtime contract **major** this project targets, as a semver range
      * (e.g. `^1`, `~1.4`, or an exact `1.4.2` to pin).
      *
      * The platform upgrades patches and minors underneath a project without
      * asking; it never crosses a major. See {@link RUNTIME_CONTRACT_VERSION}.
+     *
+     * Named `rebase` rather than `runtime` so that `runtime` means exactly one
+     * thing — {@link RebaseBackendAppConfig.runtime}, who owns the process. It
+     * reads like `engines` in a `package.json`, which is what it is.
      */
-    runtime: string;
+    rebase: string;
     /**
      * Apps this repository contributes, keyed by app name. The key is the app's
      * identity within the project: it is what `rebase deploy <app>` names, what
@@ -239,10 +228,25 @@ export interface RebaseBundleEntrypoints {
     schema?: string;
     /** Module exporting the auth users collection (default export). */
     usersCollection?: string;
-    /** Built admin assets, when the admin panel is bundled rather than hosted. */
-    admin?: string;
-    /** Built static assets to serve from the runtime, when not on a CDN. */
-    static?: string;
+    /**
+     * Built static apps to serve from this process, in declaration order.
+     *
+     * A list rather than a single directory because one process serves several
+     * apps at different paths — a site at `/` and the admin at `/admin`. The
+     * runtime mounts them longest-path-first so the `/`-rooted app's catch-all
+     * does not claim its siblings' URLs.
+     */
+    static?: RebaseBundleStatic[];
+}
+
+/** One built static app inside a bundle. */
+export interface RebaseBundleStatic {
+    /** Public base path, e.g. `/` or `/admin`. */
+    path: string;
+    /** Bundle-relative directory holding the built assets. */
+    dir: string;
+    /** Serve `index.html` for unmatched paths under `path`. */
+    spa: boolean;
 }
 
 /**
@@ -287,15 +291,17 @@ export interface RebaseBundleManifest {
     /**
      * What the runtime does with this bundle.
      *
-     * - `cms` — a backend with declared collections; the runtime provisions their
-     *   tables and serves the data API.
-     * - `baas` — a backend that introspects an existing database rather than
-     *   declaring collections.
-     * - `static` — no backend at all: the bundle is a built SPA (`entry.static`),
-     *   and the runtime only serves those assets. No database, no data sources —
-     *   this is how a `static`/`admin` app runs on the same image as the backend.
+     * - `backend` — boot the full server: database, auth and the data API, plus
+     *   any static apps in `entry.static`.
+     * - `static` — no backend at all: serve `entry.static` and nothing else. No
+     *   database, no auth, no data sources. This is how a static app runs on the
+     *   same image as the backend.
+     *
+     * Replaces an earlier `mode: "cms" | "baas" | "static"`. The cms/baas
+     * distinction was never a third kind of thing — it is simply whether
+     * `entry.config` is present, so it is derived rather than declared.
      */
-    mode: "cms" | "baas" | "static";
+    kind: "backend" | "static";
     entry: RebaseBundleEntrypoints;
     /** Collection slugs contained in the bundle, for quick inspection. */
     collections?: string[];

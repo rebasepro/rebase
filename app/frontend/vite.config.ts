@@ -8,6 +8,9 @@ import { visualizer } from "rollup-plugin-visualizer";
 
 export default defineConfig({
     envDir: path.resolve(__dirname, ".."),
+    // The public path this app is served under, from its `path` in rebase.json.
+    // See docs/apps-and-runtimes.md §4.2.
+    base: process.env.REBASE_APP_BASE ?? "/",
     server: {
         port: 5173,
         strictPort: false,

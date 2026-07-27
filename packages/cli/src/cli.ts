@@ -6,6 +6,7 @@ import { schemaCommand } from "./commands/schema";
 import { dbCommand } from "./commands/db";
 import { devCommand } from "./commands/dev";
 import { buildCommand } from "./commands/build";
+import { ejectCommand } from "./commands/eject";
 import { startCommand } from "./commands/start";
 import { authCommand } from "./commands/auth";
 import { doctorCommand } from "./commands/doctor";
@@ -56,7 +57,7 @@ export async function entry(args: string[]) {
     const subcommand = parsedArgs._[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "generate-sdk"];
+    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;
@@ -122,6 +123,10 @@ export async function entry(args: string[]) {
             await appsCommand(effectiveSubcommand, args);
             break;
 
+        case "eject":
+            await ejectCommand(args);
+            break;
+
         case "auth":
             await authCommand(effectiveSubcommand, args);
             break;
@@ -163,6 +168,8 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("dev")}                     Start the development server
   ${chalk.blue.bold("build")}                   Build all workspace packages
   ${chalk.blue.bold("start")}                   Start the backend server ${chalk.gray("(production)")}
+  ${chalk.blue.bold("apps list")}               Show the apps this repository declares
+  ${chalk.blue.bold("eject")}                   Take ownership of the server process and image
 
 ${chalk.green.bold("Schema")}
   ${chalk.blue.bold("schema generate")}         Generate Drizzle schema from collections

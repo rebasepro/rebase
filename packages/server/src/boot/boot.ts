@@ -93,7 +93,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     const devRoot = process.env.REBASE_DEV_PROJECT_ROOT || process.cwd();
     logger.info("Loaded bundle", {
         app: bundle.manifest.app,
-        mode: bundle.manifest.mode,
+        kind: bundle.manifest.kind,
         schemaVersion: bundle.manifest.schemaVersion,
         builtAgainst: bundle.manifest.runtime?.builtAgainst
     });
@@ -104,7 +104,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // the backend. Handled BEFORE `loadBootEnv`, which requires DATABASE_URL and
     // JWT_SECRET — a static app needs neither, and demanding them would be the
     // one thing that could stop a folder of assets from being served.
-    if (bundle.manifest.mode === "static") {
+    if (bundle.manifest.kind === "static") {
         return bootStaticApp(bundle, devRoot, options);
     }
 
@@ -191,7 +191,10 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         server,
         app,
         basePath: env.REBASE_BASE_PATH,
-        mode: bundle.manifest.mode ?? "cms",
+        // Where collections come from is derived, not declared: a bundle that
+        // ships a config package has them, one that does not introspects the
+        // live database at boot.
+        mode: bundle.collectionsDir ? "cms" : "baas",
         collectionsDir: bundle.collectionsDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,
@@ -283,16 +286,27 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     }
 
     // ── Static assets ────────────────────────────────────────────────────────
-    // Mounted last: `serveSPA` claims `/*` with a catch-all fallback, so anything
-    // registered after it would never be reached.
+    // Mounted last: each app's `serveSPA` ends in a catch-all under its own
+    // prefix, so anything registered after it would never be reached.
+    //
+    // `bundle.staticApps` arrives longest-path-first, which puts the "/"-rooted
+    // app last. Ordering alone is not enough, though — every app also excludes
+    // its siblings, or a miss under "/admin" would be answered with the site's
+    // index.html at the admin's URL.
     if (env.REBASE_SERVE_STATIC) {
-        const staticRoot = bundle.staticDir ?? bundle.adminDir;
-        if (staticRoot) {
-            logger.info("Serving static assets", { path: staticRoot });
+        for (const staticApp of bundle.staticApps) {
+            const siblings = bundle.staticApps
+                .filter(other => other !== staticApp)
+                .map(other => other.path)
+                .filter(other => other !== "/");
+            logger.info("Serving static assets", { path: staticApp.dir,
+at: staticApp.path });
             serveSPA(app, {
-                frontendPath: staticRoot,
+                frontendPath: staticApp.dir,
+                basePath: staticApp.path,
                 apiBasePath: env.REBASE_BASE_PATH,
-                excludePaths: ["/health", "/livez", "/metrics"]
+                excludePaths: ["/health", "/livez", "/metrics", ...siblings],
+                spa: staticApp.spa
             });
         }
     }
@@ -368,11 +382,10 @@ async function bootStaticApp(
     devRoot: string,
     options: BootOptions
 ): Promise<BootedRuntime> {
-    const staticRoot = bundle.staticDir ?? bundle.adminDir;
-    if (!staticRoot) {
+    if (bundle.staticApps.length === 0) {
         throw new BundleError(
             "A static bundle declares no assets to serve.",
-            "Its manifest has `mode: \"static\"` but no `entry.static` — rebuild the app with `rebase build`."
+            "Its manifest has `kind: \"static\"` but no `entry.static` — rebuild the app with `rebase build`."
         );
     }
 
@@ -408,13 +421,26 @@ async function bootStaticApp(
         app.route("/metrics", createMetricsRoutes(metrics.registry, metricsToken));
     }
 
-    // Mounted last: serveSPA's catch-all claims `/*`.
-    logger.info("Serving static app", { app: bundle.manifest.app, path: staticRoot });
-    serveSPA(app, {
-        frontendPath: staticRoot,
-        apiBasePath: basePath,
-        excludePaths: ["/health", "/livez", "/metrics"]
-    });
+    // Mounted last: each app's serveSPA ends in a catch-all under its prefix.
+    // Same ordering and sibling-exclusion rules as the backend path above.
+    for (const staticApp of bundle.staticApps) {
+        const siblings = bundle.staticApps
+            .filter(other => other !== staticApp)
+            .map(other => other.path)
+            .filter(other => other !== "/");
+        logger.info("Serving static app", {
+            app: bundle.manifest.app,
+            path: staticApp.dir,
+            at: staticApp.path
+        });
+        serveSPA(app, {
+            frontendPath: staticApp.dir,
+            basePath: staticApp.path,
+            apiBasePath: basePath,
+            excludePaths: ["/health", "/livez", "/metrics", ...siblings],
+            spa: staticApp.spa
+        });
+    }
 
     let port = requestedPort;
     if (options.listen !== false) {
@@ -517,9 +543,12 @@ async function ensureCollectionSchema(
         logger.info("REBASE_MIGRATE_ON_BOOT=none — leaving the database schema untouched.");
         return;
     }
-    // `baas` introspects its collections FROM the database, so there is nothing
-    // to create; a `static` bundle has no database at all.
-    if ((bundle.manifest.mode ?? "cms") !== "cms") return;
+    // A bundle without a config package introspects its collections FROM the
+    // database, so there is nothing to create; a `static` bundle has no database
+    // at all. Both conditions matter: gating on `kind` alone would push a
+    // schema into an existing database that a project only meant to read.
+    if (bundle.manifest.kind !== "backend") return;
+    if (!bundle.manifest.entry?.config) return;
     if (!bundle.collectionsDir) return;
 
     const primary = dataSources[0];

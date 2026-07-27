@@ -4,16 +4,16 @@
     "title": "Rebase project manifest",
     "description": "Declares which runtime major a project targets and which apps this repository contributes to it. Topology only — collections, security rules, hooks and functions stay in TypeScript.",
     "type": "object",
-    "required": ["runtime", "apps"],
+    "required": ["rebase", "apps"],
     "additionalProperties": false,
     "properties": {
         "$schema": {
             "type": "string",
             "description": "URL of this schema, for editor completion."
         },
-        "runtime": {
+        "rebase": {
             "type": "string",
-            "description": "Runtime major this project targets, as a semver range (e.g. \"^1\"). The platform upgrades patches and minors underneath a project; it never crosses a major.",
+            "description": "Runtime contract major this project targets, as a semver range (e.g. \"^1\"). The platform upgrades patches and minors underneath a project; it never crosses a major. Named \"rebase\" so that \"runtime\" means exactly one thing — who owns the backend process.",
             "minLength": 1,
             "examples": ["^1", "~1.4", "1.4.2"]
         },
@@ -27,10 +27,7 @@
             "additionalProperties": {
                 "oneOf": [
                     { "$ref": "#/$defs/backendApp" },
-                    { "$ref": "#/$defs/staticApp" },
-                    { "$ref": "#/$defs/adminApp" },
-                    { "$ref": "#/$defs/mobileApp" },
-                    { "$ref": "#/$defs/customApp" }
+                    { "$ref": "#/$defs/staticApp" }
                 ]
             }
         }
@@ -45,13 +42,17 @@
         "backendApp": {
             "type": "object",
             "description": "The collections, hooks and functions that define the project's API. Exactly one per project.",
-            "required": ["type"],
+            "required": ["type", "runtime"],
             "additionalProperties": false,
             "properties": {
                 "type": { "const": "backend" },
+                "runtime": {
+                    "enum": ["managed", "custom"],
+                    "description": "Who owns the process. \"managed\": the platform runtime image boots this project's bundle. \"custom\": this repository builds its own image and entrypoint. Independent of where it runs — both run on Rebase Cloud and both self-host."
+                },
                 "config": {
                     "$ref": "#/$defs/relativePath",
-                    "description": "Directory of the config package. Default \"config\"."
+                    "description": "Directory of the config package. Default \"config\". When it exists, collections come from code; when it does not, they are introspected from the live database at boot."
                 },
                 "functions": {
                     "$ref": "#/$defs/relativePath",
@@ -65,20 +66,46 @@
                     "$ref": "#/$defs/relativePath",
                     "description": "Generated Drizzle schema module. Default \"backend/src/schema.generated.ts\"."
                 },
-                "mode": {
-                    "enum": ["cms", "baas"],
-                    "default": "cms",
-                    "description": "\"cms\" reads collections from the config package; \"baas\" introspects them from the live database at boot."
-                },
                 "usersCollection": {
                     "type": "string",
                     "description": "Module path (relative to config) exporting the auth users collection. Default \"collections/users\"."
+                },
+                "dockerfile": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Custom runtime only. Dockerfile path. Default \"Dockerfile\"."
+                },
+                "context": {
+                    "$ref": "#/$defs/relativePath",
+                    "description": "Custom runtime only. Build context. Default \".\"."
+                },
+                "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "Custom runtime only. Port the container listens on. Default 8080."
                 }
-            }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": { "runtime": { "const": "managed" } },
+                        "required": ["runtime"]
+                    },
+                    "then": {
+                        "not": {
+                            "anyOf": [
+                                { "required": ["dockerfile"] },
+                                { "required": ["context"] },
+                                { "required": ["port"] }
+                            ]
+                        }
+                    }
+                }
+            ]
         },
         "staticApp": {
             "type": "object",
-            "description": "A pre-built client bundle — an SPA or static site — served from CDN.",
+            "description": "A pre-built client bundle — an SPA or static site — served at its declared path. The admin panel is one of these.",
             "required": ["type", "root", "output"],
             "additionalProperties": false,
             "properties": {
@@ -86,58 +113,21 @@
                 "root": { "$ref": "#/$defs/relativePath" },
                 "build": {
                     "type": "string",
-                    "description": "Command producing `output`. Run from the repository root."
+                    "description": "Command producing `output`. Run from the repository root, with REBASE_APP_BASE set from `path`."
                 },
                 "output": { "$ref": "#/$defs/relativePath" },
+                "path": {
+                    "type": "string",
+                    "default": "/",
+                    "pattern": "^/(?!.*\\.\\.)(?!.*/$).*$|^/$",
+                    "description": "Public base path this app is served under, e.g. \"/admin\". A build-time input as well as a serving concern: the app must be built for this path (Vite's `base`), or every asset 404s. Must be unique across the project's static apps.",
+                    "examples": ["/", "/admin"]
+                },
                 "spa": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Serve index.html for unmatched paths (client-side routing)."
+                    "description": "Serve index.html for unmatched paths under `path` (client-side routing)."
                 }
-            }
-        },
-        "adminApp": {
-            "type": "object",
-            "description": "The Rebase admin panel, hosted by the platform or built into this repository.",
-            "required": ["type"],
-            "additionalProperties": false,
-            "properties": {
-                "type": { "const": "admin" },
-                "mode": {
-                    "enum": ["hosted", "bundled"],
-                    "default": "hosted"
-                },
-                "root": { "$ref": "#/$defs/relativePath" },
-                "build": { "type": "string" },
-                "output": { "$ref": "#/$defs/relativePath" }
-            },
-            "allOf": [
-                {
-                    "if": { "properties": { "mode": { "const": "bundled" } }, "required": ["mode"] },
-                    "then": { "required": ["root", "output"] }
-                }
-            ]
-        },
-        "mobileApp": {
-            "type": "object",
-            "description": "A native app. Registered for credentials and configuration; never built or hosted here.",
-            "required": ["type", "platform"],
-            "additionalProperties": false,
-            "properties": {
-                "type": { "const": "mobile" },
-                "platform": { "enum": ["ios", "android", "other"] }
-            }
-        },
-        "customApp": {
-            "type": "object",
-            "description": "An app built from your own Dockerfile. Deploys, but is not eligible for the managed runtime.",
-            "required": ["type"],
-            "additionalProperties": false,
-            "properties": {
-                "type": { "const": "custom" },
-                "dockerfile": { "$ref": "#/$defs/relativePath" },
-                "context": { "$ref": "#/$defs/relativePath" },
-                "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
             }
         }
     }

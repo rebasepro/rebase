@@ -110,9 +110,30 @@ describe("template structure", () => {
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "README.md"))).toBe(true);
     });
 
-    it("contains backend entry point and schema", () => {
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "src", "index.ts"))).toBe(true);
+    it("contains the generated schema", () => {
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "src", "schema.generated.ts"))).toBe(true);
+    });
+
+    it("scaffolds NO backend entry point, because the runtime never loads one", () => {
+        // It used to. ~190 lines configuring CORS, auth, cookies, storage and
+        // history that the managed runtime does not read — the most
+        // important-looking file in a new project, and editing it did nothing.
+        // It lives behind `rebase eject` now, which also writes the Dockerfile
+        // and flips the manifest, so having it means it actually runs.
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "src", "index.ts"))).toBe(false);
+
+        const payload = path.resolve(__dirname, "..", "..", "templates", "eject");
+        expect(fs.existsSync(path.join(payload, "backend", "src", "index.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(payload, "Dockerfile"))).toBe(true);
+    });
+
+    it("declares a managed backend and one static app at /", () => {
+        const manifest = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "rebase.json"), "utf8"));
+        expect(manifest.rebase).toBeDefined();
+        expect(manifest.apps.backend).toEqual({ type: "backend",
+runtime: "managed" });
+        expect(manifest.apps.admin).toMatchObject({ type: "static",
+path: "/" });
     });
 
     it("contains frontend entry point", () => {
@@ -737,7 +758,8 @@ describe("scaffold security defaults", () => {
         });
 
         it("does not set defaultSecurityRules on the backend, where it would not reach the database", () => {
-            const indexPath = path.join(TEMPLATE_DIR, "backend", "src", "index.ts");
+            // The entrypoint is the eject payload now — a managed project has none.
+            const indexPath = path.resolve(__dirname, "..", "..", "templates", "eject", "backend", "src", "index.ts");
             const content = fs.readFileSync(indexPath, "utf-8");
 
             expect(content).not.toContain("defaultSecurityRules");
@@ -747,7 +769,7 @@ describe("scaffold security defaults", () => {
     describe("backend template", () => {
 
         it("does not silently fallback to a placeholder CORS domain", () => {
-            const indexPath = path.join(TEMPLATE_DIR, "backend", "src", "index.ts");
+            const indexPath = path.resolve(__dirname, "..", "..", "templates", "eject", "backend", "src", "index.ts");
             const content = fs.readFileSync(indexPath, "utf-8");
             // Should throw instead of silently using a non-existent domain
             expect(content).not.toMatch(/\|\|\s*["']https:\/\/yourdomain\.com["']/);
@@ -917,13 +939,23 @@ describe("template flavors", () => {
 describe("baas overlay", () => {
     const overlay = path.resolve(__dirname, "..", "..", "templates", "overlays", "baas");
 
-    it("runs the backend in baas mode and never serves an SPA", () => {
-        const entry = fs.readFileSync(path.join(overlay, "backend", "src", "index.ts"), "utf8");
+    it("declares a managed backend and no frontend", () => {
+        // Headless is now expressed by the manifest and by the absence of a
+        // `config/collections` directory, not by a hand-written entrypoint that
+        // passes `mode: "baas"`.
+        const manifest = JSON.parse(fs.readFileSync(path.join(overlay, "rebase.json"), "utf8"));
 
-        expect(entry).toContain('mode: "baas"');
-        expect(entry).not.toContain("serveSPA(");
-        // No collection files exist, so the auth adapter owns its user table.
-        expect(entry).not.toContain("collectionsDir");
+        expect(manifest.apps.backend).toEqual({ type: "backend", runtime: "managed" });
+        expect(Object.values(manifest.apps).some((app: any) => app.type === "static")).toBe(false);
+        expect(fs.existsSync(path.join(overlay, "backend", "src", "index.ts"))).toBe(false);
+    });
+
+    it("keeps a config package for the storage hook, but declares no collections", () => {
+        // Storage is not under row-level security, so deleting the config
+        // package outright would leave the boot guard nothing to find and the
+        // scaffold's own docker-compose.yml would crash-loop.
+        expect(fs.existsSync(path.join(overlay, "config", "index.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(overlay, "config", "collections"))).toBe(false);
     });
 
     it("ships the SDK, which its example script imports", () => {
@@ -932,7 +964,7 @@ describe("baas overlay", () => {
         // scripts/example.ts imports @rebasepro/client; with no frontend in a
         // baas project, nothing else would pull it in.
         expect(pkg.dependencies?.["@rebasepro/client"]).toBeDefined();
-        expect(pkg.workspaces).toEqual(["backend"]);
+        expect(pkg.workspaces).toEqual(["backend", "config"]);
     });
 
     it("declares no UI packages anywhere", () => {

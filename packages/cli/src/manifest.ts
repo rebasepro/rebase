@@ -55,10 +55,58 @@ export class ManifestError extends Error {
     }
 }
 
-const APP_TYPES = ["backend", "static", "admin", "mobile", "custom"] as const;
+const APP_TYPES = ["backend", "static"] as const;
+
+/**
+ * App types that used to exist, and what replaced each one.
+ *
+ * Kept so a manifest written against the old vocabulary fails with the fix in
+ * hand rather than with `must be one of: backend, static`, which tells a reader
+ * what is wrong but not what to write instead.
+ */
+const REMOVED_APP_TYPES: Record<string, string> = {
+    admin:
+        'the admin panel is an ordinary static app now — declare it as ' +
+        '{ "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/admin" }',
+    custom:
+        'who owns the server is a property of the backend now — declare ' +
+        '{ "type": "backend", "runtime": "custom" } instead of a separate app',
+    mobile:
+        "mobile apps are no longer declared in the manifest — nothing consumed this type. " +
+        "Remove the entry"
+};
 
 /** Reserved because they name things in URLs and CLI output. */
 const RESERVED_APP_NAMES = new Set(["api", "health", "metrics", "livez", "_rebase"]);
+
+/**
+ * Validate a static app's public base path.
+ *
+ * Normalizes to "no trailing slash, except for the root" so that mounting and
+ * the `REBASE_APP_BASE` build variable have one shape to reason about.
+ */
+function checkAppPath(
+    value: unknown,
+    fieldPath: string,
+    issues: ManifestValidationIssue[]
+): string | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value !== "string" || !value.startsWith("/") || value.includes("..")) {
+        issues.push({
+            path: fieldPath,
+            message: 'must be an absolute path like "/admin"'
+        });
+        return undefined;
+    }
+    if (value !== "/" && value.endsWith("/")) {
+        issues.push({
+            path: fieldPath,
+            message: 'must not end with a slash — write "/admin", not "/admin/"'
+        });
+        return undefined;
+    }
+    return value;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -115,6 +163,11 @@ message: "must be an object" });
     }
 
     const type = raw.type;
+    if (typeof type === "string" && REMOVED_APP_TYPES[type]) {
+        issues.push({ path: `${base}.type`,
+message: `"${type}" is no longer an app type — ${REMOVED_APP_TYPES[type]}` });
+        return undefined;
+    }
     if (typeof type !== "string" || !(APP_TYPES as readonly string[]).includes(type)) {
         issues.push({
             path: `${base}.type`,
@@ -130,9 +183,40 @@ message: "must be an object" });
             checkRelativePath(raw.crons, `${base}.crons`, issues, { required: false });
             checkRelativePath(raw.schema, `${base}.schema`, issues, { required: false });
             checkRelativePath(raw.usersCollection, `${base}.usersCollection`, issues, { required: false });
-            if (raw.mode !== undefined && raw.mode !== "cms" && raw.mode !== "baas") {
-                issues.push({ path: `${base}.mode`,
-message: 'must be "cms" or "baas"' });
+
+            if (raw.mode !== undefined) {
+                issues.push({
+                    path: `${base}.mode`,
+                    message:
+                        "is no longer a field — collections come from the config directory when " +
+                        "it exists, and are introspected from the database when it does not"
+                });
+            }
+
+            const custom = raw.runtime === "custom";
+            if (raw.runtime !== "managed" && !custom) {
+                issues.push({
+                    path: `${base}.runtime`,
+                    message: 'is required, and must be "managed" or "custom"'
+                });
+            }
+
+            // The image fields describe an image this repository builds. Under a
+            // managed backend there is no such image, so accepting them silently
+            // would be accepting a Dockerfile that never gets built.
+            for (const field of ["dockerfile", "context", "port"] as const) {
+                if (raw[field] !== undefined && !custom) {
+                    issues.push({
+                        path: `${base}.${field}`,
+                        message: 'only applies to a custom runtime — set "runtime": "custom" to build your own image'
+                    });
+                }
+            }
+            checkRelativePath(raw.dockerfile, `${base}.dockerfile`, issues, { required: false });
+            checkRelativePath(raw.context, `${base}.context`, issues, { required: false });
+            if (raw.port !== undefined && (typeof raw.port !== "number" || !Number.isInteger(raw.port))) {
+                issues.push({ path: `${base}.port`,
+message: "must be an integer" });
             }
             return raw as unknown as RebaseAppConfig;
         }
@@ -147,41 +231,7 @@ message: "must be a string command" });
                 issues.push({ path: `${base}.spa`,
 message: "must be a boolean" });
             }
-            return raw as unknown as RebaseAppConfig;
-        }
-        case "admin": {
-            const mode = raw.mode ?? "hosted";
-            if (mode !== "hosted" && mode !== "bundled") {
-                issues.push({ path: `${base}.mode`,
-message: 'must be "hosted" or "bundled"' });
-                return undefined;
-            }
-            if (mode === "bundled") {
-                // A bundled admin panel is built here, so it needs somewhere to
-                // build from and somewhere to put the result. Hosted needs
-                // neither, which is the entire point of it being the default.
-                checkRelativePath(raw.root, `${base}.root`, issues, { required: true });
-                checkRelativePath(raw.output, `${base}.output`, issues, { required: true });
-            }
-            return raw as unknown as RebaseAppConfig;
-        }
-        case "mobile": {
-            const platform = raw.platform;
-            if (platform !== "ios" && platform !== "android" && platform !== "other") {
-                issues.push({
-                    path: `${base}.platform`,
-                    message: 'must be "ios", "android" or "other"'
-                });
-            }
-            return raw as unknown as RebaseAppConfig;
-        }
-        case "custom": {
-            checkRelativePath(raw.dockerfile, `${base}.dockerfile`, issues, { required: false });
-            checkRelativePath(raw.context, `${base}.context`, issues, { required: false });
-            if (raw.port !== undefined && (typeof raw.port !== "number" || !Number.isInteger(raw.port))) {
-                issues.push({ path: `${base}.port`,
-message: "must be an integer" });
-            }
+            checkAppPath(raw.path, `${base}.path`, issues);
             return raw as unknown as RebaseAppConfig;
         }
         default:
@@ -203,11 +253,16 @@ export function validateManifest(raw: unknown): {
 message: `${MANIFEST_FILENAME} must contain a JSON object` }] };
     }
 
-    if (typeof raw.runtime !== "string" || raw.runtime.trim() === "") {
-        issues.push({
-            path: "runtime",
-            message: `is required, e.g. "${CURRENT_RUNTIME_RANGE}"`
-        });
+    if (typeof raw.rebase !== "string" || raw.rebase.trim() === "") {
+        // `runtime` used to be this key. It now means who owns the backend
+        // process, so a manifest still using it at the top level is naming the
+        // wrong thing rather than merely missing a field.
+        const message = typeof raw.runtime === "string"
+            ? `is required, e.g. "${CURRENT_RUNTIME_RANGE}" — this is the top-level "runtime" key renamed, ` +
+              'because "runtime" now means "managed" or "custom" on the backend app'
+            : `is required, e.g. "${CURRENT_RUNTIME_RANGE}"`;
+        issues.push({ path: "rebase",
+message });
     }
 
     if (!isRecord(raw.apps)) {
@@ -248,12 +303,29 @@ message: "name is reserved" });
         });
     }
 
+    // Two apps at one path is not a preference conflict — the first one mounted
+    // swallows the other's URLs, and the loser looks like it deployed fine.
+    const byPath = new Map<string, string>();
+    for (const [name, app] of Object.entries(apps)) {
+        if (app.type !== "static") continue;
+        const at = app.path ?? "/";
+        const owner = byPath.get(at);
+        if (owner) {
+            issues.push({
+                path: `apps.${name}.path`,
+                message: `two apps cannot serve the same path — "${owner}" is already at "${at}"`
+            });
+            continue;
+        }
+        byPath.set(at, name);
+    }
+
     if (issues.length > 0) return { issues };
 
     return {
         manifest: {
             $schema: typeof raw.$schema === "string" ? raw.$schema : undefined,
-            runtime: raw.runtime as string,
+            rebase: raw.rebase as string,
             apps
         },
         issues
@@ -267,10 +339,12 @@ message: "name is reserved" });
  * the manifest a no-op for existing projects: the synthesized result is what
  * they would have written by hand.
  *
- * An ejected backend — one with its own `src/index.ts` entrypoint — is reported
- * as a `custom` app rather than a `backend` app. That is not a downgrade; it is
- * an accurate description, and it is what keeps such a project deploying exactly
- * as it does today.
+ * The backend's `runtime` is inferred from whether the repository declares a
+ * **Dockerfile** — the thing that actually builds an image — and from nothing
+ * else. It used to be inferred from the presence of `backend/src/index.ts`,
+ * which every scaffolded project had whether or not it wanted its own server, so
+ * projects predating the manifest silently landed on the custom runtime and paid
+ * for it (see `docs/cloud-deploy-workspace-vendoring.md`).
  */
 export function synthesizeManifest(projectRoot: string): RebaseProjectManifest {
     const exists = (relative: string): boolean => fs.existsSync(path.join(projectRoot, relative));
@@ -278,20 +352,29 @@ export function synthesizeManifest(projectRoot: string): RebaseProjectManifest {
 
     const hasConfig = exists(DEFAULT_CONFIG_DIR);
     const hasBackend = exists("backend");
-    const backendEntry = exists("backend/src/index.ts");
+    const dockerfile = ["Dockerfile", "backend/Dockerfile"].find(exists);
 
-    if (hasBackend && backendEntry) {
-        apps.backend = {
-            type: "custom",
-            dockerfile: exists("backend/Dockerfile") ? "backend/Dockerfile" : undefined,
-            context: "."
-        } as RebaseAppConfig;
-    } else if (hasBackend || hasConfig) {
-        const backend: RebaseBackendAppConfig = { type: "backend" };
-        if (!hasConfig) backend.mode = "baas";
+    if (hasBackend || hasConfig) {
+        const backend: RebaseBackendAppConfig = dockerfile
+            ? { type: "backend",
+runtime: "custom",
+dockerfile,
+context: "." }
+            : { type: "backend",
+runtime: "managed" };
         if (exists(DEFAULT_FUNCTIONS_DIR)) backend.functions = DEFAULT_FUNCTIONS_DIR;
         if (exists(DEFAULT_CRONS_DIR)) backend.crons = DEFAULT_CRONS_DIR;
         apps.backend = backend;
+
+        // Say it out loud. The file looks exactly like the server and is never
+        // loaded, which used to be discovered only after a deploy answered 404
+        // on every route defined in it.
+        if (!dockerfile && exists("backend/src/index.ts")) {
+            console.warn(
+                "⚠ backend/src/index.ts exists but this project's backend is managed — it is\n" +
+                "    never loaded. Delete it, or run `rebase eject` to make it the entrypoint."
+            );
+        }
     }
 
     if (exists("frontend")) {
@@ -300,11 +383,12 @@ export function synthesizeManifest(projectRoot: string): RebaseProjectManifest {
             root: "frontend",
             build: "npm run build --workspace frontend",
             output: "frontend/dist",
+            path: "/",
             spa: true
         };
     }
 
-    return { runtime: CURRENT_RUNTIME_RANGE,
+    return { rebase: CURRENT_RUNTIME_RANGE,
 apps };
 }
 
@@ -355,7 +439,7 @@ export function writeManifest(projectRoot: string, manifest: RebaseProjectManife
     const filePath = manifestPath(projectRoot);
     const ordered = {
         $schema: manifest.$schema ?? "https://rebase.pro/schemas/rebase.json",
-        runtime: manifest.runtime,
+        rebase: manifest.rebase,
         apps: manifest.apps
     };
     fs.writeFileSync(filePath, `${JSON.stringify(ordered, null, 4)}\n`, "utf8");
@@ -385,15 +469,8 @@ export function buildableApps(
     // backend's collections, so building it second is the order that works.
     const entries = Object.entries(manifest.apps).map(([name, app]) => ({ name,
 app }));
-    const rank = (app: RebaseAppConfig): number => {
-        if (app.type === "backend") return 0;
-        if (app.type === "admin") return 1;
-        if (app.type === "static") return 2;
-        return 3;
-    };
-    return entries
-        .filter(({ app }) => app.type !== "mobile")
-        .sort((a, b) => rank(a.app) - rank(b.app));
+    const rank = (app: RebaseAppConfig): number => (app.type === "backend" ? 0 : 1);
+    return entries.sort((a, b) => rank(a.app) - rank(b.app));
 }
 
 /**
@@ -406,50 +483,72 @@ app }));
 export function assessManagedCompatibility(
     manifest: RebaseProjectManifest
 ): ManagedCompatibility {
-    const reasons: string[] = [];
-
     const backend = findBackendApp(manifest);
+
     if (!backend) {
-        const custom = Object.entries(manifest.apps).find(([, app]) => app.type === "custom");
-        if (custom) {
-            reasons.push(
-                `App "${custom[0]}" is a custom container. The managed runtime runs the ` +
-                "platform image with your bundle, so a project that builds its own image " +
-                "uses the custom runtime instead."
-            );
-        } else {
-            reasons.push(
+        return {
+            eligible: false,
+            reasons: [
                 "No backend app is declared in this repository. Only the repository that " +
                 "declares the backend selects the runtime."
-            );
-        }
+            ]
+        };
     }
 
-    for (const [name, app] of Object.entries(manifest.apps)) {
-        if (app.type === "custom") {
-            reasons.push(`App "${name}" is a custom container image.`);
-        }
+    // Declared, not deduced. A project on the custom runtime is there because
+    // somebody wrote it down, which is the whole point of the field.
+    if (backend.app.runtime === "custom") {
+        return {
+            eligible: false,
+            reasons: [
+                `App "${backend.name}" declares runtime: "custom", so it builds and runs its ` +
+                "own image. The managed runtime boots the platform image with your bundle; " +
+                "the custom runtime deploys exactly the same way, from your Dockerfile."
+            ]
+        };
     }
 
-    return { eligible: reasons.length === 0 && Boolean(backend),
-reasons };
+    return { eligible: true,
+reasons: [] };
 }
 
-/** Resolve a backend app's directories against the conventions it omits. */
-export function resolveBackendPaths(app: RebaseBackendAppConfig): {
+/**
+ * Resolve a backend app's directories against the conventions it omits.
+ *
+ * `hasCollections` replaces the old `mode: "cms" | "baas"` field. Where the
+ * collections come from was never an independent choice: either they are
+ * declared in code and the bundle ships them, or they are not and the runtime
+ * introspects the live database at boot. Declaring it separately only created
+ * the contradictory state — code-first declared, no collections anywhere.
+ *
+ * `hasConfig` is deliberately a **separate** question. A headless project has no
+ * `config/collections`, but it may still ship a config package — that is where
+ * the `storageAuthorize` hook lives, and storage is not under row-level
+ * security, so without one the server refuses to boot with storage enabled.
+ * Collapsing the two would leave a headless project nowhere to put it.
+ */
+export function resolveBackendPaths(
+    app: RebaseBackendAppConfig,
+    projectRoot: string
+): {
     config: string;
     functions: string;
     crons: string;
     schema: string;
     usersCollection: string;
-    mode: "cms" | "baas";
+    /** Whether a config package exists — hooks, storage authorization. */
+    hasConfig: boolean;
+    /** Whether collections are declared in code, under `<config>/collections`. */
+    hasCollections: boolean;
 } {
+    const config = app.config ?? DEFAULT_CONFIG_DIR;
     return {
-        config: app.config ?? DEFAULT_CONFIG_DIR,
+        config,
         functions: app.functions ?? DEFAULT_FUNCTIONS_DIR,
         crons: app.crons ?? DEFAULT_CRONS_DIR,
         schema: app.schema ?? DEFAULT_SCHEMA_FILE,
         usersCollection: app.usersCollection ?? "collections/users",
-        mode: app.mode ?? "cms"
+        hasConfig: fs.existsSync(path.join(projectRoot, config)),
+        hasCollections: fs.existsSync(path.join(projectRoot, config, "collections"))
     };
 }

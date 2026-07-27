@@ -29,10 +29,24 @@ export interface LoadedBundle {
     collectionsDir?: string;
     functionsDir?: string;
     cronsDir?: string;
-    /** Absolute path to built admin assets, when the admin panel is bundled. */
-    adminDir?: string;
-    /** Absolute path to built static assets to serve from this process. */
-    staticDir?: string;
+    /**
+     * Built static apps to serve from this process, in mount order.
+     *
+     * A list, not a single directory: one process serves a site at `/` and an
+     * admin at `/admin`. Entries whose directory is missing are dropped with a
+     * warning, so a partially-built bundle still boots its API.
+     */
+    staticApps: LoadedStaticApp[];
+}
+
+/** One built static app inside a loaded bundle, with an absolute directory. */
+export interface LoadedStaticApp {
+    /** Public base path, e.g. `/` or `/admin`. */
+    path: string;
+    /** Absolute path to the built assets. */
+    dir: string;
+    /** Serve `index.html` for unmatched paths under `path`. */
+    spa: boolean;
 }
 
 const MANIFEST_FILENAME = "manifest.json";
@@ -165,8 +179,17 @@ export function loadBundle(bundleDir: string): LoadedBundle {
         collectionsDir,
         functionsDir: resolveEntry(entry.functions, "functions"),
         cronsDir: resolveEntry(entry.crons, "crons"),
-        adminDir: resolveEntry(entry.admin, "admin"),
-        staticDir: resolveEntry(entry.static, "static")
+        staticApps: (entry.static ?? [])
+            .map(item => {
+                const resolved = resolveEntry(item.dir, `static app "${item.path}"`);
+                return resolved ? { path: item.path,
+dir: resolved,
+spa: item.spa !== false } : undefined;
+            })
+            .filter((item): item is LoadedStaticApp => item !== undefined)
+            // Longest path first, "/" last: the root app's catch-all would
+            // otherwise claim every sibling's URLs.
+            .sort((a, b) => b.path.length - a.path.length)
     };
 }
 
@@ -249,7 +272,7 @@ export function createSourceBundle(options: {
         },
         schemaVersion: "",
         app: options.app ?? "backend",
-        mode: options.mode ?? "cms",
+        kind: "backend",
         entry: {
             config: options.config ?? configDir,
             collections: collectionsDir,
@@ -270,8 +293,7 @@ createdAt: new Date().toISOString() }
         collectionsDir: resolve(collectionsDir),
         functionsDir: resolve(options.functions),
         cronsDir: resolve(options.crons),
-        adminDir: undefined,
-        staticDir: undefined
+        staticApps: []
     };
 }
 

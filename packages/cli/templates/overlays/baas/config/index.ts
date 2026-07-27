@@ -1,0 +1,15 @@
+/**
+ * The config package for a headless project.
+ *
+ * There are no collections here: this flavour introspects them from the live
+ * database at boot, which is exactly what "no `config/collections` directory"
+ * means to `rebase build`.
+ *
+ * The package still exists because storage does not run under row-level
+ * security and its keys share one flat namespace — so without an access model,
+ * a deployment with file storage enabled serves every user's files to every
+ * signed-in user. The server refuses to boot in that state, and this is the
+ * export it looks for.
+ */
+
+export { storageAuthorize } from "./storage.js";

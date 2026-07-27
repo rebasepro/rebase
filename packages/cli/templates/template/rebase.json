@@ -1,20 +1,17 @@
 {
     "$schema": "https://rebase.pro/schemas/rebase.json",
-    "runtime": "^1",
+    "rebase": "^1",
     "apps": {
         "backend": {
-            "type": "backend"
+            "type": "backend",
+            "runtime": "managed"
         },
-        "web": {
+        "admin": {
             "type": "static",
             "root": "frontend",
             "build": "npm run build --workspace frontend",
             "output": "frontend/dist",
-            "spa": true
-        },
-        "admin": {
-            "type": "admin",
-            "mode": "hosted"
+            "path": "/"
         }
     }
 }
