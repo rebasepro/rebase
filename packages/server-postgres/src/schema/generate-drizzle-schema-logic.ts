@@ -708,9 +708,17 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
                     emittedRelationNames.add(deduplicationKey);
 
                     switch (rel.kind) {
-                        case "belongsTo":
-                            tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${rel.localKey}],\n        references: [${targetTableVar}.${getPrimaryKeyName(target)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
+                        case "belongsTo": {
+                            // `localKey` is a COLUMN name; the generated Drizzle
+                            // object is keyed by PROPERTY. They differ whenever
+                            // the property is camelCase — `user_id` is exposed
+                            // as `userId` — and emitting the column produces a
+                            // schema that does not compile. The three other
+                            // emission sites normalise; this one did not.
+                            const localFieldKey = resolvePropertyKeyForColumn(collection, rel.localKey);
+                            tableRelations.push(`    "${relationKey}": one(${targetTableVar}, {\n        fields: [${tableVarName}.${localFieldKey}],\n        references: [${targetTableVar}.${getPrimaryKeyName(target)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
                             break;
+                        }
 
                         case "hasOne":
                             // The foreign key lives on the TARGET table. Drizzle pairs

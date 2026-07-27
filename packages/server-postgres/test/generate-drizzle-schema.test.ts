@@ -75,6 +75,41 @@ relationName: "author" }
         expect(cleanResult).toContain(cleanSchema(expectedRelation));
     });
 
+    it("uses the PROPERTY key, not the column name, in a belongsTo's fields", async () => {
+        // The generated Drizzle object is keyed by property; `localKey` is a
+        // column. They differ the moment a property is camelCase — `userId` is
+        // stored in `user_id` — and emitting the column produces a schema that
+        // does not compile:
+        //
+        //   Property 'user_id' does not exist ... Did you mean 'userId'?
+        //
+        // Three of the four relation-emission sites normalised via
+        // `resolvePropertyKeyForColumn`; the belongsTo branch did not, and it
+        // only shows up for a collection that actually declares the FK property.
+        const users: CollectionConfig = {
+            slug: "users", table: "users", name: "Users",
+            properties: { name: { type: "string" } }
+        };
+        const teamMembers: CollectionConfig = {
+            slug: "team_members", table: "team_members", name: "Team Members",
+            properties: {
+                userId: { type: "relation",
+relationName: "user" }
+            },
+            relations: [
+                { kind: "belongsTo",
+relationName: "user",
+target: () => users,
+localKey: "user_id" }
+            ]
+        };
+
+        const result = cleanSchema(await generateSchema([users, teamMembers]));
+
+        expect(result).toContain("fields: [teamMembers.userId]");
+        expect(result).not.toContain("fields: [teamMembers.user_id]");
+    });
+
     it("should generate a many-to-many relation with a junction table", async () => {
         const postsCollection: CollectionConfig = {
             slug: "posts",
