@@ -36,7 +36,7 @@ export function usePostgresClientDriver(config: PostgresDataDriverConfig): Postg
         client,
 
         async fetchCollection<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
-            // Pick only the fields the client needs, ignoring extra fields from the CMS layer
+            // Pick only the fields the client needs, ignoring extra fields from the admin layer
             const { path, filter, limit, startAfter, orderBy, searchString, order } = props;
             return client.fetchCollection({ path,
 filter,

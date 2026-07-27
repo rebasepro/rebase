@@ -85,7 +85,7 @@ export class FetchService {
      * Converts collection relations to a Drizzle-compatible `with` object.
      *
      * When `include` is provided, only those relations are loaded.
-     * When `include` is absent, ALL relations are loaded (CMS path).
+     * When `include` is absent, ALL relations are loaded (the admin path).
      *
      * Automatically detects many-to-many junction tables and nests
      * the target relation so actual row data is returned.

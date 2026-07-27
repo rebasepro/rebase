@@ -122,7 +122,7 @@ export type RebaseProps<USER extends User> = {
     basePath?: string;
 
     /**
-     * Optional base path for the CMS collections.
+     * Optional base path for the admin collections.
      * Defaults to "/c"
      */
     baseCollectionPath?: string;
@@ -136,13 +136,13 @@ export type RebaseProps<USER extends User> = {
 
 
     /**
-     * Format of the dates in the CMS.
+     * Format of the dates in the admin.
      * Defaults to 'MMMM dd, yyyy, HH:mm:ss'
      */
     dateTimeFormat?: string;
 
     /**
-     * Locale of the CMS, currently only affecting dates
+     * Locale of the admin, currently only affecting dates
      */
     locale?: Locale;
 
@@ -246,7 +246,7 @@ export type RebaseProps<USER extends User> = {
     userConfigPersistence?: UserConfigurationPersistence;
 
     /**
-     * Callback used to get analytics events from the CMS
+     * Callback used to get analytics events from the admin
      */
     onAnalyticsEvent?: (event: AnalyticsEvent, data?: object) => void;
 
@@ -258,12 +258,12 @@ export type RebaseProps<USER extends User> = {
 
 
     /**
-     * Plugins loaded in the CMS
+     * Plugins loaded in the admin
      */
     plugins?: RebasePlugin[];
 
     /**
-     * Extra slots for the CMS
+     * Extra slots for the admin
      */
     slots?: SlotContribution[];
 

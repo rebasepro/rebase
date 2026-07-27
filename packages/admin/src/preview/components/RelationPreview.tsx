@@ -158,7 +158,7 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     collection: AdminCollection<M>
 }) {
 
-    // CMS wire format embeds relation data as { id, path, values }
+    // admin wire format embeds relation data as { id, path, values }
     const passedEntity = relation.data as Entity<M> | undefined;
     const ResolvedEntityPreview = useComponentOverride("EntityPreview", EntityPreviewBinding);
     const customizationController = useCustomizationController();

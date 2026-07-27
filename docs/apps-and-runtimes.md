@@ -42,7 +42,7 @@ Rules for the implementer:
 | D6 | The bundle manifest's `mode` becomes `kind: "backend" \| "static"`. |
 | D7 | Static apps declare a `path`. Several are served from one process. |
 | D8 | The top-level version key is renamed `runtime` → `rebase`. |
-| D9 | ~~The name "CMS" is removed from the product, including exported API.~~ **Dropped.** New code says "admin"; the existing `registerCMS` / `useCMSContext` / `CMSBasePropertyNoName` exports stay as they are. See §4.7. |
+| D9 | The name "CMS" is removed from the product, including exported API and every locale. Deferred once, done later — see §4.7. |
 | D10 | `rebase init` scaffolds one app. Multi-app is taught by a preset. |
 | D11 | `rebase eject` is the supported route from `managed` to `custom`. |
 
@@ -555,45 +555,47 @@ There is no `rebase uneject`. Going back is deleting two files and editing one
 line, and a command that silently discarded a user's server code would be worse
 than its absence.
 
-### 4.7 The name "CMS" — deferred
+### 4.7 The name "CMS" — done
 
-**This section is not being implemented.** The rename touches exported API on
-packages that are already published, and it is orthogonal to everything else
-here; bundling it in would make every other phase look like a breaking release.
+D9 was deferred once, on the grounds that the rename touches exported API on
+published packages. It is done now, and it was smaller than it looked: the
+CMS-named symbols had **no consumers outside `packages/admin` and
+`admin-types`** — the only other references were compiled `dist/`.
 
-The standing rule instead: **anything new says "admin".** New identifiers, new
-doc comments, new CLI output and new manifest values use the admin vocabulary.
-Existing `registerCMS` / `unregisterCMS` / `useCMSContext` / `CMSContext` /
-`CMSBasePropertyNoName` / `CMSNavigationContent` stay where they are until
-someone decides to spend a major on them.
+| Was | Is |
+|---|---|
+| `useCMSContext`, `CMSContext` | `useAdminContext`, `AdminContext` |
+| `registerCMS`, `unregisterCMS` | `registerAdmin`, `unregisterAdmin` |
+| `CMSBasePropertyNoName` | `AdminBasePropertyNoName` |
+| `CMSNavigationContent` | `AdminNavigationContent` |
+| `hooks/useCMSContext.tsx` | `hooks/useAdminContext.tsx` |
 
-What still goes, because it is a *manifest value* rather than an API name: the
-`cms` / `baas` pair in `backend.mode` (D5) and in the bundle manifest's `mode`
-(D6). Those are removed by Phases 2 and 5 regardless.
+**The audit that justified deferring it was wrong in one place.** I reported "no
+user-visible strings say CMS", having grepped only for console output. Seven
+locale files said it — `"CMS Users"`, `"CMS View"`, and translated sentences in
+Spanish, Portuguese, German, French, Italian and Hindi. Those are the surface
+that matters most, and they are translated per language rather than sed'd.
 
-The rest of this section is retained as the record of what the rename would
-involve, should it ever be scheduled:
+Two traps in doing it, both caught by the typechecker rather than by review:
 
-| Current | Target | Location |
-|---|---|---|
-| `registerCMS` | `registerAdmin` | `packages/admin-types/src/controllers/registry.ts:88`, `packages/app/src/hooks/useRebaseRegistry.tsx:15`, `:43` |
-| `unregisterCMS` | `unregisterAdmin` | same files, `:89` / `:16` |
-| `useCMSContext` | `useAdminContext` | `packages/admin/src/hooks/useCMSContext.tsx:56` |
-| `CMSContext` | `AdminContext` | `packages/admin/src/hooks/useCMSContext.tsx:34` |
-| `CMSBasePropertyNoName` | `AdminBasePropertyNoName` | `packages/admin-types/src/types/property_config.tsx:4` |
-| `CMSNavigationContent` | `AdminNavigationContent` | `packages/admin/src/components/DefaultDrawer.tsx:145` |
+- `studio_sql_admin` **already existed** as a distinct key (`"(Admin)"`).
+  Renaming `studio_sql_cms` onto it would have silently merged two different
+  strings into one. It became `studio_sql_collections_label`, which says what
+  the value is.
+- A prose sweep over `\bCMS\b` reaches identifiers as readily as comments. It
+  is scoped to files that do not mention FireCMS, and every run was typechecked.
 
-Rename the file `packages/admin/src/hooks/useCMSContext.tsx` →
-`useAdminContext.tsx` and update `packages/admin/src/hooks/index.ts`.
-Callers include `packages/admin/src/data_export/export/ExportCollectionAction.tsx`
-and `packages/admin/src/components/RebaseAdmin.tsx:17`, `:25`.
+**Deliberately untouched: `packages/firebase`.** `FireCMS`, `__FIRECMS`,
+`firestoreToCMSModel`, `getCMSPathFromFirestorePath` and the
+`DataDriver.delegateToCMSModel` contract method it implements are heritage from
+a different product, not this one's naming. `delegateToCMSModel` is also an
+optional method on a public driver contract: renaming it would break a
+third-party driver *silently*, since an unimplemented optional method is simply
+never called. Worth doing when the driver contract next takes a major.
 
-Doc comments mentioning "CMS" — roughly ten in
-`packages/types/src/controllers/data.ts`, plus `properties.ts:167`,
-`entity_callbacks.ts:88`, `:135`, `data_source.ts:7`,
-`collection_registry.ts:14` — become "admin".
-
-Verification: `grep -rni "\bcms\b" packages/*/src` returns nothing.
+What stays "CMS" on purpose is prose about the product *category* — "like
+Payload/Directus", the `blog-cms` recipe. That is a thing to be compared to, not
+a thing this codebase builds.
 
 ### 4.8 `rebase init` and the templates
 
@@ -877,10 +879,11 @@ manifest using them fails validation with a message naming the replacement.
 `synthesizeManifest` — the no-manifest fallback — stays, because projects
 predating the file are real; see Phase 2.
 
-### Phase 0 — remove the name "CMS" — **dropped**
+### Phase 0 — remove the name "CMS" — done last, not first
 
-Not being implemented; see §4.7. New code says "admin", existing exports stay.
-The `cms`/`baas` *manifest values* still go, in Phases 1 and 5.
+Deferred at the start as an orthogonal rename on published packages, and carried
+out after the rest had landed. §4.7 has the result, including the two traps and
+the one thing the original audit got wrong.
 
 ### Phase 1 — manifest schema
 

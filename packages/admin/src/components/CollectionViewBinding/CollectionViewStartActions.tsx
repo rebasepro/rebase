@@ -11,7 +11,7 @@ import { FilterPresetsButton } from "./FilterPresetsButton";
 import { toArray } from "@rebasepro/utils";
 import { useNavigate } from "react-router-dom";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
-import { useCMSContext } from "../../hooks/useCMSContext";
+import { useAdminContext } from "../../hooks/useAdminContext";
 import { withViewMode } from "../../util/view_mode";
 
 export type CollectionViewStartActionsProps<M extends Record<string, unknown>> = {
@@ -43,7 +43,7 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
     openNewDocument
 }: CollectionViewStartActionsProps<M>) {
 
-    const context = useCMSContext();
+    const context = useAdminContext();
     const largeLayout = useLargeLayout();
     const { t } = useTranslation();
 

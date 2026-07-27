@@ -4,7 +4,7 @@ import type { ModeController } from "./useModeController";
 
 /**
  * Use this hook to build a color mode controller that determines
- * the theme of the CMS
+ * the theme of the admin
  */
 export function useBuildModeController(): ModeController {
 

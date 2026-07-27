@@ -1,7 +1,7 @@
 export type AnalyticsController = {
 
     /**
-     * Callback used to get analytics events from the CMS
+     * Callback used to get analytics events from the admin
      */
     onAnalyticsEvent?: (event: AnalyticsEvent, data?: object) => void;
 

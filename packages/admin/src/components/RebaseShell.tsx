@@ -19,7 +19,7 @@ export interface RebaseShellProps {
 }
 
 /**
- * Convenience component that composes all four CMS layers:
+ * Convenience component that composes all four admin layers:
  *
  * ```
  * <RebaseAuthGate>

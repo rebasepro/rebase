@@ -214,7 +214,7 @@ export function SubcollectionsEditTab({
                     title={<>Delete this subcollection?</>}
                     body={<> This will <b>not
                         delete any data</b>, only
-                        the collection in the CMS</>}/>}
+                        the collection in the admin</>}/>}
             {viewToDelete &&
                 <ConfirmationDialog open={Boolean(viewToDelete)}
                     onAccept={() => {
@@ -225,7 +225,7 @@ export function SubcollectionsEditTab({
                     title={<>Remove this view?</>}
                     body={<>This will <b>not
                         delete any data</b>, only
-                        the view in the CMS</>}/>}
+                        the view in the admin</>}/>}
 
             <CollectionEditorDialog
                 open={Boolean(currentDialog)}

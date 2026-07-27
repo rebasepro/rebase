@@ -25,13 +25,13 @@ import {
 } from "./navigation/contexts";
 
 /**
- * The CMS context extends the core RebaseContext with CMS-specific
- * controllers that are only available inside the CMS routing tree.
+ * The admin context extends the core RebaseContext with admin-specific
+ * controllers that are only available inside the admin routing tree.
  *
- * Use {@link useCMSContext} to obtain an instance.
+ * Use {@link useAdminContext} to obtain an instance.
  * @group Hooks and utilities
  */
-export type CMSContext<
+export type AdminContext<
     DB = Record<string, unknown>,
     USER extends User = User,
     AuthControllerType extends AuthController<USER> = AuthController<USER>
@@ -44,20 +44,20 @@ export type CMSContext<
 };
 
 /**
- * Hook that builds a fully-populated CMS context by combining the
- * core {@link RebaseContext} with CMS-specific controllers.
+ * Hook that builds a fully-populated admin context by combining the
+ * core {@link RebaseContext} with admin-specific controllers.
  *
- * Use this instead of `useRebaseContext()` in CMS components that
+ * Use this instead of `useRebaseContext()` in admin components that
  * need to pass context to entity action callbacks, plugin slots,
- * or any consumer that expects CMS controllers on the context object.
+ * or any consumer that expects admin controllers on the context object.
  *
  * @group Hooks and utilities
  */
-export function useCMSContext<
+export function useAdminContext<
     DB = Record<string, unknown>,
     USER extends User = User,
     AuthControllerType extends AuthController<USER> = AuthController<USER>
->(): CMSContext<DB, USER, AuthControllerType> {
+>(): AdminContext<DB, USER, AuthControllerType> {
     const baseContext = useRebaseContext<USER, AuthControllerType>();
     const sidePanelController = useSidePanel();
     const sideDialogsController = useSideDialogsController();

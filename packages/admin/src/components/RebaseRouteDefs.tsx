@@ -45,7 +45,7 @@ export interface RebaseRouteDefsProps {
 }
 
 /**
- * Route definitions for the CMS.
+ * Route definitions for the admin.
  *
  * Defines all standard routes: home, studio home, collection view,
  * settings, debug, custom views, and a catch-all 404.
@@ -77,7 +77,7 @@ export function RebaseRouteDefs({ children, layout }: RebaseRouteDefsProps) {
 
     const routeContents = (
         <>
-            {/* Core CMS Routes */}
+            {/* Core admin Routes */}
             <Route path={"/"} element={cmsHomePage}/>
             {registry.studioConfig && (
                 <Route path={"/s"} element={studioHomePage}/>

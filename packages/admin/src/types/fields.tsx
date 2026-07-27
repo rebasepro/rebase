@@ -243,7 +243,7 @@ export interface PropertyFieldBindingProps<M extends Record<string, unknown> = R
     propertyKey: string;
 
     /**
-     * The CMS property you are binding this field to
+     * The admin property you are binding this field to
      */
     property: Property;
 

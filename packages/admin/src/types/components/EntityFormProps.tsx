@@ -7,7 +7,7 @@ import { EntityFormActionsProps } from "./EntityFormActionsProps";
 
 /**
  * Props for the headless EntityForm component.
- * This form can be used without CMS context — all backend concerns
+ * This form can be used without admin context — all backend concerns
  * (save, caching, analytics, plugin slots) are provided via callbacks.
  */
 export type EntityFormProps<M extends Record<string, unknown>> = {
@@ -51,7 +51,7 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
 
     children?: React.ReactNode;
 
-    // --- Headless callbacks (replace internal CMS hooks) ---
+    // --- Headless callbacks (replace internal admin hooks) ---
 
     /**
      * Called on form submit with the values to save.

@@ -1049,8 +1049,8 @@ resizable: false }, ...dataColumns]
                 {/* Collection Badges Bar */}
                 {actionableCollections.length > 0 && (
                     <div className={cls("px-4 py-1.5 border-b flex items-center gap-2 shrink-0 bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
-                        <Tooltip title={t("studio_sql_cms_collections_tooltip")}>
-                            <Typography variant="caption" className="text-[10px] font-bold uppercase tracking-widest text-text-disabled dark:text-text-disabled-dark mr-1 shrink-0 cursor-help">{t("studio_sql_cms")}</Typography>
+                        <Tooltip title={t("studio_sql_admin_collections_tooltip")}>
+                            <Typography variant="caption" className="text-[10px] font-bold uppercase tracking-widest text-text-disabled dark:text-text-disabled-dark mr-1 shrink-0 cursor-help">{t("studio_sql_collections_label")}</Typography>
                         </Tooltip>
                         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                             {actionableCollections.map(mc => (
@@ -1404,7 +1404,7 @@ isFavorite: !s.isFavorite } : s));
                                                 </div>
                                                 {availableRoles.map(role => (
                                                     <MenuItem key={role} dense onClick={() => handleRoleChange(role)} className={cls("text-xs", selectedRole === role && "text-primary dark:text-primary-dark")}>
-                                                        {role}{role === "postgres" ? " " + t("studio_sql_admin") : ""}
+                                                        {role}{role === "postgres" ? " " + t("studio_sql_collections_label") : ""}
                                                     </MenuItem>
                                                 ))}
                                             </>

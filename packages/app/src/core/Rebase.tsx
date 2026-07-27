@@ -36,7 +36,7 @@ import { EffectiveRoleControllerContext } from "../contexts/EffectiveRoleControl
 import { useBuildEffectiveRoleController } from "../hooks/useBuildEffectiveRoleController";
 
 /**
- * If you are using independent components of the CMS
+ * If you are using independent components of the admin
  * you need to wrap them with this main component, so the internal hooks work.
  *
  * This is the main component of Rebase. It acts as the provider of all the
@@ -159,7 +159,7 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
     const resolvedData = useMemo(() => {
         const registeredDefault = dataSourcesValue.sources[DEFAULT_DATA_SOURCE_KEY];
         if (registeredDefault) return registeredDefault;
-        // CMS boundary: the SDK client returns flat rows; wrap them into the
+        // admin boundary: the SDK client returns flat rows; wrap them into the
         // Entity view-model the admin (`useData()`) renders.
         if (client?.data) return wrapAsEntityData(client.data, entityDataOptions);
         const built = Object.values(dataSourcesValue.sources);

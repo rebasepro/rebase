@@ -144,7 +144,7 @@ hasMore: false }
             // Flat row access — no .values wrapper
             expect(result.data[0].id).toBe("1");
             expect((result.data[0] as Record<string, unknown>).name).toBe("Product A");
-            // No path field — that's CMS leakage
+            // No path field — that's admin leakage
             expect((result.data[0] as Record<string, unknown>).path).toBeUndefined();
             expect(result.meta.total).toBe(1);
         });

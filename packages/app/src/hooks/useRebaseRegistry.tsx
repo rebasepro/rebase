@@ -12,8 +12,8 @@ import type { RebaseRegistryController, RebaseAdminConfig, RebaseStudioConfig, R
  */
 
 interface RegistryDispatch {
-    registerCMS: (config: RebaseAdminConfig) => void;
-    unregisterCMS: () => void;
+    registerAdmin: (config: RebaseAdminConfig) => void;
+    unregisterAdmin: () => void;
     registerStudio: (config: RebaseStudioConfig) => void;
     unregisterStudio: () => void;
     registerAuth: (config: RebaseAuthConfig) => void;
@@ -40,8 +40,8 @@ export function RebaseRegistryProvider({ children }: { children: React.ReactNode
 
     // Dispatch functions are stable — never change identity
     const dispatch = useMemo<RegistryDispatch>(() => ({
-        registerCMS: (config: RebaseAdminConfig) => setCmsConfig(config),
-        unregisterCMS: () => setCmsConfig(null),
+        registerAdmin: (config: RebaseAdminConfig) => setCmsConfig(config),
+        unregisterAdmin: () => setCmsConfig(null),
         registerStudio: (config: RebaseStudioConfig) => setStudioConfig(config),
         unregisterStudio: () => setStudioConfig(null),
         registerAuth: (config: RebaseAuthConfig) => setAuthConfig(config),

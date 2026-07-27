@@ -1,6 +1,6 @@
 // ─── Bridge ─────────────────────────────────────────────────────────
 // Re-export the Studio Bridge from @rebasepro/app.
-// The bridge lives in core so both studio and CMS can access it
+// The bridge lives in core so both studio and admin can access it
 // without circular dependencies.
 export {
     StudioBridgeProvider,

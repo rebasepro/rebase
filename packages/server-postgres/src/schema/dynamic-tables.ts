@@ -1,7 +1,7 @@
 /**
  * Build drizzle tables at runtime from an introspected schema.
  *
- * CMS mode gets its drizzle tables from a generated `schema.generated.ts` that
+ * A project with declared collections gets its drizzle tables from a generated `schema.generated.ts` that
  * the developer commits. BaaS mode has no such file — it points at a database
  * and serves it — so the equivalent table objects are constructed here from
  * `information_schema` metadata.

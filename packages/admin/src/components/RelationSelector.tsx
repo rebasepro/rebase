@@ -223,7 +223,7 @@ export const RelationSelector = React.forwardRef<
 
                 if (hasEmbeddedData) {
                     const r = rel as EntityRelation;
-                    // CMS wire format embeds relation data as { id, path, values }
+                    // admin wire format embeds relation data as { id, path, values }
                     newResolvedItems.push(toRelationItem(r.data as unknown as Entity, r));
                 } else if (currentSelectedMap.has(relId)) {
                     // We already have it in currentSelected
@@ -259,7 +259,7 @@ export const RelationSelector = React.forwardRef<
                     const relation = isPrimitive ? new EntityRelation(relId, path) : rel as EntityRelation;
 
                     if (!isPrimitive && (rel as EntityRelation).data) {
-                        // CMS wire format embeds relation data as { id, path, values }
+                        // admin wire format embeds relation data as { id, path, values }
                         return toRelationItem((rel as EntityRelation).data as unknown as Entity, relation);
                     }
                     if (currentSelectedMap.has(String(relId))) {

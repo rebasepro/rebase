@@ -221,7 +221,7 @@ alias: "u" }]);
 });
 
 describe("resolveQueryCollections", () => {
-    it("matches a single CMS collection", () => {
+    it("matches a single admin collection", () => {
         const result = resolveQueryCollections("SELECT * FROM users", mockSchemas, mockCollections);
         expect(result).toHaveLength(1);
         expect(result[0].tableName).toBe("users");
@@ -230,7 +230,7 @@ describe("resolveQueryCollections", () => {
         expect(result[0].columns).toContain("email");
     });
 
-    it("matches multiple CMS collections in a JOIN", () => {
+    it("matches multiple admin collections in a JOIN", () => {
         const result = resolveQueryCollections(
             "SELECT * FROM users u JOIN roles r ON u.role_id = r.id",
             mockSchemas,

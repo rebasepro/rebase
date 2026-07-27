@@ -1,27 +1,27 @@
 import React from "react";
 import { ArrayProperty, MapProperty, Property, StringProperty, NumberProperty, BooleanProperty, DateProperty, GeopointProperty, ReferenceProperty, RelationProperty, VectorProperty, BinaryProperty } from "@rebasepro/types";import { BaseProperty } from "@rebasepro/types";
 
-type CMSBasePropertyNoName = Omit<BaseProperty, "name">;
+type AdminBasePropertyNoName = Omit<BaseProperty, "name">;
 
 export type ConfigProperty =
-    | (Omit<StringProperty, "name"> & { name?: string } & CMSBasePropertyNoName)
-    | (Omit<NumberProperty, "name"> & { name?: string } & CMSBasePropertyNoName)
-    | (Omit<BooleanProperty, "name"> & { name?: string } & CMSBasePropertyNoName)
-    | (Omit<DateProperty, "name"> & { name?: string } & CMSBasePropertyNoName)
-    | (Omit<GeopointProperty, "name"> & { name?: string } & CMSBasePropertyNoName)
-    | (Omit<ReferenceProperty, "name"> & { name?: string } & CMSBasePropertyNoName)
-    | (Omit<RelationProperty, "name"> & { name?: string } & CMSBasePropertyNoName)
+    | (Omit<StringProperty, "name"> & { name?: string } & AdminBasePropertyNoName)
+    | (Omit<NumberProperty, "name"> & { name?: string } & AdminBasePropertyNoName)
+    | (Omit<BooleanProperty, "name"> & { name?: string } & AdminBasePropertyNoName)
+    | (Omit<DateProperty, "name"> & { name?: string } & AdminBasePropertyNoName)
+    | (Omit<GeopointProperty, "name"> & { name?: string } & AdminBasePropertyNoName)
+    | (Omit<ReferenceProperty, "name"> & { name?: string } & AdminBasePropertyNoName)
+    | (Omit<RelationProperty, "name"> & { name?: string } & AdminBasePropertyNoName)
     | (Omit<ArrayProperty, "name" | "of" | "oneOf"> & {
         name?: string;
         of?: ConfigProperty | ConfigProperty[];
         oneOf?: { properties: Record<string, ConfigProperty>; typeField?: string; valueField?: string; propertiesOrder?: string[] }
-    } & CMSBasePropertyNoName)
+    } & AdminBasePropertyNoName)
     | (Omit<MapProperty, "name" | "properties"> & {
         name?: string;
         properties?: Record<string, ConfigProperty>
-    } & CMSBasePropertyNoName)
-    | (Omit<VectorProperty, "name"> & { name?: string } & CMSBasePropertyNoName)
-    | (Omit<BinaryProperty, "name"> & { name?: string } & CMSBasePropertyNoName);
+    } & AdminBasePropertyNoName)
+    | (Omit<VectorProperty, "name"> & { name?: string } & AdminBasePropertyNoName)
+    | (Omit<BinaryProperty, "name"> & { name?: string } & AdminBasePropertyNoName);
 
 /**
  * This is the configuration object for a property.

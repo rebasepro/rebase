@@ -1,7 +1,7 @@
 /**
  * Internal re-exports for the collection editor module.
  * This avoids circular imports by pointing directly at source files
- * rather than going through the CMS barrel (index.ts).
+ * rather than going through the admin barrel (index.ts).
  */
 
 // Hooks

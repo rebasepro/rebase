@@ -75,7 +75,7 @@ import { addRecentId, getRecentIds } from "./utils";
 import { isViewMode, OpenEntityMode, resolveOpenEntityMode, VIEW_MODE_PARAM } from "../../util/view_mode";
 import { mergeDeep } from "@rebasepro/utils";
 import { useBreadcrumbsController } from "../../hooks/useBreadcrumbsController";
-import { useCMSContext } from "../../hooks/useCMSContext";
+import { useAdminContext } from "../../hooks/useAdminContext";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../../hooks/useSidePanel";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
@@ -167,7 +167,7 @@ const CollectionViewBindingInner = React.memo(
     ) {
 
         const { t } = useTranslation();
-        const context = useCMSContext();
+        const context = useAdminContext();
         const collectionRegistry = useCollectionRegistryController();
         const urlController = useUrlController();
         const breadcrumbs = useBreadcrumbsController();

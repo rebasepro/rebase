@@ -160,7 +160,7 @@ export interface CollectionEditorExtensionProps {
      * reading from React contexts.
      *
      * Use this when embedding the collection editor outside of the Rebase
-     * CMS, where the Rebase context providers are not available.
+     * admin, where the Rebase context providers are not available.
      *
      * Default: false (standard Rebase mode).
      */

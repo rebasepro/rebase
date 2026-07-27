@@ -33,9 +33,9 @@ import { LanguageToggle, RebaseLogo } from "@rebasepro/app";
 import { useApp } from "./app/useApp";
 
 /**
- * Default drawer used in the CMS.
+ * Default drawer used in the admin.
  *
- * When no `children` are provided, renders the full CMS navigation
+ * When no `children` are provided, renders the full admin navigation
  * (collection groups, mode switch, plugin slots).
  *
  * When `children` **are** provided, renders the shared drawer shell
@@ -60,7 +60,7 @@ export function DefaultDrawer({
     logoDestination?: string;
     /**
      * Custom navigation content for the drawer.
-     * When provided, replaces the default CMS navigation (collection groups,
+     * When provided, replaces the default admin navigation (collection groups,
      * mode switch, slots). The shared shell (logo, scroll area, footer
      * actions, collapse toggle) is still rendered around it.
      */
@@ -115,7 +115,7 @@ export function DefaultDrawer({
                         ? "linear-gradient(to bottom, transparent 0, black 20px, black calc(100% - 20px), transparent 100%)"
                         : "linear-gradient(to bottom, black 0, black calc(100% - 20px), transparent 100%)"
                 }}>
-                {children ?? <CMSNavigationContent />}
+                {children ?? <AdminNavigationContent />}
             </div>
 
             {footerActions !== null && (
@@ -138,11 +138,11 @@ export function DefaultDrawer({
 }
 
 /**
- * Default CMS navigation content — rendered inside DefaultDrawer when no
+ * Default admin navigation content — rendered inside DefaultDrawer when no
  * custom `children` are provided.  Contains the mode switch, navigation
  * groups, and header / footer plugin slots.
  */
-function CMSNavigationContent() {
+function AdminNavigationContent() {
 
     const {
         drawerHovered,
@@ -166,7 +166,7 @@ function CMSNavigationContent() {
     const allNavigationEntries = navigationState.topLevelNavigation?.navigationEntries ?? [];
 
     // Build a set of Studio-only dev view slugs so we can distinguish them from
-    // CMS custom views added via <RebaseAdmin views={...}> or plugins.
+    // admin custom views added via <RebaseAdmin views={...}> or plugins.
     const studioViewSlugs = useMemo(() => {
         const slugs = new Set<string>();
         (registry.studioConfig?.devViews ?? []).forEach(v => slugs.add(v.slug));
@@ -176,7 +176,7 @@ function CMSNavigationContent() {
     }, [registry.studioConfig, registry.cmsConfig?.collectionEditor]);
 
     // Studio mode shows Studio dev views + admin entries (Users/Roles).
-    // Content mode shows collections, CMS custom views, and admin entries — but not Studio dev views.
+    // Content mode shows collections, admin custom views, and admin entries — but not Studio dev views.
     const filteredEntries = adminModeController.mode === "studio"
         ? allNavigationEntries.filter(e => (e.type === "view" && studioViewSlugs.has(e.slug)) || e.type === "admin")
         : allNavigationEntries.filter(e => e.type !== "view" || !studioViewSlugs.has(e.slug));

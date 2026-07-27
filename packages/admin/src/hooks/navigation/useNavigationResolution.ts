@@ -238,13 +238,13 @@ export async function resolveAppViews(
             if (count > 1) {
                 console.warn(
                     `[Rebase] Duplicate view slug "${slug}" detected (${count} views). ` +
-                    `Last-write-wins. Ensure unique slugs across CMS views and plugins.`
+                    `Last-write-wins. Ensure unique slugs across admin views and plugins.`
                 );
             }
         });
     }
 
-    // Filter by roles — applies to CMS, plugin, and builder-returned views
+    // Filter by roles — applies to admin, plugin, and builder-returned views
     resolvedViews = filterViewsByRole(resolvedViews, authController);
 
     return resolvedViews;

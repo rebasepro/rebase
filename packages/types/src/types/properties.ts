@@ -164,7 +164,7 @@ export interface BaseProperty<CustomProps = unknown> {
 
     /**
      * You can use this prop to reuse a property that has been defined
-     * in the top level of the CMS in the prop `fields`.
+     * in the top level of the admin in the prop `fields`.
      * All the configuration will be taken from the inherited config, and
      * overwritten by the current property config.
      */

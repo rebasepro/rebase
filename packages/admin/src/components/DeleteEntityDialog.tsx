@@ -10,7 +10,7 @@ import {
     useSnackbarController,
     useTranslation
 } from "@rebasepro/app";
-import { useCMSContext } from "../hooks";
+import { useAdminContext } from "../hooks";
 import { EntityViewBinding } from "./EntityViewBinding";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
@@ -54,7 +54,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
     const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
 
-    const context = useCMSContext();
+    const context = useAdminContext();
     const entityOrEntities = Array.isArray(entityOrEntitiesToDelete) && entityOrEntitiesToDelete.length === 1
         ? entityOrEntitiesToDelete[0]
         : entityOrEntitiesToDelete;

@@ -24,7 +24,7 @@ import { useRestoreScroll } from "@rebasepro/app";
 
 import { SchemaDriftBanner } from "@rebasepro/app";
 import { useBreadcrumbsController } from "../../hooks/useBreadcrumbsController";
-import { useCMSContext } from "../../hooks/useCMSContext";
+import { useAdminContext } from "../../hooks/useAdminContext";
 
 export const DEFAULT_GROUP_NAME = "Views";
 export const ADMIN_GROUP_NAME = "Admin";
@@ -43,7 +43,7 @@ export function ContentHomePage({
     hiddenGroups?: string[];
 }) {
 
-    const context = useCMSContext();
+    const context = useAdminContext();
     const { navigationStateController } = context;
     const customizationController = useCustomizationController();
     const adminModeController = useAdminModeController();
@@ -65,7 +65,7 @@ export function ContentHomePage({
     } = navigationStateController.topLevelNavigation || {};
 
     // Build a set of Studio-only dev view slugs so we can distinguish them from
-    // CMS custom views added via <RebaseAdmin views={...}> or plugins.
+    // admin custom views added via <RebaseAdmin views={...}> or plugins.
     const studioViewSlugs = useMemo(() => {
         const slugs = new Set<string>();
         (registry.studioConfig?.devViews ?? []).forEach(v => slugs.add(v.slug));
@@ -74,7 +74,7 @@ export function ContentHomePage({
     }, [registry.studioConfig, registry.cmsConfig?.collectionEditor]);
 
     // Studio mode shows Studio dev views + admin entries (Users/Roles).
-    // Content mode shows collections, CMS custom views, and admin entries — but not Studio dev views.
+    // Content mode shows collections, admin custom views, and admin entries — but not Studio dev views.
     const rawNavigationEntries = useMemo(() => {
         if (adminModeController.mode === "studio") {
             return unFilteredNavigationEntries.filter(e => (e.type === "view" && studioViewSlugs.has(e.slug)) || e.type === "admin");

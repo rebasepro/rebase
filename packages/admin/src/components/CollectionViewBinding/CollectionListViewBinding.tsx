@@ -24,7 +24,7 @@ import { getEntityPreviewKeys } from "../../util/previews";
 import { IconForView } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionSlotKeys, resolveEntitySlots, type CollectionSlotKeys } from "./usePreviewSlots";
-import { useCMSContext } from "../../hooks/useCMSContext";
+import { useAdminContext } from "../../hooks/useAdminContext";
 import { resolveEntityAction } from "../../util/resolutions";
 
 export type CollectionListViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
@@ -265,8 +265,8 @@ year: diffDays > 365 ? "numeric" : undefined });
 }
 
 /**
- * Classic CMS list view for displaying entities.
- * Designed to be the most familiar, stereotypical CMS content management view:
+ * Classic admin list view for displaying entities.
+ * Designed to be the most familiar, stereotypical admin content management view:
  * - Clean rows with checkbox, icon/avatar, title, metadata, and actions
  * - Column-sortable headers
  * - Infinite scroll
@@ -289,7 +289,7 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
     const authController = useAuthController();
     const customizationController = useCustomizationController();
     const analyticsController = useAnalyticsController();
-    const context = useCMSContext();
+    const context = useAdminContext();
 
     const containerRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState(1200);
@@ -622,7 +622,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     isLast: boolean;
     isActive?: boolean;
     listViewActions?: EntityAction[];
-    context?: ReturnType<typeof useCMSContext>;
+    context?: ReturnType<typeof useAdminContext>;
     path?: string;
     selectionController?: SelectionController<M>;
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
@@ -888,7 +888,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     isLast: boolean;
     isActive?: boolean;
     listViewActions?: EntityAction[];
-    context?: ReturnType<typeof useCMSContext>;
+    context?: ReturnType<typeof useAdminContext>;
     path?: string;
     selectionController?: SelectionController<M>;
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";

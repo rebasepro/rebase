@@ -1,4 +1,4 @@
-// CMS-specific types take priority over base types when names conflict
+// admin-specific types take priority over base types when names conflict
 export * from "./types";
 // Editor types only — the full ProseMirror editor (RichTextEditor) is a heavy import (~300 KB)
 // and is available as a separate entry point: @rebasepro/admin/editor
@@ -77,7 +77,7 @@ export {
     mergeEntityActions,
     resolveEntityAction,
     resolveEntityView,
-    // Property utilities (moved from @rebasepro/app — property-aware logic belongs in CMS)
+    // Property utilities (moved from @rebasepro/app — property-aware logic belongs in admin)
     isReferenceProperty,
     isRelationProperty,
     getIconForWidget,
@@ -87,7 +87,7 @@ export {
     getBracketNotation,
     getPropertiesWithPropertiesOrder,
     getDefaultPropertiesOrder,
-    // Preview utilities (moved from @rebasepro/app — property-aware logic belongs in CMS)
+    // Preview utilities (moved from @rebasepro/app — property-aware logic belongs in admin)
     getEntityPreviewKeys,
     getEntityTitlePropertyKey,
     getEntityTitlePropertyKeyForEntity
@@ -102,7 +102,7 @@ export { useCollectionDataController, createStaticDataController } from "./util/
 export * from "./data_import";
 export * from "./data_export";
 
-// Collection editor — moved from @rebasepro/studio (CMS-dependent visual schema editor)
+// Collection editor — moved from @rebasepro/studio (admin-dependent visual schema editor)
 export * from "./collection_editor";
 
 

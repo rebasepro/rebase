@@ -7,7 +7,7 @@ import type { RebaseAuthConfig } from "@rebasepro/admin-types";
  * Renders nothing — purely registers config into the RebaseRegistry.
  *
  * This is a framework-level component that lives in core since
- * authentication is cross-cutting (CMS, Studio, any app area).
+ * authentication is cross-cutting (admin, Studio, any app area).
  * @group Core
  */
 export function RebaseAuth({ loginView }: RebaseAuthConfig) {

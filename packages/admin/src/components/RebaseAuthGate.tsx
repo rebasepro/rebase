@@ -15,7 +15,7 @@ import type { AuthControllerExtended } from "@rebasepro/admin-types";
  * - Renders `children` when a user is authenticated.
  *
  * **Independently usable**: Use this alone when you want auth gating
- * without the full CMS layout or navigation.
+ * without the full admin layout or navigation.
  *
  * @example
  * ```tsx

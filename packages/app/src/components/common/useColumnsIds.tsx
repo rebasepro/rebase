@@ -6,7 +6,7 @@ import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Get a property in a property tree from a dot-path like `address.street`.
- * Inlined here to avoid importing property-aware utilities from the CMS layer.
+ * Inlined here to avoid importing property-aware utilities from the admin layer.
  */
 function getPropertyInPath(properties: Properties, path: string): Property | undefined {
     if (typeof properties === "object") {

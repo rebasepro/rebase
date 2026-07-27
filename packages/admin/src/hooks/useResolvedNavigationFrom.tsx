@@ -4,7 +4,7 @@ import { Entity, User } from "@rebasepro/types";
 import { RebaseContext } from "@rebasepro/admin-types";
 import { useEffect, useState, useMemo } from "react";
 import { getNavigationEntriesFromPath } from "@rebasepro/app";
-import { useCMSContext } from "./useCMSContext";
+import { useAdminContext } from "./useAdminContext";
 
 /**
  * @see resolveNavigationFrom
@@ -136,7 +136,7 @@ export function useResolvedNavigationFrom<M extends Record<string, unknown>>(
         path
     }: NavigationFromProps): NavigationFrom<M> {
 
-    const context = useCMSContext();
+    const context = useAdminContext();
     const { navigationStateController, collectionRegistryController } = context;
 
     const [data, setData] = useState<ResolvedNavigationEntry<M>[] | undefined>();

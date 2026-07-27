@@ -16,7 +16,7 @@ export type CustomizationController = {
     entityLinkBuilder?: EntityLinkBuilder;
 
     /**
-     * Use plugins to modify the behaviour of the CMS.
+     * Use plugins to modify the behaviour of the admin.
      */
     plugins?: RebasePlugin[];
 
@@ -43,18 +43,18 @@ export type CustomizationController = {
     entityActions?: EntityAction[];
 
     /**
-     * Format of the dates in the CMS.
+     * Format of the dates in the admin.
      * Defaults to 'MMMM dd, yyyy, HH:mm:ss'
      */
     dateTimeFormat?: string;
 
     /**
-     * Locale of the CMS, currently only affecting dates
+     * Locale of the admin, currently only affecting dates
      */
     locale?: Locale;
 
     /**
-     * Record of custom form fields to be used in the CMS.
+     * Record of custom form fields to be used in the admin.
      * You can use the key to reference the custom field in
      * the `propertyConfig` prop of a property in a collection.
      */

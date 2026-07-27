@@ -39,9 +39,9 @@ import {
 /**
  * Headless entity form component.
  *
- * Renders a form for a entity collection without any CMS or backend dependencies.
+ * Renders a form for a entity collection without any admin or backend dependencies.
  * All backend concerns (save, caching, analytics, plugin slots) are provided via
- * callback props. For CMS-connected usage, use {@link EntityFormBinding} instead.
+ * callback props. For admin-connected usage, use {@link EntityFormBinding} instead.
  *
  * @group Components
  */

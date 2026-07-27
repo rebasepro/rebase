@@ -18,7 +18,7 @@ import {
 import { useTranslation } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getLocalChangesBackup } from "@rebasepro/app";
-import { useCMSContext } from "../../hooks/useCMSContext";
+import { useAdminContext } from "../../hooks/useAdminContext";
 
 /**
  *
@@ -79,7 +79,7 @@ export const CollectionRowActions = function CollectionRowActions({
         isDraggable?: boolean;
     }) {
 
-    const context = useCMSContext();
+    const context = useAdminContext();
     const sidePanelCtrl = context.sidePanelController;
     const { t } = useTranslation();
 

@@ -23,7 +23,7 @@ import { StudioHomePage } from "./StudioHomePage";
  * Declarative component to configure the Studio in Rebase.
  * Renders nothing — purely registers config into the RebaseRegistry.
  *
- * The "schema" tool (collection editor view) is now a built-in CMS feature.
+ * The "schema" tool (collection editor view) is now a built-in admin feature.
  * When `<RebaseAdmin collectionEditor={...}>` is used, the schema view is
  * automatically injected into Studio — no manual wiring needed.
  */

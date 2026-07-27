@@ -9,7 +9,7 @@ import { assertRelationsResolve } from "./validate-relations";
 /**
  * Everything a registry is built from: the collections, and the drizzle schema
  * they are backed by. In BaaS mode all of it is introspected from the live
- * database; in CMS mode it comes from the config and the generated schema.
+ * database; when collections are declared it comes from the config and the generated schema.
  */
 export interface RegistrySchema {
     collections?: CollectionConfig[];

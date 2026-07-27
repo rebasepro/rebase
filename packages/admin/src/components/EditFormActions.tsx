@@ -20,7 +20,7 @@ import { SideDialogController, useSideDialogContext } from "./SideDialogs";
 import { FormexController } from "@rebasepro/forms";
 import { ErrorTooltip } from "@rebasepro/app";
 import { usePermissions } from "@rebasepro/app";
-import { useCMSContext } from "../hooks/useCMSContext";
+import { useAdminContext } from "../hooks/useAdminContext";
 import { useChildViewSource } from "../hooks/useChildViewSource";
 
 export function EditFormActions({
@@ -40,7 +40,7 @@ export function EditFormActions({
 }: EntityFormActionsProps) {
 
     const { canCreate, canDelete } = usePermissions();
-    const context = useCMSContext();
+    const context = useAdminContext();
     const sidePanelController = context.sidePanelController;
     const sideDialogContext = useSideDialogContext();
     const customizationController = useCustomizationController();

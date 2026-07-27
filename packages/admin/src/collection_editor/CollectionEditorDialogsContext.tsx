@@ -5,7 +5,7 @@ import React, { createContext, useContext } from "react";
  * sets and CollectionEditorDialogs reads.
  *
  * This indirection exists because ConfigControllerProvider is a root-scope
- * plugin provider that wraps <RebaseShell>, therefore living ABOVE the CMS
+ * plugin provider that wraps <RebaseShell>, therefore living ABOVE the admin
  * context providers (CollectionRegistryContext, NavigationStateContext,
  * UrlContext).  The actual dialog components need those contexts, so they
  * must render inside the shell tree.

@@ -85,7 +85,7 @@ export interface AfterReadProps<M extends Record<string, unknown> = Record<strin
     collection: CollectionConfig<M>;
 
     /**
-     * Full path of the CMS where this collection is being fetched.
+     * Full path of the admin where this collection is being fetched.
      * Might contain unresolved aliases.
      */
     path: string;
@@ -132,7 +132,7 @@ export interface AfterSaveProps<M extends Record<string, unknown> = Record<strin
     collection: CollectionConfig<M>;
 
     /**
-     * Full path of the CMS where this entity is being saved.
+     * Full path of the admin where this entity is being saved.
      * Might contain unresolved aliases.
      */
     path: string;

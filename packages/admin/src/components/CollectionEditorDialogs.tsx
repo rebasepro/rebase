@@ -16,12 +16,12 @@ const PropertyFormDialog = lazy(() =>
 
 /**
  * Renders the CollectionEditorDialog and PropertyFormDialog inside
- * the RebaseShell tree where CMS-internal contexts
+ * the RebaseShell tree where admin-internal contexts
  * (CollectionRegistryContext, NavigationStateContext, UrlContext)
  * are available.
  *
  * Both dialog components are loaded dynamically via React.lazy so that
- * production CMS bundles that never open the collection editor don't pay
+ * production admin bundles that never open the collection editor don't pay
  * the download/parse cost up-front.
  *
  * The dialog state (open/close, props) is managed by ConfigControllerProvider

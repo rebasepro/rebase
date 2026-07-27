@@ -15,8 +15,8 @@ import { useAuthController, useBridgeRegistration, NavigationBlockerProvider } f
  * Provider that builds the SidePanelController and makes it available
  * via the SidePanelControllerContext from @rebasepro/app.
  *
- * After the CMS extraction refactor, `useBuildSidePanel` lives
- * in the CMS package while the context it feeds into lives in core.
+ * After the admin extraction refactor, `useBuildSidePanel` lives
+ * in the admin package while the context it feeds into lives in core.
  * This provider bridges the two: place it inside the `<Rebase>` tree and
  * above any component that calls `useSidePanel()`.
  *

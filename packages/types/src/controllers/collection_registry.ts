@@ -11,7 +11,7 @@ export type CollectionRegistryController<
 > = {
 
     /**
-     * List of the mapped collections in the CMS.
+     * List of the mapped collections in the admin.
      * Each entry relates to a collection in the root database.
      * Each of the navigation entries in this field
      * generates an entry in the main menu.

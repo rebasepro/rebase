@@ -25,7 +25,7 @@ import type { StorageAuthorizeContext } from "@rebasepro/types";
  * - the container restarts fast enough that a health check can answer `ok` in the
  *   gap between attempts, so the visible symptom was a `fetch failed / ECONNRESET`
  *   on some later call, pointing nowhere near storage;
- * - the only suite that exercised it was the CMS init e2e, inside a Docker build
+ * - the only suite that exercised it was the admin init e2e, inside a Docker build
  *   roughly fifteen minutes in, and it needs Docker.
  *
  * So the checks below are deliberately cheap and deliberately not dev-mode.

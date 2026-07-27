@@ -18,9 +18,9 @@ export type { BreadcrumbEntry, BreadcrumbsController };
 // ─── Bridge interface ───────────────────────────────────────────────
 
 /**
- * StudioBridge provides optional CMS capabilities to Studio components.
- * When CMS is present, a bridge provider injects real implementations.
- * When CMS is absent, noop defaults ensure Studio works standalone.
+ * StudioBridge provides optional admin capabilities to Studio components.
+ * When the admin is present, a bridge provider injects real implementations.
+ * When the admin is absent, noop defaults ensure Studio works standalone.
  */
 export interface StudioBridge {
     collectionRegistry: CollectionRegistryController;
@@ -84,10 +84,10 @@ const NOOP_BRIDGE: StudioBridge = {
 export const StudioBridgeContext = createContext<StudioBridge>(NOOP_BRIDGE);
 
 /**
- * Provider that injects CMS capabilities into Studio.
+ * Provider that injects admin capabilities into Studio.
  * Accepts partial overrides — any field not provided falls back to noop.
  *
- * Usage (in app wiring, when CMS is present):
+ * Usage (in app wiring, when the admin is present):
  * ```tsx
  * <StudioBridgeProvider value={{
  *     collectionRegistry: useCollectionRegistryController(),
@@ -121,27 +121,27 @@ export function StudioBridgeProvider({
 
 // ─── Convenience hooks ──────────────────────────────────────────────
 
-/** Collection registry — returns noop if CMS is not present. */
+/** Collection registry — returns noop if the admin is not present. */
 export function useStudioCollectionRegistry(): CollectionRegistryController {
     return useContext(StudioBridgeContext).collectionRegistry;
 }
 
-/** Side panel controller — returns noop if CMS is not present. */
+/** Side panel controller — returns noop if the admin is not present. */
 export function useStudioSidePanelController(): SidePanelController {
     return useContext(StudioBridgeContext).sidePanelController;
 }
 
-/** URL controller — returns noop if CMS is not present. */
+/** URL controller — returns noop if the admin is not present. */
 export function useStudioUrlController(): UrlController {
     return useContext(StudioBridgeContext).urlController;
 }
 
-/** Navigation state — returns noop if CMS is not present. */
+/** Navigation state — returns noop if the admin is not present. */
 export function useStudioNavigationState(): NavigationStateController {
     return useContext(StudioBridgeContext).navigationState;
 }
 
-/** Breadcrumbs controller — returns noop if CMS is not present. */
+/** Breadcrumbs controller — returns noop if the admin is not present. */
 export function useStudioBreadcrumbs(): BreadcrumbsController {
     return useContext(StudioBridgeContext).breadcrumbs;
 }

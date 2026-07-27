@@ -49,7 +49,7 @@ export interface KanbanConfig<M extends Record<string, unknown> = Record<string,
 
 /**
  * View mode for displaying a collection.
- * - "list": Simple, clean list view — the classic CMS default
+ * - "list": Simple, clean list view — the classic admin default
  * - "table": Table with inline editing
  * - "cards": Grid of visual cards with thumbnails
  * - "kanban": Board view grouped by a property
@@ -145,7 +145,7 @@ export interface SelectionController<M extends Record<string, unknown> = Record<
 
 /**
  * Used to indicate valid filter combinations (e.g. created in Firestore)
- * If the user selects a specific filter/sort combination, the CMS checks if it's
+ * If the user selects a specific filter/sort combination, the admin checks if it's
  * valid, otherwise it reverts to the simpler valid case
  * @group Models
  */

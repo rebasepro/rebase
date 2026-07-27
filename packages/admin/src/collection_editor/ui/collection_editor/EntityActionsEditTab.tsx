@@ -145,7 +145,7 @@ export function EntityActionsEditTab({
                     title={<>Remove this action?</>}
                     body={<>This will <b>not
                         delete any data</b>, only
-                        the action in the CMS</>}/>}
+                        the action in the admin</>}/>}
 
             <EntityActionsSelectDialog
                 open={addEntityActionDialogOpen}

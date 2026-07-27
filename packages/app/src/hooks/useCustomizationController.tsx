@@ -5,7 +5,7 @@ import { CustomizationControllerContext } from "../contexts/CustomizationControl
 /**
  * Use this hook to retrieve the customization controller.
  * This hook includes all the customization options that can be used
- * to customize the CMS.
+ * to customize the admin.
  *
  * You will likely not need to use this hook directly.
  *

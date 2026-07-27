@@ -123,7 +123,7 @@ export function StudioHomePage({
     const pluginActions = useSlot("home.actions", sectionProps);
 
     // The collection editor ("schema") is not part of `devViews` — RebaseNavigation
-    // injects it when the CMS enables a collection editor. Mirror that condition so
+    // injects it when the admin enables a collection editor. Mirror that condition so
     // the card tracks the route.
     const schemaEnabled = Boolean(registry.studioConfig && registry.cmsConfig?.collectionEditor);
 

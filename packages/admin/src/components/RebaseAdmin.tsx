@@ -3,7 +3,7 @@ import { useRebaseRegistryDispatch } from "@rebasepro/app";
 import type { RebaseAdminConfig } from "@rebasepro/admin-types";
 
 /**
- * Declarative component to configure the CMS in Rebase.
+ * Declarative component to configure the admin in Rebase.
  * Renders nothing — purely registers config into the RebaseRegistry.
  *
  * When `collectionEditor` is provided, the built-in visual schema editor
@@ -14,7 +14,7 @@ export function RebaseAdmin({ collections, views, homePage, entityViews, entityA
     const dispatch = useRebaseRegistryDispatch();
 
     useLayoutEffect(() => {
-        dispatch.registerCMS({ collections,
+        dispatch.registerAdmin({ collections,
 views,
 homePage,
 entityViews,
@@ -22,7 +22,7 @@ entityActions,
 collectionEditor,
 navigationGroupMappings,
 basePath });
-        return () => dispatch.unregisterCMS();
+        return () => dispatch.unregisterAdmin();
     }, [dispatch, collections, views, homePage, entityViews, entityActions, collectionEditor, navigationGroupMappings, basePath]);
 
     return null;

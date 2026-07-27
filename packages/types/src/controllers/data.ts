@@ -116,12 +116,12 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
 
 
 /**
- * Fluent query builder for the **admin CMS** — resolves to `FindResponse<M>`
+ * Fluent query builder for the **admin admin** — resolves to `FindResponse<M>`
  * (Snapshot-wrapped rows).
  *
  * @internal App developers should use {@link SDKQueryBuilderInterface}
  * (flat rows, returned by `client.data.*` / `context.data.*`). This
- * Snapshot-flavored variant backs the admin CMS internals only.
+ * Snapshot-flavored variant backs the admin admin internals only.
  *
  * @group Data
  */
@@ -138,13 +138,13 @@ export interface QueryBuilderInterface<M extends Record<string, unknown> = Recor
 }
 
 /**
- * A single collection's CRUD accessor for the **admin CMS** — every method
+ * A single collection's CRUD accessor for the **admin admin** — every method
  * resolves to `Snapshot`-wrapped rows (`FindResponse<M>` / `Snapshot<M>`).
  *
  * @internal App developers do **not** use this. The public, symmetric surface
  * is {@link SDKCollectionClient} (flat rows), exposed as `client.data.products`
  * in the SDK and `context.data.products` in framework callbacks. This
- * Snapshot-flavored accessor backs the admin CMS view-model only.
+ * Snapshot-flavored accessor backs the admin admin view-model only.
  *
  * @group Data
  */
@@ -269,7 +269,7 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
  * SDK collection client — returns flat rows, no Entity wrapper.
  *
  * This is the public API surface for app developers using
- * `createRebaseClient()`. CMS internals use `CollectionAccessor` instead.
+ * `createRebaseClient()`. admin internals use `CollectionAccessor` instead.
  *
  * Type parameters:
  * - `M` — the **Row** shape returned by reads (`find`, `findById`, `listen`).
@@ -406,16 +406,16 @@ export interface SDKCollectionClient<
 }
 
 /**
- * The unified data access object for the **admin CMS** (Entity-shaped).
+ * The unified data access object for the **admin admin** (Entity-shaped).
  *
  * Access collections as dynamic properties: `data.products.find(...)`. Each
  * accessor returns `Entity`-wrapped records (`{ id, path, values }`) — the
- * view-model the CMS renders. This is what `useData()` / the admin
+ * view-model the admin renders. This is what `useData()` / the admin
  * `RebaseContext.data` are backed by.
  *
  * @internal App developers do **not** use this — they use
  * {@link RebaseSdkData} (flat rows), which is what the SDK client and backend
- * `context.data` expose. This Entity-shaped map backs the admin CMS only.
+ * `context.data` expose. This Entity-shaped map backs the admin admin only.
  *
  * @group Data
  */
@@ -455,7 +455,7 @@ export type RebaseData<DB = unknown> = {
  *
  * Every accessor returns flat rows (the table's columns) via
  * {@link SDKCollectionClient} — access fields directly (`row.title`), never
- * `row.values.title`. The admin CMS uses {@link RebaseData} (Entity) instead.
+ * `row.values.title`. The admin uses {@link RebaseData} (Entity) instead.
  *
  * @example
  * // Frontend SDK

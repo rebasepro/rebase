@@ -27,7 +27,7 @@ export function GetCodeDialog({
         <DialogContent>
 
             <Typography variant={"body2"} className={"my-4 mb-8"}>
-                If you want to customise the collection in code, you can add this collection code to your CMS
+                If you want to customise the collection in code, you can add this collection code to your admin
                 app configuration.
                 More info in the <a
                     rel="noopener noreferrer"

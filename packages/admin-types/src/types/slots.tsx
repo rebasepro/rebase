@@ -9,7 +9,7 @@ import type { AdminCollection } from "@rebasepro/admin-types";
 
 /**
  * Registry mapping slot names to their component prop types.
- * Each key represents a UI extension point in the CMS.
+ * Each key represents a UI extension point in the admin.
  * @group Plugins
  */
 export interface SlotRegistry {

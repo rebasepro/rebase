@@ -37,7 +37,7 @@ export type RebaseContext<USER extends User = User, AuthControllerType extends A
     sidePanelController?: import("./controllers/side_panel_controller").SidePanelController;
 
     /**
-     * Controller resolving URLs in the CMS
+     * Controller resolving URLs in the admin
      */
     urlController?: import("./controllers/navigation").UrlController;
 
@@ -47,7 +47,7 @@ export type RebaseContext<USER extends User = User, AuthControllerType extends A
     dialogsController?: import("./controllers/dialogs_controller").DialogsController;
 
     /**
-     * Controller for CMS customization
+     * Controller for admin customization
      */
     customizationController?: import("./controllers/customization_controller").CustomizationController;
 

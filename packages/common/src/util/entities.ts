@@ -247,7 +247,7 @@ export interface RelationRefWithData extends RelationRef {
 }
 
 /**
- * Create a lightweight relation stub for CMS views.
+ * Create a lightweight relation stub for admin views.
  * Replaces inline `{ id, path, __type: "relation" }` object literals.
  */
 export function createRelationRef(id: string | number, path: string): RelationRef {

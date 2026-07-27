@@ -4,7 +4,7 @@ import { ALL_WHERE_FILTER_OPS, WhereFilterOp } from "./filter-operators";
  * Describes the capabilities and features supported by a data source (driver).
  *
  * Each driver (Postgres, Firebase, MongoDB, etc.) declares which features it
- * supports. The CMS uses this descriptor to:
+ * supports. The admin uses this descriptor to:
  * - Show/hide editor tabs (e.g. Relations for SQL, Subcollections for Firebase)
  * - Filter the property type picker (e.g. `relation` for SQL, `reference` for Firebase)
  * - Toggle driver-specific form controls (e.g. `columnType` for SQL)

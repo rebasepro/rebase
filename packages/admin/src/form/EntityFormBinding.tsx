@@ -30,7 +30,7 @@ import {
 
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";
-import { useCMSContext } from "../hooks/useCMSContext";
+import { useAdminContext } from "../hooks/useAdminContext";
 import { EntityForm } from "./EntityForm";
 import {
     extractTouchedValues,
@@ -41,9 +41,9 @@ import {
 import { mergeDeep } from "@rebasepro/utils";
 
 /**
- * Props for the CMS-connected EntityFormBinding wrapper.
+ * Props for the admin-connected EntityFormBinding wrapper.
  * Extends EntityFormProps — you can pass all the same props as EntityForm,
- * but the binding provides CMS context (save, caching, analytics, plugin slots)
+ * but the binding provides admin context (save, caching, analytics, plugin slots)
  * automatically.
  */
 export type EntityFormBindingProps<M extends Record<string, unknown>> = Omit<EntityFormProps<M>,
@@ -63,7 +63,7 @@ export type EntityFormBindingProps<M extends Record<string, unknown>> = Omit<Ent
 >;
 
 /**
- * CMS-connected wrapper around EntityForm.
+ * admin-connected wrapper around EntityForm.
  *
  * Provides all backend concerns that the headless EntityForm delegates via callbacks:
  * - Save via the data layer (`saveEntityWithCallbacks`)
@@ -74,8 +74,8 @@ export type EntityFormBindingProps<M extends Record<string, unknown>> = Omit<Ent
  * - Analytics events
  * - Navigation via side entity controller
  *
- * Use this component inside the CMS (`<RebaseShell>`).
- * For headless usage outside the CMS, use `EntityForm` directly.
+ * Use this component inside the admin (`<RebaseShell>`).
+ * For headless usage outside the admin, use `EntityForm` directly.
  *
  * @group Components
  */
@@ -102,7 +102,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
     const dataClient = useData();
     const snackbarController = useSnackbarController();
     const customizationController = useCustomizationController();
-    const context = useCMSContext();
+    const context = useAdminContext();
     const analyticsController = useAnalyticsController();
 
     const [status, setStatus] = useState<EntityStatus>(initialStatus);

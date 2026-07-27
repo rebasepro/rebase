@@ -245,7 +245,7 @@ parentEntityIds,
         }, [onAnalyticsEvent, pathSuggestions]);
 
         // Build the dialog props objects that will be consumed by
-        // CollectionEditorDialogs (rendered inside RebaseShell where CMS
+        // CollectionEditorDialogs (rendered inside RebaseShell where admin
         // contexts are available).
         const collectionDialogProps = useMemo(() => {
             if (!currentDialog) return undefined;

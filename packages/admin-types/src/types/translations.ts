@@ -626,7 +626,7 @@ export interface RebaseTranslations {
     continue_from_scratch: string;
 
     /** Admin views config */
-    cms_users: string;
+    admin_users: string;
     roles_menu: string;
     project_settings: string;
 
@@ -847,8 +847,8 @@ export interface RebaseTranslations {
     studio_sql_error_executing?: string;
     studio_sql_error_explaining?: string;
     studio_sql_save_first_to_favorite?: string;
-    studio_sql_cms?: string;
-    studio_sql_cms_collections_tooltip?: string;
+    studio_sql_collections_label?: string;
+    studio_sql_admin_collections_tooltip?: string;
     studio_sql_edit_entity?: string;
     studio_sql_sql_not_supported?: string;
     studio_sql_fetch_error?: string;
@@ -963,7 +963,7 @@ export interface RebaseTranslations {
     studio_add_kanban_column_add?: string;
     studio_add_kanban_column_cancel?: string;
     studio_collection_view_sql?: string;
-    studio_collection_view_cms?: string;
+    studio_collection_view_admin?: string;
     studio_editor_collection_tooltip?: string;
     studio_editor_collection_no_permission?: string;
     studio_editor_collection_start_tooltip?: string;

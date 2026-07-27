@@ -13,7 +13,7 @@ const ImportCollectionAction = lazy(() => import("../../data_import/import").the
 const ExportCollectionAction = lazy(() => import("../../data_export/export").then(m => ({ default: m.ExportCollectionAction })));
 import { EditorCollectionAction } from "../../collection_editor/ui/EditorCollectionAction";
 import { useCollectionEditorController } from "../../collection_editor/useCollectionEditorController";
-import { useCMSContext } from "../../hooks/useCMSContext";
+import { useAdminContext } from "../../hooks/useAdminContext";
 
 export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
     collection: AdminCollection<M>;
@@ -52,7 +52,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
     children,
     openNewDocument
 }: CollectionViewActionsProps<M>) {
-    const context = useCMSContext();
+    const context = useAdminContext();
 
     const { canCreate, canDelete } = usePermissions();
 

@@ -85,8 +85,8 @@ export interface RebaseRegistryController {
     authConfig: RebaseAuthConfig | null;
 
     // Registration functions
-    registerCMS: (config: RebaseAdminConfig) => void;
-    unregisterCMS: () => void;
+    registerAdmin: (config: RebaseAdminConfig) => void;
+    unregisterAdmin: () => void;
 
     registerStudio: (config: RebaseStudioConfig) => void;
     unregisterStudio: () => void;

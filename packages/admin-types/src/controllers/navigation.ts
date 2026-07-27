@@ -8,13 +8,13 @@ import type { AdminCollection } from "@rebasepro/admin-types";
  */
 export type UrlController = {
     /**
-     * Default path under the navigation routes of the CMS will be created.
+     * Default path under the navigation routes of the admin will be created.
      * Defaults to '/'. You may want to change this `basepath` to 'admin' for example.
      */
     basePath: string;
 
     /**
-     * Default path under the collection routes of the CMS will be created.
+     * Default path under the collection routes of the admin will be created.
      * It defaults to '/c'
      */
     baseCollectionPath: string;
@@ -48,7 +48,7 @@ export type UrlController = {
     buildUrlCollectionPath: (path: string) => string;
 
     /**
-     * Build a URL path for the CMS (e.g. for custom views)
+     * Build a URL path for the admin (e.g. for custom views)
      * @param path
      */
     buildAppUrlPath: (path: string) => string;
@@ -128,7 +128,7 @@ export interface NavigateOptions {
 export interface AppView {
 
     /**
-     * CMS Path you can reach this view from.
+     * admin Path you can reach this view from.
      */
     slug: string;
 

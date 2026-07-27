@@ -1,9 +1,9 @@
 // Collection Editor — moved from @rebasepro/studio
-// This module provides the visual schema/collection editor for the CMS.
+// This module provides the visual schema/collection editor for the admin.
 //
 // IMPORTANT: Heavy UI components (CollectionEditorDialog, CollectionStudioView,
 // CollectionsStudioView, PropertyForm, PropertyFormDialog) are NOT re-exported
-// here to keep the main CMS bundle lean. Import them from
+// here to keep the main admin bundle lean. Import them from
 // "@rebasepro/admin/collection_editor_ui" instead — they live in a separate chunk
 // that is loaded on demand.
 

@@ -7,7 +7,7 @@ import {
     useData,
     useTranslation
 } from "@rebasepro/app";
-import { useCMSContext } from "../../hooks";
+import { useAdminContext } from "../../hooks";
 import { Entity, User } from "@rebasepro/types";
 import { CollectionActionsProps, ExportConfig, RebaseContext, AdminCollection } from "@rebasepro/admin-types";
 import { getDefaultValuesFor } from "@rebasepro/common";
@@ -56,7 +56,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
     const [exportType, setExportType] = React.useState<"csv" | "json">("csv");
     const [dateExportType, setDateExportType] = React.useState<"timestamp" | "string">("string");
 
-    const context = useCMSContext<USER>();
+    const context = useAdminContext<USER>();
     const dataClient = useData();
 
     const canExport = !exportAllowed || exportAllowed({

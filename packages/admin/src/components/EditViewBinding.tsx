@@ -70,7 +70,7 @@ export type OnTabChangeParams<M extends Record<string, unknown>> = {
 
 export interface EditViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> {
     /**
-     * The CMS path of the entity, e.g. "users" or "products".
+     * The admin path of the entity, e.g. "users" or "products".
      */
     path: string;
     collection: AdminCollection<M>;

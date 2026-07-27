@@ -50,13 +50,13 @@ export interface RebaseNavigationProps {
 }
 
 /**
- * Navigation layer — builds and provides all CMS navigation controllers:
+ * Navigation layer — builds and provides all admin navigation controllers:
  * collection registry, URL controller, navigation state, side entity,
  * and the self-assembling Studio bridge.
  *
  * Also handles the collection editor config controller when enabled.
  *
- * **Independently usable**: Use this when you need CMS navigation
+ * **Independently usable**: Use this when you need admin navigation
  * (entity tables, side panels) in a custom layout.
  *
  * @example
@@ -76,7 +76,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
 
     // ── Collection Editor resolution ──────────────────────────────────
     // The collection editor is ALWAYS enabled when Studio is registered.
-    // The `collectionEditor` CMS config is for fine-tuning (readOnly, auth, etc.),
+    // The `collectionEditor` admin config is for fine-tuning (readOnly, auth, etc.),
     // not for opting-in. When omitted, the editor defaults to enabled
     // (read-only in production).
     const collectionEditorConfig = registry.cmsConfig?.collectionEditor;
@@ -86,7 +86,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return collectionEditorConfig;
     }, [collectionEditorConfig]);
 
-    // ── Combine CMS and Studio Configs ────────────────────────────────
+    // ── Combine admin and Studio Configs ────────────────────────────────
     const cmsCollections = registry.cmsConfig?.collections ?? EMPTY_COLLECTIONS;
 
     // ── Build the navigation controllers ──────────────────────────────
@@ -203,8 +203,8 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return base;
     }, [registry.studioConfig?.devViews, schemaView]);
 
-    // Merge CMS-registered views with Studio dev views.
-    // Order: CMS views (developer's primary content) → Studio dev views (tooling).
+    // Merge admin-registered views with Studio dev views.
+    // Order: admin views (developer's primary content) → Studio dev views (tooling).
     // Plugin views are merged later inside resolveAppViews.
     const cmsViews = registry.cmsConfig?.views;
     const mergedViews = useMemo(() => {
@@ -234,7 +234,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         adminMode: adminModeController?.mode
     });
 
-    // ── Merge CMS-registered entityViews/entityActions into the customization controller ──
+    // ── Merge admin-registered entityViews/entityActions into the customization controller ──
     // The <Rebase> component builds the customizationController from its own props,
     // but entity views passed to <RebaseAdmin> are stored in the registry and not
     // automatically merged. We re-provide an enriched controller here so that
@@ -260,7 +260,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     }, [parentCustomizationController, registry.cmsConfig?.entityViews, registry.cmsConfig?.entityActions]);
 
     // ── Inner content with all context providers ──────────────────────
-    // Re-provide RebaseDataContext with the routed data so that every CMS
+    // Re-provide RebaseDataContext with the routed data so that every admin
     // consumer (list/entity views, references, board, import/export, and
     // `context.data`) is routed to the correct driver by collection path.
     const navigationContent = (
@@ -302,7 +302,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
 }
 
 /**
- * Internal component that auto-registers CMS controllers into the
+ * Internal component that auto-registers admin controllers into the
  * self-assembling Studio bridge. Must be rendered inside both the
  * navigation contexts and the StudioBridgeRegistryProvider.
  */

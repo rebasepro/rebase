@@ -7,7 +7,7 @@
  * single config file.
  *
  * Distinct from `introspect-db.ts`, which runs the same queries but emits
- * TypeScript *source* for a developer to edit and commit (CMS mode). The two
+ * TypeScript *source* for a developer to edit and commit (declared collections). The two
  * share the mapping helpers in `introspect-db-logic.ts` so a table is described
  * the same way whether it was generated or introspected.
  */

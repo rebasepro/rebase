@@ -105,7 +105,7 @@ export interface RebasePlugin {
     key: string;
 
     /**
-     * If true, no CMS content is shown until this plugin finishes loading.
+     * If true, no admin content is shown until this plugin finishes loading.
      */
     loading?: boolean;
 
@@ -116,7 +116,7 @@ export interface RebasePlugin {
 
     /**
      * HOC providers wrapping root or form content.
-     * Providers with `scope: "root"` wrap the entire CMS below RebaseContext.
+     * Providers with `scope: "root"` wrap the entire admin below RebaseContext.
      * Providers with `scope: "form"` wrap each entity form/edit view.
      */
     providers?: PluginProvider[];
@@ -147,12 +147,12 @@ export interface RebasePlugin {
 // ── Provider ──────────────────────────────────────────────────────────
 
 /**
- * A HOC provider that wraps a subtree of the CMS.
+ * A HOC provider that wraps a subtree of the admin.
  * @group Plugins
  */
 export interface PluginProvider {
     /**
-     * `"root"` — wraps the entire CMS below RebaseContext.
+     * `"root"` — wraps the entire admin below RebaseContext.
      * `"form"` — wraps each entity form / edit view.
      */
     scope: "root" | "form";
@@ -174,7 +174,7 @@ export interface PluginProvider {
 
 /**
  * Behavioral hooks that a plugin can provide.
- * These are non-UI extension points for modifying CMS behavior.
+ * These are non-UI extension points for modifying admin behavior.
  * @group Plugins
  */
 export interface PluginHooks {
@@ -329,7 +329,7 @@ export type PluginFieldBuilderParams<M extends Record<string, unknown> = Record<
 };
 
 /**
- * Generic props passed to plugin components that just need CMS context.
+ * Generic props passed to plugin components that just need admin context.
  * @group Models
  */
 export interface PluginGenericProps<USER extends User = User> {

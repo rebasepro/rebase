@@ -453,7 +453,7 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
 /**
  * Wrap a flat {@link SDKCollectionClient} into a Entity-shaped
  * {@link CollectionAccessor}. Every returned row is re-wrapped into the
- * `{ id, path, values }` view-model the admin CMS renders.
+ * `{ id, path, values }` view-model the admin admin renders.
  */
 function toEntityAccessor<M extends Record<string, unknown>>(
     sdk: SDKCollectionClient<M>,
@@ -508,10 +508,10 @@ function toEntityAccessor<M extends Record<string, unknown>>(
 /**
  * Wrap a flat {@link RebaseSdkData} into a Entity-shaped {@link RebaseData}.
  *
- * This is the **CMS boundary**: the SDK client (`client.data`) returns flat
+ * This is the **admin boundary**: the SDK client (`client.data`) returns flat
  * rows, but the admin renders the `Entity` view-model (`entity.values.*`).
  * `core/Rebase.tsx` wraps `client.data` through this before handing it to the
- * CMS `RebaseDataContext` — without it the admin renders rows with only their
+ * admin `RebaseDataContext` — without it the admin renders rows with only their
  * `id`.
  */
 export function wrapAsEntityData(sdkData: RebaseSdkData, options?: EntityDataOptions): RebaseData {
@@ -577,7 +577,7 @@ export function wrapAsSdkData(entityData: RebaseData): RebaseSdkData {
  * This is the developer-facing SDK data layer used by backend framework
  * callbacks & scripts (`context.data` / `rebase.data`). It returns flat rows —
  * identical in shape to the frontend SDK client — so the API is symmetric
- * across front and back. The admin CMS uses {@link buildRebaseData} (Entity).
+ * across front and back. The admin uses {@link buildRebaseData} (Entity).
  */
 export function buildSdkData(driver: DataDriver): RebaseSdkData {
     return wrapAsSdkData(buildRebaseData(driver));

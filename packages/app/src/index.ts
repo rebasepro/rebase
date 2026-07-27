@@ -24,7 +24,7 @@ export * from "./i18n/RebaseI18nProvider";
 export * from "./locales/en";
 export * from "./locales/es";
 
-// Studio Bridge — shared context for optional CMS↔Studio integration
+// Studio Bridge — shared context for optional admin↔Studio integration
 export * from "./hooks/useStudioBridge";
 
 // Self-assembling bridge registration hook

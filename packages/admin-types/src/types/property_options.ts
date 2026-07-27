@@ -9,7 +9,7 @@
 import type { ComponentRef, WhereFilterOp } from "@rebasepro/types";
 
 /**
- * Interface including all common properties of a CMS property.
+ * Interface including all common properties of an admin property.
  * @group Entity properties
  */
 export interface AdminPropertyOptions<CustomProps = unknown> {
