@@ -2,7 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readBundleManifest, bundleDeployBody, packBundle } from "./bundle-deploy";
+import { readBundleManifest, bundleDeployBody, packBundle, declaredAppsFrom } from "./bundle-deploy";
 import type { RebaseBundleManifest } from "@rebasepro/types";
 
 let scratch: string;
@@ -17,11 +17,11 @@ afterEach(() => {
 
 function manifest(overrides: Partial<RebaseBundleManifest> = {}): RebaseBundleManifest {
     return {
-        bundleFormat: 1,
+        bundleFormat: 2,
         runtime: { range: "^1", builtAgainst: "1.4.2", contract: 1 },
         schemaVersion: "v1:abc",
         app: "backend",
-        mode: "cms",
+        kind: "backend",
         hooks: { native: false },
         deps: { declared: {} },
         build: { cli: "0.11.0", node: "22", createdAt: "2026-07-24T00:00:00Z" },
@@ -92,5 +92,52 @@ describe("packBundle", () => {
         expect(listing).toContain("config/index.js");
         expect(listing).not.toContain("node_modules");
         fs.rmSync(out, { force: true });
+    });
+});
+
+/**
+ * What a deploy tells the control plane this repository contains.
+ *
+ * The registry accepts exactly two app types. A declaration outside that set is
+ * not a warning — the apps hook rejects the registration outright, and the user
+ * sees it partway through a deploy rather than as the manifest problem it is.
+ */
+describe("declaredAppsFrom", () => {
+    it("sends the backend as a backend and everything else as static", () => {
+        expect(declaredAppsFrom({
+            apps: {
+                backend: { type: "backend" },
+                admin: { type: "static" },
+                site: { type: "static" }
+            }
+        })).toEqual([
+            { name: "backend", type: "backend" },
+            { name: "admin", type: "static" },
+            { name: "site", type: "static" }
+        ]);
+    });
+
+    it("never emits a type the control plane would reject", () => {
+        // This runs on the RAW parsed JSON, not a validated manifest, and it
+        // used to default an unknown type to "custom" — which the narrowed
+        // registry now refuses.
+        const declared = declaredAppsFrom({
+            apps: {
+                backend: { type: "backend" },
+                panel: { type: "admin" },
+                phone: { type: "mobile" },
+                nothing: {}
+            }
+        });
+
+        expect(declared.every(app => app.type === "backend" || app.type === "static")).toBe(true);
+        expect(declared.find(app => app.name === "panel")?.type).toBe("static");
+    });
+
+    it("skips a blank name and tolerates a missing apps section", () => {
+        expect(declaredAppsFrom({ apps: { "  ": { type: "static" } } })).toEqual([]);
+        expect(declaredAppsFrom({})).toEqual([]);
+        expect(declaredAppsFrom(null)).toEqual([]);
+        expect(declaredAppsFrom(undefined)).toEqual([]);
     });
 });

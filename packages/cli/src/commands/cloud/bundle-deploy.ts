@@ -113,7 +113,13 @@ export function declaredAppsFrom(manifest: { apps?: Record<string, { type?: stri
     if (!apps || typeof apps !== "object") return [];
     return Object.entries(apps)
         .filter(([name]) => name.trim().length > 0)
-        .map(([name, value]) => ({ name, type: String(value?.type ?? "custom") }));
+        // Two types, and the control plane accepts exactly those — anything else
+        // is a registration it would reject, which shows up as deploy noise
+        // rather than as the manifest error it actually is. `backend` is the
+        // narrow case; everything a repository declares that is not the backend
+        // is served as files.
+        .map(([name, value]) => ({ name,
+type: value?.type === "backend" ? "backend" : "static" }));
 }
 
 /** Upload a bundle archive; returns the control-plane bundle id. */

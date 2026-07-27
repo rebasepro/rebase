@@ -33,7 +33,7 @@ import { readBundleManifest, packBundle, uploadBundle, bundleDeployBody, declare
 import { buildBundle } from "../../bundle";
 import { foldFrontendIntoBundle } from "../../fold-static";
 import { loadManifest, findBackendApp } from "../../manifest";
-import { requireProjectRoot } from "../../utils/project";
+import { findProjectRoot, requireProjectRoot } from "../../utils/project";
 
 interface Deployment {
     id: string | number;
@@ -470,6 +470,25 @@ async function readDeployContext(
     }
 }
 
+/**
+ * Whether this repository's backend declares the managed runtime.
+ *
+ * Deliberately quiet: a directory that is not a Rebase project, or whose
+ * manifest does not parse, simply does not route this way — `rebase build` is
+ * where a broken manifest gets reported, and a deploy refusing on one before it
+ * has even said what it is doing would be the wrong place to find out.
+ */
+function declaresManagedRuntime(): boolean {
+    try {
+        const projectRoot = findProjectRoot();
+        if (!projectRoot) return false;
+        const backend = findBackendApp(loadManifest(projectRoot).manifest);
+        return backend?.app.runtime === "managed";
+    } catch {
+        return false;
+    }
+}
+
 export async function deployCommand(rawArgs: string[], projectRef: string): Promise<void> {
     const args = arg(
         { "--no-follow": Boolean,
@@ -491,13 +510,24 @@ permissive: true }
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
 
-    // Managed bundle deploy: `deploy --bundle`. Builds the project into a bundle,
-    // uploads it, and lets the control plane run the platform runtime with it —
-    // the managed path. Mutually exclusive with `--source` (one is a source
-    // build, the other is not).
-    if (args["--bundle"]) {
-        if (args["--source"]) {
+    // Managed bundle deploy. Builds the project into a bundle, uploads it, and
+    // lets the control plane run the platform runtime with it.
+    //
+    // Taken either because `--bundle` said so, or because this repository's
+    // backend *declares* `runtime: "managed"`. That declaration is the whole
+    // point of the field: a project that has written down which runtime it wants
+    // should not also have to remember a flag, and forgetting the flag used to
+    // mean a plain `deploy` tried to build a container image and eject the
+    // project — which is why the refusal further down exists.
+    //
+    // `--source` and `--bundle-dir` are explicit acts and still win.
+    const declaredManaged = !args["--source"] && !args["--bundle"] && declaresManagedRuntime();
+    if (args["--bundle"] || declaredManaged) {
+        if (args["--bundle"] && args["--source"]) {
             fail("--bundle and --source cannot be combined: one is a managed bundle, the other a source build.");
+        }
+        if (declaredManaged && !isJsonMode()) {
+            console.log(chalk.gray("  rebase.json declares runtime: managed — deploying a bundle."));
         }
         await deployBundle({
             client,

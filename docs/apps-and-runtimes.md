@@ -404,6 +404,24 @@ export interface RebaseBundleManifest {
 }
 ```
 
+**This is a format change, so `BUNDLE_FORMAT_VERSION` goes to 2.** Both
+directions of the compatibility contract depend on it, and both were missed in
+the first draft of this document:
+
+- *Old bundle, new runtime.* Every already-deployed project ships format 1. Read
+  as-is it would load with no `kind`, so every gate keyed on `kind === "backend"`
+  — migrate-on-boot among them — would silently skip, and the loader would
+  iterate a directory string as a list. `upgradeLegacyManifest` in
+  `packages/server/src/boot/bundle.ts` normalizes on read: `cms`/`baas` →
+  `backend`, a single `entry.static` string → one root-mounted entry, and
+  `entry.admin` → the same, matching the old `staticDir ?? adminDir`.
+- *New bundle, old runtime.* A format-1 runtime finds no `mode` and an array
+  where it expects a string. The bump turns that into the refusal to boot that
+  `readBundleManifest` already implements, rather than a container that starts
+  and serves nothing.
+
+The control plane needs the same treatment from the other side — see §4.9.
+
 `kind` is load-bearing at two sites in `packages/server/src/boot/boot.ts`:
 
 - `:107` — `if (bundle.manifest.mode === "static")` dispatches to
@@ -625,6 +643,41 @@ error paths at `:487`, `:492`, `:614` update accordingly.
 with the admin moved to `/admin` — which is where the multi-app model is taught.
 Every other project skips a package it never asked for.
 
+### 4.9 The control plane, and what authoring `runtime` buys
+
+`saas` reads the bundle manifest through its own duplicated `BundleManifest`
+shape — deliberately, because the platform must be able to read a manifest a
+*newer* CLI produced. `parseBundleManifest` returned `null` for anything without
+`mode`, and the deploy path turns `null` into `MALFORMED_MANIFEST`. So without a
+change there, every deploy from a current CLI is refused with a message blaming
+the user's manifest.
+
+It accepts both formats now and normalizes to `kind`, and
+`SUPPORTED_BUNDLE_FORMAT` goes to 2. The raw document is copied rather than
+mutated: it is stored on the deployment row as the record of what was shipped.
+
+**`rebase cloud deploy` honours the declared runtime.** This is the payoff of
+§2.4 — the reason to author the field rather than infer it:
+
+- Before: a bare `rebase cloud deploy` on a managed project was *refused*, with
+  "redeploy it with `rebase cloud deploy --bundle`". Forgetting the flag meant
+  the command tried to build a container image and eject the project, so the
+  refusal had to exist.
+- After: the backend declares `runtime: "managed"`, so the bare command builds
+  and ships a bundle. `--source` and `--bundle-dir` are explicit acts and still
+  win, and the refusal stays for the case it was written for — a manifest that
+  says `custom` deploying over a project the platform has as managed.
+
+The deploy still *decides* rather than obeying a stored mode (`saas`
+`deploy-plan.ts` documents why at length): shipping a bundle is what earns
+`managed`. The manifest is now what makes shipping one the default.
+
+**Not changed: `RebaseProjectContract.mode`.** `GET /api/meta/contract` still
+serves `mode: "cms" | "baas"`. It is a wire contract consumed by SDK generation,
+it describes the *running server's* collections source rather than anything in
+the manifest, and renaming it would break generation against older servers for
+no gain. It is the last `cms` in the product and it is deliberate.
+
 ---
 
 ## 5. Execution plan
@@ -632,18 +685,28 @@ Every other project skips a package it never asked for.
 Phases are ordered by dependency. Do not start a phase before the previous one's
 verification passes.
 
-**Status (branch `claude/baas-admin-split-6872b3`).** Phases 1–5 are implemented;
-Phase 0 is dropped and Phase 6 is not started.
+**Status.** Phase 0 is dropped; 1–6 are implemented across two branches —
+`claude/baas-admin-split-6872b3` here, and `feat/apps-runtimes-two-types` in
+`saas`, which is **not merged** (a local merge to `saas` main is effectively a
+publish, since another agent's push carries it).
 
 | Phase | State | Note |
 |---|---|---|
 | 0 — CMS rename | dropped | §4.7 |
-| 1 — manifest schema | done | CLI 413 tests green |
+| 1 — manifest schema | done | CLI 416 tests green |
 | 2 — template + `rebase eject` | done | new `eject` command and `templates/eject/` payload |
 | 3 — `path` build contract | done | `REBASE_APP_BASE`, router basename, build assertion |
-| 4 — `serveSPA` and boot | done | new `serve-spa.test.ts`; server 1091 tests green |
-| 5 — folding + bundle manifest | done except the self-host acceptance run, which needs Docker |
-| 6 — `saas` | not started | `saas/` is not present in this worktree |
+| 4 — `serveSPA` and boot | done | new `serve-spa.test.ts`; server 1099 tests green |
+| 5 — folding + bundle manifest | done | plus `bundleFormat` 2 and format-1 compat (§4.3) |
+| 6 — `saas` | done, unmerged | §4.9; migration 0032; saas backend 1504 tests green |
+
+**Not run: the self-host acceptance test in Phase 5.** Docker was unavailable.
+What stands in for it is `packages/server/src/serve-spa.test.ts` (two apps
+mounted exactly as `bootFromBundle` mounts them) and
+`packages/server/src/boot/bundle-compat.test.ts` (manifest → loader →
+`staticApps`, both formats). Those cover every seam between the manifest and the
+routing table; what they do not cover is the container actually starting, so
+**the compose run in Phase 5 is still worth doing before this ships.**
 
 One deviation from the phase boundaries: the type changes in
 `project_manifest.ts` are a single unit, so `entry.static` becoming a list and
@@ -774,16 +837,34 @@ collections. This is the self-hosting acceptance test for the whole document.
 
 ### Phase 6 — `saas`
 
-- `saas/config/collections/apps.ts:53` — drop the `admin`, `mobile` and `custom`
-  enum values; regenerate `schema.generated.ts`; write the Postgres enum
-  migration.
-- `saas/backend/src/managed/apps-registry.ts:20` — `AppType` down to two.
-- The deploy path already reads `runtimeMode` (`projects_runtime_mode`,
-  `schema.generated.ts:25`); point it at the manifest's declared value rather
-  than the CLI's inference.
+**Do the manifest compatibility first — it is not optional.** `bundle-manifest.ts`
+rejects a manifest without `mode`, and `deploy-plan.ts` turns that rejection into
+`MALFORMED_MANIFEST`, so until it accepts `kind` the platform refuses every
+deploy from a current CLI. See §4.9.
 
-**Verify:** `saas` tests pass; a deploy of the reference app registers exactly
-two apps with the right types.
+- `saas/backend/src/managed/bundle-manifest.ts` — `mode` → `kind`, accept both
+  formats, `SUPPORTED_BUNDLE_FORMAT` → 2.
+- `saas/backend/src/managed/deploy-plan.ts` — the static-bundle rejection reads
+  `kind`.
+- `saas/config/collections/apps.ts` — drop the `admin`, `mobile` and `custom`
+  enum values; narrow the pgEnum in `schema.generated.ts` to match.
+- `saas/backend/src/managed/apps-registry.ts` — `AppType` down to two;
+  `hooks/apps-hooks.ts` no longer defaults an unknown row to `custom`.
+- Migration `0032_apps_two_types.sql`. **Backfill and swap in one file, backfill
+  first**: the enum swap re-casts every row, so one unmapped row fails the
+  migration and blocks every deploy. An ejected backend becomes `backend` only
+  where the project has no other one — two would violate the
+  one-backend-per-project invariant, turning a data migration into a rule
+  violation nothing catches until the next deploy. Everything else becomes
+  `static`. Nothing is deleted.
+- `packages/cli/src/commands/cloud/bundle-deploy.ts` — `declaredAppsFrom` runs on
+  raw parsed JSON and defaulted an unknown type to `custom`, which the narrowed
+  registry now refuses.
+
+**Verify:** `saas` backend tests pass; `parseBundleManifest` has a case per
+format (`bundle-manifest.test.ts`); `intake.test.ts`'s "format too new" case is
+expressed against `SUPPORTED_BUNDLE_FORMAT`, not the literal `2` — as a literal
+it stopped testing anything the moment the platform learned to read format 2.
 
 ---
 
@@ -820,6 +901,21 @@ this codebase.
 8. **`pnpm --filter @rebasepro/cli run build` is required before the CLI reflects
    source changes.** The installed `rebase` binary runs `dist/`. A change that
    "does nothing" is usually an unbuilt CLI.
+9. **A manifest shape change has two compatibility directions, and the format
+   version only protects one of them for free.** New-bundle-on-old-runtime is
+   caught by the version check. Old-bundle-on-new-runtime is *not* — it loads,
+   with the renamed field simply absent, so every gate keyed on it skips
+   silently. Both were missed here until the `saas` phase surfaced the third
+   case: old-*client*-on-new-*platform*, where a strict parser rejects the new
+   shape and blames the user's manifest. See §4.3 and §4.9.
+10. **In a `.claude/worktrees/*` worktree, `tsc` does not see cross-package type
+    edits.** `packages/<x>/node_modules/@rebasepro/types` is a relative symlink
+    inside the *primary* checkout's `node_modules`, so it resolves to the primary
+    `packages/types` — editing types in the worktree and typechecking a consumer
+    silently checks against the old ones and reports nothing. A throwaway
+    tsconfig with `paths` pointing at `../types/src` (and a `rootDir` override,
+    or every import errors TS6059) is the way through. Jest is unaffected;
+    `jest.config.cjs` already maps to `../types/src`.
 
 ---
 
