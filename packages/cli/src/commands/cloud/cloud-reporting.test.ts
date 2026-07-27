@@ -11,7 +11,7 @@
  * the output being "roughly right".
  */
 import { describe, it, expect } from "vitest";
-import { describeStorageState, describeDatabaseState } from "./resources";
+import { describeStorageState, describeDatabaseState, describeRuntime } from "./resources";
 import { buildTimeEnvPrefix } from "./env";
 import { deploymentView, parseDeploymentsLimit, DEFAULT_DEPLOYMENTS_LIMIT, type DeploymentRow } from "./deployments";
 
@@ -150,5 +150,47 @@ describe("deployments list", () => {
         const view = deploymentView({ id: 44, deployMessage: "   " } as DeploymentRow);
         expect(view.message).toBeNull();
         expect(view.frameworkVersion).toBeNull();
+    });
+});
+
+describe("describeRuntime", () => {
+    /**
+     * The runtime version and the framework version are different lines and are
+     * easy to conflate — `runtime 1.2.0` shipping `framework 0.10.0` while the
+     * project's own bundle installs `0.11.0` is a real state. Printing both is
+     * the whole point, so that a reader never has to infer one from the other.
+     */
+    it("names the runtime and the framework it ships", () => {
+        const line = stripAnsi(describeRuntime({
+            runtimeMode: "managed",
+            runtimeVersion: "1.2.0",
+            runtimeFrameworkVersion: "0.10.0"
+        }));
+        expect(line).toContain("managed 1.2.0");
+        expect(line).toContain("framework 0.10.0");
+    });
+
+    it("says nothing about a framework it was not told", () => {
+        // A release whose image tag is not a semver records no framework
+        // version. Inventing one would defeat the reason for storing it.
+        const line = stripAnsi(describeRuntime({ runtimeMode: "managed", runtimeVersion: "1.2.0" }));
+        expect(line).toContain("managed 1.2.0");
+        expect(line).not.toContain("framework");
+    });
+
+    it("surfaces a pin, which is why a project may not be on the newest", () => {
+        const line = stripAnsi(describeRuntime({
+            runtimeMode: "managed",
+            runtimeVersion: "1.1.0",
+            runtimeFrameworkVersion: "0.10.0",
+            runtimeVersionPin: "1.1.0"
+        }));
+        expect(line).toContain("pinned to 1.1.0");
+    });
+
+    it("does not claim a runtime for a custom project", () => {
+        const line = stripAnsi(describeRuntime({ runtimeMode: "custom", runtimeVersion: null }));
+        expect(line).toContain("custom");
+        expect(line).not.toContain("managed");
     });
 });

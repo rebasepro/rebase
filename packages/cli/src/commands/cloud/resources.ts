@@ -87,12 +87,50 @@ export function describeDatabaseState(db: Record<string, unknown> | undefined): 
     return `${type} ${chalk.gray("· not tested (`rebase cloud db test`)")}`;
 }
 
+/**
+ * One line describing what engine is serving this project.
+ *
+ * Three numbers are in play and they are easy to conflate — I have watched it
+ * happen. The **runtime version** (`1.2.0`) is the contract line a bundle's
+ * range resolves against; its major IS the contract major. The **framework
+ * version** (`0.11.0`) is the `@rebasepro` release the runtime image ships. They
+ * move independently on purpose: tying the contract line to the framework would
+ * make `^1` become `^0.11`, and pre-1.0 caret is restrictive, so every framework
+ * minor would fall outside every project's range and force a rebuild to receive
+ * an engine upgrade — the opposite of what the bundle/runtime split is for.
+ *
+ * So both are printed, rather than leaving anyone to infer one from a Docker tag.
+ */
+export function describeRuntime(project: {
+    runtimeMode?: string | null;
+    runtimeVersion?: string | null;
+    runtimeFrameworkVersion?: string | null;
+    runtimeVersionPin?: string | null;
+}): string {
+    if (project.runtimeMode !== "managed") {
+        return `custom ${chalk.gray("· your own image")}`;
+    }
+    const version = project.runtimeVersion ?? "unknown";
+    const framework = project.runtimeFrameworkVersion;
+    const pin = project.runtimeVersionPin ? chalk.gray(` · pinned to ${project.runtimeVersionPin}`) : "";
+    // Absent rather than guessed: a release whose image tag is not a semver
+    // (a `latest`, a branch build) records no framework version, and inventing
+    // one here would defeat the point of storing it.
+    const frameworkPart = framework ? chalk.gray(` · framework ${framework}`) : "";
+    return `managed ${version}${frameworkPart}${pin}`;
+}
+
 export async function statusCommand(rawArgs: string[]): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     try {
         const project = (await client.data.collection("projects").findById(projectId)) as
-            | { id: string | number; name?: string; subdomain?: string; host?: string; status?: string; gitBranch?: string }
+            | {
+                id: string | number; name?: string; subdomain?: string; host?: string; status?: string;
+                gitBranch?: string; runtimeMode?: string | null; runtimeVersion?: string | null;
+                runtimeFrameworkVersion?: string | null; runtimeContract?: number | null;
+                runtimeRange?: string | null; runtimeVersionPin?: string | null;
+            }
             | undefined;
         if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`, undefined, "not_found");
 
@@ -120,6 +158,7 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
                     ["URL", projectHost(project, baseDomain)],
                     ["Branch", project.gitBranch],
                     ["Last deploy", deploy ? `${colorStatus(deploy.status)} · ${fmtDate(deploy.createdAt)}` : "never"],
+                    ["Runtime", describeRuntime(project)],
                     ["Database", databaseLine],
                     ["Storage", storageLine]
                 ]);
@@ -133,6 +172,14 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
                 url: projectHost(project, baseDomain) ?? null,
                 branch: project.gitBranch ?? null,
                 lastDeploy: deploy ? { id: String(deploy.id), status: deploy.status ?? null, createdAt: deploy.createdAt ?? null } : null,
+                runtime: {
+                    mode: project.runtimeMode ?? "custom",
+                    version: project.runtimeVersion ?? null,
+                    frameworkVersion: project.runtimeFrameworkVersion ?? null,
+                    contract: project.runtimeContract ?? null,
+                    range: project.runtimeRange ?? null,
+                    pin: project.runtimeVersionPin ?? null
+                },
                 database: db ? { type: db.type ?? null, connectionStatus: db.connectionStatus ?? null } : null,
                 storage: storage ?? null
             }
