@@ -45,15 +45,23 @@ export interface RateLimitStore {
 export class MemoryRateLimitStore implements RateLimitStore {
     private store = new Map<string, number[]>();
     private cleanupInterval?: ReturnType<typeof setInterval>;
+    private now: () => number;
 
-    constructor(sweepMs = 15 * 60 * 1000) {
+    /**
+     * `now` exists so the window can be driven directly instead of by sleeping:
+     * a test that waits half a real window is a test that fails on a loaded
+     * machine, where the sleep overruns and the hits it expects to still be in
+     * the window have left it.
+     */
+    constructor(sweepMs = 15 * 60 * 1000, now: () => number = Date.now) {
+        this.now = now;
         this.cleanupInterval = setInterval(() => this.sweep(sweepMs), sweepMs);
         // Never hold the process open for a cache sweep.
         this.cleanupInterval.unref?.();
     }
 
     async hit(key: string, windowMs: number, limit: number): Promise<RateLimitDecision> {
-        const now = Date.now();
+        const now = this.now();
         const timestamps = (this.store.get(key) ?? []).filter(t => now - t < windowMs);
 
         if (timestamps.length >= limit) {
@@ -75,7 +83,7 @@ export class MemoryRateLimitStore implements RateLimitStore {
     }
 
     private sweep(windowMs: number): void {
-        const now = Date.now();
+        const now = this.now();
         for (const [key, timestamps] of this.store.entries()) {
             const live = timestamps.filter(t => now - t < windowMs);
             if (live.length === 0) this.store.delete(key);

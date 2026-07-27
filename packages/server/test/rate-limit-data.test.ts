@@ -122,17 +122,36 @@ rate_limit: 1 });
     });
 });
 
+interface StoreHarness {
+    store: RateLimitStore;
+    /**
+     * Move the store's clock forward. Windows are asserted by advancing this
+     * rather than by sleeping: a real sleep of half a window overruns it on a
+     * loaded machine, and the window-sliding assertions then flip.
+     */
+    advance: (ms: number) => Promise<void>;
+}
+
 /**
  * The store contract, run against every implementation. A Postgres-backed store
  * (so several replicas share one limit) has to satisfy exactly this.
  */
-describe.each<[string, () => RateLimitStore]>([
-    ["MemoryRateLimitStore", () => new MemoryRateLimitStore()]
+describe.each<[string, () => StoreHarness]>([
+    ["MemoryRateLimitStore", () => {
+        let clock = 1_700_000_000_000;
+        return {
+            store: new MemoryRateLimitStore(15 * 60 * 1000, () => clock),
+            advance: async (ms) => {
+                clock += ms;
+            }
+        };
+    }]
 ])("%s satisfies the RateLimitStore contract", (_name, create) => {
     let store: RateLimitStore;
+    let advance: StoreHarness["advance"];
 
     beforeEach(() => {
-        store = create();
+        ({ store, advance } = create());
     });
 
     afterEach(() => {
@@ -168,19 +187,22 @@ describe.each<[string, () => RateLimitStore]>([
     });
 
     it("forgets hits that have left the window", async () => {
-        // A one-millisecond window is empty by the next tick.
-        expect((await store.hit("k", 1, 1)).allowed).toBe(true);
-        await new Promise(resolve => setTimeout(resolve, 5));
-        expect((await store.hit("k", 1, 1)).allowed).toBe(true);
+        expect((await store.hit("k", 1_000, 1)).allowed).toBe(true);
+        await advance(1_001);
+        expect((await store.hit("k", 1_000, 1)).allowed).toBe(true);
     });
 
     it("slides rather than resetting on a boundary", async () => {
         // A fixed window would let a caller spend its whole allowance at the
         // end of one window and again at the start of the next.
-        await store.hit("k", 50, 2);
-        await store.hit("k", 50, 2);
-        await new Promise(resolve => setTimeout(resolve, 30));
-        // Half a window later the two earlier hits are still in it.
-        expect((await store.hit("k", 50, 2)).allowed).toBe(false);
+        await store.hit("k", 1_000, 2);
+        await store.hit("k", 1_000, 2);
+        await advance(600);
+        // Past where a fixed window would have reset, and the two earlier hits
+        // are still in the sliding one.
+        expect((await store.hit("k", 1_000, 2)).allowed).toBe(false);
+        // They leave it only once they are a full window old.
+        await advance(401);
+        expect((await store.hit("k", 1_000, 2)).allowed).toBe(true);
     });
 });
