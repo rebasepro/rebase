@@ -1,4 +1,4 @@
-import type { CollectionConfig } from "./collections";
+import type { AnyCollectionConfig } from "./collections";
 
 /**
  * @group Models
@@ -37,13 +37,13 @@ export interface RelationBase {
     relationName?: string;
 
     /** The collection on the other end. */
-    target: () => CollectionConfig;
+    target: () => AnyCollectionConfig;
 
     onUpdate?: OnAction;
     onDelete?: OnAction;
 
     /** Presentation overrides applied when this relation is rendered as a tab. */
-    overrides?: Partial<CollectionConfig>;
+    overrides?: Partial<AnyCollectionConfig>;
 
     validation?: {
         required?: boolean;
@@ -204,12 +204,12 @@ export type ResolvedRelation =
 export interface ResolvedRelationBase {
     /** Always set: defaulted during resolution if the author omitted it. */
     relationName: string;
-    target: () => CollectionConfig;
+    target: () => AnyCollectionConfig;
     /** The target's slug, resolved once so consumers need not call `target()`. */
     targetSlug: string;
     onUpdate?: OnAction;
     onDelete?: OnAction;
-    overrides?: Partial<CollectionConfig>;
+    overrides?: Partial<AnyCollectionConfig>;
     validation?: { required?: boolean };
     /**
      * Whether one row or many come back. Derived from `kind` — kept because it

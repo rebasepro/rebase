@@ -384,6 +384,30 @@ export type CollectionConfig<M extends Record<string, unknown> = Record<string, 
     | MongoDBCollectionConfig<M, USER>;
 
 /**
+ * A collection of *any* row type.
+ *
+ * `CollectionConfig` is **invariant** in `M`: `callbacks` both consumes `M`
+ * (`AfterReadProps<M>`) and produces it, so neither direction of assignment
+ * holds. `CollectionConfig<SomeRow>` is therefore not assignable to a bare
+ * `CollectionConfig`, whose `M` defaults to `Record<string, unknown>`.
+ *
+ * That matters wherever a collection is merely *referred to* rather than read
+ * from. `defineCollection` returns a config whose `M` is inferred from the
+ * properties — the whole point of it — so a field typed `() => CollectionConfig`
+ * rejects every collection the builder produces, and `target: () => otherCollection`
+ * (the documented way to point a relation at its other end) does not compile in
+ * any project that uses the builder.
+ *
+ * `any` is deliberate and is what it is for here: these positions never read the
+ * target's rows, they only identify which collection is meant, so there is no
+ * type safety to preserve and invariance is pure obstruction.
+ *
+ * @group Models
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnyCollectionConfig = CollectionConfig<any, any>;
+
+/**
  * Type guard for PostgreSQL collections.
  * Returns true if the collection uses the Postgres engine (or the default engine).
  *

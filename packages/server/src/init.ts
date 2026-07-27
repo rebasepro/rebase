@@ -6,6 +6,7 @@ import {
     DataDriver,
     DataSourceDefinition,
     CollectionCallbacks,
+    AnyCollectionConfig,
     CollectionConfig,
     HealthCheckResult,
     HistoryConfig,
@@ -79,7 +80,12 @@ export interface RebaseAuthConfig {
      * Or pass your own collection with the required auth fields
      * (email, passwordHash, displayName, etc.).
      */
-    collection?: CollectionConfig;
+    /**
+     * Accepts a collection of any row type: `defineCollection` infers `M` from
+     * the properties, and `CollectionConfig` is invariant in `M`, so a bare
+     * `CollectionConfig` here rejects everything the builder returns.
+     */
+    collection?: AnyCollectionConfig;
     jwtSecret?: string;
     accessExpiresIn?: string;
     refreshExpiresIn?: string;
@@ -214,7 +220,8 @@ export interface BaasOptions {
 }
 
 export interface RebaseBackendConfig {
-    collections?: CollectionConfig[];
+    /** Invariance again — see the note on `RebaseAuthConfig.collection`. */
+    collections?: AnyCollectionConfig[];
     collectionsDir?: string;
     server: Server;
     app: Hono<HonoEnv>;
