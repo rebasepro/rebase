@@ -51,13 +51,22 @@ export type CollectionLookup = (slug: string) => AdminCollection | undefined;
  * Strip non-serializable fields from a `AdminPropertyOptions`.
  * Removes `Field` and `Preview` (ComponentRef).
  */
+/**
+ * Every `ComponentRef` on a property's admin block. These are components, not
+ * data, and none of them survives `JSON.stringify` — a function-valued key is
+ * dropped from the output object with no error, so a component written here
+ * would leave a key that reads back as missing rather than as itself.
+ *
+ * `Filter` was absent from this list while `Field` and `Preview` were named
+ * twice, once destructured and once compared by string.
+ */
+const NON_SERIALIZABLE_ADMIN_KEYS = ["Field", "Preview", "Filter"];
+
 function toSerializableAdminOptions(ui: AdminPropertyOptions | undefined): SerializableAdminBaseOptions | undefined {
     if (!ui) return undefined;
-    const { Field, Preview, ...rest } = ui as AdminPropertyOptions & Record<string, unknown>;
-    // Only return if there are remaining fields
     const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(rest)) {
-        if (key !== "Field" && key !== "Preview" && value !== undefined) {
+    for (const [key, value] of Object.entries(ui as Record<string, unknown>)) {
+        if (!NON_SERIALIZABLE_ADMIN_KEYS.includes(key) && value !== undefined) {
             result[key] = value;
         }
     }
@@ -134,6 +143,7 @@ function toSerializableBaseFields(property: Property): Omit<SerializableBaseProp
     if (property.description) result.description = property.description;
     if (property.propertyConfig) result.propertyConfig = property.propertyConfig;
     if (property.columnName) result.columnName = property.columnName;
+    if (property.excludeFromApi !== undefined) result.excludeFromApi = property.excludeFromApi;
     if (property.defaultValue !== undefined) result.defaultValue = property.defaultValue;
     if (property.conditions) result.conditions = property.conditions;
     if (property.metadata) result.metadata = property.metadata;
@@ -452,6 +462,8 @@ export function toSerializableCollectionConfig(collection: AdminCollection): Ser
     if (collection.enabledViews) result.enabledViews = collection.enabledViews;
     if (collection.disableDefaultActions) result.disableDefaultActions = collection.disableDefaultActions;
     if (collection.securityRules) result.securityRules = collection.securityRules;
+    if (collection.disableDefaultPolicies !== undefined) result.disableDefaultPolicies = collection.disableDefaultPolicies;
+    if (collection.strictWrites !== undefined) result.strictWrites = collection.strictWrites;
 
     // Enum-like fields
     if (collection.openEntityMode) result.openEntityMode = collection.openEntityMode;

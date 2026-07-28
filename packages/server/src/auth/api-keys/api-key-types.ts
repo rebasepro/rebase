@@ -1,27 +1,23 @@
 /**
  * Type definitions for Service API Keys.
  *
- * API keys provide machine-to-machine authentication for scripts, cron jobs,
- * and third-party integrations. Each key is scoped to specific collections
- * and operations via the `ApiKeyPermission` model.
+ * The wire contract — permissions, the masked key, the create/update payloads —
+ * lives in `@rebasepro/types`, because the client SDK needs the same shapes and
+ * the two declarations had already drifted apart. Only {@link ApiKey}, the
+ * database row carrying `key_hash`, is server-side and stays here.
  *
  * @module
  */
 
-/**
- * A single permission entry scoping an API key to a collection and set of operations.
- *
- * Use `"*"` as the collection value to grant access to all collections
- * (and all custom functions). Custom functions are addressed with the
- * `functions` namespace: `"functions"` grants every function,
- * `"functions/<name>"` grants a single one.
- */
-export interface ApiKeyPermission {
-    /** Collection slug, `"functions"`/`"functions/<name>"`, or `"*"` for everything. */
-    collection: string;
-    /** Allowed operations on the collection. */
-    operations: ("read" | "write" | "delete")[];
-}
+import type { ApiKeyPermission } from "@rebasepro/types";
+
+export type {
+    ApiKeyPermission,
+    ApiKeyMasked,
+    ApiKeyWithSecret,
+    CreateApiKeyRequest,
+    UpdateApiKeyRequest
+} from "@rebasepro/types";
 
 /**
  * Full database row for an API key.
@@ -55,61 +51,4 @@ export interface ApiKey {
     last_used_at: string | null;
     expires_at: string | null;
     revoked_at: string | null;
-}
-
-/**
- * Masked version of an API key, safe for API responses.
- * Omits `key_hash` and shows only the prefix.
- */
-export interface ApiKeyMasked {
-    id: string;
-    name: string;
-    key_prefix: string;
-    permissions: ApiKeyPermission[];
-    /** When true, the key is granted the `admin` role (admin routes + RLS `default_admin` policies). */
-    admin: boolean;
-    rate_limit: number | null;
-    created_by: string;
-    created_at: string;
-    updated_at: string;
-    last_used_at: string | null;
-    expires_at: string | null;
-    revoked_at: string | null;
-}
-
-/**
- * Request body for creating a new API key.
- */
-export interface CreateApiKeyRequest {
-    name: string;
-    permissions: ApiKeyPermission[];
-    /** When true, grants the `admin` role (admin routes + RLS `default_admin` policies). */
-    admin?: boolean;
-    /** Requests per 15-minute window. Omit or `null` to use the server default (1000/window). */
-    rate_limit?: number | null;
-    /** ISO-8601 expiration timestamp. Omit for no expiration. */
-    expires_at?: string | null;
-}
-
-/**
- * Request body for updating an existing API key.
- * All fields are optional — only provided fields are updated.
- */
-export interface UpdateApiKeyRequest {
-    name?: string;
-    permissions?: ApiKeyPermission[];
-    /** When true, grants the `admin` role (admin routes + RLS `default_admin` policies). */
-    admin?: boolean;
-    rate_limit?: number | null;
-    expires_at?: string | null;
-}
-
-/**
- * Returned exactly once when a key is created.
- * The `key` field contains the full plaintext key — it is never stored
- * or returned again after creation.
- */
-export interface ApiKeyWithSecret extends ApiKeyMasked {
-    /** Full plaintext API key (e.g. `rk_live_abc123...`). */
-    key: string;
 }

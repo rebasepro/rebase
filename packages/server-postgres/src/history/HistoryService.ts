@@ -1,39 +1,21 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
+import type { EntityHistoryEntry } from "@rebasepro/types";
 
-export interface HistoryEntry {
-    id: string;
-    table_name: string;
-    entity_id: string;
-    action: "create" | "update" | "delete";
-    changed_fields: string[] | null;
-    values: Record<string, unknown> | null;
-    previous_values: Record<string, unknown> | null;
-    updated_by: string | null;
-    updated_at: string;
-}
+export type {
+    RecordHistoryParams,
+    FetchHistoryOptions,
+    HistoryRetentionConfig
+} from "@rebasepro/types";
+import type { RecordHistoryParams, FetchHistoryOptions, HistoryRetentionConfig } from "@rebasepro/types";
 
-export interface RecordHistoryParams {
-    tableName: string;
-    id: string;
-    action: "create" | "update" | "delete";
-    values?: Record<string, unknown> | null;
-    previousValues?: Record<string, unknown> | null;
-    updatedBy?: string | null;
-}
-
-export interface FetchHistoryOptions {
-    limit?: number;
-    offset?: number;
-}
-
-export interface HistoryRetentionConfig {
-    /** Max entries per row. Oldest pruned first. Default 200. */
-    maxEntries: number;
-    /** Entries older than this many days are pruned. Default 90. */
-    ttlDays: number;
-}
+/**
+ * A Postgres history row is already the wire shape — `updated_at` comes back
+ * from the driver as a string. Kept as an alias because the name is used
+ * throughout this package and in `PostgresBackendDriver`.
+ */
+export type HistoryEntry = EntityHistoryEntry;
 
 const DEFAULT_RETENTION: HistoryRetentionConfig = {
     maxEntries: 200,

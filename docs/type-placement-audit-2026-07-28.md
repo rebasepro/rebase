@@ -26,9 +26,14 @@ The two halves were never connected.
 
 ---
 
-## Tier 1 — leaks that already misbehave
+## Tier 1 — leaks that already misbehave — **DONE**
 
 These are not placement smells. Each one produces a wrong result today.
+
+> All five resolved 2026-07-28. 1.1 fell out of the Tier 3 work; 1.2–1.5 were
+> fixed directly. Findings kept below as written; what changed is recorded at the
+> end of each. Three further drifted fields turned up in the same mirror while
+> fixing 1.4 — see there.
 
 ### 1.1 `RelationProperty.widget` is dead
 
@@ -46,6 +51,9 @@ again on `AdminRelationOptions`. The admin reads **only** the admin-block one:
 
 So a user who follows the core doc comment and writes `widget: "dialog"` on the
 property gets a `select` and no error. Two declarations, one reader.
+
+**Fixed** — the core declaration is deleted, not moved. `AdminRelationOptions` was
+already the one that worked.
 
 ### 1.2 The client SDK cannot create an admin API key
 
@@ -70,6 +78,10 @@ error. `admin` is the flag that grants the `admin` role — admin routes plus th
 `default_admin` policies — so the one privileged thing about a key is unreachable
 through the SDK.
 
+**Fixed** — one declaration, in `@rebasepro/types`, carrying the server's docs.
+The client and the server both re-export it. `ApiKey` — the database row with
+`key_hash` — stays server-side; nothing off the server may see it.
+
 ### 1.3 `HistoryEntry.updated_at` is `string` in one driver and `Date` in the other
 
 Same interface name, same field list, two packages, no shared declaration:
@@ -83,6 +95,15 @@ feature — `DatabaseAdapter.initializeHistory` is on the shared adapter interfa
 and `HistoryConfig` already lives in `types/src/controllers/client.ts` — so the entry
 shape belongs there too. As it stands nothing can consume history driver-agnostically
 without picking a side.
+
+**Fixed** — and there was a *fourth* copy: `HistoryEntryData` in the admin's
+`useHistory` hook. `EntityHistoryEntry` now lives in `types/src/types/history.ts`
+with `updated_at: string`, because that is what it is on the wire, and the admin
+reads it over JSON. MongoDB's `Date` was never the contract, only its storage: the
+driver keeps a `MongoHistoryDocument` for the stored document (`_id`, `updated_at:
+Date` so the retention query can `$lt` it) and derives it from the shared type by
+`Omit`. Naming that document `HistoryEntry` — the same name Postgres used for its
+wire shape — is what let the two disagree silently.
 
 ### 1.4 The collection editor's serializable mirror silently drops five fields
 
@@ -105,6 +126,19 @@ to the ts-morph writer, editing a collection in the panel drops whichever of the
 had. `excludeFromApi` is the one that matters: it is the server-side guarantee that a
 password hash never reaches a response, and it is not in the whitelist.
 
+**Fixed** — all five, plus three more the same search turned up once the mirror was
+open:
+
+- `StringProperty.url` was not mirrored at all, so it was dropped on save. It feeds
+  the generated OpenAPI contract.
+- `urlPreview` was mirrored under the name `url` on the *admin* options — so the
+  core flag had two serializable spellings and the admin option had none.
+- `Filter` is a `ComponentRef` like `Field` and `Preview`, but the serializer
+  strips components by naming them, and it named only those two. `Filter` was
+  copied into the result — then silently dropped by `JSON.stringify`, which
+  omits function-valued keys, so it read back as absent rather than as itself.
+  All three now come off one list.
+
 ### 1.5 A third, stale `WhereFilterOp`
 
 `packages/studio/src/components/JSEditor/JSMonacoEditor.tsx:48` declares a private
@@ -114,6 +148,19 @@ copy with the ten Firestore-era operators — missing `like`, `ilike`, `not-like
 (`VirtualTable/VirtualTableProps.tsx:281`) is currently in sync, but it is a copy,
 so it is a matter of time; this is the known-and-documented one, and studio is the
 proof that the pattern spreads.
+
+**Fixed** — studio's block is a template literal fed to Monaco as an ambient `.d.ts`,
+so it cannot import a type. The operator union is interpolated from
+`ALL_WHERE_FILTER_OPS` instead, which is the one part that now cannot fall behind.
+
+Two neighbouring declarations in the same block were wrong the same way, and both
+taught the mistake through autocomplete: `where?: Record<string, string>` (the
+canonical `FindParams.where` takes `[op, value]` tuples — a bare string reaches
+PostgREST and builds a malformed query) and `orderBy?: string` (a `[field,
+direction]` tuple). `logical` was missing entirely. All three corrected; the rest of
+that block is still hand-maintained.
+
+The `packages/ui` copy is untouched and still a copy.
 
 ---
 

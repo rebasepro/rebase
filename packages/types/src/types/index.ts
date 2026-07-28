@@ -21,6 +21,7 @@ export * from "./component_ref";
 export * from "./auth_adapter";
 export * from "./database_adapter";
 export * from "./api_keys";
+export * from "./history";
 export * from "./project_manifest";
 export * from "./collection_contract";
 export * from "./schema_version";

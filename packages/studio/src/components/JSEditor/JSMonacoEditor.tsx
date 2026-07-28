@@ -4,6 +4,7 @@ import Editor, { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { cls, defaultBorderMixin, FileIcon } from "@rebasepro/ui";
 import { useModeController } from "@rebasepro/app";
+import { ALL_WHERE_FILTER_OPS } from "@rebasepro/types";
 
 /**
  * Shape of `monaco.languages.typescript` at runtime.
@@ -19,7 +20,16 @@ interface MonacoTypeScriptApi {
     ModuleKind: Record<string, number>;
 }
 
-/** Ambient type definitions for the Rebase client SDK injected into Monaco. */
+/**
+ * Ambient type definitions for the Rebase client SDK injected into Monaco.
+ *
+ * Hand-mirrored from `@rebasepro/client`, so it drifts: this block spent long
+ * enough declaring the ten Firestore-era filter operators and a
+ * `where?: Record<string, string>` that the editor was autocompleting a query
+ * shape the server rejects. The operator union is interpolated from
+ * {@link ALL_WHERE_FILTER_OPS} for that reason — it is the one part that cannot
+ * fall behind. The rest still has to be kept in step by hand.
+ */
 const REBASE_CLIENT_TYPES = `
 // ─── Rebase Client SDK Type Definitions ─────────────────────────────
 
@@ -29,8 +39,11 @@ interface FindParams {
     limit?: number;
     offset?: number;
     page?: number;
-    where?: Record<string, string>;
-    orderBy?: string;
+    /** \`{ status: ["==", "active"] }\` — a tuple per field, or an array of tuples. */
+    where?: Record<string, [WhereFilterOp, any] | [WhereFilterOp, any][]>;
+    logical?: LogicalCondition;
+    /** \`["created_at", "desc"]\` */
+    orderBy?: [string, "asc" | "desc"];
     include?: string[];
     searchString?: string;
 }
@@ -45,7 +58,18 @@ interface FindResult<M extends Record<string, any> = any> {
     };
 }
 
-type WhereFilterOp = "<" | "<=" | "==" | "!=" | ">=" | ">" | "in" | "not-in" | "array-contains" | "array-contains-any";
+type WhereFilterOp = ${ALL_WHERE_FILTER_OPS.map(op => `"${op}"`).join(" | ")};
+
+interface FilterCondition {
+    column: string;
+    operator: WhereFilterOp;
+    value: any;
+}
+
+interface LogicalCondition {
+    type: "and" | "or";
+    conditions: (FilterCondition | LogicalCondition)[];
+}
 
 interface QueryBuilder<M extends Record<string, any> = any> {
     where(column: keyof M & string, operator: WhereFilterOp, value: any): QueryBuilder<M>;

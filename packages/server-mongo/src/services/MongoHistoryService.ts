@@ -62,31 +62,21 @@ export function findChangedFields(
     return changed.length > 0 ? changed : null;
 }
 
-export interface HistoryEntry {
+export type { RecordHistoryParams, HistoryRetentionConfig } from "@rebasepro/types";
+import type { EntityHistoryEntry, RecordHistoryParams, HistoryRetentionConfig } from "@rebasepro/types";
+
+/**
+ * A history entry as MongoDB stores it — not as it travels.
+ *
+ * Two fields differ from {@link EntityHistoryEntry}: the driver's own `_id`,
+ * and `updated_at` as a native `Date` so the retention query can compare it
+ * with `$lt`. Both of these used to be on an interface *named* `HistoryEntry`,
+ * which is also what `@rebasepro/server-postgres` called its wire shape — so
+ * the same name meant `string` in one driver and `Date` in the other.
+ */
+export interface MongoHistoryDocument extends Omit<EntityHistoryEntry, "updated_at"> {
     _id?: ObjectId;
-    id: string;
-    table_name: string;
-    entity_id: string;
-    action: "create" | "update" | "delete";
-    changed_fields: string[] | null;
-    values: Record<string, unknown> | null;
-    previous_values: Record<string, unknown> | null;
-    updated_by: string | null;
     updated_at: Date;
-}
-
-export interface RecordHistoryParams {
-    tableName: string;
-    id: string;
-    action: "create" | "update" | "delete";
-    values?: Record<string, unknown> | null;
-    previousValues?: Record<string, unknown> | null;
-    updatedBy?: string | null;
-}
-
-export interface HistoryRetentionConfig {
-    maxEntries: number;
-    ttlDays: number;
 }
 
 const DEFAULT_RETENTION: HistoryRetentionConfig = {
@@ -124,7 +114,7 @@ export class MongoHistoryService {
         }
 
         try {
-            const entry: HistoryEntry = {
+            const entry: MongoHistoryDocument = {
                 id: new ObjectId().toString(),
                 table_name: tableName,
                 entity_id: String(id),

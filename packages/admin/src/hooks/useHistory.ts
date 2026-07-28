@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useApiConfig } from "@rebasepro/app";
+import type { EntityHistoryEntry } from "@rebasepro/types";
 
-export interface HistoryEntryData {
-    id: string;
-    table_name: string;
-    entity_id: string;
-    action: "create" | "update" | "delete";
-    changed_fields: string[] | null;
-    values: Record<string, unknown> | null;
-    previous_values: Record<string, unknown> | null;
-    updated_by: string | null;
-    updated_at: string;
-}
+/**
+ * What the history REST endpoint returns. The fourth declaration of this shape
+ * — the two drivers had one each and disagreed on `updated_at` — now an alias
+ * of the one in `@rebasepro/types`.
+ */
+export type HistoryEntryData = EntityHistoryEntry;
 
 export interface UseEntityHistoryResult {
     entries: HistoryEntryData[];

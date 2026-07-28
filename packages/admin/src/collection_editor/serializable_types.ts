@@ -23,7 +23,8 @@ import type {
     OnAction,
     PropertyConditions,
     PropertyValidationSchema,
-    SecurityRule
+    SecurityRule,
+    WhereFilterOp
 } from "@rebasepro/types";
 import type {
     CollectionSize,
@@ -47,7 +48,9 @@ export interface SerializableAdminBaseOptions {
     disabled?: boolean | SerializablePropertyDisabledConfig;
     widthPercentage?: number;
     customProps?: unknown;
-    // Field and Preview are dropped (ComponentRef is not serializable)
+    /** Narrows the filter operators offered for this property. Plain data. */
+    filterOperators?: readonly WhereFilterOp[];
+    // Field, Preview and Filter are dropped (ComponentRef is not serializable)
 }
 
 /** JSON-serializable version of `PropertyDisabledConfig`. Already serializable. */
@@ -113,7 +116,12 @@ export interface SerializableAdminStringOptions extends SerializableAdminBaseOpt
     markdown?: boolean;
     previewAsTag?: boolean;
     clearable?: boolean;
-    url?: boolean | "image" | "video" | "audio" | "file";
+    /**
+     * How a string holding a URL is rendered. Was mirrored here as `url`, the
+     * name of the *core* flag that says the string is a URL at all — so this
+     * option had no serializable form and the core flag had two.
+     */
+    urlPreview?: "image" | "video" | "audio" | "file";
 }
 
 /** JSON-serializable version of `AdminNumberOptions`. */
@@ -177,6 +185,12 @@ export interface SerializableBaseProperty {
     description?: string;
     propertyConfig?: string;
     columnName?: string;
+    /**
+     * Server-side guarantee that the column never reaches an API response — a
+     * password hash, a verification token. Absent from this mirror until now,
+     * so editing a collection in the panel silently unset it.
+     */
+    excludeFromApi?: boolean;
     validation?: PropertyValidationSchema;
     defaultValue?: unknown;
     /**
@@ -205,6 +219,8 @@ export interface SerializableStringProperty extends SerializableBaseProperty {
     storage?: SerializableStorageConfig;
     userSelect?: boolean;
     email?: boolean;
+    /** The string holds a URL. Feeds the generated OpenAPI contract. */
+    url?: boolean;
     reference?: SerializableReferenceProperty;
 }
 
@@ -453,6 +469,12 @@ export interface SerializableCollectionConfig {
     table?: string;
     schema?: string;
     securityRules?: readonly SecurityRule[];
+    /** Removes the framework's injected baseline RLS policies. */
+    disableDefaultPolicies?: boolean;
+
+    // ── Write behaviour ───────────────────────────────────────────────
+    /** Whether a write naming an undeclared field is rejected with a 400. */
+    strictWrites?: boolean;
 
     // ── Owner ─────────────────────────────────────────────────────────
     ownerId?: string;
