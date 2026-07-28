@@ -19,7 +19,6 @@ const { db } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
 
 export async function start(): Promise<void> {
     await initializeRebaseBackend({
-        mode: "baas",
         server,
         app,
         database: createPostgresAdapter({

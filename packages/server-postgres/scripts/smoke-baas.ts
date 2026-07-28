@@ -176,7 +176,6 @@ async function main(): Promise<void> {
         const { db } = createPostgresDatabaseConnection(connectionString);
         await initializeRebaseBackend({
             // The whole point: no collections, no collectionsDir, no schema.
-            mode: "baas",
             server,
             app: app as never,
             database: createPostgresAdapter({ connection: db, connectionString }),
