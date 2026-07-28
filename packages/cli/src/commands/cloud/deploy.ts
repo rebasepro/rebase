@@ -208,6 +208,7 @@ async function deployBundle(opts: {
             appName: backend!.name,
             app: backend!.app,
             runtimeRange: loaded.manifest.rebase,
+            storage: loaded.manifest.storage,
             skipTypeCheck: opts.skipTypeCheck,
             log: (m: string) => console.log(chalk.gray(m))
         });

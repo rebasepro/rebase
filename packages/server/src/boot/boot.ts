@@ -6,6 +6,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { getRequestListener } from "@hono/node-server";
 import {
     DEFAULT_DATA_SOURCE_KEY,
+    normalizeStorageSources,
     type DataSourceDefinition,
     type StorageSourceDefinition
 } from "@rebasepro/types";
@@ -114,7 +115,18 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // ── Declarations ─────────────────────────────────────────────────────────
     const configExports = await loadBundleConfigExports(bundle);
     const dataSourceDefs: DataSourceDefinition[] | undefined = configExports.dataSources;
-    const storageSourceDefs: StorageSourceDefinition[] | undefined = configExports.storageSources;
+    // `rebase.json` (recorded in the manifest) is authoritative; config code may
+    // add sources it does not mention — a `direct`-transport bucket reached by a
+    // provider SDK has no reason to appear in a document the platform reads for
+    // provisioning. Merging rather than choosing is what keeps the console's view
+    // and the tenant's reality the same list. A bundle built before the manifest
+    // carried sources falls through to the config exports alone.
+    const declaredStorage = normalizeStorageSources(
+        bundle.manifest.storage?.sources,
+        configExports.storageSources
+    );
+    const storageSourceDefs: StorageSourceDefinition[] | undefined =
+        declaredStorage.length > 0 ? declaredStorage : undefined;
 
     // ── Databases ────────────────────────────────────────────────────────────
     const resolvedSources = resolveDataSources(process.env, dataSourceDefs);

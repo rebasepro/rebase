@@ -22,7 +22,10 @@ import {
     BUNDLE_FORMAT_VERSION,
     RUNTIME_CONTRACT_VERSION,
     computeSchemaVersion,
+    findStorageSuffixCollision,
+    normalizeStorageSources,
     type CollectionConfig,
+    type DeclaredStorageSources,
     type NativeDependency,
     type RebaseBundleManifest,
     type RebaseBackendAppConfig
@@ -45,6 +48,13 @@ export interface BuildBundleOptions {
     outDir?: string;
     /** Runtime range from the manifest, recorded for compatibility checks. */
     runtimeRange: string;
+    /**
+     * The `storage` block of `rebase.json` — which buckets this project uses.
+     *
+     * Passed in rather than re-read here so `rebase.json` is parsed and validated
+     * once, by the command that owns it.
+     */
+    storage?: DeclaredStorageSources;
     /** Skip type checking. Faster, and strictly worse — for iteration only. */
     skipTypeCheck?: boolean;
     /** Skip regenerating the Drizzle schema from the collections. */
@@ -330,15 +340,26 @@ paths: kept };
  * says exactly how to proceed, while a false positive would hand back the crash
  * loop this exists to prevent.
  */
-export function detectStorageAuthorize(compiledConfigDir: string): boolean {
+export function detectStorageAuthorize(compiledConfigDir: string, depth = 0): boolean {
     const indexPath = [".js", ".mjs", ".ts"]
         .map(ext => path.join(compiledConfigDir, `index${ext}`))
         .find(candidate => fs.existsSync(candidate));
     if (!indexPath) return false;
+    return moduleExportsStorageAuthorize(indexPath, depth);
+}
 
+/**
+ * Whether one compiled module re-exports or defines `storageAuthorize`.
+ *
+ * Split out from {@link detectStorageAuthorize} so a wildcard re-export can be
+ * followed. `export * from "./storage.js"` is an ordinary way to write a config
+ * barrel, and treating it as "no hook" rejected deploys that were correct — with
+ * a message telling the developer to add a hook they had already written.
+ */
+function moduleExportsStorageAuthorize(modulePath: string, depth: number): boolean {
     let source: string;
     try {
-        source = fs.readFileSync(indexPath, "utf8");
+        source = fs.readFileSync(modulePath, "utf8");
     } catch {
         return false;
     }
@@ -356,7 +377,57 @@ export function detectStorageAuthorize(compiledConfigDir: string): boolean {
         });
         if (names.includes("storageAuthorize")) return true;
     }
+
+    // `export * from "./storage.js"` — follow it. Bounded to a few levels: a
+    // barrel of barrels is realistic, an infinite chain is not, and the cost of
+    // giving up is a rejection message rather than a wrong answer.
+    if (depth < 3) {
+        for (const clause of source.matchAll(/\bexport\s*\*\s*from\s*["']([^"']+)["']/g)) {
+            const specifier = clause[1];
+            if (!specifier.startsWith(".")) continue;
+            const resolved = resolveRelativeModule(path.dirname(modulePath), specifier);
+            if (resolved && moduleExportsStorageAuthorize(resolved, depth + 1)) return true;
+        }
+    }
     return false;
+}
+
+/**
+ * Resolve a relative ESM specifier to a file on disk.
+ *
+ * Compiled output carries explicit `.js` extensions, but the same function reads
+ * TypeScript sources during a source boot, where the specifier may be
+ * extensionless or point at a directory index.
+ */
+function resolveRelativeModule(fromDir: string, specifier: string): string | null {
+    const base = path.resolve(fromDir, specifier);
+    const candidates = [
+        base,
+        `${base}.js`,
+        `${base}.mjs`,
+        `${base}.ts`,
+        path.join(base, "index.js"),
+        path.join(base, "index.mjs"),
+        path.join(base, "index.ts")
+    ];
+    for (const candidate of candidates) {
+        try {
+            if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+        } catch {
+            continue;
+        }
+    }
+    // A `.js` specifier that only exists as `.ts` — the shape every compiled-from-
+    // TypeScript barrel has when this runs against sources rather than output.
+    if (/\.js$/.test(base)) {
+        const asTs = base.replace(/\.js$/, ".ts");
+        try {
+            if (fs.existsSync(asTs) && fs.statSync(asTs).isFile()) return asTs;
+        } catch {
+            return null;
+        }
+    }
+    return null;
 }
 
 /**
@@ -847,6 +918,19 @@ stdio: "inherit" });
     const nativeModules = detectNativeDependencies(projectRoot, declared);
     const declaresStorageAuthorize = detectStorageAuthorize(path.join(outDir, paths.config));
 
+    // Resolve the declared buckets now, and refuse the build if two of them would
+    // read the same environment variables. Catching it here means a rename, not a
+    // tenant that silently served one bucket's files from another's credentials.
+    const storageSources = normalizeStorageSources(options.storage, undefined);
+    const collision = findStorageSuffixCollision(storageSources.map(s => s.key));
+    if (collision) {
+        throw new Error(
+            `Storage sources "${collision.a}" and "${collision.b}" in rebase.json both map to the ` +
+            `environment variable suffix "${collision.suffix || "(none)"}", so they would read each ` +
+            "other's configuration. Rename one of them."
+        );
+    }
+
     const schemaOut = paths.schema.replace(/\.ts$/, ".js");
     const relative = (target: string): string | undefined =>
         fs.existsSync(path.join(outDir, target)) ? target : undefined;
@@ -884,7 +968,10 @@ stdio: "inherit" });
             native: nativeModules.length > 0,
             nativeModules: nativeModules.length > 0 ? nativeModules : undefined
         },
-        storage: { authorize: declaresStorageAuthorize },
+        storage: {
+            authorize: declaresStorageAuthorize,
+            ...(storageSources.length > 0 ? { sources: storageSources } : {})
+        },
         deps: { declared },
         build: {
             cli: resolveCliVersion(),

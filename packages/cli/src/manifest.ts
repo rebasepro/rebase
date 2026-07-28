@@ -17,11 +17,14 @@
  */
 import fs from "fs";
 import path from "path";
-import type {
-    ManagedCompatibility,
-    RebaseAppConfig,
-    RebaseBackendAppConfig,
-    RebaseProjectManifest
+import {
+    findStorageSuffixCollision,
+    storageEnvSuffix,
+    type DeclaredStorageSources,
+    type ManagedCompatibility,
+    type RebaseAppConfig,
+    type RebaseBackendAppConfig,
+    type RebaseProjectManifest
 } from "@rebasepro/types";
 import { MANIFEST_FILENAME } from "./utils/project";
 
@@ -376,16 +379,93 @@ message: "name is reserved" });
         byPath.set(at, name);
     }
 
+    const storage = validateStorageSources(raw.storage, issues);
+
     if (issues.length > 0) return { issues };
 
     return {
         manifest: {
             $schema: typeof raw.$schema === "string" ? raw.$schema : undefined,
             rebase: raw.rebase as string,
-            apps
+            apps,
+            ...(storage ? { storage } : {})
         },
         issues
     };
+}
+
+/**
+ * Validate the `storage` block — which buckets this project uses.
+ *
+ * Absent means one default source, so `undefined` is a valid answer and not an
+ * issue. Everything else is checked strictly, because each key here becomes the
+ * suffix of a set of environment variables: a key that cannot become a variable
+ * name, or two keys that become the *same* one, are failures worth catching
+ * while someone is looking at the file rather than at a tenant serving one
+ * bucket's files with another's credentials.
+ */
+function validateStorageSources(
+    raw: unknown,
+    issues: ManifestValidationIssue[]
+): DeclaredStorageSources | undefined {
+    if (raw === undefined) return undefined;
+    if (!isRecord(raw)) {
+        issues.push({ path: "storage", message: "must be an object keyed by storage source name" });
+        return undefined;
+    }
+
+    const sources: DeclaredStorageSources = {};
+    for (const [key, value] of Object.entries(raw)) {
+        if (!isRecord(value)) {
+            issues.push({ path: `storage.${key}`, message: "must be an object" });
+            continue;
+        }
+        if (typeof value.engine !== "string" || value.engine.trim() === "") {
+            issues.push({
+                path: `storage.${key}.engine`,
+                message: 'is required, e.g. "s3", "gcs" or "local"'
+            });
+            continue;
+        }
+        if (value.transport !== undefined && value.transport !== "server" && value.transport !== "direct") {
+            issues.push({
+                path: `storage.${key}.transport`,
+                message: 'must be "server" or "direct"'
+            });
+            continue;
+        }
+        if (value.label !== undefined && typeof value.label !== "string") {
+            issues.push({ path: `storage.${key}.label`, message: "must be a string" });
+            continue;
+        }
+        try {
+            storageEnvSuffix(key);
+        } catch {
+            issues.push({
+                path: `storage.${key}`,
+                message: "name cannot become an environment variable suffix — " +
+                    "use a name containing at least one letter or digit"
+            });
+            continue;
+        }
+        sources[key] = {
+            engine: value.engine,
+            ...(value.transport !== undefined ? { transport: value.transport } : {}),
+            ...(value.label !== undefined ? { label: value.label as string } : {})
+        };
+    }
+
+    const collision = findStorageSuffixCollision(Object.keys(sources));
+    if (collision) {
+        issues.push({
+            path: `storage.${collision.b}`,
+            message: `maps to the same environment variable suffix ` +
+                `("${collision.suffix || "(none)"}") as "${collision.a}", so the two would read ` +
+                "each other's configuration — rename one of them"
+        });
+    }
+
+    return Object.keys(sources).length > 0 ? sources : undefined;
 }
 
 /**
