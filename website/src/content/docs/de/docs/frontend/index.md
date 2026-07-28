@@ -57,16 +57,19 @@ Controller sind React-Hooks, die spezifische Aspekte des Frameworks konfiguriere
 Der Haupt-Controller, der alles miteinander verbindet:
 
 ```typescript
+import { buildRebaseData } from "@rebasepro/common";
+
+const data = buildRebaseData(dataDriver);
+
 const navigationStateController = useBuildNavigationStateController({
     collections: () => [...collections],  // Collection definitions
     views: customViews,                   // Custom navigation views
     plugins,                              // Plugin instances
     authController,
-    data: rebaseClient.data,
+    data,
     collectionRegistryController,
     urlController,
-    adminMode: adminModeController.mode,
-    userManagement
+    adminMode: adminModeController.mode
 });
 ```
 

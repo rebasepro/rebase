@@ -58,17 +58,23 @@ Controllers are React hooks that configure specific aspects of the framework:
 
 The main controller that wires everything together:
 
+The admin consumes **Entity-shaped** data, not the SDK's flat rows, so wrap the
+driver with `buildRebaseData` — passing `rebaseClient.data` here will not compile.
+
 ```typescript
+import { buildRebaseData } from "@rebasepro/common";
+
+const data = buildRebaseData(dataDriver);
+
 const navigationStateController = useBuildNavigationStateController({
     collections: () => [...collections],  // Collection definitions
     views: customViews,                   // Custom navigation views
     plugins,                              // Plugin instances
     authController,
-    data: rebaseClient.data,
+    data,
     collectionRegistryController,
     urlController,
-    adminMode: adminModeController.mode,
-    userManagement
+    adminMode: adminModeController.mode
 });
 ```
 

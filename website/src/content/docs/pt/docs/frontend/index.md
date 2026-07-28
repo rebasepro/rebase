@@ -57,16 +57,19 @@ Controladores são hooks React que configuram aspectos específicos do framework
 O controlador principal que interliga tudo:
 
 ```typescript
+import { buildRebaseData } from "@rebasepro/common";
+
+const data = buildRebaseData(dataDriver);
+
 const navigationStateController = useBuildNavigationStateController({
     collections: () => [...collections],  // Collection definitions
     views: customViews,                   // Custom navigation views
     plugins,                              // Plugin instances
     authController,
-    data: rebaseClient.data,
+    data,
     collectionRegistryController,
     urlController,
-    adminMode: adminModeController.mode,
-    userManagement
+    adminMode: adminModeController.mode
 });
 ```
 

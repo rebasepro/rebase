@@ -57,16 +57,19 @@ I controller sono hook di React che configurano aspetti specifici del framework:
 Il controller principale che collega tutto insieme:
 
 ```typescript
+import { buildRebaseData } from "@rebasepro/common";
+
+const data = buildRebaseData(dataDriver);
+
 const navigationStateController = useBuildNavigationStateController({
     collections: () => [...collections],  // Definizioni delle collezioni
     views: customViews,                   // Viste di navigazione personalizzate
     plugins,                              // Istanze di plugin
     authController,
-    data: rebaseClient.data,
+    data,
     collectionRegistryController,
     urlController,
-    adminMode: adminModeController.mode,
-    userManagement
+    adminMode: adminModeController.mode
 });
 ```
 

@@ -49,6 +49,7 @@
     "build:stream": "pnpm -r run build --reporter=append-only",
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json && tsc --noEmit -p tsconfig.tests.json",
     "verify:docs": "node --max-old-space-size=8192 scripts/verify-docs.mjs",
+    "verify:docs:strict": "node --max-old-space-size=8192 scripts/verify-docs.mjs --strict",
     "verify:selfhost": "node --import tsx scripts/verify-selfhost.mts",
     "check:headless": "node scripts/headless-guard/check.mjs",
     "check:types-headless": "node scripts/headless-guard/check-types.mjs",
