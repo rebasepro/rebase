@@ -1015,3 +1015,54 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
     });
 });
 
+
+describe("DrizzleConditionBuilder - manyToMany scope SQL", () => {
+    const { PgDialect } = require("drizzle-orm/pg-core");
+    const pgDialect = new PgDialect();
+
+    const relation: Relation = {
+        kind: "manyToMany",
+        relationName: "tags",
+        target: () => ({ slug: "tags" } as unknown as CollectionConfig),
+        through: {
+            table: "posts_tags",
+            sourceColumn: "post_id",
+            targetColumn: "tag_id"
+        }
+    };
+
+    const build = () =>
+        DrizzleConditionBuilder.buildRelationScopeCondition(
+            resolveRelation(relation, { slug: "posts" } as unknown as CollectionConfig),
+            () => ({ table: mockPostsTable, idColumn: mockPostsTable.id }),
+            1,
+            mockTagsTable,
+            mockTagsTable.id,
+            createMockRegistry()
+        );
+
+    // The junction's columns must not be rendered as bare Drizzle columns. A column
+    // object carries no table qualifier, so inside `db.query.findMany` — which
+    // aliases the root table — they came out qualified with the *target's* alias
+    // (`"tags"."tag_id"`), a column that does not exist. Postgres then aborts the
+    // transaction and the fallback read dies on 25P02, three steps from the cause.
+    it("qualifies junction columns with the junction, never the target table", () => {
+        const { sql: text } = pgDialect.sqlToQuery(build());
+
+        expect(text).toContain('"posts_tags" AS "__rel_m2m"');
+        expect(text).toContain('"__rel_m2m"."tag_id"');
+        expect(text).toContain('"__rel_m2m"."post_id"');
+        // The precise regression: a junction column wearing the target's name.
+        expect(text).not.toContain('"tags"."tag_id"');
+        expect(text).not.toContain('"tags"."post_id"');
+    });
+
+    // The other half: the correlation has to stay bound to the outer row, so the
+    // target's key is the one thing that must remain a Drizzle column.
+    it("correlates on the outer target row", () => {
+        const { sql: text, params } = pgDialect.sqlToQuery(build());
+
+        expect(text).toContain('"__rel_m2m"."tag_id" = "tags"."id"');
+        expect(params).toEqual([1]);
+    });
+});

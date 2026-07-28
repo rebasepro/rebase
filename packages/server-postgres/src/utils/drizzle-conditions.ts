@@ -99,7 +99,24 @@ export class DrizzleConditionBuilder {
                 // Correlated, not joined: a join through a junction multiplies
                 // the target rows by the number of matching links and silently
                 // breaks `limit`/`offset`.
-                return sql`EXISTS (SELECT 1 FROM ${junctionTable} WHERE ${targetCol} = ${targetIdColumn} AND ${sourceCol} = ${parentId})`;
+                //
+                // The junction is aliased and referenced by identifier, never as a
+                // Drizzle column. A column object carries no table qualifier of its
+                // own — it is rendered against whatever the surrounding builder
+                // thinks the current table is — so inside `db.query.findMany`, which
+                // aliases the root table, `${sourceCol}` came out qualified with the
+                // *target's* alias: `podcast.podcast_id`, a column that does not
+                // exist. That aborts the transaction, and the fallback read then
+                // fails on the poisoned transaction rather than on anything to do
+                // with the relation. Only `targetIdColumn` stays a column object,
+                // because that one *must* bind to the outer row to correlate.
+                //
+                // Aliasing also disambiguates a self-referential many-to-many, where
+                // the junction and the target are the same table.
+                const junctionAlias = "__rel_m2m";
+                const junctionRef = (column: AnyPgColumn) =>
+                    sql`${sql.identifier(junctionAlias)}.${sql.identifier(column.name)}`;
+                return sql`EXISTS (SELECT 1 FROM ${junctionTable} AS ${sql.identifier(junctionAlias)} WHERE ${junctionRef(targetCol)} = ${targetIdColumn} AND ${junctionRef(sourceCol)} = ${parentId})`;
             }
 
             case "hasOne":
