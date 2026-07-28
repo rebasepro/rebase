@@ -155,7 +155,40 @@ describe("row codec round-trip", () => {
     });
 });
 
+/**
+ * Empty the shared queue between the manager tests.
+ *
+ * `IDB_NAME` is a hardcoded `"rebase-offline"`, so every
+ * `new IndexedDBOfflineStore()` in this file opens the *same* database. The
+ * `IndexedDBOfflineStore` block above shares it deliberately — each of its
+ * tests uses its own key prefix, and one of them exists to prove that
+ * isolation holds. The two `OfflineManager` blocks below do not: a manager
+ * queues under no prefix, so without this they inherit each other's pending
+ * writes.
+ *
+ * CI failed both manager tests on 2026-07-28 with exactly the symptoms this
+ * coupling would produce — "replays them from a fresh one" asserted
+ * `flushed: 1` and got `2`, and the cross-tab read came back empty. It has not
+ * been reproduced locally (14 runs, including randomized order), so treat this
+ * as removing a real coupling rather than as a confirmed diagnosis: if CI fails
+ * here again, the shared queue is no longer the explanation and the next place
+ * to look is timing inside the manager itself.
+ */
+async function clearOfflineQueue(): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.deleteDatabase("rebase-offline");
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+        // A still-open connection blocks the delete; the manager tests each
+        // build their own stores, so resolving here keeps a stray one from
+        // hanging the suite rather than failing it.
+        request.onblocked = () => resolve();
+    });
+}
+
 describe("two tabs over one database", () => {
+    beforeEach(clearOfflineQueue);
+
     /** BroadcastChannel delivery is asynchronous; give it a macrotask or two. */
     const settle = async () => {
         for (let i = 0; i < 3; i++) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -240,6 +273,8 @@ describe("two tabs over one database", () => {
 });
 
 describe("OfflineManager over IndexedDB", () => {
+    beforeEach(clearOfflineQueue);
+
     it("queues offline writes in one manager and replays them from a fresh one", async () => {
         const table = new Map<string, Record<string, unknown>>();
         const state = { online: true };
