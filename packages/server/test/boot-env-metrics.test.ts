@@ -1,4 +1,4 @@
-import { isLocalhostOrigin, resolveCorsOrigin } from "../src/boot/env";
+import { isLocalhostOrigin, resolveCorsOrigin, resolveEnableSwagger } from "../src/boot/env";
 import type { RebaseBootEnv } from "../src/boot/env";
 import { MetricsRegistry, classifySurface } from "../src/metrics";
 
@@ -68,6 +68,32 @@ describe("resolveCorsOrigin", () => {
 
         expect(origin("https://app.example.com")).toBe("https://app.example.com");
         expect(origin("")).toBeNull();
+    });
+});
+
+/**
+ * This defaulted to a flat `false`, and the runtime is how every scaffolded
+ * project boots — so `/api/docs` and `/api/swagger` 404'd for projects that
+ * never asked, including the one `rebase init` tells the user to open. The
+ * distinction the tests below pin is that "unset" is not "off": it defers to the
+ * server's own policy in development and only hard-disables in production.
+ */
+describe("resolveEnableSwagger", () => {
+    it("defers to the server's policy when unset in development", () => {
+        // Not `true`. `undefined` is what lets init/docs.ts decide, which is
+        // also what withholds the UI while still serving the spec.
+        expect(resolveEnableSwagger(env({ NODE_ENV: "development" }))).toBeUndefined();
+    });
+
+    it("is off when unset in production", () => {
+        // The spec enumerates every collection and field, so an unconfigured
+        // production deployment must not publish it.
+        expect(resolveEnableSwagger(env({ NODE_ENV: "production" }))).toBe(false);
+    });
+
+    it("honours an explicit value in either environment", () => {
+        expect(resolveEnableSwagger(env({ NODE_ENV: "production", REBASE_ENABLE_SWAGGER: true }))).toBe(true);
+        expect(resolveEnableSwagger(env({ NODE_ENV: "development", REBASE_ENABLE_SWAGGER: false }))).toBe(false);
     });
 });
 

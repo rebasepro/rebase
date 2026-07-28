@@ -19,7 +19,7 @@ import { serveSPA } from "../serve-spa";
 import { installShutdownHandlers } from "../init/shutdown";
 import { listenWithPortRetry, cleanupDevPortFile } from "../utils/dev-port";
 
-import { loadBootEnv, resolveCorsOrigin, type RebaseBootEnv } from "./env";
+import { loadBootEnv, resolveCorsOrigin, resolveEnableSwagger, type RebaseBootEnv } from "./env";
 import {
     BundleError,
     loadBundle,
@@ -218,7 +218,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         callbacks: configExports.callbacks,
         auth: resolveAuthOptions(env, usersCollection),
         history: env.REBASE_HISTORY,
-        enableSwagger: env.REBASE_ENABLE_SWAGGER,
+        enableSwagger: resolveEnableSwagger(env),
         compression: env.REBASE_COMPRESSION,
         maxBodySize: env.REBASE_MAX_BODY_SIZE,
         logging: env.LOG_LEVEL ? { level: env.LOG_LEVEL } : undefined,

@@ -76,7 +76,24 @@ const bootEnvExtension = z.object({
 
     // ── API surface ──────────────────────────────────────────────────────────
     REBASE_BASE_PATH: z.string().default("/api"),
-    REBASE_ENABLE_SWAGGER: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /**
+     * The OpenAPI surface: `/api/docs` (the spec) and `/api/swagger` (the UI).
+     *
+     * Deliberately tri-state, and resolved against NODE_ENV by
+     * {@link resolveEnableSwagger} rather than defaulted here. Unset means "on
+     * in development, off in production" — an explicit `true` or `false` always
+     * wins in both.
+     *
+     * It used to default to `"false"` outright, which reads as a safe default
+     * and was not one: the runtime is how every scaffolded project boots, so
+     * the docs disappeared from projects that never asked for that. `rebase
+     * init` prints "docs are at /api/swagger" on completion, the headless
+     * README repeats it, and the console's API Explorer fetches `/api/docs` —
+     * all three 404'd against a project running the runtime, and the baas e2e
+     * failed on exactly that.
+     */
+    REBASE_ENABLE_SWAGGER: z.enum(["true", "false", ""]).optional()
+        .transform(v => (v === undefined || v === "" ? undefined : v === "true")),
     /**
      * Maximum request body size, in **bytes**.
      *
@@ -150,6 +167,24 @@ export function isLocalhostOrigin(origin: string): boolean {
 }
 
 /** A CORS origin resolver of the shape Hono's `cors()` middleware expects. */
+/**
+ * Whether this process serves the OpenAPI docs.
+ *
+ * An explicit `REBASE_ENABLE_SWAGGER` wins in either direction. Left unset, the
+ * docs follow the environment: on in development, where they are part of how a
+ * scaffolded project is meant to be explored, and off in production, where the
+ * spec enumerates every collection and field to anyone who asks for it.
+ *
+ * Returning `undefined` for development is the point rather than an oversight —
+ * it hands the decision to the server's own policy in `init/docs.ts`, which also
+ * knows to withhold the Swagger UI while still serving the spec. Two defaults
+ * that can disagree about the same route is the bug this replaces.
+ */
+export function resolveEnableSwagger(env: RebaseBootEnv): boolean | undefined {
+    if (env.REBASE_ENABLE_SWAGGER !== undefined) return env.REBASE_ENABLE_SWAGGER;
+    return env.NODE_ENV === "production" ? false : undefined;
+}
+
 export type CorsOriginResolver = (origin: string) => string | null;
 
 /**
