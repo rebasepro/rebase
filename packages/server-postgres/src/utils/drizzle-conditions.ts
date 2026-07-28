@@ -1,10 +1,11 @@
 import { and, eq, or, sql, SQL, ilike, inArray, getTableColumns } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgVarchar, PgText, PgChar } from "drizzle-orm/pg-core";
 import {
-    FilterValues, WhereFilterOp, JoinStep, LogicalCondition, FilterCondition,
+    CollectionConfig, FilterValues, WhereFilterOp, JoinStep, LogicalCondition, FilterCondition,
     ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany
 } from "@rebasepro/types";
 import { getColumnName, normalizeToEntityRelation, resolveCollectionRelations } from "@rebasepro/common";
+import { generateForeignKeyName } from "@rebasepro/utils";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { ApiError, logger } from "@rebasepro/server";
@@ -47,6 +48,20 @@ export function configureUnknownFilterFields(mode: UnknownFilterFieldsMode): voi
 /** The process-wide behaviour for unresolvable filter fields. */
 export function getUnknownFilterFieldsMode(): UnknownFilterFieldsMode {
     return defaultUnknownFilterFieldsMode;
+}
+
+/** Per-call context for compiling a filter into SQL. */
+export interface FilterCompilationOptions {
+    /**
+     * Overrides the process-wide {@link UnknownFilterFieldsMode} for this call.
+     */
+    unknownFields?: UnknownFilterFieldsMode;
+    /**
+     * The collection the filter is written against. Its resolved relations are
+     * what turn an owning-relation filter key into the foreign-key column it
+     * actually lives in; without it only the default key shapes can be guessed.
+     */
+    collection?: CollectionConfig;
 }
 
 /**
@@ -263,25 +278,48 @@ export class DrizzleConditionBuilder {
      * The column a filter field names, or `undefined` if it names nothing.
      *
      * A field may address its column directly, or — for an owning relation —
-     * through the `<field>_id` foreign key the relation compiles to. Only a
-     * field that resolves to *neither* is an error, and by default it is one:
-     * see {@link UnknownFilterFieldsMode} for why silently dropping it is a
+     * through the foreign key the relation compiles to. Only a field that
+     * resolves to *neither* is an error, and by default it is one: see
+     * {@link UnknownFilterFieldsMode} for why silently dropping it is a
      * data-exposure primitive rather than a convenience.
+     *
+     * The relation's own `localKey` is the authority for that foreign key, not
+     * `<field>_id`. The default local key is `generateForeignKeyName`, which
+     * snake-cases *and singularises* — `userProfile` → `user_profile_id`,
+     * `users` → `user_id` — and it can be overridden outright. Guessing
+     * `<field>_id` therefore misses perfectly ordinary owning relations, and
+     * with this resolution failing closed that miss is a 400 on a filter that
+     * has nothing wrong with it. The guesses stay, last, for callers that hand
+     * over no collection to resolve against.
      */
     private static resolveFilterColumn(
         table: PgTable<any>,
         field: string,
         collectionPath: string,
-        mode: UnknownFilterFieldsMode
+        mode: UnknownFilterFieldsMode,
+        collection?: CollectionConfig
     ): AnyPgColumn | undefined {
-        const direct = table[field as keyof typeof table] as AnyPgColumn;
+        const columnAt = (key: string): AnyPgColumn | undefined =>
+            (key in table ? table[key as keyof typeof table] as AnyPgColumn : undefined) || undefined;
+
+        const direct = columnAt(field);
         if (direct) return direct;
 
-        // Fallback for relations (e.g. project -> project_id)
-        const relationKey = `${field}_id`;
-        if (relationKey in table) {
-            const viaRelation = table[relationKey as keyof typeof table] as AnyPgColumn;
-            if (viaRelation) return viaRelation;
+        // Owning relation, resolved: the relation names its own local key.
+        if (collection) {
+            const relation = resolveCollectionRelations(collection)[field];
+            if (relation?.kind === "belongsTo") {
+                const foreignKey = columnAt(relation.localKey);
+                if (foreignKey) return foreignKey;
+            }
+        }
+
+        // No collection in hand — the two shapes an owning relation's key takes
+        // by default (e.g. `project` → `project_id`, `userProfile` →
+        // `user_profile_id`).
+        for (const guess of [`${field}_id`, generateForeignKeyName(field)]) {
+            const foreignKey = columnAt(guess);
+            if (foreignKey) return foreignKey;
         }
 
         if (mode === "warn") {
@@ -316,14 +354,15 @@ export class DrizzleConditionBuilder {
         filter: FilterValues<Extract<keyof M, string>>,
         table: PgTable<any>,
         collectionPath: string,
-        mode: UnknownFilterFieldsMode = defaultUnknownFilterFieldsMode
+        options: FilterCompilationOptions = {}
     ): SQL[] {
+        const mode = options.unknownFields ?? defaultUnknownFilterFieldsMode;
         const conditions: SQL[] = [];
 
         for (const [field, filterParam] of Object.entries(filter)) {
             if (!filterParam) continue;
 
-            const fieldColumn = this.resolveFilterColumn(table, field, collectionPath, mode);
+            const fieldColumn = this.resolveFilterColumn(table, field, collectionPath, mode, options.collection);
             if (!fieldColumn) continue;
 
             const paramsList = Array.isArray(filterParam) && filterParam.length > 0 && Array.isArray(filterParam[0])
@@ -348,11 +387,11 @@ export class DrizzleConditionBuilder {
         cond: LogicalCondition | FilterCondition,
         table: PgTable<any>,
         collectionPath: string,
-        mode: UnknownFilterFieldsMode = defaultUnknownFilterFieldsMode
+        options: FilterCompilationOptions = {}
     ): SQL | null {
         if ("type" in cond) {
             const subSQLs = cond.conditions
-                .map(c => this.buildLogicalConditions(c, table, collectionPath, mode))
+                .map(c => this.buildLogicalConditions(c, table, collectionPath, options))
                 .filter((sql): sql is SQL => sql !== null);
             if (subSQLs.length === 0) return null;
             return (cond.type === "or" ? or(...subSQLs) : and(...subSQLs)) ?? null;
@@ -361,7 +400,13 @@ export class DrizzleConditionBuilder {
             // `or(...)` the disjunction loses a branch, so the surviving
             // branches match on their own and the result set widens by
             // everything the dropped leaf would have excluded.
-            const fieldColumn = this.resolveFilterColumn(table, cond.column, collectionPath, mode);
+            const fieldColumn = this.resolveFilterColumn(
+                table,
+                cond.column,
+                collectionPath,
+                options.unknownFields ?? defaultUnknownFilterFieldsMode,
+                options.collection
+            );
             if (!fieldColumn) return null;
             return this.buildSingleFilterCondition(fieldColumn, cond.operator as WhereFilterOp, cond.value);
         }

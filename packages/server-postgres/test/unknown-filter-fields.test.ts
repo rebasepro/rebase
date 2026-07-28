@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
+import { CollectionConfig } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 import {
     configureUnknownFilterFields,
@@ -20,6 +21,45 @@ const postsTable = pgTable("posts", {
     title: varchar("title").notNull(),
     author_id: integer("author_id")
 });
+
+/**
+ * Owning relations whose foreign key is NOT `<propertyKey>_id`: the default
+ * local key comes from `generateForeignKeyName`, which snake-cases and
+ * singularises, and it can be overridden outright.
+ */
+const accountsTable = pgTable("accounts", {
+    id: serial("id").primaryKey(),
+    user_profile_id: integer("user_profile_id"),
+    user_id: integer("user_id"),
+    owner_uid: integer("owner_uid")
+});
+
+const target = (slug: string) => () => ({ slug, name: slug, properties: {} } as CollectionConfig);
+
+const accountsCollection: CollectionConfig = {
+    slug: "accounts",
+    name: "Accounts",
+    properties: {
+        // camelCase key → `user_profile_id`
+        userProfile: {
+            name: "User profile",
+            type: "relation",
+            relation: { kind: "belongsTo", target: target("user_profiles") }
+        },
+        // plural key → singularised `user_id`
+        users: {
+            name: "User",
+            type: "relation",
+            relation: { kind: "belongsTo", target: target("users") }
+        },
+        // explicit local key, derivable from nothing
+        owner: {
+            name: "Owner",
+            type: "relation",
+            relation: { kind: "belongsTo", target: target("users"), localKey: "owner_uid" }
+        }
+    }
+};
 
 afterEach(() => {
     configureUnknownFilterFields("error");
@@ -145,6 +185,80 @@ describe("unknown filter fields", () => {
             expect(query.params).toEqual([7]);
         });
 
+        it("resolves a camelCase relation key through the collection's `localKey`", () => {
+            const { PgDialect } = require("drizzle-orm/pg-core");
+            const pgDialect = new PgDialect();
+
+            // `userProfile_id` is not a column; `user_profile_id` is.
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { userProfile: ["==", 3] },
+                accountsTable,
+                "accounts",
+                { collection: accountsCollection }
+            );
+            expect(conditions).toHaveLength(1);
+            expect(pgDialect.sqlToQuery(conditions[0]).sql).toBe('"accounts"."user_profile_id" = $1');
+        });
+
+        it("resolves a plural relation key through the singularised `localKey`", () => {
+            const { PgDialect } = require("drizzle-orm/pg-core");
+            const pgDialect = new PgDialect();
+
+            // `users_id` is not a column; `user_id` is.
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { users: ["==", 3] },
+                accountsTable,
+                "accounts",
+                { collection: accountsCollection }
+            );
+            expect(conditions).toHaveLength(1);
+            expect(pgDialect.sqlToQuery(conditions[0]).sql).toBe('"accounts"."user_id" = $1');
+        });
+
+        it("resolves an explicit `localKey` that no naming convention would guess", () => {
+            const { PgDialect } = require("drizzle-orm/pg-core");
+            const pgDialect = new PgDialect();
+
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { owner: ["==", 3] },
+                accountsTable,
+                "accounts",
+                { collection: accountsCollection }
+            );
+            expect(conditions).toHaveLength(1);
+            expect(pgDialect.sqlToQuery(conditions[0]).sql).toBe('"accounts"."owner_uid" = $1');
+        });
+
+        it("still resolves the derivable keys with no collection to resolve against", () => {
+            // The last-resort guesses: `<field>_id` and the singularising
+            // default. Only the explicit `localKey` is beyond them.
+            expect(DrizzleConditionBuilder.buildFilterConditions(
+                { userProfile: ["==", 3] }, accountsTable, "accounts"
+            )).toHaveLength(1);
+            expect(DrizzleConditionBuilder.buildFilterConditions(
+                { users: ["==", 3] }, accountsTable, "accounts"
+            )).toHaveLength(1);
+            expect(() => DrizzleConditionBuilder.buildFilterConditions(
+                { owner: ["==", 3] }, accountsTable, "accounts"
+            )).toThrow(ApiError);
+        });
+
+        it("resolves a relation `localKey` inside a logical condition too", () => {
+            const condition = DrizzleConditionBuilder.buildLogicalConditions(
+                {
+                    type: "or",
+                    conditions: [
+                        { column: "userProfile", operator: "==", value: 3 },
+                        { column: "owner", operator: "==", value: 4 }
+                    ]
+                },
+                accountsTable,
+                "accounts",
+                { collection: accountsCollection }
+            );
+            expect(condition).not.toBeNull();
+        });
+
         it("resolves `author` to the `author_id` column inside a logical condition", () => {
             const condition = DrizzleConditionBuilder.buildLogicalConditions(
                 {
@@ -195,7 +309,7 @@ describe("unknown filter fields", () => {
                 { nonexistent: ["==", "x"] },
                 postsTable,
                 "posts",
-                "warn"
+                { unknownFields: "warn" }
             );
             expect(conditions).toHaveLength(0);
             expect(getUnknownFilterFieldsMode()).toBe("error");

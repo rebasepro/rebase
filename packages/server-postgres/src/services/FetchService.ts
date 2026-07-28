@@ -46,6 +46,20 @@ export class FetchService {
     }
 
     /**
+     * The context the condition builder needs to compile a filter key that is
+     * not a column name outright — an owning relation's key resolves through
+     * the collection's relations to its foreign-key column.
+     *
+     * Looked up rather than passed: every read path already has the path, only
+     * some have the collection, and a path that names no registered collection
+     * (a nested/derived one) is not an error here — the builder simply falls
+     * back to guessing the default key shapes.
+     */
+    private filterContext(collectionPath: string): { collection?: CollectionConfig } {
+        return { collection: this.registry.getCollectionByPath(collectionPath) ?? undefined };
+    }
+
+    /**
      * Build filter conditions from FilterValues
      * Delegates to DrizzleConditionBuilder.buildFilterConditions
      */
@@ -54,7 +68,9 @@ export class FetchService {
         table: PgTable<any>,
         collectionPath: string
     ): SQL[] {
-        return DrizzleConditionBuilder.buildFilterConditions(filter, table, collectionPath);
+        return DrizzleConditionBuilder.buildFilterConditions(
+            filter, table, collectionPath, this.filterContext(collectionPath)
+        );
     }
 
     // =============================================================
@@ -311,7 +327,7 @@ export class FetchService {
         }
 
         if (options.logical) {
-            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath);
+            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath, this.filterContext(collectionPath));
             if (logicalCondition) allConditions.push(logicalCondition);
         }
 
@@ -656,7 +672,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         }
 
         if (options.logical) {
-            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath);
+            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath, this.filterContext(collectionPath));
             if (logicalCondition) allConditions.push(logicalCondition);
         }
 
