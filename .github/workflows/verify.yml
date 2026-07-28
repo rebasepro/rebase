@@ -103,6 +103,13 @@ jobs:
       - name: Package name guard
         run: pnpm run check:names
 
+      # An undeclared import resolves here and under npm/yarn hoisting, and
+      # fails under pnpm's isolated layout — so it type-checks, builds and tests
+      # green, then breaks on first import for an installing user.
+      # `@rebasepro/firebase` shipped that way with seven `@firebase/*` imports.
+      - name: Declared-dependency guard
+        run: pnpm run check:deps
+
       # Nothing in any pipeline ran ESLint. `verify-quality.sh` does, but that is
       # a script a human chooses to run, so a lint error could sit on main
       # indefinitely — and one was: a `no-control-regex` error in
