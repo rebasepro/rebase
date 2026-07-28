@@ -7,6 +7,12 @@ import { buildQueryString, createTransport, RebaseApiError } from "../src/transp
  */
 type MockFetch = jest.Mock<(input: RequestInfo | URL, init?: RequestInit) => Promise<Partial<Response>>>;
 
+// These build tokenless transports on purpose, in a Node environment, which is
+// exactly what the anonymous-server-client guard warns about (see
+// `ANONYMOUS_SERVER_CLIENT_WARNING`). The guard itself is covered by
+// `src/anonymous-client-guard.test.ts`; here it is only noise.
+beforeEach(() => { jest.spyOn(console, "warn").mockImplementation(() => undefined); });
+
 // --------------------------------------------------------------------------
 // buildQueryString
 // --------------------------------------------------------------------------

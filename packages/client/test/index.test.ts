@@ -7,6 +7,11 @@ import {
 import { createMemoryStorage } from "../src/auth";
 import { CollectionClient } from "../src/collection";
 
+// Tokenless clients in a Node environment, on purpose — that is what the
+// anonymous-server-client guard warns about (covered by
+// src/anonymous-client-guard.test.ts). Here it is only noise.
+beforeEach(() => { jest.spyOn(console, "warn").mockImplementation(() => undefined); });
+
 describe("createRebaseClient", () => {
     let clients: CreateRebaseClientResult<any>[] = [];
 

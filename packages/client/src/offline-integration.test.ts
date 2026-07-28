@@ -8,6 +8,11 @@ import { MemoryOfflineStore } from "./offline-store";
  * offline.test.ts covers the manager against fakes, not this plumbing.
  */
 describe("createRebaseClient({ offline })", () => {
+    // Tokenless clients in a Node environment, on purpose — that is what the
+    // anonymous-server-client guard warns about (covered by
+    // src/anonymous-client-guard.test.ts). Here it is only noise.
+    beforeEach(() => { jest.spyOn(console, "warn").mockImplementation(() => undefined); });
+
     function jsonResponse(body: unknown): Response {
         return new Response(JSON.stringify(body), {
             status: 200,

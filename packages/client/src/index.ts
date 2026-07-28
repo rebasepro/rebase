@@ -257,7 +257,10 @@ function deriveWebSocketUrl(baseUrl?: string): string {
 }
 
 export function createRebaseClient<DB = Record<string, unknown>>(options: CreateRebaseClientOptions): CreateRebaseClientResult<DB> {
-    const transport = createTransport(options);
+    // `credentialOutOfBand`: in cookie auth mode the credential is an httpOnly
+    // cookie, so a tokenless transport is not an anonymous client and must not
+    // trip the server-side anonymous guard (see `RebaseClientConfig.anonymous`).
+    const transport = createTransport(options, { credentialOutOfBand: options.auth?.authFlowMode === "cookie" });
     const auth = createAuth(transport, options.auth);
     const admin = createAdmin(transport, options.admin);
     const cron = createCron(transport, options.cron);
