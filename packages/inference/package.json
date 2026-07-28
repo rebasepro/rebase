@@ -10,9 +10,11 @@
   "module": "./dist/index.es.js",
   "types": "dist/index.d.ts",
   "source": "src/index.ts",
-  "devDependencies": {
+  "dependencies": {
     "@rebasepro/types": "workspace:*",
-    "@rebasepro/utils": "workspace:*",
+    "@rebasepro/utils": "workspace:*"
+  },
+  "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^25.9.3",
     "jest": "^30.4.2",

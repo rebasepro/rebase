@@ -1106,13 +1106,14 @@ importers:
         version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
 
   packages/inference:
-    devDependencies:
+    dependencies:
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
       '@rebasepro/utils':
         specifier: workspace:*
         version: link:../utils
+    devDependencies:
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0
