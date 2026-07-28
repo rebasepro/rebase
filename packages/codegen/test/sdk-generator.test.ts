@@ -496,7 +496,7 @@ isId: "increment" },
         expect(ts).toContain("authorId: string;"); // target is string uuid, validation required is true
     });
 
-    it("generates relation fields mapped correctly to relation type helpers", () => {
+    it("types a relation as the target's own row, inlined — the shape a read serves", () => {
         const tagsCol = {
             slug: "tags",
             driver: "postgres",
@@ -524,8 +524,71 @@ isId: "increment" },
 
         const ts = generateTypedefs([postsCol, tagsCol]);
 
-        // Row should have relation helper field
-        expect(ts).toContain("tags?: Array<{ id: string | number; path: string; __type: \"relation\"; data?: unknown }>;");
+        // `include: ["tags"]` inlines each tag's own columns. The
+        // `{ __type: "relation" }` envelope this used to emit is the admin's
+        // view-model and never reaches a `find()`.
+        expect(ts).toContain("tags?: Array<Database[\"tags\"][\"Row\"]>;");
+        expect(ts).not.toContain("__type: \"relation\"");
+    });
+
+    it("falls back to an open record when the target is not in this generation run", () => {
+        const postsCol = {
+            slug: "posts",
+            driver: "postgres",
+            properties: {
+                id: { type: "number",
+isId: "increment" },
+                author: {
+                    type: "relation",
+                    relation: {
+                        kind: "belongsTo",
+                        target: () => ({ slug: "authors", name: "authors" }),
+                        localKey: "author_id"
+                    }
+                }
+            }
+        } as unknown as CollectionConfig;
+
+        const ts = generateTypedefs([postsCol]);
+
+        expect(ts).toContain("authorId?: string | number;");
+        expect(ts).toContain("author?: Record<string, unknown>;");
+    });
+
+    it("a relation that shadows its own foreign key is typed as both", () => {
+        // The read serves the scalar column, until `include` names the relation
+        // — which nests the target under the same key and takes the column's
+        // place. Typing it as only one of the two is how `job.company_id`
+        // reached the query layer as an object.
+        const companiesCol = {
+            slug: "companies",
+            driver: "postgres",
+            properties: {
+                id: { type: "string",
+isId: "uuid" }
+            }
+        } as unknown as CollectionConfig;
+
+        const jobsCol = {
+            slug: "jobs",
+            driver: "postgres",
+            properties: {
+                id: { type: "string",
+isId: "uuid" }
+            },
+            relations: [
+                {
+                    kind: "belongsTo",
+                    relationName: "company_id",
+                    target: () => companiesCol,
+                    localKey: "company_id"
+                }
+            ]
+        } as unknown as CollectionConfig;
+
+        const ts = generateTypedefs([jobsCol, companiesCol]);
+
+        expect(ts).toContain("companyId?: string | Database[\"companies\"][\"Row\"];");
     });
 });
 

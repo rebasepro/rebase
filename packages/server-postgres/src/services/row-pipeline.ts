@@ -14,7 +14,9 @@ import { PostgresCollectionRegistry } from "../collections/PostgresCollectionReg
  *
  * - `"ref"` — a `{ id, path, __type: "relation" }` reference carrying the
  *   target's values. This is what the admin renders.
- * - `"inline"` — the target's own columns, flat. This is what REST serves.
+ * - `"inline"` — the target's own columns, flat. This is what REST serves, and
+ *   — since the in-process SDK reads through the same pipeline — what
+ *   `rebase.data` / `context.data` serve too. A developer never sees a ref.
  *
  * They used to be two functions that happened to agree, and the agreement was
  * not enforced by anything: the row-identity bug had to be fixed five times

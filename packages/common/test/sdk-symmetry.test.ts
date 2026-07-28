@@ -123,3 +123,149 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         expect(snaps[0].values.name).toBe("Widget");
     });
 });
+
+// =============================================================================
+// One relation shape, whatever the call looks like
+// =============================================================================
+
+/**
+ * The SDK used to answer in two shapes depending on whether the call passed
+ * `include`: with it, the REST pipeline inlined a relation as the target's own
+ * columns; without it, the driver's own fetch loaded every relation and put a
+ * `{ __type: "relation" }` envelope where the foreign key was. The generated
+ * types described only the envelope, so a column typed `string` arrived as an
+ * object — twice, in production, before anyone noticed.
+ *
+ * These tests pin the fix: every read through the SDK goes through the REST
+ * pipeline, which is the shape the HTTP API serves for the same query.
+ */
+
+const COMPANY = { id: "c1", name: "Acme" };
+const JOB = { id: "j1", title: "Engineer", company_id: "c1" };
+
+/** A relation envelope, exactly as `toCmsRow` builds one. */
+function envelope(values: Record<string, unknown>, path: string) {
+    return {
+        id: values.id,
+        path,
+        __type: "relation",
+        data: { id: values.id, path, values }
+    };
+}
+
+/**
+ * A driver shaped like the postgres one: two pipelines over the same row.
+ *
+ * `fetchCollection` / `fetchOne` / the listeners are the admin's — every
+ * relation eagerly loaded, as envelopes. `restFetchService` is REST's — nothing
+ * loaded unless `include` names it, and then inlined flat.
+ *
+ * `shadowFk` models the case that broke the reporting team: a relation
+ * addressed by the same name as its own foreign key, so the admin pipeline
+ * writes the envelope *over* the scalar column.
+ */
+function createRelationDriver({ shadowFk = false }: { shadowFk?: boolean } = {}): DataDriver {
+    const relationKey = shadowFk ? "company_id" : "company";
+    const cmsRow = () => ({ ...JOB, [relationKey]: envelope({ ...COMPANY }, "companies") });
+    const restRow = (include?: string[]) => include?.includes(relationKey)
+        ? { ...JOB, [relationKey]: { ...COMPANY } }
+        : { ...JOB };
+
+    return {
+        fetchCollection: jest.fn().mockImplementation(async () => [cmsRow()]),
+        fetchOne: jest.fn().mockImplementation(async () => cmsRow()),
+        listenCollection: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate([cmsRow()]); return () => {}; }),
+        listenOne: jest.fn().mockImplementation(({ onUpdate }: any) => { onUpdate(cmsRow()); return () => {}; }),
+        save: jest.fn(),
+        delete: jest.fn(),
+        restFetchService: {
+            fetchCollectionForRest: jest.fn().mockImplementation(async (_slug: string, _options: unknown, include?: string[]) => [restRow(include)]),
+            fetchOneForRest: jest.fn().mockImplementation(async (_slug: string, _id: unknown, include?: string[]) => restRow(include))
+        }
+    } as unknown as DataDriver;
+}
+
+/** What kind of thing a column holds, coarsely — the axis the shapes differed on. */
+function shapeOf(value: unknown): string {
+    if (Array.isArray(value)) return "array";
+    if (value === null || value === undefined) return "absent";
+    if (typeof value !== "object") return "scalar";
+    return (value as { __type?: string }).__type === "relation" ? "relation-envelope" : "inline-row";
+}
+
+describe("SDK relation shape (one shape, with or without `include`)", () => {
+
+    it("find() returns the same relation shape with and without include", async () => {
+        const data = buildSdkData(createRelationDriver());
+
+        const plain = (await data.jobs.find()).data[0];
+        const included = (await data.jobs.find({ include: ["company"] })).data[0];
+
+        // The foreign key is a foreign key either way — this is the assertion
+        // that used to fail, with "scalar" on one side and "relation-envelope"
+        // on the other.
+        expect(shapeOf(plain.company_id)).toBe("scalar");
+        expect(shapeOf(included.company_id)).toBe(shapeOf(plain.company_id));
+        expect(plain.company_id).toBe("c1");
+        expect(included.company_id).toBe("c1");
+
+        // `include` adds the target's own columns, flat. Not an envelope, and
+        // not there at all when it was not asked for.
+        expect(shapeOf(plain.company)).toBe("absent");
+        expect(shapeOf(included.company)).toBe("inline-row");
+        expect(included.company).toEqual(COMPANY);
+    });
+
+    it("no read through the SDK returns a `__type: \"relation\"` envelope", async () => {
+        const data = buildSdkData(createRelationDriver());
+
+        const fromFind = (await data.jobs.find()).data[0];
+        const fromInclude = (await data.jobs.find({ include: ["company"] })).data[0];
+        const fromFindById = await data.jobs.findById("j1");
+
+        let fromListen: any;
+        data.jobs.listen!(undefined, (r) => { fromListen = r.data[0]; });
+        let fromListenById: any;
+        data.jobs.listenById!("j1", (row) => { fromListenById = row; });
+
+        for (const row of [fromFind, fromInclude, fromFindById, fromListen, fromListenById]) {
+            for (const value of Object.values(row as Record<string, unknown>)) {
+                expect(shapeOf(value)).not.toBe("relation-envelope");
+            }
+        }
+    });
+
+    it("a relation that shadows its own foreign key still reads as a foreign key", async () => {
+        // `job.company_id as string` compiled and handed an object to the query
+        // layer. The column is a scalar now, on every read that did not ask for
+        // the relation.
+        const data = buildSdkData(createRelationDriver({ shadowFk: true }));
+
+        expect((await data.jobs.find()).data[0].company_id).toBe("c1");
+        expect((await data.jobs.findById("j1"))!.company_id).toBe("c1");
+    });
+
+    it("findById() agrees with find() on the same row", async () => {
+        const data = buildSdkData(createRelationDriver());
+
+        const fromFind = (await data.jobs.find()).data[0];
+        const fromFindById = await data.jobs.findById("j1");
+
+        expect(fromFindById).toEqual(fromFind);
+    });
+
+    it("a driver with no REST pipeline is untouched — the admin keeps its refs", async () => {
+        // The admin reaches rows through `buildRebaseData` over a browser
+        // driver, and no browser driver has a `restFetchService`. Nothing about
+        // that path may change: the envelope is the view-model it renders.
+        const driver = createRelationDriver();
+        delete (driver as { restFetchService?: unknown }).restFetchService;
+
+        const entity = (await buildRebaseData(driver).jobs.find()).data[0];
+        expect(shapeOf(entity.values.company)).toBe("relation-envelope");
+
+        let live: any;
+        buildRebaseData(driver).jobs.listen!(undefined, (r) => { live = r.data[0]; });
+        expect(shapeOf(live.values.company)).toBe("relation-envelope");
+    });
+});

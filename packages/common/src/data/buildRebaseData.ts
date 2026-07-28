@@ -95,6 +95,52 @@ function rowToEntity<M extends Record<string, unknown>>(
     };
 }
 
+/**
+ * The relation envelope `toCmsRow` writes where a relation was:
+ * `{ id, path, __type: "relation", data: { id, path, values } }`. It is the
+ * admin's view-model, and the only pipeline that produces one is postgres'.
+ */
+function isRelationEnvelope(
+    value: unknown
+): value is { __type: "relation"; data?: { values?: Record<string, unknown> } } {
+    return typeof value === "object"
+        && value !== null
+        && !Array.isArray(value)
+        && (value as { __type?: unknown }).__type === "relation";
+}
+
+/** The target's own columns, as `toRestRow` would have inlined them. */
+function inlineEnvelope(envelope: { data?: { values?: Record<string, unknown> } }): Record<string, unknown> {
+    return envelope.data?.values ?? {};
+}
+
+/**
+ * Replace every relation envelope on a row with the target's flat columns.
+ *
+ * The SDK serves one relation shape — the inlined one (see
+ * {@link RestFetchService}) — and reads that come back through a *driver*
+ * method rather than the REST pipeline still carry envelopes. Realtime is the
+ * one such read left: there is no `listenForRest`, so the rows arrive shaped
+ * for the admin and are flattened here instead.
+ *
+ * Only applied where the REST pipeline is the contract (see `find`); a driver
+ * without a `restFetchService` keeps whatever it returns, so the admin's own
+ * path through {@link buildRebaseData} is untouched.
+ */
+function inlineRelationRefs(row: Record<string, unknown>): Record<string, unknown> {
+    let out: Record<string, unknown> | undefined;
+    for (const [key, value] of Object.entries(row)) {
+        if (isRelationEnvelope(value)) {
+            out = out ?? { ...row };
+            out[key] = inlineEnvelope(value);
+        } else if (Array.isArray(value) && value.some(isRelationEnvelope)) {
+            out = out ?? { ...row };
+            out[key] = value.map((item) => isRelationEnvelope(item) ? inlineEnvelope(item) : item);
+        }
+    }
+    return out ?? row;
+}
+
 function createDriverAccessor<M extends Record<string, unknown> = Record<string, unknown>>(
     driver: DataDriver,
     slug: string,
@@ -107,9 +153,23 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             const limit = params?.limit ?? 20;
             const offset = params?.offset ?? 0;
 
-            // Use the RestFetchService for include-aware queries when available
+            // One relation shape, whatever the call looks like.
+            //
+            // This used to fork on `include`: asking for one ran the REST
+            // pipeline, which inlines a relation as the target's own columns;
+            // not asking ran the driver's own fetch, which eagerly loaded
+            // *every* relation and put a `{ __type: "relation" }` envelope
+            // where the foreign key was. The same method answered in two
+            // shapes, the generated types described only one, and a column
+            // typed `string` arrived as an object.
+            //
+            // The REST pipeline is the published contract — the shape the HTTP
+            // API serves for this same query, and what `RestFetchService`
+            // documents — so every read goes through it when the driver has
+            // one. Drivers without one (every browser driver, and so the
+            // admin's own path through `buildRebaseData`) are untouched.
             const fetchService = driver.restFetchService;
-            const rows = (fetchService && params?.include && params.include.length > 0)
+            const rows = fetchService
                 ? await fetchService.fetchCollectionForRest(
                     slug,
                     {
@@ -120,7 +180,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                         order: params?.orderBy?.[1],
                         searchString: params?.searchString
                     },
-                    params.include
+                    params?.include
                 )
                 : await driver.fetchCollection<M>({
                     path: slug,
@@ -147,7 +207,12 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         },
 
         async findById(id: string | number): Promise<Entity<M> | undefined> {
-            const row = await driver.fetchOne<M>({ path: slug, id: id });
+            // Same contract as `find` above: one row read the same way the
+            // collection read is, so `find()[0]` and `findById()` agree.
+            const fetchService = driver.restFetchService;
+            const row = fetchService
+                ? await fetchService.fetchOneForRest(slug, id)
+                : await driver.fetchOne<M>({ path: slug, id: id });
             return row ? rowToEntity<M>(row, slug, getPks()) : undefined;
         },
 
@@ -204,6 +269,10 @@ values: {} as Record<string, unknown> }
             ? (params: FindParams<M> | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
                 const limit = params?.limit ?? 20;
                 const offset = params?.offset ?? 0;
+                // Realtime has no REST-pipeline equivalent, so the rows arrive
+                // admin-shaped. Flatten them to the one shape the rest of this
+                // accessor serves.
+                const normalize = driver.restFetchService ? inlineRelationRefs : (row: Record<string, unknown>) => row;
                 return driver.listenCollection!<M>({
                     path: slug,
                     limit: params?.limit,
@@ -214,7 +283,7 @@ values: {} as Record<string, unknown> }
                     searchString: params?.searchString,
                     onUpdate: (entities) => {
                         onUpdate({
-                            data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(row, slug, getPks())),
+                            data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(normalize(row), slug, getPks())),
                             meta: {
                                 total: entities.length,
                                 limit,
@@ -229,10 +298,11 @@ values: {} as Record<string, unknown> }
 
         listenById: driver.listenOne
             ? (id: string | number, onUpdate: (entity: Entity<M> | undefined) => void, onError?: (error: Error) => void) => {
+                const normalize = driver.restFetchService ? inlineRelationRefs : (row: Record<string, unknown>) => row;
                 return driver.listenOne!<M>({
                     path: slug,
                     id: id,
-                    onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(entity, slug, getPks()) : undefined),
+                    onUpdate: (entity) => onUpdate(entity ? rowToEntity<M>(normalize(entity), slug, getPks()) : undefined),
                     onError
                 });
             } : undefined,
@@ -576,8 +646,12 @@ export function wrapAsSdkData(entityData: RebaseData): RebaseSdkData {
  *
  * This is the developer-facing SDK data layer used by backend framework
  * callbacks & scripts (`context.data` / `rebase.data`). It returns flat rows —
- * identical in shape to the frontend SDK client — so the API is symmetric
- * across front and back. The admin uses {@link buildRebaseData} (Entity).
+ * identical in shape to the frontend SDK client, down to how a relation is
+ * served: a foreign key stays a foreign key, and a relation named in `include`
+ * arrives as the target's own columns. The `{ __type: "relation" }` envelope is
+ * the admin's view-model and never reaches here.
+ *
+ * The admin uses {@link buildRebaseData} (Entity) over its own driver.
  */
 export function buildSdkData(driver: DataDriver): RebaseSdkData {
     return wrapAsSdkData(buildRebaseData(driver));
