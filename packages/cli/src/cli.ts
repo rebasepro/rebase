@@ -187,25 +187,25 @@ ${chalk.green.bold("SDK")}
 
 ${chalk.green.bold("Auth")}
   ${chalk.blue.bold("auth reset-password")}     Reset a user's password
-  ${chalk.blue.bold("auth")} ${chalk.gray("--help")}              Show auth command help
+  ${chalk.blue.bold("auth")} ${chalk.gray("--help")}             Show auth command help
 
 ${chalk.green.bold("Diagnostics")}
   ${chalk.blue.bold("doctor")}                  Detect schema drift between collections, schema, and DB
 
 ${chalk.green.bold("AI Agent Skills")}
-  ${chalk.blue.bold("skills install")}           Install Rebase agent skills for your AI coding assistant
+  ${chalk.blue.bold("skills install")}          Install Rebase agent skills for your AI coding assistant
 
 ${chalk.green.bold("API Keys")}
-  ${chalk.blue.bold("api-keys list")}            List all service API keys
-  ${chalk.blue.bold("api-keys create")}          Create a new scoped API key
-  ${chalk.blue.bold("api-keys revoke")}          Revoke an existing API key
-  ${chalk.blue.bold("api-keys")} ${chalk.gray("--help")}          Show API key command help
+  ${chalk.blue.bold("api-keys list")}           List all service API keys
+  ${chalk.blue.bold("api-keys create")}         Create a new scoped API key
+  ${chalk.blue.bold("api-keys revoke")}         Revoke an existing API key
+  ${chalk.blue.bold("api-keys")} ${chalk.gray("--help")}         Show API key command help
 
 ${chalk.green.bold("Rebase Cloud")}
   ${chalk.blue.bold("cloud login")}             Sign in to the hosted control plane
   ${chalk.blue.bold("cloud link")}              Link this directory to a cloud project
   ${chalk.blue.bold("cloud deploy")}            Deploy the linked project + stream logs
-  ${chalk.blue.bold("cloud")} ${chalk.gray("--help")}             Show all cloud commands
+  ${chalk.blue.bold("cloud")} ${chalk.gray("--help")}            Show all cloud commands
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--version, -v")}   Show version number
