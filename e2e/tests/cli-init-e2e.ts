@@ -519,29 +519,7 @@ function modifyDockerComposePort(projectPath: string) {
         /- "5432:5432"/g,
         '- "5433:5432"'
     );
-    // Make the packed tarballs reachable from inside the container.
-    //
-    // This suite installs @rebasepro/* from tarballs it packs itself, so the
-    // bundle's package.json declares them as `file:../tarballs/*.tgz`. The
-    // runtime installs the bundle's dependencies on first boot, inside the
-    // container, where only `./dist-bundle` is mounted — so those paths resolve
-    // to nothing and the install dies on ENOENT before the server ever listens.
-    //
-    // Purely a harness concern: a real project resolves these from the registry
-    // and needs no such mount. Which is exactly why it belongs here, in the
-    // function that already adapts the compose file for the test, rather than in
-    // the template a user gets.
-    //
-    // Mounted twice, at two paths, because the suite writes both specifier
-    // forms: `file:./tarballs/x.tgz` on the project's own package.json, and a
-    // `file:/abs/host/path/tarballs/x.tgz` on the transitive ones. The first
-    // resolves to /tarballs from /bundle; the second only resolves if the host
-    // path exists verbatim inside the container.
-    const tarballsHostDir = path.join(projectPath, "tarballs");
-    content = content.replace(
-        /(\n(\s*))- \.\/dist-bundle:\/bundle/,
-        `$1- ./dist-bundle:/bundle$1- ./tarballs:/tarballs:ro$1- ${tarballsHostDir}:${tarballsHostDir}:ro`
-    );
+
     fs.writeFileSync(composePath, content, "utf-8");
     console.log(`🐳 Modified docker-compose.yml to use port ${DOCKER_API_PORT} for the api and port 5433 for db.`);
 
@@ -1117,7 +1095,29 @@ timeout: 10000 });
         if (!fs.existsSync(path.join(projectPath, "dist-bundle"))) {
             throw new Error("`rebase build` produced no dist-bundle — the runtime has nothing to boot.");
         }
-        console.log("Bundle built.");
+        // Install the bundle's dependencies HERE, on the host.
+        //
+        // The runtime installs them itself on first boot when they are absent,
+        // which is the right default for a user with one machine. It is the
+        // wrong thing for this test: the install writes into the bind-mounted
+        // ./dist-bundle, which arrives in the container with the HOST's
+        // ownership and overrides the image's own `chown node:node /bundle`. On
+        // any host whose uid is not the image's `node` — a Linux CI runner, for
+        // one — that is `EACCES: permission denied, mkdir '/bundle/node_modules'`
+        // on a restart loop.
+        //
+        // Doing it on the host sidesteps that entirely and is what the compose
+        // file already documents as the better setup ("npm install --omit=dev
+        // --prefix dist-bundle"). It also keeps the file: specifiers this suite
+        // packs resolvable, since they point at host paths — which the container
+        // cannot see at all.
+        console.log("Installing the bundle's dependencies on the host...");
+        await execa("npm", ["install", "--omit=dev", "--no-audit", "--no-fund", "--prefix", "dist-bundle"], {
+            cwd: projectPath,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+        console.log("Bundle built and dependencies installed.");
 
         // Remove any stack from a previous run, VOLUMES INCLUDED.
         //
