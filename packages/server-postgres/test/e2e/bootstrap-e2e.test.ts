@@ -135,6 +135,19 @@ describe.each(SCENARIOS)("first-admin journey on an empty database — $name", (
         body: JSON.stringify({ email, password: PASSWORD, displayName: "First Admin" })
     });
 
+    it("answers /auth/config from getCapabilities, not from the auth router", async () => {
+        // Both handlers claim this path and both return `needsSetup` and
+        // `registrationEnabled`, so the response shape alone cannot tell them
+        // apart — which is precisely why a fix landed on the dead one.
+        // `hasBuiltInAuthRoutes` exists only on the capabilities payload, so it
+        // identifies which handler actually ran.
+        const body = await (await app.request("/auth/config")).json() as Record<string, unknown>;
+        expect(body.hasBuiltInAuthRoutes).toBe(true);
+        // And the session-routes copy reports `emailServiceEnabled`, which the
+        // capabilities payload does not. Its absence confirms it never ran.
+        expect(body).not.toHaveProperty("emailServiceEnabled");
+    });
+
     it("reports an empty table as needing setup", async () => {
         // The whole bootstrap window hangs off this number being right against
         // a real table, which the mocked unit tests cannot establish.
