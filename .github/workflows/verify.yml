@@ -231,6 +231,13 @@ jobs:
       # rls-enforcement boots a real Postgres and asserts DB state after every
       # RLS denial; policy-agreement proves the Postgres and JS policy backends
       # agree; cdc/db/channel-history/cli round out the integration surface.
+      # @rebasepro/rls-check joins them for the same reason it was added: its
+      # fixture asserts that each of the fourteen checks fires on the object
+      # built to trip it AND that nothing fires on the `secure_*` objects, which
+      # is the only thing standing between the gate below and a scanner that has
+      # quietly stopped detecting anything. RLS_CHECK_REQUIRE_DOCKER turns its
+      # "no Docker, skip" escape hatch into a failure here — a skipped suite
+      # reports success for a scan that never ran.
       #
       # Each test file boots and tears down its OWN Postgres via Docker (random
       # host ports — no clash with the 5432 service above), so there are no
@@ -244,9 +251,38 @@ jobs:
       # its own.
       - name: Run security & integration E2E (vitest)
         if: always()
-        run: pnpm --filter @rebasepro/server-postgres --filter @rebasepro/cli --workspace-concurrency=1 test:e2e
+        run: pnpm --filter @rebasepro/server-postgres --filter @rebasepro/cli --filter @rebasepro/rls-check --workspace-concurrency=1 test:e2e
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
+          RLS_CHECK_REQUIRE_DOCKER: "1"
+
+      # The gate the whole rls-check package existed for and never had: point it
+      # at a database this pipeline actually generated. `Self-host acceptance`
+      # above runs `rebase db push` over the reference app's collections, so
+      # `rebase_acceptance` holds real generated DDL and a real policies.sql
+      # applied to it — the same artefact a user gets, which is the only thing
+      # worth gating on. A policy that grants more than the collection asked for
+      # fails the build here.
+      #
+      # Findings the collections declare ON PURPOSE (the reference app is
+      # public-read, so its SELECT policies are `USING (true)` and rls-check is
+      # right to say so) live in scripts/rls-baseline.json, per table, with a
+      # reason. That is deliberately not `--skip policy-always-true`: the same
+      # check on a table nobody baselined — a newly added collection, say — still
+      # fails.
+      #
+      # `--min-tables/--min-policies` are what stop this from being the vacuous
+      # gate this repo has been burned by before: with `if: always()` the step
+      # runs even when the push above failed, and against the empty database that
+      # leaves, rls-check finds nothing and exits 0. The floors turn that into
+      # exit 2. They are floors, not equality — a removed collection is not a
+      # security event — set well below the ~11 tables / ~88 policies the
+      # reference app currently generates.
+      - name: RLS scan of the generated schema
+        if: always()
+        run: pnpm rls:check --min-tables 8 --min-policies 40
+        env:
+          RLS_CHECK_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_acceptance?sslmode=disable
 
       # NOT here, and deliberately: the Playwright admin suite (`pnpm e2e`).
       # Its `global-setup` signs in as a demo user that must already exist and waits

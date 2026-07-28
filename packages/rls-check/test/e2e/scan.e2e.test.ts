@@ -38,6 +38,17 @@ import {
 const dockerAvailable = await isDockerAvailable();
 
 if (!dockerAvailable) {
+    // In CI the skip is the dangerous outcome, not the safe one: this suite is
+    // the only thing proving the scanner still detects anything, so a runner
+    // that lost Docker would turn the RLS gate green while checking nothing.
+    // The pipeline sets RLS_CHECK_REQUIRE_DOCKER=1 to make that a failure; a
+    // contributor without Docker still gets a skip and a green `pnpm test`.
+    if (process.env.RLS_CHECK_REQUIRE_DOCKER === "1") {
+        throw new Error(
+            "[rls-check e2e] Docker is unavailable and RLS_CHECK_REQUIRE_DOCKER=1 — refusing to " +
+                "skip. A skipped integration suite reports success for a scan that never ran."
+        );
+    }
     console.warn("[rls-check e2e] Docker is not available — skipping the integration suite.");
 }
 
