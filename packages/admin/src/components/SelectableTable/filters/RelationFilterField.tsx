@@ -50,25 +50,29 @@ const multipleSelectOperations = ["array-contains-any", "in", "not-in"];
 /**
  * What this field can render, before `operators` narrows it.
  *
- * Split by the *value* the selector produces, not by the relation's meaning.
- * `RelationSelector` takes its multiplicity from the relation's cardinality, so
- * on a to-many relation it only ever emits a list — and an operator that wants
- * a single value would receive an array and compile to nonsense. The to-many
- * list is therefore the list-valued operators only.
+ * Every relation gets the whole set. The value selector is told how many
+ * values to take by the *operator* — see the `multiple` prop passed below —
+ * so a to-many relation can be asked `== <one tag>` as readily as
+ * `in <several>`, and the question of what shape the relation stores never
+ * enters into it.
  *
- * `in` and `not-in` are not a lesser `==`/`!=` here: on a to-many relation they
- * are "has any of these" and "has none of these", which is what a filter on a
- * multi-valued link means. A single value is the one-element case of each.
+ * That is a change: this list used to be split by the value the selector
+ * produced, because the selector took its multiplicity from the relation's
+ * cardinality and so a to-many one could only ever emit a list. Every
+ * single-value operator had to be withheld to keep an array from reaching
+ * `==`. `ReferenceFilterField` never had the problem — it has always sized its
+ * dialog from the operator — which is what made the split look like a
+ * property of relations rather than a limitation of one component.
  *
- * The array operators stay for the property that is an *array of* relations,
- * where the column really does hold a list.
- *
- * The null checks take no value at all, so they belong to both.
+ * The array operators are the exception, and belong only to a to-many link,
+ * which is the only one that *is* a list. On a to-one relation the filter
+ * compiles to a comparison on a scalar foreign key, and `@>` against one is a
+ * type error rather than an empty result.
  */
-const MULTI_VALUE_OPERATIONS: (keyof typeof operationLabels)[] =
-    ["array-contains", "array-contains-any", "in", "not-in", "is-null", "is-not-null"];
-const SINGLE_VALUE_OPERATIONS: (keyof typeof operationLabels)[] =
+const RELATION_OPERATIONS: (keyof typeof operationLabels)[] =
     ["==", "!=", ">", "<", ">=", "<=", "in", "not-in", "is-null", "is-not-null"];
+const LIST_ONLY_OPERATIONS: (keyof typeof operationLabels)[] =
+    ["array-contains", "array-contains-any"];
 
 /**
  * The operators this field will actually put on screen.
@@ -84,8 +88,8 @@ export function renderableRelationOperators(
     operators?: readonly VirtualTableWhereFilterOp[]
 ): (keyof typeof operationLabels)[] {
     const possible = relationCardinality(relation) === "many"
-        ? MULTI_VALUE_OPERATIONS
-        : SINGLE_VALUE_OPERATIONS;
+        ? [...RELATION_OPERATIONS, ...LIST_ONLY_OPERATIONS]
+        : RELATION_OPERATIONS;
     if (!operators) return possible;
     return possible.filter(op => (operators as readonly string[]).includes(op));
 }
@@ -190,6 +194,10 @@ export function RelationFilterField({
             <div className="grow ml-2 h-full gap-2 flex flex-col w-[340px]">
                 <RelationSelector
                     relation={relation}
+                    // The operator, not the relation, decides how many values
+                    // are being asked for — `updateFilter` already coerces the
+                    // held value on the same test, so the two cannot disagree.
+                    multiple={multiple}
                     value={relationSelectorValue}
                     onValueChange={handleRelationSelectorChange}
                     disabled={nullFiltered}

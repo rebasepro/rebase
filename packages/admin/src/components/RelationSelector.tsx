@@ -66,6 +66,20 @@ export interface RelationSelectorProps {
     invisible?: boolean;
 
     relation: Relation;
+    /**
+     * Whether the selector picks many rows or one.
+     *
+     * Defaults to what the relation implies — a `hasMany` or `manyToMany`
+     * picks many — which is right wherever the selector *edits* the relation,
+     * because there the cardinality is the shape of the stored value.
+     *
+     * A filter is the case where it is not. `tags == <one tag>` asks a single
+     * question about a to-many link, and the operator is what decides how many
+     * values it takes. Deriving multiplicity from the relation there meant a
+     * to-many relation could only ever emit a list, so the filter field had to
+     * hide every single-value operator to avoid handing `==` an array.
+     */
+    multiple?: boolean;
     fixedFilter?: FilterValues<string>;
     pageSize?: number;
     emptyPlaceholder?: string;
@@ -89,6 +103,7 @@ export const RelationSelector = React.forwardRef<
             useChips = true,
             className,
             relation,
+            multiple: multipleOverride,
             fixedFilter,
             pageSize,
             emptyPlaceholder,
@@ -102,7 +117,7 @@ export const RelationSelector = React.forwardRef<
         const collection = relation.target();
         const dataClient = useData();
         const sidePanelController = useSidePanel();
-        const multiple = relationCardinality(relation) === "many";
+        const multiple = multipleOverride ?? relationCardinality(relation) === "many";
 
         const [isPopoverOpen, setIsPopoverOpen] = useState(false);
         const isPopoverOpenRef = useRef(false);

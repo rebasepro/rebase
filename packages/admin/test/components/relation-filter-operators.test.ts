@@ -32,19 +32,20 @@ describe("relation filter operators, header to field", () => {
 
     describe("the driver compiles it, so the field renders something", () => {
 
-        it.each(["manyToMany", "hasMany"])(
-            "offers membership and the null checks for a to-many %s relation", (kind) => {
-                // Not `==`: the selector takes its multiplicity from the
-                // relation, so on a to-many it only ever emits a list.
-                expect(rendered(kind)).toEqual(["in", "not-in", "is-null", "is-not-null"]);
-            }
-        );
-
-        it.each(["belongsTo", "hasOne"])(
-            "offers equality, membership and the null checks for a to-one %s relation", (kind) => {
+        it.each(["manyToMany", "hasMany", "belongsTo", "hasOne"])(
+            "offers the same questions of a %s relation, whatever its cardinality", (kind) => {
+                // `==` included for a to-many: the value selector is sized by
+                // the operator, so asking "has this one tag" is available and
+                // is not a one-element `in` in disguise.
                 expect(rendered(kind)).toEqual(["==", "!=", "in", "not-in", "is-null", "is-not-null"]);
             }
         );
+
+        it("defaults a to-many relation to `==`, not to a list operator", () => {
+            // The first offered operator is what the field opens on. It used
+            // to be `in`, because `==` could not be rendered at all.
+            expect(rendered("manyToMany")[0]).toBe("==");
+        });
 
         it("never renders an operator the driver rejects on a relation", () => {
             // The `EXISTS` shape answers membership only; the driver 400s on
@@ -117,12 +118,11 @@ describe("relation filter operators, header to field", () => {
     describe("with no narrowing supplied", () => {
 
         it("falls back to everything the field can render", () => {
-            expect(renderableRelationOperators({ kind: "manyToMany" })).toEqual(
-                ["array-contains", "array-contains-any", "in", "not-in", "is-null", "is-not-null"]
-            );
-            expect(renderableRelationOperators({ kind: "belongsTo" })).toEqual(
-                ["==", "!=", ">", "<", ">=", "<=", "in", "not-in", "is-null", "is-not-null"]
-            );
+            const scalar = ["==", "!=", ">", "<", ">=", "<=", "in", "not-in", "is-null", "is-not-null"];
+            // A to-many link is a list, so it also answers the array operators.
+            expect(renderableRelationOperators({ kind: "manyToMany" }))
+                .toEqual([...scalar, "array-contains", "array-contains-any"]);
+            expect(renderableRelationOperators({ kind: "belongsTo" })).toEqual(scalar);
         });
     });
 });
