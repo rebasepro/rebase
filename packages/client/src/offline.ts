@@ -1,5 +1,6 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
-import { FindResult, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValue } from "@rebasepro/types";
+import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValue } from "@rebasepro/types";
+import { collectAllPages, paginateFind } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateRow, hydrateRow } from "./offline-codec";
@@ -436,6 +437,13 @@ export class OfflineManager {
                 this.notifyCollection(slug, false);
                 return { data: answer.data, meta: answer.meta };
             },
+
+            // Paginates the *wrapped* find, so a walk started offline is served
+            // page by page out of the local database exactly as it would be
+            // from the server, and rejoins the network mid-walk if it returns.
+            iterate: (params?: IterateParams<M>) => paginateFind<M>((p) => wrapped.find(p), params, slug),
+
+            findAll: (params?: FindAllParams<M>) => collectAllPages<M>((p) => wrapped.find(p), params, slug),
 
             findById: async (id: string | number) => {
                 await this.ensureCollection(slug);

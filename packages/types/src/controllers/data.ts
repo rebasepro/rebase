@@ -247,6 +247,91 @@ export interface FindResult<M extends Record<string, unknown> = Record<string, u
 }
 
 /**
+ * Which column an iteration seeks on, for keyset ("seek") pagination.
+ *
+ * Either the column name on its own — sorted ascending — or the column plus an
+ * explicit direction. The column must be **unique** and must be the column the
+ * query is ordered by; see {@link PageWalkOptions.cursor}.
+ *
+ * @group Data
+ */
+export type CursorSpec<M extends Record<string, unknown> = Record<string, unknown>> =
+    | (Extract<keyof M, string>)
+    | { field: Extract<keyof M, string>; direction?: "asc" | "desc" };
+
+/**
+ * How {@link SDKCollectionClient.iterate} / {@link SDKCollectionClient.findAll}
+ * walk a collection, layered on top of the normal `find()` parameters.
+ *
+ * @group Data
+ */
+export interface PageWalkOptions<M extends Record<string, unknown> = Record<string, unknown>> {
+    /**
+     * Rows fetched per request. Defaults to 200; values below 1 are clamped up.
+     * This is the request size, not a result cap — the iteration keeps going
+     * until the server says there is nothing left.
+     */
+    pageSize?: number;
+    /**
+     * Paginate by **seeking on a column** instead of by offset.
+     *
+     * Offset paging — the default — re-counts rows on every request, so a row
+     * inserted or deleted *while the iteration runs* shifts the window and the
+     * walk silently skips or repeats rows. Seeking is immune to that: each page
+     * asks for rows strictly after the last one seen, so concurrent writes
+     * before the cursor cannot move it.
+     *
+     * Prefer this whenever the collection has a unique, sortable column
+     * (typically its primary key). The column must be unique — a repeated value
+     * at a page boundary either skips rows or stalls, and the iterator throws
+     * rather than looping — and the query is ordered by it, so a `cursor` and a
+     * conflicting `orderBy` is an error, not a silent override.
+     *
+     * Implemented with the parameters `find()` already takes (an `orderBy` plus
+     * a `>` / `<` filter on the cursor column), so it works on every transport
+     * and needs nothing new from the server.
+     *
+     * @example
+     * for await (const job of client.data.jobs.iterate({ cursor: "id" })) { … }
+     */
+    cursor?: CursorSpec<M>;
+    /**
+     * Hard ceiling on the number of requests one walk may make, so a server
+     * that never stops saying `hasMore` cannot spin forever. Defaults to
+     * 10 000 pages; hitting it throws.
+     */
+    maxPages?: number;
+}
+
+/**
+ * Parameters accepted by {@link SDKCollectionClient.iterate} — everything
+ * `find()` takes except the window itself (`limit`, `offset`, `page`), which
+ * the iterator owns, plus the walk options.
+ *
+ * @group Data
+ */
+export type IterateParams<M extends Record<string, unknown> = Record<string, unknown>> =
+    Omit<FindParams<M>, "limit" | "offset" | "page"> & PageWalkOptions<M>;
+
+/**
+ * Parameters accepted by {@link SDKCollectionClient.findAll}: the iteration
+ * parameters plus the ceiling that keeps a whole collection from being pulled
+ * into memory unnoticed.
+ *
+ * @group Data
+ */
+export type FindAllParams<M extends Record<string, unknown> = Record<string, unknown>> =
+    IterateParams<M> & {
+        /**
+         * Most rows to materialise. Defaults to 10 000. Exceeding it **throws**
+         * — a truncated array returned as if it were the whole answer is the
+         * kind of quiet wrong that shows up months later in a report. Pass
+         * `Infinity` to opt out deliberately, or use `iterate()` to stream.
+         */
+        maxRows?: number;
+    };
+
+/**
  * Fluent Query Builder Interface for the SDK client.
  * Returns `FindResult<M>` (flat rows) instead of `FindResponse<M>` (Entity-wrapped).
  *
@@ -320,6 +405,67 @@ export interface SDKCollectionClient<
      * Find multiple records with optional filtering, pagination, and sorting.
      */
     find(params?: FindParams<M>): Promise<FindResult<M>>;
+
+    /**
+     * Walk every record matching a query, one row at a time, fetching pages as
+     * the consumer consumes them.
+     *
+     * This is the pagination primitive: `find()` returns one window, `iterate()`
+     * returns all of them without the caller hand-rolling the
+     * `limit` / `offset += ` / "am I done yet" loop. Nothing is buffered — rows
+     * are yielded as each page arrives, so a million-row walk costs one page of
+     * memory. `break` stops the walk and no further requests are made.
+     *
+     * Termination is driven by the server's `meta.hasMore`, never by comparing
+     * a page's length against the requested limit — a final page that happens
+     * to be exactly full is indistinguishable that way, and a walk that stops
+     * there drops rows. An empty page also ends the walk, and
+     * {@link PageWalkOptions.maxPages} bounds a server that never stops saying
+     * there is more.
+     *
+     * ## Consistency
+     *
+     * By default this pages by **offset**, which is only as stable as the table
+     * is still: a row inserted or deleted ahead of the cursor between two
+     * requests shifts every later window, so the walk can skip a row or hand
+     * back the same one twice. That is inherent to offset paging, not a bug
+     * here. On a collection with a unique sortable column, pass
+     * {@link PageWalkOptions.cursor} to seek on it instead — the walk then
+     * asks for rows strictly after the last one it saw, which concurrent writes
+     * cannot perturb.
+     *
+     * @example
+     * for await (const job of client.data.jobs.iterate({
+     *     where: { status: ["==", "queued"] },
+     *     cursor: "id",
+     *     pageSize: 500
+     * })) {
+     *     await handle(job);
+     * }
+     */
+    iterate(params?: IterateParams<M>): AsyncIterableIterator<M>;
+
+    /**
+     * {@link iterate}, collected into an array.
+     *
+     * Convenient when the result is known to be small and awkward to stream.
+     * Because "known to be small" is an assumption and not a fact, the result is
+     * capped — 10 000 rows by default — and going over the cap **throws**
+     * rather than returning a short array that reads like a complete one. Raise
+     * {@link FindAllParams.maxRows} when the data really is bigger, or switch to
+     * `iterate()` and stream it.
+     *
+     * The offset-drift caveat on {@link iterate} applies here too.
+     *
+     * @throws When more rows match than `maxRows` allows.
+     *
+     * @example
+     * const overdue = await client.data.invoices.findAll({
+     *     where: { due_at: ["<", today] },
+     *     cursor: "id"
+     * });
+     */
+    findAll(params?: FindAllParams<M>): Promise<M[]>;
 
     /**
      * Find a single record by its ID.
