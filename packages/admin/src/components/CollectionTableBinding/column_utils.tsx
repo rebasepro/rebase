@@ -4,7 +4,7 @@ import { getTableCellAlignment, getTablePropertyColumnWidth } from "./internal/c
 import { FilterValues } from "@rebasepro/types";
 import { VirtualTableColumn } from "@rebasepro/ui";
 import { getIconForProperty, getResolvedPropertyInPath } from "../../util/property_utils";
-import { getColumnKeysForProperty } from "@rebasepro/app";
+import { getColumnKeysForProperty, isFilterableRelation } from "@rebasepro/app";
 
 export function buildIdColumn(largeLayout?: boolean): VirtualTableColumn {
     return {
@@ -62,6 +62,13 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
 }
 
 function filterableProperty(property: Property, partOfArray = false): boolean {
+    // A relation the query layer cannot compile into a `WHERE` has no column
+    // on this row to compare against, so the header's filter control would
+    // open onto a field that renders nothing (`FilterFieldBinding` returns
+    // null on an empty operator list) — and, before the driver started failing
+    // closed, sending one silently returned every row. Same authority as the
+    // operator resolution so the two cannot drift.
+    if (!isFilterableRelation(property)) return false;
     if (partOfArray) {
         return ["string", "number", "date", "reference", "relation"].includes(property.type);
     }
