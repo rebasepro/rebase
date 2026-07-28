@@ -274,6 +274,58 @@ describe("unknown filter fields", () => {
         });
     });
 
+    describe("the admin's null checkbox on an owning relation", () => {
+
+        // The checkbox emits `[whichever operator is selected, null]`. With
+        // `in` selected that was `["in", null]`, which fell through the
+        // array-length test and returned no condition at all — a dropped
+        // condition, so the read widened to every row rather than to the ones
+        // with no author.
+
+        it("compiles `in null` to IS NULL instead of dropping it", () => {
+            const { PgDialect } = require("drizzle-orm/pg-core");
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { author: ["in", null] },
+                postsTable,
+                "posts"
+            );
+            expect(conditions).toHaveLength(1);
+            expect(new PgDialect().sqlToQuery(conditions[0]).sql).toBe('"posts"."author_id" IS NULL');
+        });
+
+        it("compiles `not-in null` to IS NOT NULL", () => {
+            const { PgDialect } = require("drizzle-orm/pg-core");
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { author: ["not-in", null] },
+                postsTable,
+                "posts"
+            );
+            expect(conditions).toHaveLength(1);
+            expect(new PgDialect().sqlToQuery(conditions[0]).sql).toBe('"posts"."author_id" IS NOT NULL');
+        });
+
+        it("agrees with `== null`, which the same control emits for `==`", () => {
+            const { PgDialect } = require("drizzle-orm/pg-core");
+            const dialect = new PgDialect();
+            const sqlFor = (op: string) => dialect.sqlToQuery(
+                DrizzleConditionBuilder.buildFilterConditions({ author: [op, null] } as never, postsTable, "posts")[0]
+            ).sql;
+            expect(sqlFor("in")).toBe(sqlFor("=="));
+            expect(sqlFor("not-in")).toBe(sqlFor("!="));
+        });
+
+        it("leaves an empty list alone — that is a different question", () => {
+            // Unchanged behaviour: `in []` still drops. Fixing that widening is
+            // its own change with its own blast radius; this one is only about
+            // the null value the checkbox sends.
+            expect(DrizzleConditionBuilder.buildFilterConditions(
+                { author: ["in", []] },
+                postsTable,
+                "posts"
+            )).toHaveLength(0);
+        });
+    });
+
     describe("`warn` mode", () => {
 
         it("drops an unknown flat filter field instead of throwing", () => {

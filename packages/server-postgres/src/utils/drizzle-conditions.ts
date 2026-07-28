@@ -607,6 +607,14 @@ export class DrizzleConditionBuilder {
      * correlation left, they become "has no related row at all" and "has at
      * least one", which is the only reading of null a link can have.
      *
+     * `in`/`not-in` against a *null value* mean the same thing, rather than
+     * membership of an empty list. Membership against null is not a membership
+     * question, and the admin's "filter for null values" control emits the
+     * operator that happens to be selected — on a to-many relation that is
+     * always `in` or `not-in`, because those are the only ones the multi-select
+     * can produce. Reading `["in", null]` as an empty list would answer "posts
+     * with no tags" with no posts at all.
+     *
      * An empty `in` list compiles to `FALSE` rather than being dropped. Dropped
      * is what the column path does, and dropping a condition widens the result
      * — the whole reason this resolution fails closed. `in []` matches nothing
@@ -638,9 +646,9 @@ export class DrizzleConditionBuilder {
             case "!=":
                 return isNullish ? { negate: false } : { predicate: equals(), negate: true };
             case "in":
-                return { predicate: inList(), negate: false };
+                return isNullish ? { negate: true } : { predicate: inList(), negate: false };
             case "not-in":
-                return { predicate: inList(), negate: true };
+                return isNullish ? { negate: false } : { predicate: inList(), negate: true };
             case "is-null":
                 return { negate: true };
             case "is-not-null":
@@ -691,6 +699,15 @@ export class DrizzleConditionBuilder {
             case "<=":
                 return sql`${column} <= ${value}`;
             case "in":
+                // Membership against a null *value* is a null check, not an
+                // empty list — the admin's "filter for null values" control
+                // emits whichever operator is selected, so `["in", null]` is
+                // how it asks for a null foreign key when the user picked
+                // `in`. Reading it as an empty list dropped the condition
+                // outright, which widened the read to every row.
+                if (value === null || value === undefined) {
+                    return sql`${column} IS NULL`;
+                }
                 if (Array.isArray(value) && value.length > 0) {
                     return inArray(column, value);
                 }
@@ -722,6 +739,10 @@ export class DrizzleConditionBuilder {
                 return sql`${column} @> ${JSON.stringify([value])}`;
             }
             case "not-in":
+                // The mirror of `in` above.
+                if (value === null || value === undefined) {
+                    return sql`${column} IS NOT NULL`;
+                }
                 if (Array.isArray(value) && value.length > 0) {
                     return sql`${column} NOT IN (${sql.join(value.map(v => sql`${v}`), sql`, `)})`;
                 }

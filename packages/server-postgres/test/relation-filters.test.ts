@@ -264,6 +264,52 @@ describe("filtering by a relation with no column on this row", () => {
         });
     });
 
+    describe("the admin's null checkbox", () => {
+
+        // It emits `[whichever operator is selected, null]`. On a to-many
+        // relation the multi-select can only produce `in`/`not-in`, so those
+        // are the two that have to carry a null value — this is the whole of
+        // "posts with no tags" on the wire.
+
+        it("`in null` asks for no related row, not for an empty list", () => {
+            const query = render(filterPosts({ tags: ["in", null] })[0]);
+            expect(query.sql).toBe(
+                'NOT EXISTS (SELECT 1 FROM "posts_tags" AS "__rel_filter" ' +
+                'WHERE "__rel_filter"."post_id" = "posts"."id")'
+            );
+            expect(query.params).toEqual([]);
+        });
+
+        it("`not-in null` asks for at least one related row", () => {
+            expect(render(filterPosts({ tags: ["not-in", null] })[0]).sql).toBe(
+                'EXISTS (SELECT 1 FROM "posts_tags" AS "__rel_filter" ' +
+                'WHERE "__rel_filter"."post_id" = "posts"."id")'
+            );
+        });
+
+        it("agrees with `is-null` however the operator got there", () => {
+            const expected = render(filterPosts({ tags: ["is-null", null] })[0]).sql;
+            for (const op of ["==", "in"]) {
+                expect(render(filterPosts({ tags: [op, null] })[0]).sql).toBe(expected);
+            }
+        });
+
+        it("keeps an empty list distinct from a null value", () => {
+            // `in []` is "none of these", which matches nothing. `in null` is
+            // "has nothing at all", which matches the unlinked rows. Collapsing
+            // the two would answer "posts with no tags" with no posts.
+            expect(render(filterPosts({ tags: ["in", []] })[0]).sql)
+                .not.toBe(render(filterPosts({ tags: ["in", null] })[0]).sql);
+        });
+
+        it("compiles on the to-many foreign-key side too", () => {
+            expect(render(filterPosts({ comments: ["in", null] })[0]).sql).toBe(
+                'NOT EXISTS (SELECT 1 FROM "comments" AS "__rel_filter" ' +
+                'WHERE "__rel_filter"."post_id" = "posts"."id")'
+            );
+        });
+    });
+
     describe("empty membership lists", () => {
 
         it("`in []` matches nothing rather than being dropped", () => {

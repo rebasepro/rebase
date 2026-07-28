@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useId, useMemo, useState } from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { EntityRelation, Relation } from "@rebasepro/types";
 import { Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
@@ -97,6 +97,12 @@ export function RelationFilterField({
 
     const manyRelation = relationCardinality(relation) === "many";
 
+    // The filters dialog renders every filterable property at once, and the
+    // checkbox's id was the literal string "null-filter" — so clicking any
+    // label toggled whichever checkbox the document matched first. Harmless
+    // while one relation per table could show it; not once every relation can.
+    const nullFilterId = useId();
+
     const possibleOperations = renderableRelationOperators(relation, operators);
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
@@ -176,12 +182,26 @@ export function RelationFilterField({
                     size={"medium"}
                 />
 
-                {!manyRelation && <Label
+                {/*
+                  * Shown for a to-many relation too. It used to be hidden
+                  * there because the only operators offered were the array
+                  * ones, which have no null to ask about — but "posts with no
+                  * tags" is the question a filter on a link is most often
+                  * for, and the driver answers it with `NOT EXISTS`.
+                  *
+                  * The operator carries the sense and the checkbox supplies
+                  * the value, which is why this emits `[operation, null]`
+                  * rather than an operator of its own: on a to-one that reads
+                  * as `IS NULL`/`IS NOT NULL` through `==`/`!=`, and on a
+                  * to-many as "has no related row"/"has at least one" through
+                  * `in`/`not-in`.
+                  */}
+                <Label
                     className="border cursor-pointer rounded-md p-2 flex items-center gap-2 bg-surface-50 dark:bg-surface-900 hover:bg-surface-100 dark:hover:bg-surface-800"
-                    htmlFor="null-filter"
+                    htmlFor={nullFilterId}
                 >
                     <Checkbox
-                        id="null-filter"
+                        id={nullFilterId}
                         checked={internalValue === null}
                         size={"small"}
                         onCheckedChange={() => {
@@ -189,8 +209,8 @@ export function RelationFilterField({
                             else updateFilter(operation, undefined);
                         }}
                     />
-                    Filter for null values
-                </Label>}
+                    {manyRelation ? "Filter for empty relations" : "Filter for null values"}
+                </Label>
             </div>
         </div>
     );
