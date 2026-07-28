@@ -93,6 +93,19 @@ export interface RebaseAuthConfig {
     requireAuth?: boolean;
     allowRegistration?: boolean;
     /**
+     * Block self-registration outright — the hard kill switch.
+     *
+     * `allowRegistration: false` still admits the very first user on an empty
+     * database, because otherwise a fresh deployment has no way to create its
+     * own admin: `POST /admin/bootstrap` needs an authenticated caller. This
+     * closes that window too, for operators who provision every account out of
+     * band and never want a public first-come-first-admin race.
+     *
+     * With this set, an empty backend has no self-service path in at all —
+     * create the first user with the CLI or a seed script.
+     */
+    disableSelfRegistration?: boolean;
+    /**
      * Opt-in: expose `POST /auth/find-user` so an authenticated user can resolve
      * an email address to a minimal public profile (`uid`, `displayName`,
      * `photoURL` only). This powers invite-by-email flows without a custom
@@ -994,6 +1007,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 emailService: authConfigResult!.emailService as import("./email").EmailService,
                 emailConfig: safeAuthConfig.email,
                 allowRegistration: safeAuthConfig.allowRegistration ?? false,
+                disableSelfRegistration: safeAuthConfig.disableSelfRegistration ?? false,
                 allowUserLookup: safeAuthConfig.allowUserLookup ?? false,
                 defaultRole: safeAuthConfig.defaultRole,
                 oauthProviders,

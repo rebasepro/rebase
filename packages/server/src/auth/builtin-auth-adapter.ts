@@ -26,6 +26,7 @@ import { Hono } from "hono";
 import { verifyAccessToken } from "./jwt";
 import type { AccessTokenPayload } from "./jwt";
 import { createAuthRoutes } from "./routes";
+import { isRegistrationOpen } from "./registration-policy";
 import { createResetPasswordRoute } from "./reset-password-admin";
 import { createAdminRolesRoute } from "./admin-roles-route";
 import { createAdminUsersRoute } from "./admin-users-route";
@@ -53,6 +54,17 @@ export interface BuiltinAuthAdapterConfig {
     emailConfig?: EmailConfig;
     /** Whether to allow new user registration. */
     allowRegistration?: boolean;
+    /**
+     * Hard kill switch: block self-registration outright, including the
+     * first-user bootstrap window that an empty database would otherwise open.
+     *
+     * Was declared on the route module and read by both config endpoints, but
+     * never plumbed through here — so nothing a user of the framework could
+     * write ever reached it, and the tests that covered it passed only because
+     * they built `createAuthRoutes` directly, bypassing this adapter (the sole
+     * wiring path a real backend uses).
+     */
+    disableSelfRegistration?: boolean;
     /** Whether to expose the authenticated email→minimal-profile lookup route. */
     allowUserLookup?: boolean;
     /** Default role to assign to new users. */
@@ -84,6 +96,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         emailService,
         emailConfig,
         allowRegistration = false,
+        disableSelfRegistration = false,
         allowUserLookup = false,
         defaultRole,
         oauthProviders = [],
@@ -201,6 +214,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailService,
                 emailConfig,
                 allowRegistration,
+                disableSelfRegistration,
                 allowUserLookup,
                 defaultRole,
                 oauthProviders,
@@ -291,11 +305,22 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
 
             const enabledProviders = oauthProviders.map((p) => p.id);
 
+            // This is what `GET /auth/config` actually returns: init.ts
+            // registers that path directly, before mounting the auth router, so
+            // Hono resolves it here and never reaches the session-routes copy.
+            // Both go through the shared predicate now, precisely because the
+            // copy that was easy to overlook is the one that was live.
+            const registrationAllowed = isRegistrationOpen({
+                disableSelfRegistration,
+                allowRegistration,
+                needsSetup
+            });
+
             return {
                 hasBuiltInAuthRoutes: true,
                 emailPasswordLogin: true,
-                registration: allowRegistration || needsSetup,
-                registrationEnabled: allowRegistration || needsSetup,
+                registration: registrationAllowed,
+                registrationEnabled: registrationAllowed,
                 passwordReset: !!emailService?.isConfigured(),
                 // Always available: createAdminRoutes() unconditionally mounts the
                 // reset-password route, which falls back to returning a one-time

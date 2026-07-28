@@ -16,6 +16,7 @@ import { logger } from "../utils/logger";
 import { mountMfaRoutes } from "./mfa-routes";
 import { mountSessionRoutes } from "./session-routes";
 import { mountMagicLinkRoutes } from "./magic-link-routes";
+import { isSteadyStateRegistrationOpen } from "./registration-policy";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import type { Context } from "hono";
 import { readRefreshToken, redactRefreshToken, clearRefreshCookie } from "./cookie-utils";
@@ -232,24 +233,22 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     }
 
     /**
-     * Check if registration is allowed in steady state.
-     * Registration is only allowed when explicitly enabled via `allowRegistration`.
+     * Whether registration is open without consulting the user table.
      *
-     * The one exception lives in POST /auth/register itself: an empty user
-     * table always admits the first registration (which auto-promotes to
-     * admin). Without it a backend deployed with registration disabled is a
-     * dead end — GET /auth/config reports `registrationEnabled` while
-     * `needsSetup`, the login UI shows the first-admin form on the strength of
-     * that, and POST /admin/bootstrap cannot help because it requires an
-     * authenticated caller, which an empty database cannot produce.
+     * The rule lives in `registration-policy.ts` and is shared with both config
+     * endpoints, so what this route enforces and what they advertise cannot
+     * drift apart — which is exactly how the empty-database dead end happened.
      *
-     * `disableSelfRegistration` is the hard kill switch and blocks even that
-     * exception, for operators who provision users out of band and never want
-     * a public first-come-first-admin window.
+     * `false` here does not mean "refuse": it means the answer depends on
+     * whether the table is empty, which `POST /auth/register` checks only at
+     * that point, because it serves anonymous callers and a count per rejected
+     * attempt is a free hit on the database.
      */
     function isRegistrationAllowed(): boolean {
-        if (config.disableSelfRegistration) return false;
-        return !!allowRegistration;
+        return isSteadyStateRegistrationOpen({
+            disableSelfRegistration: config.disableSelfRegistration,
+            allowRegistration
+        });
     }
 
     /**

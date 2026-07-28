@@ -49,6 +49,7 @@ export function resolveAuthOptions(
         serviceKey: env.REBASE_SERVICE_KEY,
         requireAuth: env.AUTH_REQUIRE,
         allowRegistration: env.ALLOW_REGISTRATION,
+        disableSelfRegistration: env.DISABLE_SELF_REGISTRATION,
         allowUserLookup: env.AUTH_ALLOW_USER_LOOKUP,
         email: resolveEmailOptions(env),
         // Cookie auth keeps the refresh token in an httpOnly cookie rather than
