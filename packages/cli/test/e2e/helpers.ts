@@ -242,8 +242,16 @@ async function reserveFreePort(): Promise<number> {
  */
 export async function startBackend(projectDir: string, env: Record<string, string>, timeoutMs = 90_000): Promise<RunningBackend> {
     const assignedPort = await reserveFreePort();
-    const proc = execa("pnpm", ["run", "dev"], {
-        cwd: path.join(projectDir, "backend"),
+    // `rebase dev --backend-only` from the PROJECT ROOT, not `pnpm run dev` inside
+    // `backend/`. 3fbe27a2b moved the scaffolded backend onto the managed runtime
+    // and removed its `dev` script — the project root's `rebase dev` runs it now —
+    // so the old invocation died with ERR_PNPM_NO_SCRIPT before a server ever
+    // started, taking all seven tests in this suite with it.
+    //
+    // `--backend-only` keeps this to the one process the suite actually asserts
+    // against; without it Vite comes up too and has to be reaped as well.
+    const proc = execa("node", [cliBin, "dev", "--backend-only"], {
+        cwd: projectDir,
         env: { ...env, PORT: String(assignedPort) },
         detached: true // so killTree can reap the tsx/backend it spawns
     });
@@ -262,7 +270,13 @@ export async function startBackend(projectDir: string, env: Record<string, strin
 
         const onData = (data: Buffer) => {
             buffer += data.toString();
-            const match = buffer.match(/(?:Server|API) running at http:\/\/localhost:(\d+)/);
+            // Strip ANSI before matching: the banner now reaches us via
+            // `rebase dev`, which prefixes and colours each child line, and a
+            // colour escape landing inside the URL would silently defeat the
+            // regex — the suite would then fail on the 90s timeout rather than
+            // on anything describing the cause.
+            const clean = buffer.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
+            const match = clean.match(/(?:Server|API) running at http:\/\/localhost:(\d+)/);
             if (match && !settled) {
                 settled = true;
                 clearTimeout(timer);

@@ -474,6 +474,20 @@ function modifyDockerComposePort(projectPath: string) {
     );
     fs.writeFileSync(composePath, content, "utf-8");
     console.log("🐳 Modified docker-compose.yml to use port 8082 for frontend and port 5433 for db.");
+
+    // `CORS_ORIGINS` is `${CORS_ORIGINS:?…}` in the compose file — required, with
+    // no default, deliberately: "an API that guesses its allowed origins is one
+    // that eventually allows the wrong one". Unlike JWT_SECRET and
+    // REBASE_SERVICE_KEY, which `rebase init` generates, this one is the
+    // deployer's choice — and in this step the deployer is us. Without it
+    // `docker compose build` refuses to interpolate and Step 9 dies before it
+    // builds anything.
+    //
+    // It has to match the port rewritten just above, since that is the origin the
+    // browser check below actually loads.
+    if (writeEnvVar(projectPath, "CORS_ORIGINS", "http://localhost:8082")) {
+        console.log("🔓 Set CORS_ORIGINS=http://localhost:8082 in .env for the compose deployment.");
+    }
 }
 
 function createBooksCollection(projectPath: string) {

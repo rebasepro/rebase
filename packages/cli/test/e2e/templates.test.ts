@@ -135,9 +135,17 @@ async function createDatabase(name: string): Promise<string> {
 async function scaffold(name: string, preset: string, flavor: string, databaseUrl: string): Promise<string> {
     // No --install here: the dependencies must be redirected to the local
     // packages before anything is fetched.
+    //
+    // `--headless` is what makes the baas cases baas. It used to be implied by a
+    // `flavor` concept the CLI has since dropped, and when that went the argument
+    // stopped reaching `init` — so every "baas template" case scaffolded an
+    // ordinary project and then asserted it had no `config/` directory. The
+    // parameter survived as a label on a distinction that was no longer being
+    // made.
     await execa("node", [
         cliBin, "init", name,
         "--yes",
+        ...(flavor === "baas" ? ["--headless"] : []),
         "--template", preset,
         "--database-url", databaseUrl
     ], { cwd: tempDir, env });
@@ -270,8 +278,20 @@ describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
     }, 60_000);
 
     it("scaffolds no collections and no admin UI", () => {
-        expect(fs.existsSync(path.join(projectDir, "config"))).toBe(false);
+        // "No collections" means no `config/collections` — not no `config`. The
+        // headless scaffold still ships a config package, and has since
+        // d71452ffa: storage does not run under row-level security and its keys
+        // share one flat namespace, so without an access model a deployment with
+        // file storage serves every user's files to every signed-in user. The
+        // server refuses to boot without it, and `config/index.ts` is the export
+        // it looks for. Asserting the whole directory away asserted that guard
+        // away with it.
+        expect(fs.existsSync(path.join(projectDir, "config", "collections"))).toBe(false);
         expect(fs.existsSync(path.join(projectDir, "frontend"))).toBe(false);
+        // The config package is present, and carries the storage access model.
+        expect(fs.existsSync(path.join(projectDir, "config", "index.ts"))).toBe(true);
+        expect(fs.readFileSync(path.join(projectDir, "config", "index.ts"), "utf-8"))
+            .toContain("storageAuthorize");
     });
 
     it("bootstraps the auth schema without a db push", async () => {
