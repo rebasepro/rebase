@@ -50,6 +50,40 @@ The navigation, URL and collection-registry controllers are **not** `<Rebase>`
 props — they are built by the hooks below and consumed inside the admin tree
 (`<RebaseShell>` wires them for you in the default scaffold).
 
+## Two data shapes
+
+There are two data layers, and they are **not** interchangeable. Passing one
+where the other is expected is a type error, so this is worth knowing before you
+wire a controller by hand.
+
+| | Shape | Where you get it | What a row looks like |
+|---|---|---|---|
+| **SDK** | `RebaseSdkData` — flat rows | `client.data`, and `context.data` in backend callbacks | `row.title` |
+| **Admin** | `RebaseData` — `Entity` view-model | `useData()`, inside the `<Rebase>` tree | `entity.values.title` |
+
+The SDK layer is the public, symmetric surface: identical on the frontend client
+and in backend callbacks. The `Entity` layer is the admin's view-model — it adds
+the `id` / `path` / `values` wrapper that the collection views and forms render
+against. `CollectionAccessor` and `FindResponse` belong to it and are marked
+`@internal` for that reason.
+
+`<Rebase>` is the boundary between them: it takes your flat `client.data` and
+wraps it with `wrapAsEntityData()` before providing it as the admin's
+`RebaseData`. You never call that yourself — you just take the shape you need
+from the right place:
+
+```tsx
+// Flat rows — anywhere, including outside React.
+const { data: posts } = await client.data.posts.find();
+posts[0].title;
+
+// Entity view-model — inside the <Rebase> tree only.
+// `data.posts` also works at runtime; `collection()` is the typed accessor.
+const data = useData();
+const { data: entities } = await data.collection("posts").find();
+entities[0].values.title;
+```
+
 ## Controllers
 
 Controllers are React hooks that configure specific aspects of the framework:
@@ -58,17 +92,23 @@ Controllers are React hooks that configure specific aspects of the framework:
 
 The main controller that wires everything together:
 
+Its `data` is the **Entity-shaped** `RebaseData`, so it comes from `useData()`
+— not from `rebaseClient.data`, which is the flat-row SDK layer. `<Rebase>`
+converts one to the other for you (see [Two data shapes](#two-data-shapes)
+below), so this hook must be called inside the `<Rebase>` tree.
+
 ```typescript
+const data = useData();
+
 const navigationStateController = useBuildNavigationStateController({
     collections: () => [...collections],  // Collection definitions
     views: customViews,                   // Custom navigation views
     plugins,                              // Plugin instances
     authController,
-    data: rebaseClient.data,
+    data,
     collectionRegistryController,
     urlController,
-    adminMode: adminModeController.mode,
-    userManagement
+    adminMode: adminModeController.mode
 });
 ```
 

@@ -57,16 +57,17 @@ Les contrôleurs sont des hooks React qui configurent des aspects spécifiques d
 Le contrôleur principal qui relie tout :
 
 ```typescript
+const data = useData();
+
 const navigationStateController = useBuildNavigationStateController({
     collections: () => [...collections],  // Définitions de collections
     views: customViews,                   // Vues de navigation personnalisées
     plugins,                              // Instances de plugin
     authController,
-    data: rebaseClient.data,
+    data,
     collectionRegistryController,
     urlController,
-    adminMode: adminModeController.mode,
-    userManagement
+    adminMode: adminModeController.mode
 });
 ```
 
