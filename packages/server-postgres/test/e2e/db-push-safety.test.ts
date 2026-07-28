@@ -36,8 +36,7 @@ const tasksCollection = {
     singularName: "Task",
     slug: "tasks",
     table: "tasks",
-    icon: "CheckCircle",
-    group: "Core",
+    admin: { icon: "CheckCircle", group: "Core" },
     properties: {
         id:    { name: "ID",    type: "string", isId: "uuid", validation: { required: true } },
         title: { name: "Title", type: "string", validation: { required: true } },
