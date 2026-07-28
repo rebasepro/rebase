@@ -180,6 +180,15 @@ const serviceKey = "mysupersecretkey12345678901234567890";
  * that exact port. `E2E_BACKEND_PORT=3199 npx tsx ...` gets out of its way.
  */
 const backendPort = Number(process.env.E2E_BACKEND_PORT || 3099);
+/**
+ * The port the compose stack publishes its api on in Step 9.
+ *
+ * Deliberately not the dev server's, and not the compose default 3001: Step 9
+ * runs after Steps 7–8 have had a server up, and 3001 is a port ordinary
+ * projects listen on. Both are ways for this step to fail for a reason that has
+ * nothing to do with the artifact under test.
+ */
+const DOCKER_API_PORT = Number(process.env.E2E_DOCKER_API_PORT || 3011);
 
 export function getCleanEnv(): Record<string, string> {
     const cleanEnv = { ...process.env } as Record<string, string>;
@@ -489,16 +498,52 @@ function modifyDockerComposePort(projectPath: string) {
     const composePath = path.join(projectPath, "docker-compose.yml");
     if (!fs.existsSync(composePath)) return;
     let content = fs.readFileSync(composePath, "utf-8");
+    // The api's published port, pinned rather than inherited.
+    //
+    // The mapping is `"${PORT:-3001}:3001"`, and PORT in .env is the one the
+    // dev server used — so the compose stack tried to publish a port this very
+    // run had just been listening on, and any unrelated app on 3001 took it out
+    // too. Pinning a port nothing else in this suite uses makes Step 9
+    // independent of Steps 7–8 and of whatever the host happens to be running.
+    //
+    // This replaced a rewrite of `- "80:80"` → `- "8082:80"`, which had matched
+    // nothing since the compose file stopped shipping an nginx service: the
+    // scaffolded stack is `db` + `api`, and the api serves the admin itself on
+    // the same origin. The rewrite was a no-op and the 8082 it advertised was
+    // never listening.
     content = content.replace(
-        /- "80:80"/g,
-        '- "8082:80"'
+        /- "\$\{PORT:-3001\}:3001"/g,
+        `- "${DOCKER_API_PORT}:3001"`
     );
     content = content.replace(
         /- "5432:5432"/g,
         '- "5433:5432"'
     );
+    // Make the packed tarballs reachable from inside the container.
+    //
+    // This suite installs @rebasepro/* from tarballs it packs itself, so the
+    // bundle's package.json declares them as `file:../tarballs/*.tgz`. The
+    // runtime installs the bundle's dependencies on first boot, inside the
+    // container, where only `./dist-bundle` is mounted — so those paths resolve
+    // to nothing and the install dies on ENOENT before the server ever listens.
+    //
+    // Purely a harness concern: a real project resolves these from the registry
+    // and needs no such mount. Which is exactly why it belongs here, in the
+    // function that already adapts the compose file for the test, rather than in
+    // the template a user gets.
+    //
+    // Mounted twice, at two paths, because the suite writes both specifier
+    // forms: `file:./tarballs/x.tgz` on the project's own package.json, and a
+    // `file:/abs/host/path/tarballs/x.tgz` on the transitive ones. The first
+    // resolves to /tarballs from /bundle; the second only resolves if the host
+    // path exists verbatim inside the container.
+    const tarballsHostDir = path.join(projectPath, "tarballs");
+    content = content.replace(
+        /(\n(\s*))- \.\/dist-bundle:\/bundle/,
+        `$1- ./dist-bundle:/bundle$1- ./tarballs:/tarballs:ro$1- ${tarballsHostDir}:${tarballsHostDir}:ro`
+    );
     fs.writeFileSync(composePath, content, "utf-8");
-    console.log("🐳 Modified docker-compose.yml to use port 8082 for frontend and port 5433 for db.");
+    console.log(`🐳 Modified docker-compose.yml to use port ${DOCKER_API_PORT} for the api and port 5433 for db.`);
 
     // `CORS_ORIGINS` is `${CORS_ORIGINS:?…}` in the compose file — required, with
     // no default, deliberately: "an API that guesses its allowed origins is one
@@ -510,8 +555,8 @@ function modifyDockerComposePort(projectPath: string) {
     //
     // It has to match the port rewritten just above, since that is the origin the
     // browser check below actually loads.
-    if (writeEnvVar(projectPath, "CORS_ORIGINS", "http://localhost:8082")) {
-        console.log("🔓 Set CORS_ORIGINS=http://localhost:8082 in .env for the compose deployment.");
+    if (writeEnvVar(projectPath, "CORS_ORIGINS", `http://localhost:${DOCKER_API_PORT}`)) {
+        console.log(`🔓 Set CORS_ORIGINS=http://localhost:${DOCKER_API_PORT} in .env for the compose deployment.`);
     }
 }
 
@@ -1052,6 +1097,48 @@ timeout: 10000 });
         });
         console.log("Docker containers built successfully.");
 
+        // Build the project bundle the runtime boots.
+        //
+        // The compose api service mounts `./dist-bundle:/bundle` and the image's
+        // entrypoint refuses to start without it — "No bundle found at /bundle",
+        // on a restart loop, which is what `fetch failed` was downstream of.
+        //
+        // Step 9 predates that design: it was written when compose built a
+        // backend image out of the project's own source, so there was nothing to
+        // produce beforehand. The runtime image replaced that, and the compose
+        // header spells the sequence out — `rebase build`, then db, then migrate,
+        // then up — but this step was never taught the first line.
+        console.log("Building the project bundle (rebase build)...");
+        await execa(projectCliBin, ["build"], {
+            cwd: projectPath,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+        if (!fs.existsSync(path.join(projectPath, "dist-bundle"))) {
+            throw new Error("`rebase build` produced no dist-bundle — the runtime has nothing to boot.");
+        }
+        console.log("Bundle built.");
+
+        // Remove any stack from a previous run, VOLUMES INCLUDED.
+        //
+        // `rebase init` generates a fresh DATABASE_PASSWORD every run, but a
+        // Postgres container only honours POSTGRES_PASSWORD when it initialises
+        // an empty data directory — an existing `postgres_data` volume keeps the
+        // password it was created with. So a second run on the same machine
+        // brings up a database whose password no longer matches its own .env and
+        // fails on `password authentication failed for user "rebase"`, three
+        // steps away from anything that explains it.
+        //
+        // CI never sees this: a fresh runner has no volume. It makes the step
+        // unrepeatable everywhere else, which is where a test gets debugged.
+        console.log("Removing any previous compose stack (including volumes)...");
+        await execa("docker", ["compose", "down", "-v", "--remove-orphans"], {
+            cwd: projectPath,
+            stdio: "inherit",
+            env: cleanEnv,
+            reject: false
+        });
+
         // Start only the DB first so we can run migrations before the backend auto-creates internal tables
         console.log("Starting Docker DB service...");
         await execa("docker", ["compose", "up", "-d", "db"], {
@@ -1107,21 +1194,41 @@ timeout: 10000 });
         });
 
         try {
-            console.log("Waiting 15s for backend to start and stabilize...");
-            await new Promise(resolve => setTimeout(resolve, 15000));
-
-            // Check health endpoint
-            console.log("Checking Docker backend health endpoint...");
-            const healthResp = await fetch("http://localhost:3001/health");
-            if (!healthResp.ok) {
-                throw new Error(`Docker health check failed with status: ${healthResp.status}`);
+            // Poll for health rather than sleeping at it.
+            //
+            // The runtime installs the bundle's declared dependencies on first
+            // boot — `rebase build` emits a package.json, not a node_modules —
+            // so the container is busy for however long that install takes. A
+            // fixed 15s wait then a single fetch turned "still installing" into
+            // `TypeError: fetch failed`, with the container perfectly healthy a
+            // few seconds later and its logs showing no error at all.
+            console.log("Waiting for the Docker backend to become healthy...");
+            const healthUrl = `http://localhost:${DOCKER_API_PORT}/health`;
+            let healthResp: Response | undefined;
+            for (let attempt = 0; attempt < 60; attempt++) {
+                try {
+                    const probe = await fetch(healthUrl);
+                    if (probe.ok) { healthResp = probe; break; }
+                } catch {
+                    // Not listening yet — the install is still running.
+                }
+                if (attempt === 59) {
+                    throw new Error(
+                        `Docker backend never became healthy at ${healthUrl} (120s). ` +
+                        "Its container logs follow."
+                    );
+                }
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            if (!healthResp?.ok) {
+                throw new Error(`Docker health check failed with status: ${healthResp?.status}`);
             }
             const healthData = await healthResp.json();
             console.log("Docker Health Data:", healthData);
 
             // Call API on Docker backend to verify database and API readiness
             console.log("Calling Books API on Docker backend using service key...");
-            const dockerApiResp = await fetch("http://localhost:3001/api/data/books", {
+            const dockerApiResp = await fetch(`http://localhost:${DOCKER_API_PORT}/api/data/books`, {
                 headers: {
                     "Authorization": `Bearer ${serviceKey}`
                 }
@@ -1134,12 +1241,12 @@ timeout: 10000 });
             console.log("✅ Docker deployment verified successfully!");
 
         } finally {
-            console.log("--- Docker Container Logs (backend) ---");
+            console.log("--- Docker Container Logs (api) ---");
             try {
-                execSync("docker compose logs backend", { cwd: projectPath,
+                execSync("docker compose logs api", { cwd: projectPath,
 stdio: "inherit" });
             } catch (err: any) {
-                console.warn("Failed to get backend logs:", err.message);
+                console.warn("Failed to get api logs:", err.message);
             }
             console.log("--- Docker Container Logs (db) ---");
             try {

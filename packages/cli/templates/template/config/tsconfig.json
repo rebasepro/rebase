@@ -13,7 +13,22 @@
     "outDir": "./dist",
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    // Pin the ambient type libraries.
+    //
+    // Unset, TypeScript sweeps every `node_modules/@types` it can reach and
+    // treats each folder as an implicit type library. Under pnpm that reaches
+    // the virtual store, where packages hoisted for peer resolution live —
+    // `dompurify` among them, pulled in transitively by the admin editor. The
+    // backend has no dependency on it and cannot resolve its entry point, so
+    // `rebase build` failed the whole bundle with:
+    //
+    //     error TS2688: Cannot find type definition file for 'dompurify'
+    //
+    // `frontend/tsconfig.json` has always pinned its own list, which is why the
+    // frontend never saw this. Naming what this program needs is both the fix
+    // and the faster compile.
+    "types": ["node"]
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules", "dist"]
