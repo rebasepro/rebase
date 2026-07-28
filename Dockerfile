@@ -1,7 +1,16 @@
 # ─── Multi-stage production Dockerfile for the Rebase backend ─────────
 # Build context: the monorepo root (where pnpm-workspace.yaml lives)
 # Usage:
-#   docker build -t rebase-backend -f app/backend/Dockerfile .
+#   docker build -t rebase-backend -f Dockerfile .
+#
+# NOTE: this file is NOT the one anything builds. `cloudbuild.yaml`,
+# `app/rebase.json` and `app/backend/docker-compose.yml` all point at
+# `app/backend/Dockerfile`; this root copy was added for Cloud Build in
+# fef2b5f84 and stopped being referenced when Cloud Build moved. It has since
+# drifted ~18 lines behind the maintained one. Prefer deleting it over editing
+# it — a second, unbuilt copy of a build file is how the two silently disagree.
+# The header used to read `-f app/backend/Dockerfile`, which is what made it
+# look like the live file.
 
 # ── Stage 1: Install + Build ─────────────────────────────────────────
 FROM node:22-alpine AS builder
@@ -26,9 +35,12 @@ COPY app ./app
 # (many packages rely on hoisted devDependencies like @vitejs/plugin-react)
 RUN pnpm install --shamefully-hoist
 
-# Build all packages using pnpm recursive with --no-bail.
-# Some packages may fail tsc declarations — that's fine, we only need vite bundles + esbuild outputs.
-RUN pnpm --filter './packages/*' -r --no-bail run build; exit 0
+# Build all packages. This must fail the image on error: `dist` is dockerignored,
+# so a swallowed failure produces an image with missing or partial output rather
+# than a loud build error. `; exit 0` discarded the exit status of every package
+# build, which meant this stage could not fail at all — the image built green
+# with zero packages compiled. Matches app/backend/Dockerfile, the live one.
+RUN pnpm --filter './packages/*' -r run build
 
 # Build the backend (TypeScript → JavaScript), then resolve ESM import extensions
 # 1. tsc compiles TS→JS  2. tsc-alias resolves path aliases  3. sed adds .js to remaining relative imports
