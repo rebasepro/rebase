@@ -63,7 +63,64 @@ export interface RebaseClientConfig {
      * `client.close()` when shutting down.
      */
     realtime?: boolean;
+    /**
+     * "Yes, I meant to be anonymous."
+     *
+     * Off-browser, a client with no credential can only ever call as an
+     * anonymous user, and row-level security answers it with whatever is
+     * public — usually nothing. That is almost always a mistake in a script or
+     * cron job, so the SDK warns once on the first request (see
+     * {@link ANONYMOUS_SERVER_CLIENT_WARNING}). Anonymous is a legitimate
+     * choice for public reads, though; set this to `true` to say so and
+     * silence the warning.
+     *
+     * Has no effect in the browser, where anonymous-before-sign-in is normal
+     * and nothing is ever warned about.
+     */
+    anonymous?: boolean;
 }
+
+/**
+ * Facts about the surrounding client that the transport cannot read off its own
+ * config, but needs in order to decide whether a request is *meaningfully*
+ * credential-less.
+ */
+export interface TransportEnvironment {
+    /**
+     * The credential reaches the server without an `Authorization` header —
+     * i.e. `auth.authFlowMode: "cookie"`, where the refresh token lives in an
+     * httpOnly cookie. Such a client looks tokenless to the transport but is
+     * not anonymous, so it must never trip the guard.
+     */
+    credentialOutOfBand?: boolean;
+}
+
+/**
+ * True when there is no browser to have signed a user in — a Node script, a
+ * cron job, an edge worker.
+ *
+ * Anonymous is an ordinary, correct state in a browser: before sign-in, on a
+ * marketing page, for public reads. Warning there would be noise that teaches
+ * people to ignore warnings, so the guard is off entirely. This uses the same
+ * `typeof window` test as {@link resolveBaseUrl}, and additionally treats a
+ * defined `document` as a browser so an SSR shim or test harness that installs
+ * only one of the two is still excluded.
+ */
+function isServerLikeEnvironment(): boolean {
+    return typeof window === "undefined" && typeof document === "undefined";
+}
+
+/**
+ * Emitted once per client. Kept as a constant so the wording is testable and
+ * greppable — this is the string a user will paste into a search.
+ */
+export const ANONYMOUS_SERVER_CLIENT_WARNING =
+    "[rebase] This client was created outside a browser with no credential — no `token`, no auth token getter, "
+    + "and no cookie auth flow — so every request runs as an anonymous caller. Row-level security will return only "
+    + "publicly readable rows, which is usually nothing and occasionally the wrong thing. "
+    + "Inside a cron or function handler, use the `client` you were handed instead of building a new one: its data "
+    + "plane is already admin-scoped. In a standalone script or job, pass the service key as `token`. "
+    + "If you really do want anonymous access, pass `anonymous: true` to silence this.";
 
 /**
  * Re-export from `@rebasepro/types` for backward compatibility.
@@ -156,12 +213,32 @@ function resolveBaseUrl(configured?: string): string {
     return "";
 }
 
-export function createTransport(config: RebaseClientConfig): Transport {
+export function createTransport(config: RebaseClientConfig, environment?: TransportEnvironment): Transport {
     const fetchFn = config.fetch || globalThis.fetch;
     const apiPath = config.apiPath || "/api";
     let token = config.token;
     let tokenGetter: (() => Promise<string | null>) | undefined;
     let onUnauthorizedHandler = config.onUnauthorized;
+    /** Once per client, never per request — log spam is its own bug. */
+    let anonymousWarningIssued = false;
+
+    /**
+     * Warn a server-side caller that it built a client that can only ever be
+     * anonymous. Deliberately checked at the *first request* rather than at
+     * construction: `setToken()` / `setAuthTokenGetter()` and a server-side
+     * `auth.signIn…()` (which calls `transport.setToken`) all land after the
+     * constructor, and warning at construction would fire on every one of them.
+     */
+    function warnIfAnonymousServerClient(activeToken: string | undefined): void {
+        if (anonymousWarningIssued) return;
+        if (activeToken) return;                          // a credential is being sent
+        if (tokenGetter) return;                          // a credential is being fetched per request
+        if (config.anonymous) return;                     // "yes, I meant this"
+        if (environment?.credentialOutOfBand) return;     // cookie auth flow — credential is not a header
+        if (!isServerLikeEnvironment()) return;           // browsers are legitimately anonymous
+        anonymousWarningIssued = true;
+        console.warn(ANONYMOUS_SERVER_CLIENT_WARNING);
+    }
 
     function getHeaders(activeToken: string | undefined, init?: RequestInit) {
         return {
@@ -185,6 +262,8 @@ export function createTransport(config: RebaseClientConfig): Transport {
                 // Ignore error, fallback to static token if any
             }
         }
+
+        warnIfAnonymousServerClient(activeToken);
 
         const headers = getHeaders(activeToken, init);
 

@@ -4,6 +4,11 @@ import { createRebaseClient as _createRebaseClient } from "../src/index";
 import { buildQueryString, Transport } from "../src/transport";
 import { QueryBuilder } from "../src/query_builder";
 
+// Tokenless clients in a Node environment, on purpose — that is what the
+// anonymous-server-client guard warns about (covered by
+// src/anonymous-client-guard.test.ts). Here it is only noise.
+beforeEach(() => { jest.spyOn(console, "warn").mockImplementation(() => undefined); });
+
 let testClients: any[] = [];
 afterEach(() => {
     testClients.forEach(c => c.ws?.disconnect());
