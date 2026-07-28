@@ -69,7 +69,7 @@ Every major page is a variation on the same three acts:
 /compare             Comparison hub  (was /why-rebase)
 └── /rebase-vs-*     8 head-to-head pages
 /pricing  /demo  /about  /manifesto  /contact  /pitch
-/startups /agencies /kit-digital     campaign pages
+/startups /agencies /kit-digital /europe    campaign pages
 ```
 
 Plus `/ui` — the `@rebasepro/ui` component gallery. It is not in the nav; it is
@@ -107,6 +107,29 @@ grid), and end with the same CTA pair: *Try the demo* + `pnpm dlx @rebasepro/cli
 | `/ai` | Can an agent drive this safely? | AgentConsole, AiAppDevelopment |
 | `/developers` | How do I build with it day to day? | TerminalInit, SdkMini, Architecture, DeveloperPlayground |
 | `/compare` | Why this and not X? | comparison matrix |
+| `/europe` | Can I run this myself, in Europe, and what does it cost? | Jurisdiction, DeployTarget, EuHostingCost |
+
+**The `/europe` rule: control, not location.** The tempting sovereignty pitch —
+"their servers are in Virginia" — is false. Supabase provisions in
+`eu-central-1`; Firestore has `eur3`. If the page ever implies otherwise it is
+lying and a reader who knows the products will catch it. The argument that is
+true is structural: a managed backend has a *second party* who operates the
+service and holds the credentials, and a self-hosted one does not.
+
+**The cost demo must size the box from the workload.** The first version let the
+self-hosted column sit at €12 while the sliders described 5M users and 10 TB of
+files, and reported "1538× cheaper" — a number that is not merely optimistic but
+arithmetically impossible, since 512 GB of database does not fit on a 40 GB
+disk. The figure now derives a minimum machine from the sliders, refuses boxes
+too small to hold it, stops the sliders where one machine stops being the right
+shape, and says **"here the managed bill wins"** when it does. A comparison this
+page cannot defend costs more than the comparison is worth.
+
+**`/europe` sells self-hosting and nothing else.** There is no managed Rebase
+offering today, so the page must not mention one — not as a footnote, not as a
+"coming soon", not as a waitlist. The counterweight to "you are the only
+processor" is *"being the only processor is also a job"* (backups, keys,
+uptime), not a hosted tier we would rather sell.
 
 **Demo budget rule.** A demo appears on the home page *and* at most one deep
 page. If a demo is the proof of a claim, it lives on the page that makes the

@@ -28,7 +28,7 @@ A minimal `docker-compose.yml`:
 ```yaml
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: rebase
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

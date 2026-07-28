@@ -395,8 +395,22 @@ export type AdminCollectionOptions<
 
     /**
      * Actions that can be performed on the entities in this collection.
+     *
+     * An entry may be the action itself, or the `key` of one registered app-level
+     * on `<RebaseAdmin entityActions={…}>` — `resolveEntityAction` looks a string
+     * up against that list.
+     *
+     * The key form is what lets a collection declared in a React-free config
+     * package use an action whose UI is React: an action carries an `onClick` and
+     * usually renders a dialog, so importing one into a collection file pulls the
+     * admin bundle into any backend that loads it for its schema. Naming it costs
+     * nothing there.
+     *
+     * `string` was accepted at runtime and by the collection editor — which stores
+     * exactly these keys — long before the type said so, which meant the documented
+     * approach needed a cast. Mirrors `entityViews`, typed this way already.
      */
-    entityActions?: EntityAction<M, USER>[];
+    entityActions?: (string | EntityAction<M, USER>)[];
 
     /**
      * Builder for the collection actions rendered in the toolbar

@@ -76,11 +76,17 @@ export function DrawerNavigationGroup({
     const { t } = useTranslation();
     const ResolvedDrawerNavigationItem = useComponentOverride("Shell.DrawerNavigationItem", DrawerNavigationItem);
 
-    // Indent the entries only when the group itself is carrying the icon. Without a
-    // header there is nothing to indent under, and collapsed to a rail the entry
-    // icons are the only affordance left, so both cases keep the original rows.
+    // Opt-in, per group: declaring `icon` on a `NavigationGroupMapping` switches
+    // this group to the categorised treatment — icon on the header, entries
+    // indented beneath it without their own. A group that declares no icon renders
+    // exactly as it did before, so an existing project sees no change at all.
+    //
+    // Two cases stay on the flat rendering regardless: with no header there is
+    // nothing to indent under, and collapsed to a rail the entry icons are the only
+    // affordance left to click.
     const groupIcon = !hideHeader && drawerOpen ? getIcon(icon, undefined, undefined, "small") : undefined;
-    const indentEntries = Boolean(groupIcon);
+    const categorised = Boolean(groupIcon);
+    const indentEntries = categorised;
     return (
         <div
             className={"my-2 mx-2 flex flex-col"}
@@ -97,7 +103,10 @@ export function DrawerNavigationGroup({
                     <ChevronDownIcon
                         size={iconSize.small}
                         className={cls(
-                            "text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1",
+                            categorised
+                                ? "text-surface-500 dark:text-surface-400"
+                                : "text-surface-400 dark:text-surface-400",
+                            "transition-transform duration-200 mr-1",
                             collapsed ? "-rotate-90" : "rotate-0"
                         )}
                     />
@@ -109,11 +118,21 @@ export function DrawerNavigationGroup({
                     <Typography
                         variant={"caption"}
                         color={"secondary"}
-                        // A category label is the thing you scan to find anything else in
-                        // the drawer, so it is read far more often than it is read *past*.
-                        // At 11px uppercase in surface-400 it sat below the contrast of the
-                        // rows it labels, which inverted that.
-                        className="font-semibold text-[12px] uppercase tracking-wide flex-grow line-clamp-1 text-surface-600 dark:text-surface-300"
+                        // Two treatments, and which one applies is decided by the group
+                        // itself. Without an icon this is byte-for-byte the original: the
+                        // drawer is a flat list of same-weight rows, and a louder header
+                        // would just compete with them.
+                        //
+                        // With one, the group becomes the thing you scan — its rows have
+                        // given up their icons to indent beneath it — so the label steps up
+                        // to match. At 11px in surface-400 it sat *below* the contrast of
+                        // the rows it labels, which is backwards once it is the anchor.
+                        className={cls(
+                            "font-semibold uppercase flex-grow line-clamp-1",
+                            categorised
+                                ? "text-[12px] tracking-wide text-surface-600 dark:text-surface-300"
+                                : "text-[11px] tracking-wider text-surface-400 dark:text-surface-400"
+                        )}
                     >
                         {(group || t("views_group"))}
                     </Typography>

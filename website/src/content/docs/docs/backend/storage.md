@@ -163,6 +163,55 @@ Client                                                   Rebase Server
 | `GOOGLE_APPLICATION_CREDENTIALS` | Standard ADC variable, read by the Google SDK itself (not needed on GCP with default credentials) |
 | `FORCE_LOCAL_STORAGE` | Allow `STORAGE_TYPE=local` in production — see below |
 
+## Several Buckets
+
+A project can have more than one bucket. Declare them in `rebase.json` — the one
+place the platform, the runtime and the console all read:
+
+```json
+{
+  "rebase": "^1",
+  "storage": {
+    "(default)": { "engine": "s3" },
+    "media": { "engine": "s3", "label": "Media" }
+  },
+  "apps": {}
+}
+```
+
+Each source is configured from the **same variable names carrying its own
+suffix**. The default source takes no suffix, so a single-bucket project keeps
+using the plain names above and needs to declare nothing at all:
+
+```bash
+S3_BUCKET=app-uploads             # (default)
+S3_BUCKET__MEDIA=app-media        # media
+S3_ACCESS_KEY_ID__MEDIA=…
+S3_SECRET_ACCESS_KEY__MEDIA=…
+```
+
+The suffix is derived from the key: uppercased, non-alphanumerics collapsed to
+underscores, behind a **double** underscore (`media-cdn` → `__MEDIA_CDN`). A
+single underscore would collide with real variable names — `S3_BUCKET_NAME`
+would parse as bucket `name`.
+
+Route a property to a source with `storageSource`:
+
+```ts
+{
+    name: "Cover",
+    dataType: "string",
+    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+}
+```
+
+A source you declare but never configure is **skipped**, not fatal: uploads
+routed to it answer `501 STORAGE_NOT_CONFIGURED`. Declaring a bucket usually
+happens before anyone attaches storage to it, and a boot error there would
+crash-loop the backend until someone did. A source the environment configures
+*wrongly* — a type with no bucket, or a bucket with no credentials — is refused
+at boot, because that is a mistake rather than an absence.
+
 ## Frontend Storage Sources
 
 When using multiple storage backends, pass `storageSources` to the `<Rebase>` provider so the frontend knows how to route uploads directly:

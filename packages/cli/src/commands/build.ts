@@ -145,6 +145,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 app,
                 outDir: args["--out"],
                 runtimeRange: manifest.rebase,
+                storage: manifest.storage,
                 skipTypeCheck: args["--skip-type-check"],
                 skipSchema: args["--skip-schema"]
             });

@@ -20,14 +20,14 @@ export const ticketsCategory = pgEnum("tickets_category", ['bug', 'feature_reque
 
 export const authors = pgTable("authors", {
     id: uuid("id").primaryKey().defaultRandom(),
-    name: varchar("name").notNull(),
-    email: varchar("email").notNull(),
-    picture: varchar("picture"),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    picture: text("picture"),
     bio: text("bio"),
-    twitter: varchar("twitter"),
-    github: varchar("github"),
-    website: varchar("website"),
-    userId: varchar("user_id")
+    twitter: text("twitter"),
+    github: text("github"),
+    website: text("website"),
+    userId: text("user_id")
 }, (table) => ([
     pgPolicy("authors_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
     pgPolicy("authors_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
@@ -41,12 +41,12 @@ export const authors = pgTable("authors", {
 
 export const customers = pgTable("customers", {
     id: uuid("id").primaryKey().defaultRandom(),
-    first_name: varchar("first_name").notNull(),
-    last_name: varchar("last_name").notNull(),
-    email: varchar("email").unique().notNull(),
-    phone: varchar("phone"),
-    avatar: varchar("avatar"),
-    company: varchar("company"),
+    first_name: text("first_name").notNull(),
+    last_name: text("last_name").notNull(),
+    email: text("email").unique().notNull(),
+    phone: text("phone"),
+    avatar: text("avatar"),
+    company: text("company"),
     is_vip: boolean("is_vip"),
     lifetime_value: numeric("lifetime_value"),
     total_orders: numeric("total_orders"),
@@ -68,10 +68,10 @@ export const customers = pgTable("customers", {
 
 export const exercises = pgTable("exercises", {
     id: uuid("id").primaryKey().defaultRandom(),
-    name: varchar("name").notNull(),
+    name: text("name").notNull(),
     description: text("description"),
     images: text("images").array(),
-    video_url: varchar("video_url"),
+    video_url: text("video_url"),
     difficulty: exercisesDifficulty("difficulty").notNull(),
     category: exercisesCategory("category").notNull(),
     equipment: text("equipment").array(),
@@ -101,8 +101,8 @@ export const orderItems = pgTable("order_items", {
     id: uuid("id").primaryKey().defaultRandom(),
     order_id: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
     product_id: uuid("product_id").references(() => products.id, { onDelete: "restrict" }),
-    product_name: varchar("product_name"),
-    sku: varchar("sku"),
+    product_name: text("product_name"),
+    sku: text("sku"),
     quantity: numeric("quantity").notNull(),
     unit_price: numeric("unit_price"),
     line_total: numeric("line_total")
@@ -119,7 +119,7 @@ export const orderItems = pgTable("order_items", {
 
 export const orders = pgTable("orders", {
     id: uuid("id").primaryKey().defaultRandom(),
-    order_number: varchar("order_number").unique().notNull(),
+    order_number: text("order_number").unique().notNull(),
     customer_id: uuid("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
     status: ordersStatus("status").notNull(),
     payment_status: ordersPayment_status("payment_status").notNull(),
@@ -130,7 +130,7 @@ export const orders = pgTable("orders", {
     total: numeric("total"),
     currency: ordersCurrency("currency"),
     shipping_address: text("shipping_address"),
-    tracking_number: varchar("tracking_number"),
+    tracking_number: text("tracking_number"),
     notes: text("notes"),
     order_date: timestamp("order_date", { withTimezone: true, mode: 'string' }).notNull(),
     shipped_date: timestamp("shipped_date", { withTimezone: true, mode: 'string' }),
@@ -150,9 +150,9 @@ export const orders = pgTable("orders", {
 
 export const posts = pgTable("posts", {
     id: uuid("id").primaryKey().defaultRandom(),
-    title: varchar("title").notNull(),
-    slug: varchar("slug").unique().notNull(),
-    hero_image: varchar("hero_image"),
+    title: text("title").notNull(),
+    slug: text("slug").unique().notNull(),
+    hero_image: text("hero_image"),
     excerpt: text("excerpt"),
     content: jsonb("content"),
     status: postsStatus("status").notNull(),
@@ -181,16 +181,16 @@ export const postsTags = pgTable("posts_tags", {
     pgPolicy("posts_tags_default_admin_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])`, withCheck: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("posts_tags_default_admin_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() IS NULL) OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])` }),
     pgPolicy("posts_tags_default_edge_read", { as: "permissive", for: "select", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE "_ex0".id = "public"."posts_tags".post_id)) AND (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE "_ex1".id = "public"."posts_tags".tag_id))` }),
-    pgPolicy("posts_tags_default_edge_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))` }),
-    pgPolicy("posts_tags_default_edge_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))`, withCheck: sql`EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))` }),
-    pgPolicy("posts_tags_default_edge_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))` }),
+    pgPolicy("posts_tags_default_edge_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin']))))` }),
+    pgPolicy("posts_tags_default_edge_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin']))))`, withCheck: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin']))))` }),
+    pgPolicy("posts_tags_default_edge_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."posts" "_ex0" WHERE ("_ex0".id = "public"."posts_tags".post_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin'])))) OR (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE ("_ex1".id = "public"."posts_tags".tag_id) AND ((string_to_array(auth.roles(), ',') && ARRAY['admin']))))` }),
 ])).enableRLS();
 
 export const productLocales = pgTable("product_locales", {
     id: uuid("id").primaryKey().defaultRandom().notNull(),
     product_id: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
-    locale: varchar("locale").notNull(),
-    name: varchar("name"),
+    locale: text("locale").notNull(),
+    name: text("name"),
     description: text("description")
 }, (table) => ([
     pgPolicy("product_locales_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
@@ -205,12 +205,12 @@ export const productLocales = pgTable("product_locales", {
 
 export const products = pgTable("products", {
     id: uuid("id").primaryKey().defaultRandom(),
-    name: varchar("name").notNull(),
-    sku: varchar("sku").unique().notNull(),
+    name: text("name").notNull(),
+    sku: text("sku").unique().notNull(),
     description: text("description"),
     images: text("images").array(),
     available_locales: text("available_locales").array(),
-    brand: varchar("brand"),
+    brand: text("brand"),
     category: productsCategory("category").notNull(),
     price: numeric("price").notNull(),
     compare_at_price: numeric("compare_at_price"),
@@ -237,7 +237,7 @@ export const products = pgTable("products", {
 
 export const tags = pgTable("tags", {
     id: uuid("id").primaryKey().defaultRandom().notNull(),
-    name: varchar("name").notNull()
+    name: text("name").notNull()
 }, (table) => ([
     pgPolicy("tags_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
     pgPolicy("tags_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
@@ -251,18 +251,18 @@ export const tags = pgTable("tags", {
 
 export const tickets = pgTable("tickets", {
     id: uuid("id").primaryKey().defaultRandom(),
-    ticket_number: varchar("ticket_number").unique().notNull(),
-    subject: varchar("subject").notNull(),
+    ticket_number: text("ticket_number").unique().notNull(),
+    subject: text("subject").notNull(),
     description: text("description"),
     resolution_notes: text("resolution_notes"),
     status: ticketsStatus("status").notNull(),
     priority: ticketsPriority("priority").notNull(),
     category: ticketsCategory("category"),
     customer_id: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
-    assigned_to: varchar("assigned_to"),
+    assigned_to: text("assigned_to"),
     created_at: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
     updated_at: timestamp("updated_at", { withTimezone: true, mode: 'string' }).default(sql`now()`),
-    __order: varchar("order")
+    __order: text("order")
 }, (table) => ([
     pgPolicy("tickets_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
     pgPolicy("tickets_insert_3561e70_0", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`string_to_array(auth.roles(), ',') && ARRAY['admin']` }),
@@ -276,13 +276,13 @@ export const tickets = pgTable("tickets", {
 
 export const users = rebaseSchema.table("users", {
     id: uuid("id").primaryKey().defaultRandom(),
-    email: varchar("email").unique().notNull(),
-    displayName: varchar("display_name"),
-    photoURL: varchar("photo_url"),
+    email: text("email").unique().notNull(),
+    displayName: text("display_name"),
+    photoURL: text("photo_url"),
     roles: text("roles").array(),
-    passwordHash: varchar("password_hash"),
+    passwordHash: text("password_hash"),
     emailVerified: boolean("email_verified"),
-    emailVerificationToken: varchar("email_verification_token"),
+    emailVerificationToken: text("email_verification_token"),
     emailVerificationSentAt: timestamp("email_verification_sent_at", { withTimezone: true, mode: 'string' }),
     metadata: jsonb("metadata"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
@@ -350,7 +350,7 @@ export const postsTagsRelations = drizzleRelations(postsTags, ({ one, many }) =>
     "tag_id": one(tags, {
         fields: [postsTags.tag_id],
         references: [tags.id],
-        relationName: "posts"
+        relationName: "posts_tags_tag_id"
     })
 }));
 

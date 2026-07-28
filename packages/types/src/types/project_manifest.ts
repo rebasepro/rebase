@@ -25,6 +25,8 @@
  * project.
  */
 
+import type { StorageSourceDefinition } from "./storage_source";
+
 /**
  * Which kind of thing an app is.
  *
@@ -131,6 +133,27 @@ export interface RebaseStaticAppConfig {
 export type RebaseAppConfig = RebaseBackendAppConfig | RebaseStaticAppConfig;
 
 /**
+ * One declared storage source, as authored in `rebase.json`.
+ *
+ * The key comes from the enclosing record, so this is
+ * {@link StorageSourceDefinition} minus its `key` — the same document the
+ * runtime registry and the frontend router consume, expressed the way a JSON
+ * object naturally expresses "a set of named things".
+ */
+export interface RebaseStorageSourceConfig {
+    /** Engine backing this source: `local`, `s3`, `gcs`, or a custom id. */
+    engine: string;
+    /**
+     * How the frontend reaches it. Default `server` (proxied through
+     * `/api/storage`). `direct` means a provider SDK talks to the bucket and the
+     * backend is not in the upload path.
+     */
+    transport?: "server" | "direct";
+    /** Human-readable label for the console and the admin UI. */
+    label?: string;
+}
+
+/**
  * `rebase.json` — the authored project manifest.
  */
 export interface RebaseProjectManifest {
@@ -155,6 +178,28 @@ export interface RebaseProjectManifest {
      * not collide with.
      */
     apps: Record<string, RebaseAppConfig>;
+    /**
+     * Storage sources this project uses, keyed by source key.
+     *
+     * **Topology only — never credentials.** Which buckets exist is a property of
+     * the project and belongs in the repository; how to reach each one is a
+     * property of the deployment and lives in the environment, read per source
+     * from `<BASE>__<KEY>` (`S3_BUCKET__MEDIA` for a source keyed `media`). The
+     * default source takes no suffix, so a single-bucket project configured with
+     * plain `S3_BUCKET` keeps working having declared nothing at all.
+     *
+     * Declared here rather than only in the config package because this file is
+     * the one artifact a host can read *before* running a build. That is what
+     * lets a console show "this project wants a `media` bucket, and it has none"
+     * on a project's first deploy, and it is why the managed and custom runtimes
+     * can present the same list — a custom build emits no bundle manifest, so a
+     * declaration that lived only in compiled config would leave every custom
+     * project invisible.
+     *
+     * Omitted entirely means one default source, which is the overwhelmingly
+     * common project and must not be required to say so.
+     */
+    storage?: Record<string, RebaseStorageSourceConfig>;
 }
 
 /**
@@ -340,6 +385,17 @@ export interface RebaseBundleManifest {
     storage?: {
         /** Whether the config package exports a `storageAuthorize` hook. */
         authorize: boolean;
+        /**
+         * Every storage source this bundle expects, resolved at build time from
+         * `rebase.json`'s `storage` block merged with any `storageSources` the
+         * config package exports.
+         *
+         * Recorded so the runtime does not have to import user code to learn its
+         * own topology, and so a host can tell — from the artifact alone, before
+         * starting anything — which buckets need configuring. Absent on bundles
+         * built before this field existed, which means one default source.
+         */
+        sources?: StorageSourceDefinition[];
     };
     deps: {
         /** Runtime dependencies of user code, as declared. */

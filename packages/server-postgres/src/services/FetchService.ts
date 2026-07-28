@@ -3,6 +3,7 @@ import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, ResolvedRelation, LogicalCondition, isManyToMany } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
+import { generateForeignKeyName } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
@@ -106,20 +107,45 @@ export class FetchService {
     /**
      * Resolves the correct Drizzle column for sorting.
      * Automatically maps owning relation property keys to their underlying foreign key column.
+     *
+     * The relation's own `localKey` is the authority for that foreign key, not
+     * `<field>_id`. The default local key comes from `generateForeignKeyName`,
+     * which snake-cases *and singularises* — `userProfile` → `user_profile_id`,
+     * `users` → `user_id` — and an author can override it outright. A wrong
+     * guess resolves to nothing, the caller drops the `ORDER BY`, and the rows
+     * come back in whatever order Postgres pleases: paging over that repeats
+     * and skips rows rather than erroring. The guesses stay, last, for a
+     * caller that hands over no collection to resolve against.
      */
     private resolveOrderByField(
         table: PgTable<any>,
         orderBy: string,
         collection?: CollectionConfig
     ): AnyPgColumn | undefined {
-        let orderByField = table[orderBy as keyof typeof table] as AnyPgColumn;
-        if (!orderByField && collection) {
-            const property = collection.properties[orderBy];
-            if (property && property.type === "relation" && "relation" in property && property.resolvedRelation?.kind === "belongsTo") {
-                orderByField = table[`${orderBy}_id` as keyof typeof table] as AnyPgColumn;
+        const columnAt = (key: string): AnyPgColumn | undefined =>
+            (key in table ? table[key as keyof typeof table] as AnyPgColumn : undefined) || undefined;
+
+        const direct = columnAt(orderBy);
+        if (direct) return direct;
+
+        // Owning relation, resolved: the relation names its own local key.
+        if (collection) {
+            const relation = resolveCollectionRelations(collection)[orderBy];
+            if (relation?.kind === "belongsTo") {
+                const foreignKey = columnAt(relation.localKey);
+                if (foreignKey) return foreignKey;
             }
         }
-        return orderByField;
+
+        // No collection in hand — the two shapes an owning relation's key takes
+        // by default (e.g. `project` → `project_id`, `userProfile` →
+        // `user_profile_id`).
+        for (const guess of [`${orderBy}_id`, generateForeignKeyName(orderBy)]) {
+            const foreignKey = columnAt(guess);
+            if (foreignKey) return foreignKey;
+        }
+
+        return undefined;
     }
 
     /**

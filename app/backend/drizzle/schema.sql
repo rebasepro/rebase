@@ -18,24 +18,24 @@ CREATE TYPE "public"."tickets_category" AS ENUM ('bug', 'feature_request', 'ques
 
 CREATE TABLE "public"."authors" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "name" VARCHAR(255) NOT NULL,
-  "email" VARCHAR(255) NOT NULL,
-  "picture" VARCHAR(255),
+  "name" TEXT NOT NULL,
+  "email" TEXT NOT NULL,
+  "picture" TEXT,
   "bio" TEXT,
-  "twitter" VARCHAR(255),
-  "github" VARCHAR(255),
-  "website" VARCHAR(255),
-  "user_id" VARCHAR(255)
+  "twitter" TEXT,
+  "github" TEXT,
+  "website" TEXT,
+  "user_id" TEXT
 );
 
 CREATE TABLE "public"."customers" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "first_name" VARCHAR(255) NOT NULL,
-  "last_name" VARCHAR(255) NOT NULL,
-  "email" VARCHAR(255) UNIQUE NOT NULL,
-  "phone" VARCHAR(255),
-  "avatar" VARCHAR(255),
-  "company" VARCHAR(255),
+  "first_name" TEXT NOT NULL,
+  "last_name" TEXT NOT NULL,
+  "email" TEXT UNIQUE NOT NULL,
+  "phone" TEXT,
+  "avatar" TEXT,
+  "company" TEXT,
   "is_vip" BOOLEAN,
   "lifetime_value" NUMERIC,
   "total_orders" NUMERIC,
@@ -48,10 +48,10 @@ CREATE TABLE "public"."customers" (
 
 CREATE TABLE "public"."exercises" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "name" VARCHAR(255) NOT NULL,
+  "name" TEXT NOT NULL,
   "description" TEXT,
   "images" TEXT[],
-  "video_url" VARCHAR(255),
+  "video_url" TEXT,
   "difficulty" "public"."exercises_difficulty" NOT NULL,
   "category" "public"."exercises_category" NOT NULL,
   "equipment" TEXT[],
@@ -72,8 +72,8 @@ CREATE TABLE "public"."order_items" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "order_id" UUID,
   "product_id" UUID,
-  "product_name" VARCHAR(255),
-  "sku" VARCHAR(255),
+  "product_name" TEXT,
+  "sku" TEXT,
   "quantity" NUMERIC NOT NULL,
   "unit_price" NUMERIC,
   "line_total" NUMERIC
@@ -81,7 +81,7 @@ CREATE TABLE "public"."order_items" (
 
 CREATE TABLE "public"."orders" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "order_number" VARCHAR(255) UNIQUE NOT NULL,
+  "order_number" TEXT UNIQUE NOT NULL,
   "customer_id" UUID NOT NULL,
   "status" "public"."orders_status" NOT NULL,
   "payment_status" "public"."orders_payment_status" NOT NULL,
@@ -92,7 +92,7 @@ CREATE TABLE "public"."orders" (
   "total" NUMERIC,
   "currency" "public"."orders_currency",
   "shipping_address" TEXT,
-  "tracking_number" VARCHAR(255),
+  "tracking_number" TEXT,
   "notes" TEXT,
   "order_date" TIMESTAMP WITH TIME ZONE NOT NULL,
   "shipped_date" TIMESTAMP WITH TIME ZONE,
@@ -103,9 +103,9 @@ CREATE TABLE "public"."orders" (
 
 CREATE TABLE "public"."posts" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "title" VARCHAR(255) NOT NULL,
-  "slug" VARCHAR(255) UNIQUE NOT NULL,
-  "hero_image" VARCHAR(255),
+  "title" TEXT NOT NULL,
+  "slug" TEXT UNIQUE NOT NULL,
+  "hero_image" TEXT,
   "excerpt" TEXT,
   "content" JSONB,
   "status" "public"."posts_status" NOT NULL,
@@ -124,19 +124,19 @@ CREATE TABLE "public"."posts_tags" (
 CREATE TABLE "public"."product_locales" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "product_id" UUID,
-  "locale" VARCHAR(255) NOT NULL,
-  "name" VARCHAR(255),
+  "locale" TEXT NOT NULL,
+  "name" TEXT,
   "description" TEXT
 );
 
 CREATE TABLE "public"."products" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "name" VARCHAR(255) NOT NULL,
-  "sku" VARCHAR(255) UNIQUE NOT NULL,
+  "name" TEXT NOT NULL,
+  "sku" TEXT UNIQUE NOT NULL,
   "description" TEXT,
   "images" TEXT[],
   "available_locales" TEXT[],
-  "brand" VARCHAR(255),
+  "brand" TEXT,
   "category" "public"."products_category" NOT NULL,
   "price" NUMERIC NOT NULL,
   "compare_at_price" NUMERIC,
@@ -154,34 +154,34 @@ CREATE TABLE "public"."products" (
 
 CREATE TABLE "public"."tags" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "name" VARCHAR(255) NOT NULL
+  "name" TEXT NOT NULL
 );
 
 CREATE TABLE "public"."tickets" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "ticket_number" VARCHAR(255) UNIQUE NOT NULL,
-  "subject" VARCHAR(255) NOT NULL,
+  "ticket_number" TEXT UNIQUE NOT NULL,
+  "subject" TEXT NOT NULL,
   "description" TEXT,
   "resolution_notes" TEXT,
   "status" "public"."tickets_status" NOT NULL,
   "priority" "public"."tickets_priority" NOT NULL,
   "category" "public"."tickets_category",
   "customer_id" UUID,
-  "assigned_to" VARCHAR(255),
+  "assigned_to" TEXT,
   "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
   "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  "order" VARCHAR(255)
+  "order" TEXT
 );
 
 CREATE TABLE "rebase"."users" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  "email" VARCHAR(255) UNIQUE NOT NULL,
-  "display_name" VARCHAR(255),
-  "photo_url" VARCHAR(255),
+  "email" TEXT UNIQUE NOT NULL,
+  "display_name" TEXT,
+  "photo_url" TEXT,
   "roles" TEXT[],
-  "password_hash" VARCHAR(255),
+  "password_hash" TEXT,
   "email_verified" BOOLEAN,
-  "email_verification_token" VARCHAR(255),
+  "email_verification_token" TEXT,
   "email_verification_sent_at" TIMESTAMP WITH TIME ZONE,
   "metadata" JSONB,
   "created_at" TIMESTAMP WITH TIME ZONE,

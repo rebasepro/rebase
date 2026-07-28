@@ -136,8 +136,14 @@ force: true });
         });
 
         console.log("6.5. Bootstrapping Rebase backend briefly to initialize auth tables...");
-        const backendProcess = execa("pnpm", ["run", "dev"], {
-            cwd: path.join(scaffoldedDir, "backend"),
+        // `rebase dev --backend-only` from the project root. 3fbe27a2b moved the
+        // scaffolded backend onto the managed runtime and dropped its `dev`
+        // script — the root's `rebase dev` runs it now — so `pnpm run dev` in
+        // `backend/` died with ERR_PNPM_NO_SCRIPT before a server ever started.
+        // (Same fix as `startBackend` in helpers.ts; this suite predates that
+        // helper and boots its own.)
+        const backendProcess = execa("node", [cliBin, "dev", "--backend-only"], {
+            cwd: scaffoldedDir,
             env: cleanEnv,
             detached: true // so killTree can reap the tsx/backend it spawns
         });

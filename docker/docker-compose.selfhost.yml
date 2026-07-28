@@ -16,7 +16,17 @@ name: rebase
 
 services:
   db:
-    image: postgres:17-alpine
+    # Pinned to a major on purpose. `postgres:alpine` would float, and a floating
+    # major is how a restart turns into "database files are incompatible with
+    # server" at three in the morning.
+    #
+    # Upgrading this line on a deployment that already has data does NOT migrate
+    # it: Postgres refuses to start against a data directory written by an older
+    # major. Dump first, then restore into the new volume —
+    #   rebase db backup --out ./backups
+    #   docker compose down -v && docker compose up -d db
+    #   rebase db restore ./backups/<file>.dump
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: rebase

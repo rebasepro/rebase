@@ -1,10 +1,17 @@
+import fs from "fs";
+import path from "path";
 import {
     DEFAULT_DATA_SOURCE_KEY,
     DEFAULT_STORAGE_SOURCE_KEY,
+    findStorageSuffixCollision,
+    normalizeStorageSources,
+    storageEnvSuffix,
     type DataSourceDefinition,
+    type DeclaredStorageSources,
     type StorageSourceDefinition
 } from "@rebasepro/types";
 import type { BackendStorageConfig } from "../storage/types";
+import { logger } from "../utils/logger";
 import { BundleError } from "./bundle";
 
 /**
@@ -39,20 +46,20 @@ export type EnvBag = Record<string, string | undefined>;
  *
  * The default key maps to no suffix at all, which is what keeps every existing
  * single-database deployment working untouched.
+ *
+ * The rule itself lives in `@rebasepro/types` so the CLI and any control plane
+ * derive identical names from identical keys; this wrapper exists only to raise
+ * it as a `BundleError`, which is what the rest of boot reports failures as.
  */
 export function envSuffixForKey(key: string, defaultKey: string): string {
-    if (!key || key === defaultKey) return "";
-    const normalized = key
-        .replace(/[^A-Za-z0-9]+/g, "_")
-        .replace(/^_+|_+$/g, "")
-        .toUpperCase();
-    if (!normalized) {
+    try {
+        return storageEnvSuffix(key, defaultKey);
+    } catch (err) {
         throw new BundleError(
             `Source key "${key}" cannot be turned into an environment variable name.`,
             "Use a key containing at least one letter or digit."
         );
     }
-    return `__${normalized}`;
 }
 
 /** Read `<base>` for the default source, `<base>__<KEY>` for a named one. */
@@ -73,23 +80,18 @@ function readBool(env: EnvBag, base: string, suffix: string): boolean | undefine
  * `media-cdn` and `media_cdn` are different source keys but the same suffix, and
  * without this check one of them would silently read the other's configuration.
  */
-function assertDistinctSuffixes(
+export function assertDistinctSuffixes(
     definitions: { key: string }[],
     defaultKey: string,
     what: string
 ): void {
-    const seen = new Map<string, string>();
-    for (const def of definitions) {
-        const suffix = envSuffixForKey(def.key, defaultKey);
-        const existing = seen.get(suffix);
-        if (existing !== undefined && existing !== def.key) {
-            throw new BundleError(
-                `${what} keys "${existing}" and "${def.key}" both map to the same environment ` +
-                `variable suffix "${suffix || "(none)"}".`,
-                "Rename one of them so each source has its own configuration."
-            );
-        }
-        seen.set(suffix, def.key);
+    const collision = findStorageSuffixCollision(definitions.map(d => d.key), defaultKey);
+    if (collision) {
+        throw new BundleError(
+            `${what} keys "${collision.a}" and "${collision.b}" both map to the same environment ` +
+            `variable suffix "${collision.suffix || "(none)"}".`,
+            "Rename one of them so each source has its own configuration."
+        );
     }
 }
 
@@ -249,22 +251,65 @@ export function resolveStorageBackend(
     defaultBasePath: string
 ): BackendStorageConfig | undefined {
     const suffix = envSuffixForKey(key, DEFAULT_STORAGE_SOURCE_KEY);
-    const type = (readVar(env, "STORAGE_TYPE", suffix) || engineHint || "").toLowerCase();
+    const declaredType = readVar(env, "STORAGE_TYPE", suffix);
+    const type = (declaredType || engineHint || "").toLowerCase();
+    // Whether the *environment* named this backend, as opposed to inheriting it
+    // from a declaration. It decides what a missing bucket means:
+    //
+    //   STORAGE_TYPE__MEDIA=s3 with no bucket  → someone configured this and got
+    //                                            it wrong. Refuse.
+    //   `rebase.json` declares media: s3, and
+    //   the environment says nothing            → the bucket has not been
+    //                                            attached yet. Not an error.
+    //
+    // Declaring a source is how a project states its topology, often long before
+    // anyone attaches a bucket to it — the console's whole "declared, not
+    // configured" state. Treating that as a fatal misconfiguration would make
+    // the act of declaring a bucket crash-loop the backend until someone
+    // configured it, which is precisely the unreadable failure the manifest
+    // declaration exists to prevent.
+    const explicit = Boolean(declaredType);
 
     if (type === "s3") {
         const bucket = readVar(env, "S3_BUCKET", suffix);
         if (!bucket) {
+            if (!explicit) return undefined;
             throw new BundleError(
                 `Storage source "${key}" is set to s3 but has no bucket — ` +
                 `set ${`S3_BUCKET${suffix}`}.`
             );
         }
+        const accessKeyId = readVar(env, "S3_ACCESS_KEY_ID", suffix);
+        const secretAccessKey = readVar(env, "S3_SECRET_ACCESS_KEY", suffix);
+        // A bucket with no credentials cannot work, and failing here is far
+        // clearer than what it does otherwise: `S3StorageController` passes an
+        // explicit `credentials: { accessKeyId: "", secretAccessKey: "" }` to the
+        // AWS SDK, which suppresses the SDK's own credential chain — so this
+        // never silently falls back to an instance profile or IRSA. It signs
+        // every request with nothing and fails each one separately, at upload
+        // time, with an opaque signing error.
+        //
+        // Same rule the control plane applies when it classifies a tenant's
+        // environment for the build log, so the log and the runtime agree on
+        // what this configuration is.
+        if (!accessKeyId || !secretAccessKey) {
+            if (!explicit) return undefined;
+            const missing = [
+                !accessKeyId && `S3_ACCESS_KEY_ID${suffix}`,
+                !secretAccessKey && `S3_SECRET_ACCESS_KEY${suffix}`
+            ].filter(Boolean).join(" and ");
+            throw new BundleError(
+                `Storage source "${key}" is set to s3 with a bucket but no credentials — set ${missing}.`,
+                "A bucket without credentials cannot be reached: every upload fails when the request is signed."
+            );
+        }
+
         return {
             type: "s3",
             bucket,
             region: readVar(env, "S3_REGION", suffix) || "auto",
-            accessKeyId: readVar(env, "S3_ACCESS_KEY_ID", suffix) || "",
-            secretAccessKey: readVar(env, "S3_SECRET_ACCESS_KEY", suffix) || "",
+            accessKeyId,
+            secretAccessKey,
             endpoint: readVar(env, "S3_ENDPOINT", suffix),
             forcePathStyle: readBool(env, "S3_FORCE_PATH_STYLE", suffix)
         };
@@ -273,6 +318,7 @@ export function resolveStorageBackend(
     if (type === "gcs") {
         const bucket = readVar(env, "GCS_BUCKET", suffix);
         if (!bucket) {
+            if (!explicit) return undefined;
             throw new BundleError(
                 `Storage source "${key}" is set to gcs but has no bucket — ` +
                 `set ${`GCS_BUCKET${suffix}`}.`
@@ -343,4 +389,59 @@ engine: undefined }]
     }
 
     return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
+ * Read a project's declared storage sources from its `rebase.json`.
+ *
+ * A managed bundle carries its topology in `manifest.json`, resolved at build
+ * time. A **custom** runtime has no manifest — it builds its own image and its
+ * own entrypoint — so without this it would have to re-declare in code what
+ * `rebase.json` already says, and the two would drift. Since a custom image
+ * contains the repository anyway, reading the file it already ships is what
+ * keeps one declaration authoritative for both runtimes.
+ *
+ * Walks up from `startDir` because an entrypoint lives at `backend/src` in the
+ * scaffolded layout and somewhere else in a hand-rolled one. A missing,
+ * unreadable or malformed file means "declared nothing" — one default source —
+ * which is the correct reading of every project that predates this and must
+ * never be an error: a storage declaration is optional, and failing to boot a
+ * whole backend over an absent optional file would be the worse bug.
+ */
+export function loadDeclaredStorageSources(
+    startDir: string,
+    levels = 5
+): StorageSourceDefinition[] {
+    let dir = startDir;
+    for (let i = 0; i <= levels; i++) {
+        const candidate = path.join(dir, "rebase.json");
+        if (fs.existsSync(candidate)) {
+            // Only the read and the parse degrade quietly. What the file *says*
+            // is validated outside this catch on purpose: a collision between two
+            // source keys is precisely the failure this loader exists to prevent,
+            // and swallowing it would turn "these two buckets would read each
+            // other's credentials" into "this project declared nothing" — the
+            // silent wrong answer instead of the loud right one.
+            let declared: DeclaredStorageSources | undefined;
+            try {
+                declared = (JSON.parse(fs.readFileSync(candidate, "utf8")) as {
+                    storage?: DeclaredStorageSources;
+                })?.storage;
+            } catch (err) {
+                logger.warn(
+                    `Could not read storage sources from ${candidate}: ` +
+                    `${err instanceof Error ? err.message : String(err)}. ` +
+                    "Continuing with a single default storage source."
+                );
+                return [];
+            }
+            const sources = normalizeStorageSources(declared, undefined);
+            assertDistinctSuffixes(sources, DEFAULT_STORAGE_SOURCE_KEY, "Storage source");
+            return sources;
+        }
+        const parent = path.dirname(dir);
+        if (parent === dir) break;
+        dir = parent;
+    }
+    return [];
 }

@@ -88,3 +88,133 @@ export interface ResolvedStorageSource {
     /** Human-readable label. */
     label?: string;
 }
+
+/**
+ * The environment-variable suffix for a storage or data source key.
+ *
+ * `""` for the default source — so a single-bucket project keeps configuring
+ * plain `S3_BUCKET` — and `__<KEY>` for every named one, uppercased with
+ * non-alphanumerics collapsed to underscores: `media-cdn` → `S3_BUCKET__MEDIA_CDN`.
+ *
+ * The rule derives the variable name from the declared key rather than
+ * discovering keys by scanning the environment. Scanning would have to guess how
+ * `S3_BUCKET__MEDIA_CDN` splits into a key; deriving cannot be ambiguous, and a
+ * typo surfaces as a missing source at boot instead of a silently ignored
+ * variable.
+ *
+ * It lives in this package, with no dependencies, because four things must agree
+ * on it exactly: the CLI (validating a build), the runtime (reading its own
+ * environment), the control plane (writing a tenant's Secret), and the docs. A
+ * second implementation of a naming convention is a second chance to disagree.
+ *
+ * @group Models
+ */
+export function storageEnvSuffix(key: string, defaultKey: string = DEFAULT_STORAGE_SOURCE_KEY): string {
+    if (!key || key === defaultKey) return "";
+    const normalized = key
+        .replace(/[^A-Za-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .toUpperCase();
+    if (!normalized) {
+        throw new Error(
+            `Source key "${key}" cannot be turned into an environment variable name. ` +
+            "Use a key containing at least one letter or digit."
+        );
+    }
+    return `__${normalized}`;
+}
+
+/**
+ * Two distinct keys that collapse onto the same variable name, or `null`.
+ *
+ * `media-cdn` and `media_cdn` are different source keys but the same suffix, so
+ * without this one of them silently reads the other's configuration. Returns the
+ * offending pair rather than throwing, so each caller can raise it in its own
+ * idiom — a `BundleError` at boot, a build failure in the CLI, a rejected deploy
+ * in a control plane.
+ *
+ * @group Models
+ */
+export function findStorageSuffixCollision(
+    keys: string[],
+    defaultKey: string = DEFAULT_STORAGE_SOURCE_KEY
+): { a: string; b: string; suffix: string } | null {
+    const seen = new Map<string, string>();
+    for (const key of keys) {
+        const suffix = storageEnvSuffix(key, defaultKey);
+        const existing = seen.get(suffix);
+        if (existing !== undefined && existing !== key) {
+            return { a: existing, b: key, suffix };
+        }
+        seen.set(suffix, key);
+    }
+    return null;
+}
+
+/** The `storage` block of `rebase.json`, structurally. */
+export type DeclaredStorageSources = Record<string, {
+    engine: string;
+    transport?: StorageSourceTransport;
+    label?: string;
+}>;
+
+/**
+ * Merge the two places a project may declare storage sources into one list.
+ *
+ * `rebase.json` is authoritative for every field it states. Config code may add
+ * sources it does not mention and fill in fields it left out, but may not
+ * contradict it: the manifest is what a host reads to decide which buckets need
+ * configuring, and a runtime that quietly disagreed with it would put the
+ * console back to describing a topology the tenant does not have — the exact
+ * failure this whole mechanism exists to end.
+ *
+ * Note what is *not* here: no default source is invented when both inputs are
+ * empty. That decision belongs to the resolver, which knows whether declaring
+ * nothing means "one plain bucket" (it does) or "no storage at all".
+ *
+ * @group Models
+ */
+export function normalizeStorageSources(
+    declared: DeclaredStorageSources | StorageSourceDefinition[] | undefined,
+    exported: StorageSourceDefinition[] | undefined
+): StorageSourceDefinition[] {
+    const merged = new Map<string, StorageSourceDefinition>();
+
+    // Two shapes, one meaning. `rebase.json` states sources as a record keyed by
+    // source key, which is how JSON expresses a set of named things; the bundle
+    // manifest stores the already-resolved array. Accepting both is what lets the
+    // CLI and the runtime call this with what each of them happens to hold.
+    const declaredEntries: [string, { engine: string; transport?: StorageSourceTransport; label?: string }][] =
+        Array.isArray(declared)
+            ? declared.filter(d => d?.key).map(d => [d.key, d])
+            : Object.entries(declared ?? {});
+
+    for (const [key, config] of declaredEntries) {
+        merged.set(key, {
+            key,
+            engine: config.engine,
+            transport: config.transport ?? "server",
+            ...(config.label !== undefined ? { label: config.label } : {})
+        });
+    }
+
+    for (const definition of exported ?? []) {
+        if (!definition?.key) continue;
+        const existing = merged.get(definition.key);
+        if (!existing) {
+            merged.set(definition.key, {
+                key: definition.key,
+                engine: definition.engine,
+                transport: definition.transport ?? "server",
+                ...(definition.label !== undefined ? { label: definition.label } : {})
+            });
+            continue;
+        }
+        // Fill gaps only. `rebase.json` stated these; code does not overrule it.
+        if (existing.label === undefined && definition.label !== undefined) {
+            existing.label = definition.label;
+        }
+    }
+
+    return Array.from(merged.values());
+}

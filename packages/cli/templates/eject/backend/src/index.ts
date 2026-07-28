@@ -12,6 +12,8 @@ import {
     HonoEnv,
     listenWithPortRetry,
     cleanupDevPortFile,
+    loadDeclaredStorageSources,
+    resolveStorageSources,
     logger
 } from "@rebasepro/server";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
@@ -22,6 +24,13 @@ import usersCollection from "../../config/collections/users.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Which buckets this project has, read from the `storage` block of its own
+// `rebase.json`. Declared there rather than here so the platform, the console
+// and this process all read one list — a custom image ships the repository, so
+// the file it already contains is the natural place for it. Absent means one
+// default source, configured from the plain S3_*/GCS_* variables.
+const storageSources = loadDeclaredStorageSources(__dirname);
 
 // ─── App ─────────────────────────────────────────────────────────────
 const app: Hono<HonoEnv> = new Hono<HonoEnv>();
@@ -128,33 +137,21 @@ pass: env.SMTP_PASS! }
         // production — the upload routes answer 501 STORAGE_NOT_CONFIGURED —
         // rather than writing to the container filesystem, which is erased on
         // every restart and redeploy. Uploads that fail loudly are recoverable;
-        // uploads that succeed into a disk about to be wiped are not.
-        // Local disk stays the default in development, where it is what you want.
-        storage: env.STORAGE_TYPE === "s3"
-            ? {
-                type: "s3",
-                bucket: env.S3_BUCKET!,
-                region: env.S3_REGION || "auto",
-                accessKeyId: env.S3_ACCESS_KEY_ID || "",
-                secretAccessKey: env.S3_SECRET_ACCESS_KEY || "",
-                endpoint: env.S3_ENDPOINT,
-                forcePathStyle: env.S3_FORCE_PATH_STYLE
-            }
-            : env.STORAGE_TYPE === "gcs"
-                ? {
-                    type: "gcs",
-                    bucket: env.GCS_BUCKET!,
-                    projectId: env.GCS_PROJECT_ID,
-                    keyFilename: env.GCS_KEY_FILENAME
-                }
-                // Set FORCE_LOCAL_STORAGE=true only if this deployment really
-                // does have a durable volume mounted at STORAGE_PATH.
-                : isProduction && !env.FORCE_LOCAL_STORAGE
-                    ? undefined
-                    : {
-                        type: "local",
-                        basePath: env.STORAGE_PATH || path.resolve(__dirname, "../../uploads")
-                    },
+        // uploads that succeed into a disk about to be wiped are not. That rule
+        // lives in the runtime, which drops a `local` backend in production
+        // unless FORCE_LOCAL_STORAGE says a durable volume really is mounted.
+        //
+        // One resolver, shared with the managed runtime, so this entrypoint
+        // cannot drift from it: every source declared in `rebase.json` is read
+        // from `<BASE>__<KEY>` (S3_BUCKET__MEDIA for a source keyed "media"),
+        // and a project that declared nothing gets one default source from the
+        // plain, unsuffixed variables — exactly as before.
+        storage: resolveStorageSources(
+            process.env,
+            storageSources,
+            path.resolve(__dirname, "../../uploads")
+        ),
+        storageSources,
         // Storage is not under row-level security, so this hook IS its access
         // model — the server refuses to boot in production without one, because
         // "signed in" would otherwise be the only thing between a visitor and

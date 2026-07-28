@@ -1,5 +1,9 @@
-import { describe, it, expect } from "@jest/globals";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, sanitizeErrorForClient, isRoleSwitchingPermissionError } from "../src/utils/pg-error-utils";
+import { logger } from "@rebasepro/server";
+// Imported from the module rather than the package barrel: the barrel is
+// mocked below, so `ApiError` would come back undefined through it.
+import { ApiError } from "../../server/src/api/errors";
 
 // Suppress logger output during tests
 jest.mock("@rebasepro/server", () => ({
@@ -10,6 +14,19 @@ jest.mock("@rebasepro/server", () => ({
         debug: jest.fn()
     }
 }));
+
+const mockLogger = logger as unknown as {
+    error: jest.Mock;
+    warn: jest.Mock;
+    info: jest.Mock;
+    debug: jest.Mock;
+};
+
+beforeEach(() => {
+    mockLogger.error.mockClear();
+    mockLogger.warn.mockClear();
+    mockLogger.debug.mockClear();
+});
 
 describe("pg-error-utils", () => {
 
@@ -206,6 +223,79 @@ describe("pg-error-utils", () => {
             (outer as any).cause = inner;
             const result = sanitizeErrorForClient(outer, "clients");
             expect(result.message).toContain("connection refused");
+        });
+
+        // A subscription failure is sanitized on the same path as a query
+        // failure, so a deliberate 400 (e.g. UNKNOWN_FILTER_FIELD) used to be
+        // flattened into "Check server logs" and logged as a database error.
+        it("passes an ApiError's message and code straight through", () => {
+            const error = ApiError.badRequest(
+                'Unknown filter field "titlee" in collection "posts". Valid fields: id, title, body.',
+                "UNKNOWN_FILTER_FIELD",
+                { field: "titlee", collection: "posts", validFields: ["id", "title", "body"] }
+            );
+
+            const result = sanitizeErrorForClient(error, "posts");
+
+            expect(result.code).toBe("UNKNOWN_FILTER_FIELD");
+            expect(result.message).toBe(error.message);
+            expect(result.message).toContain("titlee");
+            expect(result.message).toContain("Valid fields");
+            expect(result.message).not.toContain("Check server logs");
+        });
+
+        it("logs a non-expected ApiError at warn, never at error", () => {
+            sanitizeErrorForClient(ApiError.badRequest("bad filter", "UNKNOWN_FILTER_FIELD"), "posts");
+
+            expect(mockLogger.error).not.toHaveBeenCalled();
+            expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+            expect(String(mockLogger.warn.mock.calls[0][0])).toContain("UNKNOWN_FILTER_FIELD");
+        });
+
+        it("logs an expected ApiError at debug", () => {
+            sanitizeErrorForClient(ApiError.unauthenticated("No session"), "posts");
+
+            expect(mockLogger.error).not.toHaveBeenCalled();
+            expect(mockLogger.warn).not.toHaveBeenCalled();
+            expect(mockLogger.debug).toHaveBeenCalledTimes(1);
+        });
+
+        it("matches an ApiError structurally, without relying on class identity", () => {
+            // `@rebasepro/server` can be loaded twice (dist vs. source), which
+            // breaks `instanceof` — the guard must not depend on it.
+            const error = Object.assign(new Error("Row not visible"), {
+                name: "ApiError",
+                statusCode: 404,
+                code: "NOT_FOUND"
+            });
+
+            const result = sanitizeErrorForClient(error, "posts");
+
+            expect(result).toEqual({ message: "Row not visible", code: "NOT_FOUND" });
+        });
+
+        it("still sanitizes a 5xx ApiError — server internals stay server-side", () => {
+            const result = sanitizeErrorForClient(
+                ApiError.internal("connection pool exhausted: host=10.0.0.4 user=rebase_user"),
+                "posts"
+            );
+
+            expect(result.message).not.toContain("10.0.0.4");
+            expect(result.message).toContain("Check server logs");
+            expect(mockLogger.error).toHaveBeenCalled();
+        });
+
+        it("does not treat a PG error as a client error", () => {
+            // PG errors carry `code` but never `statusCode` — they must keep
+            // going through the SQLSTATE translation.
+            const pgError = Object.assign(new Error("relation \"clients\" does not exist"), {
+                code: "42P01"
+            });
+
+            const result = sanitizeErrorForClient(pgError, "clients");
+
+            expect(result.code).toBe("42P01");
+            expect(result.message).toContain("Table not found");
         });
 
         it("never leaks SQL in the returned message", () => {

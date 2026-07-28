@@ -91,8 +91,14 @@ function injectAuthCollectionConfig(
         if (actionToInject) {
             const injectedAction = actionToInject;
             const existing = result.entityActions ?? [];
-            const alreadyHas = existing.some(
-                (a) => a.key != null && a.key === injectedAction.key
+            // An entry is either the action or the key of an app-level one, and a
+            // collection that names `"reset_password"` already has this action — so
+            // the string form has to count here too, or the reset action is injected
+            // a second time and the user gets two identical buttons.
+            const alreadyHas = existing.some((a) =>
+                typeof a === "string"
+                    ? a === injectedAction.key
+                    : a.key != null && a.key === injectedAction.key
             );
             if (!alreadyHas) {
                 result = {
