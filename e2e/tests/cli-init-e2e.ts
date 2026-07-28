@@ -1014,8 +1014,37 @@ timeout: 10000 });
         console.log("\n🐳 Step 9: Testing Docker production deployment...");
         modifyDockerComposePort(projectPath);
 
-        // Run docker compose build
-        console.log("Building Docker containers (backend + frontend)...");
+        // Build the runtime image THIS checkout produces, under the tag the
+        // scaffolded compose file names.
+        //
+        // The compose file says `image: rebasepro/server:${REBASE_VERSION}` and
+        // nothing else, because a self-hoster pulls a published image rather
+        // than building one. Letting CI pull it too would invert what this test
+        // is for: it would validate the last *release* while the code under test
+        // sat unexercised, pass even if this commit broke the runtime, and fail
+        // whenever a version simply had not been published yet — which is how it
+        // failed with `pull access denied for rebasepro/server`.
+        //
+        // Building from docker/server.Dockerfile is what makes Step 9 a test.
+        // Compose's default pull policy is `missing`, so a locally tagged image
+        // is used as-is and no registry is contacted.
+        const runtimeVersion = readEnvVar(projectPath, "REBASE_VERSION") ?? "latest";
+        console.log(`Building the runtime image from this checkout (rebasepro/server:${runtimeVersion})...`);
+        await execa("docker", [
+            "build",
+            "-t", `rebasepro/server:${runtimeVersion}`,
+            "-f", "docker/server.Dockerfile",
+            "."
+        ], {
+            cwd: rootDir,
+            stdio: "inherit",
+            env: cleanEnv
+        });
+        console.log("Runtime image built.");
+
+        // Still run compose build: the eject template adds services that DO
+        // declare `build:`, and a project that ejected must keep working here.
+        console.log("Building any compose-declared services...");
         await execa("docker", ["compose", "build"], {
             cwd: projectPath,
             stdio: "inherit",

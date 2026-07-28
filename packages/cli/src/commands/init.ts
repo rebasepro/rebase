@@ -943,6 +943,29 @@ async function findAvailablePort(startPort: number): Promise<number> {
     return port;
 }
 
+/**
+ * The CLI's own version, which is the runtime image tag a scaffolded project
+ * pins. They move together: the CLI, the packages and the runtime image are cut
+ * from one release, so the version that installed the project is the version
+ * whose runtime can boot its bundle.
+ *
+ * Falls back to `latest` only when the CLI cannot read its own manifest — a
+ * floating tag is worse than a pinned one, but better than a compose file that
+ * names a version that was never published.
+ */
+function readCliVersion(): string {
+    try {
+        const manifest = path.resolve(cliRoot!, "package.json");
+        if (fs.existsSync(manifest)) {
+            const pkg = JSON.parse(fs.readFileSync(manifest, "utf-8"));
+            if (typeof pkg.version === "string" && pkg.version) return pkg.version;
+        }
+    } catch {
+        // Fall through — see the doc comment.
+    }
+    return "latest";
+}
+
 export async function configureEnvFile(targetDirectory: string, databaseUrl?: string) {
     const envExamplePath = path.join(targetDirectory, ".env.example");
     const envPath = path.join(targetDirectory, ".env");
@@ -969,6 +992,24 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             /^#\s*REBASE_SERVICE_KEY=.*$/m,
             `REBASE_SERVICE_KEY=${serviceKey}`
         );
+
+        // Pin the runtime image `docker-compose.yml` pulls.
+        //
+        // The compose file reads `rebasepro/server:${REBASE_VERSION:-latest}`,
+        // and unset it resolves to `latest` — a tag that moves under a running
+        // deployment. That is precisely the hazard `cloudbuild-runtime.yaml`
+        // designed away for the managed fleet, which pins releases by digest
+        // because "re-pushing a tag silently changes what the fleet is running
+        // with no version anywhere changing". A self-hoster deserves the same
+        // guarantee, and it costs one line here.
+        //
+        // It also makes the compose header's upgrade instruction true: "To
+        // upgrade Rebase, change REBASE_VERSION and restart" is a no-op while
+        // the value is unset and the tag floats.
+        const runtimeVersion = readCliVersion();
+        envContent = /^#?\s*REBASE_VERSION=.*$/m.test(envContent)
+            ? envContent.replace(/^#?\s*REBASE_VERSION=.*$/m, `REBASE_VERSION=${runtimeVersion}`)
+            : `${envContent.trimEnd()}\n\n# The Rebase runtime image tag docker-compose.yml pulls.\n# Change this and restart to upgrade; your project bundle is untouched.\nREBASE_VERSION=${runtimeVersion}\n`;
 
         if (databaseUrl) {
             if (/[\r\n]/.test(databaseUrl)) {
