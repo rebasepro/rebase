@@ -1,0 +1,359 @@
+---
+const { lang, t } = Astro.props;
+
+import { useTranslatedPath } from '../../i18n/ui';
+import { NeatBackground } from '../../components/NeatBackground';
+import JurisdictionDemo from '../demos/JurisdictionDemo';
+import DeployTargetDemo from '../demos/DeployTargetDemo';
+import EuHostingCostDemo from '../demos/EuHostingCostDemo';
+import EuropeMapDemo from '../demos/EuropeMapDemo';
+
+const translatePath = useTranslatedPath(lang);
+
+// Everything the runtime serves, self-hosted or not. This list is the "no lite
+// tier" claim, so it has to match what `initializeRebaseBackend` actually mounts.
+const surfaces = [
+    { name: "REST API", detail: "filters, sorting, pagination, relation includes" },
+    { name: "Typed SDK", detail: "generated from your collections" },
+    { name: "Row-level security", detail: "enforced by Postgres, fail-closed" },
+    { name: "Auth", detail: "sessions, OAuth, MFA, roles, password reset" },
+    { name: "Storage", detail: "local disk, or any S3-compatible bucket" },
+    { name: "Realtime", detail: "row subscriptions, broadcast, presence" },
+    { name: "Functions", detail: "your own routes, auto-mounted" },
+    { name: "Cron", detail: "scheduled jobs with run history" },
+    { name: "OpenAPI", detail: "spec and explorer, generated" },
+    { name: "Admin panel", detail: "the whole thing, if you want it" },
+    { name: "Studio", detail: "SQL, schema, RLS, branches" },
+    { name: "MCP server", detail: "agents, under the same policies" },
+];
+
+const composeSnippet = `<span class="text-surface-500">// docker-compose.yml — the whole deployment</span>
+<span class="text-blue-300">services</span>:
+  <span class="text-blue-300">db</span>:
+    <span class="text-blue-300">image</span>: <span class="text-green-400">postgres:18-alpine</span>
+
+  <span class="text-blue-300">api</span>:
+    <span class="text-blue-300">image</span>: <span class="text-green-400">rebasepro/server:0.11.0</span>
+    <span class="text-blue-300">volumes</span>:
+      - <span class="text-green-400">./dist-bundle:/bundle:ro</span>
+    <span class="text-blue-300">environment</span>:
+      <span class="text-blue-300">DATABASE_URL</span>: <span class="text-green-400">postgres://…@db:5432/rebase</span>
+      <span class="text-blue-300">JWT_SECRET</span>: <span class="text-green-400">\${JWT_SECRET}</span>
+
+<span class="text-surface-500">// that is the deployment. There is no application</span>
+<span class="text-surface-500">// image to build — the runtime is published, and</span>
+<span class="text-surface-500">// your project travels as a bundle.</span>`;
+---
+
+<div class="flex flex-col isolate">
+
+    <!-- ═══════════════════════ HERO ═══════════════════════ -->
+    <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-20 lg:pt-40">
+        <NeatBackground client:idle/>
+
+        <div class="relative z-10 mx-auto max-w-7xl px-4 text-center lg:px-12">
+            <div class="mx-auto mb-6 inline-flex items-center gap-2 rounded-full bg-surface-800/40 px-3 py-1.5 text-sm text-surface-400 ring-1 ring-inset ring-white/10">
+                <span class="font-medium">MIT-licensed · Runs on your Postgres · We never see the data</span>
+            </div>
+
+            <h1 class="mb-6 text-3xl font-semibold tracking-tight text-white md:text-4xl lg:text-5xl">
+                Sovereignty is not<br/><span class="text-primary">a region setting.</span>
+            </h1>
+
+            <p class="mb-6 text-lg leading-8 text-surface-300 sm:px-16 lg:text-xl xl:px-40">
+                Every backend platform will happily put your database in Frankfurt. That is the easy half.
+                The half nobody sells you is the second party — the company that operates the service, holds
+                the credentials, and can be asked for your rows without asking you first.
+            </p>
+            <p class="mb-10 text-base leading-7 text-surface-400 sm:px-16 xl:px-48">
+                Rebase gives you what Firebase and Supabase give you — REST, a typed SDK, realtime, auth,
+                storage, functions, cron and an admin panel — as an open-source container you run on a box
+                you rent in Europe. There is no second party, because there is no us.
+            </p>
+
+            <div class="mx-auto max-w-xl overflow-hidden rounded-xl border border-surface-800 bg-[#0c0d10] font-mono text-xs shadow-2xl">
+                <div class="flex items-center gap-1.5 border-b border-surface-800/80 bg-[#14151a] px-4 py-2.5">
+                    <span class="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
+                    <span class="h-2.5 w-2.5 rounded-full bg-amber-500/80"></span>
+                    <span class="h-2.5 w-2.5 rounded-full bg-emerald-500/80"></span>
+                    <span class="ml-auto text-[10px] font-semibold tracking-wide text-surface-500">zsh</span>
+                </div>
+                <div class="flex items-center gap-2 p-5 text-left">
+                    <span class="select-none font-semibold text-primary">&gt;</span>
+                    <span class="select-all font-medium text-white">pnpm dlx @rebasepro/cli init</span>
+                    <span class="inline-block h-4 w-1.5 animate-pulse bg-primary align-middle"></span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ WHO HOLDS THE KEYS ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto mb-12 max-w-3xl text-center">
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">Who holds the keys</p>
+                <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    Everyone can host in Europe. That was never the hard part.
+                </h2>
+                <p class="text-base leading-relaxed text-surface-400">
+                    You will read a lot of marketing that implies your data is being flown to Virginia. It usually
+                    is not. Supabase will provision in Frankfurt; Firestore has a European multi-region. If the
+                    question is <i>where is the disk</i>, all three answers below are the same, and we are not going
+                    to pretend otherwise to sell you something.
+                </p>
+                <p class="mt-4 text-base leading-relaxed text-surface-400">
+                    The question worth asking is the other one. <b class="text-white">Who is the second party?</b>
+                    Switch vendors below and watch which row moves.
+                </p>
+            </div>
+
+            <div class="mx-auto max-w-6xl">
+                <JurisdictionDemo client:visible/>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ WHAT YOU DEPLOY ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
+                <div class="lg:col-span-5">
+                    <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">What you actually deploy</p>
+                    <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                        A published container and a database you already know how to run
+                    </h2>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400">
+                        Self-hosting has a reputation, and it is mostly deserved: most "open source alternatives" hand
+                        you a compose file with nine services in it and wish you luck. Rebase is two processes.
+                        Postgres, and the runtime image with your project mounted into it.
+                    </p>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400">
+                        There is no application image to build. <code class="font-mono text-surface-300">rebase build</code>
+                        produces a bundle; the runtime is already on Docker Hub. Upgrading Rebase is a tag change, not a
+                        rebuild — your bundle is untouched.
+                    </p>
+                    <p class="mb-6 text-base leading-relaxed text-surface-400">
+                        Creating tables is a separate, deliberate command. A container restart must never be able to
+                        change your schema as a side effect of a deploy.
+                    </p>
+                    <a href="/docs/deployment/self-hosting"
+                       class="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80">
+                        The self-hosting guide
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+
+                <div class="lg:col-span-7">
+                    <DeployTargetDemo client:visible/>
+                </div>
+            </div>
+
+            <div class="mx-auto mt-14 grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
+                <div class="lg:col-span-7 lg:order-last">
+                    <div class="overflow-hidden rounded-2xl border border-white/5 bg-surface-950/80 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                        <div class="border-b border-surface-800/80 bg-surface-900/50 px-4 py-3">
+                            <span class="font-mono text-xs text-surface-400">docker-compose.yml</span>
+                        </div>
+                        <pre class="overflow-x-auto p-5 font-mono text-[11px] leading-relaxed text-surface-300 sm:text-xs"><code set:html={composeSnippet}></code></pre>
+                    </div>
+                </div>
+                <div class="lg:col-span-5">
+                    <h3 class="mb-4 text-2xl font-semibold text-white">Small enough to read in one sitting</h3>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400">
+                        That is the entire production deployment, minus the secrets. Two services, one volume,
+                        three environment variables. The runtime refuses to start in production without
+                        <code class="font-mono text-surface-300">DATABASE_URL</code>,
+                        <code class="font-mono text-surface-300">JWT_SECRET</code> and
+                        <code class="font-mono text-surface-300">CORS_ORIGINS</code> rather than guessing them.
+                    </p>
+                    <p class="text-base leading-relaxed text-surface-400">
+                        Mount the bundle read-only and a compromised hook cannot rewrite the code that runs after
+                        the next restart. Point your orchestrator's liveness probe at
+                        <code class="font-mono text-surface-300">/livez</code> and readiness at
+                        <code class="font-mono text-surface-300">/health</code>; the first never touches the database,
+                        so a brief hiccup does not restart a perfectly healthy process.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Neat gradient divider -->
+    <div class="neat-divider relative -my-72 overflow-hidden pointer-events-none" style="z-index: -1; height: 600px;">
+        <NeatBackground variant="a" client:visible/>
+    </div>
+
+    <!-- ═══════════════════════ THE BILL ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto mb-12 max-w-3xl text-center">
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">The bill</p>
+                <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    Their price is a function of your success. Yours is a number you chose.
+                </h2>
+                <p class="text-base leading-relaxed text-surface-400">
+                    This is the part of self-hosting that people are too polite to lead with, so we will. A managed
+                    backend prices monthly active users, gigabytes stored and gigabytes served, which means the bill
+                    grows in exactly the moment you least want a new bill. A VPS charges the same amount in the month
+                    you launch and the month you get on the front page.
+                </p>
+                <p class="mt-4 text-base leading-relaxed text-surface-400">
+                    Below is the honest version of that comparison, including the parts that do not favour us.
+                </p>
+            </div>
+
+            <div class="mx-auto max-w-6xl">
+                <EuHostingCostDemo client:visible/>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ NO LITE TIER ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="mx-auto mb-12 max-w-3xl text-center">
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">No lite tier</p>
+                <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    The self-hosted build is the build
+                </h2>
+                <p class="text-base leading-relaxed text-surface-400">
+                    There is no open-core split here, no feature held back for a paid tier, and no telephone-home.
+                    The container you run on your own hardware serves every surface Rebase has. This is the list, and
+                    it is the same list on every page of this site.
+                </p>
+            </div>
+
+            <div class="rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/70 to-surface-950/60 p-6 shadow-[0_10px_30px_rgba(0,0,0,0.45)] sm:p-8">
+                <div class="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {surfaces.map((s) => (
+                        <div class="flex items-start gap-3">
+                            <span class="mt-0.5 flex h-4 w-4 flex-none items-center justify-center rounded-full bg-primary text-white shadow-[0_0_14px_rgba(0,112,244,0.5)]">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="m5 12 5 5L20 7"/>
+                                </svg>
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-medium text-surface-200">{s.name}</span>
+                                <span class="block text-xs text-surface-500">{s.detail}</span>
+                            </span>
+                        </div>
+                    ))}
+                </div>
+
+                <p class="mt-8 border-t border-surface-800/60 pt-6 text-sm leading-relaxed text-surface-400">
+                    The admin panel is a separate React app that talks to the same public API under the same policies.
+                    Add it, skip it, or delete it — the API response does not move.
+                    <a href={translatePath("/admin")} class="ml-1 text-primary hover:underline">See the panel</a>.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ WHERE TO PUT IT ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="mx-auto mb-12 max-w-3xl text-center">
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">Where to put it</p>
+                <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    European hosts we have no relationship with whatsoever
+                </h2>
+                <p class="text-base leading-relaxed text-surface-400">
+                    Seventeen cities, seven companies, and a €-denominated invoice from each of them. Pick one below
+                    and watch which pins are theirs — the one thing they all have in common is that none of them is us.
+                </p>
+            </div>
+
+            <EuropeMapDemo client:visible/>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ PAPERWORK ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-5xl px-6 lg:px-8">
+            <div class="mx-auto mb-12 max-w-3xl text-center">
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">Paperwork</p>
+                <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    Where this leaves you on GDPR
+                </h2>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div class="rounded-2xl border border-surface-800 bg-surface-900/50 p-8">
+                    <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
+                        Self-hosted
+                    </div>
+                    <h3 class="mb-4 text-xl font-semibold text-white">You are the controller, and the only processor</h3>
+                    <ul class="space-y-3 text-sm text-surface-400">
+                        <li><b class="text-white">No third-party processor in the path.</b> The software runs on your infrastructure; we receive nothing, so there is no sub-processor list to chase and no transfer to assess.</li>
+                        <li><b class="text-white">Access and deletion requests are SQL.</b> Answer them from your own database, on your own timetable, without filing a support ticket with a vendor.</li>
+                        <li><b class="text-white">Residency is a decision, not a plan tier.</b> Put Postgres wherever your obligations require it, including a machine in your own building.</li>
+                    </ul>
+                </div>
+
+                <div class="rounded-2xl border border-surface-800 bg-surface-900/50 p-8">
+                    <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-400 ring-1 ring-inset ring-amber-500/20">
+                        The other side of it
+                    </div>
+                    <h3 class="mb-4 text-xl font-semibold text-white">Being the only processor is also a job</h3>
+                    <p class="mb-4 text-sm leading-relaxed text-surface-400">
+                        Nobody else can be compelled to hand over your data — and nobody else is going to patch your
+                        kernel, notice that your backup has been silently failing for three weeks, or answer the pager
+                        at two in the morning. Both halves of that sentence come from the same fact.
+                    </p>
+                    <ul class="space-y-3 text-sm text-surface-400">
+                        <li><b class="text-white">Backups are yours to prove.</b> <code class="font-mono text-surface-300">rebase db backup</code> takes role-complete dumps and restores them, but a backup nobody has restored is a hypothesis.</li>
+                        <li><b class="text-white">Keys are yours to lose.</b> There is no support ticket that recovers a <code class="font-mono text-surface-300">JWT_SECRET</code> you deleted.</li>
+                        <li><b class="text-white">Uptime is yours to own.</b> One VPS is one machine. If the business needs two, the architecture allows it and your invoice notices.</li>
+                    </ul>
+                    <p class="mt-5 text-sm leading-relaxed text-surface-500">
+                        If nobody on the team wants that job, that is a real answer and a managed platform is buying
+                        you something real. We would rather you decide that on the way in than find out later.
+                    </p>
+                </div>
+            </div>
+
+            <p class="mx-auto mt-8 max-w-3xl text-center text-xs leading-relaxed text-surface-500">
+                None of this is legal advice. It is an architecture description, which is the part we can actually be
+                held to — and the
+                <a href={translatePath("/security")} class="text-surface-400 underline decoration-surface-700 underline-offset-2 hover:text-primary">security page</a>
+                describes how the access rules themselves are enforced.
+            </p>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════ CTA ═══════════════════════ -->
+    <section class="relative z-0 py-20 sm:py-28">
+        <div class="mx-auto max-w-3xl px-6 text-center lg:px-8">
+            <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                It takes one command to find out
+            </h2>
+            <p class="mb-8 text-lg leading-relaxed text-surface-400">
+                No account, no credit card, no region picker. It scaffolds a project, starts Postgres, and hands you
+                a running backend on your own machine — which is, conveniently, the most sovereign infrastructure
+                you own.
+            </p>
+            <div class="mb-8 inline-flex items-center gap-3 rounded-xl border border-surface-800 bg-[#0c0d10] px-5 py-3.5 font-mono text-sm">
+                <span class="select-none font-semibold text-primary">&gt;</span>
+                <span class="select-all text-white">pnpm dlx @rebasepro/cli init</span>
+            </div>
+            <div class="flex flex-col justify-center gap-4 sm:flex-row">
+                <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white transition-all hover:bg-surface-700">
+                    Try the demo
+                </a>
+                <a href="/docs/deployment/self-hosting"
+                   class="btn-glow inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white transition-all hover:bg-primary-dark hover:brightness-105">
+                    Read the self-hosting guide
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </section>
+</div>

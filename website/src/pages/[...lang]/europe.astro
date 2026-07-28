@@ -1,0 +1,27 @@
+---
+import { languages, defaultLang, useTranslations } from '../../i18n/ui';
+
+export function getStaticPaths() {
+  return Object.keys(languages).map((lang) => ({
+    params: { lang: lang === defaultLang ? undefined : lang },
+  }));
+}
+
+const { lang } = Astro.params;
+const currentLang = lang || defaultLang;
+const t = useTranslations(currentLang as keyof typeof languages);
+
+import Layout from '../../layouts/Layout.astro';
+import EuropeContent from '../../components/pages/EuropeContent.astro';
+
+const title = "Self-hosted backend for Europe — Rebase";
+const description = "Firebase and Supabase will host in Frankfurt. Only a backend you run yourself has no second party who can be asked for your data. Open source, MIT-licensed, deploys to Hetzner, OVHcloud, Scaleway or your own rack.";
+
+const breadcrumbs = [
+    { name: "Home", url: "https://rebase.pro" },
+    { name: "Europe", url: "https://rebase.pro/europe" }
+];
+---
+<Layout title={title} description={description} breadcrumbs={breadcrumbs}>
+    <EuropeContent lang={currentLang} t={t} />
+</Layout>
