@@ -9,6 +9,7 @@ import type { RebaseClient } from "@rebasepro/types";
 import type { LoadedCronJob } from "./cron-loader";
 import type { CronStore } from "./cron-store";
 import { logger } from "../utils/logger.js";
+import { buildScaleToZeroWarning } from "./scale-to-zero.js";
 
 // ─── Cron expression parser (minimal, no external dependency) ────────
 // Supports standard 5-field cron (minute hour dom month dow).
@@ -276,6 +277,7 @@ export class CronScheduler {
         if (!this.store) {
             logger.warn("[cron] No cron store attached — runs are uncoordinated; with multiple app instances every instance will execute every job");
         }
+        this.warnIfScaleToZero();
         logger.info(`⏰ Cron scheduler started with ${this.jobs.size} job(s)`);
     }
 
@@ -384,6 +386,27 @@ reason: "already_executing" },
     }
 
     // ─── Internal ────────────────────────────────────────────────────
+
+    /**
+     * Warn once at start when the process looks like it is running on a
+     * platform that freezes or evicts instances between requests, where the
+     * in-process timers this scheduler relies on never fire.
+     *
+     * Advisory only: any failure here is swallowed so a detection bug can
+     * never take a production boot down.
+     */
+    private warnIfScaleToZero(): void {
+        try {
+            const warning = buildScaleToZeroWarning(
+                [...this.jobs.values()].map((job) => ({ id: job.id, enabled: job.enabled }))
+            );
+            if (warning) {
+                logger.warn(warning.message, warning.data);
+            }
+        } catch {
+            // Never let the advisory check affect startup.
+        }
+    }
 
     /**
      * Schedule the next execution for a job.
