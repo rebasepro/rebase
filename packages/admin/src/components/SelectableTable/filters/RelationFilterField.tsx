@@ -44,6 +44,47 @@ const operationLabels = {
 
 const multipleSelectOperations = ["array-contains-any", "in", "not-in"];
 
+/**
+ * What this field can render, before `operators` narrows it.
+ *
+ * Split by the *value* the selector produces, not by the relation's meaning.
+ * `RelationSelector` takes its multiplicity from the relation's cardinality, so
+ * on a to-many relation it only ever emits a list — and an operator that wants
+ * a single value would receive an array and compile to nonsense. The to-many
+ * list is therefore the list-valued operators only.
+ *
+ * `in` and `not-in` are not a lesser `==`/`!=` here: on a to-many relation they
+ * are "has any of these" and "has none of these", which is what a filter on a
+ * multi-valued link means. A single value is the one-element case of each.
+ *
+ * The array operators stay for the property that is an *array of* relations,
+ * where the column really does hold a list.
+ */
+const MULTI_VALUE_OPERATIONS: (keyof typeof operationLabels)[] =
+    ["array-contains", "array-contains-any", "in", "not-in"];
+const SINGLE_VALUE_OPERATIONS: (keyof typeof operationLabels)[] =
+    ["==", "!=", ">", "<", ">=", "<=", "in", "not-in"];
+
+/**
+ * The operators this field will actually put on screen.
+ *
+ * Exported because the failure mode is silence: when the intersection of what
+ * the field can render and what the engine can run comes out empty, the field
+ * returns null and the filter control the table header offered opens onto
+ * nothing. That is a rendering outcome no unit test of either side alone
+ * catches, so the intersection itself is the thing worth pinning.
+ */
+export function renderableRelationOperators(
+    relation: { kind?: string; cardinality?: string } | undefined,
+    operators?: readonly VirtualTableWhereFilterOp[]
+): (keyof typeof operationLabels)[] {
+    const possible = relationCardinality(relation) === "many"
+        ? MULTI_VALUE_OPERATIONS
+        : SINGLE_VALUE_OPERATIONS;
+    if (!operators) return possible;
+    return possible.filter(op => (operators as readonly string[]).includes(op));
+}
+
 export function RelationFilterField({
     value,
     setValue,
@@ -56,13 +97,7 @@ export function RelationFilterField({
 
     const manyRelation = relationCardinality(relation) === "many";
 
-    let possibleOperations: (keyof typeof operationLabels)[] = manyRelation
-        ? ["array-contains", "array-contains-any"]
-        : ["==", "!=", ">", "<", ">=", "<=", "in", "not-in"];
-
-    if (operators) {
-        possibleOperations = possibleOperations.filter(op => (operators as readonly string[]).includes(op));
-    }
+    const possibleOperations = renderableRelationOperators(relation, operators);
 
     const [fieldOperation, fieldValue] = value || [possibleOperations[0], undefined];
     const [operation, setOperation] = useState<VirtualTableWhereFilterOp>(fieldOperation);

@@ -109,10 +109,12 @@ describe("resolveFilterOperators", () => {
 
     describe("relation kinds", () => {
 
-        // Only `belongsTo` puts a foreign key on this row. The other kinds
-        // live on the target table or in a junction, so the query layer has
-        // no column to compare against and a filter keyed on one resolves to
-        // nothing — historically returning every row, now a 400.
+        // `belongsTo` is a column comparison — the foreign key is on this row.
+        // `manyToMany`, `hasMany` and `hasOne` are correlated `EXISTS`
+        // subqueries over the table that does hold the link. `via` is a join
+        // path with no stated inverse, so the query layer still has nothing to
+        // compile and a filter keyed on one resolves to nothing —
+        // historically returning every row, now a 400.
         const relationProp = (relation?: Record<string, unknown>): Property => ({
             name: "Tags",
             type: "relation",
@@ -127,26 +129,52 @@ describe("resolveFilterOperators", () => {
             expect(ops).toEqual(expect.arrayContaining(["==", "!=", "in"]));
         });
 
-        it.each(["manyToMany", "hasMany", "hasOne", "via"])(
-            "offers nothing for a %s relation", (kind) => {
+        it.each(["manyToMany", "hasMany", "hasOne"])(
+            "offers the membership operators for a %s relation", (kind) => {
                 const ops = resolveFilterOperators({
                     property: relationProp({ kind, target: () => ({}) }),
                     engine: "postgres"
                 });
-                expect(ops).toEqual([]);
+                expect(ops.sort()).toEqual(["!=", "==", "in", "is-not-null", "is-null", "not-in"]);
             }
         );
 
-        it("reads the kind off a stamped resolvedRelation when there is no inline block", () => {
+        it("offers only what the driver can compile — never an ordering operator", () => {
+            // The `EXISTS` shape answers membership. `>` on a relation is
+            // rejected by the driver, so the UI must not put it on screen.
             const ops = resolveFilterOperators({
+                property: relationProp({ kind: "manyToMany", target: () => ({}) }),
+                engine: "postgres"
+            });
+            expect(ops).not.toEqual(expect.arrayContaining([">", "<", "ilike"]));
+        });
+
+        it("offers nothing for a via relation", () => {
+            const ops = resolveFilterOperators({
+                property: relationProp({ kind: "via", target: () => ({}) }),
+                engine: "postgres"
+            });
+            expect(ops).toEqual([]);
+        });
+
+        it("reads the kind off a stamped resolvedRelation when there is no inline block", () => {
+            expect(resolveFilterOperators({
                 property: {
                     name: "Tags",
                     type: "relation",
                     resolvedRelation: { kind: "manyToMany" }
                 } as unknown as Property,
                 engine: "postgres"
-            });
-            expect(ops).toEqual([]);
+            })).toEqual(expect.arrayContaining(["==", "!="]));
+
+            expect(resolveFilterOperators({
+                property: {
+                    name: "Co-authors",
+                    type: "relation",
+                    resolvedRelation: { kind: "via" }
+                } as unknown as Property,
+                engine: "postgres"
+            })).toEqual([]);
         });
 
         it("stays filterable when the kind cannot be determined at all", () => {

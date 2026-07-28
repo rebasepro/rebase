@@ -32,19 +32,30 @@ const DEFAULT_OPS_BY_TYPE: Partial<Record<DataType, readonly WhereFilterOp[]>> =
 const ARRAY_OPS: readonly WhereFilterOp[] = ["array-contains", "array-contains-any"];
 
 /**
+ * Relation kinds the query layer can compile into a `WHERE`.
+ *
+ * `belongsTo` is a plain column comparison — the foreign key is on this row.
+ * The other three are correlated subqueries over the table that does hold the
+ * link: `EXISTS (SELECT 1 FROM <junction> …)` for `manyToMany`, and the same
+ * over the target's foreign key for `hasMany`/`hasOne`.
+ *
+ * `via` is not here. Its join path is authored source → target with no stated
+ * inverse, so turning it into a filter is a different problem from reversing a
+ * single link, and until the driver solves it a filter keyed on one names
+ * nothing the backend can resolve.
+ *
+ * Offering an uncompilable filter is not a cosmetic bug. The Postgres driver
+ * used to drop a filter key it could not resolve, which *widened* the result
+ * set — filtering a many-to-many column returned every row instead of none.
+ * That now fails closed with a 400, which is correct for a real schema drift
+ * and wrong as the answer to a control the admin itself put on screen.
+ */
+const FILTERABLE_RELATION_KINDS: readonly string[] = ["belongsTo", "manyToMany", "hasMany", "hasOne"];
+
+/**
  * Whether a relation is one the query layer can compile into a `WHERE`.
  *
- * Only `belongsTo` puts a column on this row — the foreign key. `hasOne`,
- * `hasMany` and `manyToMany` live on the target table or in a junction, and
- * `via` is a join path; none of them has a column here to compare against, so
- * a filter keyed on one names nothing the backend can resolve.
- *
- * Offering it anyway is not a cosmetic bug. The Postgres driver used to drop a
- * filter key it could not resolve, which *widened* the result set — filtering
- * a many-to-many column returned every row instead of none. That now fails
- * closed with a 400, which is correct for a real schema drift and wrong as the
- * answer to a control the admin itself put on screen. Removing the affordance
- * is the fix; the error stays for the drift it was built for.
+ * See {@link FILTERABLE_RELATION_KINDS} for which kinds compile and why.
  *
  * A relation whose kind cannot be determined at all — no inline `relation`
  * block and no stamped `resolvedRelation` — stays filterable. The server
@@ -57,7 +68,7 @@ export function isFilterableRelation(property: Property): boolean {
     const relationProperty = property as RelationProperty;
     const kind = relationProperty.relation?.kind ?? relationProperty.resolvedRelation?.kind;
     if (!kind) return true;
-    return kind === "belongsTo";
+    return FILTERABLE_RELATION_KINDS.includes(kind);
 }
 
 export interface ResolveFilterOperatorsParams {
