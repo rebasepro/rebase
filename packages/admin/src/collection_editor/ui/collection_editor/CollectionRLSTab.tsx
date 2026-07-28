@@ -73,6 +73,13 @@ function toSecurityOperation(cmd: PostgresPolicy["cmd"] | undefined): SecurityOp
 }
 
 function toSecurityMode(permissive: PostgresPolicy["permissive"] | undefined): SecurityRule["mode"] {
+    // Absent stays absent. `permissive` is the default, so writing it out
+    // changes nothing semantically — but this value is serialized into the
+    // user's collection file, and defaulting here would grow a `mode:
+    // "permissive"` on every rule the editor touches. The `.toLowerCase()`
+    // this replaced returned `undefined` for an absent value; that part was
+    // right, and only the widened type was wrong.
+    if (!permissive) return undefined;
     return permissive === "RESTRICTIVE" ? "restrictive" : "permissive";
 }
 

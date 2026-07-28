@@ -475,6 +475,12 @@ their preview properties, entity link and `select` widget through `admin`; array
 blocks keep their drag handles and *Add to Content* button, so `sortable` and
 `canAddElements` still default to `true` when unset.
 
+The riskiest change — swapping the `pgColumnToProperty` the editor calls — is
+pinned by `table-import-round-trip.test.ts`, which runs real `information_schema`
+and `pg_policies` row shapes through the producer, the save, and back off disk.
+That is the producer/consumer contract the two copies disagreed about, and it
+outlasts a click-through.
+
 One pre-existing bug turned up and was **not** introduced here — verified by putting
 `main`'s sources back and reproducing it. `RelationFieldBinding` throws *"expected a
 collection with relations support"* for any collection that declares its relation
