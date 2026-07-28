@@ -21,6 +21,7 @@ declare global {
 import {
     ArrowLeftIcon,
     Button,
+    Checkbox,
     cls,
     IconButton,
     iconSize,
@@ -141,6 +142,15 @@ export interface LoginViewProps {
      * Pre-fill the password field (e.g. for demo or testing environments).
      */
     defaultPassword?: string;
+
+    /**
+     * When set, the email/password forms render a "Join the newsletter"
+     * opt-in checkbox. Called with the address that just authenticated —
+     * sign-in or registration — if the box was ticked. Wire it to whatever
+     * stores the subscription; failures are the callback's problem, the
+     * login flow never waits on it.
+     */
+    onNewsletterOptIn?: (email: string) => void;
 }
 
 type AuthMode = "buttons" | "login" | "register" | "forgot";
@@ -203,7 +213,8 @@ export function LoginView({
     additionalComponent,
     topComponent,
     defaultEmail,
-    defaultPassword
+    defaultPassword,
+    onNewsletterOptIn
 }: LoginViewProps) {
 
     const modeState = useModeController();
@@ -213,6 +224,9 @@ export function LoginView({
     const [mode, setMode] = useState<AuthMode>("buttons");
     const [fadeIn, setFadeIn] = useState(false);
     const [viewVisible, setViewVisible] = useState(true);
+    // Lives here, not in LoginForm: the form unmounts on every login↔register
+    // switch, and losing the tick on a mode change would silently drop opt-ins.
+    const [newsletterOptIn, setNewsletterOptIn] = useState(false);
 
     const switchMode = (newMode: AuthMode) => {
         setViewVisible(false);
@@ -360,6 +374,9 @@ export function LoginView({
                             bootstrapMode={true}
                             defaultEmail={defaultEmail}
                             defaultPassword={defaultPassword}
+                            onNewsletterOptIn={onNewsletterOptIn}
+                            newsletterOptIn={newsletterOptIn}
+                            setNewsletterOptIn={setNewsletterOptIn}
                         />
                     )}
 
@@ -442,6 +459,9 @@ export function LoginView({
                                     switchToRegister={showRegistration ? () => switchMode("register") : undefined}
                                     defaultEmail={defaultEmail}
                                     defaultPassword={defaultPassword}
+                                    onNewsletterOptIn={onNewsletterOptIn}
+                                    newsletterOptIn={newsletterOptIn}
+                                    setNewsletterOptIn={setNewsletterOptIn}
                                 />
                             )}
 
@@ -457,6 +477,9 @@ export function LoginView({
                                     switchToLogin={() => switchMode("login")}
                                     defaultEmail={defaultEmail}
                                     defaultPassword={defaultPassword}
+                                    onNewsletterOptIn={onNewsletterOptIn}
+                                    newsletterOptIn={newsletterOptIn}
+                                    setNewsletterOptIn={setNewsletterOptIn}
                                 />
                             )}
 
@@ -646,7 +669,10 @@ function LoginForm({
     switchToRegister,
     switchToLogin,
     defaultEmail,
-    defaultPassword
+    defaultPassword,
+    onNewsletterOptIn,
+    newsletterOptIn = false,
+    setNewsletterOptIn
 }: {
     onClose: () => void,
     onForgotPassword?: () => void,
@@ -658,9 +684,13 @@ function LoginForm({
     switchToRegister?: () => void,
     switchToLogin?: () => void,
     defaultEmail?: string,
-    defaultPassword?: string
+    defaultPassword?: string,
+    onNewsletterOptIn?: (email: string) => void,
+    newsletterOptIn?: boolean,
+    setNewsletterOptIn?: (checked: boolean) => void
 }) {
     const passwordRef = useRef<HTMLInputElement | null>(null);
+    const { t } = useTranslation();
 
     const [email, setEmail] = useState<string | undefined>(defaultEmail);
     const [password, setPassword] = useState<string | undefined>(defaultPassword);
@@ -684,15 +714,28 @@ function LoginForm({
     // is not one of those: without a catch here every rejected sign-in becomes an
     // unhandled rejection, reported as a crash by anything listening for one,
     // while the user has already been shown the error.
+    // Fires only on the resolution path, i.e. after the controller accepted
+    // the credentials — a ticked box on a failed attempt must not subscribe
+    // an address its owner never proved they control.
+    function subscribeIfOptedIn(email: string) {
+        if (newsletterOptIn && onNewsletterOptIn) {
+            onNewsletterOptIn(email);
+        }
+    }
+
     function handleEnterPassword() {
         if (email && password && authController.emailPasswordLogin) {
-            void Promise.resolve(authController.emailPasswordLogin(email, password)).catch(() => undefined);
+            void Promise.resolve(authController.emailPasswordLogin(email, password))
+                .then(() => subscribeIfOptedIn(email))
+                .catch(() => undefined);
         }
     }
 
     function handleRegistration() {
         if (email && password && authController.register) {
-            void Promise.resolve(authController.register(email, password, displayName)).catch(() => undefined);
+            void Promise.resolve(authController.register(email, password, displayName))
+                .then(() => subscribeIfOptedIn(email))
+                .catch(() => undefined);
         }
     }
 
@@ -811,6 +854,19 @@ function LoginForm({
                         Forgot password?
                     </button>
                 </div>
+            )}
+
+            {onNewsletterOptIn && (
+                <label className="flex items-center gap-2 cursor-pointer mt-1 mb-1">
+                    <Checkbox
+                        checked={newsletterOptIn}
+                        onCheckedChange={(checked) => setNewsletterOptIn?.(checked === true)}
+                        size="small"
+                    />
+                    <Typography variant="caption" color="secondary" className="select-none">
+                        {t("join_newsletter")}
+                    </Typography>
+                </label>
             )}
 
             <LoadingButton

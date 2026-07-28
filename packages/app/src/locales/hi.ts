@@ -58,6 +58,7 @@ export const hi: RebaseTranslations = {
     dark_mode: "डार्क",
     light_mode: "लाइट",
     system_mode: "सिस्टम",
+    join_newsletter: "न्यूज़लेटर से जुड़ें, कोई स्पैम नहीं",
     ok: "ठीक है",
     save_collection_config: "संग्रह संरचना सहेजें",
     search_for_more_icons: "और आइकन खोजें…",

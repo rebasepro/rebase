@@ -402,6 +402,7 @@ export interface RebaseTranslations {
     dark_mode: string;
     light_mode: string;
     system_mode: string;
+    join_newsletter: string;
     ok: string;
     save_collection_config: string;
     search_for_more_icons: string;

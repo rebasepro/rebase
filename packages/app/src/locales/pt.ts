@@ -63,6 +63,7 @@ export const pt: RebaseTranslations = {
     dark_mode: "Escuro",
     light_mode: "Claro",
     system_mode: "Sistema",
+    join_newsletter: "Assine a newsletter, sem spam",
     ok: "Ok",
     save_collection_config: "Guardar estrutura da coleção",
     search_for_more_icons: "Pesquisar mais ícones…",

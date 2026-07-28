@@ -6,6 +6,22 @@ import type { RebaseAuthController } from "@rebasepro/app";
 const DEMO_EMAIL = "demo@rebase.pro";
 const DEMO_PASSWORD = "DemoRebase2026!";
 
+/**
+ * Subscriptions are recorded on the Rebase Cloud control plane (same store the
+ * console login uses), not on the demo backend — the demo database is wiped
+ * routinely. Fire-and-forget: a hiccup here must never surface at login.
+ * The shared demo account is filtered out — nearly everyone signs in with the
+ * pre-filled credentials, and subscribing demo@rebase.pro would be noise.
+ */
+function subscribeToNewsletter(email: string) {
+    if (email.trim().toLowerCase() === DEMO_EMAIL) return;
+    fetch("https://app.rebase.pro/api/functions/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, source: "demo" })
+    }).catch(() => undefined);
+}
+
 export interface DemoLoginViewProps {
     authController: RebaseAuthController;
     googleClientId?: string;
@@ -25,6 +41,7 @@ export function DemoLoginView({ authController, googleClientId }: DemoLoginViewP
             defaultEmail={DEMO_EMAIL}
             defaultPassword={DEMO_PASSWORD}
             disabled={!privacyAccepted}
+            onNewsletterOptIn={subscribeToNewsletter}
             topComponent={
                 <div className="flex flex-col gap-3 mb-1">
                     {/* Demo info */}
