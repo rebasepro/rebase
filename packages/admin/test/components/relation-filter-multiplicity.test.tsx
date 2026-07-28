@@ -21,6 +21,28 @@ import { EntityRelation } from "@rebasepro/types";
  */
 let lastProps: Record<string, unknown> = {};
 
+beforeAll(() => {
+    // The operator Select is Radix-backed and needs pointer capture and
+    // scrollIntoView, neither of which jsdom implements. Without these the
+    // dropdown never opens and an operator switch cannot be driven at all —
+    // which is why the earlier tests in this area had to inject the operator
+    // through the `value` prop instead of changing it the way a user does.
+    Object.assign(Element.prototype, {
+        hasPointerCapture: () => false,
+        setPointerCapture: () => undefined,
+        releasePointerCapture: () => undefined,
+        scrollIntoView: () => undefined
+    });
+});
+
+/** Pick an operator from the dropdown, as a user would. */
+function chooseOperator(label: string) {
+    fireEvent.click(screen.getByRole("combobox"));
+    const option = screen.queryAllByRole("option").find(o => o.textContent === label);
+    if (!option) throw new Error(`No "${label}" option. Offered: ${JSON.stringify(screen.queryAllByRole("option").map(o => o.textContent))}`);
+    fireEvent.click(option);
+}
+
 jest.mock("../../src/components/RelationSelector", () => ({
     RelationSelector: (props: Record<string, unknown>) => {
         lastProps = props;
@@ -110,6 +132,51 @@ describe("relation filter multiplicity follows the operator", () => {
         const [emitted] = setValue.mock.calls.at(-1) as [[string, unknown[]]];
         expect(emitted[0]).toBe("in");
         expect(emitted[1].map((r) => (r as EntityRelation).id)).toEqual(["7", "8"]);
+    });
+
+    describe("switching the operator, the way a user does", () => {
+
+        it("resizes the selector when the operator changes", () => {
+            renderField(manyToMany);
+            expect(isMultiple()).toBe("false");   // opens on `==`
+            chooseOperator("In");
+            expect(isMultiple()).toBe("true");
+            chooseOperator("==");
+            expect(isMultiple()).toBe("false");
+        });
+
+        it("offers `==` on a to-many relation at all", () => {
+            // The operator that could not be rendered before. Listing it is
+            // the visible half of the fix.
+            renderField(manyToMany);
+            fireEvent.click(screen.getByRole("combobox"));
+            expect(screen.queryAllByRole("option").map(o => o.textContent))
+                .toEqual(["==", "!=", "In", "Not in", "Is empty", "Is not empty"]);
+        });
+
+        it("hands the selector no value when narrowing a list to one", () => {
+            // `in [7, 8]` → `==` cannot keep both. `updateFilter` drops the
+            // held value on the arity change, and the selector is told so —
+            // otherwise a two-chip selection would sit under an operator that
+            // takes one, and `==` would be handed an array.
+            renderField(manyToMany, ["in", [new EntityRelation("7", "tags"), new EntityRelation("8", "tags")]]);
+            expect(isMultiple()).toBe("true");
+            expect(lastProps.value).toBeDefined();
+            chooseOperator("==");
+            expect(isMultiple()).toBe("false");
+            expect(lastProps.value).toBeUndefined();
+        });
+
+        it("keeps the single selection when widening one to a list", () => {
+            // The other direction is safe to carry over: one value is a valid
+            // one-element list, so the user does not lose their choice.
+            const setValue = renderField(manyToMany, ["==", new EntityRelation("7", "tags")]);
+            chooseOperator("In");
+            expect(isMultiple()).toBe("true");
+            const [emitted] = setValue.mock.calls.at(-1) as [[string, unknown[]]];
+            expect(emitted[0]).toBe("in");
+            expect((emitted[1] as EntityRelation[]).map(r => r.id)).toEqual(["7"]);
+        });
     });
 
     it("passes the prop explicitly, so the selector never falls back to cardinality", () => {
