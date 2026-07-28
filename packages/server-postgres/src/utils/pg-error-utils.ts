@@ -9,6 +9,35 @@
 
 import { logger } from "@rebasepro/server";
 
+/**
+ * Shape of a deliberate client-facing error — `ApiError` from
+ * `@rebasepro/server`, or anything else carrying a 4xx `statusCode`.
+ *
+ * Matched structurally rather than with `instanceof`: `@rebasepro/server` can
+ * be loaded twice (published dist vs. workspace source), which breaks class
+ * identity — `PersistService` hedges against the same thing by also accepting
+ * `name === "ApiError"`.
+ */
+interface ClientFacingError extends Error {
+    statusCode?: number;
+    code?: string;
+    /** See `ApiError.expected` — routine outcomes log at debug, not warn. */
+    expected?: boolean;
+}
+
+/**
+ * Return the error when it is a deliberate 4xx, otherwise null.
+ *
+ * A thrown `ApiError` is a decision the server made about the request, not a
+ * database failure: its message and code are already written for the client.
+ */
+function asClientFacingError(error: unknown): ClientFacingError | null {
+    if (!(error instanceof Error)) return null;
+    const e = error as ClientFacingError;
+    if (typeof e.statusCode !== "number" || e.statusCode < 400 || e.statusCode >= 500) return null;
+    return e;
+}
+
 /** Shape of PostgreSQL errors with diagnostic metadata. */
 export interface PostgresError extends Error {
     code?: string;
@@ -180,14 +209,34 @@ export function pgErrorToFriendlyMessage(pgError: PostgresError, context: string
 /**
  * Sanitize any error into a message safe and helpful for the client.
  *
- * Extracts the PG error from the Drizzle cause chain when possible;
- * falls back to a generic message that doesn't leak SQL.
+ * A deliberate 4xx (`ApiError`) passes through untouched — the server already
+ * decided what the client should read. Otherwise the PG error is extracted
+ * from the Drizzle cause chain, falling back to a generic message that
+ * doesn't leak SQL.
  *
  * @param error   - The raw caught error
  * @param context - A human-readable context string (e.g. collection path)
- * @returns An object with `message` (user-friendly) and optional `code` (PG code).
+ * @returns An object with `message` (user-friendly) and optional `code`
+ *          (the `ApiError` code, or the PG SQLSTATE).
  */
 export function sanitizeErrorForClient(error: unknown, context: string): { message: string; code?: string } {
+    // ── A deliberate 4xx is not a database failure ──────────────────
+    // Its message and code are written for the client; replacing them with
+    // "Check server logs" would discard the only diagnosis the caller gets
+    // (e.g. the offending filter field and the collection's valid ones).
+    // Log level follows the same convention as the HTTP error handler in
+    // @rebasepro/server: routine outcomes at debug, everything else at warn.
+    const clientError = asClientFacingError(error);
+    if (clientError) {
+        const line = `[API ${clientError.statusCode} ${clientError.code ?? "BAD_REQUEST"}] in "${context}": ${clientError.message}`;
+        if (clientError.expected) {
+            logger.debug(line);
+        } else {
+            logger.warn(`⚠️ ${line}`);
+        }
+        return { message: clientError.message, ...(clientError.code && { code: clientError.code }) };
+    }
+
     // ── Always log the full, unsanitized error server-side ──────────
     const pgError = extractPgError(error);
 
