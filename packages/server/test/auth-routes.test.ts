@@ -73,7 +73,7 @@ collectionPermissions: null };
 let mockAuthRepo: jest.Mocked<AuthRepository>;
 let mockEmailService: { send: jest.Mock; isConfigured: jest.Mock };
 
-function createApp(opts: { allowRegistration?: boolean; withEmail?: boolean; defaultRole?: string; allowUserLookup?: boolean; isBootstrapCompleted?: () => Promise<boolean>; cookieAuth?: { sameSite?: "Lax" | "Strict" | "None" } } = {}) {
+function createApp(opts: { allowRegistration?: boolean; disableSelfRegistration?: boolean; withEmail?: boolean; defaultRole?: string; allowUserLookup?: boolean; isBootstrapCompleted?: () => Promise<boolean>; cookieAuth?: { sameSite?: "Lax" | "Strict" | "None" } } = {}) {
     // Re-create mocked service instances each time
 
     // Wire constructor mocks to return our instances
@@ -92,6 +92,10 @@ displayName: data.displayName,
 passwordHash: data.passwordHash }))
         ),
         listUsers: jest.fn().mockResolvedValue([]),
+        listUsersPaginated: jest.fn().mockResolvedValue({ users: [],
+total: 0,
+limit: 1,
+offset: 0 }),
         getUserRoles: jest.fn().mockResolvedValue([mockRole("editor")]),
         getUserRoleIds: jest.fn().mockResolvedValue(["editor"]),
         assignDefaultRole: jest.fn().mockResolvedValue(undefined),
@@ -141,6 +145,7 @@ isConfigured: jest.fn().mockReturnValue(opts.withEmail ?? false) };
     const config: AuthModuleConfig = {
         authRepo: mockAuthRepo,
         allowRegistration: opts.allowRegistration ?? true,
+        disableSelfRegistration: opts.disableSelfRegistration,
         allowUserLookup: opts.allowUserLookup ?? false,
         defaultRole: opts.defaultRole,
         emailService: opts.withEmail ? mockEmailService as any : undefined,
@@ -325,26 +330,74 @@ password: "StrongPass1" }));
             expect(res.status).toBe(400);
         });
 
-        it("returns 403 when registration is disabled", async () => {
+        it("returns 403 when registration is disabled and users exist", async () => {
             const app = createApp({ allowRegistration: false });
+            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser()],
+total: 1,
+limit: 1,
+offset: 0 } as any);
 
             const res = await app.request("/auth/register", json({ email: "new@test.com",
 password: "StrongPass1" }));
             expect(res.status).toBe(403);
             const body = await res.json() as any;
             expect(body.error.code).toBe("REGISTRATION_DISABLED");
+            expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
         });
 
-        it("blocks registration even on empty database when allowRegistration=false", async () => {
+        it("empty database: admits the first registration even when allowRegistration=false and promotes it to admin", async () => {
+            // The bootstrap exception. Refusing here is a dead end: /auth/config
+            // advertises registration while the table is empty, the login UI
+            // shows the first-admin form, and /admin/bootstrap requires an
+            // authenticated caller an empty database cannot produce.
             const app = createApp({ allowRegistration: false });
-            // Even with no users, registration should be denied
-            mockAuthRepo.listUsers.mockResolvedValueOnce([]);
+            const bootUser = mockUser({ id: "boot-1",
+email: "first@test.com" });
+            mockAuthRepo.createUser.mockResolvedValueOnce(bootUser as any);
+            // the gate's paginated count sees an empty table (default mock),
+            // and the post-create check confirms they really are the first
+            mockAuthRepo.listUsers.mockResolvedValueOnce([bootUser] as any);
+
+            const res = await app.request("/auth/register", json({ email: "first@test.com",
+password: "StrongPass1" }));
+            expect(res.status).toBe(201);
+            expect(mockAuthRepo.setUserRoles).toHaveBeenCalledWith("boot-1", ["admin"]);
+        });
+
+        it("rolls back the loser of a concurrent bootstrap registration", async () => {
+            // Both racers pass the empty-table check; only the genuine first
+            // user may ride the exception. The loser must not survive as a
+            // regular account created while registration is disabled.
+            const app = createApp({ allowRegistration: false });
+            const loser = mockUser({ id: "loser-1",
+email: "second@test.com" });
+            const winner = mockUser({ id: "winner-1",
+email: "first@test.com" });
+            mockAuthRepo.createUser.mockResolvedValueOnce(loser as any);
+            // the gate's paginated count saw an empty table (default mock),
+            // but another registration landed before the post-create check
+            mockAuthRepo.listUsers.mockResolvedValueOnce([winner, loser] as any);
+
+            const res = await app.request("/auth/register", json({ email: "second@test.com",
+password: "StrongPass1" }));
+            expect(res.status).toBe(403);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("REGISTRATION_DISABLED");
+            expect(mockAuthRepo.deleteUser).toHaveBeenCalledWith("loser-1");
+            expect(mockAuthRepo.setUserRoles).not.toHaveBeenCalled();
+        });
+
+        it("disableSelfRegistration blocks even the empty-database bootstrap", async () => {
+            const app = createApp({ allowRegistration: false,
+disableSelfRegistration: true });
+            mockAuthRepo.listUsers.mockResolvedValue([]);
 
             const res = await app.request("/auth/register", json({ email: "first@test.com",
 password: "StrongPass1" }));
             expect(res.status).toBe(403);
             const body = await res.json() as any;
             expect(body.error.code).toBe("REGISTRATION_DISABLED");
+            expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
         });
 
         it("stores refresh token after registration", async () => {
@@ -1367,6 +1420,18 @@ withEmail: false });
             const body = await res.json() as any;
             expect(body.enabledProviders).toContain("google");
         });
+
+        it("does not advertise registration when disableSelfRegistration is set", async () => {
+            // Otherwise the UI is sent to a form whose POST can only 403 —
+            // the exact dead end the bootstrap exception exists to prevent.
+            const app = createApp({ disableSelfRegistration: true,
+isBootstrapCompleted: async () => false });
+
+            const res = await app.request("/auth/config");
+            const body = await res.json() as any;
+            expect(body.needsSetup).toBe(true);
+            expect(body.registrationEnabled).toBe(false);
+        });
     });
 
     // ═════════════════════════════════════════════════════════════════════
@@ -1411,10 +1476,21 @@ withEmail: false });
             );
         });
 
-        it("CVE-FIX: empty database does NOT bypass allowRegistration=false", async () => {
+        it("CVE-FIX: the bootstrap window admits only the genuine first user — a racer is rolled back", async () => {
+            // The empty-table bootstrap exception is the same trust model as
+            // the public setup screen it backs: whoever reaches a fresh
+            // deployment first becomes its admin. What must NOT happen is the
+            // window minting a second account: once anyone else exists, a
+            // registration that slipped past the empty-table check is undone.
             const app = createApp({ allowRegistration: false });
-            // Even with zero users, the registration endpoint must reject
-            mockAuthRepo.listUsers.mockResolvedValueOnce([]);
+            const hacker = mockUser({ id: "hacker-1",
+email: "hacker@evil.com" });
+            const winner = mockUser({ id: "winner-1",
+email: "first@test.com" });
+            mockAuthRepo.createUser.mockResolvedValueOnce(hacker as any);
+            // gate's paginated count saw an empty table (default mock);
+            // the real first user beat them to the post-create check
+            mockAuthRepo.listUsers.mockResolvedValueOnce([winner, hacker] as any);
 
             const res = await app.request("/auth/register", json({
                 email: "hacker@evil.com",
@@ -1425,12 +1501,16 @@ withEmail: false });
             expect(res.status).toBe(403);
             const body = await res.json() as any;
             expect(body.error.code).toBe("REGISTRATION_DISABLED");
-            // createUser must NOT have been called
-            expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
+            expect(mockAuthRepo.deleteUser).toHaveBeenCalledWith("hacker-1");
+            expect(mockAuthRepo.setUserRoles).not.toHaveBeenCalled();
         });
 
-        it("CVE-FIX: registration is blocked when allowRegistration defaults to false", async () => {
+        it("CVE-FIX: registration is blocked when allowRegistration=false and any user exists", async () => {
             const app = createApp({ allowRegistration: false });
+            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser()],
+total: 1,
+limit: 1,
+offset: 0 } as any);
 
             const res = await app.request("/auth/register", json({
                 email: "hacker@evil.com",

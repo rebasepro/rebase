@@ -232,9 +232,20 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
     }
 
     /**
-     * Check if registration is allowed.
+     * Check if registration is allowed in steady state.
      * Registration is only allowed when explicitly enabled via `allowRegistration`.
-     * First-user bootstrap must use POST /admin/bootstrap instead.
+     *
+     * The one exception lives in POST /auth/register itself: an empty user
+     * table always admits the first registration (which auto-promotes to
+     * admin). Without it a backend deployed with registration disabled is a
+     * dead end — GET /auth/config reports `registrationEnabled` while
+     * `needsSetup`, the login UI shows the first-admin form on the strength of
+     * that, and POST /admin/bootstrap cannot help because it requires an
+     * authenticated caller, which an empty database cannot produce.
+     *
+     * `disableSelfRegistration` is the hard kill switch and blocks even that
+     * exception, for operators who provision users out of band and never want
+     * a public first-come-first-admin window.
      */
     function isRegistrationAllowed(): boolean {
         if (config.disableSelfRegistration) return false;
@@ -311,14 +322,26 @@ refreshToken };
     router.post("/register", defaultAuthLimiter, async (c) => {
         const { email, password, displayName } = parseBody(registerSchema, await c.req.json());
 
-        // Hard kill switch — blocks registration regardless of allowRegistration
+        // Hard kill switch — blocks registration regardless of allowRegistration,
+        // including the empty-database bootstrap exception below.
         if (config.disableSelfRegistration) {
             throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
         }
 
-        // Check if registration is allowed (no bypass for empty databases)
+        // Bootstrap exception: an empty user table always admits the first
+        // registration, even with `allowRegistration: false` — see
+        // isRegistrationAllowed() for why refusing here is a dead end. The
+        // moment one user exists the flag is enforced again.
+        let bootstrapRegistration = false;
         if (!isRegistrationAllowed()) {
-            throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
+            // Paginated on purpose: this runs for anonymous callers, and the
+            // unbounded listUsers() would hand them a full-table fetch per
+            // rejected attempt.
+            const { total } = await authRepo.listUsersPaginated({ limit: 1 });
+            bootstrapRegistration = total === 0;
+            if (!bootstrapRegistration) {
+                throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
+            }
         }
 
         // Validate password strength
@@ -350,6 +373,15 @@ refreshToken };
         // and no way to access the bootstrap endpoint from the UI.
         const existingUsers = await authRepo.listUsers();
         const isFirstUser = existingUsers.length === 1 && existingUsers[0].id === user.id;
+
+        if (bootstrapRegistration && !isFirstUser) {
+            // Two registrations raced through the empty-table check. Only the
+            // genuine first user may ride the bootstrap exception — the loser
+            // would otherwise become a regular account created while
+            // registration is disabled. Undo it and report the gate.
+            await authRepo.deleteUser(user.id);
+            throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
+        }
 
         if (isFirstUser) {
             await authRepo.setUserRoles(user.id, ["admin"]);

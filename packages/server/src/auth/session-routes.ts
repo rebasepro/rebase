@@ -313,7 +313,10 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             needsSetup = allUsers.length === 0;
         }
 
-        const registrationAllowed = needsSetup || !!config.allowRegistration;
+        // Mirrors the POST /auth/register gate exactly: an empty system admits
+        // the first registration, and the hard kill switch blocks even that.
+        // Advertising anything else sends the UI to a form that can only 403.
+        const registrationAllowed = !config.disableSelfRegistration && (needsSetup || !!config.allowRegistration);
         const enabledProviders = (config.oauthProviders || []).map((p) => p.id);
 
         return c.json({
