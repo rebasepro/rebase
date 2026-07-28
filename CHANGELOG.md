@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+### Added
+
+- **A drawer group can carry the icon, and its entries indent beneath it** — a long navigation rendered as one flat column: every entry had an icon of its own, and the group headers organising them sat at 11px in `surface-400`, *below* the contrast of the rows they label. The thing you scan to find anything else was the quietest element on screen, and thirty entries gave no visual sign of which belonged together.
+
+  `NavigationGroupMapping` takes an `icon` now — a Lucide name, like every other icon in a collection. Declaring one moves the anchor from the rows to the group: the header takes the icon, and the entries below trade theirs for an indent of the same width, so labels stay on the original grid and the rail does not change size. The label steps up to 12px `surface-600` to match, since it is now what carries the hierarchy.
+
+  Strictly opt-in, and per group. A group that names no icon renders exactly as it did — same classes, entries keep their icons — so an existing panel sees no change until it asks for one. Two cases stay flat regardless of configuration: a group with no header has nothing to indent under, and a drawer collapsed to a rail keeps its entry icons, because there they are the only thing left to click.
+
+- **`defaultDrawerOpen` — open the navigation expanded** — the drawer started collapsed to a rail with no way to change it. `autoOpenDrawer` looks like the prop for this and is not: it expands on *hover*, and always has, though `RebaseLayout` documented it as "auto-open the drawer on load" while `Scaffold` documented the same prop as "open the drawer on hover". Both docs now say the same true thing.
+
+  The new prop seeds the initial state and nothing more — no effect syncs it afterwards, so a user who collapses the drawer is not re-expanded underneath them on the next render. Ignored on small layouts, where an expanded drawer covers the content it exists to navigate.
+
+- **The shell takes a `logo`** — `Scaffold` accepted one and rendered it in the drawer and top bar, but nothing passed it down, so the prop was unreachable from `RebaseShell` — the component a scaffolded app actually mounts. Threaded through `RebaseShell` → `RebaseLayout` → `Scaffold`.
+
+- **An entity action's icon can be a Lucide name** — `EntityAction.icon` was `React.ReactElement`, alone among a collection's icons; `admin.icon` and `entityViews[].icon` were strings already. An element cannot be written in the `config` package at all: it is plain `.ts`, and a backend loads it for its schema, so importing the UI layer just to name an icon drags React into the server's module graph. Both forms are accepted now and resolved through `getIcon` at every render site.
+
+- **A collection's `entityActions` may name an app-level action by key** — `resolveEntityAction` has always accepted `string | EntityAction`, the collection editor stores exactly these keys, and the sibling field `entityViews` is typed `(string | EntityCustomView)[]`. Only this field's type disagreed, so the documented approach — register the action on `<RebaseAdmin entityActions={…}>`, then name it from the collection — required a cast to write.
+
+  It matters most where the action *cannot* be imported. An action carries an `onClick` and usually opens a dialog, so a collection file that imports one pulls the admin bundle into any backend that loads it; naming it costs nothing there.
+
+- **A full-screen entity has a way back to its collection** — every other layout can be dismissed: a side panel and a dialog close, a split keeps the list beside it. Full screen replaces the collection outright, leaving browser Back as the only route out — which the page never shows as an affordance, and which is wrong anyway once the reader has moved between tabs inside the entity.
+
+### Fixed
+
+- **A many-to-many child listing failed on a column that does not exist** — the junction's columns were passed into the `EXISTS` subquery as bare Drizzle columns. A column object carries no table qualifier of its own; it renders against whatever table the surrounding builder believes is current. Inside `db.query.findMany`, which aliases the root table, that produced
+
+  ```sql
+  EXISTS (SELECT 1 FROM "body_area_podcast"
+          WHERE "podcast"."podcast_id" = "podcast"."id" AND "podcast"."body_area_id" = $1)
+  ```
+
+  — the junction's columns wearing the *target's* alias. Postgres aborts the transaction on the unknown column, and the fallback read then fails on `25P02 current transaction is aborted`, three frames away from anything to do with the relation.
+
+  The junction is aliased and referenced by identifier now, exactly as the `joinPath` branch beside it already did; only the correlation stays a column object, because that one has to bind to the outer row. The alias also disambiguates a self-referential many-to-many, where the junction and the target are the same table. The old form rendered *correctly* in isolation and only corrupted inside the query builder, which is why unit tests asserting on result counts never saw it — the new ones assert the emitted SQL.
+
+- **An auth collection that named `reset_password` got two Reset Password buttons** — the injector skips its action when the collection already has one, but it read `.key` off every entry, and an entry may be the key itself. A collection that named the action rather than importing it was therefore never recognised as already having it, and the injection ran on top.
+
 ## [0.11.0] - 2026-07-27
 
 ### Breaking
