@@ -71,7 +71,30 @@ RUN mkdir -p /runtime \
         "ws@^8.21.0" \
         "zod@^4.4.3" \
         "pg@^8.21.0" \
+        "@aws-sdk/client-s3@^3.1068.0" \
+        "@aws-sdk/s3-request-presigner@^3.1068.0" \
+        "nodemailer@^6.9.0" \
     && mkdir -p node_modules/@rebasepro
+# The last three are drivers for features the RUNTIME implements and loads with
+# `await import(...)` only when a project turns them on: S3 object storage and
+# SMTP email.
+#
+# They belong in the image for the same reason `pg` does — the runtime is what
+# constructs the storage and email controllers, so those imports resolve from
+# HERE. A project declaring `@aws-sdk/client-s3` in its own dependencies does not
+# help: that copy lands in /bundle/node_modules, which is not on the resolution
+# path of a module living in /app.
+#
+# Without them a tenant with S3 storage configured boots clean, passes every
+# health probe, serves every other route, and fails ONLY on writes with
+# "@aws-sdk/client-s3 is required for S3 storage". That surfaced as documents
+# which appeared to save — the row and its thumbnail updated, so the dashboard
+# preview showed the new artwork — but reopened empty, because the payload
+# upload was the one part that threw.
+#
+# Deliberately NOT here: `@google-cloud/storage` (tenant pods cannot reach the
+# GKE metadata server, so GCS is reached over its S3-compatible API instead) and
+# `sharp` (native, and managed intake rejects native dependencies outright).
 
 # The workspace packages are copied into the runtime stage below, one by one, so
 # that only built output ships. (They are deliberately NOT copied here: a
