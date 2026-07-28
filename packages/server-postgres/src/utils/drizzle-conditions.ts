@@ -624,6 +624,15 @@ export class DrizzleConditionBuilder {
      * correlation left, they become "has no related row at all" and "has at
      * least one", which is the only reading of null a link can have.
      *
+     * Under RLS, "no related row" means *no row this reader can see*. A junction
+     * with row-level security but no `SELECT` policy for `rebase_user` is opaque
+     * to it, so every row comes back looking unlinked and `is-null` matches all
+     * of them. That is not a leak — the outer table's own policies still decide
+     * which rows exist at all, and the positive direction correctly returns
+     * nothing — but it over-reports, and the cause is a missing junction policy
+     * rather than anything here. Rebase derives one for a declared many-to-many;
+     * a hand-written schema has to supply it.
+     *
      * `in`/`not-in` against a *null value* mean the same thing, rather than
      * membership of an empty list. Membership against null is not a membership
      * question, and the admin's "filter for null values" control emits the
