@@ -19,7 +19,6 @@ const __dirname = path.dirname(__filename);
  */
 function findEnvFile(startDir: string): string | undefined {
     let dir = startDir;
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         const candidate = path.join(dir, ".env");
         if (fs.existsSync(candidate)) return candidate;

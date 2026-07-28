@@ -130,6 +130,21 @@ export default [
         }
     },
     {
+        // typescript-eslint owns unused-variable reporting on TypeScript. Both
+        // rules were on, over the same files, with the same options, and the
+        // base rule cannot see a type position: it counted the parameter names
+        // in a function *type* (`((value: string) => string)`) and in an
+        // ambient `declare function gtag(...args: unknown[])` as unused
+        // bindings. Every one of the 843 findings the TypeScript rule reported
+        // was duplicated here, and the base rule added 1896 more that were all
+        // false — 2739 warnings, none of them signal, burying the 179
+        // exhaustive-deps warnings that are.
+        files: ["**/*.{ts,tsx,mts,cts}"],
+        rules: {
+            "no-unused-vars": "off"
+        }
+    },
+    {
         files: [
             "packages/utils/src/**/*.{ts,tsx}",
             "packages/common/src/**/*.{ts,tsx}",

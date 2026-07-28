@@ -404,7 +404,6 @@ export type CollectionConfig<M extends Record<string, unknown> = Record<string, 
  *
  * @group Models
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyCollectionConfig = CollectionConfig<any, any>;
 
 /**
