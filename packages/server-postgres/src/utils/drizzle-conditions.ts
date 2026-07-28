@@ -1,4 +1,4 @@
-import { and, eq, or, sql, SQL, ilike, inArray } from "drizzle-orm";
+import { and, eq, or, sql, SQL, ilike, inArray, getTableColumns } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgVarchar, PgText, PgChar } from "drizzle-orm/pg-core";
 import {
     FilterValues, WhereFilterOp, JoinStep, LogicalCondition, FilterCondition,
@@ -7,8 +7,47 @@ import {
 import { getColumnName, normalizeToEntityRelation, resolveCollectionRelations } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
-import { logger } from "@rebasepro/server";
+import { ApiError, logger } from "@rebasepro/server";
 import { getColumnMeta } from "../services/collection-helpers";
+
+/**
+ * What to do with a filter field that resolves to no column at all.
+ *
+ *  - `"error"` (default) — reject the request. A filter that cannot be
+ *    compiled is *dropped*, and dropping a condition can only ever widen the
+ *    result set. On a data plane where row-level security is the last line of
+ *    defence, a typo'd or renamed filter key therefore runs the query without
+ *    that condition and returns everything RLS happens to allow.
+ *  - `"warn"` — the historical behaviour: log and silently drop the condition.
+ *    Only for a deployment that knowingly sends filter keys the table does not
+ *    have and has satisfied itself that widening is safe there.
+ */
+export type UnknownFilterFieldsMode = "error" | "warn";
+
+/**
+ * Process-wide default, set once when the driver is constructed.
+ *
+ * The condition builder is a set of *static* methods reached from a dozen
+ * `FetchService` call sites, none of which carry the driver's config — the
+ * service is built from `(db, registry)` alone. Threading an option from
+ * `createPostgresAdapter` down to each of them would mean touching every
+ * intermediate signature to plumb a value that is a single deployment-wide
+ * switch. A module-level default set at adapter construction, plus an explicit
+ * per-call override for callers that have one (tests, mainly), buys the same
+ * control for none of the churn. It is safe by default, so the only reason to
+ * set it at all is to opt *out*.
+ */
+let defaultUnknownFilterFieldsMode: UnknownFilterFieldsMode = "error";
+
+/** Set the process-wide behaviour for unresolvable filter fields. */
+export function configureUnknownFilterFields(mode: UnknownFilterFieldsMode): void {
+    defaultUnknownFilterFieldsMode = mode;
+}
+
+/** The process-wide behaviour for unresolvable filter fields. */
+export function getUnknownFilterFieldsMode(): UnknownFilterFieldsMode {
+    return defaultUnknownFilterFieldsMode;
+}
 
 /**
  * Filter values may arrive as relation wire objects — `EntityRelation`
@@ -221,32 +260,71 @@ export class DrizzleConditionBuilder {
     }
 
     /**
+     * The column a filter field names, or `undefined` if it names nothing.
+     *
+     * A field may address its column directly, or — for an owning relation —
+     * through the `<field>_id` foreign key the relation compiles to. Only a
+     * field that resolves to *neither* is an error, and by default it is one:
+     * see {@link UnknownFilterFieldsMode} for why silently dropping it is a
+     * data-exposure primitive rather than a convenience.
+     */
+    private static resolveFilterColumn(
+        table: PgTable<any>,
+        field: string,
+        collectionPath: string,
+        mode: UnknownFilterFieldsMode
+    ): AnyPgColumn | undefined {
+        const direct = table[field as keyof typeof table] as AnyPgColumn;
+        if (direct) return direct;
+
+        // Fallback for relations (e.g. project -> project_id)
+        const relationKey = `${field}_id`;
+        if (relationKey in table) {
+            const viaRelation = table[relationKey as keyof typeof table] as AnyPgColumn;
+            if (viaRelation) return viaRelation;
+        }
+
+        if (mode === "warn") {
+            logger.warn(`Filtering by field '${field}', but it does not exist in table for collection '${collectionPath}'`);
+            return undefined;
+        }
+
+        let validFields: string[] = [];
+        try {
+            validFields = Object.keys(getTableColumns(table)).sort();
+        } catch {
+            // A table stand-in without Drizzle's column symbols — the message
+            // is worth less without the list, but not worth failing over.
+        }
+
+        // Not `expected`: unlike an anonymous token refresh, this is never a
+        // routine outcome. It means a filter key and the schema have drifted
+        // apart, which used to widen results silently — exactly the thing an
+        // operator wants in the log at warn.
+        throw ApiError.badRequest(
+            `Unknown filter field '${field}' on collection '${collectionPath}'` +
+            (validFields.length > 0 ? `. Valid fields: ${validFields.join(", ")}` : ""),
+            "UNKNOWN_FILTER_FIELD",
+            { field, collection: collectionPath, ...(validFields.length > 0 && { validFields }) }
+        );
+    }
+
+    /**
      * Build filter conditions from FilterValues
      */
     static buildFilterConditions<M extends Record<string, unknown>>(
         filter: FilterValues<Extract<keyof M, string>>,
         table: PgTable<any>,
-        collectionPath: string
+        collectionPath: string,
+        mode: UnknownFilterFieldsMode = defaultUnknownFilterFieldsMode
     ): SQL[] {
         const conditions: SQL[] = [];
 
         for (const [field, filterParam] of Object.entries(filter)) {
             if (!filterParam) continue;
 
-            let fieldColumn = table[field as keyof typeof table] as AnyPgColumn;
-
-            if (!fieldColumn) {
-                // Fallback for relations (e.g. project -> project_id)
-                const relationKey = `${field}_id`;
-                if (relationKey in table) {
-                    fieldColumn = table[relationKey as keyof typeof table] as AnyPgColumn;
-                }
-            }
-
-            if (!fieldColumn) {
-                logger.warn(`Filtering by field '${field}', but it does not exist in table for collection '${collectionPath}'`);
-                continue;
-            }
+            const fieldColumn = this.resolveFilterColumn(table, field, collectionPath, mode);
+            if (!fieldColumn) continue;
 
             const paramsList = Array.isArray(filterParam) && filterParam.length > 0 && Array.isArray(filterParam[0])
                 ? (filterParam as [WhereFilterOp, any][])
@@ -269,26 +347,22 @@ export class DrizzleConditionBuilder {
     static buildLogicalConditions(
         cond: LogicalCondition | FilterCondition,
         table: PgTable<any>,
-        collectionPath: string
+        collectionPath: string,
+        mode: UnknownFilterFieldsMode = defaultUnknownFilterFieldsMode
     ): SQL | null {
         if ("type" in cond) {
             const subSQLs = cond.conditions
-                .map(c => this.buildLogicalConditions(c, table, collectionPath))
+                .map(c => this.buildLogicalConditions(c, table, collectionPath, mode))
                 .filter((sql): sql is SQL => sql !== null);
             if (subSQLs.length === 0) return null;
             return (cond.type === "or" ? or(...subSQLs) : and(...subSQLs)) ?? null;
         } else {
-            let fieldColumn = table[cond.column as keyof typeof table] as AnyPgColumn;
-            if (!fieldColumn) {
-                const relationKey = `${cond.column}_id`;
-                if (relationKey in table) {
-                    fieldColumn = table[relationKey as keyof typeof table] as AnyPgColumn;
-                }
-            }
-            if (!fieldColumn) {
-                logger.warn(`Filtering by field '${cond.column}', but it does not exist in table for collection '${collectionPath}'`);
-                return null;
-            }
+            // A dropped leaf is worse here than in a flat filter: inside an
+            // `or(...)` the disjunction loses a branch, so the surviving
+            // branches match on their own and the result set widens by
+            // everything the dropped leaf would have excluded.
+            const fieldColumn = this.resolveFilterColumn(table, cond.column, collectionPath, mode);
+            if (!fieldColumn) return null;
             return this.buildSingleFilterCondition(fieldColumn, cond.operator as WhereFilterOp, cond.value);
         }
     }

@@ -41,6 +41,7 @@ import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cd
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
 import { isChannelBusInstance } from "@rebasepro/types";
+import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./utils/drizzle-conditions";
 
 export interface PostgresDriverConfig {
     connectionString?: string;
@@ -67,6 +68,13 @@ export interface PostgresDriverConfig {
      *    instance and wrong for two. See {@link ChannelBusConfig}.
      */
     realtime?: RealtimeChannelsConfig;
+    /**
+     * What to do with a filter field that resolves to no column at all.
+     * Defaults to `"error"` — a filter that cannot be compiled would otherwise
+     * be dropped, and a dropped condition can only widen the result set.
+     * Set to `"warn"` to restore the pre-fix behaviour of dropping it silently.
+     */
+    unknownFilterFields?: UnknownFilterFieldsMode;
 }
 
 /**
@@ -106,6 +114,13 @@ import { isEconnrefused } from "./cli-errors";
  * ```
  */
 export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): BackendBootstrapper {
+    // Applied at construction rather than threaded through every read: the
+    // condition builder's static methods are reached from call sites that
+    // carry no config. See `UnknownFilterFieldsMode`.
+    if (pgConfig.unknownFilterFields) {
+        configureUnknownFilterFields(pgConfig.unknownFilterFields);
+    }
+
     return {
         type: "postgres",
 
