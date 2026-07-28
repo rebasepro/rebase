@@ -1,4 +1,4 @@
-import { ApplicationVerifier, ConfirmationResult, User as FirebaseUser } from "@firebase/auth";
+import { ApplicationVerifier, ConfirmationResult, User as FirebaseUser } from "firebase/auth";
 
 import type { User } from "@rebasepro/types";
 import type { AuthController } from "@rebasepro/admin-types";
