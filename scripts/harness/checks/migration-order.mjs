@@ -58,7 +58,22 @@ export function run(ctx = context()) {
 
         // 2. Merge safety: a migration this branch adds must sort after everything main has.
         const mainJournal = mainVersionOf(ctx.root, rel);
-        if (mainJournal?.entries?.length) {
+        if (!mainJournal?.entries?.length) {
+            // Say so. This comparison was silently unavailable for the saas
+            // journal for its entire existence, and the check still reported
+            // "strictly ordered, including against main" — a green line for work
+            // that never happened. A gate that cannot run must not read as one
+            // that ran and passed.
+            found.push(
+                finding(
+                    id,
+                    WARN,
+                    `${rel}: could not read main's journal, so merge safety was NOT checked. ` +
+                        "Only ordering within this branch was verified.",
+                    "Ensure the repository tracking this journal has a `main` branch and shares history with HEAD.",
+                ),
+            );
+        } else {
             const mainMax = Math.max(...mainJournal.entries.map((e) => e.when));
             const mainTags = new Set(mainJournal.entries.map((e) => e.tag));
             for (const entry of entries) {
@@ -81,11 +96,43 @@ export function run(ctx = context()) {
     return found.length ? found : [pass(id, "Migration journals are strictly ordered, including against main.")];
 }
 
-/** The journal as main has it, so we can tell "new on this branch" from "already shipped". */
+/**
+ * The journal as main has it, so we can tell "new on this branch" from "already shipped".
+ *
+ * The path has to be resolved against the repository that actually TRACKS the
+ * journal, which is not always the one this check is running in. `saas/` is
+ * gitignored in the monorepo and is its own repository, so
+ * `git show <base>:saas/backend/drizzle/meta/_journal.json` at the monorepo root
+ * fails with "exists on disk, but not in HEAD" — `sh` swallows that into `""`,
+ * this returned null, and the entire merge-safety half of the check was skipped
+ * while the summary line still read "including against main". The half that had
+ * never once run is the half the check exists for: a lone journal is trivially
+ * monotonic, and two branches racing is the failure mode.
+ *
+ * So: find the enclosing repository from the journal's own directory and ask
+ * that one, with a path relative to it. For a journal the monorepo does track,
+ * this resolves to the monorepo and behaves exactly as before.
+ */
 function mainVersionOf(root, rel) {
-    const base = sh("git", ["merge-base", "HEAD", "main"], root);
+    // Both sides are realpath'd before being compared. `--show-toplevel` reports
+    // a resolved path, so on macOS — where /tmp and /var are symlinks — pairing
+    // it with an unresolved `abs` yields a `path.relative` full of `..`, `git
+    // show` fails, and this silently returns null: the exact failure mode being
+    // fixed here, reintroduced one layer down.
+    let abs = path.join(root, rel);
+    try {
+        abs = fs.realpathSync(abs);
+    } catch {
+        return null;
+    }
+
+    const repoRoot = sh("git", ["rev-parse", "--show-toplevel"], path.dirname(abs));
+    if (!repoRoot) return null;
+
+    const relToRepo = path.relative(repoRoot, abs);
+    const base = sh("git", ["merge-base", "HEAD", "main"], repoRoot);
     if (!base) return null;
-    const raw = sh("git", ["show", `${base}:${rel}`], root);
+    const raw = sh("git", ["show", `${base}:${relToRepo}`], repoRoot);
     if (!raw) return null;
     try {
         return JSON.parse(raw);

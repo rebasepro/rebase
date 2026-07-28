@@ -150,3 +150,16 @@ Triggered by `732d0b6` (empty user table admits the first registration).
 | `assertKnownWriteFields` on a collection with no properties | clean — documented, and deliberately not read as "deny all" |
 | aged-database upgrade path | **UNCOVERED** — no test existed. Added. |
 | empty-database first-run path | **UNCOVERED** — no test existed. Added. |
+| `harness preflight` migration-order, merge-safety half | **BUG** (class 4) — had never run once. Fixed. |
+| every saas gate | **UNCOVERED** — 1606 backend and 685 frontend tests ran in no pipeline. Added. |
+
+The migration-order finding is worth repeating, because it is class 4 in its
+purest form. The check reads `saas/backend/drizzle/meta/_journal.json` and
+compares it against main, and `saas/` is gitignored in the monorepo and is its
+own repository — so `git show <base>:saas/backend/...` at the monorepo root fails
+with "exists on disk, but not in HEAD". `sh` swallows that to `""`, the
+comparison returned null, the loop was skipped, and the summary line still read
+*"strictly ordered, including against main"*. The half that had never run is the
+half the check exists for: a lone journal is trivially monotonic, and two
+branches racing is the entire failure mode. A green line for work that never
+happened, in a gate written specifically to stop a class of silent skipping.
