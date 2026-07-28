@@ -10,6 +10,7 @@ import { hashRefreshToken } from "./jwt";
 import type { AuthModuleConfig } from "./routes";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import { readRefreshToken, clearRefreshCookie } from "./cookie-utils";
+import { isRegistrationOpen } from "./registration-policy";
 import type { resolveAuthHooks } from "./auth-hooks";
 import type { CreateUserData } from "./interfaces";
 
@@ -313,10 +314,14 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
             needsSetup = allUsers.length === 0;
         }
 
-        // Mirrors the POST /auth/register gate exactly: an empty system admits
-        // the first registration, and the hard kill switch blocks even that.
+        // Shared with the POST /auth/register gate and with getCapabilities(),
+        // so what is advertised here and what is enforced there cannot drift.
         // Advertising anything else sends the UI to a form that can only 403.
-        const registrationAllowed = !config.disableSelfRegistration && (needsSetup || !!config.allowRegistration);
+        const registrationAllowed = isRegistrationOpen({
+            disableSelfRegistration: config.disableSelfRegistration,
+            allowRegistration: config.allowRegistration,
+            needsSetup
+        });
         const enabledProviders = (config.oauthProviders || []).map((p) => p.id);
 
         return c.json({

@@ -100,6 +100,10 @@ const rebaseEnvSchema = z.object({
     GOOGLE_CLIENT_SECRET: z.string().optional(),
     REBASE_SERVICE_KEY: z.string().optional(),
     ALLOW_REGISTRATION: boolString,
+    // The kill switch, which also closes the empty-database bootstrap window
+    // that ALLOW_REGISTRATION=false deliberately leaves open. Optional so an
+    // unset variable means "not configured" rather than an explicit false.
+    DISABLE_SELF_REGISTRATION: optionalBoolString,
     ALLOW_LOCALHOST_IN_PRODUCTION: optionalBoolString,
     CORS_ORIGINS: z.string().optional(),
     FRONTEND_URL: z.string().optional(),
