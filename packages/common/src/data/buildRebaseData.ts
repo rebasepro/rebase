@@ -3,9 +3,11 @@ import {
     DataDriver,
     Entity,
     EntityValues,
+    FindAllParams,
     FindParams,
     FindResponse,
     FindResult,
+    IterateParams,
     LogicalCondition,
     RebaseData,
     RebaseSdkData,
@@ -16,6 +18,7 @@ import {
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
+import { collectAllPages, paginateFind } from "./paginate";
 import { deserializeFilter } from "./filter-dialect";
 import { buildCompositeId, resolvePrimaryKeys, PrimaryKeyInfo } from "../util/identity";
 
@@ -461,12 +464,23 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
  * so the backend SDK is byte-for-byte the same shape as the frontend client.
  */
 function toSdkCollectionClient<M extends Record<string, unknown>>(
-    snap: CollectionAccessor<M>
+    snap: CollectionAccessor<M>,
+    slug = "collection"
 ): SDKCollectionClient<M> {
     const client: SDKCollectionClient<M> = {
         async find(params?: FindParams<M>): Promise<FindResult<M>> {
             const res = await snap.find(params);
             return { data: res.data.map(entityToRow), meta: res.meta };
+        },
+        // Pagination is shared with the HTTP client rather than reimplemented:
+        // both transports satisfy the same `SDKCollectionClient`, so a walk that
+        // behaved differently in-process than over the wire would be a bug the
+        // type system could not see.
+        iterate(params?: IterateParams<M>) {
+            return paginateFind<M>((p) => client.find(p), params, slug);
+        },
+        findAll(params?: FindAllParams<M>) {
+            return collectAllPages<M>((p) => client.find(p), params, slug);
         },
         async findById(id: string | number): Promise<M | undefined> {
             const s = await snap.findById(id);
@@ -623,7 +637,7 @@ export function wrapAsSdkData(entityData: RebaseData): RebaseSdkData {
     function getAccessor(slug: string): SDKCollectionClient {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = toSdkCollectionClient(entityData.collection(slug));
+            accessor = toSdkCollectionClient(entityData.collection(slug), slug);
             cache.set(slug, accessor);
         }
         return accessor;

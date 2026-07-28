@@ -1,7 +1,9 @@
 import { buildQueryString, FindParams, RebaseApiError, Transport } from "./transport";
 import { RebaseWebSocketClient } from "./websocket";
 import {
+    FindAllParams,
     FindResult,
+    IterateParams,
     LogicalCondition,
     SDKCollectionClient,
     SDKQueryBuilderInterface,
@@ -9,6 +11,7 @@ import {
     WhereValue,
     WriteOptions
 } from "@rebasepro/types";
+import { collectAllPages, paginateFind } from "@rebasepro/common";
 
 import { SDKQueryBuilder } from "./sdk_query_builder";
 
@@ -111,6 +114,17 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 data: (raw.data || []) as M[],
                 meta: raw.meta
             };
+        },
+
+        // The pagination engine lives in `@rebasepro/common`, shared with the
+        // in-process accessor: `iterate()` has to mean the same thing whichever
+        // transport the caller happens to be holding.
+        iterate(params?: IterateParams<M>) {
+            return paginateFind<M>((p) => client.find(p), params, slug);
+        },
+
+        findAll(params?: FindAllParams<M>) {
+            return collectAllPages<M>((p) => client.find(p), params, slug);
         },
 
         async findById(id: string | number) {

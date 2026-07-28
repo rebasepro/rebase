@@ -48,6 +48,12 @@ export type { RebaseClientConfig, FindParams, FindResponse } from "./transport";
 export type { CollectionClient } from "./collection";
 export type { FindResult, SDKCollectionClient, SDKQueryBuilderInterface, PaginationMeta } from "@rebasepro/types";
 
+// Pagination: `iterate()` / `findAll()` parameter types and the error a walk
+// throws instead of quietly returning a truncated answer.
+export type { IterateParams, FindAllParams, PageWalkOptions, CursorSpec } from "@rebasepro/types";
+export { RebasePaginationError } from "@rebasepro/common";
+export type { PaginationErrorCode } from "@rebasepro/common";
+
 // Logical-condition helpers for `.where(or(...), and(...))`.
 export { QueryBuilder, or, and, cond } from "@rebasepro/common";
 
