@@ -1,5 +1,4 @@
 
-import { SecurityRule as GeneratedSecurityRule } from "@rebasepro/types";
 import { getPolicyNamesForRule, getPolicyNamesForRules } from "@rebasepro/utils";
 import { getEffectiveSecurityRules } from "@rebasepro/common";
 import React, { useState, useEffect, useMemo } from "react";
@@ -42,27 +41,9 @@ import {
 import { useFormex } from "@rebasepro/forms";
 import { useRebaseContext } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/admin-types";
+import type { PostgresPolicy, SecurityOperation, SecurityRule } from "@rebasepro/types";
 
-/** Postgres RLS policy shape — defined inline to avoid depending on @rebasepro/studio */
-export interface PostgresPolicy {
-    policyname: string;
-    tablename: string;
-    permissive: "PERMISSIVE" | "RESTRICTIVE";
-    roles: string[];
-    cmd: "SELECT" | "INSERT" | "UPDATE" | "DELETE" | "ALL";
-    qual: string | null;
-    with_check: string | null;
-    status?: "live" | "code_only" | "both";
-}
-
-interface SecurityRule {
-    name: string;
-    operation?: string;
-    mode?: string;
-    using?: string;
-    withCheck?: string;
-    roles?: string[];
-}
+export type { PostgresPolicy } from "@rebasepro/types";
 
 type CollectionWithSecurity = AdminCollection & {
     securityRules?: SecurityRule[];
@@ -70,6 +51,57 @@ type CollectionWithSecurity = AdminCollection & {
     table?: string;
     alias?: string;
 };
+
+/**
+ * `pg_policies` reports the operation and the permissive flag in upper case;
+ * `SecurityRule` names them in lower case. These two used to be `.toLowerCase()`
+ * assigned straight into a `SecurityRule`, which typechecks only against a
+ * `string` field — and this file declared its own local `SecurityRule` with
+ * `operation?: string`, so it did. Against the real type it does not: an
+ * unrecognised `cmd` would have been written into the collection as a policy
+ * operation that compiles to nothing.
+ */
+function toSecurityOperation(cmd: PostgresPolicy["cmd"] | undefined): SecurityOperation | undefined {
+    switch (cmd) {
+        case "SELECT": return "select";
+        case "INSERT": return "insert";
+        case "UPDATE": return "update";
+        case "DELETE": return "delete";
+        case "ALL": return "all";
+        default: return undefined;
+    }
+}
+
+function toSecurityMode(permissive: PostgresPolicy["permissive"] | undefined): SecurityRule["mode"] {
+    return permissive === "RESTRICTIVE" ? "restrictive" : "permissive";
+}
+
+/**
+ * Build a {@link SecurityRule} from a `pg_policies` row.
+ *
+ * `SecurityRule` is a discriminated union and this is the part the local shadow
+ * type flattened away: a raw-SQL rule *requires* `using`, so a policy with only
+ * a `WITH CHECK` clause — every INSERT-only policy — is not one. It is a
+ * roles-only rule carrying the check. Assembling the object field-by-field
+ * against `operation?: string` accepted all of these and told the compiler
+ * nothing.
+ */
+function toSecurityRule(policy: Partial<PostgresPolicy>): SecurityRule {
+    const base = {
+        name: policy.policyname ?? "",
+        operation: toSecurityOperation(policy.cmd),
+        mode: toSecurityMode(policy.permissive),
+        roles: policy.roles ? [...policy.roles] : undefined
+    };
+    if (policy.qual) {
+        return {
+            ...base,
+            using: policy.qual,
+            withCheck: policy.with_check || undefined
+        };
+    }
+    return base;
+}
 
 export function CollectionRLSTab() {
     const { values, setFieldValue } = useFormex<CollectionWithSecurity>();
@@ -186,7 +218,7 @@ export function CollectionRLSTab() {
         if (!tableName) return new Set<string>();
         const effectiveRules = getEffectiveSecurityRules(values as AdminCollection);
         return getPolicyNamesForRules(
-            [...(rules as unknown as GeneratedSecurityRule[]), ...effectiveRules],
+            [...rules, ...effectiveRules],
             tableName
         );
     }, [rules, tableName, values]);
@@ -194,14 +226,7 @@ export function CollectionRLSTab() {
     const unmappedPolicies = dbPolicies.filter(dp => !generatedPolicyNames.has(dp.policyname));
 
     const handleSave = async (newPolicy: Partial<PostgresPolicy>) => {
-        const rule: SecurityRule = {
-            name: newPolicy.policyname ?? "",
-            operation: newPolicy.cmd?.toLowerCase(),
-            mode: newPolicy.permissive?.toLowerCase(),
-            using: newPolicy.qual || undefined,
-            withCheck: newPolicy.with_check || undefined,
-            roles: newPolicy.roles
-        };
+        const rule: SecurityRule = toSecurityRule(newPolicy);
 
         let newRules;
         if (editingPolicy === "new") {
@@ -240,7 +265,7 @@ export function CollectionRLSTab() {
                                             {/* Unnamed rules are still named in Postgres — show what they compile to
                                                 rather than an empty heading. */}
                                             {rule.name || (tableName
-                                                ? getPolicyNamesForRule(rule as unknown as GeneratedSecurityRule, tableName).join(", ")
+                                                ? getPolicyNamesForRule(rule, tableName).join(", ")
                                                 : "Unnamed policy")}
                                         </Typography>
                                     </div>
@@ -251,11 +276,11 @@ export function CollectionRLSTab() {
                                 </div>
                                 <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                                     <Button size="small" variant="text" onClick={() => setEditingPolicy({
-                                        policyname: rule.name,
+                                        policyname: rule.name ?? "",
                                         tablename: values.id || values.table || values.alias || "your_table",
                                         permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
                                         cmd: (rule.operation || "ALL").toUpperCase() as PostgresPolicy["cmd"],
-                                        roles: rule.roles || [],
+                                        roles: [...(rule.roles ?? [])],
                                         qual: rule.using || null,
                                         with_check: rule.withCheck || null
                                     })}>
@@ -305,14 +330,7 @@ export function CollectionRLSTab() {
                                     </div>
                                     <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                                         <Button size="small" variant="outlined" color="primary" onClick={() => {
-                                             const rule: SecurityRule = {
-                                                name: dp.policyname,
-                                                operation: dp.cmd?.toLowerCase(),
-                                                mode: dp.permissive?.toLowerCase(),
-                                                using: dp.qual || undefined,
-                                                withCheck: dp.with_check || undefined,
-                                                roles: dp.roles
-                                            };
+                                             const rule: SecurityRule = toSecurityRule(dp);
                                             setFieldValue("securityRules", [...rules, rule]);
                                         }}>
                                             Import to codebase

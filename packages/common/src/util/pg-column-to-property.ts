@@ -1,6 +1,36 @@
-import { Property, StringProperty, NumberProperty, ArrayProperty, TableColumnInfo, TableMetadata, PostgresProperties } from "@rebasepro/types";
+import type {
+    ArrayProperty,
+    NumberProperty,
+    PostgresProperties,
+    Property,
+    Relation,
+    SecurityOperation,
+    SecurityRule,
+    StringProperty,
+    TableColumnInfo,
+    TableMetadata
+} from "@rebasepro/types";
 import { prettifyIdentifier } from "@rebasepro/utils";
-import type { AdminCollection } from "@rebasepro/admin-types";
+
+/**
+ * A collection as introspection can describe it: the table, its columns, the
+ * relations its foreign keys imply, and the RLS policies already on it.
+ *
+ * Deliberately not `Partial<AdminCollection>`, which is what this returned
+ * while it lived in `@rebasepro/studio`. `propertiesOrder` is the only admin
+ * key it produces, and naming the admin view model for one field would put
+ * `@rebasepro/admin-types` on the dependency path of a package the backend
+ * loads.
+ */
+export interface IntrospectedCollection {
+    name: string;
+    slug: string;
+    table: string;
+    properties: PostgresProperties;
+    propertiesOrder: string[];
+    relations?: Relation[];
+    securityRules?: SecurityRule[];
+}
 
 /**
  * Maps a PostgreSQL column data type to a Rebase property type.
@@ -194,23 +224,31 @@ label: prettifyIdentifier(v) })),
 }
 
 /**
- * Builds a partial AdminCollection from PostgreSQL table metadata.
+ * Builds a collection description from PostgreSQL table metadata.
  * This is used when creating a new collection from an existing database table.
  */
 export function buildCollectionFromTableMetadata(
     tableName: string,
     metadata: TableMetadata
-): Partial<AdminCollection> {
+): IntrospectedCollection {
     const properties: Record<string, Property> = {};
     const propertiesOrder: string[] = [];
-    const relations: any[] = []; // In the builder/editor, target can be a string path before hydration
-    const securityRules: any[] = [];
+    // Introspection can only ever produce two shapes: a foreign key on this
+    // table, or a junction between two. Both are named by their kind.
+    const relations: Array<{
+        id: string;
+        relationName: string;
+        target: string;
+        kind: "belongsTo" | "manyToMany";
+        localKey?: string;
+        through?: { table: string; sourceColumn: string; targetColumn: string };
+    }> = [];
+    const securityRules: SecurityRule[] = [];
 
     // Parse columns
     for (const column of metadata.columns) {
         const property = pgTypeToRebaseProperty(column);
         if (property) {
-            // Remove undefined keys so we don't output "validation: undefined"
             const propRecord = property as unknown as Record<string, unknown>;
             Object.keys(propRecord).forEach(key => propRecord[key] === undefined && delete propRecord[key]);
 
@@ -227,8 +265,7 @@ export function buildCollectionFromTableMetadata(
                 id: fk.column_name,
                 relationName: relName,
                 target: fk.foreign_table_name, // Will be hydrated later
-                cardinality: "one",
-                direction: "owning",
+                kind: "belongsTo",
                 localKey: fk.column_name
             });
         }
@@ -242,8 +279,7 @@ export function buildCollectionFromTableMetadata(
                 id: junction.target_table_name + "_relation",
                 relationName: relName,
                 target: junction.target_table_name, // Will be hydrated later
-                cardinality: "many",
-                direction: "owning",
+                kind: "manyToMany",
                 through: {
                     table: junction.junction_table_name,
                     sourceColumn: junction.source_column_name,
@@ -258,34 +294,42 @@ export function buildCollectionFromTableMetadata(
         for (const policy of metadata.policies) {
             // Attempt to map typical cmds to operations.
             // Postgres cmd: SELECT, INSERT, UPDATE, DELETE, ALL
-            let operations: string[] = [];
+            let operations: SecurityOperation[] = [];
             switch (policy.cmd) {
-                case "ALL": operations = ["read", "create", "update", "delete"]; break;
-                case "SELECT": operations = ["read"]; break;
-                case "INSERT": operations = ["create"]; break;
+                case "ALL": operations = ["all"]; break;
+                case "SELECT": operations = ["select"]; break;
+                case "INSERT": operations = ["insert"]; break;
                 case "UPDATE": operations = ["update"]; break;
                 case "DELETE": operations = ["delete"]; break;
             }
-            securityRules.push({
-                name: policy.policy_name,
-                operations,
-                // roles is string[] e.g., ["public", "authenticated"]
-                roles: policy.roles ?? [],
-                qual: policy.qual,
-                with_check: policy.with_check
-            });
+            const qual = policy.qual ?? undefined;
+            const withCheck = policy.with_check ?? undefined;
+            if (qual) {
+                securityRules.push({
+                    name: policy.policy_name,
+                    operations,
+                    roles: policy.roles ?? [],
+                    using: qual,
+                    ...(withCheck ? { withCheck } : {})
+                });
+            } else {
+                securityRules.push({
+                    name: policy.policy_name,
+                    operations,
+                    roles: policy.roles ?? []
+                });
+            }
         }
     }
 
-    const prettifiedName = prettifyIdentifier(tableName);
-
     return {
-        name: prettifiedName,
+        name: prettifyIdentifier(tableName),
         slug: tableName,
         table: tableName,
         properties: properties as PostgresProperties,
         propertiesOrder,
-        ...(relations.length > 0 ? { relations } : {}),
+        // `target` is still a slug here — the caller hydrates it into a thunk.
+        ...(relations.length > 0 ? { relations: relations as unknown as Relation[] } : {}),
         ...(securityRules.length > 0 ? { securityRules } : {})
     };
 }

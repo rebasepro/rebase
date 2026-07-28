@@ -15,3 +15,4 @@ export * from "./resolve-relation";
 export * from "./auth-default-policies";
 export * from "./junction-policies";
 export * from "./conditions";
+export * from "./pg-column-to-property";

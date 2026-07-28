@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useRef } from "react";
-import type { RebaseRegistryController, RebaseAdminConfig, RebaseStudioConfig, RebaseAuthConfig } from "@rebasepro/admin-types";
+import type { RebaseRegistryController, RebaseAdminConfig, RebaseStudioConfig, RebaseAuthViewConfig } from "@rebasepro/admin-types";
 
 /**
  * Split into two contexts to prevent infinite re-render loops:
@@ -16,14 +16,14 @@ interface RegistryDispatch {
     unregisterAdmin: () => void;
     registerStudio: (config: RebaseStudioConfig) => void;
     unregisterStudio: () => void;
-    registerAuth: (config: RebaseAuthConfig) => void;
+    registerAuth: (config: RebaseAuthViewConfig) => void;
     unregisterAuth: () => void;
 }
 
 interface RegistryState {
     cmsConfig: RebaseAdminConfig | null;
     studioConfig: RebaseStudioConfig | null;
-    authConfig: RebaseAuthConfig | null;
+    authConfig: RebaseAuthViewConfig | null;
 }
 
 const RegistryDispatchContext = createContext<RegistryDispatch | undefined>(undefined);
@@ -36,7 +36,7 @@ const RegistryStateContext = createContext<RegistryState>({
 export function RebaseRegistryProvider({ children }: { children: React.ReactNode }) {
     const [cmsConfig, setCmsConfig] = useState<RebaseAdminConfig | null>(null);
     const [studioConfig, setStudioConfig] = useState<RebaseStudioConfig | null>(null);
-    const [authConfig, setAuthConfig] = useState<RebaseAuthConfig | null>(null);
+    const [authConfig, setAuthConfig] = useState<RebaseAuthViewConfig | null>(null);
 
     // Dispatch functions are stable — never change identity
     const dispatch = useMemo<RegistryDispatch>(() => ({
@@ -44,7 +44,7 @@ export function RebaseRegistryProvider({ children }: { children: React.ReactNode
         unregisterAdmin: () => setCmsConfig(null),
         registerStudio: (config: RebaseStudioConfig) => setStudioConfig(config),
         unregisterStudio: () => setStudioConfig(null),
-        registerAuth: (config: RebaseAuthConfig) => setAuthConfig(config),
+        registerAuth: (config: RebaseAuthViewConfig) => setAuthConfig(config),
         unregisterAuth: () => setAuthConfig(null)
     }), []);
 

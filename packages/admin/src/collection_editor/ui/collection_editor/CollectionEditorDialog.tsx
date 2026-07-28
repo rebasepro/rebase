@@ -53,7 +53,7 @@ import { AICollectionGeneratorPopover } from "./AICollectionGeneratorPopover";
 import { AIModifiedPathsProvider, useAIModifiedPaths } from "./AIModifiedPathsContext";
 import { CollectionGenerationCallback, CollectionOperation } from "../../api/generateCollectionApi";
 import { CollectionRLSTab } from "./CollectionRLSTab";
-import { buildCollectionFromTableMetadata } from "../../pgColumnToProperty";
+import { buildCollectionFromTableMetadata } from "@rebasepro/common";
 import { mergeDeep, randomString, removeUndefined } from "@rebasepro/utils";
 import type { CollectionEditorExtensionProps, CollectionEditorTab } from "../../extensibility_types";
 

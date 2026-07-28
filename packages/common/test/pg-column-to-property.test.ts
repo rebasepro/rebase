@@ -1,4 +1,4 @@
-import { buildCollectionFromTableMetadata } from "./pgColumnToProperty";
+import { buildCollectionFromTableMetadata } from "../src/util/pg-column-to-property";
 import { StringProperty, NumberProperty, DateProperty, MapProperty, ArrayProperty, BooleanProperty, TableColumnInfo, TableMetadata } from "@rebasepro/types";
 
 describe("pgColumnToProperty Inference Logic", () => {

@@ -63,16 +63,9 @@ function sanitizeSqlIdentifier(name: string): string {
     return `"${name}"`;
 }
 
-export interface PostgresPolicy {
-    policyname: string;
-    tablename: string;
-    permissive: "PERMISSIVE" | "RESTRICTIVE";
-    roles: string[];
-    cmd: "SELECT" | "INSERT" | "UPDATE" | "DELETE" | "ALL";
-    qual: string | null; // USING clause
-    with_check: string | null; // WITH CHECK clause
-    status?: "live" | "code_only" | "both";
-}
+// Re-exported for the components that used to import it from here.
+export type { PostgresPolicy } from "@rebasepro/types";
+import type { PostgresPolicy } from "@rebasepro/types";
 
 interface TableRLSStatus {
     schemaName: string;

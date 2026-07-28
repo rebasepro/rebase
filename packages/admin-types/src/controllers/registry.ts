@@ -74,15 +74,30 @@ export interface RebaseStudioConfig {
     devViews?: AppView[];
 }
 
-export interface RebaseAuthConfig {
+/**
+ * Props of the `<RebaseAuth>` front-end route — what the sign-in screen renders.
+ *
+ * Named `RebaseAuthConfig` until it collided head-on with `RebaseAuthConfig` in
+ * `@rebasepro/server`, which is the *backend* auth configuration: JWT secrets,
+ * OAuth providers, password hooks, the users collection. Two unrelated shapes
+ * under one name, one of them exported from a package whose whole job is to be
+ * imported alongside the other. The old name is kept as a deprecated alias.
+ */
+export interface RebaseAuthViewConfig {
     loginView?: ReactNode;
 }
+
+/**
+ * @deprecated Use {@link RebaseAuthViewConfig}. This name collides with
+ * `RebaseAuthConfig` from `@rebasepro/server`, which configures the backend.
+ */
+export type RebaseAuthConfig = RebaseAuthViewConfig;
 
 export interface RebaseRegistryController {
     // Current state
     cmsConfig: RebaseAdminConfig | null;
     studioConfig: RebaseStudioConfig | null;
-    authConfig: RebaseAuthConfig | null;
+    authConfig: RebaseAuthViewConfig | null;
 
     // Registration functions
     registerAdmin: (config: RebaseAdminConfig) => void;
@@ -91,6 +106,6 @@ export interface RebaseRegistryController {
     registerStudio: (config: RebaseStudioConfig) => void;
     unregisterStudio: () => void;
 
-    registerAuth: (config: RebaseAuthConfig) => void;
+    registerAuth: (config: RebaseAuthViewConfig) => void;
     unregisterAuth: () => void;
 }

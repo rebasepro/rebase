@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useRef } from "react";
 import { useRebaseRegistryDispatch } from "../hooks";
-import type { RebaseAuthConfig } from "@rebasepro/admin-types";
+import type { RebaseAuthViewConfig } from "@rebasepro/admin-types";
 
 /**
  * Declarative component to configure authentication in Rebase.
@@ -10,7 +10,7 @@ import type { RebaseAuthConfig } from "@rebasepro/admin-types";
  * authentication is cross-cutting (admin, Studio, any app area).
  * @group Core
  */
-export function RebaseAuth({ loginView }: RebaseAuthConfig) {
+export function RebaseAuth({ loginView }: RebaseAuthViewConfig) {
     const dispatch = useRebaseRegistryDispatch();
     const registeredRef = useRef(false);
 
