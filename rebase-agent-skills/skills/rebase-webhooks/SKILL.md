@@ -25,8 +25,8 @@ Rebase provides a `WebhookDispatcher` class for sending HTTP webhook notificatio
 ### Import and Instantiate
 
 ```typescript
-import { WebhookDispatcher } from "@rebasepro/server/services/webhook-service";
-import type { WebhookConfig } from "@rebasepro/server/services/webhook-service";
+import { WebhookDispatcher } from "@rebasepro/server";
+import type { WebhookConfig } from "@rebasepro/server";
 
 const dispatcher = new WebhookDispatcher();
 ```
@@ -360,9 +360,9 @@ If the receiver does not respond within 10 seconds, the request is aborted and t
 The most common pattern is to wire the dispatcher into Rebase collection callbacks so webhooks fire automatically on CRUD operations:
 
 ```typescript
-// backend/collections/orders.ts
-import type { CollectionConfig, CollectionCallbacks } from "@rebasepro/types";
-import { WebhookDispatcher } from "@rebasepro/server/services/webhook-service";
+// config/collections/orders.ts
+import type { PostgresCollectionConfig, CollectionCallbacks } from "@rebasepro/types";
+import { WebhookDispatcher } from "@rebasepro/server";
 
 const dispatcher = new WebhookDispatcher();
 dispatcher.setWebhooks([
@@ -397,11 +397,15 @@ const callbacks: CollectionCallbacks = {
     },
 };
 
-const ordersCollection: CollectionConfig = {
+const ordersCollection: PostgresCollectionConfig = {
     name: "Orders",
-    path: "orders",
+    slug: "orders",
+    table: "orders",
     callbacks,
-    // ... properties
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        // ... the rest of the columns
+    },
 };
 
 export default ordersCollection;
@@ -414,7 +418,7 @@ Trigger webhooks from a custom function endpoint:
 ```typescript
 // backend/functions/process-payment.ts
 import { defineFunction } from "@rebasepro/server";
-import { WebhookDispatcher } from "@rebasepro/server/services/webhook-service";
+import { WebhookDispatcher } from "@rebasepro/server";
 
 const dispatcher = new WebhookDispatcher();
 dispatcher.setWebhooks([
@@ -462,8 +466,8 @@ For applications with many collections, create a single shared dispatcher:
 
 ```typescript
 // backend/lib/webhooks.ts
-import { WebhookDispatcher } from "@rebasepro/server/services/webhook-service";
-import type { WebhookConfig } from "@rebasepro/server/services/webhook-service";
+import { WebhookDispatcher } from "@rebasepro/server";
+import type { WebhookConfig } from "@rebasepro/server";
 
 const dispatcher = new WebhookDispatcher();
 

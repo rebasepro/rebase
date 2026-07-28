@@ -466,7 +466,7 @@ export default defineCron({
 
         // Fetch subscribers
         const { data: subscribers } = await ctx.client.data
-            .collection<{ email: string }>("subscribers")
+            .collection<{ email: string; active: boolean }>("subscribers")
             .find({ where: { active: ["==", true] } });
 
         for (const sub of subscribers) {

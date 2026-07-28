@@ -46,19 +46,19 @@ function UserMenu() {
 }
 ```
 
-## `useSideEntityController`
+## `useSidePanel`
 
 Ouvrir des entités par programmation dans un panneau latéral :
 
 ```typescript
-import { useSideEntityController } from "@rebasepro/app";
+import { useSidePanel } from "@rebasepro/admin";
 
 function OpenProductButton({ productId }) {
-    const sideEntityController = useSideEntityController();
+    const sidePanel = useSidePanel();
 
     return (
         <button onClick={() => {
-            sideEntityController.open({
+            sidePanel.open({
                 path: "products",
                 entityId: productId,
                 collection: productsCollection
@@ -138,15 +138,15 @@ function ThemeToggle() {
 }
 ```
 
-## `useEntitySelectionDialog`
+## `useSelectionDialog`
 
 Ouvre une boîte de dialogue latérale pour sélectionner des entités d'une collection. C'est le même hook utilisé en interne lorsqu'une propriété de relation est rendue :
 
 ```typescript
-import { useEntitySelectionDialog } from "@rebasepro/app";
+import { useSelectionDialog } from "@rebasepro/admin";
 
 function SelectProduct() {
-    const selectionDialog = useEntitySelectionDialog({
+    const selectionDialog = useSelectionDialog({
         path: "products",
         collection: productsCollection,
         onSingleEntitySelected: (entity) => {

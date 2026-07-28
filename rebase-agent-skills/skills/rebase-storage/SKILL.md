@@ -636,11 +636,11 @@ Cancel and remove an in-progress upload. Deletes the temp file and removes the u
 
 ```typescript
 // Using tus-js-client (npm install tus-js-client)
-import * as tus from "tus-js-client";
+import { Upload } from "tus-js-client";
 
 const file = document.querySelector<HTMLInputElement>("#fileInput")!.files![0];
 
-const upload = new tus.Upload(file, {
+const upload = new Upload(file, {
     endpoint: "http://localhost:3001/api/storage/tus",
     retryDelays: [0, 1000, 3000, 5000],
     metadata: {
@@ -833,6 +833,7 @@ import { PostgresCollectionConfig } from "@rebasepro/types";
 
 const productsCollection: PostgresCollectionConfig = {
     name: "Products",
+    slug: "products",
     table: "products",
     properties: {
         image: {
@@ -849,6 +850,7 @@ const productsCollection: PostgresCollectionConfig = {
             name: "Documents",
             type: "array",
             of: {
+                name: "Document",
                 type: "string",
                 storage: {
                     storageSource: "media",              // routes to the "media" backend

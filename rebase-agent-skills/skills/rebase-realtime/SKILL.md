@@ -484,6 +484,7 @@ Or per deployment: `REALTIME_CHANNEL_BUS=postgres`.
 import type { ChannelBus, ChannelBusFrame, ChannelBusHandler } from "@rebasepro/types";
 
 class MyBus implements ChannelBus {
+    constructor(private readonly url: string) {}
     readonly kind = "my-transport";
     readonly maxFrameBytes = Infinity;   // finite → large retained msgs go by pointer
     async start(handler: ChannelBusHandler) { /* reject if unusable */ }
@@ -767,29 +768,41 @@ When the server returns an `AUTH_ERROR` or `UNAUTHORIZED` error for any request 
 
 ### `RebaseWebSocketConfig`
 
+This is the config of the low-level `RebaseWebSocketClient`, which
+`createRebaseClient()` constructs for you. Only `websocketUrl` is also a
+`createRebaseClient()` option — the rest are wired internally.
+
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `websocketUrl` | `string` | Yes | WebSocket server URL (e.g., `"ws://localhost:3001"`) |
 | `getAuthToken` | `() => Promise<string>` | No | Async function that returns the current JWT token |
-| `WebSocket` | `typeof WebSocket` | No | Custom WebSocket constructor for Node.js environments |
+| `WebSocket` | `typeof WebSocket` | No | Custom WebSocket constructor. **Only reachable when you construct `RebaseWebSocketClient` yourself** — `createRebaseClient()` does not forward it. |
 | `onUnauthorized` | `() => Promise<boolean>` | No | Called on auth failure; return `true` if token was refreshed |
 
 ### Using in Node.js
 
-The browser `WebSocket` is not available in Node.js. Pass a WebSocket implementation:
+The client resolves its constructor from `globalThis.WebSocket`. Node 22+ ships
+one, so nothing is needed there. On older Node, set the global **before**
+creating the client — `createRebaseClient()` takes no `WebSocket` option:
 
 ```typescript
-import WebSocket from "ws";
+import WS from "ws";
 import { createRebaseClient } from "@rebasepro/client";
+
+// Node < 22 only. Must run before createRebaseClient().
+globalThis.WebSocket ??= WS as unknown as typeof globalThis.WebSocket;
 
 const client = createRebaseClient({
     baseUrl: "http://localhost:3001",
     websocketUrl: "ws://localhost:3001",
-    WebSocket: WebSocket as unknown as typeof globalThis.WebSocket,
 });
 ```
 
-> **IMPORTANT FOR AGENTS:** If WebSocket is not available and no `WebSocket` constructor is provided, the client logs a warning and realtime subscriptions will NOT work. Always provide a WebSocket constructor in Node.js environments. The warning is emitted on first *use*, not on construction, so a client that never subscribes stays silent.
+> **IMPORTANT FOR AGENTS:** Do NOT pass `WebSocket` to `createRebaseClient()` —
+> it is not an option and is silently ignored. If no constructor resolves, the
+> client logs a warning and realtime subscriptions do NOT work. The warning is
+> emitted on first *use*, not on construction, so a client that never subscribes
+> stays silent.
 
 ### The socket connects lazily
 

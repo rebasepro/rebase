@@ -22,7 +22,7 @@ function MyComponent() {
     context.storageSource       // Operaciones de archivo
     context.authController      // Estado de autenticación
     context.navigation          // Estado de navegación
-    context.sideEntityController // Control de panel lateral
+    context.sidePanel // Control de panel lateral
     context.snackbarController  // Notificaciones Toast
 }
 ```
@@ -45,19 +45,19 @@ function UserMenu() {
 }
 ```
 
-## `useSideEntityController`
+## `useSidePanel`
 
 Abrir entidades programáticamente en un panel lateral:
 
 ```typescript
-import { useSideEntityController } from "@rebasepro/app";
+import { useSidePanel } from "@rebasepro/admin";
 
 function OpenProductButton({ productId }) {
-    const sideEntityController = useSideEntityController();
+    const sidePanel = useSidePanel();
 
     return (
         <button onClick={() => {
-            sideEntityController.open({
+            sidePanel.open({
                 path: "products",
                 entityId: productId,
                 collection: productsCollection
@@ -137,15 +137,15 @@ function ThemeToggle() {
 }
 ```
 
-## `useEntitySelectionDialog`
+## `useSelectionDialog`
 
 Abrir un diálogo lateral para seleccionar entidades de una colección. Este es el mismo hook usado internamente cuando se renderiza una propiedad de relación:
 
 ```typescript
-import { useEntitySelectionDialog } from "@rebasepro/app";
+import { useSelectionDialog } from "@rebasepro/admin";
 
 function SelectProduct() {
-    const selectionDialog = useEntitySelectionDialog({
+    const selectionDialog = useSelectionDialog({
         path: "products",
         collection: productsCollection,
         onSingleEntitySelected: (entity) => {

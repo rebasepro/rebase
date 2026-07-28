@@ -346,7 +346,8 @@ interface AuthResponsePayload {
 
 ```typescript
 interface TransformAuthResponseContext {
-  userId: string;
+  /** The authenticated user's ID. */
+  uid: string;
   method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "mfa";
   request: Request;
 }
@@ -418,7 +419,7 @@ import admin from "firebase-admin";
 hooks: {
   transformAuthResponse: async (response, context) => {
     // Generate a custom provider token for the authenticated user
-    const firebaseToken = await admin.auth().createCustomToken(context.userId);
+    const firebaseToken = await admin.auth().createCustomToken(context.uid);
     return {
       ...response,
       tokens: {
@@ -1054,10 +1055,18 @@ const auth = createCustomAuthAdapter({
     }
   },
 
-  // Optional: separate token verification for WebSocket auth
+  // Optional: separate token verification for WebSocket auth.
+  // Same contract as verifyRequest, but it receives just the token string
+  // and must return an AuthenticatedUser or null.
+  // Default: synthesizes a Request and calls verifyRequest.
   verifyToken: async (token) => {
-    // Same as above but receives just the token string
-    // Default: synthesizes a Request and calls verifyRequest
+    const decoded = jwt.verify(token, MY_SECRET) as any;
+    return {
+      uid: decoded.sub,
+      email: decoded.email,
+      roles: decoded.roles ?? [],
+      isAdmin: decoded.roles?.includes("admin") ?? false,
+    };
   },
 
   // Optional: enable user management in admin panel
@@ -1075,7 +1084,7 @@ const auth = createCustomAuthAdapter({
 
   // Optional: enrich auth responses with external tokens
   transformAuthResponse: async (response, context) => {
-    const externalToken = await generateExternalToken(context.userId);
+    const externalToken = await generateExternalToken(context.uid);
     return {
       ...response,
       tokens: { ...response.tokens, externalToken },

@@ -19,42 +19,32 @@ Plugins are the primary extension mechanism in Rebase. They can:
 ```typescript
 interface RebasePlugin {
     key: string;                    // Unique identifier
-    loading?: boolean;              // Show loading state while initializing
+    loading?: boolean;              // Hold admin content until the plugin is ready
 
-    // Wrap the app with a provider
-    provider?: {
-        Component: React.ComponentType;
-    };
+    // UI contributions — a flat array, each entry naming its slot.
+    // This replaced the old per-area objects (homePage, collectionView, form).
+    slots?: SlotContribution[];
 
-    // Home page customization
-    homePage?: {
-        additionalActions?: React.ReactNode;
-        additionalChildrenStart?: React.ReactNode;
-        additionalChildrenEnd?: React.ReactNode;
-    };
+    // HOC providers. `scope: "root"` wraps the whole admin below
+    // RebaseContext; `scope: "form"` wraps each entity form / edit view.
+    providers?: PluginProvider[];
 
-    // Collection view customization
-    collectionView?: {
-        showTextSearchBar?: boolean;
-        CollectionActions?: React.ComponentType[];
-        AddColumnComponent?: React.ComponentType;
-        onCellValueChange?: (params) => void;
-    };
+    // Behavioural (non-UI) hooks: collection modification and injection,
+    // column reordering, navigation entries.
+    hooks?: PluginHooks;
 
-    // Entity form customization
-    form?: {
-        Actions?: React.ComponentType;
-        provider?: { Component: React.ComponentType };
-        fieldBuilder?: (params) => React.ReactNode | null;
-    };
+    // Custom field rendering (e.g. data enhancement).
+    fieldBuilder?: FieldBuilderConfig;
 
-    // Collection injection/modification
-    collection?: {
-        injectCollections?: (params) => CollectionConfig[];
-        modifyCollection?: (params) => CollectionConfig;
-    };
+    // Views added to the navigation automatically.
+    views?: AppView[];
+
+    lifecycle?: PluginLifecycle;
 }
 ```
+
+Every one of these is optional except `key`. The full slot-name list lives on
+the **[Slots](/docs/frontend/slots)** page.
 
 ## Using Plugins
 
@@ -68,7 +58,11 @@ const plugins = [dataEnhancementPlugin];
 const navigationStateController = useBuildNavigationStateController({
     plugins,
     collections: () => collections,
-    // ...
+    // These four are required — the controller resolves navigation against them.
+    authController,
+    data,
+    collectionRegistryController,
+    urlController
 });
 ```
 
@@ -83,9 +77,11 @@ function useMyPlugin(): RebasePlugin {
     return {
         key: "my_plugin",
 
-        slots: {
-            CollectionActions: [MyToolbarAction]
-        },
+        // `slots` is a flat array of contributions, each naming its slot.
+        // See the Slots page for the full list of slot names.
+        slots: [
+            { slot: "collection.actions", Component: MyToolbarAction }
+        ],
 
         form: {
             fieldBuilder: ({ property, ...rest }) => {
@@ -121,14 +117,9 @@ const enhancementPlugin = useDataEnhancementPlugin();
 Plugins can dynamically add new collections:
 
 ```typescript
-collection: {
-    injectCollections: ({ collections, user }) => {
-        // Add an audit log collection for admins
-        if (user?.roles?.includes("admin")) {
-            return [auditLogCollection];
-        }
-        return [];
-    }
+hooks: {
+    // Receives the resolved collections and returns the full list to use.
+    injectCollections: (collections) => [...collections, auditLogCollection]
 }
 ```
 
@@ -137,21 +128,20 @@ collection: {
 Plugins can modify existing collections:
 
 ```typescript
-collection: {
-    modifyCollection: ({ collection }) => {
-        // Add a "last_modified_by" field to every collection
-        return {
-            ...collection,
-            properties: {
-                ...collection.properties,
-                last_modified_by: {
-                    type: "string",
-                    name: "Modified By",
-                    admin: { readOnly: true }
-                }
+hooks: {
+    // Receives one collection, returns the modified one.
+    // Use `modifyCollectionAsync` when the change needs a fetch.
+    modifyCollection: (collection) => ({
+        ...collection,
+        properties: {
+            ...collection.properties,
+            last_modified_by: {
+                type: "string",
+                name: "Modified By",
+                admin: { readOnly: true }
             }
-        };
-    }
+        }
+    })
 }
 ```
 

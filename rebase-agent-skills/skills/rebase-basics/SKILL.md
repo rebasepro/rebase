@@ -571,9 +571,13 @@ await initializeRebaseBackend({
             ? { clientId: env.GOOGLE_CLIENT_ID }
             : undefined,
     },
-    // Single backend: { type: "local" | "s3" | "gcs" }
-    // Multi-backend: Record<string, StorageController> with named sources
-    storage: { type: env.STORAGE_TYPE },
+    // Each `type` carries its own required fields — `local` needs `basePath`,
+    // `s3`/`gcs` need `bucket` and credentials — so branch on the env var
+    // rather than spreading it into one object literal.
+    // Multi-backend: Record<string, StorageController> with named sources.
+    storage: env.STORAGE_TYPE === "s3"
+        ? { type: "s3", bucket: env.S3_BUCKET!, region: env.S3_REGION || "auto" }
+        : { type: "local", basePath: "./uploads" },
 });
 
 console.log(`Server running at http://localhost:${env.PORT}`);

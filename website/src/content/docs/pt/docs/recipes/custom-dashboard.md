@@ -79,7 +79,7 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
 ## Registrar como uma Visualização Personalizada
 
 ```tsx
-const views: CMSView[] = [
+const views: AppView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",

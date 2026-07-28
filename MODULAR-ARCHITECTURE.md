@@ -34,10 +34,22 @@ You point Rebase at a database and it serves an API.
 initializeRebaseBackend({
     app,
     server,
-    mode: "baas",
     database: createPostgresAdapter({ connection: db, connectionString })
 });
 ```
+
+**There is no mode flag.** `mode: "cms" | "baas"` used to be authored here and was
+deleted — on the manifest, on `RebaseBackendConfig`, on the wire contract, and as
+`REBASE_DEV_MODE`. It was never independent of the collections: it could only agree
+with them or contradict them, and when it contradicted, the server warned and threw
+the declared collections away.
+
+What decides it now is one question, asked **after** the collections directory is
+loaded: did any collections resolve? None did, so the adapter is asked to describe
+the schema (`introspectCollections`). A `collectionsDir` pointing at nothing falls
+through to introspection instead of serving an empty API and never looking. The flip
+side: declaring collections alongside what used to be `mode: "baas"` now *serves*
+them.
 
 Collections are **introspected from the database at boot** rather than imported from
 config files. Every table becomes a REST resource, with types, primary keys, and
@@ -333,9 +345,10 @@ Without `--headless`, `rebase init` asks. `dev`, `build`, and `start` detect a m
   (`workspace:*` deps resolve nowhere else), so it's what proves the template rather
   than the library behind it. It also asserts no `react` in the install tree — the
   guard above can't see templates.
-- `packages/server/test/init-mode.test.ts` — the mode contract: which collections
-  register, and that the schema editor follows the mode and `NODE_ENV`.
-- A driver that cannot introspect fails `baas` mode at boot rather than serving
+- `packages/server/test/init-mode.test.ts` — the derivation contract: which
+  collections register given what resolved, and that the schema editor follows that
+  and `NODE_ENV`.
+- A driver that cannot introspect fails at boot rather than serving
   nothing: reporting no collections means it never looked, so `init` throws and names
   it. An empty database is different — that warns and boots.
 - `rebase doctor --policies` diffs `pg_policies` against the policies your collections generate,

@@ -77,7 +77,7 @@ const job: CronJobDefinition = {
 
         // ✅ Use ctx.client to interact with your data
         const { data: oldSessions } = await ctx.client.data
-            .collection<{ id: string }>("sessions")
+            .collection<{ id: string; created_at: string }>("sessions")
             .find({
                 where: { created_at: ["<", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()] },
                 limit: 500,
@@ -122,7 +122,7 @@ const job: CronJobDefinition = {
         // Upsert into your collection using ctx.client
         for (const [currency, rate] of Object.entries(data.rates)) {
             const existing = await ctx.client.data
-                .collection<{ id: string }>("exchange_rates")
+                .collection<{ id: string; currency: string; rate: number }>("exchange_rates")
                 .find({
                     where: { currency: ["==", currency] },
                     limit: 1,
@@ -162,7 +162,7 @@ const job: CronJobDefinition = {
 
     async handler(ctx) {
         const { data: users } = await ctx.client.data
-            .collection<{ id: string; email: string }>("users")
+            .collection<{ id: string; email: string; digest_enabled: boolean }>("users")
             .find({
                 where: { digest_enabled: ["==", true] },
             });

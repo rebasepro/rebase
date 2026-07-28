@@ -252,8 +252,20 @@ export async function typecheckSnippets(root, opts = {}) {
     // so that request silently resolves to nothing and every frontend snippet reading
     // `import.meta.env` reported a missing property. Declaring it here needs no
     // dependency and cannot drift.
+    // Mirrors Vite's own `ImportMetaEnv` (vite/client.d.ts): the four built-ins
+    // keep their real types and the index signature is `any`. It was
+    // `string | boolean | undefined`, which made every `import.meta.env.VITE_X ||
+    // "fallback"` infer `string | true` and fail — a stub artefact reported
+    // against docs that are correct under the types Vite actually ships.
     const importMetaEnv = [
-        "interface ImportMetaEnv { readonly [key: string]: string | boolean | undefined }",
+        "interface ImportMetaEnv {",
+        "    readonly [key: string]: any;",
+        "    readonly BASE_URL: string;",
+        "    readonly MODE: string;",
+        "    readonly DEV: boolean;",
+        "    readonly PROD: boolean;",
+        "    readonly SSR: boolean;",
+        "}",
         "interface ImportMeta { readonly env: ImportMetaEnv }"
     ].join("\n");
     writeFileSync(

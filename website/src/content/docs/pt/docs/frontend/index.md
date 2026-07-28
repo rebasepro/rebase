@@ -16,7 +16,7 @@ Os componentes chave que compõem um frontend Rebase:
 <Rebase
     client={rebaseClient}
     collectionRegistryController={collectionRegistryController}
-    cmsUrlController={cmsUrlController}
+    urlController={urlController}
     navigationStateController={navigationStateController}
     authController={authController}
 >
@@ -39,7 +39,7 @@ Os componentes chave que compõem um frontend Rebase:
 |------|-------------|
 | `client` | Instância de `RebaseClient` para dados, autenticação e armazenamento |
 | `collectionRegistryController` | Resolve caminhos e configurações de coleção |
-| `cmsUrlController` | Constrói URLs e gerencia o roteamento |
+| `urlController` | Constrói URLs e gerencia o roteamento |
 | `navigationStateController` | Gerencia o estado de navegação, views e plugins |
 | `authController` | Estado e métodos de autenticação |
 | `storageSource` | Operações de armazenamento de arquivos |
@@ -64,7 +64,7 @@ const navigationStateController = useBuildNavigationStateController({
     authController,
     data: rebaseClient.data,
     collectionRegistryController,
-    cmsUrlController,
+    urlController,
     adminMode: adminModeController.mode,
     userManagement
 });
@@ -80,12 +80,12 @@ const collectionRegistryController = useBuildCollectionRegistryController({
 });
 ```
 
-### `useBuildCMSUrlController`
+### `useBuildUrlController`
 
 Configura a geração de URL:
 
 ```typescript
-const cmsUrlController = useBuildCMSUrlController({
+const urlController = useBuildUrlController({
     basePath: "/",
     baseCollectionPath: "/c",
     collectionRegistryController
@@ -128,7 +128,7 @@ const adminModeController = useBuildAdminModeController();
 Adicione views de navegação de nível superior para painéis, ferramentas ou páginas personalizadas:
 
 ```tsx
-const views: CMSView[] = [
+const views: AppView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",

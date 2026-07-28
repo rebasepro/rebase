@@ -173,8 +173,11 @@ import { Rebase } from "@rebasepro/app";
 <Rebase
     apiUrl="https://api.example.com"
     storageSources={[
-        { key: "media", label: "Media CDN" },
-        { key: "firebase", label: "Firebase Storage" },
+        // `engine` names the provider, `transport` says who talks to it:
+        // "server" proxies through the Rebase backend, "direct" goes
+        // client-to-provider (and needs a `source` implementation).
+        { key: "media", engine: "s3", transport: "server", label: "Media CDN" },
+        { key: "firebase", engine: "firebase", transport: "server", label: "Firebase Storage" },
     ]}
 >
     {/* ... */}

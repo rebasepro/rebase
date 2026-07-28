@@ -186,6 +186,15 @@ export * from "./types";
 export * from "./services/driver-registry";
 
 // =============================================================================
+// Webhooks
+// =============================================================================
+// The docs and the rebase-webhooks skill teach `WebhookDispatcher`. The package
+// exports map is `{ ".": … }` only, so the deep import they used
+// (`@rebasepro/server/services/webhook-service`) resolves in-repo and fails for
+// every installed consumer. Exported from the root, where it is reachable.
+export * from "./services/webhook-service";
+
+// =============================================================================
 // @internal — dev-server / SPA-serving plumbing for the official app template.
 // Not part of the stable public API; see the JSDoc on each symbol.
 // =============================================================================

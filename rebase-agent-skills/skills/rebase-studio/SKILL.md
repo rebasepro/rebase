@@ -130,16 +130,20 @@ const DEFAULT_TOOLS: ToolKey[] = [
 ];
 ```
 
-### Direct Tool Imports (Advanced)
+### Individual tools are not importable
 
-For advanced use cases where you need direct access to a tool component (e.g., embedding it outside the Studio), use deep imports:
+`@rebasepro/studio` exports **only** `RebaseStudio` and `StudioHomePage`. The
+tools (SQLEditor, JSEditor, RLSEditor,
+StorageView, …) are lazy-loaded inside `RebaseStudio.tsx` and deliberately not
+re-exported, so that importing the Studio does not pull every tool into the
+bundle.
 
-```typescript
-// Deep import — avoids pulling all tools into the bundle
-import { SQLEditor } from "@rebasepro/studio/components/SQLEditor/SQLEditor";
-```
-
-> **WARNING FOR AGENTS:** Do NOT import individual tools from `@rebasepro/studio` top-level. The index only exports `RebaseStudio` and `StudioHomePage`. Individual tools are intentionally excluded to preserve code splitting.
+> **WARNING FOR AGENTS:** Do NOT write a deep import such as
+> `@rebasepro/studio/components/SQLEditor/SQLEditor`. It resolves inside this
+> repository and fails for every installed consumer: the package's `exports`
+> map contains `"."` and `"./package.json"` only, and the published `dist/` is a
+> single bundle with no per-component file behind such a path. Mount
+> `<RebaseStudio>` and let it load the tool.
 
 ## Frontend Composition
 

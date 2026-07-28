@@ -15,9 +15,6 @@ The key components that make up a Rebase frontend:
 ```tsx
 <Rebase
     client={rebaseClient}
-    collectionRegistryController={collectionRegistryController}
-    cmsUrlController={cmsUrlController}
-    navigationStateController={navigationStateController}
     authController={authController}
 >
     {({ loading }) => (
@@ -38,15 +35,20 @@ The key components that make up a Rebase frontend:
 | Prop | Description |
 |------|-------------|
 | `client` | `RebaseClient` instance for data, auth, and storage |
-| `collectionRegistryController` | Resolves collection paths and configurations |
-| `cmsUrlController` | Builds URLs and handles routing |
-| `navigationStateController` | Manages navigation state, views, and plugins |
 | `authController` | Authentication state and methods |
-| `storageSource` | File storage operations |
+| `dataSources` | Additional data sources (see [Multiple sources](/docs/backend/multiple-sources)) |
+| `storageSource` / `storageSources` | File storage operations, and named storage sources |
 | `userConfigPersistence` | Local UI preferences (column widths, etc.) |
 | `entityViews` | Global custom entity view tabs |
 | `entityActions` | Global entity actions |
-| `plugins` | Plugin instances (legacy prop — prefer passing via navigation controller) |
+| `plugins` | Plugin instances |
+| `slots` | Slot contributions declared directly, without a plugin |
+| `basePath` / `baseCollectionPath` | URL prefixes when the admin is not at the site root |
+| `components` | Component overrides |
+
+The navigation, URL and collection-registry controllers are **not** `<Rebase>`
+props — they are built by the hooks below and consumed inside the admin tree
+(`<RebaseShell>` wires them for you in the default scaffold).
 
 ## Controllers
 
@@ -64,7 +66,7 @@ const navigationStateController = useBuildNavigationStateController({
     authController,
     data: rebaseClient.data,
     collectionRegistryController,
-    cmsUrlController,
+    urlController,
     adminMode: adminModeController.mode,
     userManagement
 });
@@ -80,12 +82,12 @@ const collectionRegistryController = useBuildCollectionRegistryController({
 });
 ```
 
-### `useBuildCMSUrlController`
+### `useBuildUrlController`
 
 Configures URL generation:
 
 ```typescript
-const cmsUrlController = useBuildCMSUrlController({
+const urlController = useBuildUrlController({
     basePath: "/",
     baseCollectionPath: "/c",
     collectionRegistryController
@@ -128,7 +130,7 @@ const adminModeController = useBuildAdminModeController();
 Add top-level navigation views for dashboards, tools, or custom pages:
 
 ```tsx
-const views: CMSView[] = [
+const views: AppView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",

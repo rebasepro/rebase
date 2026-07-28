@@ -106,9 +106,11 @@ app.get("/", async (c) => {
         return c.json({ error: "Unauthorized" }, 401);
     }
 
-    // Access the data driver to query collections
+    // Access the data driver to query collections.
+    // fetchCollection takes ONE object; the collection goes in `path`.
     const driver = c.get("driver");
-    const entities = await driver.fetchCollection("products", {
+    const entities = await driver.fetchCollection({
+        path: "products",
         limit: 1000,
         orderBy: "created_at",
         order: "desc"

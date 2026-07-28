@@ -1169,12 +1169,16 @@ import { iconKeys, coolIconKeys, lucideIcons } from "@rebasepro/ui";
 Converts a snake_case icon key to a PascalCase component name with `Icon` suffix:
 
 ```tsx
-// Internal plumbing: `@rebasepro/ui` does not re-export this from its entry point.
-import { keyToIconComponent } from "@rebasepro/ui/util/key_to_icon_component";
-
 keyToIconComponent("arrow_right"); // "ArrowRightIcon"
 keyToIconComponent("database");    // "DatabaseIcon"
 ```
+
+> **NOT IMPORTABLE.** `@rebasepro/ui` does not re-export this from its entry
+> point, and its `exports` map has no `./util/*` subpath — the deep import
+> `@rebasepro/ui/util/key_to_icon_component` resolves inside this repository and
+> fails for every installed consumer. It is documented because framework code
+> uses it internally. In app code, map the key yourself or use the `<Icon>`
+> component, which already accepts an icon key.
 
 ### Custom Icons
 

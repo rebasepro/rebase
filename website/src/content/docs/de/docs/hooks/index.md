@@ -46,19 +46,19 @@ function UserMenu() {
 }
 ```
 
-## `useSideEntityController`
+## `useSidePanel`
 
 Entitäten programmatisch in einem Seitenfenster öffnen:
 
 ```typescript
-import { useSideEntityController } from "@rebasepro/app";
+import { useSidePanel } from "@rebasepro/admin";
 
 function OpenProductButton({ productId }) {
-    const sideEntityController = useSideEntityController();
+    const sidePanel = useSidePanel();
 
     return (
         <button onClick={() => {
-            sideEntityController.open({
+            sidePanel.open({
                 path: "products",
                 entityId: productId,
                 collection: productsCollection
@@ -138,15 +138,15 @@ function ThemeToggle() {
 }
 ```
 
-## `useEntitySelectionDialog`
+## `useSelectionDialog`
 
 Öffnen eines Seitendialogs zur Auswahl von Entitäten aus einer Sammlung. Dies ist derselbe Hook, der intern verwendet wird, wenn eine Relationseigenschaft gerendert wird:
 
 ```typescript
-import { useEntitySelectionDialog } from "@rebasepro/app";
+import { useSelectionDialog } from "@rebasepro/admin";
 
 function SelectProduct() {
-    const selectionDialog = useEntitySelectionDialog({
+    const selectionDialog = useSelectionDialog({
         path: "products",
         collection: productsCollection,
         onSingleEntitySelected: (entity) => {

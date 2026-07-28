@@ -482,7 +482,7 @@ In production, the backend can serve the frontend SPA directly, eliminating the 
 ### `serveSPA()` Function Signature
 
 ```typescript
-function serveSPA<E extends Env>(app: Hono<E>, config: ServeSPAConfig): void;
+declare function serveSPA<E extends Env>(app: Hono<E>, config: ServeSPAConfig): void;
 ```
 
 ### `ServeSPAConfig` Options
@@ -490,6 +490,7 @@ function serveSPA<E extends Env>(app: Hono<E>, config: ServeSPAConfig): void;
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `frontendPath` | `string` | — | **Required.** Absolute path to the frontend build directory |
+| `basePath` | `string` | `"/"` | Public path prefix this app is served under. No trailing slash unless it *is* `"/"`. Several apps can run in one process — a site at `/`, the admin at `/admin` — so assets and the SPA fallback are scoped here instead of claiming `/*`. |
 | `apiBasePath` | `string` | `"/api"` | Base path for API routes (excluded from SPA handling) |
 | `excludePaths` | `string[]` | `[]` | Additional paths to exclude from SPA handling (e.g. `["/health", "/ws", "/metrics"]`) |
 | `indexFile` | `string` | `"index.html"` | Index file to serve for SPA routes |
@@ -500,6 +501,39 @@ function serveSPA<E extends Env>(app: Hono<E>, config: ServeSPAConfig): void;
 2. For any GET request not matching `apiBasePath` or `excludePaths`, returns `index.html` (SPA fallback)
 3. If `frontendPath` doesn't exist, logs a warning and **disables SPA serving** (does not crash)
 4. If `index.html` is missing, passes through to the next handler
+
+### Serving several apps from one process
+
+Two rules, and you need **both** — either one alone produces a bug that reads as
+an application error rather than a routing one:
+
+1. **Mount longest-path-first.** `/admin` before `/`.
+2. **Every app rooted at `/` must list its siblings in `excludePaths`.** Without
+   this, a request under `/admin` that misses the admin's files falls through to
+   the root app's catch-all and is answered with the *site's* `index.html` at the
+   admin's URL.
+
+`excludePaths` matches path *segments*, not string prefixes: `"/admin"` excludes
+`/admin` and `/admin/x`, but not `/administrators`.
+
+```typescript
+// The admin, mounted under a prefix, first.
+serveSPA(app, {
+    frontendPath: path.resolve(process.cwd(), "../admin/dist"),
+    basePath: "/admin"
+});
+
+// Then the site at the root, which must exclude the admin.
+serveSPA(app, {
+    frontendPath: path.resolve(process.cwd(), "../frontend/dist"),
+    excludePaths: ["/health", "/ws", "/admin"]
+});
+```
+
+> **`basePath` is also a build-time input.** A Vite app built with the default
+> `base: "/"` but served under `/admin` loads `index.html` and 404s every asset —
+> a blank page with no server error. `rebase build` passes `REBASE_APP_BASE` and
+> asserts the emitted HTML honours it.
 
 ### Usage Example
 

@@ -221,10 +221,7 @@ import type { HonoEnv } from "@rebasepro/server";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
 import path from "path";
-import {
-    initializeRebaseBackend,
-    HonoEnv
-} from "@rebasepro/server";
+import { initializeRebaseBackend } from "@rebasepro/server";
 import { createPostgresDatabaseConnection, createPostgresAdapter } from "@rebasepro/server-postgres";
 import { tables, enums, relations } from "./schema.generated.js";
 

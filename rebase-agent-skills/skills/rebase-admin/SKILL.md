@@ -1,15 +1,15 @@
 ---
 name: rebase-admin
-description: Guide for navigating the Rebase admin CMS, opening entities in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open a entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access admin-specific controllers.
+description: Guide for navigating the Rebase admin panel, opening entities in side drawers, building URLs, embedding collection panels, using the collection registry, and programmatic navigation. Use this skill when an agent or user needs to navigate to a collection view, open a entity in the side panel/drawer, build admin URLs, embed a collection inside a custom page, use the entity selection dialog, or access admin-specific controllers.
 ---
 
 # Rebase Admin (`@rebasepro/admin`)
 
-The `@rebasepro/admin` package provides the CMS layer for Rebase. It handles collection views, entity editing, navigation, side panels (drawers), URL routing, breadcrumbs, and the full admin context. This skill covers the **programmatic APIs** for navigating and interacting with the admin.
+The `@rebasepro/admin` package provides the admin-panel layer for Rebase. It handles collection views, entity editing, navigation, side panels (drawers), URL routing, breadcrumbs, and the full admin context. This skill covers the **programmatic APIs** for navigating and interacting with the admin.
 
 > **IMPORTANT FOR AGENTS:** All hooks in this skill must be called **inside** the `<RebaseShell>` component tree. They rely on React contexts provided by `<RebaseNavigation>`, `<SideEntityProvider>`, and `<RebaseRouteDefs>`.
 
-> **Building the view itself?** This skill covers navigation and CMS plumbing. For what the view should *look* like, read the **`rebase-design-language`** skill first — custom views render inside the admin shell and must match it. It ships whole-view skeletons and points at the live UI reference at `/debug/ui`.
+> **Building the view itself?** This skill covers navigation and admin plumbing. For what the view should *look* like, read the **`rebase-design-language`** skill first — custom views render inside the admin shell and must match it. It ships whole-view skeletons and points at the live UI reference at `/debug/ui`.
 
 ## Quick Reference — Common Tasks
 
@@ -101,10 +101,10 @@ interface EntitySidePanelProps<M extends Record<string, unknown> = Record<string
 
 **Open an existing entity for editing:**
 ```tsx
-const sideEntityController = useSidePanel();
+const sidePanel = useSidePanel();
 
 // Open the product with ID "abc123" in the side drawer
-sideEntityController.open({
+sidePanel.open({
     path: "products",
     entityId: "abc123"
 });
@@ -112,7 +112,7 @@ sideEntityController.open({
 
 **Create a new entity with pre-filled values:**
 ```tsx
-sideEntityController.open({
+sidePanel.open({
     path: "products",
     defaultValues: {
         name: "New Product",
@@ -123,7 +123,7 @@ sideEntityController.open({
 
 **Open with a callback on save:**
 ```tsx
-sideEntityController.open({
+sidePanel.open({
     path: "orders",
     entityId: orderId,
     closeOnSave: true,
@@ -135,7 +135,7 @@ sideEntityController.open({
 
 **Replace the current panel (instead of stacking):**
 ```tsx
-sideEntityController.replace({
+sidePanel.replace({
     path: "clients",
     entityId: "xyz789"
 });
@@ -155,7 +155,7 @@ import { useUrlController } from "@rebasepro/admin";
 
 ```typescript
 type UrlController = {
-    /** Base path for the CMS (default: "/") */
+    /** Base path for the admin (default: "/") */
     basePath: string;
 
     /** Base path for collection routes (default: "/c") */
@@ -536,7 +536,7 @@ type NavigationStateController = {
 
 ---
 
-## 9. CMS Context (All-in-One)
+## 9. Admin Context (All-in-One)
 
 Use `useAdminContext()` to get the full admin context combining the core `RebaseContext` with all admin-specific controllers.
 
@@ -544,11 +544,11 @@ Use `useAdminContext()` to get the full admin context combining the core `Rebase
 import { useAdminContext } from "@rebasepro/admin";
 ```
 
-### CMSContext Type
+### AdminContext Type
 
 ```typescript
-type CMSContext = RebaseContext & {
-    sideEntityController: SidePanelController;
+type AdminContext = RebaseContext & {
+    sidePanelController: SidePanelController;
     sideDialogsController: SideDialogsController;
     urlController: UrlController;
     navigationStateController: NavigationStateController;
@@ -562,7 +562,7 @@ type CMSContext = RebaseContext & {
 const context = useAdminContext();
 
 // Access any controller
-context.sideEntityController.open({ path: "products", entityId: "abc" });
+context.sidePanelController.open({ path: "products", entityId: "abc" });
 context.urlController.navigate(context.urlController.buildUrlCollectionPath("orders"));
 context.collectionRegistryController.getCollection("products");
 context.authController; // from RebaseContext
@@ -582,13 +582,13 @@ import { useUrlController, useSidePanel } from "@rebasepro/admin";
 
 function navigateAndOpen() {
     const urlController = useUrlController();
-    const sideEntityController = useSidePanel();
+    const sidePanel = useSidePanel();
 
     // First navigate to the collection
     urlController.navigate(urlController.buildUrlCollectionPath("products"));
 
     // Then open the entity in the side drawer
-    sideEntityController.open({
+    sidePanel.open({
         path: "products",
         entityId: "abc123"
     });
@@ -601,10 +601,10 @@ function navigateAndOpen() {
 import { useSidePanel } from "@rebasepro/admin";
 
 function MyCustomView() {
-    const sideEntityController = useSidePanel();
+    const sidePanel = useSidePanel();
 
     return (
-        <button onClick={() => sideEntityController.open({
+        <button onClick={() => sidePanel.open({
             path: "products",
             entityId: "abc123",
             updateUrl: false  // don't change the URL
@@ -645,7 +645,7 @@ function CreateButton() {
 
 ## 10. Custom Top-Level Views
 
-Add custom pages to the main CMS navigation using the `views` prop on `<RebaseAdmin>`. Views appear alongside collections in the sidebar and home page.
+Add custom pages to the main admin navigation using the `views` prop on `<RebaseAdmin>`. Views appear alongside collections in the sidebar and home page.
 
 ### AppView Interface
 
@@ -706,10 +706,13 @@ const myPlugin: RebasePlugin = {
     ]
 };
 
-<RebaseAdmin plugins={[myPlugin]} />
+// `plugins` is a prop of <Rebase>, NOT of <RebaseAdmin>.
+<Rebase plugins={[myPlugin]} client={client} authController={authController}>
+    {() => <RebaseAdmin collections={collections} />}
+</Rebase>
 ```
 
-All views (CMS, builder, plugin) are merged in order: **CMS views → Studio dev views → Plugin views**.
+All views (admin, builder, plugin) are merged in order: **admin views → Studio dev views → Plugin views**.
 
 ### Role Filtering
 
@@ -726,7 +729,7 @@ The `roles` field provides declarative access control. When set, the view is exc
 { slug: "dashboard", name: "Dashboard", view: <Dashboard /> }
 ```
 
-> **IMPORTANT FOR AGENTS:** The `roles` filter applies to ALL views — CMS views, builder-returned views, and plugin views. Use `roles` for simple role gates and the builder function for dynamic/async conditions. Both compose.
+> **IMPORTANT FOR AGENTS:** The `roles` filter applies to ALL views — admin views, builder-returned views, and plugin views. Use `roles` for simple role gates and the builder function for dynamic/async conditions. Both compose.
 
 ### Navigation Grouping
 
@@ -770,7 +773,7 @@ if (isAdmin) {
 ```
 
 ```tsx
-// frontend/src/AdminApp.tsx — tell the CMS about the prefix
+// frontend/src/AdminApp.tsx — tell the admin about the prefix
 <RebaseAdmin collections={collections} basePath="/admin" />
 ```
 
@@ -832,7 +835,7 @@ The admin package exports the following components (from `@rebasepro/admin`):
 
 | Component | Description |
 |-----------|-------------|
-| `RebaseAdmin` | Declarative CMS config (collections, views, editor) — renders nothing |
+| `RebaseAdmin` | Declarative admin config (collections, views, editor) — renders nothing |
 | `RebaseShell` | App shell (drawer, nav, routes, layout) — renders the actual UI |
 | `CollectionPanel` | Embed a collection view inside custom pages |
 | `DataCollectionView` | The collection view component |
@@ -860,7 +863,7 @@ The admin package exports the following components (from `@rebasepro/admin`):
 | `useNavigationStateController()` | Access navigation state |
 | `useCollectionRegistryController()` | Look up collections by slug |
 | `useBreadcrumbsController()` | Read/set breadcrumbs |
-| `useAdminContext()` | Full CMS context (core + admin controllers) |
+| `useAdminContext()` | Full admin context (core + admin controllers) |
 | `useSelectionDialog()` | Open entity selection dialog |
 | `useSelectionController()` | Multi-select controller |
 | `useHistory()` | Entity version history |

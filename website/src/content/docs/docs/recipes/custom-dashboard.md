@@ -79,7 +79,7 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
 ## Register as a Custom View
 
 ```tsx
-const views: CMSView[] = [
+const views: AppView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
@@ -99,7 +99,11 @@ Pass it to the navigation controller:
 const navigationStateController = useBuildNavigationStateController({
     views,
     collections: () => collections,
-    // ...
+    // These four are required — the controller resolves navigation against them.
+    authController,
+    data,
+    collectionRegistryController,
+    urlController
 });
 ```
 
