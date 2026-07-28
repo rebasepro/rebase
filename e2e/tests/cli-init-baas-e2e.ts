@@ -184,7 +184,11 @@ async function run() {
         // another one and every assertion below would hit the wrong server.
         await assertPortFree(backendPort);
         // `rebase dev` otherwise derives a per-project port, so pin one.
-        devProcess = execa("node", [cliBin, "dev", "--port", String(backendPort)], {
+        // The project's own CLI, not the monorepo's: booting through the latter
+        // loads a second copy of @rebasepro/server, and module-level state like
+        // the JWT config then lands in whichever copy called `configureJwt`.
+        // See `projectCliBin` in cli-init-e2e.ts.
+        devProcess = execa(path.join(projectPath, "node_modules", ".bin", "rebase"), ["dev", "--port", String(backendPort)], {
             cwd: projectPath,
             env: cleanEnv,
             stdio: "inherit",

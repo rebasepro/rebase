@@ -144,6 +144,31 @@ process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
 export const rootDir = process.env.REBASE_ROOT_DIR || process.cwd();
 export const cliBin = path.join(rootDir, "packages", "cli", "bin", "rebase.js");
 const projectPath = path.join(rootDir, "test-cli-init-project");
+
+/**
+ * The CLI *inside* a scaffolded project — the one a real user runs.
+ *
+ * Everything after `init` has to go through this rather than {@link cliBin},
+ * and the reason is not tidiness. The monorepo CLI resolves `@rebasepro/server`
+ * to `packages/cli/node_modules/...`; the project resolves it to its own
+ * installed tarball. Booting the project with the monorepo CLI therefore loads
+ * **two copies of the server package**, and `configureJwt()` writes a
+ * module-level `jwtConfig` — so the secret lands in the copy the CLI booted
+ * while `@rebasepro/server-postgres`, resolved from the project, verifies
+ * against the copy that never got it.
+ *
+ * That is why the WebSocket layer logged "JWT secret not configured" on every
+ * frame while HTTP login worked: signing happened in one copy, verifying in the
+ * other. The realtime subscription then fell back to `connected without auth`,
+ * the collection table stopped receiving row events, and the browser step that
+ * waits for a newly created row timed out — on CI, where the fallback refetch
+ * loses the race it wins locally.
+ *
+ * Using the project's own binary also makes this test do what its CI comment
+ * claims: prove the *published* artifacts boot, rather than exercising the
+ * working tree through a project-shaped directory.
+ */
+export const projectCliBin = path.join(projectPath, "node_modules", ".bin", "rebase");
 const screenshotDir = process.env.SCREENSHOT_DIR || path.join(rootDir, "e2e-screenshots");
 const serviceKey = "mysupersecretkey12345678901234567890";
 
@@ -719,8 +744,7 @@ force: true });
 
         // 5. Generate database schema & migration files
         console.log("\n⚡ Step 5: Generating database schema & migration files...");
-        const genResult = await execa("node", [
-            cliBin,
+        const genResult = await execa(projectCliBin, [
             "db",
             "generate"
         ], {
@@ -777,8 +801,7 @@ force: true });
 
         // 6. Run database migrations to apply schema changes
         console.log("\n🗄️ Step 6: Running database migrations...");
-        await execa("node", [
-            cliBin,
+        await execa(projectCliBin, [
             "db",
             "migrate"
         ], {
@@ -799,8 +822,7 @@ force: true });
             ...listenersOn(backendPort),
             ...[5173, 5174, 5175, 5176, 5177, 5178, 5179].flatMap(p => [...listenersOn(p)])
         ]);
-        const devProcess = execa("node", [
-            cliBin,
+        const devProcess = execa(projectCliBin, [
             "dev",
             "--port",
             String(backendPort)
@@ -1034,8 +1056,7 @@ timeout: 10000 });
         // the CLI started writing it, and cost a CI run to notice.
         const composeDbPassword = readEnvVar(projectPath, "DATABASE_PASSWORD") ?? "changeme";
         console.log("Running migrations on Docker DB from the host...");
-        await execa("node", [
-            cliBin,
+        await execa(projectCliBin, [
             "db",
             "migrate"
         ], {
