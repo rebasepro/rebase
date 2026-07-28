@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+### Breaking
+
+- **Nine presentation options move into a property's `admin` block** — `fixedFilter`, `includeId` and `includeEntityLink` on a reference or a relation; `widget` on a relation; `sortable` and `canAddElements` on an array; `previewProperties` on a map. The collection half of that split shipped in 0.11 and moved all 38 keys; the property half moved most of its options and left these behind, under a section marker in `properties.ts` that read `─── UI configuration ───`. A backend-only install went on shipping them with nothing to render them.
+
+  ```diff
+    tags: {
+        name: "Tags",
+        type: "relation",
+        relation: { kind: "manyToMany", target: () => tagsCollection },
+  -     widget: "dialog",
+  -     includeId: false,
+  +     admin: { widget: "dialog", includeId: false },
+    }
+  ```
+
+  Writing one at the top level is now a config error naming the fix, the same way the 0.11 collection keys are — `validate-config` reads them off `ADMIN_PROPERTY_KEYS`, so nothing is silently ignored.
+
+  `widget` is the one to check first, because it was never working: `AdminRelationOptions` already declared it and the admin only ever read *that* one, so every top-level `widget: "dialog"` had been quietly rendering a `select`. Moving it into `admin` is what makes an existing declaration take effect.
+
+  Two options that look like the same case stayed on the property, and deliberately: `propertiesOrder`, because `sortProperties` in `@rebasepro/common` reads it recursively and a driver calls that — a core package cannot see the `admin` block at all; and `keyValue`, because it says the map has no declared shape, which is what the OpenAPI generator emits `additionalProperties` from.
+
+- **The SQL-only fields are rejected on a document-store collection** — `table`, `relations` and `disableDefaultPolicies` are declared on `PostgresCollectionConfig` alone, and `columnType`/`columnName` are omitted from the Firestore and MongoDB property maps. A MongoDB collection could be written with a table name and a `columnType: "bigserial"`, and nothing anywhere read either.
+
+  `DataSourceCapabilities` had been reporting this all along — `supportsRelations` and `supportsColumnTypes` are both `false` for the document engines — and the engine-specific collection and property types existed too. The two were never joined, so call sites checked the capability at runtime and then read a field the base type had to declare for them. That is why the fields were on the base.
+
+  Engine-agnostic code narrows with the new `isRelationalCollectionConfig`, which *is* that capability check with the narrowing attached, so a custom SQL engine registered through `registerDataSourceCapabilities` is included rather than excluded by a hardcoded `"postgres"`.
+
+  `securityRules` is **not** part of this and stays driver-agnostic. It is a contract about who may read and write which rows, and each engine keeps it its own way: Postgres compiles it to `CREATE POLICY`, MongoDB translates it into a filter AND-ed into every read and write. `supportsRLS` answers whether an engine *generates policies*, which is a different question from whether it honours a rule.
+
 ### Added
 
 - **A drawer group can carry the icon, and its entries indent beneath it** — a long navigation rendered as one flat column: every entry had an icon of its own, and the group headers organising them sat at 11px in `surface-400`, *below* the contrast of the rows they label. The thing you scan to find anything else was the quietest element on screen, and thirty entries gave no visual sign of which belonged together.
@@ -25,6 +54,19 @@
 - **A full-screen entity has a way back to its collection** — every other layout can be dismissed: a side panel and a dialog close, a split keeps the list beside it. Full screen replaces the collection outright, leaving browser Back as the only route out — which the page never shows as an affordance, and which is wrong anyway once the reader has moved between tabs inside the entity.
 
 ### Fixed
+
+- **The client SDK could not create an admin API key** — `admin: true` is what grants a key the `admin` role: the admin-gated routes, and the RLS `default_admin` policies. `@rebasepro/client` declared its own `CreateApiKeyRequest` without the field, under a comment saying these types lived in the server package rather than in `@rebasepro/types` — which had stopped being true, and the copy had drifted. Passing `admin: true` was an excess-property error, so the one privileged thing about a key was unreachable. There is one declaration now, in `@rebasepro/types`; the client and the server both re-export it.
+
+- **A history entry's `updated_at` was a `string` from Postgres and a `Date` from MongoDB** — the same interface name in two driver packages, plus a third spelling in the admin's `useHistory` hook, so nothing could read history without first choosing a driver. `EntityHistoryEntry` in `@rebasepro/types` is the wire shape and carries a `string`. MongoDB's `Date` was never the contract, only its storage: the driver keeps that for its own document and converts on the way out.
+
+- **The collection editor dropped fields on save** — it round-trips a collection through a hand-written serializable mirror whose whitelist had fallen behind the core types by six fields. Editing a collection in the panel silently unset whichever of them it had.
+
+  Two mattered. `excludeFromApi` is the server-side guarantee that a column — a password hash, a verification token — never reaches an API response; opening such a collection in the editor and saving published it. And collection-level `relations` had no serializer at all, so importing an existing table detected its foreign keys and junction tables, showed them on the form, and discarded every one on save. The other four were `strictWrites`, `disableDefaultPolicies`, `filterOperators` and `urlPreview`; `url` was being dropped too, and it feeds the generated OpenAPI contract.
+
+- **Importing a table wrote a relation shape the framework no longer accepts** — `pgColumnToProperty` existed in two copies. The one the collection editor called emitted the pre-union flat relation (`cardinality`/`direction`, replaced by the `kind` tagged union) and CRUD verbs where `SecurityOperation` takes SQL ones, typed `any[]` at both sites so neither showed up. The correct copy was the one in `@rebasepro/studio`, which had the tests and was called from nowhere. There is one now, in `@rebasepro/common`.
+
+- **The Studio JS editor autocompleted a query shape the server rejects** — its ambient SDK declarations are hand-mirrored and had drifted: ten Firestore-era filter operators with no `like`/`ilike`/`is-null` family, `where` as `Record<string, string>` where a filter is an `[operator, value]` tuple, and `orderBy` as a bare string rather than a `[field, direction]` pair. A bare string reaches PostgREST and builds a malformed query. The operator union is now interpolated from `ALL_WHERE_FILTER_OPS`, so that part cannot fall behind again.
+
 
 - **A many-to-many child listing failed on a column that does not exist** — the junction's columns were passed into the `EXISTS` subquery as bare Drizzle columns. A column object carries no table qualifier of its own; it renders against whatever table the surrounding builder believes is current. Inside `db.query.findMany`, which aliases the root table, that produced
 

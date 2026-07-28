@@ -457,6 +457,32 @@ All four tiers are resolved. Verification, run after each tier:
 - `eslint --quiet` on each changed package, and `verify:docs` (701 doc snippets
   typechecked against workspace source, API names across all six locales).
 
+### Verified in the running app
+
+Static checks passed the whole way and still missed two things; running the panel
+against a real database found both.
+
+- **A test I wrote passed with a deliberately-invalid `@ts-expect-error`.** That is
+  how the inert `property_engine_gates.test.ts` was found in the first place.
+- **The serializable mirror had two more holes**, and the test written to pin them
+  caught a third: `url` had been added to the mirror's *type* and never to the
+  copy, so it was still being dropped. Collection-level `relations` had no
+  serializer at all — importing an existing table detects its foreign keys and
+  junction tables, shows them on the form, and discarded every one on save.
+
+What the panel confirmed working after the move: relation fields resolve and render
+their preview properties, entity link and `select` widget through `admin`; array
+blocks keep their drag handles and *Add to Content* button, so `sortable` and
+`canAddElements` still default to `true` when unset.
+
+One pre-existing bug turned up and was **not** introduced here — verified by putting
+`main`'s sources back and reproducing it. `RelationFieldBinding` throws *"expected a
+collection with relations support"* for any collection that declares its relation
+inline on the property rather than in a top-level `relations` array. Four of the
+demo app's collections do exactly that (`order_items`, `posts`, `product_locales`,
+`tickets`), and the field falls to the error boundary. The guard should ask
+`resolveCollectionRelations`, not `"relations" in collection`.
+
 Two things worth carrying forward, both instances of the same failure:
 
 1. **A test that is never typechecked asserts nothing.** `property_engine_gates.test.ts`

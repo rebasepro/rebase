@@ -8,7 +8,7 @@
  * @module
  */
 
-import { isRelationalCollectionConfig, type ArrayProperty, type BinaryProperty, type BooleanProperty, type DateProperty, type GeopointProperty, type MapProperty, type NumberProperty, type Properties, type Property, type ReferenceProperty, type RelationProperty, type StorageConfig, type StringProperty, type VectorProperty } from "@rebasepro/types";
+import { isRelationalCollectionConfig, type Relation, type ArrayProperty, type BinaryProperty, type BooleanProperty, type DateProperty, type GeopointProperty, type MapProperty, type NumberProperty, type Properties, type Property, type ReferenceProperty, type RelationProperty, type StorageConfig, type StringProperty, type VectorProperty } from "@rebasepro/types";
 import type { AdminPropertyOptions } from "@rebasepro/admin-types";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
@@ -27,6 +27,7 @@ import type {
     SerializableProperties,
     SerializableProperty,
     SerializableReferenceProperty,
+    SerializableRelation,
     SerializableRelationProperty,
     SerializableStorageConfig,
     SerializableStringProperty,
@@ -131,6 +132,48 @@ function resolveRelationTarget(target: RelationProperty["relation"] extends infe
 }
 
 /**
+ * A `Relation` as JSON: `target` resolved from its thunk down to a slug.
+ *
+ * Switched on `kind` and assigned without a cast, so the compiler checks that
+ * each branch writes the fields its kind owns and no others. This used to be
+ * built as an untyped bag and cast into place — which is how the target
+ * interface drifted a whole refactor behind the code writing to it.
+ *
+ * Shared by the relation *property* and the collection-level `relations` array,
+ * which had no serializer at all: `buildCollectionFromTableMetadata` fills that
+ * array from the table's foreign keys and junctions on import, and every one of
+ * them was dropped on save.
+ */
+function toSerializableRelation(link: Relation): SerializableRelation {
+    const target = resolveRelationTarget(link.target);
+    const common = {
+        ...(target ? { target } : {}),
+        ...(link.relationName ? { relationName: link.relationName } : {}),
+        ...(link.onUpdate ? { onUpdate: link.onUpdate } : {}),
+        ...(link.onDelete ? { onDelete: link.onDelete } : {})
+    };
+    switch (link.kind) {
+        case "belongsTo":
+            return { kind: "belongsTo", ...common, ...(link.localKey ? { localKey: link.localKey } : {}) };
+        case "hasOne":
+        case "hasMany":
+            return {
+                kind: link.kind,
+                ...common,
+                ...(link.foreignKeyOnTarget ? { foreignKeyOnTarget: link.foreignKeyOnTarget } : {})
+            };
+        case "manyToMany":
+            return { kind: "manyToMany", ...common, ...(link.through ? { through: link.through } : {}) };
+        case "via":
+            return { kind: "via", ...common, cardinality: link.cardinality, joinPath: link.joinPath };
+        default: {
+            const exhaustive: never = link;
+            throw new Error(`Unhandled relation kind: ${JSON.stringify(exhaustive)}`);
+        }
+    }
+}
+
+/**
  * Strip non-serializable base property fields.
  * Returns a clean object with only the common serializable fields from BaseProperty.
  * Validation is intentionally excluded — each property type handles its own.
@@ -174,6 +217,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
             if (sp.enum) result.enum = sp.enum;
             if (sp.userSelect) result.userSelect = sp.userSelect;
             if (sp.email) result.email = sp.email;
+            if (sp.url) result.url = sp.url;
 
             // Convert validation.matches from RegExp to string
             if (sp.validation) {
@@ -285,49 +329,7 @@ export function toSerializableProperty(property: Property): SerializableProperty
                 // no others. This used to be built as an untyped bag and cast
                 // into place — which is how the target interface drifted a
                 // whole refactor behind the code writing to it.
-                const target = resolveRelationTarget(link.target);
-                const common = {
-                    ...(target ? { target } : {}),
-                    ...(link.relationName ? { relationName: link.relationName } : {}),
-                    ...(link.onUpdate ? { onUpdate: link.onUpdate } : {}),
-                    ...(link.onDelete ? { onDelete: link.onDelete } : {})
-                };
-                switch (link.kind) {
-                    case "belongsTo":
-                        result.relation = {
-                            kind: "belongsTo",
-                            ...common,
-                            ...(link.localKey ? { localKey: link.localKey } : {})
-                        };
-                        break;
-                    case "hasOne":
-                    case "hasMany":
-                        result.relation = {
-                            kind: link.kind,
-                            ...common,
-                            ...(link.foreignKeyOnTarget ? { foreignKeyOnTarget: link.foreignKeyOnTarget } : {})
-                        };
-                        break;
-                    case "manyToMany":
-                        result.relation = {
-                            kind: "manyToMany",
-                            ...common,
-                            ...(link.through ? { through: link.through } : {})
-                        };
-                        break;
-                    case "via":
-                        result.relation = {
-                            kind: "via",
-                            ...common,
-                            cardinality: link.cardinality,
-                            joinPath: link.joinPath
-                        };
-                        break;
-                    default: {
-                        const exhaustive: never = link;
-                        throw new Error(`Unhandled relation kind: ${JSON.stringify(exhaustive)}`);
-                    }
-                }
+                result.relation = toSerializableRelation(link);
             }
             // overrides are dropped (may hold a non-serializable CollectionConfig)
             return result;
@@ -449,6 +451,9 @@ export function toSerializableCollectionConfig(collection: AdminCollection): Ser
     if (collection.ownerId) result.ownerId = collection.ownerId;
     if (collection.metadata) result.metadata = collection.metadata;
     if (isRelationalCollectionConfig(collection) && collection.table) result.table = collection.table;
+    if (isRelationalCollectionConfig(collection) && collection.relations?.length) {
+        result.relations = collection.relations.map(toSerializableRelation);
+    }
     if ("schema" in collection && collection.schema) result.schema = collection.schema as string;
     if (collection.orderProperty) result.orderProperty = collection.orderProperty as string;
 

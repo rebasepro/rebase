@@ -75,7 +75,7 @@ describe("ADMIN_PROPERTY_KEYS", () => {
 
     it("covers the base options and every per-type extension", () => {
         // Same tripwire as above. Bump it deliberately, alongside the list.
-        expect(ADMIN_PROPERTY_KEYS).toHaveLength(20);
+        expect(ADMIN_PROPERTY_KEYS).toHaveLength(25);
     });
 
     it("names nothing that belongs to the property contract", () => {
@@ -85,8 +85,13 @@ describe("ADMIN_PROPERTY_KEYS", () => {
             "type", "name", "description", "columnName", "columnType", "defaultValue",
             "validation", "excludeFromApi", "conditions", "callbacks", "metadata",
             "isId", "enum", "storage", "of", "oneOf", "properties", "relation",
-            "propertiesOrder", "keyValue", "sortable", "dimensions"
+            "propertiesOrder", "keyValue", "dimensions"
         ];
+        // `sortable` was on this list and has moved: it is drag-to-reorder in
+        // the form, read only by `RepeatFieldBinding`, and says nothing about
+        // the data. `propertiesOrder` and `keyValue` look like the same case
+        // and are not — `sortProperties` in `@rebasepro/common` reads the
+        // first, and the OpenAPI generator reads the second.
         for (const key of contractKeys) {
             expect(ADMIN_PROPERTY_KEYS as readonly string[]).not.toContain(key);
         }

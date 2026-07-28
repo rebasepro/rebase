@@ -456,6 +456,19 @@ client: {
 
 <FieldWidgetPreview client:only="react" variant="reference" />
 
+
+### Options de référence et de relation
+
+Elles s'appliquent aux propriétés `reference` comme aux propriétés `relation`.
+
+| Propriété | Type | Description |
+|----------|------|-------------|
+| `admin.fixedFilter` | `FilterValues` | Filtre les entités proposées dans le sélecteur |
+| `admin.widget` | `"select" \| "dialog"` | Quel widget sélectionne l'entité liée (relations uniquement) |
+| `admin.includeId` | `boolean` | Afficher l'id de l'entité liée dans les aperçus (par défaut : true) |
+| `admin.includeEntityLink` | `boolean` | Afficher un lien ouvrant l'entité liée (par défaut : true) |
+| `admin.previewProperties` | `string[]` | Quelles propriétés de la cible apparaissent dans l'aperçu (max. 3) |
+
 ## Valeurs d'énumération
 
 Utilisé avec les propriétés de type chaîne de caractères ou nombre pour afficher les listes déroulantes :

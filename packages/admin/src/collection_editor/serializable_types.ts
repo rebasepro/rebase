@@ -468,6 +468,16 @@ export interface SerializableCollectionConfig {
     // ── SQL / Postgres-specific ───────────────────────────────────────
     table?: string;
     schema?: string;
+    /**
+     * Collection-level relations, `target` as a slug — a thunk does not
+     * serialize, same as on a relation property.
+     *
+     * Absent from this mirror until now, and `buildCollectionFromTableMetadata`
+     * is the reason it matters: importing a table detects its foreign keys and
+     * junctions, puts them on the form, and the save then dropped every one of
+     * them. The import looked like it worked.
+     */
+    relations?: SerializableRelation[];
     securityRules?: readonly SecurityRule[];
     /** Removes the framework's injected baseline RLS policies. */
     disableDefaultPolicies?: boolean;

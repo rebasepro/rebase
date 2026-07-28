@@ -92,6 +92,7 @@ export type AdminCollectionKey = typeof ADMIN_COLLECTION_KEYS[number];
  * @group Models
  */
 export const ADMIN_PROPERTY_KEYS = [
+    "canAddElements",
     "clearable",
     "columnWidth",
     "customProps",
@@ -100,7 +101,10 @@ export const ADMIN_PROPERTY_KEYS = [
     "Field",
     "Filter",
     "filterOperators",
+    "fixedFilter",
     "hideFromCollection",
+    "includeEntityLink",
+    "includeId",
     "markdown",
     "minimalistView",
     "multiline",
@@ -108,6 +112,7 @@ export const ADMIN_PROPERTY_KEYS = [
     "previewAsTag",
     "previewProperties",
     "readOnly",
+    "sortable",
     "spreadChildren",
     "urlPreview",
     "widget",
