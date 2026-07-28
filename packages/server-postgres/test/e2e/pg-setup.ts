@@ -1,4 +1,5 @@
 import { execa } from "execa";
+import { spawnSync } from "node:child_process";
 import crypto from "crypto";
 import pg from "pg";
 
@@ -6,6 +7,46 @@ export interface PgContainer {
     containerName: string;
     connectionString: string;
     port: number;
+}
+
+/**
+ * Containers this process started and has not yet removed.
+ *
+ * Teardown lives in an `afterAll`, which does not run when the runner is killed
+ * — Ctrl-C, a cancelled CI job, an OOM. The container is detached, so it
+ * outlives the process that started it and keeps its port and memory. Two were
+ * found still up ten hours after the run that made them.
+ */
+const running = new Set<string>();
+let cleanupInstalled = false;
+
+/**
+ * Force-removes anything still running when the process goes down.
+ *
+ * `spawnSync`, because an `exit` handler cannot await. `--rm` on `docker run`
+ * covers only the case where postgres itself exits; a killed *test runner*
+ * leaves the container up and healthy, which is the case that actually leaked.
+ */
+function installCleanup(): void {
+    if (cleanupInstalled) return;
+    cleanupInstalled = true;
+
+    const reap = () => {
+        for (const name of running) {
+            spawnSync("docker", ["rm", "-f", name], { stdio: "ignore" });
+        }
+        running.clear();
+    };
+
+    process.once("exit", reap);
+    for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+        process.once(signal, () => {
+            reap();
+            // Re-raise with the default disposition so the exit status still
+            // reads as "killed by signal" to whatever is supervising.
+            process.kill(process.pid, signal);
+        });
+    }
 }
 
 /**
@@ -17,8 +58,12 @@ export async function startPgContainer(): Promise<PgContainer> {
 
     console.log(`[pg-setup] Starting PostgreSQL container: ${containerName}`);
 
+    installCleanup();
+    running.add(containerName);
+
     await execa("docker", [
         "run",
+        "--rm",                // self-remove once it stops
         "--name", containerName,
         "-e", "POSTGRES_DB=rebase",
         "-e", "POSTGRES_USER=rebase",
@@ -77,6 +122,7 @@ export async function startPgContainer(): Promise<PgContainer> {
  */
 export async function stopPgContainer(containerName: string): Promise<void> {
     console.log(`[pg-setup] Removing container: ${containerName}`);
+    running.delete(containerName);
     try {
         await execa("docker", ["rm", "-f", containerName]);
     } catch (e: unknown) {

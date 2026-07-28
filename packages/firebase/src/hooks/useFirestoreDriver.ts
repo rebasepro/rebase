@@ -1,6 +1,6 @@
 import { DataDriver, DeleteProps, CollectionConfig, EntityReference, FetchCollectionProps, FetchOneProps, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, SaveProps, WhereFilterOp } from "@rebasepro/types";
 import { FilterCombination } from "@rebasepro/admin-types";
-import { User } from "@firebase/auth";
+import { User } from "firebase/auth";
 import {
     collection as collectionClause,
     CollectionReference,
@@ -28,13 +28,13 @@ import {
     VectorValue,
     vector,
     where as whereClause
-} from "@firebase/firestore";
-import type { FieldValue } from "@firebase/firestore";
-import { FirebaseApp } from "@firebase/app";
+} from "firebase/firestore";
+import type { FieldValue } from "firebase/firestore";
+import { FirebaseApp } from "firebase/app";
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types/text_search";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { localSearchControllerBuilder } from "../utils";
-import { getAuth } from "@firebase/auth";
+import { getAuth } from "firebase/auth";
 
 /**
  * @group Firebase

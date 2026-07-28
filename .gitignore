@@ -79,7 +79,6 @@ packages/forms/.yarn/
 !/CONTRIBUTING.md
 !/PUBLISHING.md
 !/LICENSE
-tsc_output.txt
 yarn.lock
 package-lock.json
 app/uploads/
@@ -143,9 +142,10 @@ og-template.html
 # Astro build cache
 .astro/
 
-# Accidentally committed build output
-build_output.txt
-tsc_output.txt
+# Accidentally committed build output. Globbed, not exact: the exact names were
+# listed here and `tsc_output_2.txt`, `tsc_output_full.txt` were committed anyway.
+build_output*.txt
+tsc_output*.txt
 *_results.log
 
 # Playwright signed-in session, captured per run by e2e/global-setup.ts

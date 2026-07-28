@@ -1,7 +1,7 @@
-import { collection, getFirestore, onSnapshot, query } from "@firebase/firestore";
+import { collection, getFirestore, onSnapshot, query } from "firebase/firestore";
 import Fuse from "fuse.js"
 
-import { FirebaseApp } from "@firebase/app";
+import { FirebaseApp } from "firebase/app";
 import { CollectionConfig } from "@rebasepro/types";
 import { FirestoreTextSearchController, FirestoreTextSearchControllerBuilder } from "../types";
 

@@ -103,6 +103,13 @@ jobs:
       - name: Package name guard
         run: pnpm run check:names
 
+      # An undeclared import resolves here and under npm/yarn hoisting, and
+      # fails under pnpm's isolated layout — so it type-checks, builds and tests
+      # green, then breaks on first import for an installing user.
+      # `@rebasepro/firebase` shipped that way with seven `@firebase/*` imports.
+      - name: Declared-dependency guard
+        run: pnpm run check:deps
+
       # Nothing in any pipeline ran ESLint. `verify-quality.sh` does, but that is
       # a script a human chooses to run, so a lint error could sit on main
       # indefinitely — and one was: a `no-control-regex` error in
@@ -110,6 +117,13 @@ jobs:
       # treats as a hard failure; warnings stay advisory.
       - name: Lint
         run: npx eslint . --quiet
+
+      # The docs verifier existed but ran in no pipeline at all, and defaulted to
+      # exit 0, so documented APIs could drift from the source indefinitely — and
+      # had: a wiring example that could not compile and a `userManagement` prop
+      # that does not exist. The baseline is clean now, so it runs `--strict`.
+      - name: Docs API drift
+        run: pnpm run verify:docs:strict
 
       - name: Build packages
         run: pnpm run build

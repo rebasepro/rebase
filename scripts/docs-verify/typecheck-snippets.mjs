@@ -102,6 +102,35 @@ const IGNORED_CODES = new Set([
     2454 // "used before being assigned" across an elided section
 ]);
 
+/**
+ * Where a bare specifier resolved from, keyed by the package name a snippet
+ * imports. Node and tsc must agree: `isStubbable` says "resolvable, import it
+ * for real", but tsc resolves from the scratch directory under the workspace
+ * root, which cannot see a package-local `node_modules`. Anything resolvable to Node
+ * and invisible to tsc reported a bogus "Cannot find module" against a snippet
+ * that was correct. Recording the directory here lets {@link derivedPaths} hand
+ * tsc the same answer instead of a hand-maintained list nobody remembers to
+ * extend.
+ * @type {Map<string, string>}
+ */
+const resolvedPackageDirs = new Map();
+
+/** The bare package name of a specifier: `drizzle-orm/pg-core` → `drizzle-orm`. */
+function packageNameOf(specifier) {
+    return specifier.split("/").slice(0, specifier.startsWith("@") ? 2 : 1).join("/");
+}
+
+/** The package directory containing `entry`, or null if none looks right. */
+function packageDirOf(entry, packageName) {
+    let dir = path.dirname(entry);
+    const tail = packageName.split("/").join(path.sep);
+    while (dir !== path.dirname(dir)) {
+        if (dir.endsWith(`${path.sep}node_modules${path.sep}${tail}`)) return dir;
+        dir = path.dirname(dir);
+    }
+    return null;
+}
+
 function isStubbable(specifier, root) {
     if (specifier.startsWith("@rebasepro/")) return false; // the surface under test
     if (specifier.startsWith(".") || specifier.startsWith("/")) return true;
@@ -113,18 +142,43 @@ function isStubbable(specifier, root) {
         // `any`, which silently un-checks every snippet that imports it. That is how
         // `useRef<HTMLDivElement>(null)` came to report "untyped function calls may
         // not accept type arguments": React was never really in the program.
-        require.resolve(specifier, {
+        const entry = require.resolve(specifier, {
             paths: [
                 root,
                 path.join(root, "packages/app"),
+                path.join(root, "packages/ui"),
                 path.join(root, "packages/server"),
                 path.join(root, "packages/admin")
             ]
         });
+        // Key on the package name, never the full specifier: mapping
+        // `drizzle-orm/pg-core` to the package root would be an *exact* `paths`
+        // key, which beats the `drizzle-orm/*` wildcard and silently resolves
+        // every subpath import to the root barrel.
+        const pkg = packageNameOf(specifier);
+        const dir = packageDirOf(entry, pkg);
+        if (dir && !resolvedPackageDirs.has(pkg)) resolvedPackageDirs.set(pkg, dir);
         return false;
     } catch {
         return true;
     }
+}
+
+/**
+ * `paths` entries for every bare specifier the snippets actually imported,
+ * pointing at wherever Node found it. Explicit entries in the caller's map win:
+ * a few packages need a deliberately different target than the one Node picks
+ * (React resolves to a runtime package that ships no declarations, so it has to
+ * be mapped to `@types/react` instead).
+ */
+function derivedPaths() {
+    /** @type {Record<string, string[]>} */
+    const out = {};
+    for (const [spec, dir] of resolvedPackageDirs) {
+        out[spec] = [dir];
+        out[`${spec}/*`] = [path.join(dir, "*")];
+    }
+    return out;
 }
 
 /** Rewrites unresolvable import/export specifiers in place, preserving line count. */
@@ -306,6 +360,11 @@ export async function typecheckSnippets(root, opts = {}) {
         // every backend example reports a missing module.
         paths: {
             ...(parsed.options.paths ?? {}),
+            // Auto-derived from where Node resolved each specifier, so a doc that
+            // imports a package nobody listed here still compiles. The explicit
+            // entries below override it where the resolved package is the wrong
+            // target.
+            ...derivedPaths(),
             hono: [path.join(root, "packages/server/node_modules/hono")],
             "hono/*": [path.join(root, "packages/server/node_modules/hono/*")],
             zod: [path.join(root, "packages/server/node_modules/zod")],

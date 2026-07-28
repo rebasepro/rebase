@@ -367,7 +367,6 @@ describe("rebaseCollectionsPlugin — virtual collections module", () => {
         const body = source
             .replace("import.meta.glob(", "__glob(")
             .replace(/export const collections =/, "const collections =");
-        // eslint-disable-next-line no-new-func
         const fn = new Function("__glob", `${body}; return { collections };`);
         return fn(() => modules) as { collections: Record<string, unknown>[] };
     }

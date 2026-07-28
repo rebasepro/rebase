@@ -12,6 +12,9 @@ Ações de entidade são botões personalizados que aparecem em entidades indivi
 
 ```typescript
 import { defineCollection } from "@rebasepro/admin-types";
+import { iconSize } from "@rebasepro/ui";
+import { Copy, Upload } from "lucide-react";
+
 const articlesCollection = defineCollection({
     slug: "articles",
     name: "Articles",
@@ -26,7 +29,7 @@ const articlesCollection = defineCollection({
         entityActions: [
             {
                 name: "Publish",
-                icon: "publish",
+                icon: <Upload size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .update(entity.id, { status: "published", published_at: new Date() });
@@ -38,7 +41,7 @@ const articlesCollection = defineCollection({
             },
             {
                 name: "Clone",
-                icon: "content_copy",
+                icon: <Copy size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
                     const { id, ...values } = entity.values;
                     await context.data.collection<Record<string, unknown>>(entity.path)

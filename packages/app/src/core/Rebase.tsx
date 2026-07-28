@@ -204,7 +204,6 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
                 if (!cancelled) console.debug("[Rebase] Could not load storage sources", e);
             });
         return () => { cancelled = true; };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [client, authUser, loginSkipped]);
 
     // Normalize the prop + discovered definitions into a registry + sources map.

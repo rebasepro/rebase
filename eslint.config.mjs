@@ -31,7 +31,6 @@ export default [
             "**/website/**",
             "**/examples/**",
             "**/saas/**",
-            "scripts/**",
             ".pnp.loader.mjs",
             "update_translations.js",
             "inspect_product.mjs",
@@ -43,7 +42,12 @@ export default [
     pluginReact.configs.flat.recommended,
     {
 
-        files: ["**/*.{js,jsx,mjs,cjs,ts,tsx}"],
+        // `mts`/`cts` included: `pluginReact.configs.flat.recommended` above is
+        // unscoped, so it matches every file, while `settings.react.version`
+        // below lives here. A file outside this glob got the plugin without its
+        // settings, and eslint-plugin-react warned about the missing version on
+        // every run — `scripts/verify-selfhost.mts` was the one such file.
+        files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
 
         plugins: {
             "react-hooks": pluginReactHooks
@@ -127,6 +131,21 @@ export default [
             "@typescript-eslint/no-inferrable-types": "warn",
             "@typescript-eslint/ban-ts-comment": "warn",
             "@typescript-eslint/no-explicit-any": "off"
+        }
+    },
+    {
+        // typescript-eslint owns unused-variable reporting on TypeScript. Both
+        // rules were on, over the same files, with the same options, and the
+        // base rule cannot see a type position: it counted the parameter names
+        // in a function *type* (`((value: string) => string)`) and in an
+        // ambient `declare function gtag(...args: unknown[])` as unused
+        // bindings. Every one of the 843 findings the TypeScript rule reported
+        // was duplicated here, and the base rule added 1896 more that were all
+        // false — 2739 warnings, none of them signal, burying the 179
+        // exhaustive-deps warnings that are.
+        files: ["**/*.{ts,tsx,mts,cts}"],
+        rules: {
+            "no-unused-vars": "off"
         }
     },
     {

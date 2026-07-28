@@ -1,4 +1,4 @@
-import { FirebaseApp } from "@firebase/app";
+import { FirebaseApp } from "firebase/app";
 import {
     Database,
     get,
@@ -13,7 +13,7 @@ import {
     remove,
     set,
     startAt
-} from "@firebase/database";
+} from "firebase/database";
 import { useCallback } from "react";
 import { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, FilterValues, ListenCollectionProps, ListenOneProps, SaveProps } from "@rebasepro/types";
 
