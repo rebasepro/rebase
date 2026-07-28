@@ -1,4 +1,4 @@
-import type { Property, Relation } from "@rebasepro/types";
+import { isRelationalCollectionConfig, type Property, type Relation } from "@rebasepro/types";
 import { generateForeignKeyName } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/admin-types";
 import { getPrimaryKeys, isPropertyBuilder } from "@rebasepro/common";
@@ -104,7 +104,7 @@ function getForeignKeyColumns<M extends Record<string, unknown>>(collection: Adm
         }
     };
 
-    for (const relation of collection.relations ?? []) {
+    for (const relation of (isRelationalCollectionConfig(collection) ? collection.relations : undefined) ?? []) {
         addRelationKeys(relation);
     }
 

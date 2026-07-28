@@ -21,7 +21,14 @@
     // side-effect-imports it. Without this line every `admin` in the fixtures is
     // an error — the same program-scoping rule the templates deal with via
     // `config/admin.d.ts`.
-    "packages/admin-types/src"
+    "packages/admin-types/src",
+    // The engine gates: which property primitives and which collection fields
+    // each driver admits. Every assertion there is a `@ts-expect-error`, so the
+    // file is inert unless tsc reads it — and for as long as it was not listed
+    // here it asserted against `driver:`, `collectionPath` and a `StringProperty`
+    // shape that had all been gone for months, passing every run.
+    "packages/types/test",
+    "packages/types/src"
   ],
   "exclude": [
     "**/node_modules",

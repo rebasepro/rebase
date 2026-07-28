@@ -14,6 +14,11 @@ The starting point was `disableDefaultPolicies` — RLS is Postgres-only, but th
 is declared on `BaseCollectionConfig`, so a MongoDB collection accepts it. That is
 not one mistake; it is the general case.
 
+**All four tiers are resolved.** One finding below turned out to be wrong on the way
+through and is corrected in place: `securityRules` is *not* Postgres-only —
+`@rebasepro/server-mongo` enforces it as a query filter — so it stayed on the base
+type. See Tier 2.
+
 The framing that makes the whole list legible: `DataSourceCapabilities`
 (`packages/types/src/types/data_source.ts:14`) **already declares the exact axes** —
 `supportsRLS`, `supportsColumnTypes`, `supportsRelations`, `supportsSubcollections`,
@@ -164,7 +169,21 @@ The `packages/ui` copy is untouched and still a copy.
 
 ---
 
-## Tier 2 — Postgres-only fields on driver-agnostic types
+## Tier 2 — Postgres-only fields on driver-agnostic types — **DONE**
+
+> Resolved 2026-07-28, and one claim below is **wrong**: `securityRules` is not
+> Postgres-only. `@rebasepro/server-mongo` implements it, translating the rules
+> into a query filter it AND-s into every read and write — `access`,
+> `ownerField`, `roles`, `mode`, `operation`/`operations`, and a best effort at
+> raw `using`/`withCheck` SQL. It stayed on the base, now documented as the
+> cross-engine authorization contract it is. `supportsRLS` answers "does this
+> engine generate policies", which is a different question from "does this
+> engine honour a rule", and reading it as the latter is what produced the
+> error.
+>
+> What moved: `table`, `relations`, `disableDefaultPolicies` to
+> `PostgresCollectionConfig`; `columnType` and `columnName` off the document
+> engines' property maps. See **Resolution** at the end of this tier.
 
 ### 2.1 `BaseCollectionConfig`
 
@@ -247,6 +266,63 @@ Consumers: `server-postgres/src/PostgresBackendDriver.ts` (the producer),
 `properties.ts:373`. pgvector-shaped, in the shared union, and there is no
 `supportsVectors` capability flag to gate it — so unlike the others there is not even
 a runtime answer to appeal to.
+
+### Resolution
+
+The two halves the audit kept pointing at — an engine split that knew the fields
+and a capability descriptor that knew the engines — are now joined by one guard:
+
+```ts
+export function isRelationalCollectionConfig<C extends CollectionConfig<any, any>>(
+    collection: C
+): collection is C & PostgresCollectionConfig<any, any> {
+    return getDataSourceCapabilities(collection.engine).supportsRelations;
+}
+```
+
+It is the capability check the call sites were already making, with the narrowing
+the type system was missing. Every site that read `collection.table` or
+`collection.relations` was *already* guarded on `supportsRelations` at runtime and
+then read a field the base type had to declare for it — which is precisely why
+those fields were on the base. Using the guard keeps a custom SQL engine
+registered through `registerDataSourceCapabilities` working, which naming
+Postgres directly would not.
+
+For properties the fields stay on the concrete interfaces — that is where their
+per-type value unions live — and the *document engines' aliases* omit them:
+
+```ts
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+type SqlColumnFields = "columnType" | "columnName";
+
+export type MongoProperty = DistributiveOmit<Exclude<Property, RelationProperty>, SqlColumnFields>;
+```
+
+The distribution matters: a bare `Omit` over a discriminated union collapses it
+into one object with a widened `type`, so `property.type === "string"` would stop
+narrowing everywhere.
+
+**Cost.** Far below the estimate. The reference counts in the table above are
+mostly `.table` on other objects entirely: the real fallout was 64 errors across
+6 files, and the property gating landed at **zero**. Fixed sites:
+`common/util/relations.ts`, `auth-default-policies.ts`, `junction-policies.ts`,
+`admin/collection_editor/serializable_utils.ts`, `app/collections/title-property.ts`,
+`server-postgres/PostgresBootstrapper.ts`.
+
+**The test that was supposed to catch all of this.**
+`packages/types/test/property_engine_gates.test.ts` already existed, and its own
+header said "the real value is that `tsc --noEmit` validates the
+`@ts-expect-error` annotations". Nothing ever ran tsc over it. Jest strips types
+without checking them, so the file was inert — and it had drifted to asserting
+`driver: "firestore"` (the field is `engine`), `collectionPath` on a relation
+(replaced by the tagged union), `previewAsTag` and `reference` on
+`StringProperty` (moved to the admin block, and deleted), and properties missing
+their required `name`. Green every run, for months.
+
+It is rewritten to cover both the old gates and the new ones, and
+`packages/types/test` is added to the root `tsconfig.tests.json` so
+`pnpm typecheck` reads it. Verified sensitive: adding a deliberately-unused
+`@ts-expect-error` now fails with `TS2578`, which it did not before.
 
 ---
 

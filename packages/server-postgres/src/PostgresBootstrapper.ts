@@ -15,6 +15,7 @@ import {
     DatabaseAdmin,
     type DataDriver,
     CollectionConfig,
+    isRelationalCollectionConfig,
     type HistoryConfig,
     InitializedDriver,
     RealtimeProvider,
@@ -512,10 +513,11 @@ table: link.table });
                         if ((col as { auth?: { enabled?: boolean } }).auth?.enabled) continue;
 
                         const schemaName = "schema" in col && col.schema ? col.schema : "public";
+                        const declaredTable = isRelationalCollectionConfig(col) ? col.table : undefined;
                         const tableName = registry.hasTableForCollection(
-                            col.table ?? col.slug
+                            declaredTable ?? col.slug
                         )
-                            ? (col.table ?? col.slug)
+                            ? (declaredTable ?? col.slug)
                             : col.slug;
                         // Resolve the actual table name the registry stored
                         const resolvedTable = registry.getTableNames().find((k) =>

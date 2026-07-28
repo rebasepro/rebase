@@ -8,7 +8,7 @@
  * @module
  */
 
-import type { ArrayProperty, BinaryProperty, BooleanProperty, DateProperty, GeopointProperty, MapProperty, NumberProperty, Properties, Property, ReferenceProperty, RelationProperty, StorageConfig, StringProperty, VectorProperty } from "@rebasepro/types";
+import { isRelationalCollectionConfig, type ArrayProperty, type BinaryProperty, type BooleanProperty, type DateProperty, type GeopointProperty, type MapProperty, type NumberProperty, type Properties, type Property, type ReferenceProperty, type RelationProperty, type StorageConfig, type StringProperty, type VectorProperty } from "@rebasepro/types";
 import type { AdminPropertyOptions } from "@rebasepro/admin-types";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
@@ -448,7 +448,7 @@ export function toSerializableCollectionConfig(collection: AdminCollection): Ser
     if (collection.titleProperty) result.titleProperty = collection.titleProperty as string;
     if (collection.ownerId) result.ownerId = collection.ownerId;
     if (collection.metadata) result.metadata = collection.metadata;
-    if (collection.table) result.table = collection.table;
+    if (isRelationalCollectionConfig(collection) && collection.table) result.table = collection.table;
     if ("schema" in collection && collection.schema) result.schema = collection.schema as string;
     if (collection.orderProperty) result.orderProperty = collection.orderProperty as string;
 
@@ -462,7 +462,9 @@ export function toSerializableCollectionConfig(collection: AdminCollection): Ser
     if (collection.enabledViews) result.enabledViews = collection.enabledViews;
     if (collection.disableDefaultActions) result.disableDefaultActions = collection.disableDefaultActions;
     if (collection.securityRules) result.securityRules = collection.securityRules;
-    if (collection.disableDefaultPolicies !== undefined) result.disableDefaultPolicies = collection.disableDefaultPolicies;
+    if (isRelationalCollectionConfig(collection) && collection.disableDefaultPolicies !== undefined) {
+        result.disableDefaultPolicies = collection.disableDefaultPolicies;
+    }
     if (collection.strictWrites !== undefined) result.strictWrites = collection.strictWrites;
 
     // Enum-like fields

@@ -1,4 +1,4 @@
-import { CollectionConfig, getDataSourceCapabilities, Property, ResolvedRelation, RelationProperty } from "@rebasepro/types";
+import { CollectionConfig, isRelationalCollectionConfig, Property, ResolvedRelation, RelationProperty } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
 import { resolveRelation } from "./resolve-relation";
@@ -42,7 +42,7 @@ export function resolveCollectionRelations(
     const cached = _resolvedRelationsCache.get(collection);
     if (cached) return cached;
 
-    if (!getDataSourceCapabilities(collection.engine).supportsRelations) return {};
+    if (!isRelationalCollectionConfig(collection)) return {};
 
     const relations: Record<string, ResolvedRelation> = {};
 
@@ -67,7 +67,7 @@ export function resolveCollectionRelations(
 }
 
 export function getTableName(collection: CollectionConfig): string {
-    if (getDataSourceCapabilities(collection.engine).supportsRelations) {
+    if (isRelationalCollectionConfig(collection)) {
         return collection.table ?? toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);
     }
     return toSnakeCase(collection.slug) ?? toSnakeCase(collection.name);

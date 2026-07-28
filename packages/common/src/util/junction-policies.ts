@@ -268,7 +268,7 @@ function coversUpdate(rule: SecurityRule): boolean {
  * stays locked (RLS is still enabled) until they write policies for it.
  */
 export function getJunctionSecurityRules(spec: JunctionSpec): SecurityRule[] {
-    if (spec.declaringSides.every(side => side.collection.disableDefaultPolicies)) {
+    if (spec.declaringSides.every(side => isPostgresCollectionConfig(side.collection) && side.collection.disableDefaultPolicies)) {
         return [];
     }
 

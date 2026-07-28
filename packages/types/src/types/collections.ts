@@ -5,6 +5,7 @@ import type { EnumValues, Properties, PostgresProperties, FirebaseProperties, Mo
 import type { User } from "../users";
 import type { Relation } from "./relations";
 import type { SecurityRule } from "./security_rules";
+import { getDataSourceCapabilities } from "./data_source";
 import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operators";
 
 /**
@@ -116,29 +117,33 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      */
     auth?: boolean | AuthCollectionConfig;
 
+
+
+
+
+
+
     /**
-     * Opt out of the framework's default Row Level Security policies.
+     * Row-level authorization rules for this collection.
      *
-     * The schema generator automatically injects, for every collection, a
-     * baseline SELECT policy granting the trusted server context and the
-     * `admin` role read access (reads run under a restricted role, so RLS
-     * default-denies without it). For auth collections it additionally injects
-     * a self-read policy (`id = auth.uid()`) and an admin-only write gate
-     * (INSERT/UPDATE/DELETE require the `admin` role or the trusted server
-     * context), making privileged columns such as `roles` safe by default.
+     * Driver-agnostic on purpose, unlike `disableDefaultPolicies`, `table` and
+     * `relations`, which are declared on {@link PostgresCollectionConfig} only.
+     * The rules are a *contract* — who may read or write which rows — and each
+     * engine enforces it its own way:
      *
-     * Author-defined `securityRules` are permissive and broaden access on top
-     * of these defaults. Set this flag to `true` to remove the defaults
-     * entirely and take full responsibility for the collection's RLS.
-     *
-     * @default false
+     * - **Postgres** compiles them to real `CREATE POLICY` statements and lets
+     *   the database enforce them (see {@link PostgresCollectionConfig.securityRules},
+     *   which narrows this with the raw-SQL details).
+     * - **MongoDB** translates them into a query filter it AND-s into every
+     *   read and write, honouring `access`, `ownerField`, `roles`, `mode` and
+     *   the `operation`/`operations` selectors, and making a best effort at raw
+     *   `using`/`withCheck` SQL.
+     * - **Firestore** does not implement them at all; its own rules language is
+     *   evaluated by Google, not from here. `supportsRLS` on
+     *   {@link DataSourceCapabilities} reports which engines generate policies,
+     *   which is not the same question as whether an engine honours a rule.
      */
-    disableDefaultPolicies?: boolean;
-
-
-
-
-
+    securityRules?: readonly SecurityRule[];
 
     /**
      * This interface defines all the callbacks that can be used when a entity
@@ -202,26 +207,6 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
 
 
 
-    /**
-     * The database table name for this collection.
-     * Automatically set for PostgreSQL collections.
-     * For non-SQL backends, this may be undefined.
-     */
-    table?: string;
-
-    /**
-     * Relations defined for this collection.
-     * Populated at normalization time from inline relation properties
-     * or explicit relation definitions.
-     */
-    relations?: Relation[];
-
-    /**
-     * Security rules for this collection (Row Level Security).
-     * When defined, the backend enforces access control policies.
-     */
-    securityRules?: readonly SecurityRule[];
-
 }
 
 // ── Driver-specific collection types ──────────────────────────────────
@@ -279,6 +264,25 @@ export interface PostgresCollectionConfig<M extends Record<string, unknown> = Re
      * - `auth.jwt()`   — full JWT claims as JSONB
      */
     securityRules?: readonly SecurityRule[];
+
+    /**
+     * Opt out of the framework's default Row Level Security policies.
+     *
+     * The schema generator automatically injects, for every collection, a
+     * baseline SELECT policy granting the trusted server context and the
+     * `admin` role read access (reads run under a restricted role, so RLS
+     * default-denies without it). For auth collections it additionally injects
+     * a self-read policy (`id = auth.uid()`) and an admin-only write gate
+     * (INSERT/UPDATE/DELETE require the `admin` role or the trusted server
+     * context), making privileged columns such as `roles` safe by default.
+     *
+     * Author-defined `securityRules` are permissive and broaden access on top
+     * of these defaults. Set this flag to `true` to remove the defaults
+     * entirely and take full responsibility for the collection's RLS.
+     *
+     * @default false
+     */
+    disableDefaultPolicies?: boolean;
 }
 
 /**
@@ -422,6 +426,32 @@ export function isPostgresCollectionConfig<C extends CollectionConfig<any, any>>
     collection: C
 ): collection is C & PostgresCollectionConfig<any, any> {
     return !collection.engine || collection.engine === "postgres";
+}
+
+/**
+ * Narrows to the SQL collection fields — `table`, `relations`,
+ * `disableDefaultPolicies` — by asking the engine's declared capabilities
+ * rather than by naming Postgres.
+ *
+ * The two halves of this already existed and were never joined. The engine
+ * split (`PostgresCollectionConfig` / `FirebaseCollectionConfig` /
+ * `MongoDBCollectionConfig`) said which fields belong to which engine at the
+ * type level; {@link DataSourceCapabilities} said the same thing at runtime,
+ * down to a `supportsRelations` flag. So call sites guarded on the capability
+ * and then read a field the base type had to declare for them — which is why
+ * those fields were on the base, and why a MongoDB collection could be written
+ * with a `table`.
+ *
+ * Prefer this over {@link isPostgresCollectionConfig} wherever the question is
+ * "does this collection live in a SQL table", so a custom SQL engine
+ * registered through `registerDataSourceCapabilities` is included.
+ *
+ * @group Models
+ */
+export function isRelationalCollectionConfig<C extends CollectionConfig<any, any>>(
+    collection: C
+): collection is C & PostgresCollectionConfig<any, any> {
+    return getDataSourceCapabilities(collection.engine).supportsRelations;
 }
 
 /**

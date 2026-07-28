@@ -83,9 +83,9 @@ function getIdPropertyName(collection: CollectionConfig): string {
  * Collections that opt out via `disableDefaultPolicies` are returned unchanged.
  */
 export function getEffectiveSecurityRules(collection: CollectionConfig): SecurityRule[] {
-    const explicit = [...((isPostgresCollectionConfig(collection) ? collection.securityRules : undefined) ?? [])];
+    const explicit = [...(collection.securityRules ?? [])];
 
-    if (collection.disableDefaultPolicies) {
+    if (isPostgresCollectionConfig(collection) && collection.disableDefaultPolicies) {
         return explicit;
     }
 
@@ -143,9 +143,9 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
  * DDL, which policies are injected and how to take them off.
  */
 export function getInjectedSecurityRules(collection: CollectionConfig): SecurityRule[] {
-    if (collection.disableDefaultPolicies) return [];
+    if (isPostgresCollectionConfig(collection) && collection.disableDefaultPolicies) return [];
 
-    const explicitCount = ((isPostgresCollectionConfig(collection) ? collection.securityRules : undefined) ?? []).length;
+    const explicitCount = (collection.securityRules ?? []).length;
     // getEffectiveSecurityRules appends the defaults after the author's rules,
     // so everything past the author's count is injected.
     return getEffectiveSecurityRules(collection).slice(explicitCount);

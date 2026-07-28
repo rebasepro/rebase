@@ -64,19 +64,46 @@ export type Properties = {
     [key: string]: Property;
 };
 
+/**
+ * `Omit` that survives a union.
+ *
+ * `Property` is a union discriminated on `type`, and a bare `Omit<Property, K>`
+ * collapses it into one object whose `type` is the union of every tag — so
+ * `property.type === "string"` stops narrowing and the concrete property types
+ * become unreachable. The `T extends unknown` clause makes it distribute, so
+ * each member is omitted from separately and keeps its own discriminant.
+ */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/**
+ * The fields that describe a property's **column**, which only an engine with
+ * columns has.
+ *
+ * `columnType` names a Postgres type (`uuid`, `bigserial`, `jsonb`, `text[]`)
+ * and `columnName` overrides the snake_case derivation used to build a column
+ * name. `DataSourceCapabilities.supportsColumnTypes` already reported this at
+ * runtime — `false` for both document engines — while the types let a MongoDB
+ * property declare `columnType: "bigserial"`.
+ *
+ * They stay declared on the concrete property interfaces rather than moving,
+ * because that is where their per-type value unions live; what changes is that
+ * the document engines' property aliases omit them.
+ */
+type SqlColumnFields = "columnType" | "columnName";
+
 export type PostgresProperty = Exclude<Property, ReferenceProperty>;
 export type PostgresProperties = {
     [key: string]: PostgresProperty;
 };
 
-export type FirebaseProperty = Exclude<Property, RelationProperty>;
+export type FirebaseProperty = DistributiveOmit<Exclude<Property, RelationProperty>, SqlColumnFields>;
 export type FirebaseProperties = {
     [key: string]: FirebaseProperty;
 };
 
 // MongoDB is a document store: it uses references (stored pointers), not
 // SQL-style relations/joins. Same gating as Firestore.
-export type MongoProperty = Exclude<Property, RelationProperty>;
+export type MongoProperty = DistributiveOmit<Exclude<Property, RelationProperty>, SqlColumnFields>;
 export type MongoProperties = {
     [key: string]: MongoProperty;
 };
