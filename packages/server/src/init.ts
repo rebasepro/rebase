@@ -20,6 +20,7 @@ import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedR
 import { randomBytes } from "node:crypto";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
+import { assertCollectionConfigs } from "./collections/validate-config";
 import { DEFAULT_DRIVER_ID, DefaultDriverRegistry, DriverRegistry } from "./services/driver-registry";
 import { createRoutedRealtimeService } from "./services/routed-realtime-service";
 import { Server } from "http";
@@ -566,6 +567,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         collectionRegistry.setGlobalCallbacks(config.callbacks);
     }
     let activeCollections = config.collections || [];
+    // Collections handed in directly never touch the loader, so its strict parse
+    // has to be repeated here. Configs derived from the database schema below are
+    // machine-generated and are deliberately not checked.
+    if (activeCollections.length > 0) assertCollectionConfigs(activeCollections);
     if (config.collectionsDir && activeCollections.length === 0) {
         activeCollections = await loadCollectionsFromDirectory(config.collectionsDir);
         logger.info("Auto-discovered collections", {

@@ -6,6 +6,7 @@ import {
     type AdditionalFieldKey,
     type AdminCollection
 } from "../src/admin_collection";
+import { ADMIN_PROPERTY_KEYS } from "../src/types/property_options";
 // There is no separate admin authoring type: `augment.ts` declares `admin` onto
 // `CollectionConfig` itself, so core's type *is* the nested authoring shape.
 import type { CollectionConfig } from "@rebasepro/types";
@@ -50,6 +51,44 @@ describe("ADMIN_COLLECTION_KEYS", () => {
         ];
         for (const key of contractKeys) {
             expect(ADMIN_COLLECTION_KEYS as readonly string[]).not.toContain(key);
+        }
+    });
+});
+
+/**
+ * The property-level twin, for the same reason and with the same hole in the
+ * type check: `satisfies` catches a key that is not an option, and nothing
+ * catches an option that never made the list. Here the quiet consequence is the
+ * boot-time validator in `@rebasepro/server` calling a real presentation key
+ * left at the top of a property "unrecognised" — a warning instead of the
+ * migration hint it should be printing.
+ */
+describe("ADMIN_PROPERTY_KEYS", () => {
+    it("lists every key exactly once", () => {
+        expect(new Set(ADMIN_PROPERTY_KEYS).size).toBe(ADMIN_PROPERTY_KEYS.length);
+    });
+
+    it("is sorted, case-insensitively, so a diff on it stays readable", () => {
+        const sorted = [...ADMIN_PROPERTY_KEYS].sort((a, b) => a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0);
+        expect([...ADMIN_PROPERTY_KEYS]).toEqual(sorted);
+    });
+
+    it("covers the base options and every per-type extension", () => {
+        // Same tripwire as above. Bump it deliberately, alongside the list.
+        expect(ADMIN_PROPERTY_KEYS).toHaveLength(20);
+    });
+
+    it("names nothing that belongs to the property contract", () => {
+        // These stay on the property itself. A duplicate here would make the
+        // validator tell you to move a key that is already where it belongs.
+        const contractKeys = [
+            "type", "name", "description", "columnName", "columnType", "defaultValue",
+            "validation", "excludeFromApi", "conditions", "callbacks", "metadata",
+            "isId", "enum", "storage", "of", "oneOf", "properties", "relation",
+            "propertiesOrder", "keyValue", "sortable", "dimensions"
+        ];
+        for (const key of contractKeys) {
+            expect(ADMIN_PROPERTY_KEYS as readonly string[]).not.toContain(key);
         }
     });
 });

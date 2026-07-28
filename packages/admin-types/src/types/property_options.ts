@@ -7,6 +7,7 @@
  * types by `augment.ts` instead.
  */
 import type { ComponentRef, WhereFilterOp } from "@rebasepro/types";
+import { ADMIN_PROPERTY_KEYS as CORE_ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
 
 /**
  * Interface including all common properties of an admin property.
@@ -167,3 +168,26 @@ export interface PropertyDisabledConfig {
  * @group Entity properties
  */
 export type PreviewType = "image" | "video" | "audio" | "file";
+
+/**
+ * Every key any property `admin` block accepts, across the base options and the
+ * per-type extensions.
+ */
+type AnyAdminPropertyOptionKey =
+    | keyof AdminPropertyOptions
+    | keyof AdminStringOptions
+    | keyof AdminNumberOptions
+    | keyof AdminVectorOptions
+    | keyof AdminDateOptions
+    | keyof AdminReferenceOptions
+    | keyof AdminRelationOptions
+    | keyof AdminArrayOptions
+    | keyof AdminMapOptions;
+
+/**
+ * Core's list, re-exported through the same `satisfies` agreement check that
+ * {@link ADMIN_COLLECTION_KEYS} gets: core owns the data because the boot-time
+ * collection validator in `@rebasepro/server` needs it and may not import this
+ * package, and this clause is what stops the data from drifting off the types.
+ */
+export const ADMIN_PROPERTY_KEYS = CORE_ADMIN_PROPERTY_KEYS satisfies readonly AnyAdminPropertyOptionKey[];
