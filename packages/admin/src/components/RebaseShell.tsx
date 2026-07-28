@@ -18,6 +18,8 @@ export interface RebaseShellProps {
     autoOpenDrawer?: boolean;
     /** Start with the drawer expanded instead of collapsed to icons. Ignored on small layouts. */
     defaultDrawerOpen?: boolean;
+    /** Path to the logo shown in the drawer and top bar. Falls back to the Rebase mark. */
+    logo?: string;
     children?: React.ReactNode;
 }
 
@@ -44,6 +46,7 @@ export function RebaseShell(props: RebaseShellProps) {
         drawer,
         autoOpenDrawer = false,
         defaultDrawerOpen = false,
+        logo,
         children
     } = props;
 
@@ -66,6 +69,7 @@ export function RebaseShell(props: RebaseShellProps) {
                                 drawer={drawer}
                                 autoOpenDrawer={autoOpenDrawer}
                                 defaultDrawerOpen={defaultDrawerOpen}
+                                logo={logo}
                                 devViews={devViews}
                             />
                         }

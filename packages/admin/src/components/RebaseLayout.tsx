@@ -23,6 +23,8 @@ export interface RebaseLayoutProps {
     autoOpenDrawer?: boolean;
     /** Start with the drawer expanded instead of collapsed to icons. Ignored on small layouts. */
     defaultDrawerOpen?: boolean;
+    /** Path to the logo shown in the drawer and top bar. Falls back to the Rebase mark. */
+    logo?: string;
     /** Dev views passed to AdminModeSyncer (resolved from RebaseNavigation). */
     devViews?: AppView[];
 }
@@ -52,6 +54,7 @@ export function RebaseLayout(props: RebaseLayoutProps) {
         drawer,
         autoOpenDrawer = false,
         defaultDrawerOpen = false,
+        logo,
         devViews = []
     } = props;
 
@@ -66,7 +69,7 @@ export function RebaseLayout(props: RebaseLayoutProps) {
     );
 
     return (
-        <Scaffold autoOpenDrawer={autoOpenDrawer} defaultDrawerOpen={defaultDrawerOpen}>
+        <Scaffold autoOpenDrawer={autoOpenDrawer} defaultDrawerOpen={defaultDrawerOpen} logo={logo}>
             <AdminModeSyncer devViews={devViews}/>
             {appBar}
             {ActiveDrawer}
