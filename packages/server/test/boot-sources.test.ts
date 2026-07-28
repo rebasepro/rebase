@@ -170,7 +170,13 @@ describe("resolveStorageBackend", () => {
         // `S3_BUCKET_NAME` must not be read as bucket "name" for a key "name" —
         // this is exactly why the separator is a double underscore.
         const config = resolveStorageBackend(
-            { STORAGE_TYPE: "s3", S3_BUCKET: "real-bucket", S3_BUCKET_NAME: "decoy" },
+            {
+                STORAGE_TYPE: "s3",
+                S3_BUCKET: "real-bucket",
+                S3_BUCKET_NAME: "decoy",
+                S3_ACCESS_KEY_ID: "key",
+                S3_SECRET_ACCESS_KEY: "secret"
+            },
             "(default)",
             undefined,
             "/var/uploads"
@@ -213,7 +219,9 @@ describe("resolveStorageSources", () => {
         const sources = resolveStorageSources(
             {
                 STORAGE_TYPE__MEDIA: "s3",
-                S3_BUCKET__MEDIA: "media-bucket"
+                S3_BUCKET__MEDIA: "media-bucket",
+                S3_ACCESS_KEY_ID__MEDIA: "key",
+                S3_SECRET_ACCESS_KEY__MEDIA: "secret"
             },
             definitions,
             "/var/uploads"
@@ -239,7 +247,11 @@ describe("resolveStorageSources", () => {
 
     it("uses the declared engine when no STORAGE_TYPE is set for that key", () => {
         const sources = resolveStorageSources(
-            { S3_BUCKET__MEDIA: "media-bucket" },
+            {
+                S3_BUCKET__MEDIA: "media-bucket",
+                S3_ACCESS_KEY_ID__MEDIA: "key",
+                S3_SECRET_ACCESS_KEY__MEDIA: "secret"
+            },
             [
                 { key: "(default)", engine: "local", transport: "server" },
                 { key: "media", engine: "s3", transport: "server" }

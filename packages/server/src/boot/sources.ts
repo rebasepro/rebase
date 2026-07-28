@@ -251,22 +251,65 @@ export function resolveStorageBackend(
     defaultBasePath: string
 ): BackendStorageConfig | undefined {
     const suffix = envSuffixForKey(key, DEFAULT_STORAGE_SOURCE_KEY);
-    const type = (readVar(env, "STORAGE_TYPE", suffix) || engineHint || "").toLowerCase();
+    const declaredType = readVar(env, "STORAGE_TYPE", suffix);
+    const type = (declaredType || engineHint || "").toLowerCase();
+    // Whether the *environment* named this backend, as opposed to inheriting it
+    // from a declaration. It decides what a missing bucket means:
+    //
+    //   STORAGE_TYPE__MEDIA=s3 with no bucket  → someone configured this and got
+    //                                            it wrong. Refuse.
+    //   `rebase.json` declares media: s3, and
+    //   the environment says nothing            → the bucket has not been
+    //                                            attached yet. Not an error.
+    //
+    // Declaring a source is how a project states its topology, often long before
+    // anyone attaches a bucket to it — the console's whole "declared, not
+    // configured" state. Treating that as a fatal misconfiguration would make
+    // the act of declaring a bucket crash-loop the backend until someone
+    // configured it, which is precisely the unreadable failure the manifest
+    // declaration exists to prevent.
+    const explicit = Boolean(declaredType);
 
     if (type === "s3") {
         const bucket = readVar(env, "S3_BUCKET", suffix);
         if (!bucket) {
+            if (!explicit) return undefined;
             throw new BundleError(
                 `Storage source "${key}" is set to s3 but has no bucket — ` +
                 `set ${`S3_BUCKET${suffix}`}.`
             );
         }
+        const accessKeyId = readVar(env, "S3_ACCESS_KEY_ID", suffix);
+        const secretAccessKey = readVar(env, "S3_SECRET_ACCESS_KEY", suffix);
+        // A bucket with no credentials cannot work, and failing here is far
+        // clearer than what it does otherwise: `S3StorageController` passes an
+        // explicit `credentials: { accessKeyId: "", secretAccessKey: "" }` to the
+        // AWS SDK, which suppresses the SDK's own credential chain — so this
+        // never silently falls back to an instance profile or IRSA. It signs
+        // every request with nothing and fails each one separately, at upload
+        // time, with an opaque signing error.
+        //
+        // Same rule the control plane applies when it classifies a tenant's
+        // environment for the build log, so the log and the runtime agree on
+        // what this configuration is.
+        if (!accessKeyId || !secretAccessKey) {
+            if (!explicit) return undefined;
+            const missing = [
+                !accessKeyId && `S3_ACCESS_KEY_ID${suffix}`,
+                !secretAccessKey && `S3_SECRET_ACCESS_KEY${suffix}`
+            ].filter(Boolean).join(" and ");
+            throw new BundleError(
+                `Storage source "${key}" is set to s3 with a bucket but no credentials — set ${missing}.`,
+                "A bucket without credentials cannot be reached: every upload fails when the request is signed."
+            );
+        }
+
         return {
             type: "s3",
             bucket,
             region: readVar(env, "S3_REGION", suffix) || "auto",
-            accessKeyId: readVar(env, "S3_ACCESS_KEY_ID", suffix) || "",
-            secretAccessKey: readVar(env, "S3_SECRET_ACCESS_KEY", suffix) || "",
+            accessKeyId,
+            secretAccessKey,
             endpoint: readVar(env, "S3_ENDPOINT", suffix),
             forcePathStyle: readBool(env, "S3_FORCE_PATH_STYLE", suffix)
         };
@@ -275,6 +318,7 @@ export function resolveStorageBackend(
     if (type === "gcs") {
         const bucket = readVar(env, "GCS_BUCKET", suffix);
         if (!bucket) {
+            if (!explicit) return undefined;
             throw new BundleError(
                 `Storage source "${key}" is set to gcs but has no bucket — ` +
                 `set ${`GCS_BUCKET${suffix}`}.`

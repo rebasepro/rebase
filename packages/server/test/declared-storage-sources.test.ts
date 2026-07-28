@@ -137,3 +137,61 @@ describe("a custom runtime resolving what it declared", () => {
         expect(resolved!["(default)"]).toMatchObject({ type: "s3", bucket: "app-uploads" });
     });
 });
+
+describe("a declared source is not a configured one", () => {
+    /**
+     * Declaring a bucket in `rebase.json` states the project's topology, usually
+     * well before anyone attaches storage to it — that is the console's whole
+     * "declared, not configured" state. It must not be a fatal boot error, or
+     * the act of declaring a bucket would crash-loop the backend until someone
+     * configured it: precisely the unreadable failure the declaration exists to
+     * prevent.
+     */
+    it("skips a declared source the environment says nothing about", () => {
+        const resolved = resolveStorageSources(
+            {},
+            [{ key: "media", engine: "s3", transport: "server" }],
+            "/tmp/uploads"
+        );
+        expect(resolved).toBeUndefined();
+    });
+
+    it("skips only the unconfigured one, keeping the rest", () => {
+        const resolved = resolveStorageSources(
+            {
+                STORAGE_TYPE: "s3",
+                S3_BUCKET: "app-uploads",
+                S3_ACCESS_KEY_ID: "key",
+                S3_SECRET_ACCESS_KEY: "secret"
+            },
+            [
+                { key: "(default)", engine: "s3", transport: "server" },
+                { key: "media", engine: "s3", transport: "server" }
+            ],
+            "/tmp/uploads"
+        );
+        expect(Object.keys(resolved ?? {})).toEqual(["(default)"]);
+    });
+
+    it("still refuses a source the ENVIRONMENT configured wrongly", () => {
+        // Someone set this and got it wrong, which is different from never
+        // having set it. A silent skip would hide a real mistake.
+        expect(() => resolveStorageSources(
+            { STORAGE_TYPE__MEDIA: "s3" },
+            [{ key: "media", engine: "s3", transport: "server" }],
+            "/tmp/uploads"
+        )).toThrow(/S3_BUCKET__MEDIA/);
+    });
+
+    it("refuses a bucket with no credentials", () => {
+        // `S3StorageController` passes explicit empty credentials to the AWS
+        // SDK, which suppresses the SDK's own credential chain — so this never
+        // falls back to an instance profile. It signs every request with
+        // nothing and fails each one separately, at upload time.
+        expect(() => resolveStorageSources(
+            { STORAGE_TYPE: "s3", S3_BUCKET: "app-uploads" },
+            undefined,
+            "/tmp/uploads"
+        )).toThrow(/no credentials/);
+    });
+});
