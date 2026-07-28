@@ -1,6 +1,28 @@
 import { mapOperator, parseQueryOptions, DEFAULT_LIST_LIMIT, DEFAULT_VECTOR_LIST_LIMIT, MAX_LIST_LIMIT } from "../src/api/rest/query-parser";
 import { deserializeFilter } from "@rebasepro/common";
 
+/**
+ * Assert that a query is rejected as a 400 carrying `code`.
+ *
+ * The status and code are what make the difference between a client seeing
+ * what it got wrong and the API error handler reporting an incident with an
+ * opaque "An unexpected error occurred" — so both are asserted, not just the
+ * fact that something threw.
+ */
+function expectBadRequest(query: Record<string, unknown>, code: string): void {
+    let caught: unknown;
+    try {
+        parseQueryOptions(query);
+    } catch (e) {
+        caught = e;
+    }
+    // Guards the case where nothing throws at all: an empty catch would
+    // otherwise let the assertions below never run.
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as { statusCode?: number }).statusCode).toBe(400);
+    expect((caught as { code?: string }).code).toBe(code);
+}
+
 // ─────────────────────────────────────────────────────────────
 // mapOperator
 // ─────────────────────────────────────────────────────────────
@@ -230,6 +252,177 @@ describe("parseQueryOptions — PostgREST filters", () => {
     it("removes empty where object", () => {
         const result = parseQueryOptions({ limit: "10" });
         expect(result.where).toBeUndefined();
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────
+// parseQueryOptions — the `?where=` JSON dialect
+//
+// The OpenAPI document publishes `where` on every GET /api/data/{slug}, and
+// the relations docs use it for subcollection lists. The parser never read it:
+// `where` was missing from `reservedQueryKeys`, so `?where={...}` compiled as
+// a filter on a column literally named "where" — first silently dropped (the
+// read then returned the whole table), later a 400 UNKNOWN_FILTER_FIELD.
+// ─────────────────────────────────────────────────────────────
+describe("parseQueryOptions — where JSON filter", () => {
+    it("parses the documented canonical-tuple form", () => {
+        const result = parseQueryOptions({ where: JSON.stringify({ status: ["==", "active"] }) });
+        expect(result.where).toEqual({ status: ["==", "active"] });
+    });
+
+    it("never leaks `where` itself into the filter", () => {
+        const result = parseQueryOptions({ where: JSON.stringify({ status: ["==", "active"] }) });
+        // The bug: `where` was treated as a filter field, which no table has.
+        expect(result.where?.where).toBeUndefined();
+    });
+
+    it("accepts multiple fields and non-string values", () => {
+        const result = parseQueryOptions({
+            where: JSON.stringify({ status: ["==", "active"],
+age: [">=", 18],
+role: ["in", ["admin", "editor"]] })
+        });
+        expect(result.where).toEqual({
+            status: ["==", "active"],
+            age: [">=", 18],
+            role: ["in", ["admin", "editor"]]
+        });
+    });
+
+    it("normalizes PostgREST dot-strings and bare scalars inside the JSON", () => {
+        const result = parseQueryOptions({ where: JSON.stringify({ status: "eq.active",
+tier: "gold" }) });
+        expect(result.where).toEqual({ status: ["==", "active"],
+tier: ["==", "gold"] });
+    });
+
+    it("merges with the ?field=op.value dialect", () => {
+        const result = parseQueryOptions({
+            where: JSON.stringify({ status: ["==", "active"] }),
+            age: "gte.18"
+        });
+        expect(result.where).toEqual({ status: ["==", "active"],
+age: [">=", "18"] });
+    });
+
+    it("lets an explicit ?field=op.value override the same field in where", () => {
+        const result = parseQueryOptions({
+            where: JSON.stringify({ status: ["==", "active"] }),
+            status: "eq.draft"
+        });
+        expect(result.where?.status).toEqual(["==", "draft"]);
+    });
+
+    it("leaves the other options untouched", () => {
+        const result = parseQueryOptions({
+            where: JSON.stringify({ status: ["==", "active"] }),
+            limit: "5",
+            orderBy: "created_at:desc"
+        });
+        expect(result.limit).toBe(5);
+        expect(result.orderBy).toEqual([{ field: "created_at",
+direction: "desc" }]);
+    });
+
+    it("ignores an empty where", () => {
+        expect(parseQueryOptions({ where: "" }).where).toBeUndefined();
+        expect(parseQueryOptions({ where: "{}" }).where).toBeUndefined();
+    });
+
+    it("rejects malformed JSON with a 400 rather than dropping the filter", () => {
+        // Dropping it would widen the read to every row RLS allows.
+        expect(() => parseQueryOptions({ where: "{status:" })).toThrow(/Invalid `where` parameter/);
+        expectBadRequest({ where: "{status:" }, "INVALID_WHERE");
+    });
+
+    it("rejects JSON that is not an object", () => {
+        expect(() => parseQueryOptions({ where: "[\"status\",\"active\"]" })).toThrow(/Invalid `where` parameter/);
+        expect(() => parseQueryOptions({ where: "\"active\"" })).toThrow(/Invalid `where` parameter/);
+        expect(() => parseQueryOptions({ where: "null" })).toThrow(/Invalid `where` parameter/);
+    });
+
+    it("takes the last value when the param repeats", () => {
+        const result = parseQueryOptions({
+            where: [JSON.stringify({ status: ["==", "draft"] }), JSON.stringify({ status: ["==", "active"] })]
+        });
+        expect(result.where).toEqual({ status: ["==", "active"] });
+    });
+});
+
+
+// ─────────────────────────────────────────────────────────────
+// parseQueryOptions — vector search validation
+//
+// These rejections used to be bare `Error`s. The API error handler reads
+// `statusCode`/`code` off the error; a bare Error has neither, so a malformed
+// client request became a 500 — logged as an incident with a full stack, and
+// answered with "An unexpected error occurred" (the handler only forwards the
+// real message below 500), telling the caller nothing about what was wrong.
+// ─────────────────────────────────────────────────────────────
+describe("parseQueryOptions — vector search validation", () => {
+    it("accepts a well-formed vector search", () => {
+        const result = parseQueryOptions({
+            vector_search: "embedding",
+            vector: "[0.1,0.2,0.3]",
+            vector_distance: "l2",
+            vector_threshold: "0.8"
+        });
+        expect(result.vectorSearch).toEqual({
+            property: "embedding",
+            vector: [0.1, 0.2, 0.3],
+            distance: "l2",
+            threshold: 0.8
+        });
+    });
+
+    it("rejects a vector that is not valid JSON", () => {
+        expectBadRequest({ vector_search: "embedding",
+vector: "[0.1,0.2" }, "INVALID_VECTOR");
+    });
+
+    it("rejects a vector that is not an array", () => {
+        expectBadRequest({ vector_search: "embedding",
+vector: "0.5" }, "INVALID_VECTOR");
+    });
+
+    it("rejects a vector holding non-numbers", () => {
+        expectBadRequest({ vector_search: "embedding",
+vector: "[0.1,\"two\",0.3]" }, "INVALID_VECTOR");
+        expectBadRequest({ vector_search: "embedding",
+vector: "[0.1,null]" }, "INVALID_VECTOR");
+    });
+
+    it("rejects an unknown vector_distance", () => {
+        expectBadRequest({
+            vector_search: "embedding",
+            vector: "[0.1,0.2]",
+            vector_distance: "manhattan"
+        }, "INVALID_VECTOR_DISTANCE");
+    });
+
+    it("rejects a non-numeric vector_threshold", () => {
+        expectBadRequest({
+            vector_search: "embedding",
+            vector: "[0.1,0.2]",
+            vector_threshold: "high"
+        }, "INVALID_VECTOR_THRESHOLD");
+    });
+
+    it("names the offending parameter in the message", () => {
+        expect(() => parseQueryOptions({ vector_search: "embedding",
+vector: "nope" })).toThrow(/`vector` format/);
+        expect(() => parseQueryOptions({
+            vector_search: "embedding",
+            vector: "[0.1]",
+            vector_distance: "manhattan"
+        })).toThrow(/`vector_distance`: manhattan/);
+    });
+
+    it("ignores vector params unless both vector_search and vector are present", () => {
+        // Half a vector search is not a vector search — and not an error either.
+        expect(parseQueryOptions({ vector: "garbage" }).vectorSearch).toBeUndefined();
+        expect(parseQueryOptions({ vector_search: "embedding" }).vectorSearch).toBeUndefined();
     });
 });
 

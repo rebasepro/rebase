@@ -155,7 +155,9 @@ description: "Page number (alternative to offset). Calculates offset as (page-1)
                         name: "where",
                         in: "query",
                         schema: { type: "string" },
-                        description: "JSON object filter. Example: `{\"status\":[\"==\",\"active\"]}`"
+                        description: "JSON object filter, mapping each field to a `[operator, value]` tuple. "
+                            + "Combines with the per-field `?field=op.value` parameters below; on the same field, the per-field parameter wins.",
+                        example: "{\"status\":[\"==\",\"active\"]}"
                     },
                     {
                         name: "include",
