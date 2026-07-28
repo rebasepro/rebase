@@ -22,6 +22,7 @@ import {
 import { useAnalyticsController } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
 import { IconForView } from "@rebasepro/app";
+import { getIcon } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionSlotKeys, resolveEntitySlots, type CollectionSlotKeys } from "./usePreviewSlots";
 import { useAdminContext } from "../../hooks/useAdminContext";
@@ -864,7 +865,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                                         openEntityMode: openEntityMode ?? collection?.openEntityMode ?? "full_screen"
                                     });
                                 }}>
-                                {action.icon}
+                                {getIcon(action.icon, undefined, undefined, "smallest")}
                             </IconButton>
                         </Tooltip>
                     ))}

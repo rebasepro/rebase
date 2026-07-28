@@ -5,6 +5,7 @@ import type { EntityAction, AdminCollection } from "@rebasepro/admin-types";
 import React from "react";
 import { Entity } from "@rebasepro/types";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
+import { getIcon } from "@rebasepro/app";
 import {
     AlertCircleIcon,
     Button,
@@ -136,7 +137,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
                                 formContext
                             });
                     }}>
-                    {action.icon}
+                    {getIcon(action.icon, undefined, undefined, "smallest")}
                 </IconButton>
             ))}
         </div>}

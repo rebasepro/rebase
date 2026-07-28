@@ -19,8 +19,10 @@ export interface RebaseLayoutProps {
     appBar?: React.ReactNode;
     /** Custom Drawer to override the default. */
     drawer?: React.ReactNode;
-    /** Whether to auto-open the drawer on load. */
+    /** Expand the drawer while the pointer is over it. Not a load-time default — that is `defaultDrawerOpen`. */
     autoOpenDrawer?: boolean;
+    /** Start with the drawer expanded instead of collapsed to icons. Ignored on small layouts. */
+    defaultDrawerOpen?: boolean;
     /** Dev views passed to AdminModeSyncer (resolved from RebaseNavigation). */
     devViews?: AppView[];
 }
@@ -49,6 +51,7 @@ export function RebaseLayout(props: RebaseLayoutProps) {
         appBar,
         drawer,
         autoOpenDrawer = false,
+        defaultDrawerOpen = false,
         devViews = []
     } = props;
 
@@ -63,7 +66,7 @@ export function RebaseLayout(props: RebaseLayoutProps) {
     );
 
     return (
-        <Scaffold autoOpenDrawer={autoOpenDrawer}>
+        <Scaffold autoOpenDrawer={autoOpenDrawer} defaultDrawerOpen={defaultDrawerOpen}>
             <AdminModeSyncer devViews={devViews}/>
             {appBar}
             {ActiveDrawer}

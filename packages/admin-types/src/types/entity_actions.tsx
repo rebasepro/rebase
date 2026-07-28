@@ -32,9 +32,16 @@ export interface EntityAction<M extends Record<string, unknown> = Record<string,
     key?: string;
 
     /**
-     * Icon of the action
+     * Icon of the action: a Lucide icon name (`"FileBarChart"`) or an element.
+     *
+     * The name form is what lets a collection declare one from the config package,
+     * which is plain `.ts` with no React dependency — an element would drag the
+     * whole UI layer into a backend that only loads the collection for its schema.
+     * It also matches how every other icon in a collection is written
+     * (`admin.icon`, `entityViews[].icon`), which were already strings while this
+     * one alone was not.
      */
-    icon?: React.ReactElement;
+    icon?: React.ReactElement | string;
 
     /**
      * Callback when the action is clicked

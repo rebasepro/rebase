@@ -11,6 +11,7 @@ import { EntityViewBinding } from "./EntityViewBinding";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
     Alert,
+    ArrowLeftIcon,
     Button,
     CenteredView,
     cls,
@@ -470,7 +471,24 @@ entityId }
             );
         });
 
-    const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel" || layout === "dialog";
+    // Full screen is the one layout with no way out of its own: a side panel and a
+    // dialog can be dismissed, and a split keeps the list beside it, but opening an
+    // entity full screen replaces the collection entirely and left browser Back as
+    // the only route back to it — which is not an affordance the page shows, and is
+    // wrong anyway once the user has moved between tabs inside the entity.
+    const backToCollectionButton = layout === "full_screen" ? (
+        <Tooltip title={t("back")}>
+            <IconButton
+                size="small"
+                aria-label={t("back")}
+                onClick={() => navigate(urlController.buildUrlCollectionPath(path))}
+            >
+                <ArrowLeftIcon size={iconSize.smallest} />
+            </IconButton>
+        </Tooltip>
+    ) : null;
+
+    const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel" || layout === "dialog" || Boolean(backToCollectionButton);
 
     const fullScreenButton = !barActions && (layout === "side_panel" || layout === "split" || layout === "dialog") && entityId ? (
         <Tooltip title={"Open full screen"}>
@@ -561,6 +579,8 @@ entityId }
 
         {shouldShowTopBar && <div
             className={cls("h-[52px] items-center flex overflow-hidden w-full border-b pl-2 pr-2 flex bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+
+            {backToCollectionButton}
 
             {fullScreenButton}
 

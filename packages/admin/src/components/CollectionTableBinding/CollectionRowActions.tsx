@@ -16,6 +16,7 @@ import {
     Tooltip
 } from "@rebasepro/ui";
 import { useTranslation } from "@rebasepro/app";
+import { getIcon } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getLocalChangesBackup } from "@rebasepro/app";
 import { useAdminContext } from "../../hooks/useAdminContext";
@@ -140,7 +141,7 @@ export const CollectionRowActions = function CollectionRowActions({
                                 });
                             }}
                             size={iconSize}>
-                            {action.icon}
+                            {getIcon(action.icon, undefined, undefined, "smallest")}
                         </IconButton>;
                         if (isEditAction && hasDraft) {
                             iconButton = (
@@ -183,7 +184,7 @@ export const CollectionRowActions = function CollectionRowActions({
                                             openEntityMode: openEntityMode ?? collection?.openEntityMode
                                         });
                                     }}>
-                                    {action.icon}
+                                    {getIcon(action.icon, undefined, undefined, "smallest")}
                                     {action.name}
                                 </MenuItem>
                             ))}

@@ -2,7 +2,7 @@ import type { NavigationEntry } from "@rebasepro/admin-types";
 import React from "react";
 import { ChevronDownIcon, cls, iconSize, Typography } from "@rebasepro/ui";
 
-import { IconForView } from "@rebasepro/app";
+import { IconForView, getIcon } from "@rebasepro/app";
 import { DrawerNavigationItem } from "./DrawerNavigationItem";
 import { useTranslation, useComponentOverride } from "@rebasepro/app";
 
@@ -47,6 +47,13 @@ export interface DrawerNavigationGroupProps {
      * Hide the group header (title and expandable panel)
      */
     hideHeader?: boolean;
+    /**
+     * Lucide icon name for the group header, from `NavigationGroupMapping.icon`.
+     *
+     * Supplying one moves the visual anchor from the rows to the group: the header
+     * gets the icon, and the entries below trade theirs for an indent.
+     */
+    icon?: string;
 }
 
 /**
@@ -63,10 +70,17 @@ export function DrawerNavigationGroup({
     adminMenuOpen,
     headerActions,
     onItemClick,
-    hideHeader
+    hideHeader,
+    icon
 }: DrawerNavigationGroupProps) {
     const { t } = useTranslation();
     const ResolvedDrawerNavigationItem = useComponentOverride("Shell.DrawerNavigationItem", DrawerNavigationItem);
+
+    // Indent the entries only when the group itself is carrying the icon. Without a
+    // header there is nothing to indent under, and collapsed to a rail the entry
+    // icons are the only affordance left, so both cases keep the original rows.
+    const groupIcon = !hideHeader && drawerOpen ? getIcon(icon, undefined, undefined, "small") : undefined;
+    const indentEntries = Boolean(groupIcon);
     return (
         <div
             className={"my-2 mx-2 flex flex-col"}
@@ -83,14 +97,23 @@ export function DrawerNavigationGroup({
                     <ChevronDownIcon
                         size={iconSize.small}
                         className={cls(
-                            "text-surface-400 dark:text-surface-400 transition-transform duration-200 mr-1",
+                            "text-surface-500 dark:text-surface-400 transition-transform duration-200 mr-1",
                             collapsed ? "-rotate-90" : "rotate-0"
                         )}
                     />
+                    {groupIcon && (
+                        <span className="shrink-0 mr-2 flex items-center text-surface-600 dark:text-surface-300 [&>svg]:size-4">
+                            {groupIcon}
+                        </span>
+                    )}
                     <Typography
                         variant={"caption"}
                         color={"secondary"}
-                        className="font-semibold text-[11px] uppercase tracking-wider flex-grow line-clamp-1 text-surface-400 dark:text-surface-400"
+                        // A category label is the thing you scan to find anything else in
+                        // the drawer, so it is read far more often than it is read *past*.
+                        // At 11px uppercase in surface-400 it sat below the contrast of the
+                        // rows it labels, which inverted that.
+                        className="font-semibold text-[12px] uppercase tracking-wide flex-grow line-clamp-1 text-surface-600 dark:text-surface-300"
                     >
                         {(group || t("views_group"))}
                     </Typography>
@@ -122,6 +145,7 @@ export function DrawerNavigationGroup({
                         onClick={() => onItemClick?.(entry)}
                         url={entry.url}
                         name={entry.name}
+                        indented={indentEntries}
                     />
                 ))}
             </div>

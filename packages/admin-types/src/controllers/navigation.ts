@@ -227,6 +227,19 @@ export interface NavigationGroupMapping {
      */
     entries: string[];
     /**
+     * Icon for the group header, as a Lucide icon name (`"Users"`, `"CreditCard"`).
+     *
+     * The drawer carries the hierarchy on the group rather than on every row: with
+     * a group icon set, the entries below it drop their own icons and indent
+     * instead, so a long navigation reads as a few labelled categories rather than
+     * as one column of same-weight rows. Without one, entries keep their icons and
+     * nothing changes.
+     *
+     * Only applies while the drawer is expanded — collapsed to a rail, the entry
+     * icons are the only thing to click, so they always render.
+     */
+    icon?: string;
+    /**
      * Configure which groups start collapsed.
      * Set to `true` to collapse in both drawer and home page,
      * or use an object to control each independently.

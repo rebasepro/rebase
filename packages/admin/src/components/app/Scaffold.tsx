@@ -19,6 +19,18 @@ export interface ScaffoldProps {
     autoOpenDrawer?: boolean;
 
     /**
+     * Start with the drawer expanded rather than collapsed to icons.
+     *
+     * Distinct from {@link autoOpenDrawer}, which is a hover behaviour: this one
+     * only seeds the initial state, so the user's own toggle still wins for the
+     * rest of the session.
+     *
+     * Ignored on small layouts, where an expanded drawer covers the content it is
+     * meant to navigate.
+     */
+    defaultDrawerOpen?: boolean;
+
+    /**
      * Logo to be displayed in the top bar and drawer.
      * Note that this has no effect if you are using a custom AppBar or Drawer.
      */
@@ -51,6 +63,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
         const {
             children,
             autoOpenDrawer,
+            defaultDrawerOpen = false,
             logo,
             className,
             style,
@@ -70,7 +83,9 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
         const includeDrawer = drawerChildren.length > 0;
         const largeLayout = useLargeLayout();
 
-        const [drawerOpen, setDrawerOpen] = React.useState(false);
+        // Seeded once, deliberately: a `useEffect` syncing this to the prop would
+        // re-expand the drawer under a user who had just collapsed it.
+        const [drawerOpen, setDrawerOpen] = React.useState(defaultDrawerOpen && largeLayout);
         const [onHover, setOnHover] = React.useState(false);
 
         const setOnHoverTrue = useCallback(() => setOnHover(true), []);

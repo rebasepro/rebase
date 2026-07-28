@@ -10,7 +10,8 @@ export function DrawerNavigationItem({
     adminMenuOpen,
     tooltipsOpen,
     url,
-    onClick
+    onClick,
+    indented = false
 }: {
     icon: React.ReactElement,
     name: string,
@@ -19,12 +20,25 @@ export function DrawerNavigationItem({
     adminMenuOpen?: boolean,
     url: string,
     onClick?: () => void,
+    /**
+     * Render as a child of an icon-bearing group: no icon of its own, indented to
+     * sit under the group's label. Set by {@link DrawerNavigationGroup} only when
+     * the group actually has an icon and the drawer is expanded.
+     */
+    indented?: boolean,
 }) {
 
-    const iconWrap = <div
-        className={"shrink-0 flex items-center justify-center w-[44px] h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-primary transition-colors duration-150"}>
-        {icon}
-    </div>;
+    // Indented rows give up the icon rather than keeping it *and* indenting: a
+    // per-row icon repeated down a group is what flattens the hierarchy, since
+    // every row then reads at the weight of the category above it. The indent is
+    // the same 44px the icon occupied, so labels stay on the original grid and the
+    // rail width does not change.
+    const iconWrap = indented
+        ? <div className={"shrink-0 w-[44px] h-[30px]"} aria-hidden={true}/>
+        : <div
+            className={"shrink-0 flex items-center justify-center w-[44px] h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-primary transition-colors duration-150"}>
+            {icon}
+        </div>;
 
     const listItem = <div>
         <NavLink

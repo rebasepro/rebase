@@ -189,6 +189,16 @@ function AdminNavigationContent() {
         ...[...entryGroups].filter(g => !orderedGroups.includes(g))
     ];
 
+    // Group header icons, declared on `navigationGroupMappings`. Keyed by name
+    // because that is what a navigation entry's `group` holds.
+    const groupIcons = useMemo(() => {
+        const icons = new Map<string, string>();
+        (registry.cmsConfig?.navigationGroupMappings ?? []).forEach(mapping => {
+            if (mapping.icon) icons.set(mapping.name, mapping.icon);
+        });
+        return icons;
+    }, [registry.cmsConfig?.navigationGroupMappings]);
+
     // Collapsible groups state - using "drawer" namespace for independent state from home page
     const collapsedDefaults = useMemo(
         () => buildCollapsedDefaults(registry.cmsConfig?.navigationGroupMappings, "drawer"),
@@ -244,6 +254,7 @@ context });
                         tooltipsOpen={tooltipsOpen}
                         adminMenuOpen={adminMenuOpen}
                         onItemClick={onItemClick}
+                        icon={groupIcons.get(group)}
                     />
                 );
             })}

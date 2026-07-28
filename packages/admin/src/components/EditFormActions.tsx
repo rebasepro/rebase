@@ -20,6 +20,7 @@ import { SideDialogController, useSideDialogContext } from "./SideDialogs";
 import { FormexController } from "@rebasepro/forms";
 import { ErrorTooltip } from "@rebasepro/app";
 import { usePermissions } from "@rebasepro/app";
+import { getIcon } from "@rebasepro/app";
 import { useAdminContext } from "../hooks/useAdminContext";
 import { useChildViewSource } from "../hooks/useChildViewSource";
 
@@ -371,7 +372,7 @@ function EntityActionButton({
                     });
                 }
             }}>
-            {loading ? <CircularProgress size={"smallest"}/> : action.icon}
+            {loading ? <CircularProgress size={"smallest"}/> : getIcon(action.icon, undefined, undefined, "smallest")}
         </IconButton>
     </Tooltip>;
 }
