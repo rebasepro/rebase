@@ -164,7 +164,24 @@ pass: env.SMTP_PASS! }
         history: true
     });
 
+    // ─── Your own routes ──────────────────────────────────────────
+    // This is a plain Hono app and everything you add to it is yours — which
+    // also means it is outside Rebase's auth. `initializeRebaseBackend` guards
+    // the routers it mounts (`/api/data`, `/api/auth`, …); it does not guard
+    // this `app`. A route added here is reachable by anyone on the internet
+    // until you put a guard in its middleware slot:
+    //
+    //   import { requireAuth, requireAdmin } from "@rebasepro/server";
+    //   app.get("/admin/report", requireAuth, requireAdmin, handler);
+    //
+    // `requireAuth` answers 401 without a valid token; `requireAdmin` answers
+    // 403 without the `admin` role and must follow `requireAuth`. Note that
+    // `c.get("driver")` — the RLS-scoped driver — is only set inside the Rebase
+    // routers, so out here reach for `rebase.dataAsAdmin`, which **bypasses
+    // RLS** and therefore belongs behind one of those guards.
+
     // ─── Health check ─────────────────────────────────────────────
+    // Deliberately public: an orchestrator's probe has no token to send.
     app.get("/health", async (c) => {
         const result = await backend.healthCheck();
         const status = result.healthy ? 200 : 503;

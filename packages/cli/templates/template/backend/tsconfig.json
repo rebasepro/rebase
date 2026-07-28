@@ -15,5 +15,11 @@
     "sourceMap": true,
     "jsx": "preserve"
   },
-  "include": ["src/**/*", "../config/**/*", "drizzle.config.ts"]
+  // `functions/` is included so `tsc` actually checks your custom routes. It
+  // was omitted here (the baas flavour has always had it), which meant the one
+  // place you write server code by hand was the one place a type error went
+  // unnoticed until runtime. The inferred common root is already the project
+  // root because of `../config`, so this adds no `rootDir` and moves nothing
+  // that dist/ already contains.
+  "include": ["src/**/*", "functions/**/*", "../config/**/*", "drizzle.config.ts"]
 }

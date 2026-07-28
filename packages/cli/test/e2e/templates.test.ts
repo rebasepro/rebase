@@ -237,6 +237,39 @@ describe.each(CMS_CASES)("cms template: $preset", (testCase) => {
         expect(rows[0].value).toBe(testCase.expected);
     }, 120_000);
 
+    // The scaffolded example function is the shape every custom route in the
+    // project gets copied from, so its guards have to be real. The functions
+    // router is deliberately mounted with `requireAuth: false` — a webhook
+    // receiver has no token — which means a `requireAuth` that composed but did
+    // not enforce would look exactly like this template working.
+    it("enforces the three auth tiers the example function demonstrates", async () => {
+        const fn = `${backend!.baseUrl}/api/functions/hello`;
+        const auth = { Authorization: `Bearer ${admin.accessToken}` };
+
+        // Public by design.
+        expect((await fetch(fn)).status).toBe(200);
+
+        // requireAuth.
+        const anonPost = await fetch(fn, { method: "POST" });
+        expect(anonPost.status).toBe(401);
+        const authedPost = await fetch(fn, {
+            method: "POST",
+            headers: { ...auth, "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "e2e" })
+        });
+        expect(authedPost.status).toBe(200);
+        // …and the identity actually reaches the handler. The previous example
+        // read a `userId` claim the tokens do not carry, so it reported
+        // "anonymous" for every caller, signed in or not.
+        expect((await authedPost.json() as any).user).toBe(admin.uid);
+
+        // requireAdmin. The first registered user is the admin, so the same
+        // token that is merely "signed in" above is also the admin here.
+        expect((await fetch(`${fn}/stats`)).status).toBe(401);
+        const adminGet = await fetch(`${fn}/stats`, { headers: auth });
+        expect(adminGet.status, await adminGet.text()).toBe(200);
+    }, 60_000);
+
     it.runIf(testCase.rejectsUnknownFields)("rejects a field the collection does not declare", async () => {
         const bad = await writeRow(backend!.baseUrl, admin.accessToken, testCase.collection, {
             ...testCase.probeRow,
