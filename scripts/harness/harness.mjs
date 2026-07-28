@@ -30,11 +30,13 @@ switch (command) {
     case "preflight": {
         const { main } = await import("./deploy/preflight.mjs");
         process.exit(main(rest));
+        break;
     }
 
     case "eval": {
         const { main } = await import("./eval/run.mjs");
         process.exit(await main(rest));
+        break;
     }
 
     case "trace": {
@@ -53,6 +55,7 @@ switch (command) {
         const events = read(tracePath(ctx.primaryRoot, rest[idIndex + 1]));
         process.stdout.write(JSON.stringify(events, null, 2) + "\n");
         process.exit(0);
+        break;
     }
 
     default:

@@ -31,7 +31,6 @@ export default [
             "**/website/**",
             "**/examples/**",
             "**/saas/**",
-            "scripts/**",
             ".pnp.loader.mjs",
             "update_translations.js",
             "inspect_product.mjs",
@@ -43,7 +42,12 @@ export default [
     pluginReact.configs.flat.recommended,
     {
 
-        files: ["**/*.{js,jsx,mjs,cjs,ts,tsx}"],
+        // `mts`/`cts` included: `pluginReact.configs.flat.recommended` above is
+        // unscoped, so it matches every file, while `settings.react.version`
+        // below lives here. A file outside this glob got the plugin without its
+        // settings, and eslint-plugin-react warned about the missing version on
+        // every run — `scripts/verify-selfhost.mts` was the one such file.
+        files: ["**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"],
 
         plugins: {
             "react-hooks": pluginReactHooks
