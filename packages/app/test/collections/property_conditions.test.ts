@@ -425,7 +425,7 @@ roles: [] },
         } as unknown as Property;
 
         const result = applyPropertyConditions(property, baseContext);
-        expect((result as any).canAddElements).toBe(false);
+        expect((result as any).admin?.canAddElements).toBe(false);
     });
 
     it("should set sortable based on condition", () => {
@@ -440,7 +440,7 @@ roles: [] },
         } as unknown as Property;
 
         const result = applyPropertyConditions(property, baseContext);
-        expect((result as any).sortable).toBe(false);
+        expect((result as any).admin?.sortable).toBe(false);
     });
 });
 

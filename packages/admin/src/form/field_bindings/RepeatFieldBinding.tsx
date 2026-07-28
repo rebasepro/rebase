@@ -92,8 +92,8 @@ export function RepeatFieldBinding({
         </ErrorBoundary>;
     };
 
-    const canAddElements = !property.admin?.disabled && !isSubmitting && !disabled && (property.canAddElements || property.canAddElements === undefined);
-    const sortable = property.sortable === undefined ? true : property.sortable;
+    const canAddElements = !property.admin?.disabled && !isSubmitting && !disabled && (property.admin?.canAddElements || property.admin?.canAddElements === undefined);
+    const sortable = property.admin?.sortable === undefined ? true : property.admin.sortable;
     const arrayContainer = <ArrayContainer droppableId={propertyKey}
         addLabel={property.name ? t("add_to_field", { fieldName: property.name }) : t("add_entry")}
         value={(value as unknown[]) ?? []}

@@ -203,7 +203,13 @@ a runtime answer to appeal to.
 
 ---
 
-## Tier 3 — admin-panel fields still on core property types
+## Tier 3 — admin-panel fields still on core property types — **DONE**
+
+> Resolved 2026-07-28. The nine fields below moved into `Admin*Options`; `widget`
+> lost its duplicate core declaration, which also closes **1.1**. Two stayed, with
+> the reason recorded on the field. The rest of this section is the original
+> finding, kept for the record.
+
 
 `packages/admin-types/src/augment.ts` adds `admin?: Admin*Options` back onto
 `BaseCollectionConfig` and all ten property interfaces by declaration merging. Its
@@ -230,14 +236,38 @@ options never moved.
 Note the `─── UI configuration ───` section marker at `properties.ts:552`: the file
 labels the block as UI and keeps it in the BaaS package anyway.
 
-Two of these are not straightforward moves:
+Two of these are not straightforward moves, and both stayed in core:
 
-- `MapProperty.keyValue` (684) *looks* like the same category but is read by
-  `server/src/api/openapi-generator.ts:636` — it changes the generated contract, so
-  it is genuinely core. Leave it.
-- `MapProperty.previewProperties` has no reader at all in that position.
-  `AdminReferenceOptions` and `AdminRelationOptions` both declare `previewProperties`;
-  `AdminMapOptions` does not. Whichever way it goes, it is inconsistent today.
+- `MapProperty.keyValue` *looks* like the same category but is read by
+  `server/src/api/openapi-generator.ts:636` — it says the map has no declared shape,
+  which is what the generated schema is emitted from.
+- `MapProperty.propertiesOrder` is read by `sortProperties` in `@rebasepro/common`,
+  which `@rebasepro/firebase` calls when it builds collections. A core package cannot
+  read the admin block at all — the field only exists once `@rebasepro/admin-types`
+  is installed — so moving it would break a driver.
+
+`MapProperty.previewProperties` did move: `AdminReferenceOptions` and
+`AdminRelationOptions` already declared it, `AdminMapOptions` now does too.
+
+**Verification.** Every package typechecks against its own `tsconfig.prod.json` with
+workspace paths pointed at source rather than stale `dist` — that mapping is what
+makes the check meaningful, since the packages otherwise resolve each other through
+built declarations. `types`, `admin-types`, `common`, `app` and `admin` test suites
+pass (1226 tests), lint is clean, and `verify:docs` typechecks 701 doc snippets
+against the edited source.
+
+**Residue found while doing it.** The docs had the *previous* round of this same
+refactor half-applied: `properties.mdx` (all six locales) and the collections skill
+listed `multiline`, `markdown`, `previewAsTag`, `clearable`, `expanded`,
+`minimalistView`, `spreadChildren` as top-level, wrote the reference example with a
+top-level `previewProperties`, and prefixed half the rows of the shared options table
+with a `ui.` namespace that no longer exists. All corrected here.
+
+One thing deliberately not touched: `PropertyConditions` in core declares condition
+keys — `canAddElements`, `sortable`, `referenceFilter`, `disabled`, `readOnly` —
+that now target fields living in the admin block. The evaluator writes into `admin`
+correctly, but a core type still names admin-only options. Same category as this
+tier, different mechanism; worth its own pass.
 
 ---
 

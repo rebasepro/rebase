@@ -64,11 +64,11 @@ price: {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `ui.readOnly` | `boolean` | Prevent editing |
-| `ui.disabled` | `boolean \| PropertyDisabledConfig` | Disable with optional tooltip |
+| `admin.readOnly` | `boolean` | Prevent editing |
+| `admin.disabled` | `boolean \| PropertyDisabledConfig` | Disable with optional tooltip |
 | `admin.hideFromCollection` | `boolean` | Hide from table view |
-| `ui.columnWidth` | `number` | Column width in pixels (table view) |
-| `ui.widthPercentage` | `number` | Field width as a percentage in the form view |
+| `admin.columnWidth` | `number` | Column width in pixels (table view) |
+| `admin.widthPercentage` | `number` | Field width as a percentage in the form view |
 | `admin.Field` | `React.ComponentType` | Custom field component |
 | `admin.Preview` | `React.ComponentType` | Custom table cell component |
 
@@ -205,8 +205,8 @@ locales: {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `multiline` | `boolean` | Render as textarea |
-| `markdown` | `boolean` | Render as markdown editor |
+| `admin.multiline` | `boolean` | Render as textarea |
+| `admin.markdown` | `boolean` | Render as markdown editor |
 | `email` | `boolean` | Email format validation |
 | `url` | `boolean` | URL format validation |
 | `storage` | `StorageConfig` | Enable file upload |
@@ -215,8 +215,8 @@ locales: {
 | `columnType` | `string` | Database column: `"varchar"`, `"text"` |
 | `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
 | `userSelect` | `boolean` | Render as a user picker |
-| `previewAsTag` | `boolean` | Render this string as a tag in previews |
-| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
+| `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
+| `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ## Number Properties
 
@@ -245,7 +245,7 @@ Number fields render as a standard text input with numeric validation.
 | `enum` | `EnumValues` | Render as select with numeric values |
 | `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
 | `isId` | `string` | ID generation strategy |
-| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
+| `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ## Boolean Properties
 
@@ -318,7 +318,7 @@ updated_at: {
 | `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps |
 | `columnType` | `string` | `"timestamp"`, `"date"` |
 | `timezone` | `string` | Timezone string to evaluate the date in |
-| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
+| `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ## Array Properties
 
@@ -389,10 +389,10 @@ content: {
 |----------|------|-------------|
 | `of` | `Property \| Property[]` | Property schema for array items |
 | `oneOf` | `object` | Array of typed objects with multiple discriminator types |
-| `expanded` | `boolean` | Should the field be initially expanded (default: true) |
-| `minimalistView` | `boolean` | Display child properties directly without extendable panel |
-| `sortable` | `boolean` | Can elements be reordered (default: true) |
-| `canAddElements` | `boolean` | Can new elements be added (default: true) |
+| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `admin.minimalistView` | `boolean` | Display child properties directly without extendable panel |
+| `admin.sortable` | `boolean` | Can elements be reordered (default: true) |
+| `admin.canAddElements` | `boolean` | Can new elements be added (default: true) |
 
 ## Map Properties
 
@@ -433,10 +433,10 @@ metadata: {
 |----------|------|-------------|
 | `properties` | `Properties` | Record of properties included in the map |
 | `propertiesOrder` | `string[]` | Ordered keys for rendering |
-| `previewProperties` | `string[]` | Which properties to show in the table preview |
-| `spreadChildren` | `boolean` | Render child properties as separate columns in table view |
-| `minimalistView` | `boolean` | Display properties without a wrapping panel |
-| `expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `admin.previewProperties` | `string[]` | Which properties to show in the table preview |
+| `admin.spreadChildren` | `boolean` | Render child properties as separate columns in table view |
+| `admin.minimalistView` | `boolean` | Display properties without a wrapping panel |
+| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
 | `keyValue` | `boolean` | Render as arbitrary key-value pairs editor |
 
 ## Reference Properties
@@ -448,7 +448,9 @@ client: {
     type: "reference",
     name: "Related client",
     path: "clients",
-    previewProperties: ["first_name", "last_name", "email"]
+    admin: {
+        previewProperties: ["first_name", "last_name", "email"]
+    }
 }
 ```
 

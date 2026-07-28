@@ -134,18 +134,26 @@ export interface SerializableAdminVectorOptions extends SerializableAdminBaseOpt
 /** JSON-serializable version of `AdminReferenceOptions`. */
 export interface SerializableAdminReferenceOptions extends SerializableAdminBaseOptions {
     previewProperties?: string[];
+    fixedFilter?: FilterValues<string>;
+    includeId?: boolean;
+    includeEntityLink?: boolean;
 }
 
 /** JSON-serializable version of `AdminRelationOptions`. */
 export interface SerializableAdminRelationOptions extends SerializableAdminBaseOptions {
     previewProperties?: string[];
     widget?: "select" | "dialog";
+    fixedFilter?: FilterValues<string>;
+    includeId?: boolean;
+    includeEntityLink?: boolean;
 }
 
 /** JSON-serializable version of `AdminArrayOptions`. */
 export interface SerializableAdminArrayOptions extends SerializableAdminBaseOptions {
     expanded?: boolean;
     minimalistView?: boolean;
+    sortable?: boolean;
+    canAddElements?: boolean;
 }
 
 /** JSON-serializable version of `AdminMapOptions`. */
@@ -153,6 +161,7 @@ export interface SerializableAdminMapOptions extends SerializableAdminBaseOption
     expanded?: boolean;
     minimalistView?: boolean;
     spreadChildren?: boolean;
+    previewProperties?: string[];
 }
 
 // ── Serializable base property ────────────────────────────────────────
@@ -257,9 +266,6 @@ export interface SerializableReferenceProperty extends SerializableBaseProperty 
     type: "reference";
     isId?: boolean;
     path?: string;
-    fixedFilter?: FilterValues<string>;
-    includeId?: boolean;
-    includeEntityLink?: boolean;
 }
 
 /**
@@ -309,10 +315,6 @@ export interface SerializableRelationProperty extends SerializableBaseProperty {
      * went on describing a shape nothing produced, and the cast hid it.
      */
     relation?: SerializableRelation;
-    fixedFilter?: FilterValues<string>;
-    includeId?: boolean;
-    includeEntityLink?: boolean;
-    widget?: "select" | "dialog";
     // overrides are dropped (can contain non-serializable CollectionConfig fields)
 }
 
@@ -329,8 +331,6 @@ export interface SerializableArrayProperty extends SerializableBaseProperty {
         valueField?: string;
     };
     validation?: ArrayPropertyValidationSchema;
-    sortable?: boolean;
-    canAddElements?: boolean;
 }
 
 /** JSON-serializable `MapProperty`. */
@@ -341,7 +341,6 @@ export interface SerializableMapProperty extends SerializableBaseProperty {
     properties?: SerializableProperties;
     propertiesOrder?: string[];
     validation?: PropertyValidationSchema;
-    previewProperties?: string[];
     keyValue?: boolean;
 }
 

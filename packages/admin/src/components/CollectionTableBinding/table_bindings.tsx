@@ -222,10 +222,10 @@ export function getTableBindingForProperty(
                         path={(property as ReferenceProperty).path!}
                         multiselect={false}
                         previewProperties={(property as ReferenceProperty).admin?.previewProperties}
-                        includeId={(property as ReferenceProperty).includeId}
-                        includeEntityLink={(property as ReferenceProperty).includeEntityLink}
+                        includeId={(property as ReferenceProperty).admin?.includeId}
+                        includeEntityLink={(property as ReferenceProperty).admin?.includeEntityLink}
                         title={property.name ?? propertyKey}
-                        fixedFilter={(property as ReferenceProperty).fixedFilter}
+                        fixedFilter={(property as ReferenceProperty).admin?.fixedFilter}
                     />
                     );
                 },
@@ -290,9 +290,9 @@ export function getTableBindingForProperty(
                                 path={refOfProp.path!}
                                 previewProperties={refOfProp.admin?.previewProperties}
                                 title={arrayProperty.name}
-                                fixedFilter={refOfProp.fixedFilter}
-                                includeId={refOfProp.includeId}
-                                includeEntityLink={refOfProp.includeEntityLink}
+                                fixedFilter={refOfProp.admin?.fixedFilter}
+                                includeId={refOfProp.admin?.includeId}
+                                includeEntityLink={refOfProp.admin?.includeEntityLink}
                             />
                         ),
                         allowScroll: false
@@ -318,10 +318,10 @@ function RelationDialogBindingComponent({ propertyKey, internalValue, updateValu
             multiselect={false}
             relation={relProp.relation!}
             previewProperties={relProp.admin?.previewProperties}
-            includeId={relProp.includeId}
-            includeEntityLink={relProp.includeEntityLink}
+            includeId={relProp.admin?.includeId}
+            includeEntityLink={relProp.admin?.includeEntityLink}
             title={relProp.name ?? propertyKey}
-            fixedFilter={relProp.fixedFilter}
+            fixedFilter={relProp.admin?.fixedFilter}
         />
     );
 }
@@ -337,7 +337,7 @@ function RelationSelectorBindingComponent({ propertyKey, internalValue, updateVa
             disabled={disabled}
             size={"small"}
             relation={relProp.relation!}
-            fixedFilter={relProp.fixedFilter}
+            fixedFilter={relProp.admin?.fixedFilter}
         />
     );
 }

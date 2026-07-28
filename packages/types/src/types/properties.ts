@@ -2,7 +2,6 @@ import type { ComponentRef } from "./component_ref";
 
 import type { Entity, EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entities";
 import type { JoinStep, OnAction, Relation, ResolvedRelation } from "./relations";
-import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
 import type { ColorKey, ColorScheme } from "./chips";
 import type { AuthState } from "../controllers/auth_state";
 import type { AfterReadProps, BeforeSaveProps } from "./entity_callbacks";
@@ -473,20 +472,6 @@ export interface ReferenceProperty extends BaseProperty {
      * property.
      */
     path?: string;
-    /**
-     * Allow selection of entities that pass the given filter only.
-     * e.g. `fixedFilter: { age: [">=", 18] }`
-     */
-    fixedFilter?: FilterValues<string>;
-
-    /**
-     * Should the reference include the ID of the entity. Defaults to `true`
-     */
-    includeId?: boolean;
-    /**
-     * Should the reference include a link to the entity (open the entity details). Defaults to `true`
-     */
-    includeEntityLink?: boolean;
 }
 
 /**
@@ -548,29 +533,6 @@ export interface RelationProperty extends BaseProperty {
      * collection's `relations` array.
      */
     resolvedRelation?: ResolvedRelation;
-
-    // ─── UI configuration ───
-
-    /**
-     * Allow selection of entities that pass the given filter only.
-     * e.g. `fixedFilter: { age: [">=", 18] }`
-     */
-    fixedFilter?: FilterValues<string>;
-
-    /**
-     * Should the reference include the ID of the entity. Defaults to `true`
-     */
-    includeId?: boolean;
-    /**
-     * Should the reference include a link to the entity (open the entity details). Defaults to `true`
-     */
-    includeEntityLink?: boolean;
-
-    /**
-     * Choose the widget to use for selecting the relation.
-     * Defaults to `select`.
-     */
-    widget?: "select" | "dialog";
 }
 
 export interface ArrayProperty extends BaseProperty {
@@ -634,17 +596,6 @@ export interface ArrayProperty extends BaseProperty {
      * Rules for validating this property
      */
     validation?: ArrayPropertyValidationSchema;
-
-    /**
-     * Can the elements in this array be reordered. Defaults to `true`.
-     * This prop has no effect if `disabled` is set to true.
-     */
-    sortable?: boolean;
-    /**
-     * Can the elements in this array be added. Defaults to `true`
-     * This prop has no effect if `disabled` is set to true.
-     */
-    canAddElements?: boolean;
 }
 
 export interface MapProperty extends BaseProperty {
@@ -665,6 +616,12 @@ export interface MapProperty extends BaseProperty {
      * Order in which the properties are displayed.
      * If you are specifying your collection as code, the order is the same as the
      * one you define in `properties`, and you don't need to specify this prop.
+     *
+     * Stays on the property rather than moving to the `admin` block, unlike the
+     * rest of the map's presentation options: `sortProperties` in
+     * `@rebasepro/common` reads it recursively, and `@rebasepro/firebase` calls
+     * that when it builds collections. A core package cannot read the admin
+     * block — the field exists only once `@rebasepro/admin-types` is installed.
      */
     propertiesOrder?: string[];
     /**
@@ -674,12 +631,12 @@ export interface MapProperty extends BaseProperty {
      */
     validation?: PropertyValidationSchema;
     /**
-     * Properties that are displayed when rendered as a preview
-     */
-    previewProperties?: string[];
-    /**
      * Render this map as a key-value table that allows to use
      * arbitrary keys. You don't need to define the properties in this case.
+     *
+     * Core rather than admin despite the wording: it says the map has no
+     * declared shape, which is what the OpenAPI generator emits the schema
+     * from (`additionalProperties` instead of a property list).
      */
     keyValue?: boolean;
 }

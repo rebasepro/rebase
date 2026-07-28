@@ -82,7 +82,7 @@ function RelationSelectorBinding({
                     }
                 }}
                 disabled={disabled || isSubmitting}
-                fixedFilter={property.fixedFilter}
+                fixedFilter={property.admin?.fixedFilter}
                 size={selectorSize}
             />
 
@@ -127,7 +127,7 @@ function SingleRelationFieldBinding({
         collection,
         onSingleEntitySelected,
         selectedEntityIds: validValue && normalizedValue ? [normalizedValue.id] : undefined,
-        fixedFilter: property.fixedFilter
+        fixedFilter: property.admin?.fixedFilter
     });
 
     const onEntryClick = (e: React.SyntheticEvent) => {
@@ -158,8 +158,8 @@ function SingleRelationFieldBinding({
                     size={size}
                     onClick={disabled || isSubmitting ? undefined : onEntryClick}
                     relation={usedRelation}
-                    includeEntityLink={property.includeEntityLink}
-                    includeId={property.includeId}
+                    includeEntityLink={property.admin?.includeEntityLink}
+                    includeId={property.admin?.includeId}
                 />}
 
                 {!value && <div className="justify-center text-left">

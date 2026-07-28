@@ -6,7 +6,7 @@
  * in its type surface with nothing to render them. They are attached to the property
  * types by `augment.ts` instead.
  */
-import type { ComponentRef, WhereFilterOp } from "@rebasepro/types";
+import type { ComponentRef, FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { ADMIN_PROPERTY_KEYS as CORE_ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
 
 /**
@@ -111,6 +111,18 @@ export interface AdminDateOptions extends AdminPropertyOptions {
  */
 export interface AdminReferenceOptions extends AdminPropertyOptions {
     previewProperties?: string[];
+
+    /**
+     * Offer only entities that pass this filter in the selection dialog.
+     * e.g. `fixedFilter: { age: [">=", 18] }`
+     */
+    fixedFilter?: FilterValues<string>;
+
+    /** Show the referenced entity's id in previews. Defaults to `true`. */
+    includeId?: boolean;
+
+    /** Show a link that opens the referenced entity. Defaults to `true`. */
+    includeEntityLink?: boolean;
 }
 
 /**
@@ -118,7 +130,23 @@ export interface AdminReferenceOptions extends AdminPropertyOptions {
  */
 export interface AdminRelationOptions extends AdminPropertyOptions {
     previewProperties?: string[];
+
+    /**
+     * Which widget selects the related entity. Defaults to `select`.
+     */
     widget?: "select" | "dialog";
+
+    /**
+     * Offer only entities that pass this filter in the selection widget.
+     * e.g. `fixedFilter: { age: [">=", 18] }`
+     */
+    fixedFilter?: FilterValues<string>;
+
+    /** Show the related entity's id in previews. Defaults to `true`. */
+    includeId?: boolean;
+
+    /** Show a link that opens the related entity. Defaults to `true`. */
+    includeEntityLink?: boolean;
 }
 
 /**
@@ -127,6 +155,18 @@ export interface AdminRelationOptions extends AdminPropertyOptions {
 export interface AdminArrayOptions extends AdminPropertyOptions {
     expanded?: boolean;
     minimalistView?: boolean;
+
+    /**
+     * Can the elements in this array be reordered by dragging. Defaults to
+     * `true`. No effect when the property is disabled.
+     */
+    sortable?: boolean;
+
+    /**
+     * Can elements be added to this array. Defaults to `true`. No effect when
+     * the property is disabled.
+     */
+    canAddElements?: boolean;
 }
 
 /**
@@ -136,6 +176,12 @@ export interface AdminMapOptions extends AdminPropertyOptions {
     expanded?: boolean;
     minimalistView?: boolean;
     spreadChildren?: boolean;
+
+    /**
+     * Which of the map's own properties are shown when it is rendered as a
+     * preview. Defaults to all of them, in `propertiesOrder`.
+     */
+    previewProperties?: string[];
 }
 
 /**

@@ -138,7 +138,7 @@ function DefaultFilterField({
             operators={operators}
             path={referenceProperty.path}
             title={title}
-            includeId={referenceProperty.includeId}
+            includeId={referenceProperty.admin?.includeId}
             previewProperties={referenceProperty.admin?.previewProperties}
             hidden={hidden ?? false}
             setHidden={setHidden ?? (() => undefined)}/>;

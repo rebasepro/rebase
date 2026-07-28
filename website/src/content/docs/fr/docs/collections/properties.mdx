@@ -64,11 +64,11 @@ price: {
 
 | Propriété | Type | Description |
 |----------|------|-------------|
-| `ui.readOnly` | `boolean` | Empêche l'édition |
-| `ui.disabled` | `boolean \| PropertyDisabledConfig` | Désactiver avec info-bulle optionnelle |
+| `admin.readOnly` | `boolean` | Empêche l'édition |
+| `admin.disabled` | `boolean \| PropertyDisabledConfig` | Désactiver avec info-bulle optionnelle |
 | `admin.hideFromCollection` | `boolean` | Masquer de la vue tableau |
-| `ui.columnWidth` | `number` | Largeur de colonne en pixels (vue tableau) |
-| `ui.widthPercentage` | `number` | Largeur du champ en pourcentage dans la vue formulaire |
+| `admin.columnWidth` | `number` | Largeur de colonne en pixels (vue tableau) |
+| `admin.widthPercentage` | `number` | Largeur du champ en pourcentage dans la vue formulaire |
 | `admin.Field` | `React.ComponentType` | Composant de champ personnalisé |
 | `admin.Preview` | `React.ComponentType` | Composant de cellule de tableau personnalisé |
 
@@ -205,8 +205,8 @@ locales: {
 
 | Propriété | Type | Description |
 |----------|------|-------------|
-| `multiline` | `boolean` | Rendu en tant que zone de texte (textarea) |
-| `markdown` | `boolean` | Rendu en tant qu'éditeur Markdown |
+| `admin.multiline` | `boolean` | Rendu en tant que zone de texte (textarea) |
+| `admin.markdown` | `boolean` | Rendu en tant qu'éditeur Markdown |
 | `email` | `boolean` | Validation du format e-mail |
 | `url` | `boolean` | Validation du format URL |
 | `storage` | `StorageConfig` | Activer le téléchargement de fichiers |
@@ -215,8 +215,8 @@ locales: {
 | `columnType` | `string` | Colonne de base de données : `"varchar"`, `"text"` |
 | `isId` | `string` | Génération d'ID : `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
 | `userSelect` | `boolean` | Rendu en tant que sélecteur d'utilisateur |
-| `previewAsTag` | `boolean` | Afficher cette chaîne comme une étiquette dans les aperçus |
-| `clearable` | `boolean` | Ajouter une icône pour effacer la valeur (définir à null) |
+| `admin.previewAsTag` | `boolean` | Afficher cette chaîne comme une étiquette dans les aperçus |
+| `admin.clearable` | `boolean` | Ajouter une icône pour effacer la valeur (définir à null) |
 
 ## Propriétés de type nombre
 
@@ -245,7 +245,7 @@ Les champs de nombre s'affichent comme un champ de saisie standard avec validati
 | `enum` | `EnumValues` | Rendu en tant que liste déroulante avec des valeurs numériques |
 | `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
 | `isId` | `string` | Stratégie de génération d'ID |
-| `clearable` | `boolean` | Ajouter une icône pour effacer la valeur (définir à null) |
+| `admin.clearable` | `boolean` | Ajouter une icône pour effacer la valeur (définir à null) |
 
 ## Propriétés de type booléen
 
@@ -318,7 +318,7 @@ updated_at: {
 | `autoValue` | `"on_create" \| "on_update"` | Horodatages définis automatiquement |
 | `columnType` | `string` | `"timestamp"`, `"date"` |
 | `timezone` | `string` | Chaîne de fuseau horaire pour évaluer la date |
-| `clearable` | `boolean` | Ajouter une icône pour effacer la valeur (définir à null) |
+| `admin.clearable` | `boolean` | Ajouter une icône pour effacer la valeur (définir à null) |
 
 ## Propriétés de type tableau
 
@@ -389,10 +389,10 @@ content: {
 |----------|------|-------------|
 | `of` | `Property \| Property[]` | Schéma de propriété pour les éléments du tableau |
 | `oneOf` | `object` | Tableau d'objets typés avec plusieurs types de discriminateurs |
-| `expanded` | `boolean` | Le champ doit-être initialement développé (par défaut : true) |
-| `minimalistView` | `boolean` | Afficher les propriétés enfants directement sans panneau extensible |
-| `sortable` | `boolean` | Les éléments peuvent-ils être réordonnés (par défaut : true) |
-| `canAddElements` | `boolean` | De nouveaux éléments peuvent-ils être ajoutés (par défaut : true) |
+| `admin.expanded` | `boolean` | Le champ doit-être initialement développé (par défaut : true) |
+| `admin.minimalistView` | `boolean` | Afficher les propriétés enfants directement sans panneau extensible |
+| `admin.sortable` | `boolean` | Les éléments peuvent-ils être réordonnés (par défaut : true) |
+| `admin.canAddElements` | `boolean` | De nouveaux éléments peuvent-ils être ajoutés (par défaut : true) |
 
 ## Propriétés de type carte (Map)
 
@@ -433,10 +433,10 @@ metadata: {
 |----------|------|-------------|
 | `properties` | `Properties` | Enregistrement des propriétés incluses dans la carte |
 | `propertiesOrder` | `string[]` | Clés ordonnées pour le rendu |
-| `previewProperties` | `string[]` | Propriétés à afficher dans l'aperçu du tableau |
-| `spreadChildren` | `boolean` | Afficher les propriétés enfants comme des colonnes séparées dans la vue tableau |
-| `minimalistView` | `boolean` | Afficher les propriétés sans panneau d'encapsulation |
-| `expanded` | `boolean` | Le champ doit-être initialement développé (par défaut : true) |
+| `admin.previewProperties` | `string[]` | Propriétés à afficher dans l'aperçu du tableau |
+| `admin.spreadChildren` | `boolean` | Afficher les propriétés enfants comme des colonnes séparées dans la vue tableau |
+| `admin.minimalistView` | `boolean` | Afficher les propriétés sans panneau d'encapsulation |
+| `admin.expanded` | `boolean` | Le champ doit-être initialement développé (par défaut : true) |
 | `keyValue` | `boolean` | Rendu en tant qu'éditeur de paires clé-valeur arbitraires |
 
 ## Propriétés de référence
@@ -448,7 +448,9 @@ client: {
     type: "reference",
     name: "Related client",
     path: "clients",
-    previewProperties: ["first_name", "last_name", "email"]
+    admin: {
+        previewProperties: ["first_name", "last_name", "email"]
+    }
 }
 ```
 

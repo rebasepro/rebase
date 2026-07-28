@@ -28,7 +28,7 @@ export function ArrayOfMapsPreview({
         throw Error(`You need to specify a 'properties' prop (or specify a custom field) in your map property '${propertyKey}'${mapProperty.name ? ` ("${mapProperty.name}")` : ""}`);
     }
     const values = value as Record<string, unknown>[];
-    const previewProperties: string[] | undefined = (mapProperty as MapProperty).previewProperties;
+    const previewProperties: string[] | undefined = (mapProperty as MapProperty).admin?.previewProperties;
 
     if (!values) return null;
 

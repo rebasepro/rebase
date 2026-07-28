@@ -77,7 +77,7 @@ export function ArrayOfReferencesFieldBinding({
         collection,
         onMultipleEntitiesSelected,
         selectedEntityIds,
-        fixedFilter: ofProperty.fixedFilter
+        fixedFilter: ofProperty.admin?.fixedFilter
     }
     );
 
@@ -104,8 +104,8 @@ export function ArrayOfReferencesFieldBinding({
                 onClick={onEntryClick}
                 hover={!disabled}
                 reference={entryValue}
-                includeId={ofProperty.includeId}
-                includeEntityLink={ofProperty.includeEntityLink}
+                includeId={ofProperty.admin?.includeId}
+                includeEntityLink={ofProperty.admin?.includeEntityLink}
             />
         );
     }, [ofProperty.path, ofProperty.admin?.previewProperties, value]);

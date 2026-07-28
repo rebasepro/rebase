@@ -66,7 +66,7 @@ export function MultipleRelationFieldBinding({
         collection,
         onMultipleEntitiesSelected,
         selectedEntityIds,
-        fixedFilter: property.fixedFilter
+        fixedFilter: property.admin?.fixedFilter
     }
     );
 
@@ -92,8 +92,8 @@ export function MultipleRelationFieldBinding({
                 onClick={onEntryClick}
                 hover={!disabled}
                 relation={entryValue}
-                includeId={property.includeId}
-                includeEntityLink={property.includeEntityLink}
+                includeId={property.admin?.includeId}
+                includeEntityLink={property.admin?.includeEntityLink}
             />
         );
     }, [relation, property.admin?.previewProperties, value]);

@@ -41,7 +41,7 @@ export function SkeletonPropertyComponent({
                 content = <>{arrayProperty.of.map((p, i) => renderGenericArrayCell(p, i))} </>;
             } else {
                 if (arrayProperty.of.type === "map" && arrayProperty.of.properties) {
-                    content = renderArrayOfMaps(arrayProperty.of.properties, size, arrayProperty.of.previewProperties);
+                    content = renderArrayOfMaps(arrayProperty.of.properties, size, arrayProperty.of.admin?.previewProperties);
                 } else if (arrayProperty.of.type === "string") {
                     if (arrayProperty.of.enum) {
                         content = renderArrayEnumTableCell();
@@ -79,7 +79,7 @@ function renderMap<T extends Record<string, any>>(property: MapProperty, size: P
     if (size === "large") {
         mapPropertyKeys = Object.keys(property.properties);
     } else {
-        mapPropertyKeys = (property.previewProperties || Object.keys(property.properties)) as string[];
+        mapPropertyKeys = (property.admin?.previewProperties || Object.keys(property.properties)) as string[];
         if (size === "medium")
             mapPropertyKeys = mapPropertyKeys.slice(0, 3);
         else if (size === "small")

@@ -274,12 +274,12 @@ All property types support a `admin` object for display configuration:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `ui.columnWidth` | `number` | — | Column width in pixels (table view) |
+| `admin.columnWidth` | `number` | — | Column width in pixels (table view) |
 | `admin.hideFromCollection` | `boolean` | — | Hide from collection table view |
-| `ui.readOnly` | `boolean` | — | Render as read-only preview |
-| `ui.disabled` | `boolean \| PropertyDisabledConfig` | — | Disable editing |
-| `ui.widthPercentage` | `number` | — | Width as percentage of form |
-| `ui.customProps` | `unknown` | — | Custom props passed to the field component |
+| `admin.readOnly` | `boolean` | — | Render as read-only preview |
+| `admin.disabled` | `boolean \| PropertyDisabledConfig` | — | Disable editing |
+| `admin.widthPercentage` | `number` | — | Width as percentage of form |
+| `admin.customProps` | `unknown` | — | Custom props passed to the field component |
 | `admin.Field` | `ComponentRef` | — | Custom field component |
 | `admin.Preview` | `ComponentRef` | — | Custom preview/cell component |
 
@@ -301,13 +301,13 @@ title: {
 | `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | `"varchar"` | Database column type |
 | `isId` | `boolean \| "manual" \| "uuid" \| "cuid" \| string` | — | Mark as primary key with generation strategy |
 | `enum` | `EnumValues` | — | Dropdown/picklist values |
-| `multiline` | `boolean` | `false` | Multi-line text area |
-| `markdown` | `boolean` | `false` | Markdown editor with preview. Uses the `RichTextEditor` component (`import { RichTextEditor } from "@rebasepro/admin/editor"`) — a full WYSIWYG editor supporting Markdown, JSON, and HTML output. |
+| `admin.multiline` | `boolean` | `false` | Multi-line text area |
+| `admin.markdown` | `boolean` | `false` | Markdown editor with preview. Uses the `RichTextEditor` component (`import { RichTextEditor } from "@rebasepro/admin/editor"`) — a full WYSIWYG editor supporting Markdown, JSON, and HTML output. |
 | `url` | `boolean \| PreviewType` | — | Render as link. `PreviewType`: `"image"`, `"video"`, `"audio"`, `"file"` |
 | `email` | `boolean` | — | Email field rendering |
 | `storage` | `StorageConfig` | — | File upload configuration (see Storage section) |
 | `userSelect` | `boolean` | — | Render as user picker (value = user ID) |
-| `previewAsTag` | `boolean` | — | Render value as a colored tag/chip |
+| `admin.previewAsTag` | `boolean` | — | Render value as a colored tag/chip |
 | `reference` | `ReferenceProperty` | — | Lightweight reference to another collection by ID |
 
 ### String isId Strategies
@@ -490,7 +490,7 @@ updated_at: {
 | `mode` | `"date" \| "date_time"` | `"date_time"` | Date-only or date + time picker |
 | `autoValue` | `"on_create" \| "on_update"` | — | Auto-set timestamp on create or every update |
 | `timezone` | `string` | — | Timezone string for display |
-| `clearable` | `boolean` | `false` | Show clear button to set value to `null` |
+| `admin.clearable` | `boolean` | `false` | Show clear button to set value to `null` |
 
 ### Date Validation
 
@@ -530,7 +530,7 @@ address: {
 |--------|------|---------|-------------|
 | `columnType` | `"json" \| "jsonb"` | `"jsonb"` | Database column type |
 | `properties` | `Properties` | — | Nested property schema (same types as collection properties) |
-| `admin.propertiesOrder` | `string[]` | — | Display order of nested fields |
+| `propertiesOrder` | `string[]` | — | Display order of nested fields. Stays on the property, not in `admin` — `sortProperties` in `@rebasepro/common` reads it |
 | `admin.previewProperties` | `string[]` | — | Properties shown in preview/collapsed state |
 | `keyValue` | `boolean` | — | Render as key-value table with arbitrary keys (no `properties` needed) |
 
@@ -538,9 +538,9 @@ address: {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `ui.expanded` | `boolean` | — | Expand map fields by default in forms |
-| `ui.minimalistView` | `boolean` | — | Compact rendering |
-| `ui.spreadChildren` | `boolean` | — | Spread child fields as if they were top-level form fields |
+| `admin.expanded` | `boolean` | — | Expand map fields by default in forms |
+| `admin.minimalistView` | `boolean` | — | Compact rendering |
+| `admin.spreadChildren` | `boolean` | — | Spread child fields as if they were top-level form fields |
 
 > **IMPORTANT FOR AGENTS:** If `validation.required` is not set on the map property itself, an empty object `{}` is considered valid even if inner properties have `required: true`. Always set `validation: { required: true }` on the map if the entire object is mandatory.
 
@@ -589,15 +589,15 @@ metadata: {
 | `columnType` | `"json" \| "jsonb" \| "text[]" \| "integer[]" \| "boolean[]" \| "numeric[]"` | auto | Database column type. Primitives default to native arrays |
 | `of` | `Property \| Property[]` | — | Element type definition. Use a single `Property` for homogeneous arrays |
 | `oneOf` | `{ properties, propertiesOrder?, typeField?, valueField? }` | — | Discriminated union for heterogeneous arrays (e.g. blog blocks) |
-| `sortable` | `boolean` | `true` | Allow drag-and-drop reordering |
-| `canAddElements` | `boolean` | `true` | Allow adding new elements |
+| `admin.sortable` | `boolean` | `true` | Allow drag-and-drop reordering |
+| `admin.canAddElements` | `boolean` | `true` | Allow adding new elements |
 
 ### Array UI Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `ui.expanded` | `boolean` | — | Expand array items by default |
-| `ui.minimalistView` | `boolean` | — | Compact rendering |
+| `admin.expanded` | `boolean` | — | Expand array items by default |
+| `admin.minimalistView` | `boolean` | — | Compact rendering |
 | `admin.Field` | `ComponentRef` | — | Custom field component for the entire array |
 
 ### Array Validation
@@ -786,8 +786,8 @@ The link goes under `relation`, and its `kind` decides which fields apply.
 | `onUpdate` | `OnAction` | — | Cascade rule on update |
 | `overrides` | `Partial<CollectionConfig>` | — | Override target collection config when rendered as subcollection tab |
 | `admin.fixedFilter` | `FilterValues` | — | Filter applied when selecting related entities |
-| `includeId` | `boolean` | `true` | Show entity ID in the reference preview |
-| `includeEntityLink` | `boolean` | `true` | Show link to open the related entity |
+| `admin.includeId` | `boolean` | `true` | Show entity ID in the reference preview |
+| `admin.includeEntityLink` | `boolean` | `true` | Show link to open the related entity |
 | `isId` | `boolean` | — | Mark as primary key |
 | `validation` | `{ required?: boolean }` | — | Relation-level validation |
 
@@ -795,8 +795,8 @@ The link goes under `relation`, and its `kind` decides which fields apply.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `ui.widget` | `"select" \| "dialog"` | `"select"` | UI widget for selecting relations |
-| `ui.previewProperties` | `string[]` | — | Properties shown in relation preview (max 3) |
+| `admin.widget` | `"select" \| "dialog"` | `"select"` | UI widget for selecting relations |
+| `admin.previewProperties` | `string[]` | — | Properties shown in relation preview (max 3) |
 
 ### Cascade Rules (OnAction)
 

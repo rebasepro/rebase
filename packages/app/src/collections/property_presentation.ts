@@ -14,7 +14,8 @@
  * declarative conditions feature is authored and stored, never applied. It lives
  * here now because here is where it would be called from once it is wired up.
  */
-import type { ArrayProperty, ConditionContext, EnumValueConfig, Property, PropertyConditions, ReferenceProperty } from "@rebasepro/types";
+import type { ConditionContext, EnumValueConfig, Property, PropertyConditions, ReferenceProperty } from "@rebasepro/types";
+import type { AdminArrayOptions, AdminReferenceOptions } from "@rebasepro/admin-types";
 import { evaluateCondition } from "@rebasepro/common";
 
 export function isReadOnly(property: Property): boolean {
@@ -126,7 +127,9 @@ export function applyPropertyConditions(
             (result as ReferenceProperty).path = evaluateCondition(conditions.referencePath, context) as string;
         }
         if (conditions.referenceFilter) {
-            (result as ReferenceProperty).fixedFilter = evaluateCondition(conditions.referenceFilter, context) as ReferenceProperty["fixedFilter"];
+            result.admin = result.admin || {};
+            (result.admin as AdminReferenceOptions).fixedFilter =
+                evaluateCondition(conditions.referenceFilter, context) as AdminReferenceOptions["fixedFilter"];
         }
     }
 
@@ -136,10 +139,12 @@ export function applyPropertyConditions(
 
     if (result.type === "array") {
         if (conditions.canAddElements !== undefined) {
-            (result as ArrayProperty).canAddElements = evaluateCondition(conditions.canAddElements, context) as boolean;
+            result.admin = result.admin || {};
+            (result.admin as AdminArrayOptions).canAddElements = evaluateCondition(conditions.canAddElements, context) as boolean;
         }
         if (conditions.sortable !== undefined) {
-            (result as ArrayProperty).sortable = evaluateCondition(conditions.sortable, context) as boolean;
+            result.admin = result.admin || {};
+            (result.admin as AdminArrayOptions).sortable = evaluateCondition(conditions.sortable, context) as boolean;
         }
     }
 

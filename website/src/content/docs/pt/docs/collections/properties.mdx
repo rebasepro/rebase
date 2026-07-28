@@ -64,11 +64,11 @@ price: {
 
 | Propriedade | Tipo | Descrição |
 |----------|------|-------------|
-| `ui.readOnly` | `boolean` | Impedir edição |
-| `ui.disabled` | `boolean \| PropertyDisabledConfig` | Desabilitar com tooltip opcional |
+| `admin.readOnly` | `boolean` | Impedir edição |
+| `admin.disabled` | `boolean \| PropertyDisabledConfig` | Desabilitar com tooltip opcional |
 | `admin.hideFromCollection` | `boolean` | Ocultar da visualização de tabela |
-| `ui.columnWidth` | `number` | Largura da coluna em pixels (visualização de tabela) |
-| `ui.widthPercentage` | `number` | Largura do campo como porcentagem na visualização de formulário |
+| `admin.columnWidth` | `number` | Largura da coluna em pixels (visualização de tabela) |
+| `admin.widthPercentage` | `number` | Largura do campo como porcentagem na visualização de formulário |
 | `admin.Field` | `React.ComponentType` | Componente de campo personalizado |
 | `admin.Preview` | `React.ComponentType` | Componente de célula de tabela personalizado |
 
@@ -205,8 +205,8 @@ locales: {
 
 | Propriedade | Tipo | Descrição |
 |----------|------|-------------|
-| `multiline` | `boolean` | Renderizar como textarea |
-| `markdown` | `boolean` | Renderizar como editor de markdown |
+| `admin.multiline` | `boolean` | Renderizar como textarea |
+| `admin.markdown` | `boolean` | Renderizar como editor de markdown |
 | `email` | `boolean` | Validação de formato de e-mail |
 | `url` | `boolean` | Validação de formato de URL |
 | `storage` | `StorageConfig` | Habilitar upload de arquivo |
@@ -215,8 +215,8 @@ locales: {
 | `columnType` | `string` | Coluna de banco de dados: `"varchar"`, `"text"` |
 | `isId` | `string` | Geração de ID: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
 | `userSelect` | `boolean` | Renderizar como um seletor de usuário |
-| `previewAsTag` | `boolean` | Renderizar esta string como uma tag nas pré-visualizações |
-| `clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
+| `admin.previewAsTag` | `boolean` | Renderizar esta string como uma tag nas pré-visualizações |
+| `admin.clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
 
 ## Propriedades Numéricas
 
@@ -245,7 +245,7 @@ Campos numéricos são renderizados como um campo de texto padrão com validaç�
 | `enum` | `EnumValues` | Renderizar como seletor com valores numéricos |
 | `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
 | `isId` | `string` | Estratégia de geração de ID |
-| `clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
+| `admin.clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
 
 ## Propriedades Booleanas
 
@@ -318,7 +318,7 @@ updated_at: {
 | `autoValue` | `"on_create" \| "on_update"` | Definir timestamps automaticamente |
 | `columnType` | `string` | `"timestamp"`, `"date"` |
 | `timezone` | `string` | String de fuso horário para avaliar a data |
-| `clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
+| `admin.clearable` | `boolean` | Adicionar um ícone para limpar o valor (definir como nulo) |
 
 ## Propriedades de Array
 
@@ -389,10 +389,10 @@ content: {
 |----------|------|-------------|
 | `of` | `Property \| Property[]` | Esquema de propriedade para itens do array |
 | `oneOf` | `object` | Array de objetos tipados com múltiplos tipos discriminadores |
-| `expanded` | `boolean` | O campo deve ser inicialmente expandido? (padrão: true) |
-| `minimalistView` | `boolean` | Exibir propriedades filhas diretamente sem painel extensível |
-| `sortable` | `boolean` | Os elementos podem ser reordenados? (padrão: true) |
-| `canAddElements` | `boolean` | Novos elementos podem ser adicionados? (padrão: true) |
+| `admin.expanded` | `boolean` | O campo deve ser inicialmente expandido? (padrão: true) |
+| `admin.minimalistView` | `boolean` | Exibir propriedades filhas diretamente sem painel extensível |
+| `admin.sortable` | `boolean` | Os elementos podem ser reordenados? (padrão: true) |
+| `admin.canAddElements` | `boolean` | Novos elementos podem ser adicionados? (padrão: true) |
 
 ## Propriedades de Mapa
 
@@ -433,10 +433,10 @@ metadata: {
 |----------|------|-------------|
 | `properties` | `Properties` | Registro de propriedades incluídas no mapa |
 | `propertiesOrder` | `string[]` | Chaves ordenadas para renderização |
-| `previewProperties` | `string[]` | Quais propriedades mostrar na pré-visualização da tabela |
-| `spreadChildren` | `boolean` | Renderizar propriedades filhas como colunas separadas na visualização de tabela |
-| `minimalistView` | `boolean` | Exibir propriedades sem um painel de envoltório |
-| `expanded` | `boolean` | O campo deve ser inicialmente expandido? (padrão: true) |
+| `admin.previewProperties` | `string[]` | Quais propriedades mostrar na pré-visualização da tabela |
+| `admin.spreadChildren` | `boolean` | Renderizar propriedades filhas como colunas separadas na visualização de tabela |
+| `admin.minimalistView` | `boolean` | Exibir propriedades sem um painel de envoltório |
+| `admin.expanded` | `boolean` | O campo deve ser inicialmente expandido? (padrão: true) |
 | `keyValue` | `boolean` | Renderizar como editor de pares chave-valor arbitrários |
 
 ## Propriedades de Referência
@@ -448,7 +448,9 @@ client: {
     type: "reference",
     name: "Related client",
     path: "clients",
-    previewProperties: ["first_name", "last_name", "email"]
+    admin: {
+        previewProperties: ["first_name", "last_name", "email"]
+    }
 }
 ```
 

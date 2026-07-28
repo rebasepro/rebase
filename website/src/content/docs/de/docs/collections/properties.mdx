@@ -65,11 +65,11 @@ price: {
 
 | Property | Type | Beschreibung |
 |----------|------|-------------|
-| `ui.readOnly` | `boolean` | Bearbeitung verhindern |
-| `ui.disabled` | `boolean \| PropertyDisabledConfig` | Deaktivieren mit optionalem Tooltip |
+| `admin.readOnly` | `boolean` | Bearbeitung verhindern |
+| `admin.disabled` | `boolean \| PropertyDisabledConfig` | Deaktivieren mit optionalem Tooltip |
 | `admin.hideFromCollection` | `boolean` | Aus der Tabellenansicht ausblenden |
-| `ui.columnWidth` | `number` | Spaltenbreite in Pixeln (Tabellenansicht) |
-| `ui.widthPercentage` | `number` | Feldbreite als Prozentwert in der Formularansicht |
+| `admin.columnWidth` | `number` | Spaltenbreite in Pixeln (Tabellenansicht) |
+| `admin.widthPercentage` | `number` | Feldbreite als Prozentwert in der Formularansicht |
 | `admin.Field` | `React.ComponentType` | Benutzerdefinierte Feldkomponente |
 | `admin.Preview` | `React.ComponentType` | Benutzerdefinierte Tabellenzellenkomponente |
 
@@ -206,8 +206,8 @@ locales: {
 
 | Property | Type | Beschreibung |
 |----------|------|-------------|
-| `multiline` | `boolean` | Als Textbereich rendern |
-| `markdown` | `boolean` | Als Markdown-Editor rendern |
+| `admin.multiline` | `boolean` | Als Textbereich rendern |
+| `admin.markdown` | `boolean` | Als Markdown-Editor rendern |
 | `email` | `boolean` | E-Mail-Formatvalidierung |
 | `url` | `boolean` | URL-Formatvalidierung |
 | `storage` | `StorageConfig` | Dateiupload aktivieren |
@@ -216,8 +216,8 @@ locales: {
 | `columnType` | `string` | Datenbankspalte: `"varchar"`, `"text"` |
 | `isId` | `string` | ID-Generierung: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
 | `userSelect` | `boolean` | Als Benutzerauswahl rendern |
-| `previewAsTag` | `boolean` | Diese Zeichenkette als Tag in Vorschauen rendern |
-| `clearable` | `boolean` | Ein Symbol zum Löschen des Wertes hinzufügen (auf null setzen) |
+| `admin.previewAsTag` | `boolean` | Diese Zeichenkette als Tag in Vorschauen rendern |
+| `admin.clearable` | `boolean` | Ein Symbol zum Löschen des Wertes hinzufügen (auf null setzen) |
 
 ## Zahlen-Eigenschaften
 
@@ -246,7 +246,7 @@ Zahlenfelder werden als Standard-Texteingabe mit numerischer Validierung dargest
 | `enum` | `EnumValues` | Als Auswahl mit numerischen Werten rendern |
 | `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
 | `isId` | `string` | ID-Generierungsstrategie |
-| `clearable` | `boolean` | Ein Symbol zum Löschen des Wertes hinzufügen (auf null setzen) |
+| `admin.clearable` | `boolean` | Ein Symbol zum Löschen des Wertes hinzufügen (auf null setzen) |
 
 ## Boolean-Eigenschaften
 
@@ -319,7 +319,7 @@ updated_at: {
 | `autoValue` | `"on_create" \| "on_update"` | Zeitstempel automatisch setzen |
 | `columnType` | `string` | `"timestamp"`, `"date"` |
 | `timezone` | `string` | Zeitzonen-String, um das Datum auszuwerten |
-| `clearable` | `boolean` | Ein Symbol zum Löschen des Wertes hinzufügen (auf null setzen) |
+| `admin.clearable` | `boolean` | Ein Symbol zum Löschen des Wertes hinzufügen (auf null setzen) |
 
 ## Array-Eigenschaften
 
@@ -390,10 +390,10 @@ content: {
 |----------|------|-------------|
 | `of` | `Property \| Property[]` | Eigenschaftsschema für Array-Elemente |
 | `oneOf` | `object` | Array von typisierten Objekten mit mehreren Diskriminator-Typen |
-| `expanded` | `boolean` | Soll das Feld anfänglich erweitert sein (Standard: true) |
-| `minimalistView` | `boolean` | Untergeordnete Eigenschaften direkt ohne erweiterbares Panel anzeigen |
-| `sortable` | `boolean` | Können Elemente neu angeordnet werden (Standard: true) |
-| `canAddElements` | `boolean` | Können neue Elemente hinzugefügt werden (Standard: true) |
+| `admin.expanded` | `boolean` | Soll das Feld anfänglich erweitert sein (Standard: true) |
+| `admin.minimalistView` | `boolean` | Untergeordnete Eigenschaften direkt ohne erweiterbares Panel anzeigen |
+| `admin.sortable` | `boolean` | Können Elemente neu angeordnet werden (Standard: true) |
+| `admin.canAddElements` | `boolean` | Können neue Elemente hinzugefügt werden (Standard: true) |
 
 ## Map-Eigenschaften
 
@@ -434,10 +434,10 @@ metadata: {
 |----------|------|-------------|
 | `properties` | `Properties` | Datensatz der in der Map enthaltenen Eigenschaften |
 | `propertiesOrder` | `string[]` | Geordnete Schlüssel für das Rendern |
-| `previewProperties` | `string[]` | Welche Eigenschaften in der Tabellenvorschau angezeigt werden sollen |
-| `spreadChildren` | `boolean` | Untergeordnete Eigenschaften als separate Spalten in der Tabellenansicht rendern |
-| `minimalistView` | `boolean` | Eigenschaften ohne umhüllendes Panel anzeigen |
-| `expanded` | `boolean` | Soll das Feld anfänglich erweitert sein (Standard: true) |
+| `admin.previewProperties` | `string[]` | Welche Eigenschaften in der Tabellenvorschau angezeigt werden sollen |
+| `admin.spreadChildren` | `boolean` | Untergeordnete Eigenschaften als separate Spalten in der Tabellenansicht rendern |
+| `admin.minimalistView` | `boolean` | Eigenschaften ohne umhüllendes Panel anzeigen |
+| `admin.expanded` | `boolean` | Soll das Feld anfänglich erweitert sein (Standard: true) |
 | `keyValue` | `boolean` | Als Editor für beliebige Schlüssel-Wert-Paare rendern |
 
 ## Referenz-Eigenschaften
@@ -449,7 +449,9 @@ client: {
     type: "reference",
     name: "Related client",
     path: "clients",
-    previewProperties: ["first_name", "last_name", "email"]
+    admin: {
+        previewProperties: ["first_name", "last_name", "email"]
+    }
 }
 ```
 

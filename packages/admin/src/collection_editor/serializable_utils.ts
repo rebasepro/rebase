@@ -255,9 +255,6 @@ export function toSerializableProperty(property: Property): SerializableProperty
             };
             if (rp.isId !== undefined) result.isId = rp.isId;
             if (rp.path) result.path = rp.path;
-            if (rp.fixedFilter) result.fixedFilter = rp.fixedFilter;
-            if (rp.includeId !== undefined) result.includeId = rp.includeId;
-            if (rp.includeEntityLink !== undefined) result.includeEntityLink = rp.includeEntityLink;
             return result;
         }
 
@@ -322,10 +319,6 @@ export function toSerializableProperty(property: Property): SerializableProperty
                     }
                 }
             }
-            if (rl.fixedFilter) result.fixedFilter = rl.fixedFilter;
-            if (rl.includeId !== undefined) result.includeId = rl.includeId;
-            if (rl.includeEntityLink !== undefined) result.includeEntityLink = rl.includeEntityLink;
-            if (rl.widget) result.widget = rl.widget;
             // overrides are dropped (may hold a non-serializable CollectionConfig)
             return result;
         }
@@ -338,8 +331,6 @@ export function toSerializableProperty(property: Property): SerializableProperty
             };
             if (ap.columnType) result.columnType = ap.columnType;
             if (ap.validation) result.validation = ap.validation;
-            if (ap.sortable !== undefined) result.sortable = ap.sortable;
-            if (ap.canAddElements !== undefined) result.canAddElements = ap.canAddElements;
 
             // Recursively serialize the "of" property
             if (ap.of) {
@@ -371,7 +362,6 @@ export function toSerializableProperty(property: Property): SerializableProperty
             if (mp.columnType) result.columnType = mp.columnType;
             if (mp.validation) result.validation = mp.validation;
             if (mp.propertiesOrder) result.propertiesOrder = mp.propertiesOrder;
-            if (mp.previewProperties) result.previewProperties = mp.previewProperties;
             if (mp.keyValue) result.keyValue = mp.keyValue;
 
             // Recursively serialize nested properties

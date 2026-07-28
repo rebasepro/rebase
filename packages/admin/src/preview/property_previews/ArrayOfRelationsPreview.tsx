@@ -39,8 +39,8 @@ export function ArrayOfRelationsPreview({
                                 previewProperties={ofProperty.admin?.previewProperties}
                                 size={"small"}
                                 relation={entityRelation}
-                                includeId={ofProperty.includeId}
-                                includeEntityLink={ofProperty.includeEntityLink}
+                                includeId={ofProperty.admin?.includeId}
+                                includeEntityLink={ofProperty.admin?.includeEntityLink}
                             />
                         </div>
                     );

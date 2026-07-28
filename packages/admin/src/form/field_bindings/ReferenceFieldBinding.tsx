@@ -85,7 +85,7 @@ function ReferenceFieldBindingInternal({
         collection,
         onSingleEntitySelected,
         selectedEntityIds: validValue && refValue ? [refValue.id] : undefined,
-        fixedFilter: property.fixedFilter
+        fixedFilter: property.admin?.fixedFilter
     }
     );
 
@@ -115,8 +115,8 @@ function ReferenceFieldBindingInternal({
                     size={size}
                     onClick={disabled || isSubmitting ? undefined : onEntryClick}
                     reference={refValue}
-                    includeEntityLink={property.includeEntityLink}
-                    includeId={property.includeId}
+                    includeEntityLink={property.admin?.includeEntityLink}
+                    includeId={property.admin?.includeId}
                 />}
 
                 {!refValue && <div className="justify-center text-left">
