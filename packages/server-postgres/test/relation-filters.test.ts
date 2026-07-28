@@ -329,6 +329,32 @@ describe("filtering by a relation with no column on this row", () => {
         });
     });
 
+    describe("the array operators, which the admin offers for an array of relations", () => {
+
+        // A to-many relation *is* the list. These reach the driver because
+        // `resolveFilterOperators` hands an array property the array
+        // operators, and the item property is a relation — so rejecting them
+        // put a 400 behind a control the admin rendered.
+
+        it("`array-contains` asks the same question as `==`", () => {
+            expect(render(filterPosts({ tags: ["array-contains", 4] })[0]).sql)
+                .toBe(render(filterPosts({ tags: ["==", 4] })[0]).sql);
+        });
+
+        it("`array-contains-any` asks the same question as `in`", () => {
+            expect(render(filterPosts({ tags: ["array-contains-any", [1, 2]] })[0]).sql)
+                .toBe(render(filterPosts({ tags: ["in", [1, 2]] })[0]).sql);
+        });
+
+        it("compiles on the foreign-key side too", () => {
+            const query = render(filterPosts({ comments: ["array-contains", 7] })[0]);
+            expect(query.sql).toBe(
+                'EXISTS (SELECT 1 FROM "comments" AS "__rel_filter" ' +
+                'WHERE "__rel_filter"."post_id" = "posts"."id" AND "__rel_filter"."id" = $1)'
+            );
+        });
+    });
+
     describe("operators the shape cannot express", () => {
 
         it("rejects an ordering operator instead of dropping it", () => {

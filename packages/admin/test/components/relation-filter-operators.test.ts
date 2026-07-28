@@ -95,10 +95,22 @@ describe("relation filter operators, header to field", () => {
 
     describe("an array *of* relations is a different property", () => {
 
-        it("keeps the array operators, which the column really does hold", () => {
-            // Narrowing the to-many list to the list-valued operators must not
-            // cost this case the array operators it had before.
+        it("offers the array operators for an array of to-many relations", () => {
+            // These are what `resolveFilterOperators` returns for any array
+            // property. Offering them is only correct because the driver
+            // answers them on a to-many relation — `array-contains` is `==`
+            // and `array-contains-any` is `in` over the same `EXISTS`. It
+            // used to reject both, which is a 400 behind a rendered control.
             expect(rendered("manyToMany", true)).toEqual(["array-contains", "array-contains-any"]);
+        });
+
+        it("offers nothing for an array of to-one relations", () => {
+            // Pre-existing and untouched: the field renders a single-value
+            // selector for a to-one relation, so it has no array operator to
+            // pair with, and `FilterFieldBinding` renders null. The table
+            // header still offers the control — a gap that predates this work
+            // and belongs with `filterableProperty`, not here.
+            expect(rendered("belongsTo", true)).toEqual([]);
         });
     });
 

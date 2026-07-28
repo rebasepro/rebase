@@ -653,11 +653,22 @@ export class DrizzleConditionBuilder {
                 return { negate: true };
             case "is-not-null":
                 return { negate: false };
+            // A to-many relation *is* the list, so the array operators ask the
+            // same two questions under different names: "contains X" is "some
+            // related row is X", and "contains any of [X, Y]" is `in`. They
+            // reach here because the admin offers them for a property that is
+            // an *array of* relations, and rejecting a question the shape
+            // answers perfectly well would put a 400 behind a working control.
+            case "array-contains":
+                return isNullish ? { negate: true } : { predicate: equals(), negate: false };
+            case "array-contains-any":
+                return isNullish ? { negate: true } : { predicate: inList(), negate: false };
             default:
                 throw ApiError.badRequest(
                     `Operator '${op}' cannot be applied to relation field '${field}' on collection ` +
-                    `'${collectionPath}'. A relation with no column on this row is filtered by membership: ` +
-                    "==, !=, in, not-in, is-null, is-not-null.",
+                    `'${collectionPath}'. A relation with no column on this row is filtered by ` +
+                    "membership: ==, !=, in, not-in, array-contains, array-contains-any, is-null, " +
+                    "is-not-null.",
                     "UNSUPPORTED_RELATION_FILTER_OPERATOR",
                     { field, collection: collectionPath, operator: op }
                 );
