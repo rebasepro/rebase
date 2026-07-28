@@ -4,7 +4,7 @@ import { Entity, User, Property } from "@rebasepro/types";
 import { CollectionSize, RebaseContext } from "@rebasepro/admin-types";
 import { PropertyTableCell } from "./PropertyTableCell";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { useRebaseContext, useLargeLayout } from "@rebasepro/app";
+import { useRebaseContext, useLargeLayout, useCollectionScope } from "@rebasepro/app";
 import { CellRendererParams, VirtualTableColumn } from "@rebasepro/ui";
 import { CollectionRowActions } from "./CollectionRowActions";
 import { CollectionTableToolbar } from "./internal/CollectionTableToolbar";
@@ -248,11 +248,17 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
 
     }, [size]);
 
+    // Same source the filter fields read their engine from, so the header's
+    // filter control and the field it opens cannot disagree about what the
+    // collection's driver can answer.
+    const engine = useCollectionScope()?.engine;
+
     const collectionColumns: VirtualTableColumn[] = useMemo(() => {
         const columnsResult: VirtualTableColumn[] = propertiesToColumns({
             properties,
             sortable,
             fixedFilter,
+            engine,
             AdditionalHeaderWidget
         });
 
@@ -273,7 +279,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 }))
             : [];
         return [...columnsResult, ...additionalTableColumns];
-    }, [properties, sortable, fixedFilter, AdditionalHeaderWidget, additionalFields]);
+    }, [properties, sortable, fixedFilter, engine, AdditionalHeaderWidget, additionalFields]);
 
     const idColumn: VirtualTableColumn = useMemo(() => ({
         key: "id_ewcfedcswdf3",

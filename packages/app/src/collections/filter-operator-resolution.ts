@@ -1,6 +1,7 @@
 import {
     ALL_WHERE_FILTER_OPS,
     DataType,
+    DEFAULT_FILTERABLE_RELATION_KINDS,
     getDataSourceCapabilities,
     Property,
     RelationProperty,
@@ -32,30 +33,21 @@ const DEFAULT_OPS_BY_TYPE: Partial<Record<DataType, readonly WhereFilterOp[]>> =
 const ARRAY_OPS: readonly WhereFilterOp[] = ["array-contains", "array-contains-any"];
 
 /**
- * Relation kinds the query layer can compile into a `WHERE`.
+ * Whether a relation is one the collection's engine can compile into a
+ * `WHERE`.
  *
- * `belongsTo` is a plain column comparison — the foreign key is on this row.
- * The other three are correlated subqueries over the table that does hold the
- * link: `EXISTS (SELECT 1 FROM <junction> …)` for `manyToMany`, and the same
- * over the target's foreign key for `hasMany`/`hasOne`.
- *
- * `via` is not here. Its join path is authored source → target with no stated
- * inverse, so turning it into a filter is a different problem from reversing a
- * single link, and until the driver solves it a filter keyed on one names
- * nothing the backend can resolve.
+ * Which kinds those are is the *driver's* answer, not this function's, so it
+ * comes from {@link DataSourceCapabilities.filterableRelationKinds}. The admin
+ * is one UI over Postgres, MongoDB, Firestore and whatever a developer
+ * registers, and "a many-to-many compiles to an `EXISTS` over the junction" is
+ * a fact about the Postgres driver — true today, and not the sort of thing to
+ * assert on an engine's behalf.
  *
  * Offering an uncompilable filter is not a cosmetic bug. The Postgres driver
  * used to drop a filter key it could not resolve, which *widened* the result
  * set — filtering a many-to-many column returned every row instead of none.
  * That now fails closed with a 400, which is correct for a real schema drift
  * and wrong as the answer to a control the admin itself put on screen.
- */
-const FILTERABLE_RELATION_KINDS: readonly string[] = ["belongsTo", "manyToMany", "hasMany", "hasOne"];
-
-/**
- * Whether a relation is one the query layer can compile into a `WHERE`.
- *
- * See {@link FILTERABLE_RELATION_KINDS} for which kinds compile and why.
  *
  * A relation whose kind cannot be determined at all — no inline `relation`
  * block and no stamped `resolvedRelation` — stays filterable. The server
@@ -63,12 +55,14 @@ const FILTERABLE_RELATION_KINDS: readonly string[] = ["belongsTo", "manyToMany",
  * hand-built-property case, and silently dropping a working filter there would
  * be its own regression.
  */
-export function isFilterableRelation(property: Property): boolean {
+export function isFilterableRelation(property: Property, engine?: string): boolean {
     if (property.type !== "relation") return true;
     const relationProperty = property as RelationProperty;
     const kind = relationProperty.relation?.kind ?? relationProperty.resolvedRelation?.kind;
     if (!kind) return true;
-    return FILTERABLE_RELATION_KINDS.includes(kind);
+    const kinds = getDataSourceCapabilities(engine).filterableRelationKinds
+        ?? DEFAULT_FILTERABLE_RELATION_KINDS;
+    return kinds.includes(kind);
 }
 
 export interface ResolveFilterOperatorsParams {
@@ -108,7 +102,7 @@ export function resolveFilterOperators({
     isArray,
     engine
 }: ResolveFilterOperatorsParams): WhereFilterOp[] {
-    if (!isFilterableRelation(property)) return [];
+    if (!isFilterableRelation(property, engine)) return [];
 
     const typeDefaults: readonly WhereFilterOp[] = isArray
         ? ARRAY_OPS

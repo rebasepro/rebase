@@ -1,6 +1,6 @@
 import { useSelectionDialog } from "../../../hooks/useSelectionDialog";
 
-import React, { useMemo, useState } from "react";
+import React, { useId, useMemo, useState } from "react";
 import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { Entity, EntityReference } from "@rebasepro/types";
 import { ReferencePreview } from "../../../preview";
@@ -9,6 +9,7 @@ import { getReferenceFrom } from "@rebasepro/common";
 import { useTranslation } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../../hooks/navigation/contexts/CollectionRegistryContext";
 import type { AdminCollection } from "@rebasepro/admin-types";
+import { isNullFilterOperator, nullFilterOperatorFor, valueOperatorFor } from "./null_filter";
 
 interface ReferenceFilterFieldProps {
     name: string,
@@ -39,7 +40,9 @@ const operationLabels = {
     in: "In",
     "not-in": "Not in",
     "array-contains": "Contains",
-    "array-contains-any": "Contains Any"
+    "array-contains-any": "Contains Any",
+    "is-null": "Is null",
+    "is-not-null": "Is not null"
 };
 
 const multipleSelectOperations = ["array-contains-any", "in", "not-in"];
@@ -65,6 +68,9 @@ export function ReferenceFilterField({
     } else {
         possibleOperations.push("in", "not-in");
     }
+
+    // The null checks take no operand, so they apply either way.
+    possibleOperations.push("is-null", "is-not-null");
 
     if (operators) {
         possibleOperations = possibleOperations.filter(op => (operators as readonly string[]).includes(op));
@@ -97,6 +103,14 @@ export function ReferenceFilterField({
         setOperation(op);
         setInternalValue(newValue);
 
+        // A null check takes no operand, so it is complete on its own — the
+        // value gate below would otherwise clear the filter the moment one is
+        // chosen from the dropdown, where there is no value to accompany it.
+        if (isNullFilterOperator(op)) {
+            setValue([op, null]);
+            return;
+        }
+
         const hasNewValue = newValue !== null && Array.isArray(newValue)
             ? newValue.length > 0
             : newValue !== undefined;
@@ -125,6 +139,12 @@ export function ReferenceFilterField({
     };
 
     const multiple = multipleSelectOperations.includes(operation);
+    const nullFiltered = isNullFilterOperator(operation);
+
+    // The filters dialog renders every filterable property at once, and this
+    // id was the literal string "null-filter" — so clicking any label toggled
+    // whichever checkbox the document matched first, never the one clicked.
+    const nullFilterId = useId();
 
     const referenceDialogController = useSelectionDialog({
         multiselect: multiple,
@@ -200,17 +220,24 @@ export function ReferenceFilterField({
                     </Button>
                 }
 
+                {/*
+                  * Switches the operator to the matching null check rather
+                  * than pairing a null value with whatever operator is
+                  * selected. Only the operator travels to the driver, and a
+                  * null *operand* means different things to different ones —
+                  * Mongo rejects `$in: null` outright. See
+                  * `nullFilterOperatorFor`.
+                  */}
                 {!isArray && <Label
                     className="border cursor-pointer rounded-md p-2 flex items-center gap-2 bg-surface-50 dark:bg-surface-900 hover:bg-surface-100 dark:hover:bg-surface-800"
-                    htmlFor="null-filter"
+                    htmlFor={nullFilterId}
                 >
-                    <Checkbox id="null-filter"
-                        checked={internalValue === null}
+                    <Checkbox id={nullFilterId}
+                        checked={nullFiltered}
                         size={"small"}
-                        onCheckedChange={(checked) => {
-                            if (internalValue !== null)
-                                updateFilter(operation, null);
-                            else updateFilter(operation, undefined);
+                        onCheckedChange={() => {
+                            if (!nullFiltered) updateFilter(nullFilterOperatorFor(operation), null);
+                            else updateFilter(valueOperatorFor(operation, possibleOperations) ?? operation, undefined);
                         }}/>
                     {t("filter_for_null_values")}
                 </Label>}

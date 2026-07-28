@@ -22,6 +22,12 @@ export interface PropertiesToColumnsParams<M extends Record<string, unknown>> {
     properties: Properties;
     sortable?: boolean;
     fixedFilter?: FilterValues<keyof M extends string ? keyof M : never>;
+    /**
+     * The engine backing the collection (`collection.engine`). Decides which
+     * relation kinds can be filtered — see `isFilterableRelation`. Omitted
+     * falls back to the default engine's capabilities.
+     */
+    engine?: string;
     AdditionalHeaderWidget?: React.ComponentType<{
         property: Property,
         propertyKey: string,
@@ -29,7 +35,7 @@ export interface PropertiesToColumnsParams<M extends Record<string, unknown>> {
     }>;
 }
 
-export function propertiesToColumns<M extends Record<string, unknown>>({ properties, sortable, fixedFilter, AdditionalHeaderWidget }: PropertiesToColumnsParams<M>): VirtualTableColumn[] {
+export function propertiesToColumns<M extends Record<string, unknown>>({ properties, sortable, fixedFilter, engine, AdditionalHeaderWidget }: PropertiesToColumnsParams<M>): VirtualTableColumn[] {
     const disabledFilter = Boolean(fixedFilter);
     return Object.entries<Property>(properties)
         .flatMap(([key, property]) => getColumnKeysForProperty(property, key))
@@ -40,7 +46,7 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
             const property = getResolvedPropertyInPath(properties, key) as Property;
             if (!property)
                 throw Error("Internal error: no property found in path " + key);
-            const filterable = filterableProperty(property);
+            const filterable = filterableProperty(property, false, engine);
             return {
                 key: key as string,
                 align: getTableCellAlignment(property),
@@ -61,20 +67,21 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
         });
 }
 
-function filterableProperty(property: Property, partOfArray = false): boolean {
-    // A relation the query layer cannot compile into a `WHERE` has no column
-    // on this row to compare against, so the header's filter control would
-    // open onto a field that renders nothing (`FilterFieldBinding` returns
-    // null on an empty operator list) — and, before the driver started failing
-    // closed, sending one silently returned every row. Same authority as the
-    // operator resolution so the two cannot drift.
-    if (!isFilterableRelation(property)) return false;
+function filterableProperty(property: Property, partOfArray = false, engine?: string): boolean {
+    // A relation this engine's driver cannot compile into a `WHERE` has
+    // nothing to filter on, so the header's filter control would open onto a
+    // field that renders nothing (`FilterFieldBinding` returns null on an
+    // empty operator list) — and, before the driver started failing closed,
+    // sending one silently returned every row. Same authority as the operator
+    // resolution, and engine-aware for the same reason: this table renders
+    // over Postgres, Mongo, Firestore and anything a developer registers.
+    if (!isFilterableRelation(property, engine)) return false;
     if (partOfArray) {
         return ["string", "number", "date", "reference", "relation"].includes(property.type);
     }
     if (property.type === "array") {
         if (property.of && !Array.isArray(property.of))
-            return filterableProperty(property.of, true);
+            return filterableProperty(property.of, true, engine);
         else
             return false;
     }

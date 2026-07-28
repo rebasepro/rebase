@@ -48,6 +48,28 @@ export interface DataSourceCapabilities {
      */
     filterOperators: readonly WhereFilterOp[];
 
+    /**
+     * Relation kinds this engine's driver can compile into a filter.
+     *
+     * Only `belongsTo` puts a column on the row being filtered; the others are
+     * answered with a correlated subquery over the junction or the target
+     * table, which not every driver can build. An engine with no relations at
+     * all declares none.
+     *
+     * The admin uses this to decide whether a relation column offers a filter
+     * control. Offering one an engine cannot answer is not cosmetic: a driver
+     * that drops the key it cannot resolve *widens* the read to every row, and
+     * one that fails closed answers a control the admin itself put on screen
+     * with a 400.
+     *
+     * Optional, so a third-party driver registered before this existed still
+     * compiles. Omitted means {@link DEFAULT_FILTERABLE_RELATION_KINDS} — the
+     * one kind that is a plain column comparison, which every relational
+     * driver can do. The subquery kinds are a real capability and have to be
+     * claimed rather than assumed: assuming them wrongly is the widening.
+     */
+    filterableRelationKinds?: readonly string[];
+
     // ── Admin capability flags ───────────────────────────────────────
     /** Does this source support SQL admin operations (SQL editor, EXPLAIN, etc.)? */
     supportsSQLAdmin: boolean;
@@ -152,6 +174,17 @@ export interface ResolvedDataSource {
     capabilities: DataSourceCapabilities;
 }
 
+/**
+ * Relation kinds assumed filterable when a driver does not say.
+ *
+ * `belongsTo` alone: its filter is a comparison on a column of the row being
+ * filtered, the one shape that needs no query construction a driver might not
+ * have. Everything else is a correlated subquery over another table.
+ *
+ * @group Models
+ */
+export const DEFAULT_FILTERABLE_RELATION_KINDS: readonly string[] = ["belongsTo"];
+
 // ── Built-in driver capabilities ─────────────────────────────────────
 
 /** @group Models */
@@ -165,6 +198,9 @@ export const POSTGRES_CAPABILITIES: DataSourceCapabilities = {
     supportsColumnTypes: true,
     supportsRealtime: true,
     filterOperators: ALL_WHERE_FILTER_OPS,
+    // `via` is absent: its join path is authored source → target with no
+    // stated inverse, so the driver has nothing to reverse into a filter.
+    filterableRelationKinds: ["belongsTo", "manyToMany", "hasMany", "hasOne"],
     supportsSQLAdmin: true,
     supportsDocumentAdmin: false,
     supportsSchemaAdmin: true
@@ -184,6 +220,8 @@ export const FIREBASE_CAPABILITIES: DataSourceCapabilities = {
     // family, so the UI must never offer it.
     filterOperators: ALL_WHERE_FILTER_OPS.filter(op =>
         op !== "like" && op !== "ilike" && op !== "not-like" && op !== "not-ilike"),
+    // No relations at all — a document store links by reference.
+    filterableRelationKinds: [],
     supportsSQLAdmin: false,
     supportsDocumentAdmin: false,
     supportsSchemaAdmin: false
@@ -200,6 +238,7 @@ export const MONGODB_CAPABILITIES: DataSourceCapabilities = {
     supportsColumnTypes: false,
     supportsRealtime: false,
     filterOperators: ALL_WHERE_FILTER_OPS,
+    filterableRelationKinds: [],
     supportsSQLAdmin: false,
     supportsDocumentAdmin: true,
     supportsSchemaAdmin: true
@@ -220,6 +259,11 @@ export const DEFAULT_CAPABILITIES: DataSourceCapabilities = {
     supportsColumnTypes: true,
     supportsRealtime: true,
     filterOperators: ALL_WHERE_FILTER_OPS,
+    // The exception to this descriptor's "enable everything" rule. The other
+    // flags hide a tab or a picker when they are wrong; this one decides
+    // whether a query is sent that an unknown driver may answer by dropping
+    // the condition — which returns every row rather than none.
+    filterableRelationKinds: DEFAULT_FILTERABLE_RELATION_KINDS,
     supportsSQLAdmin: true,
     supportsDocumentAdmin: true,
     supportsSchemaAdmin: true

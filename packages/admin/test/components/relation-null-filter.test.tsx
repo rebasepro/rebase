@@ -35,12 +35,13 @@ const belongsTo = { kind: "belongsTo", target: () => ({ slug: "authors" }) } as 
 /** What `resolveFilterOperators` hands a relation property on postgres. */
 const RELATION_OPERATORS = ["==", "!=", "in", "not-in", "is-null", "is-not-null"] as never;
 
-function renderField(relation: never) {
+function renderField(relation: never, value?: unknown) {
     const setValue = jest.fn();
     render(
         <RelationFilterField
             name="tags"
             relation={relation}
+            value={value as never}
             setValue={setValue as never}
             hidden={false}
             setHidden={() => undefined}
@@ -59,12 +60,21 @@ describe("the null checkbox on a relation filter", () => {
         expect(screen.getByText("Filter for empty relations")).toBeTruthy();
     });
 
-    it("emits the selected operator with a null value when ticked", () => {
-        // `in` is the to-many default — the first operator the field offers.
-        // Paired with null the driver reads it as "has no related row".
+    it("emits `is-null`, not a null paired with the selected operator", () => {
+        // The to-many default operator is `in`, and `["in", null]` is not
+        // portable — Postgres dropped it and Mongo rejects `$in: null`.
+        // `is-null` is an operator every driver implements outright.
         const setValue = renderField(manyToMany);
         fireEvent.click(screen.getByRole("checkbox"));
-        expect(setValue).toHaveBeenCalledWith(["in", null]);
+        expect(setValue).toHaveBeenCalledWith(["is-null", null]);
+    });
+
+    it("emits `is-not-null` when the selected operator is a negative one", () => {
+        // The checkbox is a toggle, so the operator it sits beside is what
+        // says which way round it means.
+        const setValue = renderField(manyToMany, ["not-in", []]);
+        fireEvent.click(screen.getByRole("checkbox"));
+        expect(setValue).toHaveBeenLastCalledWith(["is-not-null", null]);
     });
 
     it("clears the filter when unticked rather than leaving a null behind", () => {
@@ -75,6 +85,14 @@ describe("the null checkbox on a relation filter", () => {
         expect(setValue).toHaveBeenLastCalledWith(undefined);
     });
 
+    it("comes back ticked when the saved filter is already a null check", () => {
+        // The value round-trips: `is-null` is in the operator list, so the
+        // control can render the filter it produced.
+        renderField(manyToMany, ["is-null", null]);
+        expect(screen.getByRole("checkbox").getAttribute("data-state")).toBe("checked");
+        expect(screen.getByTestId("relation-selector").getAttribute("data-disabled")).toBe("true");
+    });
+
     it("disables the value selector while the null filter is on", () => {
         renderField(manyToMany);
         expect(screen.getByTestId("relation-selector").getAttribute("data-disabled")).toBe("false");
@@ -83,10 +101,12 @@ describe("the null checkbox on a relation filter", () => {
     });
 
     it("still works on a to-one relation, where it always did", () => {
+        // It used to emit `["==", null]`, which Postgres read as IS NULL.
+        // `is-null` is the same question asked portably.
         const setValue = renderField(belongsTo);
         expect(screen.getByText("Filter for null values")).toBeTruthy();
         fireEvent.click(screen.getByRole("checkbox"));
-        expect(setValue).toHaveBeenCalledWith(["==", null]);
+        expect(setValue).toHaveBeenCalledWith(["is-null", null]);
     });
 
     it("gives each field its own checkbox id", () => {

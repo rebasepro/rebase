@@ -33,16 +33,16 @@ describe("relation filter operators, header to field", () => {
     describe("the driver compiles it, so the field renders something", () => {
 
         it.each(["manyToMany", "hasMany"])(
-            "offers membership operators for a to-many %s relation", (kind) => {
+            "offers membership and the null checks for a to-many %s relation", (kind) => {
                 // Not `==`: the selector takes its multiplicity from the
                 // relation, so on a to-many it only ever emits a list.
-                expect(rendered(kind)).toEqual(["in", "not-in"]);
+                expect(rendered(kind)).toEqual(["in", "not-in", "is-null", "is-not-null"]);
             }
         );
 
         it.each(["belongsTo", "hasOne"])(
-            "offers equality and membership for a to-one %s relation", (kind) => {
-                expect(rendered(kind)).toEqual(["==", "!=", "in", "not-in"]);
+            "offers equality, membership and the null checks for a to-one %s relation", (kind) => {
+                expect(rendered(kind)).toEqual(["==", "!=", "in", "not-in", "is-null", "is-not-null"]);
             }
         );
 
@@ -65,6 +65,34 @@ describe("relation filter operators, header to field", () => {
         });
     });
 
+    describe("the engine decides, not this UI", () => {
+
+        // The admin is one interface over every engine. "A many-to-many
+        // compiles to an EXISTS over the junction" is a fact about the
+        // Postgres driver, so it is the driver's descriptor that says so.
+
+        it("offers nothing on a document store, which has no relations", () => {
+            for (const engine of ["firestore", "mongodb"]) {
+                for (const kind of ["belongsTo", "manyToMany", "hasMany", "hasOne"]) {
+                    expect(resolveFilterOperators({
+                        property: relationProp(kind), engine
+                    })).toEqual([]);
+                }
+            }
+        });
+
+        it("gives an unknown engine only the kind that needs no subquery", () => {
+            // A driver that has not claimed the subquery kinds may answer one
+            // by dropping the condition, which returns every row.
+            expect(resolveFilterOperators({ property: relationProp("belongsTo"), engine: "acme-db" }))
+                .toEqual(expect.arrayContaining(["==", "!="]));
+            for (const kind of ["manyToMany", "hasMany", "hasOne"]) {
+                expect(resolveFilterOperators({ property: relationProp(kind), engine: "acme-db" }))
+                    .toEqual([]);
+            }
+        });
+    });
+
     describe("an array *of* relations is a different property", () => {
 
         it("keeps the array operators, which the column really does hold", () => {
@@ -78,10 +106,10 @@ describe("relation filter operators, header to field", () => {
 
         it("falls back to everything the field can render", () => {
             expect(renderableRelationOperators({ kind: "manyToMany" })).toEqual(
-                ["array-contains", "array-contains-any", "in", "not-in"]
+                ["array-contains", "array-contains-any", "in", "not-in", "is-null", "is-not-null"]
             );
             expect(renderableRelationOperators({ kind: "belongsTo" })).toEqual(
-                ["==", "!=", ">", "<", ">=", "<=", "in", "not-in"]
+                ["==", "!=", ">", "<", ">=", "<=", "in", "not-in", "is-null", "is-not-null"]
             );
         });
     });

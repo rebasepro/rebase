@@ -185,6 +185,35 @@ describe("resolveFilterOperators", () => {
             expect(ops).toEqual(expect.arrayContaining(["==", "!="]));
         });
 
+        it("asks the engine rather than assuming Postgres", () => {
+            // The admin renders over every engine. Which relation kinds can be
+            // filtered is a fact about a driver, so it comes from the driver's
+            // capabilities — a document store declares none at all.
+            for (const kind of ["belongsTo", "manyToMany", "hasMany", "hasOne"]) {
+                expect(resolveFilterOperators({ property: relationProp({ kind, target: () => ({}) }), engine: "postgres" }))
+                    .not.toEqual([]);
+                for (const engine of ["firestore", "mongodb"]) {
+                    expect(resolveFilterOperators({ property: relationProp({ kind, target: () => ({}) }), engine }))
+                        .toEqual([]);
+                }
+            }
+        });
+
+        it("gives an unclaimed engine only the kind that needs no subquery", () => {
+            // `belongsTo` is a comparison on a column of this row; the others
+            // are a correlated subquery a driver may not build. An unknown
+            // driver that answers one by dropping the condition returns
+            // every row, so the subquery kinds must be claimed, not assumed.
+            expect(resolveFilterOperators({
+                property: relationProp({ kind: "belongsTo", target: () => ({}) }), engine: "acme-db"
+            })).toEqual(expect.arrayContaining(["==", "!="]));
+            for (const kind of ["manyToMany", "hasMany", "hasOne"]) {
+                expect(resolveFilterOperators({
+                    property: relationProp({ kind, target: () => ({}) }), engine: "acme-db"
+                })).toEqual([]);
+            }
+        });
+
         it("leaves reference properties (Firestore) alone", () => {
             const ops = resolveFilterOperators({
                 property: { name: "Author", type: "reference", path: "authors" } as Property,

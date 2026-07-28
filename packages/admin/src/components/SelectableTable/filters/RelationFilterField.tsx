@@ -3,6 +3,7 @@ import { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 import { EntityRelation, Relation } from "@rebasepro/types";
 import { Checkbox, Label, Select, SelectItem } from "@rebasepro/ui";
 import { RelationSelector } from "../../RelationSelector";
+import { isNullFilterOperator, nullFilterOperatorFor, valueOperatorFor } from "./null_filter";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
 function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
@@ -39,7 +40,9 @@ const operationLabels = {
     in: "In",
     "not-in": "Not in",
     "array-contains": "Contains",
-    "array-contains-any": "Contains Any"
+    "array-contains-any": "Contains Any",
+    "is-null": "Is empty",
+    "is-not-null": "Is not empty"
 };
 
 const multipleSelectOperations = ["array-contains-any", "in", "not-in"];
@@ -59,11 +62,13 @@ const multipleSelectOperations = ["array-contains-any", "in", "not-in"];
  *
  * The array operators stay for the property that is an *array of* relations,
  * where the column really does hold a list.
+ *
+ * The null checks take no value at all, so they belong to both.
  */
 const MULTI_VALUE_OPERATIONS: (keyof typeof operationLabels)[] =
-    ["array-contains", "array-contains-any", "in", "not-in"];
+    ["array-contains", "array-contains-any", "in", "not-in", "is-null", "is-not-null"];
 const SINGLE_VALUE_OPERATIONS: (keyof typeof operationLabels)[] =
-    ["==", "!=", ">", "<", ">=", "<=", "in", "not-in"];
+    ["==", "!=", ">", "<", ">=", "<=", "in", "not-in", "is-null", "is-not-null"];
 
 /**
  * The operators this field will actually put on screen.
@@ -121,6 +126,14 @@ export function RelationFilterField({
         setOperation(op);
         setInternalValue(newValue);
 
+        // A null check takes no operand, so it is complete on its own — the
+        // value gate below would otherwise clear the filter the moment one is
+        // chosen from the dropdown, where there is no value to accompany it.
+        if (isNullFilterOperator(op)) {
+            setValue([op, null]);
+            return;
+        }
+
         const hasNewValue = newValue !== null && Array.isArray(newValue)
             ? newValue.length > 0
             : newValue !== undefined;
@@ -132,6 +145,7 @@ export function RelationFilterField({
     }
 
     const multiple = multipleSelectOperations.includes(operation);
+    const nullFiltered = isNullFilterOperator(operation);
 
     const relationSelectorValue = useMemo(() => {
         if (internalValue === null || internalValue === undefined) return undefined;
@@ -178,7 +192,7 @@ export function RelationFilterField({
                     relation={relation}
                     value={relationSelectorValue}
                     onValueChange={handleRelationSelectorChange}
-                    disabled={internalValue === null}
+                    disabled={nullFiltered}
                     size={"medium"}
                 />
 
@@ -189,12 +203,11 @@ export function RelationFilterField({
                   * tags" is the question a filter on a link is most often
                   * for, and the driver answers it with `NOT EXISTS`.
                   *
-                  * The operator carries the sense and the checkbox supplies
-                  * the value, which is why this emits `[operation, null]`
-                  * rather than an operator of its own: on a to-one that reads
-                  * as `IS NULL`/`IS NOT NULL` through `==`/`!=`, and on a
-                  * to-many as "has no related row"/"has at least one" through
-                  * `in`/`not-in`.
+                  * It switches the operator to the matching null check rather
+                  * than pairing a null value with whatever operator is
+                  * selected. Only the operator travels to the driver, and
+                  * `is-null` is a thing every engine implements; a null
+                  * *operand* is not — see `nullFilterOperatorFor`.
                   */}
                 <Label
                     className="border cursor-pointer rounded-md p-2 flex items-center gap-2 bg-surface-50 dark:bg-surface-900 hover:bg-surface-100 dark:hover:bg-surface-800"
@@ -202,11 +215,11 @@ export function RelationFilterField({
                 >
                     <Checkbox
                         id={nullFilterId}
-                        checked={internalValue === null}
+                        checked={nullFiltered}
                         size={"small"}
                         onCheckedChange={() => {
-                            if (internalValue !== null) updateFilter(operation, null);
-                            else updateFilter(operation, undefined);
+                            if (!nullFiltered) updateFilter(nullFilterOperatorFor(operation), null);
+                            else updateFilter(valueOperatorFor(operation, possibleOperations) ?? operation, undefined);
                         }}
                     />
                     {manyRelation ? "Filter for empty relations" : "Filter for null values"}
