@@ -24,6 +24,7 @@
  * | `relation` property | yes | no | no |
  * | `reference` property | no | yes | yes |
  * | `columnType` / `columnName` | yes | no | no |
+ * | `vector` property | yes | no | no |
  * | `table`, `relations`, `disableDefaultPolicies` | yes | no | no |
  * | `securityRules` | yes (RLS) | no | yes (query filter) |
  */
@@ -120,6 +121,28 @@ describe("engine gates — property primitives", () => {
             author_rel: relProp
         };
         expect(properties).toBeDefined();
+    });
+});
+
+describe("engine gates — vectors", () => {
+
+    it("Postgres takes a vector property", () => {
+        const properties: PostgresProperties = {
+            embedding: { name: "Embedding", type: "vector", dimensions: 1536 }
+        };
+        expect(properties.embedding.type).toBe("vector");
+    });
+
+    it("the document engines do not — pgvector is the only implementation", () => {
+        const fs: FirebaseProperties = {
+            // @ts-expect-error — `supportsVectors` is false for Firestore
+            embedding: { name: "Embedding", type: "vector", dimensions: 1536 }
+        };
+        const mongo: MongoProperties = {
+            // @ts-expect-error — `supportsVectors` is false for MongoDB
+            embedding: { name: "Embedding", type: "vector", dimensions: 1536 }
+        };
+        expect([fs, mongo]).toHaveLength(2);
     });
 });
 

@@ -38,6 +38,17 @@ export interface DataSourceCapabilities {
     supportsRealtime: boolean;
 
     /**
+     * Does this source store vectors natively?
+     *
+     * `VectorProperty` carries a `dimensions` and is pgvector-shaped. It was
+     * the one driver-specific property kind with no flag to gate it, so unlike
+     * every other field in this descriptor there was not even a runtime answer
+     * to appeal to — a Firestore collection could declare an embedding column
+     * and no driver would do anything with it.
+     */
+    supportsVectors: boolean;
+
+    /**
      * Canonical filter operators this engine can execute.
      *
      * The admin UI intersects this set with the property-type defaults and
@@ -197,6 +208,7 @@ export const POSTGRES_CAPABILITIES: DataSourceCapabilities = {
     supportsReferences: false,
     supportsColumnTypes: true,
     supportsRealtime: true,
+    supportsVectors: true,
     filterOperators: ALL_WHERE_FILTER_OPS,
     // `via` is absent: its join path is authored source → target with no
     // stated inverse, so the driver has nothing to reverse into a filter.
@@ -216,6 +228,7 @@ export const FIREBASE_CAPABILITIES: DataSourceCapabilities = {
     supportsReferences: true,
     supportsColumnTypes: false,
     supportsRealtime: true,
+    supportsVectors: false,
     // Firestore has no SQL pattern matching — the driver throws on the LIKE
     // family, so the UI must never offer it.
     filterOperators: ALL_WHERE_FILTER_OPS.filter(op =>
@@ -237,6 +250,7 @@ export const MONGODB_CAPABILITIES: DataSourceCapabilities = {
     supportsReferences: true,
     supportsColumnTypes: false,
     supportsRealtime: false,
+    supportsVectors: false,
     filterOperators: ALL_WHERE_FILTER_OPS,
     filterableRelationKinds: [],
     supportsSQLAdmin: false,
@@ -258,6 +272,7 @@ export const DEFAULT_CAPABILITIES: DataSourceCapabilities = {
     supportsReferences: true,
     supportsColumnTypes: true,
     supportsRealtime: true,
+    supportsVectors: true,
     filterOperators: ALL_WHERE_FILTER_OPS,
     // The exception to this descriptor's "enable everything" rule. The other
     // flags hide a tab or a picker when they are wrong; this one decides

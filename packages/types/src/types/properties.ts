@@ -96,14 +96,17 @@ export type PostgresProperties = {
     [key: string]: PostgresProperty;
 };
 
-export type FirebaseProperty = DistributiveOmit<Exclude<Property, RelationProperty>, SqlColumnFields>;
+export type FirebaseProperty = DistributiveOmit<Exclude<Property, RelationProperty | VectorProperty>, SqlColumnFields>;
 export type FirebaseProperties = {
     [key: string]: FirebaseProperty;
 };
 
 // MongoDB is a document store: it uses references (stored pointers), not
 // SQL-style relations/joins. Same gating as Firestore.
-export type MongoProperty = DistributiveOmit<Exclude<Property, RelationProperty>, SqlColumnFields>;
+//
+// `vector` goes with them: it is pgvector-shaped, only `@rebasepro/server-postgres`
+// reads it, and `supportsVectors` on the engine's capabilities says so.
+export type MongoProperty = DistributiveOmit<Exclude<Property, RelationProperty | VectorProperty>, SqlColumnFields>;
 export type MongoProperties = {
     [key: string]: MongoProperty;
 };

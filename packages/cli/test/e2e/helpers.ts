@@ -275,6 +275,8 @@ export async function startBackend(projectDir: string, env: Record<string, strin
             // colour escape landing inside the URL would silently defeat the
             // regex — the suite would then fail on the 90s timeout rather than
             // on anything describing the cause.
+            // An ANSI escape *is* a control character; matching one is the point.
+            // eslint-disable-next-line no-control-regex
             const clean = buffer.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, "");
             const match = clean.match(/(?:Server|API) running at http:\/\/localhost:(\d+)/);
             if (match && !settled) {

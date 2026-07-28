@@ -43,8 +43,19 @@ export function MultipleRelationFieldBinding({
 
     const parentCollection = context.collection;
     const capabilities = parentCollection ? getDataSourceCapabilities(parentCollection.engine) : undefined;
-    if (!parentCollection || !capabilities?.supportsRelations || !("relations" in parentCollection) || !parentCollection.relations) {
-        throw Error("RelationFieldBinding expected a collection with relations support");
+    // Only two things have to hold here: there is a collection, and its engine
+    // has relations at all. Whether *this* property's relation can be resolved
+    // is `resolveRelationProperty`'s question, and it answers it across all
+    // three forms — a pre-stamped `resolvedRelation`, an inline `relation`, or
+    // a lookup by name in the collection's `relations` array — with an error
+    // naming the property and the collection when it cannot.
+    //
+    // This used to demand the `relations` array as well, which the inline form
+    // does not produce. That is the documented way to declare a relation, so
+    // every collection using it threw here and rendered the error boundary
+    // instead of the field.
+    if (!parentCollection || !capabilities?.supportsRelations) {
+        throw Error("MultipleRelationFieldBinding expected a collection whose engine supports relations");
     }
     const resolvedProperty = resolveRelationProperty(property, parentCollection, propertyKey)
     const relation = resolvedProperty;
