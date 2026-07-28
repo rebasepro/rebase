@@ -2,9 +2,12 @@ import { and, eq, or, sql, SQL, ilike, inArray, getTableColumns } from "drizzle-
 import { AnyPgColumn, PgTable, PgVarchar, PgText, PgChar } from "drizzle-orm/pg-core";
 import {
     CollectionConfig, FilterValues, WhereFilterOp, JoinStep, LogicalCondition, FilterCondition,
-    ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany
+    ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany,
+    ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany
 } from "@rebasepro/types";
-import { getColumnName, normalizeToEntityRelation, resolveCollectionRelations } from "@rebasepro/common";
+import {
+    getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations
+} from "@rebasepro/common";
 import { generateForeignKeyName } from "@rebasepro/utils";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
@@ -62,7 +65,44 @@ export interface FilterCompilationOptions {
      * actually lives in; without it only the default key shapes can be guessed.
      */
     collection?: CollectionConfig;
+    /**
+     * The driver's registry, for relations whose link is not on this row at
+     * all. A `manyToMany` compiles to an `EXISTS` over its junction and a
+     * `hasMany`/`hasOne` to one over the target table — neither of which this
+     * builder can reach from the collection alone.
+     */
+    registry?: PostgresCollectionRegistry;
+    /**
+     * The key column of the table being filtered — what those `EXISTS`
+     * subqueries correlate back to.
+     *
+     * It has to be the Drizzle column object rather than a name: a column
+     * renders qualified with its own table, which is what binds it to the
+     * *outer* row instead of to the junction or target aliased inside the
+     * subquery. See {@link DrizzleConditionBuilder.buildRelationFilterCondition}.
+     */
+    sourceIdColumn?: AnyPgColumn;
 }
+
+/**
+ * What a filter field turns out to name.
+ *
+ * A field naming a column compiles to a comparison on it. A field naming a
+ * relation that owns no column here compiles to a whole `EXISTS` condition
+ * instead, so there is no column to hand back — which is why resolution
+ * answers with a discriminated result rather than a column. The caller cannot
+ * tell the two apart from the field name, and the difference is not cosmetic:
+ * one is `column <op> value`, the other is a correlated subquery.
+ */
+type FilterTarget =
+    | { kind: "column"; column: AnyPgColumn }
+    | {
+        kind: "relation";
+        relation: ResolvedForeignKeyOnTarget | ResolvedManyToMany;
+        /** Bound here so the compile step cannot be reached without them. */
+        registry: PostgresCollectionRegistry;
+        sourceIdColumn: AnyPgColumn;
+    };
 
 /**
  * Filter values may arrive as relation wire objects — `EntityRelation`
@@ -275,42 +315,60 @@ export class DrizzleConditionBuilder {
     }
 
     /**
-     * The column a filter field names, or `undefined` if it names nothing.
+     * What a filter field names, or `undefined` if it names nothing.
      *
-     * A field may address its column directly, or — for an owning relation —
-     * through the foreign key the relation compiles to. Only a field that
-     * resolves to *neither* is an error, and by default it is one: see
+     * Three ways a field resolves. It may address its column directly; it may
+     * be an owning relation, whose foreign key is a column here; or it may be
+     * a relation whose link lives on another table entirely, which compiles to
+     * a subquery instead of a column. Only a field that resolves to *none* of
+     * them is an error, and by default it is one: see
      * {@link UnknownFilterFieldsMode} for why silently dropping it is a
      * data-exposure primitive rather than a convenience.
      *
-     * The relation's own `localKey` is the authority for that foreign key, not
-     * `<field>_id`. The default local key is `generateForeignKeyName`, which
-     * snake-cases *and singularises* — `userProfile` → `user_profile_id`,
+     * For an owning relation the relation's own `localKey` is the authority,
+     * not `<field>_id`. The default local key is `generateForeignKeyName`,
+     * which snake-cases *and singularises* — `userProfile` → `user_profile_id`,
      * `users` → `user_id` — and it can be overridden outright. Guessing
      * `<field>_id` therefore misses perfectly ordinary owning relations, and
      * with this resolution failing closed that miss is a 400 on a filter that
      * has nothing wrong with it. The guesses stay, last, for callers that hand
      * over no collection to resolve against.
+     *
+     * The subquery kinds need a registry and the source table's key column on
+     * top of the collection. A caller that supplies neither gets the behaviour
+     * it had before they were compilable — unresolvable, and so fail-closed —
+     * rather than a half-built condition.
      */
-    private static resolveFilterColumn(
+    private static resolveFilterTarget(
         table: PgTable<any>,
         field: string,
         collectionPath: string,
         mode: UnknownFilterFieldsMode,
-        collection?: CollectionConfig
-    ): AnyPgColumn | undefined {
+        options: FilterCompilationOptions
+    ): FilterTarget | undefined {
+        const { collection, registry, sourceIdColumn } = options;
+
         const columnAt = (key: string): AnyPgColumn | undefined =>
             (key in table ? table[key as keyof typeof table] as AnyPgColumn : undefined) || undefined;
 
         const direct = columnAt(field);
-        if (direct) return direct;
+        if (direct) return { kind: "column", column: direct };
 
-        // Owning relation, resolved: the relation names its own local key.
         if (collection) {
             const relation = resolveCollectionRelations(collection)[field];
+
+            // Owning relation, resolved: the relation names its own local key.
             if (relation?.kind === "belongsTo") {
                 const foreignKey = columnAt(relation.localKey);
-                if (foreignKey) return foreignKey;
+                if (foreignKey) return { kind: "column", column: foreignKey };
+            }
+
+            // The link is on the target table or in a junction. `via` is left
+            // out: its join path is authored source → target with no stated
+            // inverse, so reversing it into a filter is a different problem
+            // from the two shapes below rather than a third case of them.
+            if (relation && (hasForeignKeyOnTarget(relation) || isManyToMany(relation)) && registry && sourceIdColumn) {
+                return { kind: "relation", relation, registry, sourceIdColumn };
             }
         }
 
@@ -319,7 +377,7 @@ export class DrizzleConditionBuilder {
         // `user_profile_id`).
         for (const guess of [`${field}_id`, generateForeignKeyName(field)]) {
             const foreignKey = columnAt(guess);
-            if (foreignKey) return foreignKey;
+            if (foreignKey) return { kind: "column", column: foreignKey };
         }
 
         if (mode === "warn") {
@@ -362,15 +420,15 @@ export class DrizzleConditionBuilder {
         for (const [field, filterParam] of Object.entries(filter)) {
             if (!filterParam) continue;
 
-            const fieldColumn = this.resolveFilterColumn(table, field, collectionPath, mode, options.collection);
-            if (!fieldColumn) continue;
+            const target = this.resolveFilterTarget(table, field, collectionPath, mode, options);
+            if (!target) continue;
 
             const paramsList = Array.isArray(filterParam) && filterParam.length > 0 && Array.isArray(filterParam[0])
                 ? (filterParam as [WhereFilterOp, any][])
                 : [filterParam as [WhereFilterOp, any]];
 
             for (const [op, value] of paramsList) {
-                const condition = this.buildSingleFilterCondition(fieldColumn, op, value);
+                const condition = this.compileFilterTarget(target, op, value, field, collectionPath);
                 if (condition) {
                     conditions.push(condition);
                 }
@@ -400,16 +458,208 @@ export class DrizzleConditionBuilder {
             // `or(...)` the disjunction loses a branch, so the surviving
             // branches match on their own and the result set widens by
             // everything the dropped leaf would have excluded.
-            const fieldColumn = this.resolveFilterColumn(
+            const target = this.resolveFilterTarget(
                 table,
                 cond.column,
                 collectionPath,
                 options.unknownFields ?? defaultUnknownFilterFieldsMode,
-                options.collection
+                options
             );
-            if (!fieldColumn) return null;
-            return this.buildSingleFilterCondition(fieldColumn, cond.operator as WhereFilterOp, cond.value);
+            if (!target) return null;
+            return this.compileFilterTarget(
+                target, cond.operator as WhereFilterOp, cond.value, cond.column, collectionPath
+            );
         }
+    }
+
+    /** Dispatch a resolved filter field onto the shape it actually compiles to. */
+    private static compileFilterTarget(
+        target: FilterTarget,
+        op: WhereFilterOp,
+        value: unknown,
+        field: string,
+        collectionPath: string
+    ): SQL | null {
+        return target.kind === "column"
+            ? this.buildSingleFilterCondition(target.column, op, value)
+            : this.buildRelationFilterCondition(
+                target.relation, op, value, target.sourceIdColumn, target.registry, field, collectionPath
+            );
+    }
+
+    /**
+     * A filter on a relation that owns no column on this row — `EXISTS` over
+     * the rows it reaches.
+     *
+     * `posts` filtered by `tags == <tagId>` is not a comparison on `posts`; it
+     * is a question about the junction:
+     *
+     *     EXISTS (SELECT 1 FROM posts_tags AS j
+     *             WHERE j.post_id = posts.id AND j.tag_id = <tagId>)
+     *
+     * which is {@link buildRelationScopeCondition}'s many-to-many shape with
+     * source and target swapped — there the junction's *target* column
+     * correlates and the source is pinned; here the *source* column correlates
+     * and the target is what the filter constrains.
+     *
+     * `hasMany`/`hasOne` are the same shape one table over: the target row
+     * carries the foreign key, so the correlation is on that key and the
+     * compared column is the target's own id.
+     *
+     * `EXISTS` and not a join, for the reason the scope condition gives: a join
+     * through a junction multiplies the outer rows by the number of matching
+     * links, which duplicates results and silently breaks `limit`/`offset`.
+     *
+     * Everything inside the subquery is referenced by identifier against a
+     * local alias, and only `sourceIdColumn` stays a Drizzle column object —
+     * again see {@link buildRelationScopeCondition}, which explains why a
+     * column object renders against whatever table the surrounding builder
+     * thinks is current and so cannot be used for the inner references. The
+     * alias is also what keeps a self-referential relation unambiguous
+     * (`categories.children`, or a many-to-many whose junction and target are
+     * the same table), where the subquery's table and the outer one coincide.
+     */
+    static buildRelationFilterCondition(
+        relation: ResolvedForeignKeyOnTarget | ResolvedManyToMany,
+        op: WhereFilterOp,
+        value: unknown,
+        sourceIdColumn: AnyPgColumn,
+        registry: PostgresCollectionRegistry,
+        field: string,
+        collectionPath: string
+    ): SQL {
+        const alias = "__rel_filter";
+        const ref = (column: AnyPgColumn) =>
+            sql`${sql.identifier(alias)}.${sql.identifier(column.name)}`;
+
+        let scanTable: PgTable<any>;
+        let correlation: SQL;
+        let comparedColumn: AnyPgColumn;
+
+        if (relation.kind === "manyToMany") {
+            const { table: junctionName, sourceColumn, targetColumn } = relation.through;
+            const junctionTable = registry.getTable(junctionName);
+            if (!junctionTable) {
+                throw new Error(`Junction table not found: ${junctionName}`);
+            }
+            const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
+            const targetCol = junctionTable[targetColumn as keyof typeof junctionTable] as AnyPgColumn;
+            if (!sourceCol || !targetCol) {
+                throw new Error(
+                    `Junction columns '${sourceColumn}'/'${targetColumn}' not found in '${junctionName}'`
+                );
+            }
+            scanTable = junctionTable;
+            correlation = sql`${ref(sourceCol)} = ${sourceIdColumn}`;
+            comparedColumn = targetCol;
+        } else {
+            const targetCollection = relation.target();
+            const targetTable = registry.getTable(getTableName(targetCollection));
+            if (!targetTable) {
+                throw new Error(
+                    `Table not found for the target of relation '${relation.relationName}' ` +
+                    `(collection '${targetCollection.slug}')`
+                );
+            }
+            const fkColumn = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
+            if (!fkColumn) {
+                throw new Error(
+                    `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of ` +
+                    `relation '${relation.relationName}'.`
+                );
+            }
+            // The filter value is a target row's id, so that is what the
+            // subquery compares — the foreign key is spent on the correlation.
+            const targetIdColumn = this.primaryKeyColumn(targetTable);
+            if (!targetIdColumn) {
+                throw new Error(
+                    `No primary key or "id" column in the target table of relation '${relation.relationName}', ` +
+                    `so a filter on it has nothing to match against.`
+                );
+            }
+            scanTable = targetTable;
+            correlation = sql`${ref(fkColumn)} = ${sourceIdColumn}`;
+            comparedColumn = targetIdColumn;
+        }
+
+        const { predicate, negate } = this.buildRelationFilterPredicate(
+            ref(comparedColumn), op, value, field, collectionPath
+        );
+
+        const where = predicate ? sql`${correlation} AND ${predicate}` : correlation;
+        const exists = sql`EXISTS (SELECT 1 FROM ${scanTable} AS ${sql.identifier(alias)} WHERE ${where})`;
+        return negate ? sql`NOT ${exists}` : exists;
+    }
+
+    /**
+     * The inner predicate of a relation filter, and whether the `EXISTS`
+     * wrapping it is negated.
+     *
+     * Negation is `NOT EXISTS` of the *positive* predicate, never `EXISTS` of a
+     * negated one. On a many-valued relation the two are different questions:
+     * `EXISTS (… AND tag_id != X)` asks "does some tag differ from X", which is
+     * true of nearly every post with more than one tag and answers nothing
+     * anybody asked. `NOT EXISTS (… AND tag_id = X)` asks "is X absent", which
+     * is what unticking a value in a filter control means — and it makes `==`
+     * and `!=` partition the rows, the way a filter implies they do.
+     *
+     * `is-null`/`is-not-null` drop the predicate entirely: with nothing but the
+     * correlation left, they become "has no related row at all" and "has at
+     * least one", which is the only reading of null a link can have.
+     *
+     * An empty `in` list compiles to `FALSE` rather than being dropped. Dropped
+     * is what the column path does, and dropping a condition widens the result
+     * — the whole reason this resolution fails closed. `in []` matches nothing
+     * and `not-in []` matches everything, and `NOT EXISTS (… AND FALSE)` gives
+     * the second for free.
+     *
+     * Anything else is rejected. Returning `null` for an operator this cannot
+     * express would drop the condition, and the operators the admin offers for
+     * a relation are exactly the six below.
+     */
+    private static buildRelationFilterPredicate(
+        ref: SQL,
+        op: WhereFilterOp,
+        value: unknown,
+        field: string,
+        collectionPath: string
+    ): { predicate?: SQL; negate: boolean } {
+        value = unwrapRelationFilterValue(value);
+        const isNullish = value === null || value === undefined;
+
+        const equals = () => sql`${ref} = ${value}`;
+        const inList = () => Array.isArray(value) && value.length > 0
+            ? sql`${ref} IN (${sql.join(value.map(v => sql`${v}`), sql`, `)})`
+            : sql`FALSE`;
+
+        switch (op) {
+            case "==":
+                return isNullish ? { negate: true } : { predicate: equals(), negate: false };
+            case "!=":
+                return isNullish ? { negate: false } : { predicate: equals(), negate: true };
+            case "in":
+                return { predicate: inList(), negate: false };
+            case "not-in":
+                return { predicate: inList(), negate: true };
+            case "is-null":
+                return { negate: true };
+            case "is-not-null":
+                return { negate: false };
+            default:
+                throw ApiError.badRequest(
+                    `Operator '${op}' cannot be applied to relation field '${field}' on collection ` +
+                    `'${collectionPath}'. A relation with no column on this row is filtered by membership: ` +
+                    "==, !=, in, not-in, is-null, is-not-null.",
+                    "UNSUPPORTED_RELATION_FILTER_OPERATOR",
+                    { field, collection: collectionPath, operator: op }
+                );
+        }
+    }
+
+    /** The column a table's rows are keyed by: its primary key, else `id`. */
+    private static primaryKeyColumn(table: PgTable<any>): AnyPgColumn | undefined {
+        return (Object.values(table).find((col: Record<string, unknown>) => col.primary)
+            ?? Object.values(table).find((col: Record<string, unknown>) => col.name === "id")) as AnyPgColumn | undefined;
     }
 
     /**
@@ -882,9 +1132,7 @@ whereConditions };
         if (relation.kind === "belongsTo") {
             // `parentId` is the foreign key's value, matched against the
             // target's own key.
-            const targetIdCol =
-                (Object.values(targetTable).find((col: Record<string, unknown>) => col.primary)
-                    ?? Object.values(targetTable).find((col: Record<string, unknown>) => col.name === "id")) as AnyPgColumn | undefined;
+            const targetIdCol = this.primaryKeyColumn(targetTable);
             if (!targetIdCol) {
                 throw new Error(
                     `No primary key or "id" column in the target table of relation '${relation.relationName}'.`

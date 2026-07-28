@@ -3,10 +3,11 @@ import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, ResolvedRelation, LogicalCondition, isManyToMany } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
-import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
+import { DrizzleConditionBuilder, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
     getTableForCollection,
+    getPrimaryKeys,
     requirePrimaryKeys,
     deriveRowAddress,
     parseIdValues,
@@ -47,16 +48,41 @@ export class FetchService {
 
     /**
      * The context the condition builder needs to compile a filter key that is
-     * not a column name outright — an owning relation's key resolves through
-     * the collection's relations to its foreign-key column.
+     * not a column name outright.
+     *
+     * Two such keys. An owning relation's key resolves through the collection's
+     * relations to its foreign-key column; a relation whose link lives on the
+     * target table or in a junction resolves to a correlated `EXISTS`, which
+     * needs the registry to reach that other table and this table's key column
+     * to correlate back.
      *
      * Looked up rather than passed: every read path already has the path, only
      * some have the collection, and a path that names no registered collection
      * (a nested/derived one) is not an error here — the builder simply falls
-     * back to guessing the default key shapes.
+     * back to guessing the default key shapes, and a relation filter it cannot
+     * compile stays unresolvable and so fails closed.
      */
-    private filterContext(collectionPath: string): { collection?: CollectionConfig } {
-        return { collection: this.registry.getCollectionByPath(collectionPath) ?? undefined };
+    private filterContext(collectionPath: string, table: PgTable<any>): FilterCompilationOptions {
+        const collection = this.registry.getCollectionByPath(collectionPath) ?? undefined;
+        return {
+            collection,
+            registry: this.registry,
+            sourceIdColumn: collection ? this.resolveIdColumn(collection, table) : undefined
+        };
+    }
+
+    /**
+     * The table column this collection's rows are keyed by, or `undefined`.
+     *
+     * `getPrimaryKeys` rather than `requirePrimaryKeys`: a collection with no
+     * resolvable key is not an error on the filter path — it only means the
+     * relation filters that would correlate on it cannot be compiled, which
+     * the builder already handles by failing that field closed.
+     */
+    private resolveIdColumn(collection: CollectionConfig, table: PgTable<any>): AnyPgColumn | undefined {
+        const [idInfo] = getPrimaryKeys(collection, this.registry);
+        if (!idInfo) return undefined;
+        return table[idInfo.fieldName as keyof typeof table] as AnyPgColumn | undefined;
     }
 
     /**
@@ -69,7 +95,7 @@ export class FetchService {
         collectionPath: string
     ): SQL[] {
         return DrizzleConditionBuilder.buildFilterConditions(
-            filter, table, collectionPath, this.filterContext(collectionPath)
+            filter, table, collectionPath, this.filterContext(collectionPath, table)
         );
     }
 
@@ -327,7 +353,7 @@ export class FetchService {
         }
 
         if (options.logical) {
-            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath, this.filterContext(collectionPath));
+            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath, this.filterContext(collectionPath, table));
             if (logicalCondition) allConditions.push(logicalCondition);
         }
 
@@ -672,7 +698,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         }
 
         if (options.logical) {
-            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath, this.filterContext(collectionPath));
+            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(options.logical, table, collectionPath, this.filterContext(collectionPath, table));
             if (logicalCondition) allConditions.push(logicalCondition);
         }
 
