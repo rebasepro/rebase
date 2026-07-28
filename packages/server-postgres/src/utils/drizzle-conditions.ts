@@ -116,6 +116,23 @@ function unwrapRelationFilterValue(value: unknown): unknown {
     return relation ? relation.id : value;
 }
 
+/**
+ * The operand of `in`/`not-in`, as a list.
+ *
+ * A scalar is the one-element list, because that is what it means and because
+ * the wire produces one: `?filter=id.in.5` parses to the string `"5"`, not to
+ * `["5"]` — the REST dialect only builds an array when the value is
+ * parenthesised. Treating that as malformed and dropping the condition turned
+ * a perfectly ordinary query into an unfiltered read.
+ *
+ * The empty list stays empty. Callers must decide what "no candidates" means
+ * for their operator — it is `FALSE` for `in` and `TRUE` for `not-in` — and
+ * neither of those is "no condition at all".
+ */
+function toMembershipList(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : [value];
+}
+
 /** Drizzle dynamic query builder — accepts innerJoin + where chaining */
 
 export interface DrizzleDynamicQuery {
@@ -636,9 +653,16 @@ export class DrizzleConditionBuilder {
         const isNullish = value === null || value === undefined;
 
         const equals = () => sql`${ref} = ${value}`;
-        const inList = () => Array.isArray(value) && value.length > 0
-            ? sql`${ref} IN (${sql.join(value.map(v => sql`${v}`), sql`, `)})`
-            : sql`FALSE`;
+        const inList = () => {
+            // Same reading as the column path: a scalar is the one-element
+            // list, an empty list is `FALSE`. Here `FALSE` also gives
+            // `not-in []` its answer for free — `NOT EXISTS (… AND FALSE)`
+            // is true of every row, which is what excluding nothing means.
+            const values = toMembershipList(value);
+            return values.length === 0
+                ? sql`FALSE`
+                : sql`${ref} IN (${sql.join(values.map(v => sql`${v}`), sql`, `)})`;
+        };
 
         switch (op) {
             case "==":
@@ -709,7 +733,7 @@ export class DrizzleConditionBuilder {
                 return sql`${column} < ${value}`;
             case "<=":
                 return sql`${column} <= ${value}`;
-            case "in":
+            case "in": {
                 // Membership against a null *value* is a null check, not an
                 // empty list — the admin's "filter for null values" control
                 // emits whichever operator is selected, so `["in", null]` is
@@ -719,10 +743,15 @@ export class DrizzleConditionBuilder {
                 if (value === null || value === undefined) {
                     return sql`${column} IS NULL`;
                 }
-                if (Array.isArray(value) && value.length > 0) {
-                    return inArray(column, value);
-                }
-                return null;
+                const values = toMembershipList(value);
+                // An empty list matches nothing. Returning no condition — what
+                // this did — matches *everything*, which is the same inversion
+                // one layer down from the one `UnknownFilterFieldsMode` exists
+                // for. It is the dangerous shape too: `filter: { id: ["in",
+                // teamIds] }` with no teams is how a caller asks for nothing,
+                // and it answered with the whole table.
+                return values.length === 0 ? sql`FALSE` : inArray(column, values);
+            }
             case "array-contains": {
                 const meta = getColumnMeta(column);
                 if (meta.dataType === "array" || meta.columnType === "PgArray") {
@@ -734,6 +763,13 @@ export class DrizzleConditionBuilder {
             case "array-contains-any": {
                 const meta = getColumnMeta(column);
                 const isNativeArray = meta.dataType === "array" || meta.columnType === "PgArray";
+                // "Overlaps nothing" is false, not a licence to skip the
+                // condition. The single-value fallback below is for a *scalar*
+                // operand; an empty array fell into it and built
+                // `@> ARRAY[$1]` around an empty binding.
+                if (Array.isArray(value) && value.length === 0) {
+                    return sql`FALSE`;
+                }
                 if (Array.isArray(value) && value.length > 0) {
                     if (isNativeArray) {
                         return sql`${column} && ARRAY[${sql.join(value.map(v => sql`${v}`), sql`, `)}]`;
@@ -749,15 +785,18 @@ export class DrizzleConditionBuilder {
                 }
                 return sql`${column} @> ${JSON.stringify([value])}`;
             }
-            case "not-in":
-                // The mirror of `in` above.
+            case "not-in": {
+                // The mirror of `in` above, including the empty list — which
+                // excludes nothing, and so matches every row. Same condition
+                // the old code produced by accident, now on purpose and for
+                // the empty list only.
                 if (value === null || value === undefined) {
                     return sql`${column} IS NOT NULL`;
                 }
-                if (Array.isArray(value) && value.length > 0) {
-                    return sql`${column} NOT IN (${sql.join(value.map(v => sql`${v}`), sql`, `)})`;
-                }
-                return null;
+                const values = toMembershipList(value);
+                if (values.length === 0) return sql`TRUE`;
+                return sql`${column} NOT IN (${sql.join(values.map(v => sql`${v}`), sql`, `)})`;
+            }
             case "like":
                 return sql`${column} LIKE ${String(value)}`;
             case "ilike":

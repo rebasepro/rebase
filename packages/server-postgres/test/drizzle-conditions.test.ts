@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { eq } from "drizzle-orm";
-import { integer, pgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
+import { integer, pgTable, PgDialect, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
 import { CollectionConfig, EntityRelation, Relation } from "@rebasepro/types";
 import { resolveRelation } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -794,22 +794,30 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             expect(condition).not.toBeNull();
         });
 
-        it("should return null for empty array", () => {
+        it("matches every row for an empty array, rather than dropping", () => {
+            // Excluding nothing excludes nothing. Returning no condition said
+            // the same thing by accident and said the *opposite* for `in`, so
+            // both now state it.
             const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
                 mockUsersTable.age,
                 "not-in",
                 []
             );
-            expect(condition).toBeNull();
+            expect(new PgDialect().sqlToQuery(condition!).sql).toBe("TRUE");
         });
 
-        it("should return null for non-array value", () => {
+        it("reads a scalar as the one-element list", () => {
+            // `?filter=age.not-in.42` parses to the string, not to a list —
+            // the REST dialect only builds an array for a parenthesised value.
+            // Dropping it left the read unfiltered.
             const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
                 mockUsersTable.age,
                 "not-in",
                 42
             );
-            expect(condition).toBeNull();
+            const query = new PgDialect().sqlToQuery(condition!);
+            expect(query.sql).toBe('"users"."age" NOT IN ($1)');
+            expect(query.params).toEqual([42]);
         });
     });
 
@@ -850,13 +858,15 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             expect(condition).not.toBeNull();
         });
 
-        it("should return null for in operator with empty array", () => {
+        it("matches no row for `in` with an empty array, rather than dropping", () => {
+            // The inversion this whole path exists to prevent: `in []` selects
+            // nothing, and no condition at all selects everything.
             const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
                 mockUsersTable.age,
                 "in",
                 []
             );
-            expect(condition).toBeNull();
+            expect(new PgDialect().sqlToQuery(condition!).sql).toBe("FALSE");
         });
 
         it("should warn and return null for unsupported operators", () => {
@@ -949,13 +959,14 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             expect(conditions).toHaveLength(1);
         });
 
-        it("should skip not-in filter with empty array", () => {
+        it("keeps a not-in filter with an empty array instead of skipping it", () => {
             const conditions = DrizzleConditionBuilder.buildFilterConditions(
                 { age: ["not-in", []] },
                 mockUsersTable,
                 "users"
             );
-            expect(conditions).toHaveLength(0);
+            expect(conditions).toHaveLength(1);
+            expect(new PgDialect().sqlToQuery(conditions[0]).sql).toBe("TRUE");
         });
     });
 

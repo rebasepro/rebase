@@ -314,15 +314,87 @@ describe("unknown filter fields", () => {
             expect(sqlFor("not-in")).toBe(sqlFor("!="));
         });
 
-        it("leaves an empty list alone — that is a different question", () => {
-            // Unchanged behaviour: `in []` still drops. Fixing that widening is
-            // its own change with its own blast radius; this one is only about
-            // the null value the checkbox sends.
-            expect(DrizzleConditionBuilder.buildFilterConditions(
-                { author: ["in", []] },
+        it("keeps an empty list distinct from a null value", () => {
+            // Two different questions, and both now have an answer. `in null`
+            // is "has no author"; `in []` is "is one of nobody", which selects
+            // nothing. Neither is "no condition".
+            const { PgDialect } = require("drizzle-orm/pg-core");
+            const dialect = new PgDialect();
+            const sqlFor = (value: unknown) => dialect.sqlToQuery(
+                DrizzleConditionBuilder.buildFilterConditions(
+                    { author: ["in", value] } as never, postsTable, "posts"
+                )[0]
+            ).sql;
+            expect(sqlFor(null)).toBe('"posts"."author_id" IS NULL');
+            expect(sqlFor([])).toBe("FALSE");
+        });
+    });
+
+    describe("an empty membership list", () => {
+
+        // `filter: { id: ["in", teamIds] }` with no teams is how a caller asks
+        // for nothing. It answered with the whole table, because a dropped
+        // condition is an absent condition. This is the same inversion
+        // `UnknownFilterFieldsMode` exists for, one layer down, and unlike an
+        // unknown field it needs no typo to reach — an empty array is what a
+        // correct program produces when the set it derived is empty.
+
+        const dialect = new (require("drizzle-orm/pg-core").PgDialect)();
+        const render = (condition: unknown) => dialect.sqlToQuery(condition).sql;
+
+        it("`in []` selects nothing", () => {
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { author_id: ["in", []] }, postsTable, "posts"
+            );
+            expect(conditions).toHaveLength(1);
+            expect(render(conditions[0])).toBe("FALSE");
+        });
+
+        it("`not-in []` selects everything, which is what excluding nothing means", () => {
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { author_id: ["not-in", []] }, postsTable, "posts"
+            );
+            expect(conditions).toHaveLength(1);
+            expect(render(conditions[0])).toBe("TRUE");
+        });
+
+        it("`array-contains-any []` overlaps nothing", () => {
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { title: ["array-contains-any", []] }, postsTable, "posts"
+            );
+            expect(conditions).toHaveLength(1);
+            expect(render(conditions[0])).toBe("FALSE");
+        });
+
+        it("survives inside an `and`, where dropping it widened the most", () => {
+            // `and(title = 'x', FALSE)` is FALSE. Drop the second and the
+            // first matches on its own — every post with that title, from a
+            // query that asked for none.
+            const condition = DrizzleConditionBuilder.buildLogicalConditions(
+                {
+                    type: "and",
+                    conditions: [
+                        { column: "title", operator: "==", value: "hello" },
+                        { column: "author_id", operator: "in", value: [] }
+                    ]
+                },
                 postsTable,
                 "posts"
-            )).toHaveLength(0);
+            );
+            expect(render(condition)).toContain("FALSE");
+        });
+
+        it("reads a scalar as the one-element list rather than dropping it", () => {
+            // `?filter=author_id.in.7` parses to the string `"7"` — the REST
+            // dialect only builds an array for a parenthesised value — so this
+            // is an ordinary query, not malformed input.
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { author_id: ["in", 7] }, postsTable, "posts"
+            );
+            expect(conditions).toHaveLength(1);
+            const query = dialect.sqlToQuery(conditions[0]);
+            expect(query.sql).toBe('"posts"."author_id" in ($1)');
+            expect(query.params).toEqual([7]);
         });
     });
 
