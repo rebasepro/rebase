@@ -1,7 +1,8 @@
-import type { LogicalCondition, VectorSearchParams } from "@rebasepro/types";
+import type { FilterValues, LogicalCondition, VectorSearchParams } from "@rebasepro/types";
 import { toCanonicalOp, resolveClientListLimit, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { deserializeOrderBy, deserializeFilter, deserializeLogicalCondition } from "@rebasepro/common";
 import { QueryOptions } from "../types";
+import { ApiError } from "../errors";
 
 export const mapOperator = (op: string) => toCanonicalOp(op) ?? null;
 
@@ -31,6 +32,45 @@ function parseLogicalGroup(type: "or" | "and", raw: unknown): LogicalCondition |
     if (!inner) return undefined;
     const parsed = deserializeLogicalCondition(`${type}(${inner})`);
     return "type" in parsed ? parsed : undefined;
+}
+
+/**
+ * Parse the `?where=` JSON filter object.
+ *
+ * This is the dialect the OpenAPI document publishes on every
+ * `GET /api/data/{slug}` — `{"status":["==","active"]}`: field → canonical
+ * `[WhereFilterOp, value]` tuple. It is normalized through the same
+ * `deserializeFilter` as the `?field=op.value` params below, so a value that
+ * arrives as a PostgREST dot-string (`{"status":"eq.active"}`) or as a bare
+ * scalar (`{"status":"active"}`) compiles to the same condition. Unlike the
+ * querystring dialect, JSON carries types — a number stays a number.
+ *
+ * A malformed value is a 400 rather than a silent drop: dropping the filter
+ * would run the read unfiltered and return everything RLS happens to allow.
+ */
+function parseWhereParam(raw: unknown): FilterValues<string> | undefined {
+    const str = String(raw).trim();
+    if (!str) return undefined;
+
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(str);
+    } catch {
+        throw ApiError.badRequest(
+            "Invalid `where` parameter: expected a JSON object, e.g. {\"status\":[\"==\",\"active\"]}",
+            "INVALID_WHERE"
+        );
+    }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        throw ApiError.badRequest(
+            "Invalid `where` parameter: expected a JSON object mapping fields to conditions, "
+            + "e.g. {\"status\":[\"==\",\"active\"]}",
+            "INVALID_WHERE"
+        );
+    }
+
+    const filter = deserializeFilter(parsed as Record<string, unknown>);
+    return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
 // Re-exported for callers/tests that reference the REST list bounds. The
@@ -97,13 +137,25 @@ export function parseQueryOptions(
     // eq). Values stay strings; the schema-aware driver coerces them to
     // column types. This keeps the REST path byte-for-byte consistent with
     // the SDK/admin path, which parses through the same `deserializeFilter`.
-    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and"];
+    //
+    // `where` is reserved: it is the JSON filter dialect (see
+    // `parseWhereParam`), not a column named "where". Leaving it out of this
+    // list made the documented `?where={...}` compile as a filter on a
+    // nonexistent field — which used to be dropped, widening the read to the
+    // whole table, and is now a 400 `UNKNOWN_FILTER_FIELD`.
+    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "where"];
     const filterDict: Record<string, unknown> = {};
     for (const [key, rawValue] of Object.entries(query)) {
         if (reservedQueryKeys.includes(key)) continue;
         filterDict[key] = rawValue;
     }
-    const where = deserializeFilter(filterDict);
+    // Both dialects may be sent together; an explicit `?field=op.value` wins
+    // over the same field inside `where`, being the more specific request.
+    const whereVal = getLastValue(query.where);
+    const where = {
+        ...(whereVal !== undefined && whereVal !== null ? parseWhereParam(whereVal) : undefined),
+        ...deserializeFilter(filterDict)
+    };
     if (Object.keys(where).length > 0) {
         options.where = where;
     }
@@ -149,25 +201,41 @@ export function parseQueryOptions(
         options.fields = fieldsStr.split(",").map(s => s.trim()).filter(Boolean);
     }
 
-    // Vector similarity search
+    // ── Vector similarity search ───────────────────────────────────────
+    // Every rejection here is a malformed *request*, so it must carry a 400.
+    // A bare `Error` reaches the handler with no `statusCode` and no known
+    // `code`, which makes it a 500 — logged with a full stack as an incident,
+    // and answered with "An unexpected error occurred", because the handler
+    // only forwards a message to the client below 500. The caller was told
+    // nothing about what it got wrong.
     const vectorSearchVal = getLastValue(query.vector_search);
     const vectorVal = getLastValue(query.vector);
     if (vectorSearchVal && vectorVal) {
         const vectorStr = String(vectorVal);
-        let queryVector: number[];
+        let decoded: unknown;
         try {
-            queryVector = JSON.parse(vectorStr) as number[];
-            if (!Array.isArray(queryVector) || !queryVector.every(v => typeof v === "number")) {
-                throw new Error("Expected array of numbers");
-            }
+            decoded = JSON.parse(vectorStr);
         } catch {
-            throw new Error("Invalid vector format. Expected JSON array of numbers, e.g. [0.1,0.2,0.3]");
+            decoded = undefined;
         }
+        // Validated outside the `try` on purpose: inside it, the thrown
+        // ApiError would be caught by its own `catch` and re-thrown as
+        // something else.
+        if (!Array.isArray(decoded) || !decoded.every(v => typeof v === "number")) {
+            throw ApiError.badRequest(
+                "Invalid `vector` format. Expected a JSON array of numbers, e.g. [0.1,0.2,0.3]",
+                "INVALID_VECTOR"
+            );
+        }
+        const queryVector = decoded as number[];
 
         const distanceParamVal = getLastValue(query.vector_distance);
         const distanceParam = distanceParamVal ? String(distanceParamVal) : "cosine";
         if (distanceParam !== "cosine" && distanceParam !== "l2" && distanceParam !== "inner_product") {
-            throw new Error(`Invalid vector_distance: ${distanceParam}. Expected: cosine, l2, or inner_product`);
+            throw ApiError.badRequest(
+                `Invalid \`vector_distance\`: ${distanceParam}. Expected: cosine, l2, or inner_product`,
+                "INVALID_VECTOR_DISTANCE"
+            );
         }
 
         const vectorSearch: VectorSearchParams = {
@@ -180,7 +248,10 @@ export function parseQueryOptions(
         if (thresholdVal) {
             const threshold = parseFloat(String(thresholdVal));
             if (isNaN(threshold)) {
-                throw new Error("Invalid vector_threshold. Expected a number.");
+                throw ApiError.badRequest(
+                    "Invalid `vector_threshold`. Expected a number.",
+                    "INVALID_VECTOR_THRESHOLD"
+                );
             }
             vectorSearch.threshold = threshold;
         }

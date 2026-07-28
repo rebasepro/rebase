@@ -10,7 +10,7 @@ import path from "path";
 import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
-import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp } from "./init.js";
+import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, TEMPLATE_PLACEHOLDER_FILES } from "./init.js";
 
 
 let tmpDir: string;
@@ -52,17 +52,12 @@ async function simulateInit(projectName: string): Promise<string> {
         }
     });
 
-    // Replace placeholders
-    const filesToProcess = [
-        "package.json",
-        "frontend/package.json",
-        "backend/package.json",
-        "config/package.json",
-        "frontend/index.html",
-        "README.md"
-    ];
-
-    for (const file of filesToProcess) {
+    // Replace placeholders, using the PRODUCTION list rather than a copy of it.
+    // This harness used to keep its own, which was missing `pnpm-workspace.yaml`
+    // and `docker-compose.yml` — so every test built on it substituted a
+    // different set of files than `rebase init` does, and could not observe a
+    // file missing from the real list no matter what it asserted.
+    for (const file of TEMPLATE_PLACEHOLDER_FILES) {
         const fullPath = path.join(targetDir, file);
         if (!fs.existsSync(fullPath)) continue;
         let content = fs.readFileSync(fullPath, "utf-8");
@@ -171,6 +166,50 @@ path: "/" });
 // =============================================================================
 
 describe("placeholder replacement", () => {
+    // The guard that generalises: derive the expectation from the template files
+    // themselves, so adding one with a placeholder and forgetting the list fails
+    // here rather than in a user's terminal.
+    //
+    // `docker-compose.yml` shipped with a literal `name: {{PROJECT_NAME}}` for
+    // exactly this reason. Nothing caught it, because the only tests that touched
+    // substitution ran against a hand-written copy of the file list.
+    it("processes every template file that carries a placeholder", () => {
+        const withPlaceholders: string[] = [];
+        const walk = (dir: string, prefix = "") => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                if (entry.name === "node_modules" || entry.name === ".DS_Store") continue;
+                const full = path.join(dir, entry.name);
+                const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+                if (entry.isDirectory()) {
+                    walk(full, rel);
+                } else if (fs.readFileSync(full, "utf-8").includes("{{")) {
+                    withPlaceholders.push(rel);
+                }
+            }
+        };
+        walk(TEMPLATE_DIR);
+
+        const unprocessed = withPlaceholders.filter(f => !TEMPLATE_PLACEHOLDER_FILES.includes(f));
+        expect({ unprocessed }).toEqual({ unprocessed: [] });
+    });
+
+    it("leaves no placeholder behind anywhere in a scaffolded project", async () => {
+        const targetDir = await simulateInit("my-cool-app");
+        const leftovers: string[] = [];
+        const walk = (dir: string, prefix = "") => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                if (entry.name === "node_modules" || entry.name === ".DS_Store") continue;
+                const full = path.join(dir, entry.name);
+                const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+                if (entry.isDirectory()) walk(full, rel);
+                else if (fs.readFileSync(full, "utf-8").includes("{{PROJECT_NAME}}")) leftovers.push(rel);
+            }
+        };
+        walk(targetDir);
+
+        expect({ leftovers }).toEqual({ leftovers: [] });
+    });
+
     it("replaces {{PROJECT_NAME}} in root package.json", async () => {
         const targetDir = await simulateInit("my-cool-app");
         const pkg = JSON.parse(fs.readFileSync(path.join(targetDir, "package.json"), "utf-8"));

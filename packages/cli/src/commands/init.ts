@@ -35,6 +35,32 @@ const cliRoot = findParentDir(__dirname, "cli");
 
 const PROJECT_NAME_RE = /^[a-z0-9][a-z0-9._-]*$/;
 
+/**
+ * Every scaffolded file that carries a `{{PLACEHOLDER}}`.
+ *
+ * Exported because it is the single source of truth: `init.test.ts` reads it and
+ * asserts that every template file containing `{{` appears here. It used to be a
+ * local, with the test harness keeping a *second* copy — so the two drifted, and
+ * a test built on the copy could not observe the production list at all.
+ *
+ * The drift shipped: `docker-compose.yml` arrived with the self-host work
+ * (26fd5259c) and was added to neither, so every scaffolded project got a literal
+ * `name: {{PROJECT_NAME}}`. In YAML `{{...}}` is a map, not a string, so the
+ * documented `docker compose up` path failed on the file before doing anything:
+ *
+ *   yaml: unmarshal errors: line 28: cannot unmarshal !!map into string
+ */
+export const TEMPLATE_PLACEHOLDER_FILES = [
+    "package.json",
+    "frontend/package.json",
+    "backend/package.json",
+    "config/package.json",
+    "frontend/index.html",
+    "pnpm-workspace.yaml",
+    "docker-compose.yml",
+    "README.md"
+];
+
 /** Returns an error message, or null when the name is a valid package name. */
 export function validateProjectName(name: string): string | null {
     if (!name.trim()) return "Project name is required";
@@ -776,15 +802,7 @@ force: true });
 }
 
 async function replacePlaceholders(options: InitOptions) {
-    const filesToProcess = [
-        "package.json",
-        "frontend/package.json",
-        "backend/package.json",
-        "config/package.json",
-        "frontend/index.html",
-        "pnpm-workspace.yaml",
-        "README.md"
-    ];
+    const filesToProcess = TEMPLATE_PLACEHOLDER_FILES;
 
     const packageJsonPath = path.resolve(cliRoot!, "package.json");
     let cliVersion = "latest";

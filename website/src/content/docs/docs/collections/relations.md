@@ -344,11 +344,13 @@ from other parents.
 ### The same rules over REST
 
 Child lists are ordinary collection queries narrowed to one parent, so they accept
-everything a root list does — `where`, `orderBy`, `limit`, `offset`, `include` — and
-`meta.total` counts the filtered rows:
+everything a root list does — filters, `orderBy`, `limit`, `offset`, `include` — and
+`meta.total` counts the filtered rows. Filter either per field (`?field=op.value`) or
+with a whole-object `?where={"field":["op","value"]}`; both reach the same query:
 
 ```
-GET    /api/data/authors/a-1/posts?where=status:eq.published&orderBy=title&limit=20
+GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
+GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
 GET    /api/data/authors/a-1/posts/p-1
 POST   /api/data/authors/a-1/posts          create under this parent
 PUT    /api/data/authors/a-1/posts/p-1      update; will not reparent
