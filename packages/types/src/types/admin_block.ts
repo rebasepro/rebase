@@ -73,3 +73,46 @@ export const ADMIN_COLLECTION_KEYS = [
 
 /** A key of a collection's `admin` block. @group Models */
 export type AdminCollectionKey = typeof ADMIN_COLLECTION_KEYS[number];
+
+/**
+ * Every key that belongs inside a *property's* `admin` block, as data.
+ *
+ * The union of `AdminPropertyOptions` and its per-type extensions
+ * (`AdminStringOptions`, `AdminArrayOptions`, …) in `@rebasepro/admin-types`.
+ * It lives here for the same reason {@link ADMIN_COLLECTION_KEYS} does: the
+ * runtime consumers are core packages that the BaaS guard forbids from
+ * importing `@rebasepro/admin-types`. Here it is the boot-time collection
+ * validator in `@rebasepro/server`, which has to tell "you left `readOnly` at
+ * the top of the property, where nothing reads it" apart from "you invented a
+ * key we have never heard of".
+ *
+ * `@rebasepro/admin-types` re-exports this and asserts it names only real
+ * option keys.
+ *
+ * @group Models
+ */
+export const ADMIN_PROPERTY_KEYS = [
+    "clearable",
+    "columnWidth",
+    "customProps",
+    "disabled",
+    "expanded",
+    "Field",
+    "Filter",
+    "filterOperators",
+    "hideFromCollection",
+    "markdown",
+    "minimalistView",
+    "multiline",
+    "Preview",
+    "previewAsTag",
+    "previewProperties",
+    "readOnly",
+    "spreadChildren",
+    "urlPreview",
+    "widget",
+    "widthPercentage"
+] as const;
+
+/** A key of a property's `admin` block. @group Models */
+export type AdminPropertyKey = typeof ADMIN_PROPERTY_KEYS[number];

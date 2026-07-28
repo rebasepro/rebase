@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { pathToFileURL } from "url";
 import { logger } from "../utils/logger";
+import { assertCollectionConfigs, type ValidateCollectionConfigOptions } from "./validate-config";
 
 /**
  * The one definition of "the collections".
@@ -90,9 +91,23 @@ export function applyCollectionDefaults(
  * configuration error, and continuing produces the worst outcome available: an
  * API missing a route, or a policy file missing a table, with a successful exit
  * code. Both read as "no data" rather than as a failure.
+ *
+ * Every collection is strict-parsed on the way out — see `validate-config` for
+ * why a key that moved is fatal and a key nobody recognises only warns. It
+ * happens here, at the one definition of "the collections", so the runtime, the
+ * schema generator, the policy generator and the doctor all see the same
+ * verdict rather than three of them silently accepting a config the fourth
+ * rejects.
  */
-export async function loadCollectionsFromDirectory(source: string): Promise<CollectionConfig[]> {
+export async function loadCollectionsFromDirectory(
+    source: string,
+    options: { validate?: false | ValidateCollectionConfigOptions } = {}
+): Promise<CollectionConfig[]> {
     const resolved = path.resolve(source);
+    const validate = (collections: CollectionConfig[]): CollectionConfig[] => {
+        if (options.validate !== false) assertCollectionConfigs(collections, options.validate ?? {});
+        return collections;
+    };
 
     if (!fs.existsSync(resolved)) {
         logger.warn(`[collections] Not found: ${resolved}`);
@@ -103,9 +118,9 @@ export async function loadCollectionsFromDirectory(source: string): Promise<Coll
     if (!fs.statSync(resolved).isDirectory()) {
         const mod = await importModule(resolved);
         const collections = (mod.backendCollections || mod.collections || []) as CollectionConfig[];
-        return applyCollectionDefaults([...collections], {
+        return validate(applyCollectionDefaults([...collections], {
             defaultSecurityRules: mod.defaultSecurityRules as SecurityRule[] | undefined
-        });
+        }));
     }
 
     const collections: CollectionConfig[] = [];
@@ -132,5 +147,5 @@ export async function loadCollectionsFromDirectory(source: string): Promise<Coll
         );
     }
 
-    return applyCollectionDefaults(collections, await readDefaults(resolved));
+    return validate(applyCollectionDefaults(collections, await readDefaults(resolved)));
 }

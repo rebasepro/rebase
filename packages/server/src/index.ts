@@ -38,6 +38,17 @@ export {
     type CollectionDefaults
 } from "./collections/loader";
 
+// The strict parse the loader runs. Exported so the doctor and the CLI can
+// report the same problems without booting a server.
+export {
+    assertCollectionConfigs,
+    findCollectionConfigProblems,
+    unknownKeyPolicyFromEnv,
+    type ConfigProblem,
+    type UnknownKeyPolicy,
+    type ValidateCollectionConfigOptions
+} from "./collections/validate-config";
+
 // =============================================================================
 // DB Abstractions (for database driver implementations)
 // =============================================================================
