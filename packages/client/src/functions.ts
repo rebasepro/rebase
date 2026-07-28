@@ -33,14 +33,8 @@ export interface FunctionsClient {
     ): Promise<T>;
 }
 
-export interface FunctionInvokeOptions {
-    /** HTTP method — defaults to `"POST"`. */
-    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-    /** Sub-path appended after the function name, e.g. `"status/123"`. */
-    path?: string;
-    /** Extra headers merged into the request (auth is still injected automatically). */
-    headers?: Record<string, string>;
-}
+export type { FunctionInvokeOptions } from "@rebasepro/types";
+import type { FunctionInvokeOptions } from "@rebasepro/types";
 
 /**
  * Create a `FunctionsClient` backed by the given transport.

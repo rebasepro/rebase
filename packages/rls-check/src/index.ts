@@ -54,7 +54,7 @@ export type {
     Finding,
     FindingTarget,
     PolicyCommand,
-    RelationKind,
+    PgRelationKind,
     ScanResult,
     Severity
 } from "./types";

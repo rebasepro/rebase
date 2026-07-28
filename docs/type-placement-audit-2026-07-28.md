@@ -394,7 +394,10 @@ tier, different mechanism; worth its own pass.
 
 ---
 
-## Tier 4 — duplicated definitions
+## Tier 4 — duplicated definitions — **DONE**
+
+> Resolved 2026-07-28, and a second sweep after the first pass turned up five more.
+> See **Resolution** at the end.
 
 Beyond the ones already covered above (API keys ×3, `WhereFilterOp` ×3, history ×2):
 
@@ -406,39 +409,77 @@ Beyond the ones already covered above (API keys ×3, `WhereFilterOp` ×3, histor
 | `serializable_types.ts` | `admin/src/collection_editor/` | 497-line mirror; drift documented in 1.4. |
 | `RelationKind` | `types/src/types/relations.ts:26`, `rls-check/src/types.ts:69` | Genuine name collision, unrelated meanings (`"belongsTo" \| …` vs `"table" \| "view" \| …`). Harmless, but the two are one import away from being confused. |
 
+### Resolution
+
+The table above, plus what a re-scan for repeated exported names found afterwards:
+
+| Type | Was | Now |
+| --- | --- | --- |
+| `PostgresPolicy` | admin + studio, one commented "inline to avoid depending on @rebasepro/studio" | `types/postgres_introspection.ts`, alongside the `Table*` shapes moved out of `websockets.ts` |
+| `SecurityRule` (admin's local shadow) | a local `{ operation?: string }` in the RLS tab | deleted — see below |
+| `pgColumnToProperty` | admin's copy called and wrong, studio's copy correct and never called | one copy in `@rebasepro/common`, retyped off `AdminCollection` |
+| `RebaseAuthConfig` | the admin's `{ loginView }` vs the server's whole auth config | admin-side renamed `RebaseAuthViewConfig`, old name deprecated |
+| `DatabaseConnection` | server's `{ db, pool, query }` vs types' `{ type, isConnected, close }` — disjoint, both public | server's renamed `DriverConnection`, old name deprecated |
+| `RelationKind` | `belongsTo`\|… in types vs `table`\|`view`\|… in rls-check | rls-check's renamed `PgRelationKind` |
+| `FunctionInvokeOptions` | client + types, identical | client re-exports |
+| `ChannelHistoryEntry` | client + types — the client's had drifted `at` to optional | client re-exports |
+| `EffectiveRoleController` | app + types, identical | app re-exports |
+| `UploadFn` | `editor/extensions/Image.ts` and `editor/extensions/Image/index.ts` | the `Image/` directory was dead — module resolution always picked the sibling file — and is deleted |
+
+`WhereFilterOp` in `@rebasepro/ui` is the one duplicate left standing, and it should:
+`@rebasepro/ui` has no `@rebasepro/*` dependency at all, and
+`types/test/filter-operators-duplication.test.ts` already parses both files and
+fails if their members diverge. That is the pattern for a duplicate that has to
+exist.
+
+**What the shadow was hiding.** Deleting the admin RLS tab's local `SecurityRule`
+turned up six type errors that had never been reachable. The form wrote
+`cmd?.toLowerCase()` — a `string` — into `operation`, which takes a union, so an
+unrecognised `cmd` would have been saved as a policy operation that compiles to
+nothing. And it assembled raw-SQL rules with an optional `using`, where that
+variant requires it: an INSERT-only policy carries only `WITH CHECK` and is a
+roles-only rule, not a raw-SQL one. Both now go through named converters.
+
 ---
 
-## Recommended sequencing
+## Status
 
-The Tier 1 items are independent, small, and fix real behaviour — do them first,
-regardless of what happens to the rest.
+All four tiers are resolved. Verification, run after each tier:
 
-Tier 2 is where the cost is. Blast radius, counting references outside
-`packages/types`:
+- `tsc --noEmit` per package against its own `tsconfig.prod.json`, with workspace
+  `paths` pointed at **source** rather than `dist`. That mapping is the part that
+  makes the check mean anything: the packages resolve each other through built
+  declarations, so a naive run typechecks the *previous* build and reports clean
+  no matter what changed.
+- The repo's own `tsconfig.typecheck.json`, `tsconfig.tests.json` and
+  `tsconfig.core.json`.
+- Every package suite: 4,720 tests.
+- `eslint --quiet` on each changed package, and `verify:docs` (701 doc snippets
+  typechecked against workspace source, API names across all six locales).
 
-| Field | refs |
-| --- | --- |
-| `disableDefaultPolicies` | 8 |
-| `securityRules` | 80 |
-| `relations` | 47 |
-| `columnType` | 127 |
-| `table` | 230 |
+Two things worth carrying forward, both instances of the same failure:
 
-`disableDefaultPolicies` alone is an afternoon. `columnType` and `table` are not, and
-neither should be attempted as a type edit — `rls-enforcement.ts:258` already takes a
-structural `{ slug?; securityRules? }[]` rather than a collection type, which is the
-shape the rest of the call sites will need too.
+1. **A test that is never typechecked asserts nothing.** `property_engine_gates.test.ts`
+   said so in its own header — "the real value is that `tsc --noEmit` validates the
+   `@ts-expect-error` annotations" — and nothing ran tsc over it, so it sat green for
+   months against `driver:`, `collectionPath` and a `StringProperty` shape that had
+   been gone the whole time. When adding a compile-time test, add its directory to
+   `tsconfig.tests.json` in the same change, then prove it by inserting a
+   deliberately-unused `@ts-expect-error` and watching `TS2578` fire.
+2. **A local shadow of a shared type suppresses the errors it was meant to model.**
+   The admin's `SecurityRule` with `operation?: string` accepted a `.toLowerCase()`
+   the real union rejects. Both times, the shape being shadowed was one import away.
 
-There is also a design question to settle before moving anything in Tier 2, because
-it decides the whole approach: should the driver-agnostic types stay *narrow* (fields
-live only on `PostgresCollectionConfig`, and agnostic code narrows via
-`isPostgresCollectionConfig`), or stay *wide* with the capability flags enforcing
-correctness (a conditional type keyed on `engine`)? The first is honest and noisy;
-the second keeps every existing call site compiling. `DataSourceCapabilities` already
-holds the data either way.
+Still open, deliberately:
 
-Tier 3 is mechanical but wide, and it is the second half of a split that already
-shipped — worth finishing so the property surface matches the collection surface.
+- `PropertyConditions` in core declares condition keys — `canAddElements`,
+  `sortable`, `referenceFilter`, `disabled`, `readOnly` — that name fields living in
+  the admin block. The evaluator writes into `admin` correctly, so nothing is broken;
+  a core type just still names admin-only options.
+- `serializable_types.ts` remains a 497-line hand-maintained mirror. It is in sync
+  now, and drifted three times over while nobody was looking. Generating it, or
+  testing it against the source types, is the durable fix.
+- `VectorProperty.dimensions` is pgvector-shaped and there is no `supportsVectors`
+  capability to gate it against, so unlike every other field here there is not even a
+  runtime answer to appeal to.
 
-Tier 4 wants one decision per row about which copy is canonical; the API-key and
-history rows are the two with live consequences.

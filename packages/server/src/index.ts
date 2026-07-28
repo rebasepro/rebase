@@ -250,7 +250,7 @@ export {
 } from "./boot/sources";
 export type { ResolvedDataSourceConfig, EnvBag } from "./boot/sources";
 export { initializeDataSource, initializeDataSources } from "./boot/driver";
-export type { InitializedDataSource, DatabaseConnection, BundleSchema } from "./boot/driver";
+export type { InitializedDataSource, DriverConnection, DatabaseConnection, BundleSchema } from "./boot/driver";
 
 // =============================================================================
 // Metrics + project contract

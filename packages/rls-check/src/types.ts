@@ -66,12 +66,22 @@ export interface Finding {
 // Snapshot — the read-only picture of the database the checks reason about.
 // ---------------------------------------------------------------------------
 
-export type RelationKind = "table" | "partitioned_table" | "view" | "materialized_view" | "foreign_table";
+/**
+ * `pg_class.relkind`, spelled out.
+ *
+ * Named `RelationKind` until that collided with `RelationKind` in
+ * `@rebasepro/types`, which is the cardinality of a *collection* relation
+ * (`belongsTo` | `hasOne` | `hasMany` | `manyToMany` | `via`). Unrelated
+ * meanings, and the shared word is "relation" in two different senses —
+ * Postgres's (any table-like object) and the data model's (a link between
+ * collections).
+ */
+export type PgRelationKind = "table" | "partitioned_table" | "view" | "materialized_view" | "foreign_table";
 
 export interface DbRelation {
     schema: string;
     name: string;
-    kind: RelationKind;
+    kind: PgRelationKind;
     owner: string;
     /** `pg_class.relrowsecurity`. Always false for views. */
     rlsEnabled: boolean;

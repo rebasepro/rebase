@@ -31,7 +31,7 @@ import type {
     DbSnapshot,
     DbView,
     PolicyCommand,
-    RelationKind
+    PgRelationKind
 } from "./types";
 
 export interface ConnectOptions {
@@ -87,7 +87,7 @@ const PLATFORM_SCHEMAS = [
     "rebase", "drizzle"
 ];
 
-const RELATION_KINDS: Record<string, RelationKind> = {
+const RELATION_KINDS: Record<string, PgRelationKind> = {
     r: "table",
     p: "partitioned_table",
     v: "view",

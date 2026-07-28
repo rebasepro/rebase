@@ -32,12 +32,21 @@ type DriverConnectionFactory = (
     connectionString: string,
     schema?: Record<string, unknown>,
     poolConfig?: Record<string, unknown>
-) => DatabaseConnection;
+) => DriverConnection;
 
 type DriverAdapterFactory = (config: Record<string, unknown>) => DatabaseAdapter;
 
-/** The connection handle a driver hands back. */
-export interface DatabaseConnection {
+/**
+ * The connection handle a driver hands back at boot: the client object, the
+ * pool to close on shutdown, and how to probe it.
+ *
+ * Named `DatabaseConnection` until that collided with `DatabaseConnection` in
+ * `@rebasepro/types` — an abstract `{ type, isConnected, close() }` that
+ * `MongoDBConnection` implements. The two share no field, and both are public:
+ * one is re-exported from `@rebasepro/server`'s index, the other from
+ * `@rebasepro/types`, packages that are installed together.
+ */
+export interface DriverConnection {
     db: unknown;
     /**
      * Present for pool-based drivers. Closed during shutdown, and used to probe
@@ -81,7 +90,7 @@ export interface InitializedDataSource {
     engine: string;
     driverPackage: string;
     bootstrapper: BackendBootstrapper;
-    connection: DatabaseConnection;
+    connection: DriverConnection;
 }
 
 export interface BundleSchema {
@@ -301,3 +310,9 @@ export async function initializeDataSources(
     }
     return initialized;
 }
+
+/**
+ * @deprecated Use {@link DriverConnection}. This name collides with
+ * `DatabaseConnection` from `@rebasepro/types`, which is a different shape.
+ */
+export type DatabaseConnection = DriverConnection;

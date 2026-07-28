@@ -47,10 +47,8 @@ type DeepPartial<T> = T extends object
  * Controller to simulate different roles when dev mode is active.
  * @group Models
  */
-export interface EffectiveRoleController {
-    effectiveRole: string | null;
-    setEffectiveRole: (role: string | null) => void;
-}
+export type { EffectiveRoleController } from "@rebasepro/types";
+import type { EffectiveRoleController } from "@rebasepro/types";
 
 
 /**

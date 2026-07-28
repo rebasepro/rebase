@@ -53,14 +53,14 @@ export interface BroadcastEvent {
     replayed?: boolean;
 }
 
-/** One retained message, as returned by {@link RebaseRealtimeChannel.history}. */
-export interface ChannelHistoryEntry {
-    seq: number;
-    event: string;
-    payload: unknown;
-    senderId?: string;
-    at?: string;
-}
+/**
+ * One retained message, as returned by {@link RebaseRealtimeChannel.history}.
+ *
+ * Re-exported rather than re-declared: the copy that used to live here had
+ * drifted `at` to optional, while the server always sends it.
+ */
+export type { ChannelHistoryEntry } from "@rebasepro/types";
+import type { ChannelHistoryEntry } from "@rebasepro/types";
 
 /** The answer to a catch-up request. */
 export interface ChannelHistoryResult {
