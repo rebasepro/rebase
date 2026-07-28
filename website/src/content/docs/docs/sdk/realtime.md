@@ -87,11 +87,14 @@ client.data.products.listen(
 Use `listenById()` to watch a specific record by its ID:
 
 ```typescript
-const unsubscribe = client.data.products.listenById(
+// The SDK hands back a flat row, not an `Entity` — there is no `.values`.
+const unsubscribe = client.data
+    .collection<{ id: number; name: string }>("products")
+    .listenById!(
     42,
-    (entity) => {
-        if (entity) {
-            console.log("Product changed:", entity.values.name);
+    (product) => {
+        if (product) {
+            console.log("Product changed:", product.name);
         } else {
             console.log("Product was deleted");
         }

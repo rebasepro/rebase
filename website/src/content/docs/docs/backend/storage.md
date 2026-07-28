@@ -180,7 +180,7 @@ import { Rebase } from "@rebasepro/app";
         { key: "firebase", engine: "firebase", transport: "server", label: "Firebase Storage" },
     ]}
 >
-    {/* ... */}
+    {() => <MyApp />}
 </Rebase>
 ```
 

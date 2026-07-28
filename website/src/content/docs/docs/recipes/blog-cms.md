@@ -104,7 +104,7 @@ type Article = {
     title: string;
     slug: string;
     status: string;
-    published_at?: string | null;
+    published_at?: Date | null;
 };
 
 export const articlesCollection = defineCollection({
@@ -197,7 +197,8 @@ export const articlesCollection = defineCollection({
             }
             // Set published_at when publishing
             if (values.status === "published" && !values.published_at) {
-                values.published_at = new Date().toISOString();
+                // `published_at` is a `date` property, so its value is a Date.
+                values.published_at = new Date();
             }
             return values;
         }

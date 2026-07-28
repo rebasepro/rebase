@@ -43,14 +43,16 @@ The `LoginView` component provides a complete login and registration form:
 ```tsx
 import { LoginView } from "@rebasepro/app";
 
-if (!authController.user) {
-    return (
-        <LoginView
-            authController={authController}
-            googleEnabled={!!GOOGLE_CLIENT_ID}
-            googleClientId={GOOGLE_CLIENT_ID}
-        />
-    );
+function App() {
+    if (!authController.user) {
+        return (
+            <LoginView
+                authController={authController}
+                googleClientId={GOOGLE_CLIENT_ID}
+            />
+        );
+    }
+    return <MyApp />;
 }
 ```
 

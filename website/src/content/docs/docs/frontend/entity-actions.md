@@ -77,12 +77,15 @@ function PublishSelectedAction({ selectionController, context }: CollectionActio
     );
 }
 
-// Register
+// Register — `Actions` is an array, so several can be composed.
 const collection = defineCollection({
+    slug: "products",
+    name: "Products",
+    table: "products",
+    properties: { /* … */ },
     admin: {
-        Actions: PublishSelectedAction
+        Actions: [PublishSelectedAction]
     }
-    // ...
 });
 ```
 

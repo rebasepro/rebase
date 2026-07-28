@@ -83,14 +83,12 @@ function useMyPlugin(): RebasePlugin {
             { slot: "collection.actions", Component: MyToolbarAction }
         ],
 
-        form: {
-            fieldBuilder: ({ property, ...rest }) => {
-                // Return a custom field for specific property configs
-                if (property.propertyConfig === "my_custom_field") {
-                    return <MyCustomField {...rest} />;
-                }
-                return null; // Use default field
-            }
+        // `fieldBuilder` is top-level and takes a `wrap` function that returns
+        // a *component* (or null to leave the default field alone) — it is not
+        // a render function and no longer lives under `form`.
+        fieldBuilder: {
+            wrap: ({ property }) =>
+                property.propertyConfig === "my_custom_field" ? MyCustomField : null
         }
     };
 }

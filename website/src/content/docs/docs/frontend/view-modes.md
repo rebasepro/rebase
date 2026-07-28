@@ -19,10 +19,15 @@ Every collection can be displayed in four view modes:
 import { defineCollection } from "@rebasepro/admin-types";
 const productsCollection = defineCollection({
     slug: "products",
-    properties: { /* … */ },
+    // `orderProperty` and `kanban.columnProperty` are checked against these
+    // keys — with an empty `properties` block they narrow to `never`.
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        status: { name: "Status", type: "string" },
+        sort_order: { name: "Order", type: "number" }
+    },
     name: "Products",
     table: "products",
-    // ...
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views

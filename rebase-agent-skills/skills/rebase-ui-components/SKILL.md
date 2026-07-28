@@ -931,14 +931,18 @@ export function MyEditableGrid() {
                 data={data}
                 columns={columns}
                 rowHeight={52}
-                cellRenderer={({ rowData, column }) => (
-                    <EditableCell
-                        rowId={rowData.id}
-                        columnKey={column.key}
-                        value={rowData.name}
-                        onUpdate={(val) => updateCell(rowData.id, val || "")}
-                    />
-                )}
+                cellRenderer={({ rowData, column }) => {
+                    // rowData is Record<string, unknown> — narrow it here.
+                    const row = rowData as { id: string; name: string };
+                    return (
+                        <EditableCell
+                            rowId={row.id}
+                            columnKey={column.key}
+                            value={row.name}
+                            onUpdate={(val) => updateCell(row.id, val || "")}
+                        />
+                    );
+                }}
             />
         </VirtualTableSelectionProvider>
     );

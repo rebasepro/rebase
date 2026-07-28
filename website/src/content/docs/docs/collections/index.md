@@ -140,7 +140,7 @@ The split is not cosmetic. It is what lets Rebase be a backend on its own:
 a BaaS project, writing one is a **type error**. `@rebasepro/admin-types` adds it back by
 declaration merging, so one line per project turns it on:
 
-```typescript
+```typescript no-verify
 // config/admin.d.ts
 /// <reference types="@rebasepro/admin-types" />
 ```

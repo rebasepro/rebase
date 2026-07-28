@@ -437,7 +437,9 @@ export default defineFunction((app, { rebase }) => {
         const { orderId, amount } = await c.req.json();
 
         // Create the payment record
-        const payment = await rebase.data.collection<Record<string, unknown>>("payments").create({
+        const payment = await rebase.data
+            .collection<{ id: string; orderId: string; amount: number; status: string }>("payments")
+            .create({
             orderId,
             amount,
             status: "completed"

@@ -160,10 +160,21 @@ export default defineCron({
     async handler(ctx) {
         ctx.log("Checking for expired trial users...");
 
-        // Fetch using the pre-initialized data driver
-        const { data: trials } = await ctx.client.data.users.find({
+        // Fetch using the pre-initialized data driver. `collection<Row>(slug)`
+        // gives the query builder the row type — `where` keys are checked
+        // against it. Every filter is an `[operator, value]` tuple; a bare
+        // value is passed straight through and builds a malformed query.
+        const users = ctx.client.data.collection<{
+            id: string;
+            email: string;
+            trial_status: string;
+            trial_ends_at: string;
+            status: string;
+        }>("users");
+
+        const { data: trials } = await users.find({
             where: {
-                trial_status: "active",
+                trial_status: ["==", "active"],
                 trial_ends_at: ["<", new Date().toISOString()]
             }
         });
@@ -171,7 +182,7 @@ export default defineCron({
         ctx.log(`Found ${trials.length} users with expired trials.`);
 
         for (const user of trials) {
-            await ctx.client.data.users.update(user.id, {
+            await users.update(user.id, {
                 trial_status: "expired",
                 status: "disabled"
             });
@@ -179,7 +190,7 @@ export default defineCron({
             // Send email notification using Rebase email service
             if (ctx.client.email) {
                 await ctx.client.email.send({
-                    to: user.values.email,
+                    to: user.email,
                     subject: "Your trial has expired",
                     html: "<p>Please upgrade your subscription to continue.</p>"
                 });

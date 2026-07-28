@@ -47,7 +47,6 @@ if (!authController.user) {
     return (
         <LoginView
             authController={authController}
-            googleEnabled={!!GOOGLE_CLIENT_ID}
             googleClientId={GOOGLE_CLIENT_ID}
         />
     );

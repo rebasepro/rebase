@@ -274,16 +274,19 @@ const { data } = await client.data.articles.find({
 When included, the response contains both the **scalar foreign key** and the **hydrated relation object**:
 
 ```typescript
-const { data } = await client.data.articles
+const { data } = await client.data
+    .collection<{ id: string; author_id: string; author?: { name: string } }>("articles")
     .include("author")
     .find();
 
+// The SDK returns flat rows — there is no `.values` wrapper. (`Entity`, with
+// `id`/`path`/`values`, is an admin-UI view model, not what the client hands back.)
 for (const article of data) {
     // Scalar FK — always present
-    article.values.author_id;     // "uuid-1234"
+    article.author_id;     // "uuid-1234"
 
     // Hydrated relation — only present when included
-    article.values.author?.name;  // "Jane Doe"
+    article.author?.name;  // "Jane Doe"
 }
 ```
 

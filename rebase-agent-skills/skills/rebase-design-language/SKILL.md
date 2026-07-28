@@ -359,7 +359,7 @@ This is the gold standard for how a card should look:
                 <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500">
                     {icon}
                 </div>
-                <Typography variant="subtitle1" component="h2">{name}</Typography>
+                <Typography variant="subtitle1" component="h2">{title}</Typography>
             </div>
         </div>
         {/* Description indented to align with title */}
@@ -615,7 +615,7 @@ Form inputs should use `@rebasepro/ui` components directly without excessive cla
 
 ```tsx
 // ✅ CORRECT
-<TextField label="Client Name" value={name} onChange={e => setName(e.target.value)} />
+<TextField label="Client Name" value={clientName} onChange={e => setClientName(e.target.value)} />
 <Select label="Package" value={pkg} onValueChange={setPkg}>
     <SelectItem value="basic">Basic</SelectItem>
     <SelectItem value="premium">Premium</SelectItem>

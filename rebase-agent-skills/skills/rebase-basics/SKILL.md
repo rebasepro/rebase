@@ -537,7 +537,7 @@ When `shutdown()` is called, it performs these steps in order:
 
 ```typescript
 import { Hono } from "hono";
-import type { HonoEnv } from "@rebasepro/server";
+import type { BackendStorageConfig, HonoEnv } from "@rebasepro/server";
 import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
@@ -551,6 +551,21 @@ const env = loadEnv();
 
 const app = new Hono<HonoEnv>();
 const server = createServer(getRequestListener(app.fetch));
+
+// Each `type` carries its own required fields — `local` needs `basePath`,
+// `s3`/`gcs` need `bucket` and credentials — so branch on the env var rather
+// than spreading it into one object literal. Annotate the const: inline, the
+// ternary is checked against `BackendStorageConfig | StorageController |
+// Record<string, …>` all at once and TypeScript cannot distribute over it.
+const storage: BackendStorageConfig = env.STORAGE_TYPE === "s3"
+    ? {
+        type: "s3",
+        bucket: env.S3_BUCKET!,
+        region: env.S3_REGION || "auto",
+        accessKeyId: env.S3_ACCESS_KEY_ID || "",
+        secretAccessKey: env.S3_SECRET_ACCESS_KEY || ""
+    }
+    : { type: "local", basePath: "./uploads" };
 
 await initializeRebaseBackend({
     app,
@@ -571,13 +586,8 @@ await initializeRebaseBackend({
             ? { clientId: env.GOOGLE_CLIENT_ID }
             : undefined,
     },
-    // Each `type` carries its own required fields — `local` needs `basePath`,
-    // `s3`/`gcs` need `bucket` and credentials — so branch on the env var
-    // rather than spreading it into one object literal.
     // Multi-backend: Record<string, StorageController> with named sources.
-    storage: env.STORAGE_TYPE === "s3"
-        ? { type: "s3", bucket: env.S3_BUCKET!, region: env.S3_REGION || "auto" }
-        : { type: "local", basePath: "./uploads" },
+    storage,
 });
 
 console.log(`Server running at http://localhost:${env.PORT}`);

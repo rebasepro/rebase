@@ -50,9 +50,10 @@ function ArticlePreview({
     modifiedValues,
     formContext
 }: EntityCustomViewParams) {
-    // modifiedValues has the unsaved, live form values
-    const title = modifiedValues?.title ?? entity?.values?.title;
-    const content = modifiedValues?.content ?? entity?.values?.content;
+    // modifiedValues has the unsaved, live form values. Both it and
+    // entity.values are open records, so narrow before rendering.
+    const title = String(modifiedValues?.title ?? entity?.values?.title ?? "");
+    const content = String(modifiedValues?.content ?? entity?.values?.content ?? "");
 
     return (
         <div className="p-8 max-w-2xl mx-auto">
