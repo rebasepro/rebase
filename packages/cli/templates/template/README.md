@@ -87,16 +87,32 @@ Drop a Hono app in `backend/functions/` and it's auto-mounted at `/api/functions
 
 ```typescript
 // backend/functions/hello.ts
-import { Hono } from "hono";
-const app = new Hono();
-app.post("/", async (c) => {
-    const body = await c.req.json();
-    return c.json({ message: `Hello, ${body.name}!` });
+import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server";
+
+export default defineFunction((app) => {
+    // Deliberately public — anyone can call this.
+    app.get("/", (c) => c.json({ status: "ok" }));
+
+    // 401 without a valid token.
+    app.post("/", requireAuth, async (c) => {
+        const body = await c.req.json();
+        return c.json({ message: `Hello, ${body.name}!` });
+    });
+
+    // 401 anonymous, 403 without the `admin` role. Order matters.
+    app.get("/stats", requireAuth, requireAdmin, (c) => c.json({ ok: true }));
 });
-export default app;
 ```
 
 Call from the client SDK: `client.call("functions/hello", { name: "World" })`
+
+**Functions are not authenticated for you.** The functions router parses the
+caller's token into the request context but does not reject anonymous requests —
+webhook receivers have no token to send. So every route here is public until a
+guard says otherwise, and reading `c.get("user")` is not a guard: an anonymous
+caller simply gets `undefined` and the handler runs. Put `requireAuth` /
+`requireAdmin` in the route's own middleware slot rather than in `app.use()`,
+which only covers routes declared below it.
 
 ### Shared Collections
 
