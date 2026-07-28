@@ -3,6 +3,7 @@ import {
     DataType,
     getDataSourceCapabilities,
     Property,
+    RelationProperty,
     WhereFilterOp
 } from "@rebasepro/types";
 
@@ -30,6 +31,35 @@ const DEFAULT_OPS_BY_TYPE: Partial<Record<DataType, readonly WhereFilterOp[]>> =
 /** Operators offered when the property is an *array of* a filterable type. */
 const ARRAY_OPS: readonly WhereFilterOp[] = ["array-contains", "array-contains-any"];
 
+/**
+ * Whether a relation is one the query layer can compile into a `WHERE`.
+ *
+ * Only `belongsTo` puts a column on this row — the foreign key. `hasOne`,
+ * `hasMany` and `manyToMany` live on the target table or in a junction, and
+ * `via` is a join path; none of them has a column here to compare against, so
+ * a filter keyed on one names nothing the backend can resolve.
+ *
+ * Offering it anyway is not a cosmetic bug. The Postgres driver used to drop a
+ * filter key it could not resolve, which *widened* the result set — filtering
+ * a many-to-many column returned every row instead of none. That now fails
+ * closed with a 400, which is correct for a real schema drift and wrong as the
+ * answer to a control the admin itself put on screen. Removing the affordance
+ * is the fix; the error stays for the drift it was built for.
+ *
+ * A relation whose kind cannot be determined at all — no inline `relation`
+ * block and no stamped `resolvedRelation` — stays filterable. The server
+ * resolves relations before the config reaches the admin, so this is the
+ * hand-built-property case, and silently dropping a working filter there would
+ * be its own regression.
+ */
+export function isFilterableRelation(property: Property): boolean {
+    if (property.type !== "relation") return true;
+    const relationProperty = property as RelationProperty;
+    const kind = relationProperty.relation?.kind ?? relationProperty.resolvedRelation?.kind;
+    if (!kind) return true;
+    return kind === "belongsTo";
+}
+
 export interface ResolveFilterOperatorsParams {
     /**
      * The property to filter on. For array properties, pass the **item**
@@ -56,8 +86,9 @@ export interface ResolveFilterOperatorsParams {
  * 2. what makes sense for the property type (e.g. no `>` on booleans);
  * 3. the developer's optional narrowing — `property.admin.filterOperators`.
  *
- * Returns an empty array when the property is not filterable (either by
- * type, or because the developer disabled it with `filterOperators: []`).
+ * Returns an empty array when the property is not filterable — by type, by
+ * developer narrowing (`filterOperators: []`), or because it is a relation the
+ * query layer has no column for (see {@link isFilterableRelation}).
  *
  * @group Models
  */
@@ -66,6 +97,8 @@ export function resolveFilterOperators({
     isArray,
     engine
 }: ResolveFilterOperatorsParams): WhereFilterOp[] {
+    if (!isFilterableRelation(property)) return [];
+
     const typeDefaults: readonly WhereFilterOp[] = isArray
         ? ARRAY_OPS
         : DEFAULT_OPS_BY_TYPE[property.type] ?? [];

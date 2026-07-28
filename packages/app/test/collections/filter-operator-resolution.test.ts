@@ -106,4 +106,63 @@ describe("resolveFilterOperators", () => {
             expect(ops).toEqual([]);
         });
     });
+
+    describe("relation kinds", () => {
+
+        // Only `belongsTo` puts a foreign key on this row. The other kinds
+        // live on the target table or in a junction, so the query layer has
+        // no column to compare against and a filter keyed on one resolves to
+        // nothing — historically returning every row, now a 400.
+        const relationProp = (relation?: Record<string, unknown>): Property => ({
+            name: "Tags",
+            type: "relation",
+            ...(relation ? { relation } : {})
+        } as Property);
+
+        it("offers operators for a belongsTo relation", () => {
+            const ops = resolveFilterOperators({
+                property: relationProp({ kind: "belongsTo", target: () => ({}) }),
+                engine: "postgres"
+            });
+            expect(ops).toEqual(expect.arrayContaining(["==", "!=", "in"]));
+        });
+
+        it.each(["manyToMany", "hasMany", "hasOne", "via"])(
+            "offers nothing for a %s relation", (kind) => {
+                const ops = resolveFilterOperators({
+                    property: relationProp({ kind, target: () => ({}) }),
+                    engine: "postgres"
+                });
+                expect(ops).toEqual([]);
+            }
+        );
+
+        it("reads the kind off a stamped resolvedRelation when there is no inline block", () => {
+            const ops = resolveFilterOperators({
+                property: {
+                    name: "Tags",
+                    type: "relation",
+                    resolvedRelation: { kind: "manyToMany" }
+                } as unknown as Property,
+                engine: "postgres"
+            });
+            expect(ops).toEqual([]);
+        });
+
+        it("stays filterable when the kind cannot be determined at all", () => {
+            const ops = resolveFilterOperators({
+                property: relationProp(),
+                engine: "postgres"
+            });
+            expect(ops).toEqual(expect.arrayContaining(["==", "!="]));
+        });
+
+        it("leaves reference properties (Firestore) alone", () => {
+            const ops = resolveFilterOperators({
+                property: { name: "Author", type: "reference", path: "authors" } as Property,
+                engine: "firestore"
+            });
+            expect(ops).toEqual(expect.arrayContaining(["==", "!="]));
+        });
+    });
 });
