@@ -1,7 +1,8 @@
 import React from "react";
 
 import "@fontsource/jetbrains-mono";
-import "@fontsource/rubik";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/instrument-sans";
 
 import { Rebase, RebaseAuth, useRebaseAuthController } from "@rebasepro/app";
 import { RebaseAdmin, RebaseShell } from "@rebasepro/admin";

@@ -54,12 +54,13 @@
     --color-primary: #0070f4; /* #0070f4 */
     --color-primary-light: #359aff; /* #359aff */
     --color-primary-dark: #0061c2; /* #0061c2 */
-    --font-sans: 'Rubik Variable', 'Rubik', 'Roboto', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
-    --font-headers: 'Rubik Variable', 'Rubik', 'Roboto', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+    --font-sans: 'Inter Variable', 'Inter', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
+    --font-headers: 'Instrument Sans Variable', 'Instrument Sans', 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
-/* Rubik — variable font (single file covers all weights 300-900) */
+/* Two faces, both variable (one file each covers the whole weight range):
+   Instrument Sans carries the headlines, Inter carries UI and body copy. */
 
 /* clip (not hidden) on BOTH elements: `hidden` makes the element a scroll
    container, and once html stops propagating body's overflow to the viewport,

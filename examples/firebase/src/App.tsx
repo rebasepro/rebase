@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 
-import "@fontsource/rubik";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/instrument-sans";
 import "@fontsource/jetbrains-mono";
 
 import { FirebaseAccessGate, FirebaseUserWrapper, RebaseFirebaseApp } from "@rebasepro/firebase";

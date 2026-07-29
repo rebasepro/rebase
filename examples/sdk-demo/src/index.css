@@ -30,12 +30,14 @@
   --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.4);
   --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  font-family: 'Rubik', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  font-family: 'Inter', ui-sans-serif, system-ui, 'Helvetica', 'Arial', sans-serif;
   color: var(--text-primary);
   background: var(--bg-primary);
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Inter only — this demo styles its headings by class, so it never reaches for
+   the Instrument Sans display face the site and admin panel use. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 * {
   margin: 0;

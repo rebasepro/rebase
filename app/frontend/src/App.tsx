@@ -1,6 +1,7 @@
 import React from "react";
 import "@fontsource/jetbrains-mono";
-import "@fontsource/rubik";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/instrument-sans";
 import type { AnalyticsEvent } from "@rebasepro/admin-types";
 
 // Global gtag function injected by the GA4 script in index.html

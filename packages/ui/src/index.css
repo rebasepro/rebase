@@ -1,7 +1,7 @@
 @theme {
     /* Font Families */
-    --font-sans: 'Rubik', 'Roboto', 'Helvetica', 'Arial', sans-serif;
-    --font-headers: 'Rubik', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+    --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, 'Helvetica', 'Arial', sans-serif;
+    --font-headers: 'Instrument Sans Variable', 'Instrument Sans', 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', 'Space Mono', 'Lucida Console', monospace;
 
     /* Colors */
