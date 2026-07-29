@@ -16,15 +16,9 @@
  * ------------------------------------------------------------------------- */
 
 @theme {
-    /* Font Families — ONE sans, headings and body alike.
-       The two-family split (display face over Inter body) was the thing that
-       made the real pages read differently from the design comp: the comp set
-       an entire block in Instrument Sans, so headline, subtitle and buttons all
-       shared one voice. Splitting families put a second voice under every
-       headline. `--font-headers` still exists because headings take their own
-       weight and tracking tier — it is the same face, not a different one. */
-    --font-sans: 'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui, 'Helvetica', 'Arial', sans-serif;
-    --font-headers: 'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    /* Font Families — Instrument Sans for headings, Inter for UI and body copy. */
+    --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, 'Helvetica', 'Arial', sans-serif;
+    --font-headers: 'Instrument Sans Variable', 'Instrument Sans', 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', 'Space Mono', 'Lucida Console', monospace;
 
     /* Type scale — three tiers keyed to RENDERED SIZE, not tag depth.

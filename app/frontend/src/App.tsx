@@ -1,5 +1,6 @@
 import React from "react";
 import "@fontsource/jetbrains-mono";
+import "@fontsource-variable/inter";
 import "@fontsource-variable/instrument-sans";
 import type { AnalyticsEvent } from "@rebasepro/admin-types";
 

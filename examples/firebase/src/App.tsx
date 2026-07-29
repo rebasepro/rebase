@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo } from "react";
 
+import "@fontsource-variable/inter";
 import "@fontsource-variable/instrument-sans";
 import "@fontsource/jetbrains-mono";
 

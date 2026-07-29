@@ -5,6 +5,7 @@
 /* Docs run on Starlight's own layout, not src/layouts/Layout.astro, so nothing
    here loads the webfonts the way the marketing pages do — the @font-face rules
    have to come in through this stylesheet or the docs fall back to system sans. */
+@import "@fontsource-variable/inter";
 @import "@fontsource-variable/instrument-sans";
 
 

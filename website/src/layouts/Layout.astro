@@ -1,12 +1,15 @@
 ---
 import { ClientRouter } from "astro:transitions";
+import "@fontsource-variable/inter";
 import "@fontsource-variable/instrument-sans";
 import "../styles/global.css";
+import interLatinUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import instrumentSansLatinUrl from "@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2?url";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 import CookieBanner from "../components/CookieBanner.astro";
 import ABDevPanel from "../components/ABDevPanel.astro";
+import TypeDevPanel from "../components/TypeDevPanel.astro";
 
 import ManifestoBanner from "../components/ManifestoBanner.astro";
 
@@ -143,6 +146,7 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
 
     <title>{title}</title>
     <link rel="shortcut icon" href="/favicon.svg" type="image/x-icon">
+    <link rel="preload" as="font" type="font/woff2" href={interLatinUrl} crossorigin>
     <link rel="preload" as="font" type="font/woff2" href={instrumentSansLatinUrl} crossorigin>
     <link rel="stylesheet" href="/styles/fonts-mono.css" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="/styles/fonts-mono.css"></noscript>
@@ -287,6 +291,7 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
 </div>
 <CookieBanner/>
 <ABDevPanel/>
+<TypeDevPanel/>
 
 <script src="../scripts/tracking-params.js"/>
 

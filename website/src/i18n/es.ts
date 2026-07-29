@@ -5,8 +5,7 @@ export const es = {
   "hero.subtitle":
     "Conecta tu base de datos y obtén REST, auth, storage y tiempo real — con cada regla de acceso aplicada por Postgres, no por middleware.",
   "hero.cta.demo": "Ver la demo en vivo",
-  "hero.cta.demo.note": "Sin registro — un backend Rebase real, en vivo, con su panel admin generado",
-  "hero.cli.label": "Esa demo es nuestra. Así montas la tuya — un comando, menos de un minuto:",
+  "hero.cli.label": "La demo no requiere registro. La tuya está a un comando:",
   "hero.cta.github": "Ver en GitHub",
 
   "rlscheck.badge": "Herramienta gratuita · sin registro",

@@ -64,7 +64,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                      72px was picked over 80px because 80 leaves only 4% of slack
                      and any copy edit overflows it. Base stays 36px and wraps,
                      which is correct on phones. -->
-                <h1 class="relative mb-6 text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-semibold leading-[1.05] text-white animate-on-scroll fade-in-up">
+                <h1 class="relative mb-6 text-4xl md:text-5xl lg:text-6xl font-semibold leading-[1.08] text-white animate-on-scroll fade-in-up">
                     {t("hero.title.part1")}<br/><span class="text-primary">{t("hero.title.part2")}</span>
                 </h1>
             </div>
@@ -77,8 +77,11 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
             <p class="mx-auto mb-4 max-w-2xl text-lg lg:text-xl leading-relaxed text-surface-300 animate-on-scroll fade-in-up"
                set:html={t("hero.subtitle")}/>
 
-            <!-- Hero primary CTA: zero-friction live demo -->
-            <div class="mt-10 flex flex-col items-center gap-2.5 animate-on-scroll fade-in-up">
+            <!-- Two actions side by side, then one command with a one-line lead-in.
+                 The old stack narrated its own CTAs — a note under the button, a
+                 two-line paragraph introducing the command, an npx alternative
+                 inside the box. Six text moments where a hero carries three. -->
+            <div class="mt-10 flex items-center justify-center gap-3 flex-wrap animate-on-scroll fade-in-up">
                 <a href="https://demo.rebase.pro"
                    target="_blank" rel="noopener noreferrer"
                    id="hero-try-demo"
@@ -100,35 +103,35 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                         <path d="m12 5 7 7-7 7"/>
                     </svg>
                 </a>
-                <span class="text-xs text-surface-500">{t("hero.cta.demo.note")}</span>
+                <a href="https://github.com/rebasepro/rebase"
+                   target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center gap-x-2 rounded-lg border border-surface-700 px-7 py-3.5 text-base font-medium text-surface-300 hover:text-white hover:border-surface-500 transition-all duration-200 ease-in-out">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.31.76-1.61-2.66-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.66 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.8 5.63-5.48 5.92.43.37.81 1.1.81 2.22l-.01 3.29c0 .32.22.7.83.57A12 12 0 0 0 12 .3Z"/>
+                    </svg>
+                    {t("hero.cta.github")}
+                </a>
             </div>
 
-            <!-- Hero secondary path: run locally via CLI -->
-            <div class="mt-10 mb-10 max-w-md mx-auto animate-on-scroll fade-in-up">
-                <p class="mb-3 text-sm text-surface-400">{t("hero.cli.label")}</p>
-                <div class="group relative">
-                    <div class="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500"
-                         aria-hidden="true"></div>
-                    <div class="relative rounded-xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden group-hover:border-primary/40 transition-colors duration-300">
-                        <div class="px-5 py-4 flex items-center justify-between">
-                            <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                <span class="text-primary font-semibold mr-3">~</span>
-                                <span class="text-white">pnpm dlx @rebasepro/cli init</span>
-                            </div>
-                            <button data-track-copy="hero" data-command="pnpm dlx @rebasepro/cli init"
-                                    class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                    aria-label="Copy command" title="Copy to clipboard">
-                                <svg class="lucide lucide-copy" xmlns="http://www.w3.org/2000/svg" width="18"
-                                     height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                     stroke-linecap="round" stroke-linejoin="round">
-                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                </svg>
-                            </button>
+            <!-- The command, with a single line of copy doing the work three used to -->
+            <div class="mt-8 mb-6 max-w-md mx-auto animate-on-scroll fade-in-up">
+                <p class="mb-2.5 text-sm text-surface-500">{t("hero.cli.label")}</p>
+                <div class="rounded-xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden hover:border-primary/40 transition-colors duration-300">
+                    <div class="px-5 py-4 flex items-center justify-between">
+                        <div class="font-mono text-sm sm:text-base flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
+                            <span class="text-primary font-semibold mr-3">~</span>
+                            <span class="text-white">pnpm dlx @rebasepro/cli init</span>
                         </div>
-                        <div class="px-5 pb-3 -mt-1">
-                            <span class="font-mono text-xs text-surface-400">or: npx @rebasepro/cli init</span>
-                        </div>
+                        <button data-track-copy="hero" data-command="pnpm dlx @rebasepro/cli init"
+                                class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                aria-label="Copy command" title="Copy to clipboard">
+                            <svg class="lucide lucide-copy" xmlns="http://www.w3.org/2000/svg" width="18"
+                                 height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                 stroke-linecap="round" stroke-linejoin="round">
+                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                            </svg>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -408,7 +411,11 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
-                    <div class="relative z-10 flex flex-col aspect-[4/3] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
+                    <!-- Fixed height, not aspect-ratio: this card spans the full row
+                         (lg:col-span-6), so aspect-[4/3] made the media ~900px tall
+                         with the 4-row demo stranded at the top. The demo is h-full,
+                         so a bounded height is what keeps it a sensible size. -->
+                    <div class="relative z-10 flex flex-col h-[240px] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
                         <!-- Window controls -->
                         <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>

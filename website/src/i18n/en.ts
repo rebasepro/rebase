@@ -5,8 +5,7 @@ export const en = {
   "hero.subtitle":
     "Connect your database and get REST, auth, storage and realtime — with every access rule enforced by Postgres itself, not by middleware.",
   "hero.cta.demo": "See the live demo",
-  "hero.cta.demo.note": "No signup — a real Rebase backend, live, with its generated admin panel",
-  "hero.cli.label": "That demo is ours. Here is how you run your own — one command, under a minute:",
+  "hero.cli.label": "No signup for the demo. Yours is one command away:",
   "hero.cta.github": "View on GitHub",
 
   // Free-tool section. The copy stays useful to someone who will never adopt

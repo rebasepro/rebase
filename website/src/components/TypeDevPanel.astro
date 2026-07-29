@@ -1,0 +1,258 @@
+---
+/**
+ * Typography Developer Panel
+ *
+ * Floating toggle that opens a popup for tuning type on the LIVE site — it
+ * writes the real design tokens (--font-headers, --font-sans, --tracking-*)
+ * onto <html>, so what you are looking at is the actual page, not a mockup.
+ *
+ * Only renders on localhost / dev, same as ABDevPanel.
+ *
+ * Choices persist in localStorage so they survive navigation; "Reset" clears
+ * the override and returns the page to what is actually shipped in theme.css.
+ * Nothing here changes source — copy the tokens out when you like what you see.
+ */
+const isDev = import.meta.env.DEV;
+---
+
+{isDev && (
+<div id="type-dev-panel">
+    <button id="tdp-toggle" title="Typography panel" aria-expanded="false">Aa</button>
+
+    <div id="tdp-body" hidden>
+        <header>
+            <strong>Typography</strong>
+            <button id="tdp-close" aria-label="Close">×</button>
+        </header>
+
+        <div class="tdp-scroll">
+            <fieldset>
+                <legend>Faces</legend>
+                <label>Headings <span class="v" id="v-fh"></span></label>
+                <select id="tdp-fh"></select>
+                <label>Body &amp; UI <span class="v" id="v-fb"></span></label>
+                <select id="tdp-fb"></select>
+                <button class="wide" id="tdp-same">Use one face for both</button>
+            </fieldset>
+
+            <fieldset>
+                <legend>Headings</legend>
+                <label>Display weight <span class="v" id="v-wd">600</span></label>
+                <input type="range" id="tdp-wd" min="300" max="800" step="50" value="600">
+                <label>Small-heading weight <span class="v" id="v-ws">500</span></label>
+                <input type="range" id="tdp-ws" min="300" max="700" step="50" value="500">
+                <label>Display tracking <span class="v" id="v-td">-0.025em</span></label>
+                <input type="range" id="tdp-td" min="-60" max="20" step="1" value="-25">
+                <label>Title tracking <span class="v" id="v-tt">-0.018em</span></label>
+                <input type="range" id="tdp-tt" min="-50" max="20" step="1" value="-18">
+                <label>Label tracking <span class="v" id="v-th">-0.01em</span></label>
+                <input type="range" id="tdp-th" min="-40" max="20" step="1" value="-10">
+                <label>Hero size <span class="v" id="v-hs">default</span></label>
+                <input type="range" id="tdp-hs" min="0" max="110" step="2" value="0">
+            </fieldset>
+
+            <fieldset>
+                <legend>Body</legend>
+                <label>Weight <span class="v" id="v-wb">400</span></label>
+                <input type="range" id="tdp-wb" min="300" max="600" step="50" value="400">
+                <label>Tracking <span class="v" id="v-tb">0em</span></label>
+                <input type="range" id="tdp-tb" min="-30" max="30" step="1" value="0">
+            </fieldset>
+
+            <fieldset>
+                <legend>Rendering</legend>
+                <label>Font smoothing</label>
+                <div class="seg">
+                    <button data-sm="anti" class="on">Antialiased</button>
+                    <button data-sm="sub">macOS default</button>
+                </div>
+                <p class="note">macOS default (subpixel) renders text heavier — the reason the same face can
+                look like two different ones across pages.</p>
+            </fieldset>
+
+            <pre id="tdp-out"></pre>
+            <button class="wide primary" id="tdp-copy">Copy tokens</button>
+            <button class="wide" id="tdp-reset">Reset to shipped</button>
+        </div>
+    </div>
+</div>
+
+<style is:global>
+    #type-dev-panel { position: fixed; bottom: 16px; right: 74px; z-index: 99999;
+        font-family: 'Inter Variable', system-ui, sans-serif; font-size: 13px; }
+    #tdp-toggle { width: 40px; height: 40px; border-radius: 10px; cursor: pointer;
+        background: #131316; color: #fff; border: 1px solid #2c2c32;
+        font-family: 'Instrument Sans Variable', system-ui, sans-serif;
+        font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
+    #tdp-toggle:hover { background: #1e1e22; }
+    #tdp-body { position: absolute; bottom: 50px; right: 0; width: 310px; max-height: 78vh;
+        display: flex; flex-direction: column; background: #08080a; color: #fff;
+        border: 1px solid #2c2c32; border-radius: 12px; overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+    #tdp-body header { display: flex; align-items: center; justify-content: space-between;
+        padding: 11px 14px; border-bottom: 1px solid #1e1e22; }
+    #tdp-body header strong { font-size: 13px; font-weight: 600; }
+    #tdp-close { background: none; border: none; color: #71717a; font-size: 19px; cursor: pointer; line-height: 1; }
+    .tdp-scroll { overflow-y: auto; padding: 4px 14px 14px; }
+    #type-dev-panel fieldset { border: none; border-top: 1px solid #1e1e22; padding: 10px 0 0; margin: 12px 0 0; }
+    #type-dev-panel legend { font-family: ui-monospace, monospace; font-size: 9px; text-transform: uppercase;
+        letter-spacing: .14em; color: #71717a; padding-right: 8px; }
+    #type-dev-panel label { display: block; font-size: 11px; color: #a1a1aa; margin: 10px 0 4px; }
+    #type-dev-panel label .v { float: right; font-family: ui-monospace, monospace; color: #fff; font-size: 10px; }
+    #type-dev-panel select { width: 100%; background: #131316; color: #fff; border: 1px solid #2c2c32;
+        border-radius: 7px; padding: 6px 8px; font-size: 12px; font-family: inherit; }
+    #type-dev-panel input[type=range] { width: 100%; accent-color: #0070f4; height: 16px; }
+    #type-dev-panel .seg { display: flex; gap: 6px; margin-top: 4px; }
+    #type-dev-panel .seg button { flex: 1; background: #131316; color: #a1a1aa; border: 1px solid #2c2c32;
+        border-radius: 7px; padding: 6px 4px; font-size: 11px; font-family: inherit; cursor: pointer; }
+    #type-dev-panel .seg button.on { background: #0070f4; border-color: #0070f4; color: #fff; }
+    #type-dev-panel button.wide { width: 100%; margin-top: 8px; background: transparent; color: #a1a1aa;
+        border: 1px solid #2c2c32; border-radius: 7px; padding: 7px; font-size: 11.5px;
+        font-family: inherit; cursor: pointer; }
+    #type-dev-panel button.wide.primary { background: #0070f4; border-color: #0070f4; color: #fff; font-weight: 500; }
+    #tdp-out { margin-top: 12px; background: #000; border: 1px solid #1e1e22; border-radius: 8px;
+        padding: 10px; font-family: ui-monospace, monospace; font-size: 9.5px; line-height: 1.6;
+        color: #a1a1aa; white-space: pre-wrap; word-break: break-all; }
+    #type-dev-panel .note { font-size: 10.5px; color: #71717a; line-height: 1.5; margin-top: 6px; }
+    html.tdp-subpixel { -webkit-font-smoothing: auto; -moz-osx-font-smoothing: auto; }
+</style>
+
+<script is:inline>
+(function () {
+    var FONTS = ["Instrument Sans", "Inter", "IBM Plex Sans", "Rubik",
+                 "Geist", "Manrope", "Space Grotesk", "Archivo"];
+    // Everything except the two already self-hosted is pulled on demand, so the
+    // panel never adds weight to a page that is not using it.
+    var GF = "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700"
+           + "&family=Rubik:wght@300..900&family=Geist:wght@100..900&family=Manrope:wght@200..800"
+           + "&family=Space+Grotesk:wght@300..700&family=Archivo:wght@100..900&display=swap";
+    var SHIPPED = { fh: "Instrument Sans", fb: "Inter", wd: 600, ws: 500,
+                    td: -25, tt: -18, th: -10, wb: 400, tb: 0, hs: 0, sm: "anti" };
+    var KEY = "rb_type_panel";
+    var root = document.documentElement;
+    var state, styleEl, fontsLoaded = false;
+
+    function $(id) { return document.getElementById(id); }
+    function q(f) { return "'" + f + " Variable', '" + f + "', ui-sans-serif, system-ui, sans-serif"; }
+
+    function loadFonts() {
+        if (fontsLoaded) return;
+        fontsLoaded = true;
+        var l = document.createElement("link");
+        l.rel = "stylesheet"; l.href = GF;
+        document.head.appendChild(l);
+    }
+
+    function apply() {
+        root.style.setProperty("--font-headers", q(state.fh));
+        root.style.setProperty("--font-sans", q(state.fb));
+        root.style.setProperty("--tracking-display", (state.td / 1000) + "em");
+        root.style.setProperty("--tracking-title", (state.tt / 1000) + "em");
+        root.style.setProperty("--tracking-heading", (state.th / 1000) + "em");
+        root.classList.toggle("tdp-subpixel", state.sm === "sub");
+
+        // Weights and hero size are utility-driven in the markup, so they need a
+        // real rule to beat them rather than a variable.
+        if (!styleEl) { styleEl = document.createElement("style"); document.head.appendChild(styleEl); }
+        var heroSize = state.hs > 0
+            ? "#s-hero h1{font-size:" + state.hs + "px !important}" : "";
+        styleEl.textContent =
+            ":is(h1,h2,h3,h4,h5,h6):is(.text-3xl,.text-4xl,.text-5xl,.text-6xl,.text-7xl,.text-8xl,.text-xl,.text-2xl)" +
+            "{font-weight:" + state.wd + " !important}" +
+            "h1,h2,h3,h4,h5,h6{font-weight:" + state.ws + "}" +
+            "body,p,td,li{font-weight:" + state.wb + ";letter-spacing:" + (state.tb / 1000) + "em}" +
+            heroSize;
+
+        $("tdp-fh").value = state.fh; $("tdp-fb").value = state.fb;
+        $("v-wd").textContent = state.wd; $("tdp-wd").value = state.wd;
+        $("v-ws").textContent = state.ws; $("tdp-ws").value = state.ws;
+        $("v-wb").textContent = state.wb; $("tdp-wb").value = state.wb;
+        $("v-td").textContent = (state.td / 1000).toFixed(3) + "em"; $("tdp-td").value = state.td;
+        $("v-tt").textContent = (state.tt / 1000).toFixed(3) + "em"; $("tdp-tt").value = state.tt;
+        $("v-th").textContent = (state.th / 1000).toFixed(3) + "em"; $("tdp-th").value = state.th;
+        $("v-tb").textContent = (state.tb / 1000).toFixed(3) + "em"; $("tdp-tb").value = state.tb;
+        $("v-hs").textContent = state.hs > 0 ? state.hs + "px" : "default"; $("tdp-hs").value = state.hs;
+        Array.prototype.forEach.call(document.querySelectorAll("[data-sm]"), function (b) {
+            b.classList.toggle("on", b.dataset.sm === state.sm);
+        });
+        $("tdp-out").textContent = tokens();
+        try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    }
+
+    function tokens() {
+        return "--font-headers: " + q(state.fh) + ";\n"
+             + "--font-sans:    " + q(state.fb) + ";\n\n"
+             + "--tracking-display: " + (state.td / 1000).toFixed(3) + "em;\n"
+             + "--tracking-title:   " + (state.tt / 1000).toFixed(3) + "em;\n"
+             + "--tracking-heading: " + (state.th / 1000).toFixed(3) + "em;\n\n"
+             + "display weight " + state.wd + " · small heading " + state.ws + " · body " + state.wb + "\n"
+             + (state.hs > 0 ? "hero size " + state.hs + "px\n" : "")
+             + "smoothing " + (state.sm === "sub" ? "macOS default" : "antialiased");
+    }
+
+    function reset() {
+        state = JSON.parse(JSON.stringify(SHIPPED));
+        ["--font-headers", "--font-sans", "--tracking-display", "--tracking-title", "--tracking-heading"]
+            .forEach(function (p) { root.style.removeProperty(p); });
+        if (styleEl) styleEl.textContent = "";
+        root.classList.remove("tdp-subpixel");
+        try { localStorage.removeItem(KEY); } catch (e) {}
+        apply();
+    }
+
+    function init() {
+        var toggle = $("tdp-toggle");
+        if (!toggle) return;
+        // init() fires on DOMContentLoaded AND on astro:page-load, and on first
+        // load both hit the same DOM — binding twice made one click toggle the
+        // panel open and shut again. After a view transition the node is fresh
+        // and carries no flag, so re-binding still happens when it should.
+        if (toggle.dataset.bound) { apply(); return; }
+        toggle.dataset.bound = "1";
+        try { state = JSON.parse(localStorage.getItem(KEY)) || JSON.parse(JSON.stringify(SHIPPED)); }
+        catch (e) { state = JSON.parse(JSON.stringify(SHIPPED)); }
+
+        var opts = FONTS.map(function (f) { return '<option value="' + f + '">' + f + "</option>"; }).join("");
+        $("tdp-fh").innerHTML = opts; $("tdp-fb").innerHTML = opts;
+
+        toggle.addEventListener("click", function () {
+            var body = $("tdp-body"), open = body.hidden;
+            body.hidden = !open;
+            $("tdp-toggle").setAttribute("aria-expanded", String(open));
+            if (open) loadFonts();
+        });
+        $("tdp-close").addEventListener("click", function () { $("tdp-body").hidden = true; });
+
+        ["fh", "fb"].forEach(function (k) {
+            $("tdp-" + k).addEventListener("change", function (e) { loadFonts(); state[k] = e.target.value; apply(); });
+        });
+        ["wd", "ws", "wb", "td", "tt", "th", "tb", "hs"].forEach(function (k) {
+            $("tdp-" + k).addEventListener("input", function (e) { state[k] = +e.target.value; apply(); });
+        });
+        Array.prototype.forEach.call(document.querySelectorAll("[data-sm]"), function (b) {
+            b.addEventListener("click", function () { state.sm = b.dataset.sm; apply(); });
+        });
+        $("tdp-same").addEventListener("click", function () {
+            loadFonts(); state.fb = state.fh; apply();
+        });
+        $("tdp-reset").addEventListener("click", reset);
+        $("tdp-copy").addEventListener("click", function () {
+            var btn = $("tdp-copy");
+            navigator.clipboard.writeText(tokens()).then(
+                function () { btn.textContent = "Copied"; },
+                function () { btn.textContent = "Copy failed — select the box"; }
+            );
+            setTimeout(function () { btn.textContent = "Copy tokens"; }, 1400);
+        });
+
+        if (localStorage.getItem(KEY)) loadFonts();
+        apply();
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+    else init();
+    // Astro view transitions swap the DOM, so re-bind on every navigation.
+    document.addEventListener("astro:page-load", init);
+})();
+</script>
+)}
