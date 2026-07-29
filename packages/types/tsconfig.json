@@ -26,10 +26,9 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "baseUrl": ".",
     "paths": {
       "hono": [
-        "node_modules/hono"
+        "./node_modules/hono"
       ]
     },
     "types": [

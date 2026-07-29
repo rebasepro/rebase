@@ -31,7 +31,6 @@
       "node",
       "jest"
     ],
-    "baseUrl": ".",
     "paths": {
       "@rebasepro/types": [
         "../types/src"

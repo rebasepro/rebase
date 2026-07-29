@@ -19,7 +19,6 @@
         "types": [
             "node"
         ],
-        "baseUrl": ".",
         "paths": {
             "react": [
                 "./stubs/react-absent.d.ts"

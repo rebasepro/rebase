@@ -47,14 +47,14 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.1.2",
     "@types/object-hash": "^3.0.6",
     "@types/react-measure": "^2.0.12",
     "hono": "^4.12.27",
     "jest": "^30.4.2",
-    "ts-jest": "^29.4.11",
+    "ts-jest": "^29.4.12",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16"
+    "vite": "^8.1.5"
   },
   "peerDependencies": {
     "hono": "^4.12.27"

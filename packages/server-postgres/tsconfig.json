@@ -27,7 +27,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
 
-    "baseUrl": ".",
     "paths": {
       "@rebasepro/types": [
         "../types/src"

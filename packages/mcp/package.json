@@ -17,14 +17,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@rebasepro/client": "workspace:*",
     "dotenv": "^17.4.2"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.1.2",
     "typescript": "^6.0.3",
-    "vitest": "4.1.8"
+    "vitest": "4.1.10"
   },
   "files": [
     "bin/",

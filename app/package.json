@@ -24,7 +24,7 @@
     "devDependencies": {
         "@rebasepro/cli": "workspace:*",
         "@rebasepro/types": "workspace:*",
-        "concurrently": "^10.0.3",
+        "concurrently": "^10.0.4",
         "typescript": "^6.0.3"
     },
     "engines": {

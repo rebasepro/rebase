@@ -16,7 +16,6 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
       "@rebasepro/types": ["../types/src"],
       "@rebasepro/common": ["../common/src"],

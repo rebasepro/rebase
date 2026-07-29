@@ -11,8 +11,8 @@
     "start:dev": "tsx src/index.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1068.0",
-    "@hono/node-server": "^2.0.11",
+    "@aws-sdk/client-s3": "^3.1096.0",
+    "@hono/node-server": "^2.0.12",
     "@rebasepro/server": "workspace:*",
     "@rebasepro/server-postgres": "workspace:*",
     "dotenv": "^17.4.2",
@@ -21,8 +21,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
-    "tsx": "^4.22.4",
+    "@types/node": "^26.1.2",
+    "tsx": "^4.23.1",
     "typescript": "^6.0.3"
   },
   "gitHead": "e42be25c08d53e4b59790f8619ba848cce455363",

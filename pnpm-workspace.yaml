@@ -37,6 +37,8 @@ overrides:
   ws: ">=8.21.0"
   undici: ">=7.28.0 <8"
   uuid: ">=11.1.1"
-  js-yaml: ">=4.2.0"
+  # Upper bound is load-bearing: js-yaml 5 is ESM-only with no default export,
+  # which breaks `import yaml from "js-yaml"` inside Astro/Starlight.
+  js-yaml: ">=4.2.0 <5"
   tar: ">=7.5.16"
   esbuild: ">=0.28.1"

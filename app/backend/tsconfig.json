@@ -16,17 +16,16 @@
     "declaration": false,
     "declarationMap": false,
     "sourceMap": true,
-    "baseUrl": ".",
     "jsx": "preserve",
     "paths": {
       "config": [
         "../config/index"
       ],
       "hono": [
-        "node_modules/hono"
+        "./node_modules/hono"
       ],
       "hono/*": [
-        "node_modules/hono/*"
+        "./node_modules/hono/*"
       ]
     }
   },

@@ -48,7 +48,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@ariga/atlas": "^1.2.2",
+    "@ariga/atlas": "^1.2.3",
     "@rebasepro/codegen": "workspace:*",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/server": "workspace:*",
@@ -60,22 +60,22 @@
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "execa": "^9.6.1",
-    "pg": "^8.21.0",
-    "ws": "^8.21.0"
+    "pg": "^8.22.0",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
-    "@hono/node-server": "^2.0.11",
+    "@hono/node-server": "^2.0.12",
     "@jest/globals": "^30.4.1",
     "@types/jest": "^30.0.0",
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.1.2",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
     "hono": "^4.12.27",
     "jest": "^30.4.2",
-    "ts-jest": "^29.4.11",
+    "ts-jest": "^29.4.12",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16",
-    "vitest": "^4.1.9"
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
   },
   "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
   "publishConfig": {

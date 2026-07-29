@@ -28,136 +28,135 @@
     "types": [
       "node"
     ],
-    "baseUrl": ".",
     "paths": {
       "@rebasepro/admin": [
-        "packages/admin/src"
+        "./packages/admin/src"
       ],
       "@rebasepro/admin/*": [
-        "packages/admin/src/*"
+        "./packages/admin/src/*"
       ],
       "@rebasepro/admin-types": [
-        "packages/admin-types/src"
+        "./packages/admin-types/src"
       ],
       "@rebasepro/admin-types/*": [
-        "packages/admin-types/src/*"
+        "./packages/admin-types/src/*"
       ],
       "@rebasepro/app": [
-        "packages/app/src"
+        "./packages/app/src"
       ],
       "@rebasepro/app/*": [
-        "packages/app/src/*"
+        "./packages/app/src/*"
       ],
       "@rebasepro/cli": [
-        "packages/cli/src"
+        "./packages/cli/src"
       ],
       "@rebasepro/cli/*": [
-        "packages/cli/src/*"
+        "./packages/cli/src/*"
       ],
       "@rebasepro/client": [
-        "packages/client/src"
+        "./packages/client/src"
       ],
       "@rebasepro/client/*": [
-        "packages/client/src/*"
+        "./packages/client/src/*"
       ],
       "@rebasepro/firebase": [
-        "packages/firebase/src"
+        "./packages/firebase/src"
       ],
       "@rebasepro/firebase/*": [
-        "packages/firebase/src/*"
+        "./packages/firebase/src/*"
       ],
       "@rebasepro/client-postgres": [
-        "packages/client-postgres/src"
+        "./packages/client-postgres/src"
       ],
       "@rebasepro/client-postgres/*": [
-        "packages/client-postgres/src/*"
+        "./packages/client-postgres/src/*"
       ],
       "@rebasepro/common": [
-        "packages/common/src"
+        "./packages/common/src"
       ],
       "@rebasepro/common/*": [
-        "packages/common/src/*"
+        "./packages/common/src/*"
       ],
       "@rebasepro/forms": [
-        "packages/forms/src"
+        "./packages/forms/src"
       ],
       "@rebasepro/forms/*": [
-        "packages/forms/src/*"
+        "./packages/forms/src/*"
       ],
       "@rebasepro/mcp": [
-        "packages/mcp/src"
+        "./packages/mcp/src"
       ],
       "@rebasepro/mcp/*": [
-        "packages/mcp/src/*"
+        "./packages/mcp/src/*"
       ],
       "@rebasepro/plugin-ai": [
-        "packages/plugin-ai/src"
+        "./packages/plugin-ai/src"
       ],
       "@rebasepro/plugin-ai/*": [
-        "packages/plugin-ai/src/*"
+        "./packages/plugin-ai/src/*"
       ],
       "@rebasepro/plugin-insights": [
-        "packages/plugin-insights/src"
+        "./packages/plugin-insights/src"
       ],
       "@rebasepro/plugin-insights/*": [
-        "packages/plugin-insights/src/*"
+        "./packages/plugin-insights/src/*"
       ],
       "@rebasepro/inference": [
-        "packages/inference/src"
+        "./packages/inference/src"
       ],
       "@rebasepro/inference/*": [
-        "packages/inference/src/*"
+        "./packages/inference/src/*"
       ],
       "@rebasepro/codegen": [
-        "packages/codegen/src"
+        "./packages/codegen/src"
       ],
       "@rebasepro/codegen/*": [
-        "packages/codegen/src/*"
+        "./packages/codegen/src/*"
       ],
       "@rebasepro/server": [
-        "packages/server/src"
+        "./packages/server/src"
       ],
       "@rebasepro/server/*": [
-        "packages/server/src/*"
+        "./packages/server/src/*"
       ],
       "@rebasepro/server-mongo": [
-        "packages/server-mongo/src"
+        "./packages/server-mongo/src"
       ],
       "@rebasepro/server-mongo/*": [
-        "packages/server-mongo/src/*"
+        "./packages/server-mongo/src/*"
       ],
       "@rebasepro/server-postgres": [
-        "packages/server-postgres/src"
+        "./packages/server-postgres/src"
       ],
       "@rebasepro/server-postgres/*": [
-        "packages/server-postgres/src/*"
+        "./packages/server-postgres/src/*"
       ],
       "@rebasepro/studio": [
-        "packages/studio/src"
+        "./packages/studio/src"
       ],
       "@rebasepro/studio/*": [
-        "packages/studio/src/*"
+        "./packages/studio/src/*"
       ],
       "@rebasepro/types": [
-        "packages/types/src"
+        "./packages/types/src"
       ],
       "@rebasepro/types/*": [
-        "packages/types/src/*"
+        "./packages/types/src/*"
       ],
       "@rebasepro/ui": [
-        "packages/ui/src"
+        "./packages/ui/src"
       ],
       "@rebasepro/ui/*": [
-        "packages/ui/src/*"
+        "./packages/ui/src/*"
       ],
       "@rebasepro/utils": [
-        "packages/utils/src"
+        "./packages/utils/src"
       ],
       "@rebasepro/utils/*": [
-        "packages/utils/src/*"
+        "./packages/utils/src/*"
       ],
       "hono": [
-        "node_modules/hono"
+        "./node_modules/hono"
       ]
     },
     "typeRoots": [

@@ -49,18 +49,18 @@
     "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/utils": "workspace:*",
-    "mongodb": "^7.3.0",
-    "ws": "^8.21.0"
+    "mongodb": "^7.5.0",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.1.2",
     "@types/ws": "^8.18.1",
     "jest": "^30.4.2",
     "mongodb-memory-server": "^11.2.0",
-    "ts-jest": "29.4.11",
+    "ts-jest": "29.4.12",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16"
+    "vite": "^8.1.5"
   },
   "peerDependencies": {
     "@rebasepro/server": "workspace:*"

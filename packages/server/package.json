@@ -47,29 +47,29 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.11",
+    "@hono/node-server": "^2.0.12",
     "@rebasepro/client": "workspace:*",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/utils": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "jsonwebtoken": "^9.0.3",
-    "ws": "^8.21.0",
+    "ws": "^8.21.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.1.2",
     "@types/nodemailer": "^8.0.1",
     "@types/ws": "^8.18.1",
     "cross-env": "^10.1.0",
     "hono": "^4.12.27",
     "jest": "^30.4.2",
-    "ts-jest": "29.4.11",
+    "ts-jest": "29.4.12",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16"
+    "vite": "^8.1.5"
   },
   "peerDependencies": {
     "@aws-sdk/client-s3": "^3.1068.0",

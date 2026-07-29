@@ -27,7 +27,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "baseUrl": ".",
     "paths": {
       "@rebasepro/types": [
         "../types/src"
@@ -39,7 +38,7 @@
         "../common/src"
       ],
       "hono": [
-        "node_modules/hono"
+        "./node_modules/hono"
       ]
     }
   },

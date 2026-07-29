@@ -47,12 +47,12 @@
     "jiti": "^2.7.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.1.2",
     "@types/pg": "^8.20.0",
-    "pg": "^8.21.0",
+    "pg": "^8.22.0",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16",
-    "vitest": "4.1.8"
+    "vite": "^8.1.5",
+    "vitest": "4.1.10"
   },
   "files": [
     "bin/",
