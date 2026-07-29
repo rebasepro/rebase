@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-29
+
 ### Breaking
 
 - **`rebase.json` is rebuilt around one authored runtime** — the manifest had four unrelated fields named `mode`, an app type (`admin`) with no mechanism behind it, and a managed-vs-custom distinction nobody had written down.
