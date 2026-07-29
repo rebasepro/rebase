@@ -533,37 +533,83 @@ export async function runFromBundle(options: BootOptions = {}): Promise<BootedRu
  * Bring the database's collection tables up to date before serving.
  *
  * Delegates to whichever driver bootstrapped the default data source; a driver
- * without `ensureCollectionSchema` (a schemaless one, or an older build) simply
- * skips, which is why this cannot break an existing deployment.
+ * without `ensureCollectionSchema` (a schemaless one, or an older build) skips
+ * rather than failing, which is why this cannot break an existing deployment.
+ *
+ * Every path out of here says why, at info or louder. Guaranteeing the tables
+ * exist is this function's entire job, so "it declined, and said nothing" is the
+ * one outcome it must never produce: a deployment that skips comes up answering
+ * sign-in and 500ing every `/api/data/*` route, and the operator's only evidence
+ * is what these lines print. Silence here has already sent one investigation
+ * chasing a stale runtime image that was not stale.
  *
  * Failure is fatal on purpose. Booting anyway would produce exactly the state
  * this exists to prevent — an app that answers sign-in and 500s every data
  * request — and a crash-looping pod with the DDL error in its logs is a far
  * better signal than a running one that silently cannot serve.
  */
-async function ensureCollectionSchema(
+export async function ensureCollectionSchema(
     bundle: LoadedBundle,
     dataSources: InitializedDataSource[],
     env: RebaseBootEnv
 ): Promise<void> {
+    // `info` is for the bundle shapes with legitimately nothing to create;
+    // `warn` is for a bundle that asked for collection tables and is not getting
+    // them. A backend carrying a config package is the shape that expects
+    // tables, so every stop after that point is a real problem worth raising.
+    const skip = (reason: string, level: "info" | "warn" = "info"): void => {
+        logger[level](`Collection schema: skipped — ${reason}`);
+    };
+
     const mode = env.REBASE_MIGRATE_ON_BOOT || "ensure";
     if (mode === "none") {
-        logger.info("REBASE_MIGRATE_ON_BOOT=none — leaving the database schema untouched.");
+        skip("REBASE_MIGRATE_ON_BOOT=none, leaving the database schema untouched.");
         return;
     }
     // A bundle without a config package introspects its collections FROM the
     // database, so there is nothing to create; a `static` bundle has no database
     // at all. Both conditions matter: gating on `kind` alone would push a
     // schema into an existing database that a project only meant to read.
-    if (bundle.manifest.kind !== "backend") return;
-    if (!bundle.manifest.entry?.config) return;
-    if (!bundle.collectionsDir) return;
+    if (bundle.manifest.kind !== "backend") {
+        skip(`this bundle's kind is "${bundle.manifest.kind}", which serves no database.`);
+        return;
+    }
+    if (!bundle.manifest.entry?.config) {
+        skip("this bundle declares no config package, so its collections are read from the database rather than from code.");
+        return;
+    }
+    // Reachable only when the config package exists but carries no collections
+    // directory — a build that produced a manifest the runtime cannot act on,
+    // which looks identical from the outside to a database that was never
+    // migrated. Name the path so the two are told apart from the log alone.
+    if (!bundle.collectionsDir) {
+        skip(
+            `this bundle declares a config package at "${bundle.manifest.entry.config}", but no collections directory resolved inside it. ` +
+                "Rebuild with `rebase build` and check the manifest's `entry.collections`.",
+            "warn"
+        );
+        return;
+    }
 
     const primary = dataSources[0];
-    if (!primary?.bootstrapper.ensureCollectionSchema) return;
+    if (!primary) {
+        skip("no data source was initialized for this runtime.", "warn");
+        return;
+    }
+    if (!primary.bootstrapper.ensureCollectionSchema) {
+        skip(
+            `the "${primary.driverPackage}" driver (engine "${primary.engine}") does not implement collection-table creation. ` +
+                "Apply this project's schema with `rebase db push` or `rebase db migrate`.",
+            "warn"
+        );
+        return;
+    }
 
     const collections = await loadCollectionsFromDirectory(bundle.collectionsDir);
-    if (collections.length === 0) return;
+    if (collections.length === 0) {
+        skip(`no collections were loaded from "${bundle.collectionsDir}".`, "warn");
+        return;
+    }
 
     const { applied } = await primary.bootstrapper.ensureCollectionSchema(
         collections,
