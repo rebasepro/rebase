@@ -1,11 +1,18 @@
 # Tenancy, sharing and unit economics — plan
 
-> **Status, 2026-07-29.** Waves 0–4 are implemented on the `feat/tenancy-tiers`
-> branch of the `saas` repo (worktree `~/rebase-worktrees/saas-tiers`), 7 commits,
-> 1771 tests passing. **Nothing has been applied to the live cluster** — every
-> change is code, manifests and an operator script waiting to be run. §10 records
-> what building it found, which changed several numbers below; §11 is what to run
-> and in what order.
+> **Status, 2026-07-29.** Waves 0–5 are implemented on the `feat/tenancy-tiers`
+> branch of the `saas` repo (worktree `~/rebase-worktrees/saas-tiers`), 13 commits,
+> 1861 tests passing. **Nothing has been applied to the live cluster** — every
+> change is code, manifests and an operator script waiting to be run.
+>
+> The reconciler's read-and-diff has been run against `rebase-saas-gke` read-only
+> and agrees with the numbers here: **$667/month across the three tenants today,
+> $301 once `legacy` is applied**, with no capacity change anywhere. The pool
+> manifests pass `kubectl create --dry-run=server`, and the shared-pool isolation
+> SQL has been executed against a real PostgreSQL and attacked.
+>
+> §10 records what building it found, which changed several numbers below; §11 is
+> what to run and in what order.
 
 Written 2026-07-28. Supersedes the "GKE cost optimization handoff" of the same date,
 which is correct about the cluster but scoped as an infrastructure clean-up. It is not
@@ -608,4 +615,81 @@ certificate.
   the SQL, and hands the tenant its `DATABASE_URL`. That is the remaining work
   between "a shared tier is designed" and "a shared tier can be sold".
 - **Wave 5, the serverless tier** (§4.5) and **Wave 6, static** (§4.6).
+- **Metering** (§5), which the free tier needs before it opens to strangers.
+
+---
+
+## 12. What the second pass built, and what it found
+
+Waves 3–5 completed, plus five defects that only surfaced by building and
+running the thing.
+
+### 12.1 Two gaps that would each have broken the shared tier on its first tenant
+
+- **Tenant egress had no rule for `rebase-shared:5432`.** A shared tenant could
+  not reach its own database: the connection matches no egress rule, is dropped,
+  and the pod crashloops on a connect timeout with nothing naming the cause —
+  the same failure the NetworkPolicy's own comments already describe for the
+  managed bundle fetch.
+- **`deployTenant` did not take the shared branch**; `deploy.ts` did. These are
+  the two doors into the same stack, and the test written for it caught the
+  drift on its first run.
+
+### 12.2 `shared_preload_libraries` is not a parameter
+
+Validating the generated pool manifests with `kubectl create --dry-run=server`
+put them past the *live* CloudNativePG admission webhook, which rejected the
+Cluster outright: `shared_preload_libraries` is a fixed setting CNPG composes
+itself and it belongs in `postgresql.shared_preload_libraries`, not
+`postgresql.parameters`. No unit test could have known — the rule exists only in
+the webhook. The pool would have failed to create on its first attempt.
+
+### 12.3 The shared pool leaked the estate through the maintenance databases
+
+Covered in §10.4. Found by running the SQL for real, now closed and re-verified.
+
+### 12.4 A reconciler needs to survive the shapes a real API server returns
+
+Running the read-and-diff against the live cluster returned two shapes the unit
+fixtures did not have: `spec.resources` is `{}` rather than absent (a truthiness
+check reads that as "declared" and reports a clean fleet forever), and a live
+Deployment carries an `ephemeral-storage` request Autopilot injected and we never
+wrote (comparing whole objects would re-patch on every pass — a reconciler that
+never converges is worse than one that never runs, because it rolls pods on a
+schedule).
+
+### 12.5 `pg` was a runtime import declared as a dev dependency
+
+`functions/extensions.ts` imports it at module load; the production image runs
+`pnpm install --prod`. It resolves today only because `--shamefully-hoist` hoists
+it as somebody else's transitive dependency — the exact class of latent break
+this repo has on record. Moved before a second runtime consumer relied on the
+same accident.
+
+### 12.6 The rules that carry the shared tier
+
+Two invariants are worth knowing outside the code, because both fail silently:
+
+**A tenant never changes pool.** Placement runs on every deploy. A tenant moved
+to another pool gets a fresh empty database plus a `DATABASE_URL` pointing at it,
+and `REBASE_MIGRATE_ON_BOOT=ensure` then creates the schema there — so the app
+comes up *healthy*, serving nothing, while the customer's rows sit on the pool
+nobody is looking at. Residency therefore beats capacity absolutely, and an
+unreadable pool is treated as full **and** as possibly holding the tenant, never
+as empty.
+
+**A shared tenant's database outlives its namespace.** Deleting a dedicated
+tenant deletes its namespace and the CNPG cluster goes with it; a shared tenant's
+namespace holds nothing. `destroySharedTenantDatabase` runs on every project
+deletion — not only for shared plans, because a project moved to a dedicated tier
+still has a database on the pool and asking its plan would miss it.
+
+### 12.7 Still to build
+
+- **Applying the Cloud Run service.** The service body and the ingress routing
+  are built and tested; the Admin API call, waiting for the revision and reading
+  back the URL are not. The runtime also needs a boot-time bundle fetch, since
+  Cloud Run has no init containers.
+- **Static hosting on GCS** (§4.6). `substrate: "static"` is now reachable, and
+  nothing serves it yet.
 - **Metering** (§5), which the free tier needs before it opens to strangers.
