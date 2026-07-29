@@ -1936,6 +1936,9 @@ importers:
       hono:
         specifier: ^4.12.27
         version: 4.12.32
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
       ssh2:
         specifier: ^1.17.0
         version: 1.17.0
@@ -1961,9 +1964,6 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
-      pg:
-        specifier: ^8.22.0
-        version: 8.22.0
       tsx:
         specifier: ^4.23.1
         version: 4.23.1
