@@ -100,44 +100,57 @@ reason: `${name} field: ${err instanceof Error ? err.message : String(err)}` };
     return { valid: true };
 }
 
+/** The five cron fields, pre-expanded into the values each one allows. */
+interface CronFields {
+    minutes: number[];
+    hours: number[];
+    doms: number[];
+    months: number[];
+    dows: number[];
+}
+
+/** Expand all five fields of an expression. Throws on invalid expressions. */
+function parseCronFields(expression: string): CronFields {
+    const parts = expression.trim().split(/\s+/);
+    if (parts.length < 5) {
+        throw new Error(`Invalid cron expression: "${expression}". Expected 5 fields.`);
+    }
+    const [minField, hourField, domField, monField, dowField] = parts;
+    return {
+        minutes: expandCronField(minField, 0, 59),
+        hours: expandCronField(hourField, 0, 23),
+        doms: expandCronField(domField, 1, 31),
+        months: expandCronField(monField, 1, 12),
+        dows: expandCronField(dowField, 0, 6) // 0=Sunday
+    };
+}
+
+/** Whether a minute-precision instant matches every field of the expression. */
+function matchesCronFields(candidate: Date, fields: CronFields): boolean {
+    return fields.months.includes(candidate.getMonth() + 1) // getMonth is 0-11
+        && fields.doms.includes(candidate.getDate())
+        && fields.dows.includes(candidate.getDay())
+        && fields.hours.includes(candidate.getHours())
+        && fields.minutes.includes(candidate.getMinutes());
+}
+
+/** ~1 year in minutes — the walk bound for both search directions. */
+const MAX_SLOT_SEARCH_MINUTES = 525960;
+
 /**
  * Calculate the next Date after `after` that matches the cron expression.
  * Throws on invalid expressions.
  */
 function parseCronExpression(expression: string, after: Date): Date {
-    const parts = expression.trim().split(/\s+/);
-    if (parts.length < 5) {
-        throw new Error(`Invalid cron expression: "${expression}". Expected 5 fields.`);
-    }
-
-    const [minField, hourField, domField, monField, dowField] = parts;
-
-    const minutes = expandCronField(minField, 0, 59);
-    const hours = expandCronField(hourField, 0, 23);
-    const doms = expandCronField(domField, 1, 31);
-    const months = expandCronField(monField, 1, 12);
-    const dows = expandCronField(dowField, 0, 6); // 0=Sunday
+    const fields = parseCronFields(expression);
 
     // Forward-search from `after + 1 minute`
     const candidate = new Date(after);
     candidate.setSeconds(0, 0);
     candidate.setMinutes(candidate.getMinutes() + 1);
 
-    const maxIterations = 525960; // ~1 year in minutes
-    for (let i = 0; i < maxIterations; i++) {
-        const month = candidate.getMonth() + 1; // 1-12
-        const dom = candidate.getDate();
-        const dow = candidate.getDay(); // 0=Sunday
-        const hour = candidate.getHours();
-        const minute = candidate.getMinutes();
-
-        if (
-            months.includes(month) &&
-            doms.includes(dom) &&
-            dows.includes(dow) &&
-            hours.includes(hour) &&
-            minutes.includes(minute)
-        ) {
+    for (let i = 0; i < MAX_SLOT_SEARCH_MINUTES; i++) {
+        if (matchesCronFields(candidate, fields)) {
             return candidate;
         }
         candidate.setMinutes(candidate.getMinutes() + 1);
@@ -147,6 +160,38 @@ function parseCronExpression(expression: string, after: Date): Date {
     const fallback = new Date(after);
     fallback.setMinutes(fallback.getMinutes() + 1);
     return fallback;
+}
+
+/**
+ * The latest slot matching `expression` within the inclusive window
+ * `[from, to]`, or `undefined` when the expression has no slot in it.
+ *
+ * Walks backwards a minute at a time from `to`, so the first hit is already
+ * the answer — in the common case (a job that ran normally moments ago) that
+ * is a handful of iterations, not a scan of the whole window.
+ *
+ * `to`'s own minute is included: an instance booting at 06:00:30 has *not* run
+ * the 06:00 slot — `parseCronExpression` already skipped past it to tomorrow —
+ * so that slot is genuinely missed and must be a candidate.
+ *
+ * Seconds and milliseconds are zeroed to match how `parseCronExpression`
+ * builds a slot, so the same wall-clock slot serialises to a byte-identical
+ * ISO string down either path. The claim key depends on that.
+ */
+export function findMostRecentSlot(expression: string, from: Date, to: Date): Date | undefined {
+    const fields = parseCronFields(expression);
+
+    const candidate = new Date(to);
+    candidate.setSeconds(0, 0);
+
+    for (let i = 0; i < MAX_SLOT_SEARCH_MINUTES && candidate.getTime() >= from.getTime(); i++) {
+        if (matchesCronFields(candidate, fields)) {
+            return candidate;
+        }
+        candidate.setMinutes(candidate.getMinutes() - 1);
+    }
+
+    return undefined;
 }
 
 // ─── In-memory ring buffer for logs ──────────────────────────────────
@@ -278,6 +323,12 @@ export class CronScheduler {
             logger.warn("[cron] No cron store attached — runs are uncoordinated; with multiple app instances every instance will execute every job");
         }
         this.warnIfScaleToZero();
+
+        // Recover slots that elapsed while nothing was ticking. Deliberately
+        // not awaited: catch-up reaches the database and runs handlers, and
+        // boot must not wait on either. Its own errors are contained inside.
+        void this.catchUpMissedSlots();
+
         logger.info(`⏰ Cron scheduler started with ${this.jobs.size} job(s)`);
     }
 
@@ -494,6 +545,79 @@ reason: "already_executing" },
     }
 
     /**
+     * Run any slot that elapsed while no instance was holding a timer for it.
+     *
+     * Only jobs that opted in via `catchUpWindowSeconds` are considered, and
+     * only their single most recent missed slot — see the field's docs for why
+     * both limits are deliberate.
+     *
+     * The claim is what makes this safe. In the ordinary case — an instance
+     * restarting minutes after a slot ran normally — the most recent slot is
+     * already claimed, so this costs one `tryClaimRun` per job per boot and
+     * does nothing. A slot is only executed when no instance, past or present,
+     * ever claimed it.
+     *
+     * Never throws: a failure here must not take down a scheduler that is
+     * otherwise ticking correctly.
+     */
+    private async catchUpMissedSlots(): Promise<void> {
+        const candidates = [...this.jobs.values()].filter(
+            job => job.enabled && (job.definition.catchUpWindowSeconds ?? 0) > 0
+        );
+        if (candidates.length === 0) return;
+
+        // A claims-capable store is the whole safety mechanism. Without one,
+        // every boot would look like "this slot never ran" and an instance
+        // recycled twice an hour would re-run the same hourly job twice an
+        // hour. Refusing to catch up is the correct degradation.
+        if (!this.store?.tryClaimRun) {
+            logger.warn(
+                `[cron] Catch-up is configured on ${candidates.length} job(s) but no claims-capable store is attached — skipping. ` +
+                "Without claims a restart cannot tell an unrun slot from one the previous instance already ran."
+            );
+            return;
+        }
+
+        const now = new Date();
+
+        for (const job of candidates) {
+            try {
+                if (!this.started || !job.enabled || job.executing) continue;
+
+                const windowSeconds = job.definition.catchUpWindowSeconds!;
+                const from = new Date(now.getTime() - windowSeconds * 1000);
+                const slot = findMostRecentSlot(job.definition.schedule, from, now);
+                if (!slot) continue;
+
+                const slotIso = slot.toISOString();
+
+                // Same key the scheduled path claims with, so a slot that fired
+                // normally is already taken and this is a no-op.
+                let claimed: boolean;
+                try {
+                    claimed = await this.store.tryClaimRun(job.id, slotIso);
+                } catch (err) {
+                    // Fail closed, unlike the scheduled path. A missed slot is
+                    // a recovery, not an obligation — running it against a
+                    // store that cannot tell us whether it already ran risks a
+                    // duplicate on every boot.
+                    logger.warn(`[cron] Catch-up claim threw for "${job.id}" — skipping catch-up`, { error: err });
+                    continue;
+                }
+
+                if (!claimed) continue;
+
+                const lateBy = Math.round((now.getTime() - slot.getTime()) / 1000);
+                logger.info(`[cron] Catching up missed slot ${slotIso} for "${job.id}" (${lateBy}s late)`);
+
+                await this.executeJob(job, false, `⏰ Catch-up run for missed slot ${slotIso} (${lateBy}s late)`);
+            } catch (err) {
+                logger.error(`[cron] Catch-up failed for "${job.id}"`, { error: err });
+            }
+        }
+    }
+
+    /**
      * Stop a single job's timer and clear its next run state.
      */
     private stopJob(id: string): void {
@@ -516,10 +640,15 @@ reason: "already_executing" },
      */
     private async executeJob(
         job: RegisteredJob,
-        manual: boolean
+        manual: boolean,
+        seedLog?: string
     ): Promise<CronJobLogEntry> {
         const startedAt = new Date();
-        const capturedLogs: string[] = [];
+        // A caller-supplied first line, stored with the run's own output. A
+        // catch-up uses it to say so in the persisted log, where an operator
+        // reading `cron_logs` will actually see it — `manual` is the only other
+        // provenance the entry carries, and a catch-up is not manual.
+        const capturedLogs: string[] = seedLog ? [seedLog] : [];
 
         // Set executing flag — prevents concurrent runs
         job.executing = true;

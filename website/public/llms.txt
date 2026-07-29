@@ -5063,6 +5063,10 @@ interface CronJobDefinition {
     // Max execution time in seconds (default: 300)
     timeoutSeconds?: number;
 
+    // How far back to look on startup for a slot that elapsed while no
+    // instance was ticking (default: off). See "Recovering Missed Slots".
+    catchUpWindowSeconds?: number;
+
     // The function to run on each tick
     handler: (ctx: CronJobContext) => Promise<unknown> | unknown;
 }
@@ -5245,6 +5249,39 @@ Standard interval-based schedulers (such as `setInterval`) drift over time and c
 2. **Dynamic Sleep**: It calculates the difference in milliseconds (`nextRun.getTime() - now.getTime()`) and schedules a single `setTimeout`.
 3. **Drift Safety Threshold**: A minimum sleep buffer (`MIN_SCHEDULE_INTERVAL_MS`) of **5,000ms** is enforced. If a scheduler tick completes extremely quickly, this threshold prevents near-instant double-firing.
 4. **Shutdown Friendliness**: Timer handles are explicitly detached from the Node.js event loop using `timer.unref()`, ensuring background cron schedulers do not block clean process terminations during deployments.
+
+---
+
+### Recovering Missed Slots
+
+Because the scheduler computes the next slot from *now* on every boot, a slot only fires if some instance was alive and ticking when it came round. Anything that replaces the process during a slot — a rolling deploy, a crash, a platform recycling the container — drops that run, and the replacement schedules the slot *after* it. Nothing errors; the run simply never happens.
+
+This is **not** only a scale-to-zero problem. A service pinned to a warm instance still loses runs, because a platform is free to retire the instance holding the timer and start a fresh one.
+
+Set `catchUpWindowSeconds` to a window comfortably wider than a restart, and startup will run a slot it finds unclaimed inside that window:
+
+```typescript
+export default defineCron({
+    schedule: "0 6 * * *",       // daily at 06:00
+    name: "Scrape Listings",
+    catchUpWindowSeconds: 3600,  // tolerate an hour of downtime around 06:00
+    handler: async (ctx) => { /* … */ }
+});
+```
+
+Three things to know:
+
+- **Off by default.** Without `catchUpWindowSeconds`, behaviour is unchanged.
+- **Only the most recent missed slot runs.** Booting after a six-hour outage catches an hourly job up once, not six times. Catch-up stops a run going missing; it does not replay history.
+- **A claims-capable store is required.** Catch-up claims the slot through the same `(job_id, slot)` key the scheduled path uses, which is the only thing distinguishing "this slot never ran" from "this slot already ran on the instance being replaced". With no store attached, catch-up is skipped and a warning is logged — otherwise an instance recycled every 30 minutes would re-run the same hourly job every time it booted.
+
+In the ordinary case — a restart minutes after a slot ran normally — the most recent slot is already claimed, so catch-up costs one claim check per job per boot and does nothing.
+
+A recovered run is a normal entry in `cron_logs` (`manual` is `false`), with a first log line recording the slot it recovered and how late it was:
+
+```
+⏰ Catch-up run for missed slot 2026-07-29T06:00:00.000Z (612s late)
+```
 
 ---
 

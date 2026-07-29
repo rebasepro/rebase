@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
-import { CronScheduler, validateCronExpression } from "./cron-scheduler";
+import { CronScheduler, validateCronExpression, findMostRecentSlot } from "./cron-scheduler";
 import type { CronJobDefinition, CronJobLogEntry } from "@rebasepro/types";
 import type { LoadedCronJob } from "./cron-loader";
 
@@ -631,6 +631,240 @@ lastRunAt: "2026-01-01T00:00:00Z" });
             scheduler.start();
             await jest.advanceTimersByTimeAsync(61 * 60 * 1000);
             expect(executed).toBe(true);
+        });
+    });
+
+    // ── catch-up for slots missed while nothing was ticking ─────────
+
+    describe("findMostRecentSlot", () => {
+        it("returns the latest matching slot inside the window", () => {
+            const to = new Date(2026, 6, 29, 6, 10);
+            const from = new Date(2026, 6, 29, 5, 10);
+            expect(findMostRecentSlot("0 6 * * *", from, to)).toEqual(new Date(2026, 6, 29, 6, 0));
+        });
+
+        it("prefers the most recent of several matches", () => {
+            const to = new Date(2026, 6, 29, 6, 10);
+            const from = new Date(2026, 6, 29, 3, 0);
+            expect(findMostRecentSlot("0 * * * *", from, to)).toEqual(new Date(2026, 6, 29, 6, 0));
+        });
+
+        it("returns undefined when no slot falls in the window", () => {
+            const to = new Date(2026, 6, 29, 6, 10);
+            const from = new Date(2026, 6, 29, 6, 5);
+            expect(findMostRecentSlot("0 6 * * *", from, to)).toBeUndefined();
+        });
+
+        it("includes the boundary minute of `to` — that slot has not run yet", () => {
+            // Boot at 06:00:30: parseCronExpression has already skipped ahead to
+            // tomorrow, so today's 06:00 is missed, not upcoming.
+            const to = new Date(2026, 6, 29, 6, 0, 30);
+            const from = new Date(2026, 6, 29, 5, 0);
+            expect(findMostRecentSlot("0 6 * * *", from, to)).toEqual(new Date(2026, 6, 29, 6, 0));
+        });
+
+        it("zeroes seconds and milliseconds so the slot key matches the scheduled path", () => {
+            const to = new Date(2026, 6, 29, 6, 10, 42, 123);
+            const from = new Date(2026, 6, 29, 5, 0);
+            const slot = findMostRecentSlot("0 6 * * *", from, to)!;
+            expect(slot.getSeconds()).toBe(0);
+            expect(slot.getMilliseconds()).toBe(0);
+        });
+    });
+
+    describe("catch-up on start", () => {
+        // 06:10 local — ten minutes past a daily 06:00 slot that never fired.
+        const BOOT_TIME = new Date(2026, 6, 29, 6, 10);
+        const MISSED_SLOT = new Date(2026, 6, 29, 6, 0).toISOString();
+
+        function makeClaimStore(claimResult = true) {
+            return {
+                ensureTable: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+                insertLog: jest.fn<(entry: CronJobLogEntry) => Promise<void>>().mockResolvedValue(undefined),
+                fetchLogs: jest.fn<() => Promise<CronJobLogEntry[]>>().mockResolvedValue([]),
+                fetchJobStats: jest.fn<() => Promise<Map<string, { totalRuns: number; totalFailures: number; lastRunAt?: string }>>>().mockResolvedValue(new Map()),
+                tryClaimRun: jest.fn<(jobId: string, slot: string) => Promise<boolean>>().mockResolvedValue(claimResult)
+            };
+        }
+
+        function makeCatchUpJob(id: string, overrides: Partial<CronJobDefinition> = {}) {
+            return makeJob(id, { schedule: "0 6 * * *",
+catchUpWindowSeconds: 3600,
+...overrides });
+        }
+
+        /** Let the un-awaited catch-up pass settle without firing real slots. */
+        async function settle() {
+            await jest.advanceTimersByTimeAsync(1);
+        }
+
+        beforeEach(() => {
+            jest.setSystemTime(BOOT_TIME);
+        });
+
+        it("runs the missed slot when the claim is won", async () => {
+            const store = makeClaimStore(true);
+            let executed = false;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeCatchUpJob("late", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            expect(executed).toBe(true);
+            expect(store.tryClaimRun).toHaveBeenCalledWith("late", MISSED_SLOT);
+            expect(scheduler.getJob("late")?.totalRuns).toBe(1);
+        });
+
+        it("skips the slot another instance already ran", async () => {
+            const store = makeClaimStore(false);
+            let executed = false;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeCatchUpJob("already-ran", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            expect(store.tryClaimRun).toHaveBeenCalledWith("already-ran", MISSED_SLOT);
+            expect(executed).toBe(false);
+            expect(scheduler.getJob("already-ran")?.totalRuns).toBe(0);
+        });
+
+        it("is off by default — no catchUpWindowSeconds, no claim attempt", async () => {
+            const store = makeClaimStore(true);
+            let executed = false;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("opted-out", {
+                schedule: "0 6 * * *",
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            expect(executed).toBe(false);
+            expect(store.tryClaimRun).not.toHaveBeenCalled();
+        });
+
+        it("does not reach a slot older than the window", async () => {
+            const store = makeClaimStore(true);
+            let executed = false;
+            scheduler.setStore(store);
+            // A 60s window at 06:10 cannot reach the 06:00 slot.
+            scheduler.registerJobs([makeCatchUpJob("stale", {
+                catchUpWindowSeconds: 60,
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            expect(executed).toBe(false);
+            expect(store.tryClaimRun).not.toHaveBeenCalled();
+        });
+
+        it("refuses to catch up without a claims-capable store", async () => {
+            const legacyStore = { ...makeClaimStore(true), tryClaimRun: undefined };
+            let executed = false;
+            scheduler.setStore(legacyStore);
+            scheduler.registerJobs([makeCatchUpJob("no-claims", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            // Re-running on every boot is worse than missing one slot.
+            expect(executed).toBe(false);
+        });
+
+        it("refuses to catch up with no store at all", async () => {
+            let executed = false;
+            scheduler.registerJobs([makeCatchUpJob("storeless-catchup", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            expect(executed).toBe(false);
+        });
+
+        it("fails closed when the catch-up claim throws", async () => {
+            const store = makeClaimStore(true);
+            store.tryClaimRun.mockRejectedValue(new Error("claims table gone"));
+            let executed = false;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeCatchUpJob("throwing-catchup-claim", {
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            expect(executed).toBe(false);
+        });
+
+        it("does not catch up a disabled job", async () => {
+            const store = makeClaimStore(true);
+            let executed = false;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeCatchUpJob("off", {
+                enabled: false,
+                handler: async () => { executed = true; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            expect(executed).toBe(false);
+            expect(store.tryClaimRun).not.toHaveBeenCalled();
+        });
+
+        it("still schedules the next slot normally", async () => {
+            const store = makeClaimStore(true);
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeCatchUpJob("keeps-ticking")]);
+            scheduler.start();
+            await settle();
+
+            const next = scheduler.getJob("keeps-ticking")!.nextRunAt!;
+            expect(new Date(next)).toEqual(new Date(2026, 6, 30, 6, 0));
+        });
+
+        it("records the catch-up in the run's persisted logs", async () => {
+            const store = makeClaimStore(true);
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeCatchUpJob("annotated")]);
+            scheduler.start();
+            await settle();
+
+            const entry = scheduler.getJobLogs("annotated")[0]!;
+            expect(entry.manual).toBe(false);
+            expect(entry.logs[0]).toContain("Catch-up run for missed slot");
+            expect(entry.logs[0]).toContain(MISSED_SLOT);
+            // The handler's own output still follows the seeded line.
+            expect(entry.logs.some(l => l.includes("hello from annotated"))).toBe(true);
+        });
+
+        it("does not replay a slot the catch-up already took", async () => {
+            // One claim per (job, slot): catch-up takes today's 06:00, and
+            // tomorrow's 06:00 is a different key — one further run, not a replay.
+            const claimed = new Set<string>();
+            const store = makeClaimStore(true);
+            store.tryClaimRun.mockImplementation(async (_id: string, slot: string) => {
+                if (claimed.has(slot)) return false;
+                claimed.add(slot);
+                return true;
+            });
+            let runs = 0;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeCatchUpJob("no-double", {
+                handler: async () => { runs++; }
+            })]);
+            scheduler.start();
+            await settle();
+            expect(runs).toBe(1);
+
+            await jest.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+            expect(runs).toBe(2);
+            expect(claimed.size).toBe(2);
         });
     });
 

@@ -39,6 +39,38 @@ export interface CronJobDefinition {
     timeoutSeconds?: number;
 
     /**
+     * How far back to look, on startup, for a slot that elapsed while no
+     * instance was holding a timer for it. Off by default.
+     *
+     * The scheduler drives jobs with in-process `setTimeout` and computes the
+     * next slot from *now* on every boot, so a slot only fires if some instance
+     * happened to be alive and ticking when it came round. That is not a
+     * scale-to-zero problem: a platform that recycles containers — Cloud Run
+     * rotating an instance under `--min-instances 1`, a rolling deploy, a crash
+     * loop — drops any slot that falls inside the changeover, and the
+     * replacement schedules the slot *after* it. The run is skipped in silence.
+     *
+     * Set this to a window comfortably wider than a restart (a few minutes for
+     * a frequent job; an hour or more for a daily one) and startup will run a
+     * slot it finds unclaimed inside that window.
+     *
+     * Two deliberate limits:
+     *
+     * - **Only the most recent missed slot runs.** Booting after a six-hour
+     *   outage catches an hourly job up once, not six times. Catch-up exists to
+     *   stop a run going missing, not to replay history.
+     * - **A claims-capable store is required.** Catch-up is skipped entirely
+     *   when the store has no `tryClaimRun` (or no store is attached), because
+     *   the claim is the only thing that distinguishes "this slot never ran"
+     *   from "this slot already ran on the instance I am replacing". Without
+     *   it, an instance recycled every 30 minutes would re-run the same hourly
+     *   job every time it booted.
+     *
+     * @example catchUpWindowSeconds: 3600  // daily job: tolerate an hour of downtime
+     */
+    catchUpWindowSeconds?: number;
+
+    /**
      * The handler function executed on each tick.
      * Receives a context object with the data driver and logger.
      * May return arbitrary JSON-serialisable data stored in the log.
