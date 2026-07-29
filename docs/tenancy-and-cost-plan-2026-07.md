@@ -693,3 +693,68 @@ still has a database on the pool and asking its plan would miss it.
 - **Static hosting on GCS** (§4.6). `substrate: "static"` is now reachable, and
   nothing serves it yet.
 - **Metering** (§5), which the free tier needs before it opens to strangers.
+
+---
+
+## 13. Waves 6 and 7
+
+### 13.1 Static hosting
+
+A project whose apps are all static now resolves to `substrate: "static"` and is
+served from a shared bucket at `sites/<projectId>/<deploymentId>/`. Nothing is
+ever overwritten, so every previous deployment stays complete and rollback is one
+control-plane write — no upload, no build, and no window where the site is half
+of one version and half of another. (One flat prefix has that window on every
+deploy: a visitor mid-upload gets the new `index.html` referencing a hashed
+bundle that has not landed, sees a blank page, and nothing records it.)
+
+Cost is storage only, about **$0.003/month** for a 50 MB site with three
+deployments retained — against $3.28 for the cheapest pod that could serve it.
+
+Three rules carry it, and each is the difference between a working site and a
+confusing one: a trailing `/` resolves to `index.html` (object storage has no
+directory index); an *extensionless* path may fall back to the app shell but one
+naming a file must not (serving HTML where a script was expected gives a console
+syntax error and a blank page, and nothing says the file is missing); and
+`index.html` is never cached while content-hashed assets are cached forever.
+
+### 13.2 Metering
+
+Billing has had no usage input at all. That is fine while every plan is flat and
+it is the thing standing between us and a €0 tier.
+
+The runtime exposes **counters**, so usage is a difference between scrapes, and
+the difficulty is that the thing being differenced restarts — and on Starter the
+pod is preemptible by design, so that is most days rather than an edge case. The
+rule throughout is **when in doubt, count less**: undercounting costs a little
+revenue we could not prove we were owed, overcounting bills a customer for
+traffic they did not send, which they will find and be right about.
+
+Quotas carry an explicit policy per plan, never a default:
+
+| Plan | Requests/month | Database | Storage | Past the line |
+|---|---:|---:|---:|---|
+| Hobby | 1M | 500 MB | 1 GB | **pauses** |
+| Starter | 5M | 4 GB | 10 GB | billed, €1.50/M |
+| Pro | 25M | — | 100 GB | billed, €1.00/M |
+| Business | — | — | 500 GB | billed |
+| legacy | — | — | — | unmetered |
+
+A throttle sets Cloud Run's `maxScale` to zero — nothing is deleted, the database
+is untouched, the URL still resolves, and coming back is one write. Expressed as
+a ceiling rather than a `suspended` flag deliberately: the ceiling is a number
+every deploy already writes, so a throttled project that redeploys stays
+throttled and a new month releases it through the ordinary path. A flag would
+need every deploy path to consult it, and the one that forgot would be the one
+that let a throttled project serve again.
+
+Warnings start at 80%, and that is what makes the throttle fair.
+
+### 13.3 What is still not built
+
+- **Applying the Cloud Run service** — the body and the routing exist; the Admin
+  API call does not. The runtime also needs a boot-time bundle fetch, since Cloud
+  Run has no init containers. That work is in `packages/server`, a different
+  repository.
+- **Uploading a static build** to the bucket and serving it through the router.
+- **Stripe metered prices** for the overage the quota model computes.
