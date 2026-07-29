@@ -9,6 +9,12 @@
 **/build
 **/*.tsbuildinfo
 
+# Local-storage uploads. Gitignored, so its contents differ per checkout — a
+# fresh clone/worktree/CI has none, a long-lived checkout has stale extras. The
+# builder repopulates it from the tracked `app/seed-assets/` instead (see
+# scripts/mirror-seed-assets.mjs), keeping the image reproducible from git.
+app/uploads
+
 .rebase-dev-port
 .rebase/
 .rebase-dev-url
