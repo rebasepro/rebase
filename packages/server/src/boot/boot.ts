@@ -32,6 +32,7 @@ import { resolveDataSources, resolveStorageSources } from "./sources";
 import { initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveAuthOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
+import { fetchBundle, shouldFetchBundle, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV } from "./fetch-bundle.js";
 
 /** A running runtime, and the handle to stop it. */
 export interface BootedRuntime {
@@ -78,7 +79,23 @@ export interface BootOptions {
  * rebuilt, which is the precondition for patching a fleet.
  */
 export async function bootFromBundle(options: BootOptions = {}): Promise<BootedRuntime> {
+    // Serverless platforms have no init container, so there may be nothing on
+    // disk yet. `REBASE_BUNDLE_URL` means "download it first"; an explicit
+    // bundle path always wins, because a platform that mounted one AND set a URL
+    // is mid-migration between the two and the local copy is definitely there.
+    //
+    // This runs on EVERY cold start — a scale-from-zero, an instance recycled
+    // after an hour idle — which is why the URL it is given is a stable endpoint
+    // rather than a signed one that would have expired.
+    const fetchedDir = !options.bundleDir && !options.bundle && shouldFetchBundle()
+        ? await fetchBundle({
+            url: process.env[BUNDLE_URL_ENV]!,
+            token: process.env[BUNDLE_TOKEN_ENV]
+        })
+        : undefined;
+
     const bundleDir = options.bundleDir
+        || fetchedDir
         || process.env.REBASE_BUNDLE
         || path.resolve(process.cwd(), "dist-bundle");
 
