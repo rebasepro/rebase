@@ -26,6 +26,13 @@ COPY app ./app
 # only the directories named here are actually copied in.
 COPY scripts ./scripts
 
+# Populate the served uploads directory from the git-tracked `app/seed-assets/`.
+# `app/uploads/` is gitignored AND excluded by .dockerignore, so it is never
+# inherited from the host: the image's asset content is reproducible from git,
+# and a build from a fresh clone, a worktree, or CI ships the same images as one
+# from a long-lived checkout. Without this the demo served 404s for every image.
+RUN node scripts/mirror-seed-assets.mjs app/seed-assets app/uploads
+
 # Install all dependencies with flat node_modules for Docker compatibility
 # (many packages rely on hoisted devDependencies like @vitejs/plugin-react)
 RUN pnpm install --shamefully-hoist
@@ -71,7 +78,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/app ./app
 
-# Uploads are already present from builder (app/uploads/ copied via COPY app ./app)
+# Uploads arrive from the builder, mirrored there from the tracked seed-assets
+# (not inherited from the host — app/uploads is dockerignored).
 # Set STORAGE_PATH so the app resolves to the correct location at runtime
 RUN mkdir -p /app/app/uploads && chown -R rebase:rebase /app
 
