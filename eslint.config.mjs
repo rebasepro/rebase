@@ -13,6 +13,15 @@ export default [
             // Linting them double-reports every finding and makes them look
             // like competing TSConfig roots to typescript-eslint.
             ".claude/worktrees/**",
+            // The projects the CLI e2e suites scaffold and npm-install at the
+            // repo root. They are in .gitignore, but eslint reads its own
+            // ignores and not that file, so once a suite has run locally these
+            // hold thousands of errors in installed and bundled code — 17,616
+            // of them, which reads as a catastrophic regression and is instead
+            // a test artefact. CI never saw it because a fresh runner has no
+            // such directory, so the gate disagreed with every local run of it.
+            "test-cli-init-project/**",
+            "test-cli-init-baas-project/**",
             "**/dist/**",
             "**/build/**",
             "**/.next/**",
