@@ -25,6 +25,11 @@ import { useTranslatedPath } from "../../i18n/ui";
 
 const translatePath = useTranslatedPath(lang);
 
+// The FAQ is seven identically-shaped q/a pairs; the numbers index into i18n.
+// `as const` matters: t() takes a literal key union, so the numbers have to stay
+// literal for `faq.q${n}` to widen to "faq.q1" | ... rather than to string.
+const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
+
 ---
 
 
@@ -131,7 +136,7 @@ const translatePath = useTranslatedPath(lang);
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">01</span><span class="mx-2 text-surface-600">·</span>{t("demo.badge")}</p>
-                <h2 class="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+                <h2 class="mt-3 text-3xl sm:text-5xl font-semibold tracking-tight text-white text-balance">
                     {t("demo.title")}
                 </h2>
                 <div class="mt-8 max-w-2xl mx-auto">
@@ -287,7 +292,7 @@ const translatePath = useTranslatedPath(lang);
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-14 animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">03</span><span class="mx-2 text-surface-600">·</span>{t("engine.badge")}</p>
-                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">{t("engine.title")}</h2>
+                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl text-balance">{t("engine.title")}</h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("engine.subtitle")}</p>
             </div>
 
@@ -342,7 +347,7 @@ const translatePath = useTranslatedPath(lang);
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <div class="ml-2 text-[10px] font-mono text-surface-400">api.demo.rebase.dev</div>
+                            <div class="ml-2 text-[10px] font-mono text-surface-400">api.demo.rebase.pro</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
                             <ApiMiniDemo client:load/>
@@ -478,9 +483,9 @@ const translatePath = useTranslatedPath(lang);
 
         <div class="mx-auto max-w-7xl px-6 lg:px-12">
             <div class="max-w-3xl mx-auto text-center mb-12 sm:mb-16 animate-on-scroll fade-in-up">
-                <h2 class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase"><span class="font-mono text-surface-500">04</span><span class="mx-2 text-surface-600">·</span>{t("modes.badge")}</h2>
-                <p class="mt-4 text-3xl md:text-5xl font-semibold tracking-tight text-white"
-                   set:html={t("modes.title")}></p>
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/70 uppercase"><span class="font-mono text-surface-500">04</span><span class="mx-2 text-surface-600">·</span>{t("modes.badge")}</p>
+                <h2 class="mt-4 text-3xl md:text-5xl font-semibold tracking-tight text-white text-balance"
+                    set:html={t("modes.title")}></h2>
                 <p class="mt-5 text-base sm:text-lg text-surface-400 leading-relaxed">
                     {t("modes.subtitle")}
                 </p>
@@ -599,7 +604,7 @@ const translatePath = useTranslatedPath(lang);
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="max-w-3xl mx-auto text-center mb-12 animate-on-scroll fade-in-up">
                 <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">05</span><span class="mx-2 text-surface-600">·</span>{t("see.badge")}</p>
-                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">{t("see.title")}</h2>
+                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl text-balance">{t("see.title")}</h2>
                 <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">{t("see.subtitle")}</p>
             </div>
 
@@ -607,7 +612,7 @@ const translatePath = useTranslatedPath(lang);
                 <AdminDemoCarousel client:load/>
             </div>
             <p class="mt-2 text-center text-xs sm:text-sm text-surface-400">
-                A quick tour of the generated Rebase admin panel — one dependency on top of the backend above.
+                {t("see.caption")}
             </p>
 
             <!-- The panel-side capabilities that used to sit in the backend beat above.
@@ -724,8 +729,9 @@ const translatePath = useTranslatedPath(lang);
                     </div>
                 </div>
 
-                <!-- Extreme Customization -->
-                <div class="lg:col-span-3 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-200">
+                <!-- Extreme Customization. Keep this at span-2: the row is six
+                     columns wide and the two cards above it take four. -->
+                <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-200">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
                          aria-hidden="true"
                          style="background: radial-gradient(300px 300px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
@@ -768,7 +774,7 @@ const translatePath = useTranslatedPath(lang);
             <div class="mt-10 text-center animate-on-scroll fade-in delay-300">
                 <a href={translatePath("/admin")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors group">
-                    Everything the admin panel adds
+                    {t("see.link")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                          class="group-hover:translate-x-0.5 transition-transform">
@@ -959,7 +965,7 @@ const translatePath = useTranslatedPath(lang);
                     <p class="mt-5 text-sm leading-6 text-surface-500">{t("rlscheck.note")}</p>
 
                     <div class="mt-6">
-                        <a href="/docs/rls-check"
+                        <a href={translatePath("/docs/rls-check")}
                            class="inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-primary transition-colors">
                             {t("rlscheck.cta")}
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
@@ -985,21 +991,13 @@ const translatePath = useTranslatedPath(lang);
 
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
             <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">07</span><span class="mx-2 text-surface-600">·</span>Built for the agent era</p>
-                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">
-                    The backend an agent <span class="text-primary">can't screw up</span>
-                </h2>
-                <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">
-                    An AI agent can scaffold a backend in an hour. It can't tell you whether that backend is safe.
-                    Agents are extremely good at producing <em>plausible</em> backends — and famously bad at
-                    producing <em>secure</em> ones. Rebase makes the safe outcome the only outcome, by construction.
-                </p>
-                <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">
-                    And the surface it has to get right is small: one TypeScript file per collection, no React in it,
-                    no endpoints to hand-write, no ORM layer to keep in sync. The schema <em>is</em> the API, and the
-                    permissions live in Postgres — where an agent's mistake gets rejected by the database instead of
-                    shipped.
-                </p>
+                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase"><span class="font-mono text-surface-500">07</span><span class="mx-2 text-surface-600">·</span>{t("agentera.badge")}</p>
+                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl text-balance"
+                    set:html={t("agentera.title")}></h2>
+                <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed"
+                   set:html={t("agentera.p1")}></p>
+                <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed"
+                   set:html={t("agentera.p2")}></p>
             </div>
 
             <!-- Interactive: the decoupled AI engine, live -->
@@ -1019,13 +1017,10 @@ const translatePath = useTranslatedPath(lang);
                          aria-hidden="true"
                          style="background: radial-gradient(400px 200px at 50% 0%, rgba(0,112,244,0.15), transparent 80%); z-index: 1;"></div>
                     <div class="relative z-10">
-                        <h3 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-4">
-                            Boilerplate depreciates. <span class="text-primary">Guarantees appreciate.</span>
-                        </h3>
+                        <h3 class="text-2xl sm:text-3xl font-semibold tracking-tight text-white text-balance mb-4"
+                            set:html={t("agentera.card.title")}></h3>
                         <p class="text-surface-400 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
-                            Agents made day-one code cheap. What stayed expensive are the day-30 problems:
-                            RLS correctness, backups, migrations, realtime consistency. Rebase isn't the boilerplate
-                            your agent would have written anyway — it's the operational guarantees it can't.
+                            {t("agentera.card.desc")}
                         </p>
                     </div>
                 </div>
@@ -1035,7 +1030,7 @@ const translatePath = useTranslatedPath(lang);
             <div class="mt-12 text-center animate-on-scroll fade-in-up delay-200">
                 <a href={translatePath("/ai")}
                    class="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors group">
-                    Explore all AI & Agent features
+                    {t("agentera.link")}
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
                          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                          class="group-hover:translate-x-0.5 transition-transform">
@@ -1064,41 +1059,21 @@ const translatePath = useTranslatedPath(lang);
                 <h2 class="text-3xl sm:text-4xl font-semibold text-white">{t("faq.title")}</h2>
             </div>
             <div class="mt-10 max-w-3xl mx-auto space-y-4 animate-on-scroll fade-in-up delay-100">
-                <details
-                        class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300">
-                    <summary class="cursor-pointer text-white font-semibold">{t("faq.q1")}</summary>
-                    <p class="mt-3 text-surface-400 leading-relaxed" set:html={t("faq.a1")}></p>
-                </details>
-                <details
-                        class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300">
-                    <summary class="cursor-pointer text-white font-semibold">{t("faq.q2")}</summary>
-                    <p class="mt-3 text-surface-400 leading-relaxed" set:html={t("faq.a2")}></p>
-                </details>
-                <details
-                        class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300">
-                    <summary class="cursor-pointer text-white font-semibold">{t("faq.q3")}</summary>
-                    <p class="mt-3 text-surface-400 leading-relaxed" set:html={t("faq.a3")}></p>
-                </details>
-                <details
-                        class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300">
-                    <summary class="cursor-pointer text-white font-semibold">{t("faq.q4")}</summary>
-                    <p class="mt-3 text-surface-400 leading-relaxed" set:html={t("faq.a4")}></p>
-                </details>
-                <details
-                        class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300">
-                    <summary class="cursor-pointer text-white font-semibold">{t("faq.q5")}</summary>
-                    <p class="mt-3 text-surface-400 leading-relaxed" set:html={t("faq.a5")}></p>
-                </details>
-                <details
-                        class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300">
-                    <summary class="cursor-pointer text-white font-semibold">{t("faq.q6")}</summary>
-                    <p class="mt-3 text-surface-400 leading-relaxed" set:html={t("faq.a6")}></p>
-                </details>
-                <details
-                        class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300">
-                    <summary class="cursor-pointer text-white font-semibold">{t("faq.q7")}</summary>
-                    <p class="mt-3 text-surface-400 leading-relaxed" set:html={t("faq.a7")}></p>
-                </details>
+                {faqs.map((n) => (
+                    <details
+                            class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300 [&::-webkit-details-marker]:hidden">
+                        <summary class="flex cursor-pointer items-center justify-between gap-4 text-white font-semibold marker:content-[''] [&::-webkit-details-marker]:hidden">
+                            {t(`faq.q${n}`)}
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                 stroke-linejoin="round" aria-hidden="true"
+                                 class="flex-none text-surface-500 transition-transform duration-300 group-open:rotate-180 group-hover:text-surface-300">
+                                <path d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </summary>
+                        <p class="mt-3 text-surface-400 leading-relaxed" set:html={t(`faq.a${n}`)}></p>
+                    </details>
+                ))}
             </div>
         </div>
     </section>
@@ -1119,7 +1094,7 @@ const translatePath = useTranslatedPath(lang);
  <section id="s-final-cta" class="relative z-0 py-28 sm:py-36 overflow-hidden">
 
         <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
-            <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl mb-4 animate-on-scroll fade-in-up">
+            <h2 class="text-3xl font-semibold tracking-tight text-white sm:text-4xl text-balance mb-4 animate-on-scroll fade-in-up">
                 {t("cta.title")}
             </h2>
             <p class="text-surface-400 mb-6 text-lg max-w-xl mx-auto animate-on-scroll fade-in-up"

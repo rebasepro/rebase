@@ -24,19 +24,33 @@ export const en = {
   "demo.pull": "✔ Schema pushed to database. Tables created.",
   "demo.dev": "✔ Admin panel, API, and WebSocket server running.",
   "social.title": "Teams shipping products on our tools — Rebase and FireCMS",
-  "see.badge": "The optional half",
+  "see.badge": "Generated, not built",
   "see.title": "From connection string to control panel",
   "see.subtitle":
-    "Everything above runs without a single line of UI. Add the admin layer and the same collections become a back office — generated, not built.",
+    "Everything above runs without a line of UI. Add one dependency and the same collections become a back office your team can live in — every view, relation and upload derived from the definition you already wrote.",
   "engine.badge": "The backend underneath",
   "engine.title": "A full backend. Not just a pretty face.",
   "engine.subtitle":
     "The admin panel is the layer you see. Underneath it: a typed SDK, instant REST, and realtime over WebSocket — running against your database from minute one.",
   "engine.link": "Explore the backend",
-  "modes.badge": "Two products, one file",
-  "modes.title": 'Adopt only <span class="text-primary">what you need.</span>',
+  "see.caption":
+    "A tour of the generated panel. It ships as one dependency and reads the same public API your app does — which is why taking it out changes nothing your code can see.",
+  "see.link": "Everything the admin panel adds",
+  "agentera.badge": "Built for the agent era",
+  "agentera.title": 'The backend an agent <span class="text-primary">can\'t screw up</span>',
+  "agentera.p1":
+    "An AI agent can scaffold a backend in an hour. It can't tell you whether that backend is safe. Agents are extremely good at producing <em>plausible</em> backends — and famously bad at producing <em>secure</em> ones. Rebase makes the safe outcome the only outcome, by construction.",
+  "agentera.p2":
+    "And the surface it has to get right is small: one TypeScript file per collection, no React in it, no endpoints to hand-write, no ORM layer to keep in sync. The schema <em>is</em> the API, and the permissions live in Postgres — where an agent's mistake gets rejected by the database instead of shipped.",
+  "agentera.card.title":
+    'Boilerplate depreciates. <span class="text-primary">Guarantees appreciate.</span>',
+  "agentera.card.desc":
+    "Agents made day-one code cheap. What stayed expensive are the day-30 problems: RLS correctness, backups, migrations, realtime consistency. Rebase isn't the boilerplate your agent would have written anyway — it's the operational guarantees it can't.",
+  "agentera.link": "Explore all AI & Agent features",
+  "modes.badge": "Two products, one definition",
+  "modes.title": 'Take the half you <span class="text-primary">actually need.</span>',
   "modes.subtitle":
-    "The backend and the admin panel are separate products that happen to share a schema. Start headless, add the panel later — or never. Nothing is bundled that you didn't ask for.",
+    "The backend and the panel are separate products that share a schema. Ship headless today, add the panel the day a human needs to touch the data — or never. Whatever you leave out, the API answers exactly the same.",
   "modes.baas.title":
     "Backend",
   "modes.baas.desc":
@@ -45,7 +59,7 @@ export const en = {
   "modes.cms.title":
     "Admin panel",
   "modes.cms.desc":
-    "A schema-driven back office: spreadsheet editing, media and workflows, extensible with your own React components.",
+    "A back office generated from the same collections: spreadsheet editing, media, roles and workflows — with your own React components dropped in wherever the generated field isn't enough.",
   "modes.cms.tag": "One dependency. No second data model.",
   "modes.full.title":
     "Studio",

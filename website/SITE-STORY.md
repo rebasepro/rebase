@@ -104,7 +104,7 @@ grid), and end with the same CTA pair: *Try the demo* + `pnpm dlx @rebasepro/cli
 | `/studio` | Can I run my database from here? | SQLEditor, SchemaBuilder, RLSEditor, OrdersList, JSEditor |
 | `/editing` | Will non-developers actually live in this? | Editor demos, Kanban, Spreadsheet, CustomFields |
 | `/security` | Can I trust it with production data? | RLSEditor, RbacMini, rls-check |
-| `/ai` | Can an agent drive this safely? | AgentConsole, AiAppDevelopment |
+| `/ai` | Can an agent drive this safely? | McpSession, AgentConsole |
 | `/developers` | How do I build with it day to day? | TerminalInit, SdkMini, Architecture, DeveloperPlayground |
 | `/compare` | Why this and not X? | comparison matrix |
 | `/europe` | Can I run this myself, in Europe, and what does it cost? | Jurisdiction, DeployTarget, EuHostingCost |
@@ -115,6 +115,16 @@ grid), and end with the same CTA pair: *Try the demo* + `pnpm dlx @rebasepro/cli
 lying and a reader who knows the products will catch it. The argument that is
 true is structural: a managed backend has a *second party* who operates the
 service and holds the credentials, and a self-hosted one does not.
+
+**The cost demo must size *both* columns from the workload, with the same rule.**
+Sizing only our side was the second version of the same bug as the first: with
+files parked on the VPS disk and Supabase left on its included Micro instance,
+the managed plan came out cheaper across the most-used part of the sliders. Both
+errors were modelling shortcuts that happened to point in opposite directions,
+and both were caught by sweeping every slider combination rather than by looking
+at the default state. Any future change to the constants must be re-swept: the
+test is *zero* combinations where the figure claims hardware that could not hold
+the workload, on either side.
 
 **The cost demo must size the box from the workload.** The first version let the
 self-hosted column sit at €12 while the sliders described 5M users and 10 TB of
@@ -130,6 +140,20 @@ offering today, so the page must not mention one — not as a footnote, not as a
 "coming soon", not as a waitlist. The counterweight to "you are the only
 processor" is *"being the only processor is also a job"* (backups, keys,
 uptime), not a hosted tier we would rather sell.
+
+**No emoji, anywhere.** `/ai` shipped with a card grid headed 📝 👤 🗄️ 🌿 ⚙️ 🖥️ 📁.
+Icons are fine — lucide paths, inherited colour, sized to the text. Emoji render
+differently on every platform, cannot be recoloured, and read as a placeholder
+for a design decision nobody made. The same goes for `✓` as a list bullet: use
+the primary-filled check used everywhere else.
+
+**A figure that shows a mechanism must model it, not mirror it.** The `/ai`
+session demo draws two gates — the API key's permission list and Postgres RLS —
+and the first draft rendered both from one boolean, so revoking a key permission
+lit "RLS ✗" next to a caption saying RLS would have allowed it. They are
+independent, and the state worth showing is the one where they disagree: grant
+`orders:delete` and the call still deletes nothing, because a key permission is
+not a policy.
 
 **Demo budget rule.** A demo appears on the home page *and* at most one deep
 page. If a demo is the proof of a claim, it lives on the page that makes the

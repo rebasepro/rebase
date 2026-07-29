@@ -7,6 +7,7 @@ import path from "node:path";
 import starlight from "@astrojs/starlight";
 import mdx from "@astrojs/mdx";
 import yaml from "@rollup/plugin-yaml";
+import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
 export default defineConfig({
@@ -209,7 +210,8 @@ export default defineConfig({
             }
         },
         plugins: [
-            yaml()
+            yaml(),
+            tailwindcss()
         ],
         resolve: {
             dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "react-compiler-runtime"],

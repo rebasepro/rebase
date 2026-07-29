@@ -1,307 +1,342 @@
 ---
 const { lang, t } = Astro.props;
 
-import { languages, defaultLang, useTranslations } from '../../i18n/ui';
-
-
-
+import { useTranslatedPath } from '../../i18n/ui';
 import { NeatBackground } from '../../components/NeatBackground';
 import { AgentConsoleDemo } from '../../components/demos/AgentConsoleDemo';
+import McpSessionDemo from '../demos/McpSessionDemo';
+import { mcpClients } from '../../utils/mcpClients';
 
+const translatePath = useTranslatedPath(lang);
 
-
-
-const mcpConfigCode = `<span class="text-surface-500">// .cursor/mcp.json</span>
+const mcpConfigCode = `<span class="text-surface-500">// .cursor/mcp.json — or Claude Desktop, Windsurf, Copilot…</span>
 {
   <span class="text-blue-400">"mcpServers"</span>: {
     <span class="text-blue-400">"rebase"</span>: {
       <span class="text-blue-400">"command"</span>: <span class="text-emerald-400">"npx"</span>,
       <span class="text-blue-400">"args"</span>: [<span class="text-emerald-400">"@rebasepro/mcp"</span>],
       <span class="text-blue-400">"env"</span>: {
-        <span class="text-blue-400">"REBASE_BASE_URL"</span>: <span class="text-emerald-400">"http://localhost:3001"</span>
+        <span class="text-blue-400">"REBASE_BASE_URL"</span>: <span class="text-emerald-400">"https://api.example.com"</span>,
+        <span class="text-blue-400">"REBASE_API_TOKEN"</span>: <span class="text-emerald-400">"rk_live_…"</span>
       }
     }
   }
 }`;
 
-const enhancementCode = `<span class="text-blue-400">import</span> { useDataEnhancementPlugin } <span class="text-blue-400">from</span>
-  <span class="text-emerald-400">"@rebasepro/plugin-ai"</span>;
+const keyCode = `<span class="text-surface-500">// The key behind that token. Three operations, not two —</span>
+<span class="text-surface-500">// and \`admin\` is a separate flag, off by default.</span>
+{
+  <span class="text-blue-400">"name"</span>: <span class="text-emerald-400">"support-agent"</span>,
+  <span class="text-blue-400">"permissions"</span>: [
+    { <span class="text-blue-400">"collection"</span>: <span class="text-emerald-400">"products"</span>, <span class="text-blue-400">"operations"</span>: [<span class="text-emerald-400">"read"</span>] },
+    { <span class="text-blue-400">"collection"</span>: <span class="text-emerald-400">"orders"</span>,   <span class="text-blue-400">"operations"</span>: [<span class="text-emerald-400">"read"</span>, <span class="text-emerald-400">"write"</span>] }
+  ],
+  <span class="text-blue-400">"admin"</span>: <span class="text-amber-400">false</span>,
+  <span class="text-blue-400">"expires_at"</span>: <span class="text-emerald-400">"2026-10-01"</span>
+}`;
 
-<span class="text-blue-400">const</span> plugin = <span class="text-amber-400">useDataEnhancementPlugin</span>({
-  getConfigForPath: ({ path }) =&gt; ({
-    suggestions: <span class="text-amber-400">true</span>,
-    autofill: <span class="text-amber-400">true</span>,
-  })
-});
+// The tool surface, taken from the exported tool names in @rebasepro/mcp.
+// If that package gains or loses a tool, this list is wrong — keep them together.
+const toolGroups = [
+    {
+        name: "Data",
+        icon: "M3 12a9 3 0 1 0 18 0 9 3 0 1 0-18 0M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0",
+        tools: ["list_documents", "get_document", "create_document", "update_document", "delete_document"]
+    },
+    {
+        name: "Users & roles",
+        icon: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 8 0 4 4 0 1 0-8 0M22 21v-2a4 4 0 0 0-3-3.87",
+        tools: ["list_users", "create_user", "update_user", "delete_user", "list_roles", "rebase_auth_reset_password"]
+    },
+    {
+        name: "Schema & database",
+        icon: "M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01",
+        tools: ["rebase_schema_generate", "rebase_schema_introspect", "rebase_db_push", "rebase_db_generate", "rebase_db_migrate", "rebase_generate_sdk", "rebase_doctor"]
+    },
+    {
+        name: "Branching",
+        icon: "M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6M15 6a9 9 0 0 1-9 9",
+        tools: ["rebase_db_branch_create", "rebase_db_branch_list", "rebase_db_branch_info", "rebase_db_branch_delete"]
+    },
+    {
+        name: "Storage",
+        icon: "M21 8v13H3V8M1 3h22v5H1zM10 12h4",
+        tools: ["storage_list_objects", "storage_get_metadata", "storage_delete_object"]
+    },
+    {
+        name: "Cron",
+        icon: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 6v6l4 2",
+        tools: ["cron_list_jobs", "cron_get_job", "cron_trigger_job", "cron_get_job_logs", "cron_toggle_job"]
+    },
+    {
+        name: "Functions",
+        icon: "m18 16 4-4-4-4M6 8l-4 4 4 4M14.5 4l-5 16",
+        tools: ["invoke_function"]
+    },
+    {
+        name: "Dev server",
+        icon: "m4 17 6-6-6-6M12 19h8",
+        tools: ["rebase_dev_start", "rebase_dev_logs", "rebase_dev_stop"]
+    },
+    {
+        name: "Projects",
+        icon: "M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2",
+        tools: ["rebase_project_list", "rebase_project_current", "rebase_project_switch", "rebase_project_add", "rebase_project_remove", "rebase_project_status"]
+    }
+];
 
-<span class="text-surface-500">// Drop into your Rebase app:</span>
-&lt;Rebase
-  plugins={[plugin]}
-  ...
-/&gt;`;
+const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
 ---
 
-  <div class="flex flex-col isolate">
-    <!-- Hero -->
- <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-24 lg:pt-40 lg:pb-24">
-     <NeatBackground client:idle />
+<div class="flex flex-col isolate">
 
-      <div class="px-4 mx-auto max-w-7xl text-center lg:px-12 relative z-10">
-        <p class="mb-5 text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">
-          <a href="/backend" class="hover:text-primary transition-colors">The backend</a>
-          <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">AI &amp; agents</span>
-        </p>
-        <div class="inline-flex items-center py-1.5 px-3 mb-6 text-sm rounded-full bg-surface-800/40 text-surface-400 ring-1 ring-inset ring-white/10 mx-auto">
-          <span class="text-sm font-medium">MCP server · scoped API keys · agent skills</span>
+    <!-- ═══════════════════════ HERO ═══════════════════════ -->
+    <section class="relative isolate overflow-hidden pt-24 pb-16 sm:pt-32 sm:pb-20 lg:pt-40">
+        <NeatBackground client:idle/>
+
+        <div class="relative z-10 mx-auto max-w-7xl px-4 text-center lg:px-12">
+            <p class="mb-5 text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">
+                <a href={translatePath("/backend")} class="transition-colors hover:text-primary">The backend</a>
+                <span class="mx-2 text-surface-600">/</span><span class="text-surface-500">AI &amp; agents</span>
+            </p>
+            <div class="mx-auto mb-6 inline-flex items-center rounded-full bg-surface-800/40 px-3 py-1.5 text-sm text-surface-400 ring-1 ring-inset ring-white/10">
+                <span class="font-medium">{toolCount} MCP tools · scoped keys · enforced by Postgres</span>
+            </div>
+            <h1 class="mb-6 text-3xl font-semibold tracking-tight text-white md:text-4xl lg:text-5xl">
+                The backend an agent<br class="hidden sm:inline"/> <span class="text-primary">can't screw up.</span>
+            </h1>
+            <p class="mb-4 text-lg leading-8 text-surface-300 sm:px-16 lg:text-xl xl:px-48">
+                Give an agent real tools over your data — read, write, migrate, deploy — through an MCP server it
+                connects to in one config block.
+            </p>
+            <p class="text-base leading-7 text-surface-400 sm:px-16 xl:px-48">
+                Then take the safety on trust out of it. What the agent may touch is a scoped key, and what the
+                database will return is row-level security. Two gates, neither of them a prompt.
+            </p>
         </div>
-        <h1 class="mb-6 text-3xl font-semibold tracking-tight md:text-4xl lg:text-5xl text-white">
-          The backend an agent<br class="hidden sm:inline"/> can't screw up.
-        </h1>
-        <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl sm:px-16 xl:px-48">
-          Let AI agents read, write, and manage your data — through an MCP server with real tools, scoped
-          API keys, and authorization the agent can't forget, because Postgres enforces it on every query.
-        </p>
-      </div>
     </section>
 
-    <!-- MCP Server -->
- <section class="relative z-0 py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
-          <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-violet-500/10 text-violet-400 ring-1 ring-inset ring-violet-500/20">
-              Model Context Protocol
+    <!-- ═══════════════════════ ONE CONFIG BLOCK ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
+                <div class="lg:col-span-5">
+                    <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">Model Context Protocol</p>
+                    <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                        Your project, as tools an assistant can call
+                    </h2>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400">
+                        <code class="font-mono text-surface-300">@rebasepro/mcp</code> speaks the Model Context Protocol,
+                        so anything that speaks MCP can drive your backend: query and edit data, push schema changes,
+                        open a database branch, trigger a cron job, tail the dev server.
+                    </p>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400">
+                        Your collection definitions and the generated Drizzle schema are exposed as MCP
+                        <i>resources</i> too, so the assistant reads your actual data model rather than guessing at it
+                        from the code it happens to have open.
+                    </p>
+                    <p class="text-base leading-relaxed text-surface-400">
+                        There is nothing to build and no adapter to write. It is one block in a config file.
+                    </p>
+                </div>
+
+                <div class="lg:col-span-7">
+                    <div class="overflow-hidden rounded-2xl border border-white/5 bg-surface-950/80 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                        <div class="flex items-center gap-1.5 border-b border-surface-800/80 bg-surface-900/50 px-4 py-3">
+                            <span class="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
+                            <span class="h-2.5 w-2.5 rounded-full bg-amber-400/80"></span>
+                            <span class="h-2.5 w-2.5 rounded-full bg-emerald-400/80"></span>
+                            <span class="ml-2 font-mono text-[11px] text-surface-400">.cursor/mcp.json</span>
+                        </div>
+                        <pre class="overflow-x-auto p-5 font-mono text-[11px] leading-relaxed text-surface-300 sm:text-xs"><code set:html={mcpConfigCode}></code></pre>
+                    </div>
+                </div>
             </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">MCP Server</h2>
-            <p class="text-lg text-surface-400 mb-6">The <code class="text-sm bg-surface-800 px-1.5 py-0.5 rounded">@rebasepro/mcp</code> package exposes your entire Rebase project to AI assistants like Cursor, Claude, and Windsurf via the Model Context Protocol standard.</p>
-            <p class="text-surface-400 mb-6">AI agents can autonomously manage your data, run migrations, generate SDKs, and control the dev server — all through a standardized, secure interface.</p>
-            <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6 mt-6">
-              <div class="text-xs font-semibold text-surface-500 mb-3 uppercase tracking-wider">Configuration</div>
-              <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={mcpConfigCode}/></pre>
-            </div>
-          </div>
-          <div>
-            <h3 class="text-xl font-semibold text-white mb-6">Available Tools</h3>
-            <div class="space-y-4">
-              <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                <h4 class="text-white font-semibold mb-1">📝 Data Tools</h4>
-                <p class="text-sm text-surface-400">List, get, create, update, and delete documents in any collection with filtering and pagination.</p>
-              </div>
-              <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                <h4 class="text-white font-semibold mb-1">👤 Admin Tools</h4>
-                <p class="text-sm text-surface-400">List users, create users, assign roles, delete users, and list roles — all programmatically.</p>
-              </div>
-              <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                <h4 class="text-white font-semibold mb-1">🗄️ Schema & DB Tools</h4>
-                <p class="text-sm text-surface-400"><code class="text-xs bg-surface-800 px-1 rounded">schema_generate</code>, <code class="text-xs bg-surface-800 px-1 rounded">schema_introspect</code>, <code class="text-xs bg-surface-800 px-1 rounded">db_push</code>, <code class="text-xs bg-surface-800 px-1 rounded">db_generate</code>, <code class="text-xs bg-surface-800 px-1 rounded">db_migrate</code>, <code class="text-xs bg-surface-800 px-1 rounded">generate_sdk</code>, <code class="text-xs bg-surface-800 px-1 rounded">doctor</code></p>
-              </div>
-              <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                <h4 class="text-white font-semibold mb-1">🌿 Database Branching</h4>
-                <p class="text-sm text-surface-400">Create, list, inspect, and delete database branches — agents can try schema changes on an isolated copy of your data.</p>
-              </div>
-              <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                <h4 class="text-white font-semibold mb-1">⚙️ Storage, Cron & Functions</h4>
-                <p class="text-sm text-surface-400">Manage storage objects, list and trigger cron jobs, read execution logs, and invoke your custom functions.</p>
-              </div>
-              <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                <h4 class="text-white font-semibold mb-1">🖥️ Dev Server</h4>
-                <p class="text-sm text-surface-400">Start, stop, and read logs from the dev server without leaving your AI assistant.</p>
-              </div>
-              <div class="p-4 rounded-xl bg-surface-900/50 ring-1 ring-inset ring-surface-800">
-                <h4 class="text-white font-semibold mb-1">📁 Resources</h4>
-                <p class="text-sm text-surface-400">Collection definitions and generated Drizzle schema exposed as MCP resources for context-aware AI assistance.</p>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
+    </section>
+
+    <!-- ═══════════════════════ THE TOOL SURFACE ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="mx-auto mb-12 max-w-3xl text-center">
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">The tool surface</p>
+                <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    {toolCount} tools, and these are their real names
+                </h2>
+                <p class="text-base leading-relaxed text-surface-400">
+                    Not a category diagram — the actual list the server registers. An agent that can call these can
+                    build and operate an application without a human in the request path.
+                </p>
+            </div>
+
+            <div class="rounded-2xl border border-white/5 bg-gradient-to-br from-surface-900/70 to-surface-950/60 p-6 shadow-[0_10px_30px_rgba(0,0,0,0.45)] sm:p-8">
+                <div class="grid grid-cols-1 gap-x-8 gap-y-7 sm:grid-cols-2 lg:grid-cols-3">
+                    {toolGroups.map((group) => (
+                        <div>
+                            <div class="mb-3 flex items-center gap-2.5">
+                                <span class="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-primary/10 ring-1 ring-inset ring-primary/20">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round" class="text-primary">
+                                        <path d={group.icon}/>
+                                    </svg>
+                                </span>
+                                <span class="text-sm font-medium text-surface-200">{group.name}</span>
+                                <span class="ml-auto font-mono text-[11px] text-surface-600">{group.tools.length}</span>
+                            </div>
+                            <ul class="space-y-1">
+                                {group.tools.map((tool) => (
+                                    <li class="truncate font-mono text-[11.5px] text-surface-500">{tool}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
     </section>
 
     <!-- Neat gradient divider -->
-    <div class="neat-divider relative -my-72 pointer-events-none overflow-hidden" style="z-index: -1; height: 600px;">
+    <div class="neat-divider relative -my-72 overflow-hidden pointer-events-none" style="z-index: -1; height: 600px;">
         <NeatBackground variant="a" client:visible/>
     </div>
 
-    <!-- AI Data Enhancement -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div class="lg:order-last">
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-pink-500/10 text-pink-400 ring-1 ring-inset ring-pink-500/20">
-              Schema-Aware AI
+    <!-- ═══════════════════════ TRY TO MAKE IT LEAK ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-24">
+        <div class="mx-auto max-w-7xl px-6 lg:px-8">
+            <div class="mx-auto mb-12 max-w-3xl text-center">
+                <p class="mb-4 text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">Least-privilege agents</p>
+                <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    Authorization the agent cannot forget
+                </h2>
+                <p class="text-base leading-relaxed text-surface-400">
+                    Everyone in this category will tell you their agent integration is safe. The question worth asking
+                    is what enforces it — because if the answer is the tool layer, then a bug in the tool layer is a
+                    breach. Here the tool layer is the first of two gates, and the second one is the database.
+                </p>
+                <p class="mt-4 text-base leading-relaxed text-surface-400">
+                    Revoke a permission below and watch the same four calls come back refused.
+                </p>
             </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">AI Data Enhancement</h2>
-            <p class="text-lg text-surface-400 mb-6">The data enhancement plugin analyzes your collection schema and uses AI to auto-fill fields, suggest descriptions, generate SEO metadata, and translate content — all from within the admin UI.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> One-click autofill based on existing field values</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Schema-aware prompts (knows your field types and constraints)</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Inline AI completions in the rich text editor</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Works with any OpenAI-compatible API</li>
-            </ul>
-          </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-            <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300" set:html={enhancementCode}/></pre>
-          </div>
+
+            <div class="mx-auto max-w-6xl">
+                <McpSessionDemo client:visible/>
+            </div>
+
+            <div class="mx-auto mt-14 grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
+                <div class="lg:col-span-5">
+                    <h3 class="mb-4 text-2xl font-semibold text-white">A key, not a god-mode credential</h3>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400">
+                        Permissions are declared per collection and per operation, and there are three operations
+                        rather than the usual two — <code class="font-mono text-surface-300">delete</code> is separable
+                        from <code class="font-mono text-surface-300">write</code>, which is the one you actually want
+                        to withhold from an agent.
+                    </p>
+                    <p class="mb-4 text-base leading-relaxed text-surface-400">
+                        <code class="font-mono text-surface-300">admin</code> is a separate flag. Without it the key
+                        carries only the <code class="font-mono text-surface-300">service</code> role, and Postgres
+                        grants that role nothing at all unless one of your policies names it.
+                    </p>
+                    <p class="text-base leading-relaxed text-surface-400">
+                        Keys are SHA-256 hashed at rest, rate-limited per key, expiring, and revocable.
+                    </p>
+                    <a href={translatePath("/security")}
+                       class="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/80">
+                        How the policies are generated
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+                <div class="lg:col-span-7">
+                    <div class="overflow-hidden rounded-2xl border border-white/5 bg-surface-950/80 shadow-[0_10px_30px_rgba(0,0,0,0.45)]">
+                        <div class="border-b border-surface-800/80 bg-surface-900/50 px-4 py-3">
+                            <span class="font-mono text-xs text-surface-400">POST /api/admin/api-keys</span>
+                        </div>
+                        <pre class="overflow-x-auto p-5 font-mono text-[11px] leading-relaxed text-surface-300 sm:text-xs"><code set:html={keyCode}></code></pre>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
     </section>
 
-    <!-- Least-privilege agents: scoped keys + RLS -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
-            <div class="inline-flex items-center py-1 px-2.5 mb-4 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
-              Least-Privilege Agents
-            </div>
-            <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-4">Authorization the agent can't forget</h2>
-            <p class="text-lg text-surface-400 mb-6">Hand your agent a scoped API key instead of god-mode credentials. Permissions are declared per collection and per operation — and because every request runs through Postgres row-level security, the limits hold even if the agent goes off-script.</p>
-            <ul class="space-y-3 text-surface-300">
-              <li class="flex gap-3"><span class="text-primary">✓</span> Per-collection, per-operation permission scoping</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Enforced twice: permission checks on every request, RLS on every query</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> Keys are SHA-256 hashed, rate-limited, expiring, and revocable</li>
-              <li class="flex gap-3"><span class="text-primary">✓</span> No prompt, jailbreak, or bug can widen what the database allows</li>
-            </ul>
-          </div>
-          <div class="relative rounded-2xl overflow-hidden ring-1 ring-surface-800 bg-surface-900 p-6">
-            <div class="text-xs font-semibold text-surface-500 mb-3 uppercase tracking-wider">Scoped key for an agent</div>
-            <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300"><span class="text-surface-500">// The agent's key can read products and manage orders.</span>
-<span class="text-surface-500">// Everything else 403s — checked in the API, enforced in Postgres.</span>
-{"{"}
-  <span class="text-blue-400">"name"</span>: <span class="text-emerald-400">"support-agent"</span>,
-  <span class="text-blue-400">"permissions"</span>: [
-    {"{"} <span class="text-blue-400">"collection"</span>: <span class="text-emerald-400">"products"</span>, <span class="text-blue-400">"operations"</span>: [<span class="text-emerald-400">"read"</span>] {"}"},
-    {"{"} <span class="text-blue-400">"collection"</span>: <span class="text-emerald-400">"orders"</span>,   <span class="text-blue-400">"operations"</span>: [<span class="text-emerald-400">"read"</span>, <span class="text-emerald-400">"write"</span>] {"}"}
-  ],
-  <span class="text-blue-400">"expires_at"</span>: <span class="text-emerald-400">"2026-10-01"</span>
-{"}"}</code></pre>
-            <div class="mt-4 pt-4 border-t border-surface-800">
-              <pre class="text-sm font-mono overflow-x-auto"><code class="text-surface-300"><span class="text-surface-500">// Drop it into the MCP config:</span>
-<span class="text-blue-400">"env"</span>: {"{"}
-  <span class="text-blue-400">"REBASE_BASE_URL"</span>: <span class="text-emerald-400">"https://api.yourapp.com"</span>,
-  <span class="text-blue-400">"REBASE_API_TOKEN"</span>: <span class="text-emerald-400">"rk_live_…"</span>
-{"}"}</code></pre>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Integration Grid -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div class="mx-auto max-w-2xl text-center mb-16">
-          <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl">Works With Your AI Stack</h2>
-          <p class="mt-4 text-lg text-surface-400">Rebase integrates with the tools developers are already using.</p>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <p class="text-white font-semibold mb-1">Claude Code</p>
-            <p class="text-sm text-surface-400">MCP integration</p>
-          </div>
-          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <p class="text-white font-semibold mb-1">Cursor</p>
-            <p class="text-sm text-surface-400">MCP integration</p>
-          </div>
-          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <p class="text-white font-semibold mb-1">Claude Desktop</p>
-            <p class="text-sm text-surface-400">MCP integration</p>
-          </div>
-          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <p class="text-white font-semibold mb-1">GitHub Copilot</p>
-            <p class="text-sm text-surface-400">MCP integration</p>
-          </div>
-          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <p class="text-white font-semibold mb-1">Codex</p>
-            <p class="text-sm text-surface-400">MCP integration</p>
-          </div>
-          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <p class="text-white font-semibold mb-1">Gemini CLI</p>
-            <p class="text-sm text-surface-400">MCP integration</p>
-          </div>
-          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <p class="text-white font-semibold mb-1">Windsurf</p>
-            <p class="text-sm text-surface-400">MCP integration</p>
-          </div>
-          <div class="p-6 rounded-2xl bg-surface-900/50 ring-1 ring-inset ring-surface-800 text-center">
-            <p class="text-white font-semibold mb-1">OpenAI API</p>
-            <p class="text-sm text-surface-400">Data enhancement</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Agent Infrastructure Feature Grid -->
-<section id="s-ai-apps" class="relative isolate py-24 sm:py-32 overflow-hidden">
-
+    <!-- ═══════════════════════ AGENT INFRASTRUCTURE ═══════════════════════ -->
+    <section id="s-ai-apps" class="relative isolate overflow-hidden py-24 sm:py-32">
         <div class="pointer-events-none absolute inset-0 -z-10">
             <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] opacity-10"></div>
         </div>
 
         <div class="mx-auto max-w-7xl px-6 lg:px-8">
-            <div class="mx-auto max-w-3xl text-center mb-16 animate-on-scroll fade-in-up">
-                <p class="text-xs font-semibold tracking-[0.25em] text-primary/80 uppercase">Agent infrastructure</p>
-                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">Everything an agent needs to operate</h2>
-                <p class="mt-4 text-surface-400 text-base sm:text-lg leading-relaxed">
+            <div class="mx-auto mb-16 max-w-3xl text-center">
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-primary/80">Agent infrastructure</p>
+                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-5xl">
+                    Everything an agent needs to operate
+                </h2>
+                <p class="mt-4 text-base leading-relaxed text-surface-400 sm:text-lg">
                     Vector search, scoped keys, streaming functions, realtime and scheduled tasks — the operational
                     surface agents build on, in one window instead of a wall of cards.
                 </p>
             </div>
 
-            <div class="max-w-6xl mx-auto animate-on-scroll fade-in-up delay-100" inert aria-hidden="true">
+            <div class="mx-auto max-w-6xl" inert aria-hidden="true">
                 <AgentConsoleDemo client:visible/>
             </div>
         </div>
     </section>
 
-    <!-- CTA -->
- <section class="py-24 sm:py-32">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
-        <h2 class="text-3xl font-medium tracking-tight text-white sm:text-4xl mb-8">Make your data AI-ready</h2>
-        <div class="flex items-center justify-center gap-x-6">
-          <a href="/sdk"
-             class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white hover:bg-primary-dark hover:brightness-105 transition-all duration-200 ease-in-out btn-glow">
-            Client SDK
-
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
-          </a>
-          <a href="/backend" class="inline-flex items-center gap-x-2 text-white hover:text-primary transition-colors font-semibold">
-            Backend & APIs
-
-<svg
-  class="lucide lucide-arrow-right"
-  xmlns="http://www.w3.org/2000/svg"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
-  stroke-linecap="round"
-  stroke-linejoin="round"
->
-  <path d="M5 12h14" />
-  <path d="m12 5 7 7-7 7" />
-</svg>
-
-          </a>
+    <!-- ═══════════════════════ CLIENTS ═══════════════════════ -->
+    <section class="relative z-0 py-16 sm:py-20">
+        <!-- max-w-6xl so the eight chips clear one row on desktop; the sentence
+             keeps its own narrower measure so it does not stretch with them. -->
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <p class="mx-auto mb-8 max-w-3xl text-center text-sm text-surface-400">
+                MCP is a standard, so the list of things that can drive your backend is not ours to control —
+                it is whatever speaks it.
+            </p>
+            <div class="flex flex-wrap items-center justify-center gap-2.5">
+                {mcpClients.map((client) => (
+                    <span class="group inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm text-surface-300 ring-1 ring-inset ring-surface-800 transition-colors duration-200 hover:text-white hover:ring-surface-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                             fill="currentColor" aria-hidden="true"
+                             class="flex-none text-surface-500 transition-colors duration-200 group-hover:text-surface-300">
+                            <path d={client.icon}/>
+                        </svg>
+                        {client.name}
+                    </span>
+                ))}
+            </div>
         </div>
-      </div>
     </section>
-  </div>
 
+    <!-- ═══════════════════════ CTA ═══════════════════════ -->
+    <section class="relative z-0 py-20 sm:py-28">
+        <div class="mx-auto max-w-3xl px-6 text-center lg:px-8">
+            <h2 class="mb-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                Point an agent at it
+            </h2>
+            <p class="mb-8 text-lg leading-relaxed text-surface-400">
+                Scaffold a project, add the config block, and hand your assistant a key that can read one collection.
+                It is a faster way to find out whether any of this is true than reading the rest of this page.
+            </p>
+            <div class="mb-8 inline-flex items-center gap-3 rounded-xl border border-surface-800 bg-[#0c0d10] px-5 py-3.5 font-mono text-sm">
+                <span class="select-none font-semibold text-primary">&gt;</span>
+                <span class="select-all text-white">pnpm dlx @rebasepro/cli init</span>
+            </div>
+            <div class="flex flex-col justify-center gap-4 sm:flex-row">
+                <a href="https://demo.rebase.pro" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-surface-700 bg-surface-800 px-6 py-3 text-base font-semibold text-white transition-all hover:bg-surface-700">
+                    Try the demo
+                </a>
+                <a href="/docs"
+                   class="btn-glow inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary px-6 py-3 text-base font-semibold text-white transition-all hover:bg-primary-dark hover:brightness-105">
+                    Read the docs
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </section>
+</div>

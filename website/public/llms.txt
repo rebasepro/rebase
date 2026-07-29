@@ -1007,7 +1007,7 @@ The split is not cosmetic. It is what lets Rebase be a backend on its own:
 a BaaS project, writing one is a **type error**. `@rebasepro/admin-types` adds it back by
 declaration merging, so one line per project turns it on:
 
-```typescript
+```typescript no-verify
 // config/admin.d.ts
 /// <reference types="@rebasepro/admin-types" />
 ```
@@ -1295,11 +1295,11 @@ price: {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `ui.readOnly` | `boolean` | Prevent editing |
-| `ui.disabled` | `boolean \| PropertyDisabledConfig` | Disable with optional tooltip |
+| `admin.readOnly` | `boolean` | Prevent editing |
+| `admin.disabled` | `boolean \| PropertyDisabledConfig` | Disable with optional tooltip |
 | `admin.hideFromCollection` | `boolean` | Hide from table view |
-| `ui.columnWidth` | `number` | Column width in pixels (table view) |
-| `ui.widthPercentage` | `number` | Field width as a percentage in the form view |
+| `admin.columnWidth` | `number` | Column width in pixels (table view) |
+| `admin.widthPercentage` | `number` | Field width as a percentage in the form view |
 | `admin.Field` | `React.ComponentType` | Custom field component |
 | `admin.Preview` | `React.ComponentType` | Custom table cell component |
 
@@ -1420,8 +1420,8 @@ locales: {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `multiline` | `boolean` | Render as textarea |
-| `markdown` | `boolean` | Render as markdown editor |
+| `admin.multiline` | `boolean` | Render as textarea |
+| `admin.markdown` | `boolean` | Render as markdown editor |
 | `email` | `boolean` | Email format validation |
 | `url` | `boolean` | URL format validation |
 | `storage` | `StorageConfig` | Enable file upload |
@@ -1430,8 +1430,8 @@ locales: {
 | `columnType` | `string` | Database column: `"varchar"`, `"text"` |
 | `isId` | `string` | ID generation: `"uuid"`, `"cuid"`, `"increment"`, `"manual"` |
 | `userSelect` | `boolean` | Render as a user picker |
-| `previewAsTag` | `boolean` | Render this string as a tag in previews |
-| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
+| `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
+| `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ### Number Properties
 
@@ -1458,7 +1458,7 @@ Number fields render as a standard text input with numeric validation.
 | `enum` | `EnumValues` | Render as select with numeric values |
 | `columnType` | `string` | `"integer"`, `"bigint"`, `"numeric"`, `"serial"`, `"smallint"` |
 | `isId` | `string` | ID generation strategy |
-| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
+| `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ### Boolean Properties
 
@@ -1525,7 +1525,7 @@ updated_at: {
 | `autoValue` | `"on_create" \| "on_update"` | Auto-set timestamps |
 | `columnType` | `string` | `"timestamp"`, `"date"` |
 | `timezone` | `string` | Timezone string to evaluate the date in |
-| `clearable` | `boolean` | Add an icon to clear the value (set to null) |
+| `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 
 ### Array Properties
 
@@ -1590,10 +1590,10 @@ content: {
 |----------|------|-------------|
 | `of` | `Property \| Property[]` | Property schema for array items |
 | `oneOf` | `object` | Array of typed objects with multiple discriminator types |
-| `expanded` | `boolean` | Should the field be initially expanded (default: true) |
-| `minimalistView` | `boolean` | Display child properties directly without extendable panel |
-| `sortable` | `boolean` | Can elements be reordered (default: true) |
-| `canAddElements` | `boolean` | Can new elements be added (default: true) |
+| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `admin.minimalistView` | `boolean` | Display child properties directly without extendable panel |
+| `admin.sortable` | `boolean` | Can elements be reordered (default: true) |
+| `admin.canAddElements` | `boolean` | Can new elements be added (default: true) |
 
 ### Map Properties
 
@@ -1630,10 +1630,10 @@ metadata: {
 |----------|------|-------------|
 | `properties` | `Properties` | Record of properties included in the map |
 | `propertiesOrder` | `string[]` | Ordered keys for rendering |
-| `previewProperties` | `string[]` | Which properties to show in the table preview |
-| `spreadChildren` | `boolean` | Render child properties as separate columns in table view |
-| `minimalistView` | `boolean` | Display properties without a wrapping panel |
-| `expanded` | `boolean` | Should the field be initially expanded (default: true) |
+| `admin.previewProperties` | `string[]` | Which properties to show in the table preview |
+| `admin.spreadChildren` | `boolean` | Render child properties as separate columns in table view |
+| `admin.minimalistView` | `boolean` | Display properties without a wrapping panel |
+| `admin.expanded` | `boolean` | Should the field be initially expanded (default: true) |
 | `keyValue` | `boolean` | Render as arbitrary key-value pairs editor |
 
 ### Reference Properties
@@ -1645,9 +1645,23 @@ client: {
     type: "reference",
     name: "Related client",
     path: "clients",
-    previewProperties: ["first_name", "last_name", "email"]
+    admin: {
+        previewProperties: ["first_name", "last_name", "email"]
+    }
 }
 ```
+
+#### Reference & Relation Options
+
+These apply to both `reference` and `relation` properties.
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `admin.fixedFilter` | `FilterValues` | Filter the entities offered in the selection widget |
+| `admin.widget` | `"select" \| "dialog"` | Which widget selects the related entity (relations only) |
+| `admin.includeId` | `boolean` | Show the related entity's id in previews (default: true) |
+| `admin.includeEntityLink` | `boolean` | Show a link that opens the related entity (default: true) |
+| `admin.previewProperties` | `string[]` | Which of the target's properties appear in the preview (max 3) |
 
 ### Enum Values
 
@@ -2020,16 +2034,19 @@ const { data } = await client.data.articles.find({
 When included, the response contains both the **scalar foreign key** and the **hydrated relation object**:
 
 ```typescript
-const { data } = await client.data.articles
+const { data } = await client.data
+    .collection<{ id: string; author_id: string; author?: { name: string } }>("articles")
     .include("author")
     .find();
 
+// The SDK returns flat rows — there is no `.values` wrapper. (`Entity`, with
+// `id`/`path`/`values`, is an admin-UI view model, not what the client hands back.)
 for (const article of data) {
     // Scalar FK — always present
-    article.values.author_id;     // "uuid-1234"
+    article.author_id;     // "uuid-1234"
 
     // Hydrated relation — only present when included
-    article.values.author?.name;  // "Jane Doe"
+    article.author?.name;  // "Jane Doe"
 }
 ```
 
@@ -2087,11 +2104,13 @@ from other parents.
 #### The same rules over REST
 
 Child lists are ordinary collection queries narrowed to one parent, so they accept
-everything a root list does — `where`, `orderBy`, `limit`, `offset`, `include` — and
-`meta.total` counts the filtered rows:
+everything a root list does — filters, `orderBy`, `limit`, `offset`, `include` — and
+`meta.total` counts the filtered rows. Filter either per field (`?field=op.value`) or
+with a whole-object `?where={"field":["op","value"]}`; both reach the same query:
 
 ```
-GET    /api/data/authors/a-1/posts?where=status:eq.published&orderBy=title&limit=20
+GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
+GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
 GET    /api/data/authors/a-1/posts/p-1
 POST   /api/data/authors/a-1/posts          create under this parent
 PUT    /api/data/authors/a-1/posts/p-1      update; will not reparent
@@ -4245,6 +4264,55 @@ Client                                                   Rebase Server
 | `GOOGLE_APPLICATION_CREDENTIALS` | Standard ADC variable, read by the Google SDK itself (not needed on GCP with default credentials) |
 | `FORCE_LOCAL_STORAGE` | Allow `STORAGE_TYPE=local` in production — see below |
 
+### Several Buckets
+
+A project can have more than one bucket. Declare them in `rebase.json` — the one
+place the platform, the runtime and the console all read:
+
+```json
+{
+  "rebase": "^1",
+  "storage": {
+    "(default)": { "engine": "s3" },
+    "media": { "engine": "s3", "label": "Media" }
+  },
+  "apps": {}
+}
+```
+
+Each source is configured from the **same variable names carrying its own
+suffix**. The default source takes no suffix, so a single-bucket project keeps
+using the plain names above and needs to declare nothing at all:
+
+```bash
+S3_BUCKET=app-uploads             # (default)
+S3_BUCKET__MEDIA=app-media        # media
+S3_ACCESS_KEY_ID__MEDIA=…
+S3_SECRET_ACCESS_KEY__MEDIA=…
+```
+
+The suffix is derived from the key: uppercased, non-alphanumerics collapsed to
+underscores, behind a **double** underscore (`media-cdn` → `__MEDIA_CDN`). A
+single underscore would collide with real variable names — `S3_BUCKET_NAME`
+would parse as bucket `name`.
+
+Route a property to a source with `storageSource`:
+
+```ts
+{
+    name: "Cover",
+    dataType: "string",
+    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+}
+```
+
+A source you declare but never configure is **skipped**, not fatal: uploads
+routed to it answer `501 STORAGE_NOT_CONFIGURED`. Declaring a bucket usually
+happens before anyone attaches storage to it, and a boot error there would
+crash-loop the backend until someone did. A source the environment configures
+*wrongly* — a type with no bucket, or a bucket with no credentials — is refused
+at boot, because that is a mistake rather than an absence.
+
 ### Frontend Storage Sources
 
 When using multiple storage backends, pass `storageSources` to the `<Rebase>` provider so the frontend knows how to route uploads directly:
@@ -4254,11 +4322,14 @@ When using multiple storage backends, pass `storageSources` to the `<Rebase>` pr
 <Rebase
     apiUrl="https://api.example.com"
     storageSources={[
-        { key: "media", label: "Media CDN" },
-        { key: "firebase", label: "Firebase Storage" },
+        // `engine` names the provider, `transport` says who talks to it:
+        // "server" proxies through the Rebase backend, "direct" goes
+        // client-to-provider (and needs a `source` implementation).
+        { key: "media", engine: "s3", transport: "server", label: "Media CDN" },
+        { key: "firebase", engine: "firebase", transport: "server", label: "Firebase Storage" },
     ]}
 >
-    {/* ... */}
+    {() => <MyApp />}
 </Rebase>
 ```
 
@@ -5033,10 +5104,21 @@ export default defineCron({
     async handler(ctx) {
         ctx.log("Checking for expired trial users...");
 
-        // Fetch using the pre-initialized data driver
-        const { data: trials } = await ctx.client.data.users.find({
+        // Fetch using the pre-initialized data driver. `collection<Row>(slug)`
+        // gives the query builder the row type — `where` keys are checked
+        // against it. Every filter is an `[operator, value]` tuple; a bare
+        // value is passed straight through and builds a malformed query.
+        const users = ctx.client.data.collection<{
+            id: string;
+            email: string;
+            trial_status: string;
+            trial_ends_at: string;
+            status: string;
+        }>("users");
+
+        const { data: trials } = await users.find({
             where: {
-                trial_status: "active",
+                trial_status: ["==", "active"],
                 trial_ends_at: ["<", new Date().toISOString()]
             }
         });
@@ -5044,7 +5126,7 @@ export default defineCron({
         ctx.log(`Found ${trials.length} users with expired trials.`);
 
         for (const user of trials) {
-            await ctx.client.data.users.update(user.id, {
+            await users.update(user.id, {
                 trial_status: "expired",
                 status: "disabled"
             });
@@ -5052,7 +5134,7 @@ export default defineCron({
             // Send email notification using Rebase email service
             if (ctx.client.email) {
                 await ctx.client.email.send({
-                    to: user.values.email,
+                    to: user.email,
                     subject: "Your trial has expired",
                     html: "<p>Please upgrade your subscription to continue.</p>"
                 });
@@ -6268,9 +6350,6 @@ The key components that make up a Rebase frontend:
 ```tsx
 <Rebase
     client={rebaseClient}
-    collectionRegistryController={collectionRegistryController}
-    cmsUrlController={cmsUrlController}
-    navigationStateController={navigationStateController}
     authController={authController}
 >
     {({ loading }) => (
@@ -6291,15 +6370,54 @@ The key components that make up a Rebase frontend:
 | Prop | Description |
 |------|-------------|
 | `client` | `RebaseClient` instance for data, auth, and storage |
-| `collectionRegistryController` | Resolves collection paths and configurations |
-| `cmsUrlController` | Builds URLs and handles routing |
-| `navigationStateController` | Manages navigation state, views, and plugins |
 | `authController` | Authentication state and methods |
-| `storageSource` | File storage operations |
+| `dataSources` | Additional data sources (see [Multiple sources](/docs/backend/multiple-sources)) |
+| `storageSource` / `storageSources` | File storage operations, and named storage sources |
 | `userConfigPersistence` | Local UI preferences (column widths, etc.) |
 | `entityViews` | Global custom entity view tabs |
 | `entityActions` | Global entity actions |
-| `plugins` | Plugin instances (legacy prop — prefer passing via navigation controller) |
+| `plugins` | Plugin instances |
+| `slots` | Slot contributions declared directly, without a plugin |
+| `basePath` / `baseCollectionPath` | URL prefixes when the admin is not at the site root |
+| `components` | Component overrides |
+
+The navigation, URL and collection-registry controllers are **not** `<Rebase>`
+props — they are built by the hooks below and consumed inside the admin tree
+(`<RebaseShell>` wires them for you in the default scaffold).
+
+### Two data shapes
+
+There are two data layers, and they are **not** interchangeable. Passing one
+where the other is expected is a type error, so this is worth knowing before you
+wire a controller by hand.
+
+| | Shape | Where you get it | What a row looks like |
+|---|---|---|---|
+| **SDK** | `RebaseSdkData` — flat rows | `client.data`, and `context.data` in backend callbacks | `row.title` |
+| **Admin** | `RebaseData` — `Entity` view-model | `useData()`, inside the `<Rebase>` tree | `entity.values.title` |
+
+The SDK layer is the public, symmetric surface: identical on the frontend client
+and in backend callbacks. The `Entity` layer is the admin's view-model — it adds
+the `id` / `path` / `values` wrapper that the collection views and forms render
+against. `CollectionAccessor` and `FindResponse` belong to it and are marked
+`@internal` for that reason.
+
+`<Rebase>` is the boundary between them: it takes your flat `client.data` and
+wraps it with `wrapAsEntityData()` before providing it as the admin's
+`RebaseData`. You never call that yourself — you just take the shape you need
+from the right place:
+
+```tsx
+// Flat rows — anywhere, including outside React.
+const { data: posts } = await client.data.posts.find();
+posts[0].title;
+
+// Entity view-model — inside the <Rebase> tree only.
+// `data.posts` also works at runtime; `collection()` is the typed accessor.
+const data = useData();
+const { data: entities } = await data.collection("posts").find();
+entities[0].values.title;
+```
 
 ### Controllers
 
@@ -6309,17 +6427,23 @@ Controllers are React hooks that configure specific aspects of the framework:
 
 The main controller that wires everything together:
 
+Its `data` is the **Entity-shaped** `RebaseData`, so it comes from `useData()`
+— not from `rebaseClient.data`, which is the flat-row SDK layer. `<Rebase>`
+converts one to the other for you (see [Two data shapes](#two-data-shapes)
+below), so this hook must be called inside the `<Rebase>` tree.
+
 ```typescript
+const data = useData();
+
 const navigationStateController = useBuildNavigationStateController({
     collections: () => [...collections],  // Collection definitions
     views: customViews,                   // Custom navigation views
     plugins,                              // Plugin instances
     authController,
-    data: rebaseClient.data,
+    data,
     collectionRegistryController,
-    cmsUrlController,
-    adminMode: adminModeController.mode,
-    userManagement
+    urlController,
+    adminMode: adminModeController.mode
 });
 ```
 
@@ -6333,12 +6457,12 @@ const collectionRegistryController = useBuildCollectionRegistryController({
 });
 ```
 
-#### `useBuildCMSUrlController`
+#### `useBuildUrlController`
 
 Configures URL generation:
 
 ```typescript
-const cmsUrlController = useBuildCMSUrlController({
+const urlController = useBuildUrlController({
     basePath: "/",
     baseCollectionPath: "/c",
     collectionRegistryController
@@ -6381,7 +6505,7 @@ const adminModeController = useBuildAdminModeController();
 Add top-level navigation views for dashboards, tools, or custom pages:
 
 ```tsx
-const views: CMSView[] = [
+const views: AppView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
@@ -6413,7 +6537,8 @@ Rebase uses **Tailwind CSS v4** and supports light/dark modes. Customize via:
 ```css
 /* Override design tokens */
 :root {
-    --font-sans: "Rubik", sans-serif;
+    --font-sans: "Inter", sans-serif;
+    --font-headers: "Instrument Sans", sans-serif;
     --font-mono: "JetBrains Mono", monospace;
 }
 ```
@@ -6739,14 +6864,16 @@ The `LoginView` component provides a complete login and registration form:
 
 ```tsx
 
-if (!authController.user) {
-    return (
-        <LoginView
-            authController={authController}
-            googleEnabled={!!GOOGLE_CLIENT_ID}
-            googleClientId={GOOGLE_CLIENT_ID}
-        />
-    );
+function App() {
+    if (!authController.user) {
+        return (
+            <LoginView
+                authController={authController}
+                googleClientId={GOOGLE_CLIENT_ID}
+            />
+        );
+    }
+    return <MyApp />;
 }
 ```
 
@@ -6969,10 +7096,15 @@ Every collection can be displayed in four view modes:
 
 const productsCollection = defineCollection({
     slug: "products",
-    properties: { /* … */ },
+    // `orderProperty` and `kanban.columnProperty` are checked against these
+    // keys — with an empty `properties` block they narrow to `never`.
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        status: { name: "Status", type: "string" },
+        sort_order: { name: "Order", type: "number" }
+    },
     name: "Products",
     table: "products",
-    // ...
     admin: {
         defaultViewMode: "table",            // Default view
         enabledViews: ["list", "table", "kanban"],    // Available views
@@ -7329,9 +7461,10 @@ function ArticlePreview({
     modifiedValues,
     formContext
 }: EntityCustomViewParams) {
-    // modifiedValues has the unsaved, live form values
-    const title = modifiedValues?.title ?? entity?.values?.title;
-    const content = modifiedValues?.content ?? entity?.values?.content;
+    // modifiedValues has the unsaved, live form values. Both it and
+    // entity.values are open records, so narrow before rendering.
+    const title = String(modifiedValues?.title ?? entity?.values?.title ?? "");
+    const content = String(modifiedValues?.content ?? entity?.values?.content ?? "");
 
     return (
         <div className="p-8 max-w-2xl mx-auto">
@@ -7397,7 +7530,7 @@ const articlesCollection = defineCollection({
         entityActions: [
             {
                 name: "Publish",
-                icon: "publish",
+                icon: <Upload size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
                     await context.data.collection<Record<string, unknown>>(entity.path)
                             .update(entity.id, { status: "published", published_at: new Date() });
@@ -7409,7 +7542,7 @@ const articlesCollection = defineCollection({
             },
             {
                 name: "Clone",
-                icon: "content_copy",
+                icon: <Copy size={iconSize.small}/>,
                 onClick: async ({ entity, context }) => {
                     const { id, ...values } = entity.values;
                     await context.data.collection<Record<string, unknown>>(entity.path)
@@ -7448,12 +7581,15 @@ function PublishSelectedAction({ selectionController, context }: CollectionActio
     );
 }
 
-// Register
+// Register — `Actions` is an array, so several can be composed.
 const collection = defineCollection({
+    slug: "products",
+    name: "Products",
+    table: "products",
+    properties: { /* … */ },
     admin: {
-        Actions: PublishSelectedAction
+        Actions: [PublishSelectedAction]
     }
-    // ...
 });
 ```
 
@@ -7862,42 +7998,32 @@ Plugins are the primary extension mechanism in Rebase. They can:
 ```typescript
 interface RebasePlugin {
     key: string;                    // Unique identifier
-    loading?: boolean;              // Show loading state while initializing
+    loading?: boolean;              // Hold admin content until the plugin is ready
 
-    // Wrap the app with a provider
-    provider?: {
-        Component: React.ComponentType;
-    };
+    // UI contributions — a flat array, each entry naming its slot.
+    // This replaced the old per-area objects (homePage, collectionView, form).
+    slots?: SlotContribution[];
 
-    // Home page customization
-    homePage?: {
-        additionalActions?: React.ReactNode;
-        additionalChildrenStart?: React.ReactNode;
-        additionalChildrenEnd?: React.ReactNode;
-    };
+    // HOC providers. `scope: "root"` wraps the whole admin below
+    // RebaseContext; `scope: "form"` wraps each entity form / edit view.
+    providers?: PluginProvider[];
 
-    // Collection view customization
-    collectionView?: {
-        showTextSearchBar?: boolean;
-        CollectionActions?: React.ComponentType[];
-        AddColumnComponent?: React.ComponentType;
-        onCellValueChange?: (params) => void;
-    };
+    // Behavioural (non-UI) hooks: collection modification and injection,
+    // column reordering, navigation entries.
+    hooks?: PluginHooks;
 
-    // Entity form customization
-    form?: {
-        Actions?: React.ComponentType;
-        provider?: { Component: React.ComponentType };
-        fieldBuilder?: (params) => React.ReactNode | null;
-    };
+    // Custom field rendering (e.g. data enhancement).
+    fieldBuilder?: FieldBuilderConfig;
 
-    // Collection injection/modification
-    collection?: {
-        injectCollections?: (params) => CollectionConfig[];
-        modifyCollection?: (params) => CollectionConfig;
-    };
+    // Views added to the navigation automatically.
+    views?: AppView[];
+
+    lifecycle?: PluginLifecycle;
 }
 ```
+
+Every one of these is optional except `key`. The full slot-name list lives on
+the **[Slots](/docs/frontend/slots)** page.
 
 ### Using Plugins
 
@@ -7911,7 +8037,11 @@ const plugins = [dataEnhancementPlugin];
 const navigationStateController = useBuildNavigationStateController({
     plugins,
     collections: () => collections,
-    // ...
+    // These four are required — the controller resolves navigation against them.
+    authController,
+    data,
+    collectionRegistryController,
+    urlController
 });
 ```
 
@@ -7925,18 +8055,18 @@ function useMyPlugin(): RebasePlugin {
     return {
         key: "my_plugin",
 
-        slots: {
-            CollectionActions: [MyToolbarAction]
-        },
+        // `slots` is a flat array of contributions, each naming its slot.
+        // See the Slots page for the full list of slot names.
+        slots: [
+            { slot: "collection.actions", Component: MyToolbarAction }
+        ],
 
-        form: {
-            fieldBuilder: ({ property, ...rest }) => {
-                // Return a custom field for specific property configs
-                if (property.propertyConfig === "my_custom_field") {
-                    return <MyCustomField {...rest} />;
-                }
-                return null; // Use default field
-            }
+        // `fieldBuilder` is top-level and takes a `wrap` function that returns
+        // a *component* (or null to leave the default field alone) — it is not
+        // a render function and no longer lives under `form`.
+        fieldBuilder: {
+            wrap: ({ property }) =>
+                property.propertyConfig === "my_custom_field" ? MyCustomField : null
         }
     };
 }
@@ -7960,14 +8090,9 @@ const enhancementPlugin = useDataEnhancementPlugin();
 Plugins can dynamically add new collections:
 
 ```typescript
-collection: {
-    injectCollections: ({ collections, user }) => {
-        // Add an audit log collection for admins
-        if (user?.roles?.includes("admin")) {
-            return [auditLogCollection];
-        }
-        return [];
-    }
+hooks: {
+    // Receives the resolved collections and returns the full list to use.
+    injectCollections: (collections) => [...collections, auditLogCollection]
 }
 ```
 
@@ -7976,21 +8101,20 @@ collection: {
 Plugins can modify existing collections:
 
 ```typescript
-collection: {
-    modifyCollection: ({ collection }) => {
-        // Add a "last_modified_by" field to every collection
-        return {
-            ...collection,
-            properties: {
-                ...collection.properties,
-                last_modified_by: {
-                    type: "string",
-                    name: "Modified By",
-                    admin: { readOnly: true }
-                }
+hooks: {
+    // Receives one collection, returns the modified one.
+    // Use `modifyCollectionAsync` when the change needs a fetch.
+    modifyCollection: (collection) => ({
+        ...collection,
+        properties: {
+            ...collection.properties,
+            last_modified_by: {
+                type: "string",
+                name: "Modified By",
+                admin: { readOnly: true }
             }
-        };
-    }
+        }
+    })
 }
 ```
 
@@ -9267,11 +9391,14 @@ client.data.products.listen(
 Use `listenById()` to watch a specific record by its ID:
 
 ```typescript
-const unsubscribe = client.data.products.listenById(
+// The SDK hands back a flat row, not an `Entity` — there is no `.values`.
+const unsubscribe = client.data
+    .collection<{ id: number; name: string }>("products")
+    .listenById!(
     42,
-    (entity) => {
-        if (entity) {
-            console.log("Product changed:", entity.values.name);
+    (product) => {
+        if (product) {
+            console.log("Product changed:", product.name);
         } else {
             console.log("Product was deleted");
         }
@@ -11721,7 +11848,7 @@ type Article = {
     title: string;
     slug: string;
     status: string;
-    published_at?: string | null;
+    published_at?: Date | null;
 };
 
 export const articlesCollection = defineCollection({
@@ -11814,7 +11941,8 @@ export const articlesCollection = defineCollection({
             }
             // Set published_at when publishing
             if (values.status === "published" && !values.published_at) {
-                values.published_at = new Date().toISOString();
+                // `published_at` is a `date` property, so its value is a Date.
+                values.published_at = new Date();
             }
             return values;
         }
@@ -11958,7 +12086,7 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
 ### Register as a Custom View
 
 ```tsx
-const views: CMSView[] = [
+const views: AppView[] = [
     {
         slug: "dashboard",
         name: "Dashboard",
@@ -11978,7 +12106,11 @@ Pass it to the navigation controller:
 const navigationStateController = useBuildNavigationStateController({
     views,
     collections: () => collections,
-    // ...
+    // These four are required — the controller resolves navigation against them.
+    authController,
+    data,
+    collectionRegistryController,
+    urlController
 });
 ```
 

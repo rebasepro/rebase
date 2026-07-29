@@ -27,9 +27,31 @@ const PRICING = {
     checked: "28 July 2026",
     source: "https://supabase.com/pricing",
     base: 25,
+    /** Pro bundles $10/month of compute credit, which covers one Micro. */
+    computeCredit: 10,
     included: { mau: 100_000, dbGb: 8, storageGb: 100, egressGb: 250 },
     rate: { mau: 0.00325, dbGb: 0.125, storageGb: 0.0213, egressGb: 0.09 }
 };
+
+/**
+ * Supabase's published compute add-ons.
+ *
+ * These exist here because leaving them out quietly rigged the figure the other
+ * way: the managed column was running a 128 GB database on the included Micro
+ * instance — one gigabyte of RAM — for free, while our column was made to buy a
+ * machine that could actually hold it. Both columns are now sized by the same
+ * `requirementFor` rule, which is what makes the comparison a comparison.
+ */
+const SUPABASE_COMPUTE = [
+    { name: "Micro", vcpu: 2, ram: 1, price: 10 },
+    { name: "Small", vcpu: 2, ram: 2, price: 15 },
+    { name: "Medium", vcpu: 2, ram: 4, price: 60 },
+    { name: "Large", vcpu: 2, ram: 8, price: 110 },
+    { name: "XL", vcpu: 4, ram: 16, price: 210 },
+    { name: "2XL", vcpu: 8, ram: 32, price: 410 },
+    { name: "4XL", vcpu: 16, ram: 64, price: 960 },
+    { name: "8XL", vcpu: 32, ram: 128, price: 1_870 }
+];
 
 // Ceilings chosen so that the largest workload here still genuinely fits on one
 // machine. Past these the answer is object storage, replicas and a second box —
@@ -63,20 +85,40 @@ const TIERS: Tier[] = [
 const INCLUDED_TRAFFIC_GB = 20_000;
 
 /**
+ * User files go in an S3-compatible bucket, not on the server's NVMe — which is
+ * how Rebase's storage layer is actually deployed, and how anyone self-hosting
+ * 100 GB of uploads would really do it.
+ *
+ * An earlier version put files on the VPS disk. It looked conservative and was
+ * in fact just wrong: 100 GB of files dragged the box from €5 to €30 and made
+ * the managed plan cheaper across the most-used part of the sliders, because
+ * Supabase bundles 100 GB of file storage into its base plan. Modelling a real
+ * architecture badly is not the same as being cautious.
+ *
+ * €0.01/GB is the rough going rate for EU object storage. Indicative, like the
+ * box shapes — providers vary and several include a first allowance free.
+ */
+const OBJECT_STORAGE_EUR_PER_GB = 0.01;
+
+/**
  * What the workload needs from one machine.
  *
- * Deliberately rough, and deliberately unkind to us: 30% disk headroom for WAL,
- * indexes and the OS; RAM to cache half the database; a vCPU per 50k monthly
- * actives. Nobody should size production from this — it exists so the figure
- * cannot claim a workload runs on a box that could not hold it.
+ * Deliberately rough: 30% headroom on the database for WAL and indexes, 20 GB
+ * for the OS, the bundle and room to take a dump before restoring it; RAM to
+ * cache a quarter of the database; a vCPU per 50k monthly actives. Nobody
+ * should size production from this — it exists so the figure cannot claim a
+ * workload runs on hardware that could not hold it.
  *
- * The constants were tightened after a sweep of all 2,205 slider combinations
- * put a 250k-user app on a 2 vCPU box and reported "458× cheaper". Every one of
- * these numbers should err towards buying more machine than you need.
+ * Applied to *both* columns, which is the point. Arguing about whether a 128 GB
+ * database wants 32 GB or 64 GB of RAM changes both bills in the same
+ * direction, so the constant stops deciding who wins.
  */
-const requirementFor = (mau: number, dbGb: number, storageGb: number) => ({
-    disk: Math.ceil((dbGb + storageGb) * 1.3),
-    ram: Math.max(4, Math.ceil(dbGb / 2)),
+const requirementFor = (mau: number, dbGb: number) => ({
+    disk: Math.ceil(dbGb * 1.3) + 20,
+    // Floor of 1 GB, not 4: a 1 GB database on a Micro instance is a thing
+    // Supabase genuinely sells, and a 4 GB floor forced every toy app onto a
+    // $60 Medium — flattering to us and not true.
+    ram: Math.max(1, Math.ceil(dbGb / 4)),
     vcpu: Math.max(2, Math.ceil(mau / 50_000))
 });
 
@@ -104,10 +146,20 @@ export function EuHostingCostDemo() {
     const storageGb = STORAGE_STEPS[storageIdx];
     const egressGb = EGRESS_STEPS[egressIdx];
 
+    const need = useMemo(() => requirementFor(mau, dbGb), [mau, dbGb]);
+
     const bill = useMemo(() => {
         const over = (used: number, inc: number, rate: number) => Math.max(0, used - inc) * rate;
+        const instance = SUPABASE_COMPUTE.find((c) => c.ram >= need.ram && c.vcpu >= need.vcpu)
+            ?? SUPABASE_COMPUTE[SUPABASE_COMPUTE.length - 1];
         const items = [
-            { label: "Pro plan", detail: "includes one Micro compute instance", amount: PRICING.base, always: true },
+            { label: "Pro plan", detail: `includes $${PRICING.computeCredit} of compute credit`, amount: PRICING.base, always: true },
+            {
+                label: "Compute",
+                detail: `${instance.name} — ${instance.vcpu} vCPU, ${instance.ram} GB — $${instance.price} less the credit`,
+                amount: Math.max(0, instance.price - PRICING.computeCredit),
+                always: false
+            },
             {
                 label: "Monthly active users",
                 detail: `${fmtCount(Math.max(0, mau - PRICING.included.mau))} over ${fmtCount(PRICING.included.mau)} × $${PRICING.rate.mau}`,
@@ -134,12 +186,10 @@ export function EuHostingCostDemo() {
             }
         ];
         const total = items.reduce((sum, i) => sum + i.amount, 0);
-        return { items, total, overage: total - PRICING.base };
-    }, [mau, dbGb, storageGb, egressGb]);
+        return { items, total, overage: total - PRICING.base, instance };
+    }, [mau, dbGb, storageGb, egressGb, need]);
 
     // ── Size the box from the workload, not from wishful thinking ──────────
-    const need = useMemo(() => requirementFor(mau, dbGb, storageGb), [mau, dbGb, storageGb]);
-
     const requiredTierIdx = useMemo(() => {
         const i = TIERS.findIndex((t) => t.disk >= need.disk && t.ram >= need.ram && t.vcpu >= need.vcpu);
         return i === -1 ? TIERS.length - 1 : i;
@@ -150,7 +200,8 @@ export function EuHostingCostDemo() {
     const effectiveTierIdx = Math.max(pickedTierIdx, requiredTierIdx);
     const tier = TIERS[effectiveTierIdx];
     const sizedUp = effectiveTierIdx > pickedTierIdx;
-    const box = tier.price;
+    const objectStorage = storageGb * OBJECT_STORAGE_EUR_PER_GB;
+    const box = tier.price + objectStorage;
 
     const insideIncluded = bill.overage < 0.005;
     const atCeiling = mauIdx === MAU_STEPS.length - 1 || storageIdx === STORAGE_STEPS.length - 1
@@ -235,8 +286,9 @@ export function EuHostingCostDemo() {
                     </div>
 
                     <p className="mt-4 text-[11px] leading-relaxed text-surface-500">
-                        Unit prices published by Supabase, checked {PRICING.checked}. This <b className="text-surface-400">under</b>-states
-                        the real bill: it assumes the included Micro instance is enough, and at these numbers it would not be.
+                        Every figure is a price Supabase publishes, checked {PRICING.checked} — including the compute
+                        add-on, which is sized by the same rule as the box opposite rather than left on the included
+                        Micro instance. Still conservative: it counts no read replicas, no PITR and no support plan.
                     </p>
                 </div>
 
@@ -287,8 +339,8 @@ export function EuHostingCostDemo() {
                         <p className="mb-5 text-[11px] leading-relaxed text-surface-500">
                             {sizedUp ? (
                                 <span className="text-amber-300/90">
-                                    Sized up — this workload needs about {need.disk} GB of disk, {need.ram} GB of RAM
-                                    and {need.vcpu} vCPU, and the box you picked has less.
+                                    Sized up — the database alone needs about {need.disk} GB of disk, {need.ram} GB of
+                                    RAM and {need.vcpu} vCPU, and the box you picked has less.
                                 </span>
                             ) : (
                                 <>Indicative shapes at European providers. Yours will differ — put your own number on it.</>
@@ -303,12 +355,25 @@ export function EuHostingCostDemo() {
                                         {tier.vcpu} vCPU · {tier.ram} GB RAM · {tier.disk} GB NVMe
                                     </span>
                                 </span>
-                                <span className="flex-none font-mono text-sm tabular-nums text-surface-300">€{box.toFixed(2)}</span>
+                                {/* The machine alone — `box` also carries the bucket, which is its own line. */}
+                                <span className="flex-none font-mono text-sm tabular-nums text-surface-300">€{tier.price.toFixed(2)}</span>
+                            </li>
+                            <li className="flex items-baseline justify-between gap-4">
+                                <span className="min-w-0 text-sm text-surface-200">
+                                    Object storage
+                                    <span className="block text-[11px] text-surface-500">
+                                        {fmtGb(storageGb)} in an S3-compatible bucket, ~€{OBJECT_STORAGE_EUR_PER_GB.toFixed(2)}/GB
+                                    </span>
+                                </span>
+                                <span className={`flex-none font-mono text-sm tabular-nums ${
+                                    objectStorage > 0 ? "text-surface-300" : "text-primary"
+                                }`}>
+                                    €{objectStorage.toFixed(2)}
+                                </span>
                             </li>
                             {[
                                 ["Monthly active users", "no per-user pricing exists"],
                                 ["Database disk", `${dbGb} GB of the ${tier.disk} GB you already rented`],
-                                ["File storage", `${fmtGb(storageGb)} on the same disk`],
                                 ["Egress", `${fmtGb(egressGb)} of the ${fmtGb(INCLUDED_TRAFFIC_GB)} the plan includes`]
                             ].map(([label, detail]) => (
                                 <li key={label} className="flex items-baseline justify-between gap-4">
@@ -347,8 +412,10 @@ export function EuHostingCostDemo() {
                         sliders to where you are going, not where you are.
                     </p>
                 ) : multiple < 1 ? (
-                    /* It happens: a tiny user base with a lot of files needs a big disk, and
-                       disk is the one thing a managed platform sells cheaply. Say so. */
+                    /* A guard, not a branch anyone reaches today: with both columns sized by
+                       the same rule, a sweep of every slider combination finds no case where
+                       the managed bill is lower. It stays so that a future change to the
+                       constants surfaces as an admission rather than a silent overclaim. */
                     <p className="text-[15px] leading-relaxed text-surface-300">
                         <b className="text-white">Here the managed bill wins.</b> A workload this small does not need
                         much of a plan, but {fmtGb(storageGb)} of files still needs a disk to sit on, and one box big
@@ -397,10 +464,12 @@ export function EuHostingCostDemo() {
                 )}
 
                 <p className="mt-6 text-[11px] leading-relaxed text-surface-500">
-                    The right-hand column is sized from the sliders — disk for the database and the files plus 30%
-                    headroom, RAM to cache half the database, a vCPU per 50k monthly actives — so the box on offer is
-                    always one that could actually run the workload, and picking a smaller one is not on the menu.
-                    Those shapes are indicative, not a quote.{" "}
+                    The right-hand column is sized from the sliders — disk for the database plus 30% headroom and 20 GB
+                    for the system, RAM to cache a quarter of the database, a vCPU per 50k monthly actives — and the
+                    <b className="text-surface-400"> same rule sizes the compute add-on on the left</b>, so neither
+                    column gets to run this workload on hardware that could not hold it. Files sit in an S3-compatible
+                    bucket rather than on that disk, which is how Rebase's storage layer is deployed in practice. Those
+                    shapes and rates are indicative, not a quote.{" "}
                     Dollars and euros are shown as they are billed and not converted — we are not going to track FX on a
                     marketing page, and at present rates it does not change the shape.{" "}
                     <a href={PRICING.source} target="_blank" rel="noopener noreferrer"

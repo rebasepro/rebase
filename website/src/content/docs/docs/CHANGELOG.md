@@ -6,6 +6,191 @@ title: Changelog
 
 ## [Unreleased]
 
+### Breaking
+
+- **`rebase.json` is rebuilt around one authored runtime** — the manifest had four unrelated fields named `mode`, an app type (`admin`) with no mechanism behind it, and a managed-vs-custom distinction nobody had written down.
+
+  A backend now declares `runtime: "managed" | "custom"` — who owns the process, independent of where it runs. It used to be *inferred* from the presence of `backend/src/index.ts`, which every scaffolded project had, so every project predating the manifest silently landed on the custom runtime. App types reduce to `backend` and `static`: the admin is an ordinary static app, because `RebaseAdmin` takes its collections as a build-time prop, so a platform-hosted admin was precluded by the component's interface rather than merely unimplemented. Top-level `runtime` becomes `rebase`, so the word means exactly one thing. In the bundle manifest, `mode` becomes `kind: "backend" | "static"`, `entry.static` becomes a list, and `entry.admin` is gone — format-1 bundles still boot, and the format is 2.
+
+  `backend.mode` (`cms`/`baas`) is deleted outright. Where collections come from was never an independent choice: it is whether `<config>/collections` exists.
+
+  Static apps declare a `path` and several are served from one process — the API at `/api`, a site at `/`, the admin at `/admin`, one container. Three ways that could fail silently are now caught: an app built with Vite's default `base: "/"` but served at `/admin` (blank page, every asset 404, no server error) fails `rebase build`; `serveSPA` orders longest-path-first *and* excludes siblings, so a miss under `/admin` can no longer be answered with the site's index.html; and folding appends to `entry.static` rather than overwriting it, which used to let a second app silently replace the first in a bundle that still looked complete.
+
+- **`mode: "cms" | "baas"` is gone from the server as well** — removing `backend.mode` from the manifest left the identical pair standing one layer down: `RebaseBackendConfig.mode`, authored by anyone who ejects and passed to every driver, plus a wire field, a dev env var and an init flag.
+
+  It was never independent of the collections. The Postgres bootstrapper already guarded `mode === "baas" && collections.length === 0`, so the flag could only agree with them or contradict them — and when it contradicted, the server warned and threw the declared collections away. Everything derives from one question now: did any collections resolve?
+
+  - `RebaseBackendConfig.mode` — deleted, and derived *after* the collections directory is loaded, so a `collectionsDir` pointing at nothing falls through to introspection instead of serving an empty API and never looking at the database.
+  - `DriverInitConfig.mode` → `introspectCollections`. A driver may contribute collections only when it was asked to describe the schema, so it can no longer inject whatever the database happens to contain into a project that declared its own.
+  - `RebaseProjectContract.mode` — removed from `/api/meta/contract` and `/api/meta/schema-version`. Nothing in the CLI, codegen, client or console ever read it.
+  - `REBASE_DEV_MODE` — deleted.
+  - `rebase init --flavor cms|baas` → `--headless`.
+
+  One behaviour change: declaring collections alongside what used to be `mode: "baas"` now **serves** them instead of discarding them.
+
+- **The CMS-named exports are called what they are** — `useCMSContext`/`CMSContext` → `useAdminContext`/`AdminContext`, `registerCMS`/`unregisterCMS` → `registerAdmin`/`unregisterAdmin`, `CMSBasePropertyNoName` → `AdminBasePropertyNoName`, `CMSNavigationContent` → `AdminNavigationContent`. Smaller than it looks: outside `packages/admin` and `admin-types` these had no consumers.
+
+  Seven locale files did say "CMS" in user-visible strings — "CMS Users", "CMS View" and translated sentences in es/pt/de/fr/it/hi — and the two keys carrying it in the public `RebaseTranslations` type are renamed with them. One collision worth knowing about: `studio_sql_admin` already existed as a different string, so `studio_sql_cms` became `studio_sql_collections_label` rather than being merged onto it.
+
+  `packages/firebase` is deliberately untouched: `FireCMS`, `firestoreToCMSModel` and the optional `DataDriver.delegateToCMSModel` are heritage from a different product, and renaming an optional method on a public driver contract breaks a third-party driver *silently* — an unimplemented optional method is simply never called. That waits for a driver-contract major.
+
+- **A scaffolded project self-hosts the same artifact Rebase Cloud runs** — the template declared `runtime: "managed"` and shipped a compose file that built two custom images, one of which ended in `CMD ["pnpm","start"]` — running the entrypoint the managed runtime never loads, and which is no longer scaffolded. `docker compose up` on a fresh `rebase init` was not merely inconsistent with the project's own manifest; it was broken, building an image around a file that did not exist.
+
+  The scaffolded compose now runs the managed shape — Postgres, plus `rebasepro/server` with `./dist-bundle` mounted — so one container serves the API at `/api` and the admin at `/`, same origin, no CORS between them and no nginx. The frontend image and its `nginx.conf` are gone for the same reason the backend one is: the runtime serves those assets.
+
+  Image-building moves into `rebase eject`, which writes the Dockerfile and a `docker-compose.custom.yml` together and does **not** touch the scaffolded compose — so going back stays a one-line change in `rebase.json` rather than a restore from git.
+
+- **Nine presentation options move into a property's `admin` block** — `fixedFilter`, `includeId` and `includeEntityLink` on a reference or a relation; `widget` on a relation; `sortable` and `canAddElements` on an array; `previewProperties` on a map. The collection half of that split shipped in 0.11 and moved all 38 keys; the property half moved most of its options and left these behind, under a section marker in `properties.ts` that read `─── UI configuration ───`. A backend-only install went on shipping them with nothing to render them.
+
+  ```diff
+    tags: {
+        name: "Tags",
+        type: "relation",
+        relation: { kind: "manyToMany", target: () => tagsCollection },
+  -     widget: "dialog",
+  -     includeId: false,
+  +     admin: { widget: "dialog", includeId: false },
+    }
+  ```
+
+  Writing one at the top level is now a config error naming the fix, the same way the 0.11 collection keys are — `validate-config` reads them off `ADMIN_PROPERTY_KEYS`, so nothing is silently ignored.
+
+  `widget` is the one to check first, because it was never working: `AdminRelationOptions` already declared it and the admin only ever read *that* one, so every top-level `widget: "dialog"` had been quietly rendering a `select`. Moving it into `admin` is what makes an existing declaration take effect.
+
+  Two options that look like the same case stayed on the property, and deliberately: `propertiesOrder`, because `sortProperties` in `@rebasepro/common` reads it recursively and a driver calls that — a core package cannot see the `admin` block at all; and `keyValue`, because it says the map has no declared shape, which is what the OpenAPI generator emits `additionalProperties` from.
+
+- **The SQL-only fields are rejected on a document-store collection** — `table`, `relations` and `disableDefaultPolicies` are declared on `PostgresCollectionConfig` alone, and `columnType`/`columnName` are omitted from the Firestore and MongoDB property maps. A MongoDB collection could be written with a table name and a `columnType: "bigserial"`, and nothing anywhere read either.
+
+  `DataSourceCapabilities` had been reporting this all along — `supportsRelations` and `supportsColumnTypes` are both `false` for the document engines — and the engine-specific collection and property types existed too. The two were never joined, so call sites checked the capability at runtime and then read a field the base type had to declare for them. That is why the fields were on the base.
+
+  Engine-agnostic code narrows with the new `isRelationalCollectionConfig`, which *is* that capability check with the narrowing attached, so a custom SQL engine registered through `registerDataSourceCapabilities` is included rather than excluded by a hardcoded `"postgres"`.
+
+  `securityRules` is **not** part of this and stays driver-agnostic. It is a contract about who may read and write which rows, and each engine keeps it its own way: Postgres compiles it to `CREATE POLICY`, MongoDB translates it into a filter AND-ed into every read and write. `supportsRLS` answers whether an engine *generates policies*, which is a different question from whether it honours a rule.
+
+### Added
+
+- **`rebase cloud deploy` needs no flag on a managed project** — a bare deploy used to be refused with "redeploy it with `rebase cloud deploy --bundle`". The refusal existed because forgetting the flag meant the command built a container image and ejected the project — a plausible mistake with an expensive outcome. Now that the backend *declares* `runtime: "managed"`, the flag is redundant and the bare command builds and ships a bundle. `--source` and `--bundle-dir` are explicit acts and still win, and the refusal stays for the case it was written for: a manifest that says `custom` deploying over a project the platform runs.
+
+- **`rebase cloud status` says which runtime and which framework a project is running** — it reported no runtime information at all, so "what is actually serving this project" had to be assembled by hand from a Docker tag, a manifest and a pod. Three numbers are in play and two of them look interchangeable: the runtime version is the contract line a bundle's range resolves against, the framework version is the `@rebasepro` release the runtime image ships, and a project can legitimately run runtime 1.2.0 — whose image was built against framework 0.10.0 — while its own bundle installs 0.11.0 at boot.
+
+- **The login screens can offer a newsletter opt-in** — `LoginView` takes an `onNewsletterOptIn` prop and renders a checkbox on the sign-in, register and bootstrap forms, translated in all seven locales. It fires only once the credentials are accepted: a ticked box on a *failed* attempt must not subscribe an address whose owner never proved they control it. The state lives in `LoginView` rather than the form, so switching between login and register does not drop the tick. Entirely opt-in — a panel that passes no handler renders no checkbox.
+
+- **A drawer group can carry the icon, and its entries indent beneath it** — a long navigation rendered as one flat column: every entry had an icon of its own, and the group headers organising them sat at 11px in `surface-400`, *below* the contrast of the rows they label. The thing you scan to find anything else was the quietest element on screen, and thirty entries gave no visual sign of which belonged together.
+
+  `NavigationGroupMapping` takes an `icon` now — a Lucide name, like every other icon in a collection. Declaring one moves the anchor from the rows to the group: the header takes the icon, and the entries below trade theirs for an indent of the same width, so labels stay on the original grid and the rail does not change size. The label steps up to 12px `surface-600` to match, since it is now what carries the hierarchy.
+
+  Strictly opt-in, and per group. A group that names no icon renders exactly as it did — same classes, entries keep their icons — so an existing panel sees no change until it asks for one. Two cases stay flat regardless of configuration: a group with no header has nothing to indent under, and a drawer collapsed to a rail keeps its entry icons, because there they are the only thing left to click.
+
+- **`defaultDrawerOpen` — open the navigation expanded** — the drawer started collapsed to a rail with no way to change it. `autoOpenDrawer` looks like the prop for this and is not: it expands on *hover*, and always has, though `RebaseLayout` documented it as "auto-open the drawer on load" while `Scaffold` documented the same prop as "open the drawer on hover". Both docs now say the same true thing.
+
+  The new prop seeds the initial state and nothing more — no effect syncs it afterwards, so a user who collapses the drawer is not re-expanded underneath them on the next render. Ignored on small layouts, where an expanded drawer covers the content it exists to navigate.
+
+- **The shell takes a `logo`** — `Scaffold` accepted one and rendered it in the drawer and top bar, but nothing passed it down, so the prop was unreachable from `RebaseShell` — the component a scaffolded app actually mounts. Threaded through `RebaseShell` → `RebaseLayout` → `Scaffold`.
+
+- **An entity action's icon can be a Lucide name** — `EntityAction.icon` was `React.ReactElement`, alone among a collection's icons; `admin.icon` and `entityViews[].icon` were strings already. An element cannot be written in the `config` package at all: it is plain `.ts`, and a backend loads it for its schema, so importing the UI layer just to name an icon drags React into the server's module graph. Both forms are accepted now and resolved through `getIcon` at every render site.
+
+- **A collection's `entityActions` may name an app-level action by key** — `resolveEntityAction` has always accepted `string | EntityAction`, the collection editor stores exactly these keys, and the sibling field `entityViews` is typed `(string | EntityCustomView)[]`. Only this field's type disagreed, so the documented approach — register the action on `<RebaseAdmin entityActions={…}>`, then name it from the collection — required a cast to write.
+
+  It matters most where the action *cannot* be imported. An action carries an `onClick` and usually opens a dialog, so a collection file that imports one pulls the admin bundle into any backend that loads it; naming it costs nothing there.
+
+- **A full-screen entity has a way back to its collection** — every other layout can be dismissed: a side panel and a dialog close, a split keeps the list beside it. Full screen replaces the collection outright, leaving browser Back as the only route out — which the page never shows as an affordance, and which is wrong anyway once the reader has moved between tabs inside the entity.
+
+- **A project declares its storage buckets in `rebase.json`** — storage had one destination and three ways in, and which buckets a project has was declared in compiled config code, so nothing outside the running container could learn it. The console could only ever configure the default bucket, and a named source was reachable only by hand-writing `S3_BUCKET__MEDIA` — and only on the managed runtime, because the ejected template parsed `STORAGE_TYPE` itself and knew nothing about suffixes.
+
+  Topology moves to `rebase.json`, the one artifact a host can read *before* running a build. The CLI resolves it into the bundle manifest for managed runtimes; a custom runtime reads the same file out of the image it already ships. Both end at the same list, so the console and the tenant cannot describe different topologies. A declared bucket is a topology rather than a boot requirement — declaring one does not fail the boot if its credentials are not present yet.
+
+- **`iterate()` and `findAll()`, so nobody hand-rolls the paging loop** — `find()` with manual `limit`/`offset` was the whole pagination API, so every consumer wrote the same loop and wrote it wrong in the same two ways: terminating on `rows.length >= limit`, which mistakes an exactly-full final page for a middle one and drops everything after it, and capping `findAll`-style helpers by silently truncating.
+
+  `iterate()` is an async generator that fetches a page at a time and yields rows as they are consumed. `findAll()` is the same walk collected under a ceiling that **throws** when hit, because a short array that reads like a complete one is the bug this exists to prevent. Termination comes from `meta.hasMore` alone. Offset paging is the default and drifts under concurrent writes — `cursor: "id"` switches to keyset seeking, built out of parameters `find()` already takes, so it needs nothing new from the server and works on every transport.
+
+- **Filters on a relation, for every kind the driver can compile** — `isFilterableRelation` allowed only `belongsTo`, the one kind with a column on this row. The driver compiles `manyToMany`, `hasMany` and `hasOne` into a correlated `EXISTS` now, so the affordance returns for them; `via` stays out, its join path having no stated inverse. A to-many relation also answers `array-contains` and `array-contains-any` — a to-many *is* the list, so "contains X" is `==` and "contains any of" is `in`, the same `EXISTS` under a different name. Before, the admin rendered those controls and the driver returned a 400 behind them.
+
+- **`supportsVectors` on a data source's capabilities** — `VectorProperty` carries a `dimensions` and is pgvector-shaped, and it was the one driver-specific property kind with no flag to gate it, so unlike every other field in that descriptor there was not even a runtime answer to appeal to: a Firestore collection could declare an embedding and no driver would do anything with it. Postgres claims it; the document stores do not, and `vector` is now excluded from their property maps alongside `relation`.
+
+- **Every collection config is strict-parsed at boot** — nothing checked these files. A config written against an older version loaded clean and whichever keys had moved were ignored: no warning, no log line, no failed boot. The collection still served rows, so the only signal was the feature quietly not being there — an icon that never appeared, a `readOnly` field the panel let you edit, a relation that answered `[]`. The renames were never the problem; a rename with no runtime signal is.
+
+  `assertCollectionConfigs` runs at the loader — the one definition of "the collections" — so the runtime, the drizzle generator, the policy generator and the doctor reach the same verdict. It is also what turns the property-block move above into an error naming the fix rather than a silently ignored key.
+
+- **The cron scheduler warns when in-process timers cannot fire** — jobs are driven with `setTimeout`, and on a platform that freezes or evicts the instance between requests (Cloud Run at `--min-instances=0`, Lambda, Vercel) those timers never fire. The failure was completely silent: the server booted, logged the jobs as registered, and ran nothing. Detected from documented runtime env vars and warned once at scheduler start. Kubernetes pods are excluded, so a GKE Deployment never warns. Nothing here can fail a boot.
+
+### Fixed
+
+- **The API docs disappeared from every project the runtime boots** — `REBASE_ENABLE_SWAGGER` defaulted to a flat `"false"`, which reads as a safe default and was not one: the runtime is how every scaffolded project boots, so `/api/docs` and `/api/swagger` 404'd for projects that never asked for that. `rebase init` prints "docs are at /api/swagger" on completion, the headless README repeats it, and the console's API Explorer fetches `/api/docs` — all three were broken against a project running the runtime.
+
+  The variable is tri-state now and resolved against `NODE_ENV`: unset means on in development and off in production, and an explicit `true` or `false` wins in both. Unset in development resolves to *undefined* rather than `true`, which hands the decision to the server's own policy — the one that already knows to serve the spec while withholding the Swagger UI. Two defaults that can disagree about the same route is the bug this replaces, so there is only one now.
+
+- **A backend with `allowRegistration: false` was a dead end on a fresh database** — `GET /auth/config` reported `registrationEnabled` while `needsSetup`, the login UI showed the first-admin form on the strength of that, and `POST /auth/register` then refused it. `POST /admin/bootstrap` could not break the tie either, since it requires an authenticated caller and an empty database cannot produce one. Hit live on a deployed project.
+
+  The register gate now admits the first registration when the user table is empty — a paginated count, not an unbounded list, since this path serves anonymous callers — and the existing auto-promote makes that user an admin. One user in and the flag binds again; a racer that slips past the empty check is deleted and refused, so the window can never mint a second account. `disableSelfRegistration` stays a hard kill switch above even bootstrap, and `/auth/config` stops advertising registration when it is set instead of pointing the UI at a form that can only 403.
+
+- **`@rebasepro/server` loaded twice in one process left every custom function without a singleton** — under the managed runtime this is the normal layout, not an edge case: the image ships the framework at `/app/node_modules`, while a bundle installs its own dependencies into `/bundle/node_modules`, where `@rebasepro/server` arrives transitively. Every custom function imports `defineFunction` from `@rebasepro/server`, so functions held the bundle's copy while `initializeRebaseBackend()` initialized the image's. With the instance in a module-local variable, `rebase.data`, `rebase.dataAsAdmin` and `rebase.storage` threw "server not initialized yet" on every request to every custom function — in a process that booted cleanly, served `/api/data/*` fine and reported itself healthy. Observed in production as 100% of one tenant's document routes 500ing while the rest of the app worked.
+
+- **The documented `where` query parameter was never read** — the OpenAPI document publishes `where` on every `GET /api/data/{slug}` and the relations docs use it to narrow a subcollection list, but `parseQueryOptions` never looked at it. It was also missing from `reservedQueryKeys`, so it fell through to the per-field `?field=op.value` loop and compiled as a filter on a column literally named "where", which no table has — meaning the documented way to filter a list returned the entire table, bounded only by whatever RLS allowed, until unresolvable fields started failing closed and it became a hard 400 instead. It is parsed as JSON and normalized through the same `deserializeFilter` the querystring dialect uses, so `{"status":["==","active"]}`, `{"status":"eq.active"}` and `{"status":"active"}` compile to one condition — and unlike the querystring, JSON carries types, so `[">=", 18]` stays a number.
+
+- **`serveSPA` 404'd routes that merely shared a prefix** — exclusion was a `startsWith`, so `/api` excluded `/apidocs` and `/admin` excluded `/administrators`. Both are ordinary client-side routes of an app rooted at `/`, and both 404'd: the SPA fallback declined them and nothing else claimed the path. `apiBasePath` is always in the exclusion list, so this was never limited to the multi-app setups the list was added for — a single SPA with a route under `/api<something>` hit it too. Matching is by path segment now.
+
+- **A deliberate 400 was reported as a database failure** — `sanitizeErrorForClient` only knew how to unwrap Postgres errors, so a thrown `ApiError` lost its message, its code and its status on the way to the client and took a `logger.error` line with it. That is the whole diagnosis for a realtime subscription: the admin list prefers `accessor.listen`, so an unknown filter field arrived as an opaque failure and every notify-triggered refetch logged at error as if the database had gone down. A 4xx short-circuits ahead of the Postgres extraction now and passes its message and code through untouched, logging at debug or warn per the error's `expected` flag. 5xx is unchanged: still a generic message, still logged at error, so internals stay server-side.
+
+- **`rebase schema generate` emitted a schema that does not compile** — `rel.localKey` is a *column* name and the generated Drizzle object is keyed by *property*. They coincide until a property is camelCase — `userId` stored in `user_id` — and then the emitted relation references a key that is not there: `Property 'user_id' does not exist on type … Did you mean 'userId'?`. Three of the four relation-emission sites already normalised through `resolvePropertyKeyForColumn`; the `belongsTo` branch did not. It hid because the existing test's collection declares no property matching the FK column, so the resolver fell through and returned the column unchanged — identical output either way.
+
+- **The runtime image did not ship the S3 and SMTP drivers it loads** — the runtime implements S3 object storage and SMTP email and pulls their drivers in with `await import(...)`, but the image never installed them, and the import resolves relative to the runtime's own location: a project declaring `@aws-sdk/client-s3` in its bundle does not satisfy it, because that copy lands off the resolution path. The failure is nasty precisely because it is so narrow — the tenant boots clean, passes every health probe, serves every other route, and fails only on storage *writes*.
+
+- **The runtime deduped every `@rebasepro` package, not just the one that needs it** — the first cut of the singleton fix redirected every `@rebasepro` package the image ships, which took tenants down: the image installs only the narrow dependency set the runtime itself needs, while a bundle's own install resolves each package's full tree, so redirecting `@rebasepro/server-postgres` pointed the database driver at a copy with no `chokidar` and the pod crash-looped. `@rebasepro/server` is the only package that both needs the redirect and is provably safe to redirect.
+
+- **Two published packages imported dependencies they never declared** — `@rebasepro/firebase` declares `firebase` as a peer dependency, but every source file imported the *scoped subpackages* — `@firebase/app`, `@firebase/auth`, `@firebase/firestore` and four more — which appeared only in devDependencies. Rollup externalises every bare specifier, so those imports survived into the published `dist` verbatim. They resolve by accident under npm and yarn, whose hoisting puts them at the top level, and fail under pnpm's isolated layout — so the package type-checked, built and tested green, then broke on first import for an installing user. `@rebasepro/inference` shipped the same way with two packages.
+
+- **A scaffolded project could not run `rebase build`** — `backend/tsconfig.json` and `config/tsconfig.json` left `types` unset, so TypeScript swept every reachable `node_modules/@types` and treated each folder as an implicit type library. Under pnpm that reaches the virtual store, where packages hoisted for peer resolution live — `dompurify` among them, pulled in transitively by the admin editor — and every scaffolded project failed with `TS2688: Cannot find type definition file for 'dompurify'`.
+
+- **A custom runtime was built a bundle it never deploys** — `rebase build` had no `runtime` check, so an ejected project — whose artifact is an image built from its own Dockerfile and entrypoint — still got a `dist-bundle/` produced for it. That is worse than doing nothing, because the bundle looks like the thing that ships. A custom backend is skipped now, naming the two commands that actually build it; static apps in the same repo still build, since an ejected entrypoint serves them itself via `serveSPA`.
+
+- **The headless scaffold's backend had nothing to compile** — moving `storage.ts` into the config package left `backend/src/` empty in the headless flavour: it declares no collections, so there is no generated schema, and the entrypoint moved behind `rebase eject`. The tsconfig still said `include: ["src/**/*"]`, and tsc reports an include matching nothing as `TS18003` — an error, not a no-op — so the backend workspace failed to build on every headless scaffold.
+
+- **The client SDK could not create an admin API key** — `admin: true` is what grants a key the `admin` role: the admin-gated routes, and the RLS `default_admin` policies. `@rebasepro/client` declared its own `CreateApiKeyRequest` without the field, under a comment saying these types lived in the server package rather than in `@rebasepro/types` — which had stopped being true, and the copy had drifted. Passing `admin: true` was an excess-property error, so the one privileged thing about a key was unreachable. There is one declaration now, in `@rebasepro/types`; the client and the server both re-export it.
+
+- **A history entry's `updated_at` was a `string` from Postgres and a `Date` from MongoDB** — the same interface name in two driver packages, plus a third spelling in the admin's `useHistory` hook, so nothing could read history without first choosing a driver. `EntityHistoryEntry` in `@rebasepro/types` is the wire shape and carries a `string`. MongoDB's `Date` was never the contract, only its storage: the driver keeps that for its own document and converts on the way out.
+
+- **The collection editor dropped fields on save** — it round-trips a collection through a hand-written serializable mirror whose whitelist had fallen behind the core types by six fields. Editing a collection in the panel silently unset whichever of them it had.
+
+  Two mattered. `excludeFromApi` is the server-side guarantee that a column — a password hash, a verification token — never reaches an API response; opening such a collection in the editor and saving published it. And collection-level `relations` had no serializer at all, so importing an existing table detected its foreign keys and junction tables, showed them on the form, and discarded every one on save. The other four were `strictWrites`, `disableDefaultPolicies`, `filterOperators` and `urlPreview`; `url` was being dropped too, and it feeds the generated OpenAPI contract.
+
+- **Importing a table wrote a relation shape the framework no longer accepts** — `pgColumnToProperty` existed in two copies. The one the collection editor called emitted the pre-union flat relation (`cardinality`/`direction`, replaced by the `kind` tagged union) and CRUD verbs where `SecurityOperation` takes SQL ones, typed `any[]` at both sites so neither showed up. The correct copy was the one in `@rebasepro/studio`, which had the tests and was called from nowhere. There is one now, in `@rebasepro/common`.
+
+- **The Studio JS editor autocompleted a query shape the server rejects** — its ambient SDK declarations are hand-mirrored and had drifted: ten Firestore-era filter operators with no `like`/`ilike`/`is-null` family, `where` as `Record<string, string>` where a filter is an `[operator, value]` tuple, and `orderBy` as a bare string rather than a `[field, direction]` pair. A bare string reaches PostgREST and builds a malformed query. The operator union is now interpolated from `ALL_WHERE_FILTER_OPS`, so that part cannot fall behind again.
+
+
+- **A many-to-many child listing failed on a column that does not exist** — the junction's columns were passed into the `EXISTS` subquery as bare Drizzle columns. A column object carries no table qualifier of its own; it renders against whatever table the surrounding builder believes is current. Inside `db.query.findMany`, which aliases the root table, that produced
+
+  ```sql
+  EXISTS (SELECT 1 FROM "body_area_podcast"
+          WHERE "podcast"."podcast_id" = "podcast"."id" AND "podcast"."body_area_id" = $1)
+  ```
+
+  — the junction's columns wearing the *target's* alias. Postgres aborts the transaction on the unknown column, and the fallback read then fails on `25P02 current transaction is aborted`, three frames away from anything to do with the relation.
+
+  The junction is aliased and referenced by identifier now, exactly as the `joinPath` branch beside it already did; only the correlation stays a column object, because that one has to bind to the outer row. The alias also disambiguates a self-referential many-to-many, where the junction and the target are the same table. The old form rendered *correctly* in isolation and only corrupted inside the query builder, which is why unit tests asserting on result counts never saw it — the new ones assert the emitted SQL.
+
+- **An auth collection that named `reset_password` got two Reset Password buttons** — the injector skips its action when the collection already has one, but it read `.key` off every entry, and an entry may be the key itself. A collection that named the action rather than importing it was therefore never recognised as already having it, and the injection ran on top.
+
+- **An empty `in` list returned every row** — `filter: { id: ["in", teamIds] }` with no teams is how a caller asks for nothing, and it answered with the whole table: an empty list built no condition, and an absent condition is not a restriction. It needs no typo to reach, because an empty array is exactly what a correct program produces when the set it derived came out empty.
+
+  `in []` is FALSE now and `not-in []` is TRUE, which is what excluding nothing means; `array-contains-any []` overlaps nothing. A non-array operand was dropped too, and that one arrives over the wire — `?filter=id.in.5` parses to the string `"5"`, since the REST dialect only builds an array when the value is parenthesised, so an ordinary REST query ran unfiltered. A scalar is now the one-element list it means.
+
+- **An unresolvable filter field widened the read** — a filter key matching no column was logged and dropped. Dropping a condition can only widen a result set, so a typo'd or renamed key ran the query without it and returned everything RLS happened to allow. Inside `or(...)` it was worse: the leaf vanished from the disjunction, so the surviving branches matched on their own and the widening was not bounded by the condition that went missing.
+
+  Both sites resolve through one helper now, which throws a 400 `UNKNOWN_FILTER_FIELD` naming the field, the collection and the table's real columns. `unknownFilterFields: "warn"` on the driver config restores the old drop-and-continue behaviour verbatim.
+
+- **An owning relation's key is its `localKey`, not `<field>_id`** — the filter resolver guessed the column name. The real one is the relation's `localKey`, whose default is snake-cased *and* singularised, so `userProfile` is `user_profile_id` and `users` is `user_id` — and an explicit `localKey` is anything at all. With unresolvable fields now failing closed rather than widening, that guess turned an ordinary `belongsTo` filter into a 400. It resolves through the collection's relations, keeping the two derivable shapes as a last resort.
+
+- **The SDK answered in two different relation shapes** — `data.jobs.find()` and `data.jobs.find({ include: […] })` disagreed. With `include` the accessor ran the REST pipeline, which inlines a relation as the target's own columns; without it, the driver eagerly loaded every relation and put a `{ __type: "relation" }` envelope where the foreign key was. `findById` was always the second. The generated types described only the envelope, so a column the schema calls a foreign key was typed `string` and arrived as an object — twice, in production, before anyone traced it here. Every SDK read goes through the REST pipeline now, which is what the HTTP API already serves for the same query.
+
+- **"Posts with no tags" returned no posts** — the null checkbox was hidden on a to-many relation, and asking which rows have *no* link is the question a filter on a link is most often for. Showing it was not enough: the design is that the operator carries the sense and the checkbox supplies the value, and on a to-many the multi-select can only produce `in`/`not-in`, neither of which carried a null — the relation path read `["in", null]` as membership of an empty list.
+
+- **The filter UI asserted Postgres on every engine's behalf** — `isFilterableRelation` hardcoded the four kinds *the Postgres driver* compiles. Only Postgres declares `supportsRelations` today, so the claim happened to be true, but it was a fact about a driver stated where no driver could see it. It moves to `DataSourceCapabilities` beside `filterOperators`, where the same question is already answered for operators. The field is optional, so a third-party driver registered before it existed still compiles. Two related fixes: the operator now decides how many values a relation filter takes, and a relation with no column to filter on is no longer offered one.
+
+- **A relation declared inline on the property rendered an error instead of a field** — `RelationFieldBinding` demanded a top-level `relations` array before it would render, and the inline form — `relation: { kind, target }` on the property, which is what the docs show — produces no such array. Every collection declaring a relation that way threw and rendered the error boundary where the field should be. The guard was redundant as well as wrong: `resolveRelationProperty` handles all three forms and reports a real error naming the property and the collection when it genuinely cannot resolve.
+
+- **A server-side client with no credential now says so** — a `createRebaseClient` built with no token off-browser is silently anonymous, and RLS answers it with whatever is public: usually nothing, occasionally the wrong thing. Warned once per client on the first request rather than at construction, since `setToken`, `setAuthTokenGetter` and a server-side sign-in all land after the constructor. Deliberately narrow: anonymous is an ordinary state in a browser, and warning there is noise that teaches people to ignore the warning.
+
 ## [0.11.0] - 2026-07-27
 
 ### Breaking
