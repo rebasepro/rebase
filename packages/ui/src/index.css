@@ -1,59 +1,4 @@
-@theme {
-    /* Font Families */
-    --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, 'Helvetica', 'Arial', sans-serif;
-    --font-headers: 'Instrument Sans Variable', 'Instrument Sans', 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Space Mono', 'Lucida Console', monospace;
-
-    /* Colors */
-    --color-primary: #0070F4;
-    --color-primary-light: oklch(from var(--color-primary) calc(l + 0.15) c h);
-    --color-primary-dark: oklch(from var(--color-primary) calc(l - 0.15) c h);
-    --color-secondary: #FF5B79;
-    --color-secondary-light: oklch(from var(--color-secondary) calc(l + 0.15) c h);
-    --color-secondary-dark: oklch(from var(--color-secondary) calc(l - 0.15) c h);
-
-    --color-primary-bg: oklch(from var(--color-primary) l c h / 0.1);
-    --color-secondary-bg: oklch(from var(--color-secondary) l c h / 0.1);
-
-    /* Field Colors */
-    --color-field-disabled: rgb(224 224 226);
-    --color-field-disabled-dark: rgb(35 35 37);
-
-    /* Text Colors — using opaque values so icon strokes render solidly */
-    --color-text-primary: #212121;
-    --color-text-secondary: #757575;
-    --color-text-disabled: #9e9e9e;
-    --color-text-primary-dark: #ffffff;
-    --color-text-secondary-dark: #a0a0a9;
-    --color-text-disabled-dark: #757580;
-
-    /* Surface Colors */
-    --color-surface-50: #fafafa;
-    --color-surface-100: #f5f5f5;
-    --color-surface-200: #e5e5e5;
-    --color-surface-300: #d4d4d4;
-    --color-surface-400: #a3a3a3;
-    --color-surface-500: #737373;
-    --color-surface-600: #404040;
-    --color-surface-700: #262626;
-    --color-surface-800: #111111;
-    --color-surface-900: #0a0a0a;
-    --color-surface-950: #000000;
-
-    /* Surface Accent Colors */
-    --color-surface-accent-50: #f8fafc;
-    --color-surface-accent-100: #f1f5f9;
-    --color-surface-accent-200: #e2e8f0;
-    --color-surface-accent-300: #cbd5e1;
-    --color-surface-accent-400: #94a3b8;
-    --color-surface-accent-500: #64748b;
-    --color-surface-accent-600: #475569;
-    --color-surface-accent-700: #334155;
-    --color-surface-accent-800: #1e293b;
-    --color-surface-accent-900: #172033;
-    --color-surface-accent-950: #0f172a;
-}
-
+@import "./theme.css";
 /* Native UI (scrollbars, form controls) must follow the active theme,
    otherwise Chrome renders light scrollbars in dark mode */
 html {
@@ -74,32 +19,42 @@ html.dark {
     scrollbar-width: none; /* Firefox */
 }
 
+/* Optical ladder: weight comes down as size comes down, tracking tightens as
+   size goes up. Seven consecutive levels of semibold was a Rubik-era setting,
+   and holding 600 all the way down to text-sm made every heading shout equally
+   — a heading stops being a headline somewhere, and the scale should say where.
+   600 is display-scale only; the small end carries 500.
+
+   With a single face carrying both headings and body, weight and tracking are
+   the only things separating a heading from the copy around it — so the tiers
+   have to actually differ, rather than all sitting at 600. */
+
 .typography-h1 {
-    @apply text-4xl font-headers font-semibold tracking-tight;
+    @apply text-4xl font-headers font-semibold tracking-display;
 }
 
 .typography-h2 {
-    @apply text-3xl font-headers font-semibold tracking-tight;
+    @apply text-3xl font-headers font-semibold tracking-display;
 }
 
 .typography-h3 {
-    @apply text-2xl font-headers font-semibold tracking-tight;
+    @apply text-2xl font-headers font-semibold tracking-title;
 }
 
 .typography-h4 {
-    @apply text-xl font-headers font-semibold tracking-[-0.01em];
+    @apply text-xl font-headers font-medium tracking-title;
 }
 
 .typography-h5 {
-    @apply text-lg font-headers font-semibold tracking-[-0.01em];
+    @apply text-lg font-headers font-medium tracking-heading;
 }
 
 .typography-h6 {
-    @apply text-base font-headers font-semibold tracking-[-0.01em];
+    @apply text-base font-headers font-medium tracking-heading;
 }
 
 .typography-subtitle1 {
-    @apply text-sm font-headers font-semibold tracking-[-0.01em];
+    @apply text-sm font-headers font-medium tracking-heading;
 }
 
 .typography-subtitle2 {

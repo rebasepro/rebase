@@ -54,11 +54,27 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
             <!-- Headline -->
             <div class="relative">
 
-                <h1 class="relative mb-6 text-4xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-[1.08] text-white animate-on-scroll fade-in-up">
+                <!-- Display tier, one clear step above the 48px section h2s.
+                     Each rung is the largest that still sets the longer line
+                     ("The backend you always wanted.") on ONE line at that
+                     breakpoint — the line width runs ~14.6x the font size, so:
+                       md  (736px usable) -> 48px = 700px
+                       lg  (960px usable) -> 60px = 875px
+                       xl (1216px usable) -> 72px = 1049px, 86% of the measure
+                     72px was picked over 80px because 80 leaves only 4% of slack
+                     and any copy edit overflows it. Base stays 36px and wraps,
+                     which is correct on phones. -->
+                <h1 class="relative mb-6 text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-semibold leading-[1.05] text-white animate-on-scroll fade-in-up">
                     {t("hero.title.part1")}<br/><span class="text-primary">{t("hero.title.part2")}</span>
                 </h1>
             </div>
-            <p class="mb-4 text-lg leading-8 text-surface-400 lg:text-xl sm:px-10 xl:px-40 animate-on-scroll fade-in-up"
+            <!-- Measure is set with max-w, not side padding: `xl:px-40` only bit
+                 above 1280px, so on a 1440px screen the line ran ~90 characters
+                 before wrapping. A hero subtitle wants ~60-70. -->
+            <!-- Steps up with the headline so the pair keeps its ratio (~3.6:1
+                 at xl). Measure is set with max-w, not side padding — `xl:px-40`
+                 only bit above 1280px, so the line used to run ~90 characters. -->
+            <p class="mx-auto mb-4 max-w-2xl text-lg lg:text-xl leading-relaxed text-surface-300 animate-on-scroll fade-in-up"
                set:html={t("hero.subtitle")}/>
 
             <!-- Hero primary CTA: zero-friction live demo -->
@@ -66,7 +82,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                 <a href="https://demo.rebase.pro"
                    target="_blank" rel="noopener noreferrer"
                    id="hero-try-demo"
-                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-7 py-3.5 text-base font-semibold text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
+                   class="inline-flex items-center gap-x-2 rounded-lg bg-primary px-7 py-3.5 text-base font-medium text-white hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 ease-in-out btn-glow">
                     {t("hero.cta.demo")}
                     <svg
                             class="lucide lucide-arrow-right"

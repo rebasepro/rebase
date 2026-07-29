@@ -638,18 +638,18 @@ Form inputs should use `@rebasepro/ui` components directly without excessive cla
 ## 16. Font Stack
 
 ```css
---font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, 'Helvetica', 'Arial', sans-serif;
---font-headers: 'Instrument Sans Variable', 'Instrument Sans', 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+--font-sans: 'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui, 'Helvetica', 'Arial', sans-serif;
+--font-headers: 'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
 --font-mono: 'JetBrains Mono', 'Space Mono', 'Lucida Console', monospace;
 ```
 
-Two faces, deliberately split: **Instrument Sans** carries headings and display
-type, **Inter** carries every piece of UI and body copy. Reach for
-`font-headers` only on headings — a slightly condensed display face in a dense
-data table costs legibility for no gain.
+**One face, Instrument Sans**, for headings and body alike. `--font-headers`
+exists so headings can take their own weight and tracking tier, not because it
+is a different family — mixing in a second face is what made earlier pages read
+as two competing voices stacked on top of each other.
 
-Ensure `@fontsource-variable/inter`, `@fontsource-variable/instrument-sans` and
-`@fontsource/jetbrains-mono` are imported in the entry file.
+Ensure `@fontsource-variable/instrument-sans` and `@fontsource/jetbrains-mono`
+are imported in the entry file.
 
 ---
 

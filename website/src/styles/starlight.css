@@ -1,10 +1,10 @@
 @import "tailwindcss";
+@import "@rebasepro/ui/theme.css";
 @import "@rebasepro/ui/index.css";
 
 /* Docs run on Starlight's own layout, not src/layouts/Layout.astro, so nothing
    here loads the webfonts the way the marketing pages do — the @font-face rules
    have to come in through this stylesheet or the docs fall back to system sans. */
-@import "@fontsource-variable/inter";
 @import "@fontsource-variable/instrument-sans";
 
 
@@ -16,12 +16,13 @@
 
 @custom-variant dark (&:is([data-theme=dark], [data-theme=dark] *));
 
+/* Docs-only overrides. Fonts and the type scale come from ui/theme.css. The
+   two that genuinely differ here: the primary tints (hand-picked hexes rather
+   than ui's oklch derivation) and the mono face — docs set code in IBM Plex
+   Mono, not the JetBrains Mono the app uses. */
 @theme {
-    --color-primary: #0070f4; /* #0070f4 */
-    --color-primary-light: #359aff; /* #359aff */
-    --color-primary-dark: #0061c2; /* #0061c2 */
-    --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
-    --font-headers: "Instrument Sans Variable", "Instrument Sans", "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+    --color-primary-light: #359aff;
+    --color-primary-dark: #0061c2;
     --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
@@ -61,7 +62,7 @@
     --sl-color-bg-inline-code: #f2f3f7;
 }
 
-/* Headings ride on Instrument Sans; body and UI stay on Inter. `.sl-markdown-content`
+/* Headings take their own weight and tracking tier; the face is the `.sl-markdown-content`
    is the docs prose body, the rest are Starlight's own chrome headings. */
 .sl-markdown-content :is(h1, h2, h3, h4, h5, h6),
 .content-panel :is(h1, h2, h3),
@@ -69,7 +70,7 @@
 site-title,
 h1, h2, h3 {
     font-family: var(--font-headers);
-    letter-spacing: -0.02em;
+    letter-spacing: var(--tracking-title);
 }
 
 /* Fixed header background and translucency */

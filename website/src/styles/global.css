@@ -1,6 +1,11 @@
 @layer base, starlight, theme, components, utilities;
 
 @import "tailwindcss";
+/* Tokens UNLAYERED, components layered. `@theme` does not register through a
+   layered import — the layer wraps the whole file transitively — so pulling
+   both from index.css silently dropped the design tokens and every consumer
+   ended up re-declaring the font stacks in its own @theme. See ui/theme.css. */
+@import "@rebasepro/ui/theme.css";
 @import "@rebasepro/ui/index.css" layer(base);
 
 
@@ -50,17 +55,14 @@
 }
 
 
+/* Site-only overrides. Fonts, the type scale and the surface ramp all come from
+   @rebasepro/ui/theme.css — do not restate them here. What stays is the pair of
+   primary tints the site sets by hand: ui derives them in oklch, the site wants
+   these exact hexes. */
 @theme {
-    --color-primary: #0070f4; /* #0070f4 */
-    --color-primary-light: #359aff; /* #359aff */
-    --color-primary-dark: #0061c2; /* #0061c2 */
-    --font-sans: 'Inter Variable', 'Inter', 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
-    --font-headers: 'Instrument Sans Variable', 'Instrument Sans', 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --color-primary-light: #359aff;
+    --color-primary-dark: #0061c2;
 }
-
-/* Two faces, both variable (one file each covers the whole weight range):
-   Instrument Sans carries the headlines, Inter carries UI and body copy. */
 
 /* clip (not hidden) on BOTH elements: `hidden` makes the element a scroll
    container, and once html stops propagating body's overflow to the viewport,
@@ -71,28 +73,37 @@ body {
     overflow-x: clip;
 }
 
-h1 {
-    @apply font-headers font-semibold;
+/* Heading weight follows RENDERED SIZE, not tag depth — the same three tiers
+   @rebasepro/ui applies to .typography-*, expressed for bare elements because
+   that is how the marketing pages are written.
+
+   Keying off the tag was the bug: on this site h3 alone spans 16px to 30px —
+   nine of the fifteen on the home page render at 16px — so `h3 { font-semibold }`
+   made a page of 16px labels read as a page of headlines. Weight has to track
+   what a reader actually sees, so it keys off the size class the markup already
+   carries. Responsive stacks like `text-4xl md:text-5xl` match on their base
+   class, which is the display end anyway.
+
+   The tracking-* values come from ui/theme.css. Do not inline em values here. */
+
+h1, h2, h3, h4, h5, h6 {
+    @apply font-headers font-medium tracking-heading;
 }
 
-h2 {
-    @apply font-headers font-semibold;
+:is(h1, h2, h3, h4, h5, h6):is(.text-3xl, .text-4xl, .text-5xl, .text-6xl, .text-7xl, .text-8xl) {
+    @apply font-semibold tracking-display;
 }
 
-h3 {
-    @apply font-headers font-semibold;
-}
-
-h4 {
-    @apply font-headers font-medium;
+:is(h1, h2, h3, h4, h5, h6):is(.text-xl, .text-2xl) {
+    @apply font-semibold tracking-title;
 }
 
 h5 {
-    @apply font-headers font-medium text-xl leading-7;
+    @apply text-xl leading-7;
 }
 
 h6 {
-    @apply font-headers font-medium text-base leading-6;
+    @apply text-base leading-6;
 }
 
 /* Focus style matching app */

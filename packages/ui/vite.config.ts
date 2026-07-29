@@ -53,6 +53,13 @@ export default defineConfig(() => ({
                 {
                     src: path.resolve(__dirname, "src/index.css"),
                     dest: ""
+                },
+                {
+                    // index.css does `@import "./theme.css"`, so shipping one
+                    // without the other leaves published consumers with no
+                    // design tokens at all.
+                    src: path.resolve(__dirname, "src/theme.css"),
+                    dest: ""
                 }
             ]
         })
