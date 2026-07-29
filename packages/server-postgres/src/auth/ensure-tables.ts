@@ -107,16 +107,38 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                 ? "GENERATED ALWAYS AS IDENTITY"
                 : "DEFAULT gen_random_uuid()::text";
 
+        // Identifiers for the constraint and indexes reconciled further down.
+        // Derived from the resolved table name so two auth tables in different
+        // schemas cannot collide, and truncated to Postgres's 63-byte identifier
+        // limit here rather than letting the server truncate silently — the
+        // `IF NOT EXISTS` guards below have to compare against the same name
+        // Postgres actually stored, or they re-run forever.
+        const authIdentifier = (suffix: string) => `${resolvedTable}_${suffix}`.slice(0, 63);
+        const emailLengthConstraint = `"${authIdentifier("email_length_check")}"`;
+        const emailLowerUniqueIndex = authIdentifier("email_lower_key");
+        const verificationTokenIndex = authIdentifier("email_verification_token_idx");
+
+        // Every string column here is TEXT, deliberately. In Postgres VARCHAR(n)
+        // and TEXT are the same type with the same storage and the same
+        // performance; the only difference is a length check, and none of these
+        // columns wants one. The widths this table used to carry were inherited
+        // MySQL habit (255) and they were all wrong in the same direction —
+        // `password_hash VARCHAR(255)` against a 193-char scrypt string left 62
+        // characters of headroom in front of a KEY_LENGTH constant living in
+        // another package, and `photo_url VARCHAR(500)` rejected the `data:` URIs
+        // and long signed URLs that OAuth providers hand back. A limit worth
+        // having is a CHECK — alterable without a table rewrite, unlike a type
+        // modifier — which is why `email` has one and nothing else does.
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ${sql.raw(usersTableName)} (
                 id ${sql.raw(userIdType)} PRIMARY KEY ${sql.raw(idDefault)},
-                email VARCHAR(255) UNIQUE NOT NULL,
-                display_name VARCHAR(255),
-                photo_url VARCHAR(500),
+                email TEXT NOT NULL CONSTRAINT ${sql.raw(emailLengthConstraint)} CHECK (length(email) <= 320),
+                display_name TEXT,
+                photo_url TEXT,
                 roles TEXT[] DEFAULT '{}' NOT NULL,
-                password_hash VARCHAR(255),
+                password_hash TEXT,
                 email_verified BOOLEAN DEFAULT FALSE NOT NULL,
-                email_verification_token VARCHAR(255),
+                email_verification_token TEXT,
                 email_verification_sent_at TIMESTAMP WITH TIME ZONE,
                 is_anonymous BOOLEAN DEFAULT FALSE NOT NULL,
                 metadata JSONB DEFAULT '{}' NOT NULL,
@@ -359,12 +381,12 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // statement that references it. `email` is deliberately absent: it has
         // existed since the first era and cannot be added NOT NULL safely.
         const userColumnBackfills = [
-            "display_name VARCHAR(255)",
-            "photo_url VARCHAR(500)",
+            "display_name TEXT",
+            "photo_url TEXT",
             "roles TEXT[] DEFAULT '{}' NOT NULL",
-            "password_hash VARCHAR(255)",
+            "password_hash TEXT",
             "email_verified BOOLEAN DEFAULT FALSE NOT NULL",
-            "email_verification_token VARCHAR(255)",
+            "email_verification_token TEXT",
             "email_verification_sent_at TIMESTAMP WITH TIME ZONE",
             "is_anonymous BOOLEAN DEFAULT FALSE NOT NULL",
             "metadata JSONB DEFAULT '{}' NOT NULL",
@@ -376,6 +398,139 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             await db.execute(sql`
                 ALTER TABLE ${sql.raw(usersTableName)}
                 ADD COLUMN IF NOT EXISTS ${sql.raw(columnDef)}
+            `);
+        }
+
+        // Which of the columns below the table actually has. An adopted table —
+        // one this framework did not create, which the column-name resolution in
+        // `services.ts` exists to support — may be missing any of them, and every
+        // statement past this point has to tolerate that rather than abort the
+        // whole migration block.
+        const usersColumns = await db.execute(sql`
+            SELECT column_name, data_type
+            FROM information_schema.columns
+            WHERE table_schema = ${usersSchema} AND table_name = ${resolvedTable}
+        `);
+        const usersColumnTypes = new Map(
+            (usersColumns.rows as { column_name: string; data_type: string }[])
+                .map(row => [row.column_name, row.data_type])
+        );
+
+        // ── Migration: VARCHAR(n) → TEXT on the users string columns ────────
+        // Tables created before the widths came off still carry them. Postgres
+        // treats varchar(n) → text as binary-coercible with no stricter
+        // constraint, so this is a catalogue-only change: no table rewrite, no
+        // index rebuild, just a brief ACCESS EXCLUSIVE lock. Guarded on the
+        // current type so it runs once and is a pure catalogue read thereafter.
+        for (const column of ["email", "display_name", "photo_url", "password_hash", "email_verification_token"]) {
+            if (usersColumnTypes.get(column) !== "character varying") continue;
+            await db.execute(sql`
+                ALTER TABLE ${sql.raw(usersTableName)}
+                ALTER COLUMN ${sql.raw(`"${column}"`)} TYPE TEXT
+            `);
+            logger.info(`🔧 Widened ${usersTableName}.${column} from VARCHAR(n) to TEXT`);
+        }
+
+        // ── Migration: case-insensitive email identity ──────────────────────
+        // `getUserByEmail` has always searched `email.toLowerCase()` while the
+        // write path stored whatever it was handed, leaving normalisation to a
+        // convention every caller had to remember. A row that reached the table
+        // with mixed case is then invisible to every lookup — the account exists,
+        // login reports no such user, and the plain UNIQUE on `email` does not
+        // stop a second row differing only in case, because it compares bytes.
+        //
+        // Fixed on both sides: `mapPayload` now folds on write, and this index
+        // makes the database agree. A unique index on lower(email) is strictly
+        // stronger than the byte-exact UNIQUE that older tables carry, so the
+        // old constraint is left alone — it can no longer fire on anything the
+        // new one would allow.
+        //
+        // Deliberately no AUTH_SCHEMA_VERSION bump: a runtime that predates this
+        // migration keeps working against the migrated table (all of its own
+        // write paths already lower-cased), which is exactly the additive case
+        // the version stamp is documented not to cover.
+        if (usersColumnTypes.has("email")) {
+            const indexPresent = await db.execute(sql`
+                SELECT 1 FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = ${usersSchema} AND c.relname = ${emailLowerUniqueIndex} AND c.relkind = 'i'
+            `);
+            if (indexPresent.rows.length === 0) {
+                // Case-collisions already in the table would make the unique
+                // index impossible to build. Report them and leave the table
+                // alone: the next boot retries, so fixing the rows is all the
+                // operator has to do. Failing loudly beats folding the emails
+                // and letting CREATE INDEX pick which account survives.
+                const collisions = await db.execute(sql`
+                    SELECT lower(email) AS normalized, count(*)::int AS occurrences
+                    FROM ${sql.raw(usersTableName)}
+                    WHERE email IS NOT NULL
+                    GROUP BY lower(email)
+                    HAVING count(*) > 1
+                    LIMIT 10
+                `);
+                if (collisions.rows.length > 0) {
+                    const sample = (collisions.rows as { normalized: string; occurrences: number }[])
+                        .map(row => `${row.normalized} (×${row.occurrences})`)
+                        .join(", ");
+                    logger.error(
+                        `❌ Cannot enforce case-insensitive email uniqueness on ${usersTableName}: ` +
+                        `these addresses already exist more than once, differing only in case — ${sample}. ` +
+                        "Merge or delete the duplicates and restart; until then two accounts can share " +
+                        "one address and only the lower-cased one is reachable by login."
+                    );
+                } else {
+                    const folded = await db.execute(sql`
+                        UPDATE ${sql.raw(usersTableName)}
+                        SET email = lower(email)
+                        WHERE email IS NOT NULL AND email <> lower(email)
+                    `);
+                    if (folded.rowCount) {
+                        logger.info(`🔧 Lower-cased ${folded.rowCount} email address(es) in ${usersTableName}`);
+                    }
+                    await db.execute(sql`
+                        CREATE UNIQUE INDEX IF NOT EXISTS ${sql.raw(`"${emailLowerUniqueIndex}"`)}
+                        ON ${sql.raw(usersTableName)} (lower(email))
+                    `);
+                    logger.info(`✅ Email uniqueness on ${usersTableName} is now case-insensitive`);
+                }
+            }
+        }
+
+        // ── Migration: bound the email column's length ──────────────────────
+        // The only length limit on this table worth keeping. 320 is the RFC 5321
+        // maximum (64-char local part + @ + 255-char domain), and it matters here
+        // beyond tidiness: `email` carries a btree index, and a sufficiently long
+        // value fails index insertion with an error that says nothing about
+        // email. NOT VALID so an adopted table with a long row still migrates —
+        // it binds all new writes, which is the part that matters.
+        if (usersColumnTypes.has("email")) {
+            const checkPresent = await db.execute(sql`
+                SELECT 1 FROM pg_constraint c
+                JOIN pg_class t ON t.oid = c.conrelid
+                JOIN pg_namespace n ON n.oid = t.relnamespace
+                WHERE n.nspname = ${usersSchema}
+                  AND t.relname = ${resolvedTable}
+                  AND c.conname = ${authIdentifier("email_length_check")}
+            `);
+            if (checkPresent.rows.length === 0) {
+                await db.execute(sql`
+                    ALTER TABLE ${sql.raw(usersTableName)}
+                    ADD CONSTRAINT ${sql.raw(emailLengthConstraint)} CHECK (length(email) <= 320) NOT VALID
+                `);
+            }
+        }
+
+        // ── Index: email verification token lookups ─────────────────────────
+        // `getUserByVerificationToken` filters on this column, which had no
+        // index — every click of a verification link was a sequential scan of
+        // the whole users table. Partial, because the column is NULL for every
+        // user who is not mid-verification, which is nearly all of them.
+        if (usersColumnTypes.has("email_verification_token")) {
+            await db.execute(sql`
+                CREATE INDEX IF NOT EXISTS ${sql.raw(`"${verificationTokenIndex}"`)}
+                ON ${sql.raw(usersTableName)} (email_verification_token)
+                WHERE email_verification_token IS NOT NULL
             `);
         }
 

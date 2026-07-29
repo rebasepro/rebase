@@ -19,6 +19,40 @@ character_maximum_length: 255 }
             expect(prop.validation?.required).toBe(true);
         });
 
+        it("carries the declared width across, so a round-trip cannot narrow a column", () => {
+            // Introspection used to discard character_maximum_length. Reading a
+            // varchar(500) column back therefore produced a bare `varchar`
+            // property, which the DDL generator then re-emitted as VARCHAR(255)
+            // — silently narrowing a column that may already hold longer values.
+            const columns: TableColumnInfo[] = [
+                { column_name: "long_slug",
+data_type: "character varying",
+udt_name: "varchar",
+is_nullable: "YES",
+column_default: null,
+character_maximum_length: 500 }
+            ];
+            const collection = buildCollectionFromTableMetadata("pages", { columns } as TableMetadata);
+            const prop = collection.properties!.long_slug as StringProperty;
+            expect(prop.columnType).toBe("varchar");
+            expect(prop.validation?.max).toBe(500);
+        });
+
+        it("reports no width for text, which has none", () => {
+            const columns: TableColumnInfo[] = [
+                { column_name: "body",
+data_type: "text",
+udt_name: "text",
+is_nullable: "YES",
+column_default: null,
+character_maximum_length: null }
+            ];
+            const collection = buildCollectionFromTableMetadata("posts", { columns } as TableMetadata);
+            const prop = collection.properties!.body as StringProperty;
+            expect(prop.columnType).toBe("text");
+            expect(prop.validation?.max).toBeUndefined();
+        });
+
         it("maps text and citext to StringProperty with text columnType", () => {
             const columns: TableColumnInfo[] = [
                 { column_name: "bio",

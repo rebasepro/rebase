@@ -355,8 +355,14 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
      * Create an anonymous user with temporary credentials
      */
     router.post("/anonymous", strictAuthLimiter, async (c) => {
-        const anonId = randomBytes(16).toString("hex");
-        const anonEmail = `anon_${anonId.slice(0, 8)}@anonymous.local`;
+        // `email` is NOT NULL, so an anonymous user needs a synthetic address —
+        // and it lands under a unique index, which makes the width of this
+        // string a correctness property rather than cosmetics. It used to keep 8
+        // of the 32 hex characters generated here: a 2^32 space, where a
+        // collision is ~1% likely by 9,000 anonymous users and ~50% by 77,000,
+        // surfacing as an unexplained 500 on sign-in for one unlucky visitor.
+        // The entropy was already generated; there was no reason to discard it.
+        const anonEmail = `anon_${randomBytes(16).toString("hex")}@anonymous.local`;
 
         let createData: CreateUserData = {
             email: anonEmail,

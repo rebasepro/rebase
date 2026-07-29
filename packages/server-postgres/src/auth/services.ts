@@ -55,6 +55,25 @@ function getColumn(table: RebasePgTable | undefined, ...keys: string[]): RebaseP
 }
 
 /**
+ * The single definition of what an email address looks like in storage.
+ *
+ * Reads have always folded case; writes did not, and normalising was left to
+ * each caller. That asymmetry is only ever one forgotten `.toLowerCase()` away
+ * from a row no lookup can find — the account exists, every sign-in path
+ * reports no such user, and the byte-exact UNIQUE on the column does not stop a
+ * duplicate differing only in case. Applied on both sides here so the guarantee
+ * belongs to the repository rather than to its callers' discipline; the
+ * `lower(email)` unique index added in `ensureAuthTablesExist` is the database
+ * half of the same rule.
+ *
+ * Whitespace goes too: a trailing space survives the fold and reproduces the
+ * problem exactly.
+ */
+export function normalizeEmail<T>(email: T): T | string {
+    return typeof email === "string" ? email.trim().toLowerCase() : email;
+}
+
+/**
  * PostgreSQL implementation of UserRepository.
  * Handles all user-related database operations using Drizzle ORM.
  */
@@ -184,7 +203,7 @@ export class UserService implements UserRepository {
         const metadataKey = getColumnKey(this.usersTable, "metadata") || "metadata";
 
         if ("id" in data) payload[idKey] = data.id;
-        if ("email" in data) payload[emailKey] = data.email;
+        if ("email" in data) payload[emailKey] = normalizeEmail(data.email);
         if ("passwordHash" in data) payload[passwordHashKey] = data.passwordHash;
         if ("displayName" in data) payload[displayNameKey] = data.displayName;
         if ("photoUrl" in data) payload[photoUrlKey] = data.photoUrl;
@@ -244,7 +263,7 @@ export class UserService implements UserRepository {
     async getUserByEmail(email: string): Promise<UserData | null> {
         const emailCol = getColumn(this.usersTable, "email");
         if (!emailCol) return null;
-        const [row] = await this.db.select().from(this.usersTable).where(eq(emailCol, email.toLowerCase()));
+        const [row] = await this.db.select().from(this.usersTable).where(eq(emailCol, normalizeEmail(email)));
         return row ? this.mapRowToUser(row as Record<string, unknown>) : null;
     }
 

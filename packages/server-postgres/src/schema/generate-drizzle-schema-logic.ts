@@ -1,6 +1,6 @@
 import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, hasForeignKeyOnTarget } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/collection-helpers";
-import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig } from "@rebasepro/common";
+import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server";
 // --- Helper Functions ---
@@ -98,9 +98,13 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             } else if (stringProp.columnType === "uuid") {
                 columnDefinition = `uuid("${colName}")`;
             } else if (stringProp.columnType === "char") {
-                columnDefinition = `char("${colName}")`;
+                columnDefinition = `char("${colName}", { length: ${resolveStringColumnLength(stringProp)} })`;
             } else if (stringProp.columnType === "varchar") {
-                columnDefinition = `varchar("${colName}")`;
+                // The length is not optional decoration: `varchar("col")` with
+                // no length is an UNBOUNDED varchar in Postgres, which is what
+                // this emitted while the DDL generator emitted VARCHAR(255) for
+                // the very same property.
+                columnDefinition = `varchar("${colName}", { length: ${resolveStringColumnLength(stringProp)} })`;
             } else {
                 // `text` is the default, and the only length-unbounded choice.
                 // Ask for `varchar` explicitly if you want the length constraint.

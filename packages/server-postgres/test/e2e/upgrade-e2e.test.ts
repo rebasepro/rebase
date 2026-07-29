@@ -179,6 +179,71 @@ describe.each(snapshots)("upgrading a database left by %s", (snapshotFile) => {
         }
     });
 
+    it("widens the inherited VARCHAR(n) string columns to TEXT", async () => {
+        // Every one of these was a MySQL-shaped width that Postgres gained
+        // nothing from, and two of them were live hazards: password_hash(255)
+        // sat 62 characters in front of a 193-char scrypt string, and
+        // photo_url(500) rejected the long signed URLs OAuth providers return.
+        const result = await client.query<{ column_name: string; data_type: string }>(
+            `SELECT column_name, data_type FROM information_schema.columns
+             WHERE table_schema = 'rebase' AND table_name = 'users'
+               AND column_name = ANY($1)`,
+            [["email", "display_name", "photo_url", "password_hash", "email_verification_token"]]
+        );
+        const stillBounded = result.rows.filter(r => r.data_type === "character varying");
+        expect(stillBounded.map(r => r.column_name)).toEqual([]);
+    });
+
+    it("makes email uniqueness case-insensitive", async () => {
+        // The byte-exact UNIQUE this replaces could not see that Foo@x.com and
+        // foo@x.com are one account, while every read path folded case — so the
+        // mixed-case row existed and no lookup could reach it.
+        const index = await client.query(
+            `SELECT 1 FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'rebase' AND c.relname = 'users_email_lower_key' AND c.relkind = 'i'`
+        );
+        expect(index.rows.length).toBe(1);
+
+        const { rows: [user] } = await client.query<{ email: string }>(
+            "SELECT email FROM rebase.users LIMIT 1"
+        );
+        await expect(
+            client.query("INSERT INTO rebase.users (id, email) VALUES ($1, $2)", [
+                "case-collision-probe",
+                user.email.toUpperCase()
+            ])
+        ).rejects.toThrow();
+    });
+
+    it("indexes the email verification token it used to sequentially scan", async () => {
+        const index = await client.query(
+            `SELECT 1 FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'rebase' AND c.relname = 'users_email_verification_token_idx'
+               AND c.relkind = 'i'`
+        );
+        expect(index.rows.length).toBe(1);
+    });
+
+    it("bounds the email column with a CHECK rather than a type modifier", async () => {
+        const constraint = await client.query(
+            `SELECT 1 FROM pg_constraint c
+             JOIN pg_class t ON t.oid = c.conrelid
+             JOIN pg_namespace n ON n.oid = t.relnamespace
+             WHERE n.nspname = 'rebase' AND t.relname = 'users'
+               AND c.conname = 'users_email_length_check'`
+        );
+        expect(constraint.rows.length).toBe(1);
+
+        await expect(
+            client.query("INSERT INTO rebase.users (id, email) VALUES ($1, $2)", [
+                "long-email-probe",
+                `${"a".repeat(320)}@example.test`
+            ])
+        ).rejects.toThrow();
+    });
+
     it("stamps the auth schema version it migrated to", async () => {
         // An unstamped database reads as null and is treated as "upgrade me".
         // After the upgrade it must carry the current number, or the next
@@ -360,6 +425,120 @@ describe("era-1a — the legacy roles junction", () => {
         for (const row of result.rows) {
             expect(row.uid, `${row.token_hash}.uid`).toBe(user.id);
             expect(row.user_id, `${row.token_hash}.user_id`).toBe(user.id);
+        }
+    });
+});
+
+// ── The case-fold migration, which needs a database that predates the rule ────
+
+describe("a database carrying mixed-case emails", () => {
+    const snapshot = "era-1a-user-id-legacy-roles.sql";
+    let container: PgContainer;
+    let client: pg.Client;
+
+    beforeAll(async () => {
+        expect(snapshots).toContain(snapshot);
+        container = await startPgContainer();
+        client = new pg.Client({ connectionString: container.connectionString });
+        await client.connect();
+        await client.query(readFileSync(join(SNAPSHOT_DIR, snapshot), "utf8"));
+
+        // The state the old write path could produce and the old read path
+        // could not reach: the byte-exact UNIQUE allowed it in, and
+        // `getUserByEmail` searched lower(email), so this account was
+        // unreachable by every sign-in, reset and lookup the framework has.
+        await client.query(
+            "INSERT INTO rebase.users (id, email) VALUES ($1, $2)",
+            ["user-mixed-case", "Mixed.Case@Era1a.TEST"]
+        );
+
+        const pool = new pg.Pool({ connectionString: container.connectionString });
+        await ensureAuthTablesExist(drizzle(pool));
+        await pool.end();
+    }, 180_000);
+
+    afterAll(async () => {
+        await client?.end().catch(() => {});
+        if (container) await stopPgContainer(container.containerName);
+    });
+
+    it("folds the existing rows rather than leaving them unreachable", async () => {
+        const { rows: [user] } = await client.query<{ email: string }>(
+            "SELECT email FROM rebase.users WHERE id = 'user-mixed-case'"
+        );
+        expect(user.email).toBe("mixed.case@era1a.test");
+    });
+
+    it("builds the unique index over the folded rows", async () => {
+        const index = await client.query(
+            `SELECT 1 FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'rebase' AND c.relname = 'users_email_lower_key' AND c.relkind = 'i'`
+        );
+        expect(index.rows.length).toBe(1);
+    });
+});
+
+describe("a database whose emails already collide", () => {
+    const snapshot = "era-1a-user-id-legacy-roles.sql";
+    let container: PgContainer;
+    let client: pg.Client;
+
+    beforeAll(async () => {
+        container = await startPgContainer();
+        client = new pg.Client({ connectionString: container.connectionString });
+        await client.connect();
+        await client.query(readFileSync(join(SNAPSHOT_DIR, snapshot), "utf8"));
+
+        // Two accounts that differ only in case. Folding them would make the
+        // unique index impossible to build, and picking a survivor is not a
+        // migration's call to make.
+        await client.query(
+            "INSERT INTO rebase.users (id, email) VALUES ($1, $2), ($3, $4)",
+            ["user-dup-lower", "dup@era1a.test", "user-dup-upper", "DUP@era1a.test"]
+        );
+
+        const pool = new pg.Pool({ connectionString: container.connectionString });
+        await ensureAuthTablesExist(drizzle(pool));
+        await pool.end();
+    }, 180_000);
+
+    afterAll(async () => {
+        await client?.end().catch(() => {});
+        if (container) await stopPgContainer(container.containerName);
+    });
+
+    it("boots, leaving both rows untouched", async () => {
+        // The whole migration block is best-effort by design. What must not
+        // happen is a half-applied fold that silently merges two accounts.
+        const result = await client.query<{ id: string; email: string }>(
+            "SELECT id, email FROM rebase.users WHERE id LIKE 'user-dup-%' ORDER BY id"
+        );
+        expect(result.rows).toEqual([
+            { id: "user-dup-lower", email: "dup@era1a.test" },
+            { id: "user-dup-upper", email: "DUP@era1a.test" }
+        ]);
+    });
+
+    it("does not create the index it could not honestly build", async () => {
+        const index = await client.query(
+            `SELECT 1 FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'rebase' AND c.relname = 'users_email_lower_key' AND c.relkind = 'i'`
+        );
+        expect(index.rows.length).toBe(0);
+    });
+
+    it("still completes the rest of the upgrade", async () => {
+        // A skipped index must not abort the migrations after it — this is the
+        // failure mode the surrounding try/catch makes invisible.
+        const columns = await client.query<{ column_name: string }>(
+            `SELECT column_name FROM information_schema.columns
+             WHERE table_schema = 'rebase' AND table_name = 'refresh_tokens'`
+        );
+        const names = new Set(columns.rows.map(r => r.column_name));
+        for (const required of REQUIRED_REFRESH_TOKEN_COLUMNS) {
+            expect(names.has(required), `refresh_tokens.${required}`).toBe(true);
         }
     });
 });

@@ -159,6 +159,22 @@ describe("Auth Services", () => {
                 expect(result).toEqual(mockUserData({ displayName: "Test User" }));
             });
 
+            it("folds the email to lower case on write, not just on read", async () => {
+                // The asymmetry this closes: getUserByEmail has always searched
+                // `email.toLowerCase()`, while the write path stored whatever it
+                // was handed. A row that arrived mixed-case was then invisible
+                // to every lookup — the account exists, sign-in reports no such
+                // user — and the byte-exact UNIQUE on the column would not stop
+                // a second row differing only in case.
+                mockInsertReturning.mockResolvedValueOnce([{ id: "user-123", email: "test@example.com" }]);
+
+                await userService.createUser({ email: "  Test@Example.COM " });
+
+                expect(mockInsertValues).toHaveBeenCalledWith(
+                    expect.objectContaining({ email: "test@example.com" })
+                );
+            });
+
             it("clears the RLS GUCs inside a transaction before the insert", async () => {
                 mockInsertReturning.mockResolvedValueOnce([{ id: "user-123", email: "test@example.com" }]);
 

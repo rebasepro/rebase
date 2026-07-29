@@ -1,5 +1,5 @@
 import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo } from "@rebasepro/types";
-import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, getInjectedSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig } from "@rebasepro/common";
+import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, getInjectedSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
 
 // --- Helper Functions ---
@@ -103,11 +103,15 @@ export const getSqlColumnType = (propName: string, prop: Property, collection: C
             if (stringProp.isId === "uuid" || stringProp.columnType === "uuid") {
                 return "UUID";
             }
+            // Width comes from `validation.max` when the property states one.
+            // It used to be a hardcoded 255 here and *absent* on the Drizzle
+            // path, so the same property produced a bounded column down one
+            // generator and an unbounded one down the other.
             if (stringProp.columnType === "char") {
-                return "CHAR(255)";
+                return `CHAR(${resolveStringColumnLength(stringProp)})`;
             }
             if (stringProp.columnType === "varchar") {
-                return "VARCHAR(255)";
+                return `VARCHAR(${resolveStringColumnLength(stringProp)})`;
             }
             // `text` is the default. The two generators disagreed here before:
             // this one emitted VARCHAR(255) while the drizzle path emitted a bare

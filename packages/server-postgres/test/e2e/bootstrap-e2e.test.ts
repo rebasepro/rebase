@@ -232,3 +232,104 @@ describe.each(SCENARIOS)("first-admin journey on an empty database — $name", (
         expect(body.user?.roles).toContain("admin");
     });
 });
+
+// ── The freshly created schema, as opposed to a migrated one ─────────────────
+
+describe("the users table a first boot creates", () => {
+    let container: PgContainer;
+    let pool: pg.Pool;
+    let repo: PostgresAuthRepository;
+    let app: Hono<HonoEnv>;
+    let adapter: ReturnType<typeof createBuiltinAuthAdapter>;
+
+    beforeAll(async () => {
+        container = await startPgContainer();
+        pool = new pg.Pool({ connectionString: container.connectionString });
+        const db = drizzle(pool);
+        await ensureAuthTablesExist(db);
+        repo = new PostgresAuthRepository(db);
+
+        configureJwt({ secret: JWT_SECRET, accessExpiresIn: "15m", refreshExpiresIn: "7d" });
+        adapter = createBuiltinAuthAdapter({
+            authRepository: repo,
+            allowRegistration: true,
+            disableSelfRegistration: false
+        });
+        app = new Hono<HonoEnv>();
+        app.onError(errorHandler);
+        app.route("/auth", adapter.createAuthRoutes()!);
+    }, 180_000);
+
+    afterAll(async () => {
+        await pool?.end().catch(() => {});
+        if (container) await stopPgContainer(container.containerName);
+    });
+
+    it("declares its string columns as TEXT, not as inherited widths", async () => {
+        const result = await pool.query<{ column_name: string; data_type: string }>(
+            `SELECT column_name, data_type FROM information_schema.columns
+             WHERE table_schema = 'rebase' AND table_name = 'users'
+               AND column_name = ANY($1)`,
+            [["email", "display_name", "photo_url", "password_hash", "email_verification_token"]]
+        );
+        expect(result.rows.length).toBe(5);
+        expect(result.rows.filter(r => r.data_type !== "text")).toEqual([]);
+    });
+
+    it("carries the case-insensitive unique index from the moment it is created", async () => {
+        // The fresh path no longer declares `email ... UNIQUE` inline: the
+        // lower(email) index is the only thing enforcing account identity, and
+        // it is created a few statements later than the table itself. If that
+        // step were ever skipped for a new database, nothing else would notice
+        // — duplicate accounts are not an error anyone sees until support does.
+        const index = await pool.query(
+            `SELECT 1 FROM pg_class c
+             JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE n.nspname = 'rebase' AND c.relname = 'users_email_lower_key' AND c.relkind = 'i'`
+        );
+        expect(index.rows.length).toBe(1);
+    });
+
+    it("folds the email on the programmatic createUser path, which never did", async () => {
+        // Deliberately NOT through /auth/register: that route lower-cases its
+        // own input before it ever reaches the repository, so it cannot detect
+        // whether storage normalises anything. `userManagement` is the path
+        // that could not — it hands `data.email` to createUser verbatim — and
+        // init.ts publishes it to application code as `auth.userService`.
+        await adapter.userManagement!.createUser!({
+            email: "Case.Probe@Bootstrap.TEST",
+            password: PASSWORD,
+            displayName: "Case Probe"
+        });
+
+        const { users } = await repo.listUsersPaginated({ limit: 10 });
+        const matching = users.filter(u => u.email.toLowerCase() === "case.probe@bootstrap.test");
+        expect(matching).toHaveLength(1);
+        // Folded in storage, which is what makes it findable: every read path
+        // searches lower(email), so a mixed-case row is a live account that no
+        // sign-in, reset or lookup in the framework can reach.
+        expect(matching[0].email).toBe("case.probe@bootstrap.test");
+    });
+
+    it("refuses a second account differing from it only in case", async () => {
+        await expect(
+            adapter.userManagement!.createUser!({
+                email: "case.probe@bootstrap.test",
+                password: PASSWORD,
+                displayName: "Case Probe Duplicate"
+            })
+        ).rejects.toThrow();
+    });
+
+    it("lets the account created with mixed case actually sign in", async () => {
+        // The other half of the same bug: created mixed-case, the account was
+        // unreachable by getUserByEmail, so this login returned "no such user"
+        // against a row that plainly existed.
+        const response = await app.request("/auth/login", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email: "Case.Probe@Bootstrap.TEST", password: PASSWORD })
+        });
+        expect(response.status).toBe(200);
+    });
+});

@@ -1,8 +1,19 @@
-import { pgSchema, pgTable, varchar, uuid, timestamp, boolean, jsonb, text, unique, index } from "drizzle-orm/pg-core";
+import { pgSchema, pgTable, uuid, timestamp, boolean, jsonb, text, unique, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 /**
  * Factory function to dynamically create the auth tables bound to the specified schema names.
+ *
+ * This module builds queries; it does not create tables. `ensureAuthTablesExist`
+ * owns the DDL, which makes everything here a *claim* about a database it cannot
+ * enforce — and the claims drifted. Every column below was declared
+ * `varchar(n)` while the DDL created it as `TEXT`: `user_agent` as varchar(500),
+ * `ip_address` as varchar(45), `secret_encrypted` as varchar(500), every
+ * `token_hash` as varchar(255). None of it was true of any database this
+ * framework ever provisioned. Harmless at runtime — drizzle does not enforce a
+ * length client-side, so the widths only ever misled the next reader — but a
+ * schema module that describes columns that do not exist is worse than no
+ * schema module. They are `text` here now because they are TEXT there.
  */
 export function createAuthSchema(usersSchemaName = "rebase") {
     const usersSchema = usersSchemaName === "public" ? null : pgSchema(usersSchemaName);
@@ -15,12 +26,12 @@ export function createAuthSchema(usersSchemaName = "rebase") {
      */
     const users = usersTableCreator("users", {
         id: uuid("id").defaultRandom().primaryKey(),
-        email: varchar("email", { length: 255 }).notNull().unique(),
-        passwordHash: varchar("password_hash", { length: 255 }), // NULL for OAuth-only users
-        displayName: varchar("display_name", { length: 255 }),
-        photoUrl: varchar("photo_url", { length: 500 }),
+        email: text("email").notNull().unique(),
+        passwordHash: text("password_hash"), // NULL for OAuth-only users
+        displayName: text("display_name"),
+        photoUrl: text("photo_url"),
         emailVerified: boolean("email_verified").default(false).notNull(),
-        emailVerificationToken: varchar("email_verification_token", { length: 255 }),
+        emailVerificationToken: text("email_verification_token"),
         emailVerificationSentAt: timestamp("email_verification_sent_at"),
         isAnonymous: boolean("is_anonymous").default(false).notNull(),
         roles: text("roles").array().default([]).notNull(),
@@ -65,7 +76,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
         id: uuid("id").defaultRandom().primaryKey(),
         uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
         sessionId: uuid("session_id").defaultRandom().notNull(),
-        tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
+        tokenHash: text("token_hash").notNull().unique(),
         expiresAt: timestamp("expires_at").notNull(),
         revoked: boolean("revoked").default(false).notNull(),
         rotatedAt: timestamp("rotated_at"),
@@ -76,8 +87,8 @@ export function createAuthSchema(usersSchemaName = "rebase") {
          * that rotates immediately after it.
          */
         sessionStartedAt: timestamp("session_started_at").defaultNow().notNull(),
-        userAgent: varchar("user_agent", { length: 500 }),
-        ipAddress: varchar("ip_address", { length: 45 }),
+        userAgent: text("user_agent"),
+        ipAddress: text("ip_address"),
         createdAt: timestamp("created_at").defaultNow().notNull()
     }, (table) => ({
         sessionIdx: index("idx_refresh_tokens_session").on(table.sessionId)
@@ -89,7 +100,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
     const passwordResetTokens = tableCreator("password_reset_tokens", {
         id: uuid("id").defaultRandom().primaryKey(),
         uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
-        tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
+        tokenHash: text("token_hash").notNull().unique(),
         expiresAt: timestamp("expires_at").notNull(),
         usedAt: timestamp("used_at"),
         createdAt: timestamp("created_at").defaultNow().notNull()
@@ -99,7 +110,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
      * App config - key/value store for custom settings
      */
     const appConfig = tableCreator("app_config", {
-        key: varchar("key", { length: 100 }).primaryKey(),
+        key: text("key").primaryKey(),
         value: jsonb("value").notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
     });
@@ -110,8 +121,8 @@ export function createAuthSchema(usersSchemaName = "rebase") {
     const userIdentities = tableCreator("user_identities", {
         id: uuid("id").defaultRandom().primaryKey(),
         uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
-        provider: varchar("provider", { length: 50 }).notNull(), // e.g. 'google', 'linkedin'
-        providerId: varchar("provider_id", { length: 255 }).notNull(),
+        provider: text("provider").notNull(), // e.g. 'google', 'linkedin'
+        providerId: text("provider_id").notNull(),
         profileData: jsonb("profile_data"),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
@@ -125,9 +136,9 @@ export function createAuthSchema(usersSchemaName = "rebase") {
     const mfaFactors = tableCreator("mfa_factors", {
         id: uuid("id").defaultRandom().primaryKey(),
         uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
-        factorType: varchar("factor_type", { length: 20 }).notNull(), // 'totp'
-        secretEncrypted: varchar("secret_encrypted", { length: 500 }).notNull(),
-        friendlyName: varchar("friendly_name", { length: 255 }),
+        factorType: text("factor_type").notNull(), // 'totp'
+        secretEncrypted: text("secret_encrypted").notNull(),
+        friendlyName: text("friendly_name"),
         verified: boolean("verified").default(false).notNull(),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at").defaultNow().notNull()
@@ -141,7 +152,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
         factorId: uuid("factor_id").notNull().references(() => mfaFactors.id, { onDelete: "cascade" }),
         createdAt: timestamp("created_at").defaultNow().notNull(),
         verifiedAt: timestamp("verified_at"),
-        ipAddress: varchar("ip_address", { length: 45 }),
+        ipAddress: text("ip_address"),
         expiresAt: timestamp("expires_at").notNull()
     });
 
@@ -151,7 +162,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
     const recoveryCodes = tableCreator("recovery_codes", {
         id: uuid("id").defaultRandom().primaryKey(),
         uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
-        codeHash: varchar("code_hash", { length: 255 }).notNull(),
+        codeHash: text("code_hash").notNull(),
         usedAt: timestamp("used_at"),
         createdAt: timestamp("created_at").defaultNow().notNull()
     });
@@ -162,7 +173,7 @@ export function createAuthSchema(usersSchemaName = "rebase") {
     const magicLinkTokens = tableCreator("magic_link_tokens", {
         id: uuid("id").defaultRandom().primaryKey(),
         uid: uuid("uid").notNull().references(() => users.id, { onDelete: "cascade" }),
-        tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
+        tokenHash: text("token_hash").notNull().unique(),
         expiresAt: timestamp("expires_at").notNull(),
         usedAt: timestamp("used_at"),
         createdAt: timestamp("created_at").defaultNow().notNull()

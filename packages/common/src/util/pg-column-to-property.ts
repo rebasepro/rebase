@@ -42,6 +42,7 @@ function pgTypeToRebaseProperty(column: TableColumnInfo): Property | null {
         udt_name,
         is_nullable,
         column_default,
+        character_maximum_length,
         enum_values
     } = column;
 
@@ -78,11 +79,23 @@ label: prettifyIdentifier(v) })),
             let colType: "varchar" | "text" | "char" = "varchar";
             if (dt === "text" || dt === "citext") colType = "text";
             if (dt === "char" || dt === "character") colType = "char";
+            // Carry the declared width across. Dropping it made introspection
+            // lossy in the one direction that costs data: a `character
+            // varying(500)` column read back as a bare `varchar` regenerates as
+            // `VARCHAR(255)`, narrowing a column that already holds longer
+            // values. TEXT has no width, and reporting one would invent a limit
+            // the database does not have.
+            const declaredLength = colType === "text" ? null : character_maximum_length;
             const prop: StringProperty = {
                 type: "string",
                 name: prettifiedName,
                 columnType: colType,
-                validation: required ? { required: true } : undefined
+                validation: required || declaredLength
+                    ? {
+                        ...(required ? { required: true } : {}),
+                        ...(declaredLength ? { max: declaredLength } : {})
+                    }
+                    : undefined
             };
             if (isAutoId) {
                 prop.isId = "manual";

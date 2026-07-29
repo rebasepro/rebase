@@ -196,8 +196,30 @@ columnType: "varchar" }
                 const cleanResult = cleanSchema(result);
 
                 expect(cleanResult).toContain("t_text: text(\"t_text\"),");
-                expect(cleanResult).toContain("t_char: char(\"t_char\"),");
-                expect(cleanResult).toContain("t_varchar: varchar(\"t_varchar\")");
+                // Bounded types carry their length. A bare `varchar("col")` is
+                // an UNBOUNDED varchar in Postgres, so emitting one for a
+                // property whose whole point is `columnType: "varchar"` gave a
+                // column with no limit — while the DDL generator gave the same
+                // property a VARCHAR(255). Asserted as full definitions: the
+                // old `toContain("varchar(\"t_varchar\")")` is a prefix of the
+                // correct output too, so it could not tell the two apart.
+                expect(cleanResult).toContain("t_char: char(\"t_char\", { length: 255 }),");
+                expect(cleanResult).toContain("t_varchar: varchar(\"t_varchar\", { length: 255 })");
+            });
+
+            it("takes the column width from validation.max", async () => {
+                const collections: CollectionConfig[] = [{
+                    slug: "texts",
+                    table: "texts",
+                    name: "Texts",
+                    properties: {
+                        t_varchar: { type: "string",
+columnType: "varchar",
+validation: { max: 40 } }
+                    }
+                }];
+                const result = await generateSchema(collections);
+                expect(cleanSchema(result)).toContain("t_varchar: varchar(\"t_varchar\", { length: 40 })");
             });
 
             it("does not let a presentation flag choose the column type", async () => {
@@ -282,7 +304,7 @@ columnType: "char",
 validation: { unique: true } } }
                 }];
                 const result = await generateSchema(collections);
-                expect(cleanSchema(result)).toContain("t_unique: char(\"t_unique\").unique()");
+                expect(cleanSchema(result)).toContain("t_unique: char(\"t_unique\", { length: 255 }).unique()");
             });
         });
 

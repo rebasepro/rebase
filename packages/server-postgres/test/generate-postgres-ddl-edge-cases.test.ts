@@ -1,5 +1,6 @@
 import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { generatePostgresDdl, generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
+import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 
 describe("generatePostgresDdl edge cases", () => {
     const cleanDdl = (ddl: string) => {
@@ -722,6 +723,49 @@ describe("generatePostgresDdl edge cases", () => {
             expect(result).toContain("CREATE TABLE");
             expect(result).not.toContain("ENABLE ROW LEVEL SECURITY");
             expect(result).not.toContain("CREATE POLICY");
+        });
+    });
+
+    // ── Bounded string columns ────────────────────────────────────────
+    describe("varchar width", () => {
+        const boundedCollection = (validation?: { max: number }): PostgresCollectionConfig[] => [
+            {
+                slug: "items",
+                table: "items",
+                name: "Items",
+                properties: {
+                    code: { type: "string",
+columnType: "varchar",
+...(validation ? { validation } : {}) }
+                }
+            }
+        ];
+
+        it("defaults to 255 when the property declares no maximum", async () => {
+            const result = await generatePostgresDdl(boundedCollection(), { includePolicies: false });
+            expect(cleanDdl(result)).toContain("\"code\" VARCHAR(255)");
+        });
+
+        it("takes the width from validation.max", async () => {
+            const result = await generatePostgresDdl(boundedCollection({ max: 40 }), { includePolicies: false });
+            expect(cleanDdl(result)).toContain("\"code\" VARCHAR(40)");
+        });
+
+        it("agrees with the Drizzle generator on the width", async () => {
+            // The two generators are separate implementations of one mapping,
+            // and they drifted: for this exact property the DDL path emitted
+            // VARCHAR(255) while the Drizzle path emitted `varchar("code")` —
+            // an UNBOUNDED varchar. Whichever generator a project happened to
+            // run decided whether its column had a limit at all. Asserted
+            // across both so the next divergence fails here.
+            for (const max of [undefined, 40, 500]) {
+                const collections = boundedCollection(max ? { max } : undefined);
+                const expected = max ?? 255;
+                expect(cleanDdl(await generatePostgresDdl(collections, { includePolicies: false })))
+                    .toContain(`"code" VARCHAR(${expected})`);
+                expect(await generateSchema(collections as CollectionConfig[]))
+                    .toContain(`varchar("code", { length: ${expected} })`);
+            }
         });
     });
 });
