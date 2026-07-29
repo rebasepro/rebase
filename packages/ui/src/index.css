@@ -1,4 +1,17 @@
 @import "./theme.css";
+
+/* Grayscale antialiasing, not macOS's subpixel default.
+   This is the single largest reason the same typeface can look like a
+   different one between two pages: subpixel-antialiased text renders visibly
+   heavier and slightly fuzzier, and the effect is worst for light text on dark
+   backgrounds — which is most of this product and all of the marketing site.
+   Design comps that set this and shipped pages that do not will never match,
+   no matter how carefully the font, size, weight and tracking are aligned. */
+html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 /* Native UI (scrollbars, form controls) must follow the active theme,
    otherwise Chrome renders light scrollbars in dark mode */
 html {
