@@ -1,8 +1,9 @@
 # Tenancy, sharing and unit economics — plan
 
-> **Status, 2026-07-29.** Waves 0–5 are implemented on the `feat/tenancy-tiers`
-> branch of the `saas` repo (worktree `~/rebase-worktrees/saas-tiers`), 13 commits,
-> 1861 tests passing. **Nothing has been applied to the live cluster** — every
+> **Status, 2026-07-29.** Waves 0–7 are implemented on the `feat/tenancy-tiers`
+> branch of the `saas` repo (worktree `~/rebase-worktrees/saas-tiers`), 20 commits,
+> 2003 tests passing — plus one commit on `feat/runtime-bundle-fetch` in the OSS
+> repo, which is the last piece the serverless tier needed. **Nothing has been applied to the live cluster** — every
 > change is code, manifests and an operator script waiting to be run.
 >
 > The reconciler's read-and-diff has been run against `rebase-saas-gke` read-only
@@ -750,11 +751,55 @@ that let a throttled project serve again.
 
 Warnings start at 80%, and that is what makes the throttle fair.
 
-### 13.3 What is still not built
+### 13.3 Everything in §12.7 and §13.3 is now built
 
-- **Applying the Cloud Run service** — the body and the routing exist; the Admin
-  API call does not. The runtime also needs a boot-time bundle fetch, since Cloud
-  Run has no init containers. That work is in `packages/server`, a different
-  repository.
-- **Uploading a static build** to the bucket and serving it through the router.
-- **Stripe metered prices** for the overage the quota model computes.
+- **Cloud Run** — `cloudrun/admin.ts` applies the service, waits for the revision
+  and reads back the URL, and `provisionRebaseService`/`provisionIngress` route
+  at it through an `ExternalName` Service.
+- **The runtime fetches its own bundle** (`feat/runtime-bundle-fetch` in the OSS
+  repo), which is what makes a container with no init container possible.
+- **Static builds** upload to the bucket and the pointer moves last.
+- **Metered Stripe prices** exist for the overage the quota model computes.
+
+## 14. What the last pass found
+
+**The suite was flaky, about one run in six, and had been before any of this
+work.** `project-hooks.test.ts` drives the real orchestrator against an address
+nothing listens on — deliberately — and each failure logs a full serialised
+Error. Past some volume, node:test's IPC fails to deserialise a chunk and the
+whole *file* is reported as `Unable to deserialize cloned data`, with every
+subtest inside it having passed and the file passing when run alone. Fixed by
+defaulting `LOG_LEVEL=error` in the test environment; 0 failures in 8 runs after,
+reproduced on a clean HEAD before.
+
+**A Service recreated on every deploy.** The first version of the
+substrate-aware `provisionRebaseService` deleted and recreated unconditionally on
+409 — a window with no Service behind the Ingress, on every deploy of every
+tenant, to serve a migration that almost never happens. It is now conditional on
+the type actually crossing the `ExternalName` boundary, where `clusterIP` being
+immutable genuinely forces a delete.
+
+**A pre-existing invariant that overage prices had to break.** "Every catalog
+price is a whole number of cents" is correct *because* `unit_amount` is an
+integer field — and a metered per-request price is €0.0000015, which has to reach
+Stripe as `unit_amount_decimal`. Sending it as `unit_amount` would round it to
+zero: a metered price that bills nothing forever and looks entirely correct in
+the dashboard. The invariant is now scoped to flat prices, with its inverse added
+for metered ones.
+
+**Streaming a download into `tar` cannot be made safe.** A stream that dies
+mid-transfer leaves `tar` having extracted a *prefix* of the archive and exiting
+0 — a half-unpacked bundle that boots and fails much later, since missing
+collections read as an empty schema and `REBASE_MIGRATE_ON_BOOT=ensure` then
+creates nothing and reports success. The bundle fetch writes the whole tarball
+first, which turns a truncated download into a corrupt archive, which is an
+error.
+
+## 15. Still not built
+
+- **Wiring the Cloud Run and static paths into the deploy function.** Every
+  piece exists and is tested; `runManagedDeployJob` still only knows the
+  Kubernetes branch.
+- **Reporting usage to Stripe.** `overageLines` and `matchUsageReports` compute
+  what to send; the monthly close that sends it is not written.
+- **A retention job** calling `pruneStaticDeployments`.
