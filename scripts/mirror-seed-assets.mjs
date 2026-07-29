@@ -75,8 +75,8 @@ const unmapped = subdirs.filter(d => !(d in PREFIXES));
 if (unmapped.length > 0) {
     console.error(
         `❌ seed-assets subdirectories have no storage prefix mapping: ${unmapped.join(", ")}\n` +
-        `   Add them to PREFIXES in scripts/mirror-seed-assets.mjs (and to a seedAssets() call\n` +
-        `   in app/backend/src/seed.ts) so their files reach the served uploads directory.`
+        "   Add them to PREFIXES in scripts/mirror-seed-assets.mjs (and to a seedAssets() call\n" +
+        "   in app/backend/src/seed.ts) so their files reach the served uploads directory."
     );
     process.exit(1);
 }
