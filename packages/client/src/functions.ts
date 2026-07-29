@@ -55,7 +55,15 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
             options?: FunctionInvokeOptions
         ): Promise<T> {
             const method = options?.method ?? "POST";
-            const subPath = options?.path ? `/${options.path.replace(/^\//, "")}` : "";
+            // A `path` that starts the query or fragment is appended as-is. Only a
+            // real sub-path gets a separator: inserting one before `?days=30` asks
+            // for `/functions/dashboard-stats/?days=30`, and the trailing slash
+            // misses the route, so a function that exists answers 404 — and the
+            // caller sees it as the backend being down rather than as a bad URL.
+            const rawPath = options?.path;
+            const subPath = rawPath
+                ? (/^[?#]/.test(rawPath) ? rawPath : `/${rawPath.replace(/^\//, "")}`)
+                : "";
             const routePath = `/functions/${encodeURIComponent(name)}${subPath}`;
 
             const init: RequestInit = { method };
