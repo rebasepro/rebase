@@ -102,6 +102,7 @@ export interface PostgresDriverInternals {
 
 // Re-export from shared CLI error utilities
 import { isEconnrefused } from "./cli-errors";
+import { classifyConnectFailure } from "./utils/pg-error-utils";
 
 /**
  * Default PostgreSQL bootstrapper.
@@ -260,9 +261,45 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     throw new Error(`Cannot connect to PostgreSQL at ${hostInfo}: connection refused. Is the database running?`);
                 }
 
-                // For other errors (timeouts, auth failures, etc.) warn but continue —
-                // the pool may recover on subsequent attempts.
-                logger.error("❌ Failed to connect to PostgreSQL", { error: err });
+                /*
+                 * Everything else.
+                 *
+                 * Two problems with what used to happen here. First, the logged
+                 * error was Drizzle's wrapper — `Failed query: SELECT 1` and a
+                 * stack through drizzle internals — while the sentence that
+                 * actually says what is wrong ("password authentication failed
+                 * for user …", "database … does not exist") sits in `.cause`
+                 * and was never printed. A developer with a typo in their
+                 * DATABASE_URL got two walls of stack trace and no cause.
+                 *
+                 * Second, "continuing… the pool may recover" is only true for
+                 * a transient fault. A wrong password or a missing database is
+                 * settled: the next query fails the same way, so the process
+                 * died seconds later anyway — after printing a reassurance.
+                 * Those now fail here, where the message can be about the
+                 * cause rather than about whichever query ran next.
+                 */
+                const { fatal, reason, code } = classifyConnectFailure(err);
+                const detail = code ? ` [${code}]` : "";
+
+                if (fatal) {
+                    logger.error(
+                        `\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                        `  ❌  PostgreSQL refused the connection\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+                        `\n` +
+                        `  ${reason}${detail}\n` +
+                        `\n` +
+                        `  The server is reachable, so this is the credentials or the\n` +
+                        `  database name in DATABASE_URL — check them in your .env.\n` +
+                        `\n` +
+                        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+                    );
+                    throw new Error(`PostgreSQL refused the connection: ${reason}${detail}`);
+                }
+
+                logger.error(`❌ Failed to connect to PostgreSQL: ${reason}${detail}`, { error: err });
                 logger.warn("⚠️ Continuing without initial database verification. Drizzle/PG will attempt to connect on subsequent queries.");
             }
 
