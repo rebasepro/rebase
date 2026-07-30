@@ -26,6 +26,8 @@ The MCP server supports managing multiple Rebase projects simultaneously. This i
 - **Auto-Discovery**: If `rebase dev` is running locally, the MCP server automatically discovers the active development port and service key from `.rebase/state.json` inside the project directory, giving you **zero-config local development**.
 - **Default Project**: If no project registry exists, a default project named `default` is created using `REBASE_PROJECT_DIR` (or current working directory), `REBASE_BASE_URL`, and `REBASE_API_TOKEN`.
 
+A token registered for a project **takes precedence over auto-discovery**. Discovery reads the dev server's *service key*, which is an unscoped admin secret — so if you deliberately register a narrow `rk_live_*` API key for a project, that key is what gets used, even while `rebase dev` is running. Discovery only fills in a token when none is registered.
+
 ## Configuration
 
 The server reads configuration from environment variables and `.env` files:
@@ -35,8 +37,31 @@ The server reads configuration from environment variables and `.env` files:
 | `REBASE_PROJECT_DIR` | `process.cwd()` | Project root directory (fallback if no registry) |
 | `REBASE_BASE_URL` | `http://localhost:3001` | Rebase backend URL (fallback if no registry) |
 | `REBASE_API_TOKEN` / `REBASE_TOKEN` | (empty) | Auth token for API calls (fallback if no registry) |
+| `REBASE_MCP_ALLOW_REMOTE_WRITES` | `false` | Allow destructive tools to run against non-local targets (see below) |
 
 The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_PROJECT_DIR/app/.env`.
+
+## Destructive-Tool Safety Gate
+
+`rebase_project_add` accepts any `baseUrl`, and the CLI tools connect with whatever `DATABASE_URL` the project's `.env` declares. That means the same tool list that edits a scratch database on your laptop can drop production rows — with nothing in between but the assistant's judgement about which project is currently active.
+
+These tools are therefore refused unless their target is on the loopback interface:
+
+| Tool | Target checked |
+|---|---|
+| `rebase_db_push` | `DATABASE_URL` |
+| `rebase_db_migrate` | `DATABASE_URL` |
+| `rebase_db_branch_delete` | `DATABASE_URL` |
+| `delete_document` | project `baseUrl` |
+| `delete_user` | project `baseUrl` |
+| `storage_delete_object` | project `baseUrl` |
+| `rebase_auth_reset_password` | project `baseUrl` |
+
+The two targets are not interchangeable: CLI tools never see `baseUrl`, so a localhost backend sitting next to a production `DATABASE_URL` is checked against the database, not the backend.
+
+Only loopback (`localhost`, `127.0.0.0/8`, `::1`) counts as local — private ranges like `10.x` and `192.168.x` do not, since those are as likely to be a shared staging cluster as a laptop. Read-only tools, and writes that only add data (`create_document`, `create_user`), are not gated.
+
+Set `REBASE_MCP_ALLOW_REMOTE_WRITES=true` to opt out.
 
 ---
 

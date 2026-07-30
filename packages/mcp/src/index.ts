@@ -193,37 +193,58 @@ function autoDiscoverLocal(project: ProjectConfig): ProjectConfig {
     if (!project.projectDir) return project;
 
     const devState = readDevState(project.projectDir);
-    if (devState) {
-        return {
-            ...project,
-            baseUrl: devState.baseUrl,
-            token: devState.serviceKey || project.token
-        };
-    }
+    if (!devState) return project;
 
-    return project;
+    return {
+        ...project,
+        baseUrl: devState.baseUrl,
+        // A registered token wins over the discovered one. What discovery finds
+        // is the dev server's *service key* — the unscoped admin secret — so
+        // letting it win meant a deliberately narrow API key registered for
+        // this project was silently upgraded to full admin on every call.
+        // Discovery now only fills a gap, which is all the zero-config story
+        // ever needed it to do.
+        token: project.token || devState.serviceKey || ""
+    };
 }
 
 /**
- * Read `.env` from a project directory and extract REBASE_SERVICE_KEY.
+ * Read a variable out of a project's `.env` (project root, or `app/`).
+ *
+ * The active project is not necessarily the one whose `.env` was loaded into
+ * `process.env` at startup, so ambient env vars are not a substitute — callers
+ * that want that fallback apply it themselves.
+ *
+ * @param isValid - Optional filter. A value that fails it is skipped and the
+ *                  next candidate file is tried, rather than ending the search.
  */
-function readServiceKeyFromEnv(projectDir: string): string | undefined {
+function readEnvVarFromProject(
+    projectDir: string,
+    name: string,
+    isValid: (value: string) => boolean = () => true
+): string | undefined {
+    const pattern = new RegExp(`^${name}\\s*=\\s*["']?([^"'\\n\\r]+)["']?`, "m");
     for (const envPath of [
         resolve(projectDir, ".env"),
         resolve(projectDir, "app", ".env")
     ]) {
         try {
             if (!existsSync(envPath)) continue;
-            const content = readFileSync(envPath, "utf-8");
-            const match = content.match(/^REBASE_SERVICE_KEY\s*=\s*["']?([^"'\n\r]+)["']?/m);
-            if (match?.[1] && match[1].trim().length >= 32) {
-                return match[1].trim();
-            }
+            const match = readFileSync(envPath, "utf-8").match(pattern);
+            const value = match?.[1]?.trim();
+            if (value && isValid(value)) return value;
         } catch {
             // ignore
         }
     }
     return undefined;
+}
+
+/**
+ * Read `.env` from a project directory and extract REBASE_SERVICE_KEY.
+ */
+function readServiceKeyFromEnv(projectDir: string): string | undefined {
+    return readEnvVarFromProject(projectDir, "REBASE_SERVICE_KEY", (v) => v.length >= 32);
 }
 
 // ── Environment & Initialization ────────────────────────────────────────────
@@ -263,7 +284,12 @@ function initializeRegistry(): void {
             name: "default",
             projectDir: ENV_PROJECT_DIR,
             baseUrl: ENV_BASE_URL || devState?.baseUrl || "http://localhost:3001",
-            token: ENV_API_TOKEN || devState?.serviceKey || envServiceKey || "",
+            // Deliberately no `devState.serviceKey` here: this runs once, at
+            // startup, and a key baked in now would outrank the freshly
+            // discovered one for the rest of the process — so a dev server
+            // restarted with a new service key would authenticate with the
+            // stale one forever. `autoDiscoverLocal` reads it per call instead.
+            token: ENV_API_TOKEN || envServiceKey || "",
             addedAt: new Date().toISOString()
         };
     }
@@ -356,6 +382,130 @@ async function getClient(): Promise<RebaseClient> {
 /** Clear cached clients (used when switching projects). */
 function clearClientCache(): void {
     clientCache.clear();
+}
+
+// ── Destructive-tool safety gate ────────────────────────────────────────────
+
+/**
+ * Tools that destroy or overwrite live state, and which target each one hits.
+ *
+ * The two values are not interchangeable:
+ *
+ * - `"http"` tools go through the SDK and hit the project's `baseUrl`.
+ * - `"db"` tools spawn the CLI, which connects with `DATABASE_URL` out of the
+ *   project's `.env` and never sees `baseUrl` at all. Gating those on the
+ *   backend URL would check a value they don't use — a localhost `baseUrl`
+ *   sitting next to a production `DATABASE_URL` is an ordinary way to have a
+ *   project configured, and it would sail straight through.
+ *
+ * Scoped to operations that lose data or credentials. Writes that create rows
+ * (`create_document`, `create_user`) and side-effectful-but-recoverable ones
+ * (`cron_trigger_job`, `invoke_function`) are deliberately out — the gate is
+ * meant to stay narrow enough that nobody switches it off wholesale.
+ */
+export const DESTRUCTIVE_TOOLS: Record<string, "http" | "db"> = {
+    rebase_db_push: "db",
+    rebase_db_migrate: "db",
+    rebase_db_branch_delete: "db",
+    delete_document: "http",
+    delete_user: "http",
+    storage_delete_object: "http",
+    // Not a delete, but it overwrites a real person's credentials in whatever
+    // environment it lands in, and it cannot be undone.
+    rebase_auth_reset_password: "http"
+};
+
+/** Whether the operator has opted into destructive tools against remote targets. */
+function remoteDestructiveAllowed(): boolean {
+    return /^(1|true|yes)$/i.test(process.env.REBASE_MCP_ALLOW_REMOTE_WRITES || "");
+}
+
+/**
+ * Is this host the loopback interface?
+ *
+ * Loopback only, on purpose. A `10.x` or `192.168.x` address is as likely to be
+ * a shared staging cluster as somebody's laptop, and counting private ranges as
+ * "local" would wave through exactly the accident this gate exists to stop.
+ */
+export function isLoopbackHost(host: string): boolean {
+    const h = host.toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
+    return h === "localhost"
+        || h.endsWith(".localhost")
+        || h === "::1"
+        || h === "0.0.0.0"
+        || /^127\./.test(h);
+}
+
+/**
+ * Classify a target URL as local.
+ *
+ * A non-empty value that won't parse counts as remote: we have a target we
+ * cannot verify, and the safe reading of "unknown" is "not your laptop".
+ */
+export function isLocalTarget(url: string): boolean {
+    try {
+        return isLoopbackHost(new URL(url).hostname);
+    } catch {
+        return false;
+    }
+}
+
+/** Strip credentials from a URL before it goes into an error message. */
+function redactUrl(url: string): string {
+    try {
+        const u = new URL(url);
+        u.username = "";
+        u.password = "";
+        return u.toString();
+    } catch {
+        return "(unparseable URL)";
+    }
+}
+
+/**
+ * Refuse a destructive tool call whose target isn't local.
+ *
+ * `rebase_project_add` accepts any `baseUrl`, and `DATABASE_URL` is whatever
+ * the project's `.env` says, so the same tool list that edits a scratch
+ * database on a laptop can drop production rows — with nothing in between but
+ * the model's judgement about which project is currently active. This is that
+ * something.
+ *
+ * Set `REBASE_MCP_ALLOW_REMOTE_WRITES=true` to opt out.
+ */
+export function assertDestructiveTargetIsLocal(toolName: string): void {
+    const target = DESTRUCTIVE_TOOLS[toolName];
+    if (!target) return;
+    if (remoteDestructiveAllowed()) return;
+
+    const project = getActiveProject();
+    const optOut = "Set REBASE_MCP_ALLOW_REMOTE_WRITES=true to allow destructive tools against remote environments.";
+
+    if (target === "http") {
+        if (isLocalTarget(project.baseUrl)) return;
+        throw new Error(
+            `Refusing to run "${toolName}": project "${project.name}" points at ` +
+            `${redactUrl(project.baseUrl)}, which is not local. ${optOut}`
+        );
+    }
+
+    // "db" — the CLI reads DATABASE_URL, and `runRebaseCmd` hands the child the
+    // whole of `process.env`, so an ambient DATABASE_URL is a live target even
+    // when the project's own .env declares none.
+    const projectDir = project.projectDir || ENV_PROJECT_DIR;
+    const databaseUrl = readEnvVarFromProject(projectDir, "DATABASE_URL")
+        || process.env.DATABASE_URL
+        || "";
+
+    // Nothing configured anywhere: there is no target to protect, and the CLI
+    // will fail on its own with a better message than this gate could give.
+    if (!databaseUrl) return;
+    if (isLocalTarget(databaseUrl)) return;
+
+    throw new Error(
+        `Refusing to run "${toolName}": DATABASE_URL for project "${project.name}" points at ` +
+        `${redactUrl(databaseUrl)}, which is not local. ${optOut}`
+    );
 }
 
 async function ensureAdmin(): Promise<void> {
@@ -903,6 +1053,11 @@ function jsonResult(data: unknown) {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
         const { name, arguments: args } = request.params;
+
+    // Gated here, before dispatch splits: the CLI and SDK branches are handled
+    // in two different places, and a per-branch check is one branch away from
+    // being forgotten the next time a tool is added.
+    assertDestructiveTargetIsLocal(name);
 
     // ── CLI tools ───────────────────────────────────────────────────────
     const cliTool = CLI_TOOLS.find((t) => t.name === name);
