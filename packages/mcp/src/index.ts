@@ -8,9 +8,28 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { config as loadDotenv } from "dotenv";
-import { resolve, join } from "node:path";
+import { resolve, join, dirname } from "node:path";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, chmodSync } from "node:fs";
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
+
+/**
+ * The server version advertised in the MCP `initialize` handshake — read from
+ * this package's own package.json so it tracks the release, rather than a
+ * hardcoded string that silently went stale (it read "0.1.0" while the package
+ * shipped 0.12). `package.json` sits one level above both `src/` and the
+ * bundled `dist/`, so the same relative path resolves in dev (tsx) and prod.
+ */
+function readPackageVersion(): string {
+    try {
+        const here = dirname(fileURLToPath(import.meta.url));
+        return JSON.parse(readFileSync(resolve(here, "../package.json"), "utf8")).version || "0.0.0";
+    } catch {
+        return "0.0.0";
+    }
+}
+
+const MCP_SERVER_VERSION = readPackageVersion();
 
 // ── Package Manager Detection ───────────────────────────────────────────────
 
@@ -356,7 +375,7 @@ async function ensureAdmin(): Promise<void> {
 
 export const server = new Server(
     { name: "rebase-mcp-server",
-      version: "0.1.0" },
+      version: MCP_SERVER_VERSION },
     { capabilities: { tools: {},
       resources: {} } }
 );
