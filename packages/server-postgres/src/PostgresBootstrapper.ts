@@ -537,17 +537,26 @@ table: fullCheckName });
                         const lines = missing.map(
                             m => `    • collection "${m.slug}" → table "${m.table}"`
                         );
+                        // This runtime creates collection tables (and their RLS)
+                        // at boot unless REBASE_MIGRATE_ON_BOOT=none, so a drift
+                        // this late means that step was disabled, could not run,
+                        // or failed — the guidance names a path for both a managed
+                        // tenant (whose in-cluster database `pnpm db:push` cannot
+                        // reach) and a self-host. Naming only the pnpm scripts, as
+                        // this once did, told a managed operator to run a command
+                        // that structurally cannot touch their database.
                         logger.warn([
                             "",
-                            "┌──────────────────────────────────────────────────────────────┐",
-                            "│  ⚠️  SCHEMA DRIFT — Missing tables in database               │",
-                            "├──────────────────────────────────────────────────────────────┤",
-                            ...lines.map(l => `│ ${l.padEnd(60)}│`),
-                            "├──────────────────────────────────────────────────────────────┤",
-                            "│  Run one of:                                                 │",
-                            "│    pnpm db:push      (dev — fast, no migration files)        │",
-                            "│    pnpm db:migrate   (prod — creates migration files)        │",
-                            "└──────────────────────────────────────────────────────────────┘",
+                            "⚠️  SCHEMA DRIFT — the database is missing tables this backend serves:",
+                            ...lines,
+                            "",
+                            "  This runtime applies the collection schema at boot unless",
+                            "  REBASE_MIGRATE_ON_BOOT=none. Check the \"Collection schema\" / \"policies\"",
+                            "  log lines above — this drift means that step was off, skipped, or failed.",
+                            "    • Managed cloud: redeploy (or restart) with REBASE_MIGRATE_ON_BOOT",
+                            "      unset or \"ensure\"; the runtime applies the schema to the tenant DB.",
+                            "    • Self-host: run `rebase db push` (dev) or `rebase db migrate` (prod)",
+                            "      against DATABASE_URL.",
                             ""
                         ].join("\n"));
                     }
@@ -712,6 +721,52 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 log
             );
             return { applied: plan.actions.length };
+        },
+
+        /**
+         * Apply the collections' RLS policies — ENABLE ROW LEVEL SECURITY and the
+         * `securityRules` compiled to `CREATE POLICY` — so a freshly provisioned
+         * database serves data instead of denying every user-context read.
+         *
+         * The companion to {@link ensureCollectionSchema}: that creates the
+         * tables, this makes them servable. Boot runs it *after* auth
+         * initialization, because the generated policies call `auth.uid()` /
+         * `auth.roles()`, and `CREATE POLICY` validates those functions exist.
+         *
+         * Runs through the same drizzle handle, one statement at a time (that
+         * handle speaks the extended query protocol, which rejects multi-command
+         * strings). Failures are per-table and non-fatal: a table left un-policed
+         * stays RLS-enabled, so it denies rather than leaks.
+         */
+        async ensureCollectionPolicies(
+            collections: unknown[],
+            driverResult: InitializedDriver,
+            log?: (message: string) => void
+        ): Promise<{ applied: number }> {
+            const internals = driverResult.internals as PostgresDriverInternals;
+            const { ensureCollectionPolicies } = await import("./schema/ensure-collection-policies");
+            const queryable = {
+                async query<T>(text: string): Promise<{ rows: T[] }> {
+                    const result = await internals.db.execute(sql.raw(text));
+                    const rows = (result as unknown as { rows?: T[] }).rows;
+                    return { rows: rows ?? (Array.isArray(result) ? (result as T[]) : []) };
+                }
+            };
+            const outcome = await ensureCollectionPolicies(
+                queryable,
+                collections as CollectionConfig[],
+                log
+            );
+
+            for (const skip of outcome.skipped) {
+                logger.warn(`🔐 [rls] Policies not applied to "${skip.table}": ${skip.reason}`);
+            }
+            for (const failure of outcome.failures) {
+                logger.warn(
+                    `🔐 [rls] Could not fully apply policies to "${failure.table}" — it stays locked (denies) until this is resolved: ${failure.error}`
+                );
+            }
+            return { applied: outcome.policiesApplied };
         },
 
         getAdmin(driverResult: InitializedDriver): DatabaseAdmin | undefined {

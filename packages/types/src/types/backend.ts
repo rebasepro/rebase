@@ -799,6 +799,28 @@ export interface BackendBootstrapper {
     ): Promise<{ applied: number }>;
 
     /**
+     * Apply the collections' row-level-security policies, additively and
+     * idempotently — the companion to {@link ensureCollectionSchema}.
+     *
+     * That method creates the tables; a table with RLS disabled and no policies
+     * is not servable, because authenticated requests run as a restricted role:
+     * a read with no `SELECT` policy returns nothing (a public collection
+     * answers 401) and a write with no `INSERT`/`UPDATE` policy is denied. The
+     * `db push` CLI applies these from the same collections, but it cannot reach
+     * a managed tenant's in-cluster database — the runtime, already connected,
+     * is the only thing that can.
+     *
+     * MUST be idempotent (re-run on every boot) and MUST NOT be destructive.
+     * Runs after auth initialization, because the generated policies call the
+     * `auth.*` helper functions and `CREATE POLICY` validates they exist.
+     */
+    ensureCollectionPolicies?(
+        collections: unknown[],
+        driverResult: InitializedDriver,
+        log?: (message: string) => void
+    ): Promise<{ applied: number }>;
+
+    /**
      * Initialize WebSocket server for realtime operations.
      */
     initializeWebsockets?(server: unknown, realtimeService: RealtimeProvider, driver: import("../controllers/data_driver").DataDriver, config?: unknown, authAdapter?: AuthAdapter): Promise<void> | void;

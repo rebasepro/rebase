@@ -236,6 +236,21 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         schemaEditor: false
     });
 
+    // ── RLS policies ───────────────────────────────────────────────────────────
+    //
+    // Now that the backend is up — auth tables and the `auth.*` helper functions
+    // exist, the restricted user role is provisioned, and the collection tables
+    // were created above — apply the collections' row-level-security policies.
+    // Tables without them are not servable: authenticated requests run as a
+    // restricted role, so a read with no policy returns nothing (a public
+    // collection answers 401) and a write with no policy is denied. This is the
+    // second half of what `db push` does, and the half a managed tenant could
+    // not reach any other way. Ordered after `initializeRebaseBackend` on
+    // purpose: `CREATE POLICY` validates the `auth.uid()` functions it references
+    // exist, and those are created during auth initialization. Same
+    // `REBASE_MIGRATE_ON_BOOT=none` opt-out as the table creation above.
+    await ensureCollectionPolicies(bundle, dataSources, env);
+
     // Restrict metric labels to collections that exist, now that they do.
     metrics?.setKnownCollections(
         backend.collectionRegistry.getCollections()
@@ -620,5 +635,59 @@ export async function ensureCollectionSchema(
         applied > 0
             ? `Applied ${applied} additive schema change(s) before boot.`
             : "Collection schema is up to date."
+    );
+}
+
+/**
+ * Apply the project's RLS policies before serving — the companion to
+ * {@link ensureCollectionSchema}, which creates the tables this makes servable.
+ *
+ * Runs after `initializeRebaseBackend`, not alongside table creation: the
+ * generated policies call the `auth.*` helper functions, and `CREATE POLICY`
+ * validates those exist, so this cannot run before auth is initialized. The
+ * gate conditions mirror `ensureCollectionSchema` (mode, bundle shape, driver
+ * support) — and because that function already ran and explained any skip on
+ * this same boot, the benign gates here return quietly rather than logging the
+ * same reason twice. The one thing it does say out loud is a driver that
+ * created tables but cannot apply policies: that is the difference between a
+ * served collection and a 401, and it must not pass in silence.
+ */
+export async function ensureCollectionPolicies(
+    bundle: LoadedBundle,
+    dataSources: InitializedDataSource[],
+    env: RebaseBootEnv
+): Promise<void> {
+    const mode = env.REBASE_MIGRATE_ON_BOOT || "ensure";
+    if (mode === "none") return;
+    if (bundle.manifest.kind !== "backend") return;
+    if (!bundle.manifest.entry?.config) return;
+    if (!bundle.collectionsDir) return;
+
+    const primary = dataSources[0];
+    if (!primary) return;
+    if (!primary.bootstrapper.ensureCollectionPolicies) {
+        // The tables may exist (ensureCollectionSchema ran) but their RLS does
+        // not, so every user-context read is denied. Name it: a silent skip here
+        // reads from outside the pod as "the database has no data".
+        logger.warn(
+            `Collection policies: skipped — the "${primary.driverPackage}" driver (engine "${primary.engine}") ` +
+                "does not apply RLS policies at boot. Collections will deny reads until policies are applied " +
+                "with `rebase db push` or `rebase db migrate`."
+        );
+        return;
+    }
+
+    const collections = await loadCollectionsFromDirectory(bundle.collectionsDir);
+    if (collections.length === 0) return;
+
+    const { applied } = await primary.bootstrapper.ensureCollectionPolicies(
+        collections,
+        primary.connection as never,
+        message => logger.info(`policies: ${message}`)
+    );
+    logger.info(
+        applied > 0
+            ? `Applied ${applied} RLS policy statement(s) before serving.`
+            : "RLS policies are up to date."
     );
 }

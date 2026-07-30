@@ -216,7 +216,7 @@ createAdapter };
  * sources need an explicit `id` per adapter, because the id is exactly what
  * `collection.dataSource` routes against.
  */
-function adapterToBootstrapper(
+export function adapterToBootstrapper(
     adapter: DatabaseAdapter,
     id: string,
     isDefault: boolean
@@ -234,6 +234,19 @@ function adapterToBootstrapper(
         initializeAuth: adapter.initializeAuth,
         initializeHistory: adapter.initializeHistory,
         initializeWebsockets: adapter.initializeWebsockets,
+        // Load-bearing for a managed boot: the runtime creates a fresh tenant's
+        // tables and RLS through these at boot. Dropping them here (the previous
+        // shape did) left the schema-ensure feature dead on the real adapter
+        // path — `boot.ts` saw no method and skipped, so every data route 500'd
+        // on a missing relation with only a "driver does not implement" warning.
+        ensureCollectionSchema: adapter.ensureCollectionSchema
+            ? (collections, driverResult, log) =>
+                adapter.ensureCollectionSchema!(collections, driverResult, log)
+            : undefined,
+        ensureCollectionPolicies: adapter.ensureCollectionPolicies
+            ? (collections, driverResult, log) =>
+                adapter.ensureCollectionPolicies!(collections, driverResult, log)
+            : undefined,
         getAdmin: adapter.getAdmin,
         mountRoutes: adapter.mountRoutes
     };
