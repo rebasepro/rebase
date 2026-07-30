@@ -178,6 +178,13 @@ describe("Password Utilities", () => {
             const ratio = Math.abs(correctMedian - incorrectMedian) / Math.max(correctMedian, incorrectMedian);
 
             expect(ratio).toBeLessThan(0.5);
-        });
+        // Interleaving 15 samples means 30 verifications, and a password hash is
+        // deliberately expensive — so this needs a runtime budget well past
+        // Jest's 5s default. It has nothing to do with the ratio: under a full
+        // `pnpm -r test` the samples themselves are fine and the test simply runs
+        // out of time mid-loop, which reads as a timing-safety failure while
+        // saying nothing about timing safety. The generous ceiling costs nothing
+        // on an idle machine, where the test finishes in about a second.
+        }, 60_000);
     });
 });

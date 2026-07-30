@@ -2,12 +2,24 @@
  * @jest-environment jsdom
  */
 
-import { renderHook, waitFor } from "@testing-library/react";
+import { configure, renderHook, waitFor } from "@testing-library/react";
 import { useResolvedCollections } from "../../src/hooks/navigation/useResolvedCollections";
 import { CollectionRegistryController, RebaseData, CollectionConfig } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/admin-types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
+
+/**
+ * `waitFor` keeps its own 1s budget, which `jest.setTimeout` does not touch.
+ *
+ * Every test here waits for `loading` to go false, and under a full
+ * `pnpm -r test` the machine is saturated enough that the resolve does not
+ * settle inside a second. It then fails as `expect(loading).toBe(false)` —
+ * indistinguishable from the hook never resolving at all, which is the one thing
+ * these tests exist to detect. Raising the budget changes nothing on an idle
+ * machine, where they finish in milliseconds.
+ */
+configure({ asyncUtilTimeout: 15_000 });
 
 describe("useResolvedCollections", () => {
 
