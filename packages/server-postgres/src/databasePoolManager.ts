@@ -2,7 +2,7 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
-import { guardPoolAgainstDirtyRelease } from "./connection";
+import { guardPoolAgainstDirtyRelease, pinSearchPath } from "./connection";
 
 export class DatabasePoolManager {
     private pools: Map<string, Pool> = new Map();
@@ -41,7 +41,10 @@ export class DatabasePoolManager {
         url.pathname = `/${databaseName}`;
 
         const pool = new Pool({
-            connectionString: url.toString(),
+            // Same pin as the primary pool: these are branch/multi-database
+            // connections to the *same* server, so they inherit the same
+            // `"$user"` hazard. See `pinSearchPath`.
+            connectionString: pinSearchPath(url.toString()),
             max: 10, // Default sensible limit, can be tuned later
             idleTimeoutMillis: 10000, // Reduced from 30000 for aggressive cleanup
             allowExitOnIdle: true // Prevent idle clients from hanging the Node.js process

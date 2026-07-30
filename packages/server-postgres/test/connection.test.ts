@@ -49,7 +49,8 @@ jest.mock("@rebasepro/server", () => ({
 import {
     createPostgresDatabaseConnection,
     createDirectDatabaseConnection,
-    createReadReplicaConnection
+    createReadReplicaConnection,
+    pinSearchPath
 } from "../src/connection";
 import { logger } from "@rebasepro/server";
 
@@ -74,14 +75,14 @@ describe("createPostgresDatabaseConnection", () => {
 
         expect(result).toHaveProperty("db");
         expect(result).toHaveProperty("pool");
-        expect(result).toHaveProperty("connectionString", connStr);
+        expect(result).toHaveProperty("connectionString", pinSearchPath(connStr));
     });
 
     it("creates a Pool with the provided connectionString", () => {
         createPostgresDatabaseConnection(connStr);
 
         expect(Pool).toHaveBeenCalledTimes(1);
-        expect(lastPool().config.connectionString).toBe(connStr);
+        expect(lastPool().config.connectionString).toBe(pinSearchPath(connStr));
     });
 
     it("applies default pool config values", () => {
@@ -174,7 +175,7 @@ describe("createDirectDatabaseConnection", () => {
 
         expect(result).toHaveProperty("db");
         expect(result).toHaveProperty("pool");
-        expect(result).toHaveProperty("connectionString", connStr);
+        expect(result).toHaveProperty("connectionString", pinSearchPath(connStr));
     });
 
     it("uses a smaller default max of 5 for the direct pool", () => {
@@ -233,7 +234,7 @@ describe("createReadReplicaConnection", () => {
 
         expect(result).toHaveProperty("db");
         expect(result).toHaveProperty("pool");
-        expect(result).toHaveProperty("connectionString", connStr);
+        expect(result).toHaveProperty("connectionString", pinSearchPath(connStr));
     });
 
     it("uses a default max of 10 for the replica pool", () => {
@@ -290,5 +291,56 @@ describe("createReadReplicaConnection", () => {
         createReadReplicaConnection(connStr, schema);
 
         expect(mockDrizzle).toHaveBeenCalledWith(lastPool(), { schema });
+    });
+});
+
+describe("pinSearchPath", () => {
+    // Postgres resolves unqualified SQL through `"$user", public`. This project
+    // creates a schema named `rebase` and every template names the database role
+    // `rebase`, so `$user` hits — and unqualified DDL lands in `rebase` instead
+    // of `public`. These cases are the contract that keeps that from happening
+    // without taking a deployment's own choices away.
+    it("pins search_path=public on a URL that has no options", () => {
+        expect(pinSearchPath("postgresql://rebase:pw@localhost:5432/rebase"))
+            .toBe("postgresql://rebase:pw@localhost:5432/rebase?options=-c%20search_path%3Dpublic");
+    });
+
+    it("percent-encodes rather than plus-encodes", () => {
+        // `URLSearchParams` writes a space as `+`. node-postgres decodes that;
+        // libpq — which runs the backups via pg_dump/psql on this same string —
+        // does not, and would pass `-c+search_path=public` to the backend.
+        expect(pinSearchPath("postgresql://u@h/db")).not.toContain("+");
+    });
+
+    it("leaves an explicit search_path alone", () => {
+        const url = "postgresql://u@h/db?options=-c%20search_path%3Danalytics";
+        expect(pinSearchPath(url)).toBe(url);
+    });
+
+    it("preserves other options and appends the flag", () => {
+        const pinned = pinSearchPath("postgresql://u@h/db?options=-c%20statement_timeout%3D5000");
+        expect(decodeURIComponent(new URL(pinned).searchParams.get("options")!))
+            .toBe("-c statement_timeout=5000 -c search_path=public");
+    });
+
+    it("keeps unrelated query parameters", () => {
+        expect(pinSearchPath("postgresql://u@h/db?sslmode=disable"))
+            .toContain("sslmode=disable");
+    });
+
+    it("honours a custom search path", () => {
+        expect(decodeURIComponent(pinSearchPath("postgresql://u@h/db", "app,public")))
+            .toContain("-c search_path=app,public");
+    });
+
+    it("sends nothing when the pin is disabled", () => {
+        const url = "postgresql://u@h/db";
+        expect(pinSearchPath(url, false)).toBe(url);
+    });
+
+    it("returns non-URL connection strings untouched", () => {
+        // Key/value DSNs: a connection that works unpinned beats a corrupted one.
+        const dsn = "host=localhost user=rebase dbname=rebase";
+        expect(pinSearchPath(dsn)).toBe(dsn);
     });
 });

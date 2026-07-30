@@ -21,10 +21,19 @@ export interface PostgresPoolConfig {
     statementTimeout?: number;
     /** Enable TCP keep-alive (default: true) */
     keepAlive?: boolean;
+    /**
+     * `search_path` pinned on every connection (default: `"public"`).
+     *
+     * Pass `false` to send no `search_path` at all and inherit whatever the
+     * server/role defaults to. See {@link pinSearchPath} for why the default
+     * is not "inherit".
+     */
+    searchPath?: string | false;
 }
 
 const DEFAULT_POOL: Required<PostgresPoolConfig> = {
     max: 20,
+    searchPath: "public",
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
     // The client-side read timeout MUST be comfortably above the server-side
@@ -42,6 +51,67 @@ const DEFAULT_POOL: Required<PostgresPoolConfig> = {
 
 /** ReadyForQuery status byte: `I` idle, `T` in transaction, `E` failed transaction. */
 const TX_IDLE = "I";
+
+/**
+ * Pin `search_path` into a connection string, so unqualified SQL resolves to a
+ * schema this framework chose rather than to one Postgres inferred.
+ *
+ * Postgres defaults `search_path` to `"$user", public`: the *first* candidate
+ * is a schema named after the connecting role. Rebase creates a schema called
+ * `rebase` (auth, history, api keys), and every template, compose file and
+ * deployment doc names the database role `rebase` too — so `$user` resolves to
+ * a schema that exists, and every unqualified statement lands there instead of
+ * in `public`. The generated Drizzle schema emits bare `pgTable("posts", …)`
+ * for any collection without an explicit `schema`, which makes the *runtime's*
+ * own reads and writes unqualified; a developer's raw `rebase.sql(...)`, the
+ * Studio SQL editor and any hand-written migration are unqualified too. The
+ * result is collection tables created in, and served from, `rebase`.
+ *
+ * Drizzle cannot express the fix on its side: `pgSchema("public")` throws by
+ * design ("just use pgTable() instead"), so there is no way to emit a
+ * public-qualified table from the generator. The pin has to live on the
+ * connection.
+ *
+ * Precedence is deliberate and verified against node-postgres: `options` in
+ * the connection string wins over the `options` field passed to `Pool`, so
+ * rewriting the URL — rather than setting the field — is what makes this
+ * authoritative. Two escape hatches survive it:
+ *
+ *  - an `options` that already mentions `search_path` is left untouched, so a
+ *    deployment that deliberately pins something else keeps it;
+ *  - `searchPath: false` (or an unparseable, non-URL connection string) sends
+ *    nothing and inherits the server default.
+ *
+ * Anything else in `options` (a `statement_timeout`, say) is preserved and the
+ * `search_path` flag is appended to it.
+ */
+export function pinSearchPath(connectionString: string, searchPath: string | false = "public"): string {
+    if (searchPath === false) return connectionString;
+
+    let url: URL;
+    try {
+        url = new URL(connectionString);
+    } catch {
+        // Key/value DSNs and anything else we cannot parse are returned as
+        // given: a connection that works unpinned beats one we corrupted.
+        return connectionString;
+    }
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") return connectionString;
+
+    const existing = url.searchParams.get("options");
+    if (existing && /(^|\s)-c\s*search_path\s*=/.test(existing)) return connectionString;
+
+    const flag = `-c search_path=${searchPath}`;
+    url.searchParams.set("options", existing ? `${existing} ${flag}` : flag);
+    // Re-serialize by hand. `URLSearchParams` writes a space as `+`, which
+    // node-postgres happens to decode but libpq does not — and this same string
+    // is handed to `pg_dump`/`psql` for backups. Percent-encoding is the form
+    // both agree on, and is what the scaffolded `.env` already ships.
+    url.search = Array.from(url.searchParams.entries())
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join("&");
+    return url.toString();
+}
 
 /**
  * Destroy pool clients that are released while still inside a transaction.
@@ -108,6 +178,7 @@ export function createPostgresDatabaseConnection(
 ) {
     const opts = { ...DEFAULT_POOL,
 ...poolConfig };
+    connectionString = pinSearchPath(connectionString, opts.searchPath);
 
     const pgPoolConfig: PoolConfig = {
         connectionString,
@@ -159,6 +230,7 @@ export function createDirectDatabaseConnection(
         max: 5,
         ...poolConfig
     };
+    connectionString = pinSearchPath(connectionString, opts.searchPath);
 
     const pgPoolConfig: PoolConfig = {
         connectionString,
@@ -199,6 +271,7 @@ export function createReadReplicaConnection(
         max: 10,
         ...poolConfig
     };
+    connectionString = pinSearchPath(connectionString, opts.searchPath);
 
     const pgPoolConfig: PoolConfig = {
         connectionString,

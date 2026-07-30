@@ -551,8 +551,15 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
         const tableVarName = getTableVarName(tableName);
         if (isJunction && relation && sourceCollection && isManyToMany(relation)) {
             const targetCollection = relation.target();
-            const schema = (isPostgresCollectionConfig(targetCollection) ? targetCollection.schema : undefined) || (isPostgresCollectionConfig(sourceCollection) ? sourceCollection.schema : undefined);
-            const tableCreator = schema ? `${schema}Schema.table` : "pgTable";
+            // Junctions live in `public`, full stop — `resolveJunctionSpecs`
+            // hardcodes that, so it is where `planJunctionTables` CREATEs them
+            // and where the derived RLS policies are applied. Inheriting the
+            // endpoint's schema here (as this used to) put the junction of any
+            // m2m onto `users` in `rebase`, while its policies were still
+            // created against `public.<junction>` — RLS enabled on one table,
+            // rows written to another. The three generators have to agree, and
+            // the other two already did.
+            const tableCreator = "pgTable";
             const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
             const {
                 sourceColumn,

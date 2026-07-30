@@ -254,11 +254,38 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
             ? applyPropertyConfigs(initialCollection, propertyConfigs)
             : copyFromProp
                 ? (() => {
-                    // When duplicating, copy all properties but clear identifiers
-                    const { subcollections: _sub, ...rest } = copyFromProp as unknown as Record<string, unknown>;
+                    // When duplicating, copy all properties but clear identifiers.
+                    //
+                    // "Identifiers" has to include the ones this dialog cannot
+                    // show. `schema` has no field anywhere in the editor, so a
+                    // duplicate of the Users collection — the one collection
+                    // scaffolded with `schema: "rebase"` — silently produced a
+                    // new collection whose table is created in `rebase` rather
+                    // than `public`, with nothing on screen to explain why.
+                    // Panel-authored collections are `public` collections.
+                    //
+                    // `slug`/`table` are cleared rather than carried: both are
+                    // re-derived from the name the user types (see
+                    // `updateName` in GeneralSettingsForm, which fills untouched
+                    // fields while `isNewCollection`), and carrying them meant a
+                    // duplicate pointed at the source's table until then.
+                    //
+                    // `auth` goes too — a duplicate must not become a second
+                    // auth collection wired to the same user store.
+                    const {
+                        subcollections: _sub,
+                        schema: _schema,
+                        auth: _auth,
+                        ...rest
+                    } = copyFromProp as unknown as Record<string, unknown>;
                     return {
                         ...rest,
                         name: "",
+                        // Same shape the "new collection" branch below starts
+                        // from, so validation and the registry lookups never see
+                        // an undefined slug mid-edit.
+                        slug: fallbackSlug,
+                        table: "",
                         ownerId: authController.user?.uid ?? ""
                     } as AdminCollection<any>;
                 })()

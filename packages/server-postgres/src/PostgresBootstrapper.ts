@@ -524,22 +524,28 @@ table: link.table });
             try {
                 const registeredCollections = registry.getCollections();
                 if (registeredCollections.length > 0) {
-                    const schemasToCheck = Array.from(new Set(
-                        registeredCollections.map(c => "schema" in c && c.schema ? c.schema : "public")
-                    ));
-                    const schemasList = schemasToCheck.map(s => `'${s}'`).join(",");
+                    // Deliberately unfiltered by schema: a table that is missing
+                    // from where the collection says it lives is very often
+                    // sitting in another schema entirely (see the misplaced-table
+                    // report below), and knowing *which* is the whole answer.
                     const result = await schemaAwareDb.execute(sql.raw(`
                         SELECT table_name, table_schema
                         FROM information_schema.tables
-                        WHERE table_schema IN (${schemasList})
+                        WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
                           AND table_type = 'BASE TABLE'
                     `));
+                    const tablesByName = new Map<string, string[]>();
+                    for (const row of result.rows as Array<{ table_name: string; table_schema: string }>) {
+                        const schemas = tablesByName.get(row.table_name) ?? [];
+                        schemas.push(row.table_schema);
+                        tablesByName.set(row.table_name, schemas);
+                    }
                     const dbTables = new Set(
                         (result.rows as Array<{ table_name: string; table_schema: string }>).map(r =>
                             r.table_schema === "public" ? r.table_name : `${r.table_schema}.${r.table_name}`
                         )
                     );
-                    const missing: Array<{ slug: string; table: string }> = [];
+                    const missing: Array<{ slug: string; table: string; foundIn: string[] }> = [];
                     for (const col of registeredCollections) {
                         // Auth owns its table and creates it later in this same
                         // boot (initializeAuth → ensureAuthTablesExist), so it is
@@ -567,13 +573,40 @@ table: link.table });
                             // Report what was actually looked up: an unqualified
                             // "users" sends people hunting for public.users.
                             missing.push({ slug: col.slug,
-table: fullCheckName });
+table: fullCheckName,
+foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
                         }
                     }
                     if (missing.length > 0) {
                         const lines = missing.map(
-                            m => `    • collection "${m.slug}" → table "${m.table}"`
+                            m => `    • collection "${m.slug}" → table "${m.table}"` +
+                                (m.foundIn.length > 0
+                                    ? ` — but a table of that name exists in ${m.foundIn.map(s => `"${s}"`).join(", ")}`
+                                    : "")
                         );
+                        // A table that exists under the same name in another
+                        // schema is not ordinary drift: it is almost always this
+                        // framework's own `search_path` hazard. Postgres resolves
+                        // unqualified SQL through `"$user", public`, and this
+                        // project creates a schema named `rebase` while every
+                        // template names the database role `rebase` too — so an
+                        // unqualified CREATE TABLE (a hand-written migration, the
+                        // SQL editor, drizzle-kit) lands in `rebase`, and the
+                        // runtime, which now pins `search_path=public`, cannot see
+                        // it. Say so, because "missing table" sends people to
+                        // re-run a push that will create a *second* copy.
+                        const misplaced = missing.filter(m => m.foundIn.length > 0);
+                        const misplacedHelp = misplaced.length === 0 ? [] : [
+                            "  Those tables exist — in the wrong schema. Unqualified SQL run by a",
+                            "  role whose name matches a schema (`rebase` is both, by default)",
+                            "  resolves through search_path's \"$user\" and creates there. Move them:",
+                            ...misplaced.map(m =>
+                                `      ALTER TABLE "${m.foundIn[0]}"."${m.table.split(".").pop()}" SET SCHEMA "${m.table.includes(".") ? m.table.split(".")[0] : "public"}";`
+                            ),
+                            "  and qualify the SQL that created them, or pin search_path in DATABASE_URL",
+                            "  (`?options=-c%20search_path%3Dpublic`).",
+                            ""
+                        ];
                         // This runtime creates collection tables (and their RLS)
                         // at boot unless REBASE_MIGRATE_ON_BOOT=none, so a drift
                         // this late means that step was disabled, could not run,
@@ -587,11 +620,17 @@ table: fullCheckName });
                             "⚠️  SCHEMA DRIFT — the database is missing tables this backend serves:",
                             ...lines,
                             "",
+                            ...misplacedHelp,
                             "  This runtime applies the collection schema at boot unless",
                             "  REBASE_MIGRATE_ON_BOOT=none. Check the \"Collection schema\" / \"policies\"",
                             "  log lines above — this drift means that step was off, skipped, or failed.",
-                            "    • Managed cloud: redeploy (or restart) with REBASE_MIGRATE_ON_BOOT",
-                            "      unset or \"ensure\"; the runtime applies the schema to the tenant DB.",
+                            "    • Managed cloud: redeploy with REBASE_MIGRATE_ON_BOOT unset or",
+                            "      \"ensure\"; the runtime applies the schema to the tenant DB.",
+                            "      If the log above says the driver does not implement collection-table",
+                            "      creation, THIS driver is too old to do it. A driver is installed from",
+                            "      your bundle's dependencies, not supplied by the platform image, so a",
+                            "      newer runtime will not update it: bump \"@rebasepro/server-postgres\"",
+                            "      in your project's package.json and redeploy.",
                             "    • Self-host: run `rebase db push` (dev) or `rebase db migrate` (prod)",
                             "      against DATABASE_URL.",
                             ""

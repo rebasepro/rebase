@@ -164,6 +164,51 @@ relationName: "tags" }
         expect(cleanResult).toContain(cleanSchema(expectedJunctionRelations));
     });
 
+    it("keeps a junction in public even when an endpoint lives in another schema", async () => {
+        // The users collection is scaffolded with `schema: "rebase"`, so every
+        // m2m onto it used to emit `rebaseSchema.table("post_editors", …)` here
+        // — while `resolveJunctionSpecs` (and therefore the CREATE TABLE and the
+        // derived policies) hardcodes `public`. RLS was enabled and policies
+        // created on `public.post_editors`; the rows went to `rebase`. The three
+        // generators have to agree, and public is what the other two say.
+        const usersCollection: CollectionConfig = {
+            slug: "users",
+            table: "users",
+            schema: "rebase",
+            name: "Users",
+            properties: { email: { type: "string" } }
+        };
+        const postsCollection: CollectionConfig = {
+            slug: "posts",
+            table: "posts",
+            name: "Posts",
+            properties: {
+                title: { type: "string" },
+                editors: { type: "relation",
+relationName: "editors" }
+            },
+            relations: [
+                {
+                    kind: "manyToMany",
+                    relationName: "editors",
+                    target: () => usersCollection,
+                    through: {
+                        table: "post_editors",
+                        sourceColumn: "post_id",
+                        targetColumn: "user_id"
+                    }
+                }
+            ]
+        };
+
+        const cleanResult = cleanSchema(await generateSchema([postsCollection, usersCollection]));
+
+        expect(cleanResult).toContain("export const postEditors = pgTable(\"post_editors\",");
+        expect(cleanResult).not.toContain("rebaseSchema.table(\"post_editors\"");
+        // The endpoint itself still lives where it says it does.
+        expect(cleanResult).toContain("export const users = rebaseSchema.table(\"users\",");
+    });
+
     describe("generateDrizzleSchema Column Types", () => {
 
         describe("String Property", () => {

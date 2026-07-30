@@ -1030,6 +1030,20 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             if (/[\r\n]/.test(databaseUrl)) {
                 throw new Error("Invalid DATABASE_URL: multiline values are not allowed.");
             }
+            // A supplied URL used to be written through verbatim, which quietly
+            // dropped the `search_path=public` pin the generated URL below has
+            // always carried. Postgres defaults `search_path` to `"$user",
+            // public`, and this project creates a `rebase` schema — so on any
+            // database whose role happens to be named `rebase` (the name every
+            // template, compose file and deployment doc uses), unqualified SQL
+            // resolves to `$user` and the project's tables get created in
+            // `rebase` instead of `public`. Pinning here makes the two branches
+            // agree; a URL that already pins something keeps it.
+            // Imported lazily: this is the only line in `init` that needs the
+            // Postgres package, and a static import would load pg + drizzle on
+            // every CLI invocation.
+            const { pinSearchPath } = await import("@rebasepro/server-postgres");
+            const pinnedUrl = pinSearchPath(databaseUrl);
             // DATABASE_PASSWORD is still written even though the URL points
             // elsewhere: docker-compose.yml interpolates it into both
             // POSTGRES_PASSWORD and the backend's own DATABASE_URL, defaulting
@@ -1038,7 +1052,7 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             // on a service that publishes a host port by default.
             envContent = envContent.replace(
                 /^DATABASE_URL=.*$/m,
-                `DATABASE_URL=${databaseUrl}\nDATABASE_PASSWORD=${dbPassword}`
+                `DATABASE_URL=${pinnedUrl}\nDATABASE_PASSWORD=${dbPassword}`
             );
         } else {
             const dbPort = await findAvailablePort(5432);

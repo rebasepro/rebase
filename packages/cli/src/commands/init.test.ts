@@ -728,7 +728,7 @@ describe(".env.example", () => {
         expect(envContent).not.toMatch(/^#\s*REBASE_SERVICE_KEY=/m);
     });
 
-    it("configureEnvFile correctly uses provided databaseUrl", async () => {
+    it("configureEnvFile correctly uses provided databaseUrl, pinned to public", async () => {
         const targetDir = await simulateInit("env-custom-db-app");
         const customDbUrl = "postgresql://user:pass@remote:5432/db";
         await configureEnvFile(targetDir, customDbUrl);
@@ -736,7 +736,22 @@ describe(".env.example", () => {
         const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
         const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);
         expect(dbMatch).toBeTruthy();
-        expect(dbMatch![1]).toBe(customDbUrl);
+        expect(dbMatch![1]).toContain("postgresql://user:pass@remote:5432/db");
+        // A supplied URL used to be written through verbatim, dropping the
+        // `search_path=public` pin the generated URL has always carried — and on
+        // a database whose role is named `rebase` (what every template creates),
+        // `"$user"` then resolves to the `rebase` schema this project creates and
+        // unqualified DDL builds the project's tables there instead of in public.
+        expect(dbMatch![1]).toContain("search_path%3Dpublic");
+    });
+
+    it("configureEnvFile keeps a search_path the caller already chose", async () => {
+        const targetDir = await simulateInit("env-custom-db-pinned-app");
+        const customDbUrl = "postgresql://user:pass@remote:5432/db?options=-c%20search_path%3Danalytics";
+        await configureEnvFile(targetDir, customDbUrl);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+        expect(envContent.match(/^DATABASE_URL=(.*)$/m)![1]).toBe(customDbUrl);
     });
 
     it("configureEnvFile throws an error if a multiline databaseUrl is provided", async () => {
