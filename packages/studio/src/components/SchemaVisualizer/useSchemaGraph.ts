@@ -119,8 +119,20 @@ const extractColumns = (collection: AdminCollection): ColumnInfo[] => {
 
 const buildGraph = (
     collections: AdminCollection[],
-    direction: LayoutDirection
+    direction: LayoutDirection,
+    liveRls: Set<string> | null
 ): { nodes: Node[]; edges: Edge[] } => {
+    /**
+     * Is RLS on for this table?
+     *
+     * The database is the authority whenever we could reach it. Declaring rules
+     * in code is not the same as having them applied, and the hosted console
+     * never sees the declarations at all — see `useLiveRlsTables`. Only when
+     * there is no SQL capability do we fall back to what the config says.
+     */
+    const isRlsEnabled = (schema: string, tableName: string, declaresRules: boolean): boolean =>
+        liveRls ? liveRls.has(`${schema}.${tableName}`) : declaresRules;
+
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     const tableToNodeId = new Map<string, string>();
@@ -160,7 +172,11 @@ const buildGraph = (
             columns,
             isJunction: false,
             isUnmanaged: false,
-            rlsEnabled: Boolean(collection.securityRules && collection.securityRules.length > 0),
+            rlsEnabled: isRlsEnabled(
+                collection.schema ?? "public",
+                tableName,
+                Boolean(collection.securityRules && collection.securityRules.length > 0)
+            ),
             historyEnabled: Boolean(collection.history),
             icon: typeof collection.icon === "string" ? collection.icon : undefined
         };
@@ -260,7 +276,10 @@ y: 0 },
                         columns: junctionColumns,
                         isJunction: true,
                         isUnmanaged: false,
-                        rlsEnabled: false,
+                        // Junction tables get derived policies rather than
+                        // declared ones, so the config can never say — but the
+                        // database can, and usually says yes.
+                        rlsEnabled: isRlsEnabled("public", rel.through.table, false),
                         historyEnabled: false
                     } satisfies TableNodeData
                 });
@@ -361,7 +380,12 @@ export interface UseSchemaGraphResult {
 }
 
 export const useSchemaGraph = (
-    collections: AdminCollection[] | undefined
+    collections: AdminCollection[] | undefined,
+    /**
+     * `schema.table` for every table the database reports RLS on, or `null`
+     * when there is no SQL capability to ask. See {@link useLiveRlsTables}.
+     */
+    liveRls: Set<string> | null = null
 ): UseSchemaGraphResult => {
     const [direction, setDirection] = useState<LayoutDirection>("LR");
     const [version, setVersion] = useState(0);
@@ -380,14 +404,14 @@ edges: [],
 tableCount: 0,
 relationCount: 0 };
         }
-        const result = buildGraph(collections, direction);
+        const result = buildGraph(collections, direction, liveRls);
         return {
             ...result,
             tableCount: result.nodes.length,
             relationCount: result.edges.length
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [collections, direction, version]);
+    }, [collections, direction, version, liveRls]);
 
     return {
         nodes,

@@ -94,6 +94,21 @@ export interface AuthClient {
      * Manually refresh the session token
      */
     refreshSession(): Promise<RebaseSession>;
+
+    /**
+     * Whether a session could exist that this client has not loaded yet.
+     *
+     * `false` means the only way this client can hold a session is an explicit
+     * sign-in during this page's lifetime: it neither persists sessions nor
+     * carries an httpOnly auth cookie, so there is nothing on disk or in the
+     * browser to restore from. A caller that would otherwise probe the server
+     * — `getUser()` on mount, say — can skip it, because the answer is already
+     * known and the request can only ever fail.
+     *
+     * Optional so that alternative {@link AuthClient} implementations need not
+     * supply it; treat a missing implementation as "unknown, go ahead and ask".
+     */
+    canRestoreSession?: () => boolean;
 }
 
 // ─── Admin API ───────────────────────────────────────────────────────────────
