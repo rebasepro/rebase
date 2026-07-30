@@ -5,6 +5,7 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     collectDeclaredDependencies,
+    detectFrameworkDepDrift,
     detectNativeDependencies,
     detectStorageAuthorize,
     findUnusedServerEntry,
@@ -431,5 +432,108 @@ describe("what `rebase build` does with each runtime", () => {
 
     it("still bundles a managed backend", () => {
         expect(read("commands/build.ts")).toContain("const result = await buildBundle(");
+    });
+});
+
+/**
+ * The declared `@rebasepro/*` versions are the one thing a project can get badly
+ * wrong and never find out locally.
+ *
+ * In development every one of them resolves through pnpm's workspace and `link:`
+ * overrides to the checkout on disk, so the version STRINGS are never exercised.
+ * They are first honoured when the runtime npm-installs them from a bundle in
+ * the cloud — where the image supplies only `@rebasepro/server` and the database
+ * driver comes from these declarations. A build warning is the only moment a
+ * developer can be told.
+ */
+describe("detectFrameworkDepDrift", () => {
+    it("flags a pin that can never reach the CLI's own version", () => {
+        write("package.json", JSON.stringify({
+            dependencies: { "@rebasepro/server-postgres": "^0.10.0" }
+        }));
+
+        const drift = detectFrameworkDepDrift(scratch, "0.12.0");
+        expect(drift.behind.map(d => d.name)).toEqual(["@rebasepro/server-postgres"]);
+        expect(drift.behind[0].file).toBe("package.json");
+    });
+
+    it("accepts a range that spans the CLI's version", () => {
+        write("package.json", JSON.stringify({
+            dependencies: { "@rebasepro/server-postgres": "^0.12.0" }
+        }));
+        expect(detectFrameworkDepDrift(scratch, "0.12.0").behind).toEqual([]);
+    });
+
+    it("reads every package.json, because the forgotten one is the problem", () => {
+        // They have to be bumped together; the one nobody looks at is the one
+        // that strands the deployment.
+        write("package.json", JSON.stringify({
+            dependencies: { "@rebasepro/server": "^0.12.0" }
+        }));
+        write("backend/package.json", JSON.stringify({
+            dependencies: { "@rebasepro/server-postgres": "^0.10.0" }
+        }));
+        write("config/package.json", JSON.stringify({
+            dependencies: { "@rebasepro/types": "^0.12.0" }
+        }));
+
+        const drift = detectFrameworkDepDrift(scratch, "0.12.0");
+        expect(drift.behind.map(d => d.file)).toEqual(["backend/package.json"]);
+    });
+
+    it("looks in devDependencies too", () => {
+        write("package.json", JSON.stringify({
+            devDependencies: { "@rebasepro/cli": "0.10.0" }
+        }));
+        expect(detectFrameworkDepDrift(scratch, "0.12.0").behind).toHaveLength(1);
+    });
+
+    it("ignores packages that are not @rebasepro", () => {
+        write("package.json", JSON.stringify({
+            dependencies: { zod: "^3.0.0", hono: "1.0.0" }
+        }));
+        expect(detectFrameworkDepDrift(scratch, "0.12.0").behind).toEqual([]);
+    });
+
+    it("says nothing about workspace and link specifiers", () => {
+        // Normal inside the monorepo, and not a version range. Guessing at one
+        // would produce a warning on every in-repo build, which is how a warning
+        // stops being read.
+        write("package.json", JSON.stringify({
+            dependencies: {
+                "@rebasepro/server": "workspace:*",
+                "@rebasepro/server-postgres": "link:../server-postgres"
+            }
+        }));
+        const drift = detectFrameworkDepDrift(scratch, "0.12.0");
+        expect(drift.behind).toEqual([]);
+        expect(drift.disagreeing).toEqual([]);
+    });
+
+    it("reports mixed-era pins even when none is behind", () => {
+        write("package.json", JSON.stringify({
+            dependencies: {
+                "@rebasepro/server": "^0.12.0",
+                "@rebasepro/admin": "^0.13.0"
+            }
+        }));
+        const drift = detectFrameworkDepDrift(scratch, "0.12.0");
+        expect(drift.behind).toEqual([]);
+        expect(drift.disagreeing).toEqual(["0.12.0", "0.13.0"]);
+    });
+
+    it("does not call a caret and an exact pin of the same version a disagreement", () => {
+        write("package.json", JSON.stringify({
+            dependencies: {
+                "@rebasepro/server": "^0.12.0",
+                "@rebasepro/admin": "0.12.0"
+            }
+        }));
+        expect(detectFrameworkDepDrift(scratch, "0.12.0").disagreeing).toEqual([]);
+    });
+
+    it("survives an unparseable package.json rather than failing the build", () => {
+        write("package.json", "{ not json");
+        expect(() => detectFrameworkDepDrift(scratch, "0.12.0")).not.toThrow();
     });
 });
