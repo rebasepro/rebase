@@ -20,12 +20,11 @@
         "schema:generate": "rebase schema generate --collections ../config/collections",
         "generate:sdk": "rebase generate-sdk",
         "skills:install": "rebase skills install",
-        "deploy": "rebase build && rebase start"
+        "deploy": "rebase cloud deploy"
     },
     "devDependencies": {
         "@rebasepro/cli": "workspace:*",
         "@rebasepro/types": "workspace:*",
-        "concurrently": "^8.2.2",
         "typescript": "^5.9.2"
     },
     "engines": {
