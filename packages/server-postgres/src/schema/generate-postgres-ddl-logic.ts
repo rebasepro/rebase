@@ -11,7 +11,7 @@ export const resolveColumnName = (propName: string, prop?: Property | null): str
     return toSnakeCase(propName);
 };
 
-const getPrimaryKeyProp = (collection: CollectionConfig): { name: string, type: "string" | "number", isUuid: boolean } => {
+export const getPrimaryKeyProp = (collection: CollectionConfig): { name: string, type: "string" | "number", isUuid: boolean } => {
     if (collection.properties) {
         const idPropEntry = Object.entries(collection.properties).find(([_, prop]) => "isId" in (prop as unknown as object) && Boolean((prop as unknown as Record<string, unknown>).isId));
         if (idPropEntry) {
@@ -28,13 +28,17 @@ const getPrimaryKeyProp = (collection: CollectionConfig): { name: string, type: 
     return { name: "id", type: "string", isUuid: isUuid ?? false };
 };
 
-const isNumericId = (collection: CollectionConfig): boolean => {
+export const isNumericId = (collection: CollectionConfig): boolean => {
     return getPrimaryKeyProp(collection).type === "number";
 };
 
-const getPrimaryKeyName = (collection: CollectionConfig): string => {
+export const getPrimaryKeyName = (collection: CollectionConfig): string => {
     return getPrimaryKeyProp(collection).name;
 };
+
+/** The column type a junction holds for one endpoint's primary key. */
+const junctionKeyType = (collection: CollectionConfig): string =>
+    isNumericId(collection) ? "INTEGER" : (getPrimaryKeyProp(collection).isUuid ? "UUID" : "TEXT");
 
 export const isIdProperty = (propName: string, prop: Property, collection: CollectionConfig): boolean => {
     if ("isId" in prop && Boolean(prop.isId)) return true;
@@ -497,6 +501,213 @@ export const generatePostgresDdl = async (
 };
 
 /** The RLS statements one declared collection's table needs, ready to run. */
+/**
+ * A foreign key, as both its parts and the statement that creates it.
+ *
+ * `ALTER TABLE … ADD CONSTRAINT` has no `IF NOT EXISTS`, so a caller applying
+ * these has to skip by name — hence the name is a field and not only a substring
+ * of the SQL.
+ */
+export interface ForeignKeyPlan {
+    constraintName: string;
+    schema: string;
+    /** Bare table name, no schema prefix. */
+    table: string;
+    column: string;
+    targetSchema: string;
+    targetTable: string;
+    targetColumn: string;
+    sql: string;
+}
+
+/** A column a `relation` or `reference` property owns on its own table. */
+export interface RelationalColumnPlan {
+    schema: string;
+    /** Bare table name, no schema prefix. */
+    table: string;
+    column: string;
+    /** Postgres type, exactly as the DDL generator declares it. */
+    type: string;
+    /** Absent when the target collection is not part of this bundle. */
+    foreignKey?: ForeignKeyPlan;
+}
+
+/** The table behind a many-to-many `through` relation. */
+export interface JunctionTablePlan {
+    schema: string;
+    /** Bare table name, no schema prefix. */
+    table: string;
+    columns: { name: string; type: string }[];
+    /** Both endpoint columns plus the composite primary key. */
+    createTable: string;
+    foreignKeys: ForeignKeyPlan[];
+}
+
+const schemaOfCollection = (collection: CollectionConfig): string =>
+    isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
+
+const bareTableName = (name: string): string => (name.includes(".") ? name.split(".").pop()! : name);
+
+const foreignKeyPlan = (
+    args: Omit<ForeignKeyPlan, "constraintName" | "sql"> & { onDelete: string; onUpdate?: string }
+): ForeignKeyPlan => {
+    const constraintName = `${args.table}_${args.column}_fkey`;
+    const onUpdate = args.onUpdate ? ` ON UPDATE ${args.onUpdate.toUpperCase()}` : "";
+    return {
+        constraintName,
+        schema: args.schema,
+        table: args.table,
+        column: args.column,
+        targetSchema: args.targetSchema,
+        targetTable: args.targetTable,
+        targetColumn: args.targetColumn,
+        sql:
+            `ALTER TABLE "${args.schema}"."${args.table}" ADD CONSTRAINT "${constraintName}" ` +
+            `FOREIGN KEY ("${args.column}") REFERENCES "${args.targetSchema}"."${args.targetTable}" ` +
+            `("${args.targetColumn}") ON DELETE ${args.onDelete.toUpperCase()}${onUpdate};`
+    };
+};
+
+/**
+ * The FK columns the declared collections own — one entry per `relation`
+ * (`belongsTo` side) or `reference` property.
+ *
+ * Split out of {@link generatePostgresDdl} so the boot-time schema ensure can
+ * create the same columns with the same names, types and constraints. Before
+ * this it skipped them outright, which was survivable only because `db push`
+ * always followed; on a managed tenant nothing follows, so a table arrived
+ * without the column its own collection reads and wrote 400 on every insert.
+ *
+ * A relation whose target is not in the bundle yields no column at all (the
+ * generator returns early on an unresolvable target); a `reference` whose target
+ * is unknown yields the column without a constraint. Both mirror the generator
+ * exactly — a divergence here is a schema fork between boot and `db push`.
+ */
+export const planRelationalColumns = (collections: CollectionConfig[]): RelationalColumnPlan[] => {
+    const plans: RelationalColumnPlan[] = [];
+
+    for (const collection of collections) {
+        const tableName = getTableName(collection);
+        if (!tableName) continue;
+        const schema = schemaOfCollection(collection);
+        const table = bareTableName(tableName);
+
+        for (const [propName, rawProp] of Object.entries(collection.properties ?? {})) {
+            const prop = rawProp as Property;
+
+            if (prop.type === "relation") {
+                const refProp = prop as RelationProperty;
+                const resolvedRelations = resolveCollectionRelations(collection);
+                const relInfo = findRelation(resolvedRelations, refProp.relation?.relationName ?? propName);
+                if (relInfo?.kind !== "belongsTo") continue;
+                // The relation and an explicit FK property can both be declared;
+                // the explicit one owns the column.
+                if (collection.properties[relInfo.localKey] && propName !== relInfo.localKey) continue;
+
+                let targetCollection: CollectionConfig;
+                try {
+                    targetCollection = relInfo.target();
+                } catch {
+                    continue;
+                }
+                if (!targetCollection) continue;
+
+                const required = prop.validation?.required;
+                plans.push({
+                    schema,
+                    table,
+                    column: relInfo.localKey,
+                    type: getSqlColumnType(propName, prop, collection, collections),
+                    foreignKey: foreignKeyPlan({
+                        schema,
+                        table,
+                        column: relInfo.localKey,
+                        targetSchema: schemaOfCollection(targetCollection),
+                        targetTable: bareTableName(getTableName(targetCollection)),
+                        targetColumn: getPrimaryKeyName(targetCollection),
+                        onDelete: relInfo.onDelete ?? (required ? "CASCADE" : "SET NULL"),
+                        onUpdate: relInfo.onUpdate
+                    })
+                });
+            } else if (prop.type === "reference") {
+                const refProp = prop as ReferenceProperty;
+                const targetCollection = collections.find(
+                    c => c.slug === refProp.path || getTableName(c) === refProp.path
+                );
+                const column = resolveColumnName(propName, prop);
+                const type = getSqlColumnType(propName, prop, collection, collections);
+                const required = prop.validation?.required;
+
+                plans.push({
+                    schema,
+                    table,
+                    column,
+                    type,
+                    foreignKey: targetCollection
+                        ? foreignKeyPlan({
+                            schema,
+                            table,
+                            column,
+                            targetSchema: schemaOfCollection(targetCollection),
+                            targetTable: bareTableName(getTableName(targetCollection)),
+                            targetColumn: getPrimaryKeyName(targetCollection),
+                            onDelete: required ? "CASCADE" : "SET NULL"
+                        })
+                        : undefined
+                });
+            }
+        }
+    }
+
+    return plans;
+};
+
+/**
+ * The junction tables a bundle's many-to-many relations imply.
+ *
+ * Derived from {@link resolveJunctionSpecs}, the same source the junction RLS
+ * comes from, so a table created here always has policies planned for it — a
+ * junction with row-level security left off is readable and writable by every
+ * signed-in user, which is why the two must ship together.
+ */
+export const planJunctionTables = (collections: CollectionConfig[]): JunctionTablePlan[] => {
+    const plans: JunctionTablePlan[] = [];
+
+    for (const spec of resolveJunctionSpecs(collections).values()) {
+        const [source, target] = spec.endpoints;
+        const columns = [
+            { name: source.junctionColumn, type: junctionKeyType(source.collection) },
+            { name: target.junctionColumn, type: junctionKeyType(target.collection) }
+        ];
+        // Every declaring side agrees on the edge's lifetime; the first one wins,
+        // as it does in the generator's walk.
+        const onDelete = spec.declaringSides[0]?.relation.onDelete ?? "CASCADE";
+
+        plans.push({
+            schema: spec.schema,
+            table: spec.table,
+            columns,
+            createTable:
+                `CREATE TABLE IF NOT EXISTS "${spec.schema}"."${spec.table}" (` +
+                columns.map(c => `"${c.name}" ${c.type} NOT NULL`).join(", ") +
+                `, PRIMARY KEY (${columns.map(c => `"${c.name}"`).join(", ")}));`,
+            foreignKeys: [source, target].map((endpoint, i) =>
+                foreignKeyPlan({
+                    schema: spec.schema,
+                    table: spec.table,
+                    column: columns[i].name,
+                    targetSchema: schemaOfCollection(endpoint.collection),
+                    targetTable: bareTableName(getTableName(endpoint.collection)),
+                    targetColumn: getPrimaryKeyName(endpoint.collection),
+                    onDelete
+                })
+            )
+        });
+    }
+
+    return plans;
+};
+
 export interface CollectionPolicyPlan {
     /** The table's schema (e.g. `public`, `rebase`). */
     schema: string;
@@ -515,16 +726,15 @@ export interface CollectionPolicyPlan {
  * statements — what the managed runtime applies at boot so a freshly
  * provisioned tenant database serves data instead of 401ing every read.
  *
- * Mirrors the non-junction half of {@link generatePostgresPoliciesDdl} exactly
- * (same `generatePolicyStatements`, same enable-RLS, same effective rules), so
- * boot and `db push` produce identical policies from identical collections.
+ * Mirrors {@link generatePostgresPoliciesDdl} exactly (same
+ * `generatePolicyStatements`, same enable-RLS, same effective rules, same
+ * derived junction rules), so boot and `db push` produce identical policies from
+ * identical collections.
  *
- * Junction tables are deliberately excluded: they are derived from `through`
- * relations, not declared collections, and the boot-time *table* creator
- * (`ensureCollectionTables`) does not create them either — enabling RLS on a
- * table that boot never created would fail. Their RLS stays a `db push` /
- * `db migrate` concern, which is where those tables get created in the first
- * place. `db push` still applies junction policies via the string generator.
+ * Junction tables are included, and have to be: boot creates them now
+ * ({@link planJunctionTables}), and a junction with RLS left off is readable and
+ * writable by every signed-in user. A junction whose table is still absent is
+ * skipped by the applier, not planned away here.
  */
 export const planCollectionPolicies = (collections: CollectionConfig[]): CollectionPolicyPlan[] => {
     const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
@@ -550,6 +760,28 @@ export const planCollectionPolicies = (collections: CollectionConfig[]): Collect
             table: baseTableName,
             qualified,
             enableRls: `ALTER TABLE "${schema}"."${baseTableName}" ENABLE ROW LEVEL SECURITY;`,
+            policyStatements
+        });
+    }
+
+    // Junctions are derived from `through` relations rather than declared, so
+    // the walk above never sees them.
+    for (const spec of resolveJunctionSpecs(collections).values()) {
+        const qualified = `${spec.schema}.${spec.table}`;
+        if (seen.has(qualified)) continue;
+        seen.add(qualified);
+
+        const junctionCollection = getJunctionCollectionConfig(spec);
+        const policyStatements: string[] = [];
+        for (const rule of getJunctionSecurityRules(spec)) {
+            policyStatements.push(...generatePolicyStatements(junctionCollection, rule, resolveCollection));
+        }
+
+        plans.push({
+            schema: spec.schema,
+            table: spec.table,
+            qualified,
+            enableRls: `ALTER TABLE "${spec.schema}"."${spec.table}" ENABLE ROW LEVEL SECURITY;`,
             policyStatements
         });
     }

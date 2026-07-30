@@ -30,7 +30,9 @@ import { getTableName } from "@rebasepro/common";
 import {
     getSqlColumnType,
     resolveColumnName,
-    isIdProperty
+    isIdProperty,
+    planRelationalColumns,
+    planJunctionTables
 } from "./generate-postgres-ddl-logic";
 
 /**
@@ -62,10 +64,18 @@ export interface ExistingSchema {
     tables: Map<string, Set<string>>;
     /** `schema.typename` of every enum type that already exists. */
     enums: Set<string>;
+    /**
+     * `schema.table.constraint` of every constraint that already exists.
+     *
+     * Optional so a caller that only cares about tables can still build one by
+     * hand; absent is read as "none known", which at worst re-attempts a
+     * constraint that then fails harmlessly as a duplicate.
+     */
+    constraints?: Set<string>;
 }
 
 export interface EnsureAction {
-    kind: "create-enum" | "create-table" | "add-column";
+    kind: "create-enum" | "create-table" | "add-column" | "add-constraint";
     /** Qualified target, for logging: `public.posts` or `public.posts.title`. */
     target: string;
     sql: string;
@@ -75,6 +85,18 @@ export interface EnsurePlan {
     actions: EnsureAction[];
     /** Every statement, in dependency order. Empty when the schema is current. */
     statements: string[];
+}
+
+export interface EnsureOutcome extends EnsurePlan {
+    /**
+     * Constraints that could not be added — always non-fatal.
+     *
+     * A foreign key can only fail on data that already violates it, and the
+     * column it would police exists either way, so the collection still serves.
+     * Refusing to boot over one would turn a pre-existing data problem into an
+     * outage. Reported loudly instead.
+     */
+    failures: { target: string; error: string }[];
 }
 
 function schemaOf(collection: CollectionConfig): string {
@@ -183,32 +205,92 @@ export function planCollectionSchemaEnsure(
         });
     }
 
+    // 2b. Junction tables behind many-to-many relations. No collection declares
+    //     them, so the walk above never sees them — and until they existed, an
+    //     m2m write had nowhere to land and the junction's derived RLS had
+    //     nothing to attach to.
+    const junctions = planJunctionTables(collections);
+    for (const junction of junctions) {
+        const key = `${junction.schema}.${junction.table}`;
+        if (existing.tables.has(key) || created.has(key)) continue;
+        created.add(key);
+        actions.push({ kind: "create-table", target: key, sql: junction.createTable });
+    }
+
     // 3. Missing columns, on both brand-new and pre-existing tables.
+    const addColumn = (
+        key: string,
+        schema: string,
+        table: string,
+        column: string,
+        type: string
+    ): void => {
+        const present = existing.tables.get(key);
+        if (present?.has(column)) return;
+        actions.push({
+            kind: "add-column",
+            target: `${key}.${column}`,
+            // Never NOT NULL: an existing table with rows cannot take a
+            // non-null column without a default, and inventing one would be
+            // guessing at the customer's data.
+            sql: `ALTER TABLE "${schema}"."${table}" ADD COLUMN IF NOT EXISTS "${column}" ${type};`
+        });
+    };
+
     for (const collection of collections) {
         const key = qualified(collection);
         const schema = schemaOf(collection);
         const table = getTableName(collection);
-        const present = existing.tables.get(key) ?? new Set<string>();
         for (const [propName, prop] of Object.entries(collection.properties ?? {})) {
             const p = prop as Property;
             if (isIdProperty(propName, p, collection)) continue;
-            // A relation's own column is emitted by the DDL generator with a
-            // foreign key; adding a bare column here would create the column
-            // without the constraint and make the generator's later output
-            // disagree with the database. Left to a real migration.
+            // Relation and reference columns are planned from the shared
+            // relational planner below, which derives the column name, type and
+            // foreign key the same way `db push` does. Deriving them here as
+            // plain columns is what once produced a column with no constraint.
             if (p.type === "reference" || p.type === "relation") continue;
-            const column = resolveColumnName(propName, p);
-            if (present.has(column)) continue;
-            const type = getSqlColumnType(propName, p, collection, collections);
-            actions.push({
-                kind: "add-column",
-                target: `${key}.${column}`,
-                // Never NOT NULL: an existing table with rows cannot take a
-                // non-null column without a default, and inventing one would be
-                // guessing at the customer's data.
-                sql: `ALTER TABLE "${schema}"."${table}" ADD COLUMN IF NOT EXISTS "${column}" ${type};`
-            });
+            addColumn(key, schema, table, resolveColumnName(propName, p), getSqlColumnType(propName, p, collection, collections));
         }
+    }
+
+    // 3b. A junction that already existed, but is short a column.
+    for (const junction of junctions) {
+        const key = `${junction.schema}.${junction.table}`;
+        for (const column of junction.columns) {
+            addColumn(key, junction.schema, junction.table, column.name, column.type);
+        }
+    }
+
+    // 3c. The columns relation and reference properties own.
+    for (const relational of planRelationalColumns(collections)) {
+        addColumn(
+            `${relational.schema}.${relational.table}`,
+            relational.schema,
+            relational.table,
+            relational.column,
+            relational.type
+        );
+    }
+
+    // 4. Foreign keys, last: the tables and columns on both ends have to exist
+    //    first, and a constraint is the one thing here that can fail on data
+    //    rather than on schema, so nothing else depends on it.
+    const knownConstraints = existing.constraints ?? new Set<string>();
+    const plannedConstraints = new Set<string>();
+    const foreignKeys = [
+        ...planRelationalColumns(collections).map(r => r.foreignKey),
+        ...junctions.flatMap(j => j.foreignKeys)
+    ];
+    for (const fk of foreignKeys) {
+        if (!fk) continue;
+        const name = `${fk.schema}.${fk.table}.${fk.constraintName}`;
+        if (knownConstraints.has(name) || plannedConstraints.has(name)) continue;
+        plannedConstraints.add(name);
+        actions.push({
+            kind: "add-constraint",
+            target: `${fk.schema}.${fk.table}.${fk.constraintName}`,
+            sql: fk.sql
+        });
     }
 
     return { actions, statements: actions.map(a => a.sql) };
@@ -250,7 +332,23 @@ export async function readExistingSchema(
     );
     for (const row of enumRows) enums.add(`${row.schema}.${row.name}`);
 
-    return { tables, enums };
+    // `ADD CONSTRAINT` has no IF NOT EXISTS, so an existing foreign key is
+    // skipped by name rather than guarded in SQL.
+    const constraints = new Set<string>();
+    const { rows: constraintRows } = await client.query<{
+        schema: string;
+        table: string;
+        name: string;
+    }>(
+        `SELECT n.nspname AS schema, c.relname AS table, con.conname AS name
+         FROM pg_constraint con
+         JOIN pg_class c ON con.conrelid = c.oid
+         JOIN pg_namespace n ON c.relnamespace = n.oid
+         WHERE n.nspname IN (${inList})`
+    );
+    for (const row of constraintRows) constraints.add(`${row.schema}.${row.table}.${row.name}`);
+
+    return { tables, enums, constraints };
 }
 
 /**
@@ -265,8 +363,14 @@ export async function ensureCollectionTables(
     client: Queryable,
     collections: CollectionConfig[],
     log?: (message: string) => void
-): Promise<EnsurePlan> {
-    const schemas = Array.from(new Set(collections.map(schemaOf)));
+): Promise<EnsureOutcome> {
+    // Junctions live alongside the collections that declare them, so their
+    // schema has to be read too — otherwise an existing junction reads as
+    // missing and its constraints as unplanned.
+    const schemas = Array.from(new Set([
+        ...collections.map(schemaOf),
+        ...planJunctionTables(collections).map(j => j.schema)
+    ]));
     for (const schema of schemas) {
         assertSafeIdentifier(schema, "schema name");
         if (schema !== "public") {
@@ -276,10 +380,11 @@ export async function ensureCollectionTables(
 
     const existing = await readExistingSchema(client, schemas);
     const plan = planCollectionSchemaEnsure(collections, existing);
+    const failures: { target: string; error: string }[] = [];
 
     if (plan.actions.length === 0) {
         log?.("Schema is up to date; nothing to create.");
-        return plan;
+        return { ...plan, failures };
     }
 
     for (const action of plan.actions) {
@@ -287,11 +392,19 @@ export async function ensureCollectionTables(
             await client.query(action.sql);
             log?.(`${action.kind}: ${action.target}`);
         } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            // A foreign key is the only action that can fail on the customer's
+            // data rather than on the schema. The column it polices is already
+            // there, so the collection serves either way — record it and carry
+            // on rather than crash-looping the deployment.
+            if (action.kind === "add-constraint") {
+                failures.push({ target: action.target, error: message });
+                continue;
+            }
             throw new Error(
-                `Failed to ${action.kind} ${action.target}: ` +
-                `${err instanceof Error ? err.message : String(err)}\n  ${action.sql}`
+                `Failed to ${action.kind} ${action.target}: ${message}\n  ${action.sql}`
             );
         }
     }
-    return plan;
+    return { ...plan, failures };
 }

@@ -16,7 +16,7 @@ import {
     RealtimeProvider,
     SecurityRule
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData } from "@rebasepro/common";
+import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, getEffectiveSecurityRules } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
 import { BackendCollectionRegistry } from "./collections/BackendCollectionRegistry";
 import { loadCollectionsFromDirectory } from "./collections/loader";
@@ -1215,6 +1215,32 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 "If no RLS policies exist, data is publicly accessible. " +
                 "Set auth.requireAuth to true (or remove it) to require authentication."
             );
+        } else {
+            // The other half of the same decision, and the one nobody sees.
+            //
+            // `{ operation: "select", access: "public" }` means "no row filter",
+            // not "no login" — the API gate still answers 401 to a caller with no
+            // token, whatever RLS would have allowed. Read on its own, a 401 from
+            // a collection the author called public looks like broken RLS or a
+            // missing table, and gets debugged as one (it has been). Say it once
+            // at boot, where the operator is already reading, naming the switch.
+            const publicSelect = activeCollections
+                .filter(c => getEffectiveSecurityRules(c).some(rule =>
+                    "access" in rule && rule.access === "public" &&
+                    (rule.operation === "select" || rule.operation === "all" ||
+                        (Array.isArray(rule.operations) && rule.operations.includes("select")))
+                ))
+                .map(c => c.slug);
+
+            if (publicSelect.length > 0) {
+                logger.info(
+                    `${publicSelect.length} collection(s) grant unfiltered reads (${publicSelect.join(", ")}), ` +
+                    "but every /api/data route still requires a token: `access: \"public\"` widens which ROWS a " +
+                    "caller sees, not who may call. An unauthenticated read answers 401 regardless. " +
+                    "To let RLS alone decide — the usual choice for a public website reading its own backend — " +
+                    "set AUTH_REQUIRE=false (or `auth.requireAuth: false`)."
+                );
+            }
         }
 
         // Multi-data-source routing: when more than one database engine is

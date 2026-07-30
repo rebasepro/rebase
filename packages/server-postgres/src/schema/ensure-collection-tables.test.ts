@@ -87,16 +87,112 @@ describe("planning an additive schema ensure", () => {
         expect(sql).not.toMatch(/NOT NULL/i);
     });
 
-    it("leaves relation columns to a real migration rather than adding them without their key", () => {
-        const withRelation = {
-            ...posts,
-            properties: {
-                ...(posts as unknown as { properties: Record<string, unknown> }).properties,
-                author: { name: "Author", type: "reference", target: () => posts }
+    // ── Relations ────────────────────────────────────────────────────────────
+    //
+    // These columns were once skipped outright, on the reasoning that a bare
+    // column without its foreign key would disagree with what `db push` later
+    // generated. On a managed tenant nothing pushes afterwards, so the table
+    // arrived without the column its own collection reads: every insert 400ed
+    // with `column "author_id" does not exist`. The answer is to emit the key
+    // too, from the same planner `db push` uses.
+
+    const authors = {
+        name: "Authors",
+        slug: "authors",
+        properties: {
+            id: { name: "ID", type: "string", isId: "uuid" },
+            name: { name: "Name", type: "string" }
+        }
+    } as unknown as CollectionConfig;
+
+    const postsWithAuthor = {
+        ...posts,
+        properties: {
+            ...(posts as unknown as { properties: Record<string, unknown> }).properties,
+            author: { name: "Author", type: "reference", path: "authors" }
+        }
+    } as unknown as CollectionConfig;
+
+    const tags = {
+        name: "Tags",
+        slug: "tags",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            name: { name: "Name", type: "string" }
+        }
+    } as unknown as CollectionConfig;
+
+    const postsWithTags = {
+        ...posts,
+        properties: {
+            ...(posts as unknown as { properties: Record<string, unknown> }).properties,
+            tags: {
+                name: "Tags",
+                type: "relation",
+                relation: { kind: "manyToMany", target: () => tags, relationName: "tags" }
             }
-        } as unknown as CollectionConfig;
-        const plan = planCollectionSchemaEnsure([withRelation], withTable("public.posts", ["id"]));
-        expect(plan.actions.some(a => a.target.endsWith(".author"))).toBe(false);
+        }
+    } as unknown as CollectionConfig;
+
+    it("adds a reference column, and the foreign key that makes it one", () => {
+        const plan = planCollectionSchemaEnsure([postsWithAuthor, authors], withTable("public.posts", ["id"]));
+
+        expect(plan.actions.some(a => a.kind === "add-column" && a.target === "public.posts.author")).toBe(true);
+        const fk = plan.actions.find(a => a.kind === "add-constraint");
+        expect(fk?.target).toBe("public.posts.posts_author_fkey");
+        expect(fk?.sql).toMatch(/REFERENCES "public"\."authors" \("id"\)/);
+    });
+
+    it("orders every constraint after the columns and tables it depends on", () => {
+        const plan = planCollectionSchemaEnsure([postsWithAuthor, authors], empty());
+        const kinds = plan.actions.map(a => a.kind);
+        expect(kinds.lastIndexOf("add-column")).toBeLessThan(kinds.indexOf("add-constraint"));
+        expect(kinds.lastIndexOf("create-table")).toBeLessThan(kinds.indexOf("add-constraint"));
+    });
+
+    it("skips a foreign key the database already has, since ADD CONSTRAINT has no IF NOT EXISTS", () => {
+        const existing: ExistingSchema = {
+            tables: new Map([
+                ["public.posts", new Set(["id", "author"])],
+                ["public.authors", new Set(["id", "name"])]
+            ]),
+            enums: new Set(["public.posts_status"]),
+            constraints: new Set(["public.posts.posts_author_fkey"])
+        };
+        const plan = planCollectionSchemaEnsure([postsWithAuthor, authors], existing);
+        expect(plan.actions.some(a => a.kind === "add-constraint")).toBe(false);
+    });
+
+    it("creates the junction table behind a many-to-many, keyed on both endpoints", () => {
+        const plan = planCollectionSchemaEnsure([postsWithTags, tags], empty());
+        const junction = plan.actions.find(a => a.kind === "create-table" && a.target === "public.posts_tags");
+
+        expect(junction).toBeDefined();
+        // The endpoint key types have to match the primary keys they reference:
+        // posts is a uuid, tags an auto-increment integer.
+        expect(junction!.sql).toMatch(/"post_id" UUID NOT NULL/);
+        expect(junction!.sql).toMatch(/"tag_id" INTEGER NOT NULL/);
+        expect(junction!.sql).toMatch(/PRIMARY KEY \("post_id", "tag_id"\)/);
+
+        const fks = plan.actions.filter(a => a.kind === "add-constraint").map(a => a.target);
+        expect(fks).toContain("public.posts_tags.posts_tags_post_id_fkey");
+        expect(fks).toContain("public.posts_tags.posts_tags_tag_id_fkey");
+    });
+
+    it("leaves an existing junction table alone", () => {
+        const existing: ExistingSchema = {
+            tables: new Map([
+                ["public.posts", new Set(["id", "title", "views", "status"])],
+                ["public.tags", new Set(["id", "name"])],
+                ["public.posts_tags", new Set(["post_id", "tag_id"])]
+            ]),
+            enums: new Set(["public.posts_status"]),
+            constraints: new Set([
+                "public.posts_tags.posts_tags_post_id_fkey",
+                "public.posts_tags.posts_tags_tag_id_fkey"
+            ])
+        };
+        expect(planCollectionSchemaEnsure([postsWithTags, tags], existing).actions).toEqual([]);
     });
 });
 

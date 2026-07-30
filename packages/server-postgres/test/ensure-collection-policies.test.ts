@@ -40,7 +40,7 @@ describe("planCollectionPolicies", () => {
         expect(byTable.customers.policyStatements.some(s => /CREATE POLICY/.test(s))).toBe(true);
     });
 
-    it("excludes junction tables — boot never creates them, so it must not police them", () => {
+    it("includes junction tables — boot creates them, so it must police them too", () => {
         const tags: CollectionConfig = {
             slug: "tags", table: "tags", name: "Tags", properties: { name: { type: "string" } }
         } as unknown as CollectionConfig;
@@ -53,10 +53,16 @@ describe("planCollectionPolicies", () => {
             }]
         } as unknown as CollectionConfig;
 
-        const tables = planCollectionPolicies([posts, tags]).map(p => p.table);
+        const plans = planCollectionPolicies([posts, tags]);
+        const tables = plans.map(p => p.table);
         expect(tables).toContain("posts");
         expect(tables).toContain("tags");
-        expect(tables).not.toContain("posts_to_tags");
+        // A junction left un-policed is readable and writable by every signed-in
+        // user, so it may never be created without its derived RLS.
+        expect(tables).toContain("posts_to_tags");
+        const junction = plans.find(p => p.table === "posts_to_tags")!;
+        expect(junction.enableRls).toMatch(/ENABLE ROW LEVEL SECURITY/);
+        expect(junction.policyStatements.some(s => /^CREATE POLICY/.test(s))).toBe(true);
     });
 });
 
@@ -73,6 +79,7 @@ function fakeDb(present: string[], failOn?: RegExp): { queryable: Queryable; ran
                 return { rows: rows as unknown as T[] };
             }
             if (/pg_type/i.test(text)) return { rows: [] };
+            if (/pg_constraint/i.test(text)) return { rows: [] };
             ran.push(text);
             if (failOn && failOn.test(text)) throw new Error("boom");
             return { rows: [] };

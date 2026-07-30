@@ -757,7 +757,13 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                 collections as Parameters<typeof ensureCollectionTables>[1],
                 log
             );
-            return { applied: plan.actions.length };
+            for (const failure of plan.failures) {
+                logger.warn(
+                    `🔗 [schema] Could not add foreign key "${failure.target}" — the column exists and the ` +
+                    `collection still serves, but rows are not policed by this constraint: ${failure.error}`
+                );
+            }
+            return { applied: plan.actions.length - plan.failures.length };
         },
 
         /**

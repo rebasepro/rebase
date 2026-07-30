@@ -86,7 +86,38 @@ const secretsCollection: CollectionConfig = {
     }
 } as unknown as CollectionConfig;
 
-const collections = [tiersCollection, customersCollection, secretsCollection];
+// `orders` points at a customer, and carries a many-to-many to `tiers`. Almost
+// every real schema has a shape like this, and for a while none of it survived
+// boot: relation columns were skipped and junction tables were never created, so
+// a managed tenant got an `orders` table with no `customer_id` (every insert
+// 400ed) and no `orders_tiers` at all. Fixtures without a single relation are
+// exactly why that shipped, so this one has both.
+const ordersCollection: CollectionConfig = {
+    name: "Orders",
+    slug: "orders",
+    table: "orders",
+    schema: "public",
+    properties: {
+        id: { name: "ID", type: "string", isId: true },
+        reference: { name: "Reference", type: "string" },
+        customer: {
+            name: "Customer",
+            type: "relation",
+            relation: { kind: "belongsTo", target: () => customersCollection, relationName: "customer" }
+        },
+        tiers: {
+            name: "Tiers",
+            type: "relation",
+            relation: { kind: "manyToMany", target: () => tiersCollection, relationName: "tiers" }
+        }
+    },
+    securityRules: [
+        { operation: "select", access: "public" },
+        { operation: "insert", access: "public" }
+    ]
+} as unknown as CollectionConfig;
+
+const collections = [tiersCollection, customersCollection, secretsCollection, ordersCollection];
 
 // Drizzle tables for the registry the driver reads through. Names must match
 // what `ensureCollectionTables` creates (snake_case of the property keys).
@@ -97,6 +128,11 @@ const customersTable = pgTable("customers", {
     owner_id: varchar("owner_id")
 });
 const secretsTable = pgTable("secrets", { id: varchar("id").primaryKey(), value: varchar("value") });
+const ordersTable = pgTable("orders", {
+    id: varchar("id").primaryKey(),
+    reference: varchar("reference"),
+    customer_id: varchar("customer_id")
+});
 
 describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", () => {
     let container: PgContainer;
@@ -153,7 +189,8 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         //    applies each collection's securityRules as CREATE POLICY.
         const applied = await ensureCollectionPolicies(queryable, collections);
         expect(applied.failures).toEqual([]);
-        expect(applied.tablesSecured).toBe(3);
+        // Four declared collections plus the derived `orders_tiers` junction.
+        expect(applied.tablesSecured).toBe(5);
         expect(applied.policiesApplied).toBeGreaterThan(0);
 
         const registry = new PostgresCollectionRegistry();
@@ -161,6 +198,7 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         registry.registerTable(tiersTable, "tiers");
         registry.registerTable(customersTable, "customers");
         registry.registerTable(secretsTable, "secrets");
+        registry.registerTable(ordersTable, "orders");
 
         realtime = new RealtimeService(db as never, registry);
         driver = new PostgresBackendDriver(db as never, realtime as never, registry);
@@ -185,9 +223,54 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         const rows = await admin.query<{ table_name: string }>(
             `SELECT table_name FROM information_schema.tables
              WHERE table_schema = 'public' AND table_name = ANY($1)`,
-            [["tiers", "customers", "secrets"]]
+            [["tiers", "customers", "secrets", "orders", "orders_tiers"]]
         );
-        expect(rows.rows.map(r => r.table_name).sort()).toEqual(["customers", "secrets", "tiers"]);
+        expect(rows.rows.map(r => r.table_name).sort()).toEqual(
+            ["customers", "orders", "orders_tiers", "secrets", "tiers"]
+        );
+    });
+
+    it("gave a relation its foreign-key column, not just its table", async () => {
+        // The gap a fixture with no relations could never catch: the table was
+        // created, the column its own collection reads was not, and every insert
+        // failed with `column "customer_id" of relation "orders" does not exist`.
+        const columns = await admin.query<{ column_name: string }>(
+            `SELECT column_name FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'orders'`
+        );
+        expect(columns.rows.map(r => r.column_name).sort()).toContain("customer_id");
+
+        const fks = await admin.query<{ conname: string }>(
+            `SELECT conname FROM pg_constraint
+             WHERE conrelid = 'public.orders'::regclass AND contype = 'f'`
+        );
+        expect(fks.rows.map(r => r.conname)).toContain("orders_customer_id_fkey");
+    });
+
+    it("created the junction table behind a many-to-many, keyed and policed", async () => {
+        const columns = await admin.query<{ column_name: string }>(
+            `SELECT column_name FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'orders_tiers'`
+        );
+        expect(columns.rows.map(r => r.column_name).sort()).toEqual(["order_id", "tier_id"]);
+
+        // A junction created without RLS is readable and writable by every
+        // signed-in user, so the table and its policies must arrive together.
+        const rls = await admin.query<{ relrowsecurity: boolean }>(
+            `SELECT relrowsecurity FROM pg_class WHERE oid = 'public.orders_tiers'::regclass`
+        );
+        expect(rls.rows[0].relrowsecurity).toBe(true);
+        const pols = await admin.query<{ policyname: string }>(
+            `SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND tablename = 'orders_tiers'`
+        );
+        expect(pols.rows.length).toBeGreaterThan(0);
+    });
+
+    it("rejects a row whose foreign key points nowhere", async () => {
+        // Proof the constraint is real and not just a column of the right type.
+        await expect(
+            admin.query(`INSERT INTO public.orders (id, reference, customer_id) VALUES ('o-bad', 'X', 'nobody')`)
+        ).rejects.toThrow(/foreign key|violates/i);
     });
 
     it("enabled RLS and installed policies on every collection table", async () => {
@@ -250,12 +333,30 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         expect(await rawCount("secrets")).toBe(1);
     });
 
-    it("is idempotent: applying policies again is a no-op that still serves", async () => {
+    it("writes a row through its relation, the case that used to 400", async () => {
+        await (await asUser("u1")).save({
+            path: "orders",
+            collection: ordersCollection,
+            values: { id: "o1", reference: "ORD-1", customer_id: "c1" }
+        } as never);
+
+        expect(await rawCount("orders", "WHERE id = 'o1' AND customer_id = 'c1'")).toBe(1);
+        expect(await countAs("anyone", "orders", ordersCollection)).toBe(1);
+    });
+
+    it("is idempotent: a second boot changes nothing and still serves", async () => {
+        // Both phases, as a restart would run them — the table pass must plan no
+        // work at all the second time, or every boot would churn the schema.
+        const tablesAgain = await ensureCollectionTables(queryable, collections);
+        expect(tablesAgain.actions).toEqual([]);
+        expect(tablesAgain.failures).toEqual([]);
+
         const again = await ensureCollectionPolicies(queryable, collections);
         expect(again.failures).toEqual([]);
-        expect(again.tablesSecured).toBe(3);
+        expect(again.tablesSecured).toBe(5);
         // Data still reads exactly the same after a second application.
         expect(await countAs("anyone", "tiers", tiersCollection)).toBe(2);
         expect(await countAs("u1", "customers", customersCollection)).toBe(1);
+        expect(await countAs("anyone", "orders", ordersCollection)).toBe(1);
     });
 });
