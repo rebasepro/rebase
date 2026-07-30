@@ -546,6 +546,50 @@ export interface RebaseBackendInstance {
     shutdown(timeoutMs?: number): Promise<void>;
 }
 
+/**
+ * Present a `DatabaseAdapter` as a `BackendBootstrapper`.
+ *
+ * The `config.database` convenience path — one adapter, no explicit source keys
+ * — funnels through here. `adapterToBootstrapper` in `boot/driver.ts` does the
+ * same job for the multi-source path, and the two stay separate because only
+ * that one carries a registry id and a default flag; this path has exactly one
+ * driver and needs neither.
+ *
+ * Extracted from the middle of `initializeRebaseBackend` so it can be tested.
+ * Both wrappers rebuild the bootstrapper field by field, which means any
+ * capability nobody remembers to list is dropped in silence — no type error,
+ * because every one of them is optional, and no runtime error either, because
+ * the caller's own fallback for "driver does not implement this" is to skip.
+ * That is not hypothetical: `ensureCollectionSchema` was missing from both
+ * wrappers for months, so every managed tenant booted with no collection tables
+ * and 500'd on every data route. `bootstrapper-forwarding.test.ts` now asserts
+ * both wrappers pass through the whole optional surface.
+ */
+export function wrapDatabaseAdapter(dbAdapter: DatabaseAdapter): BackendBootstrapper {
+    return {
+        type: dbAdapter.type,
+        initializeDriver: (initConfig: unknown) =>
+            dbAdapter.initializeDriver(initConfig as import("@rebasepro/types").DatabaseAdapterInitConfig),
+        initializeRealtime: dbAdapter.initializeRealtime
+            ? (_config: unknown, driverResult: InitializedDriver) =>
+                dbAdapter.initializeRealtime!(driverResult)
+            : undefined,
+        initializeAuth: dbAdapter.initializeAuth,
+        initializeHistory: dbAdapter.initializeHistory,
+        initializeWebsockets: dbAdapter.initializeWebsockets,
+        ensureCollectionSchema: dbAdapter.ensureCollectionSchema
+            ? (collections, driverResult, log) =>
+                dbAdapter.ensureCollectionSchema!(collections, driverResult, log)
+            : undefined,
+        ensureCollectionPolicies: dbAdapter.ensureCollectionPolicies
+            ? (collections, driverResult, log) =>
+                dbAdapter.ensureCollectionPolicies!(collections, driverResult, log)
+            : undefined,
+        getAdmin: dbAdapter.getAdmin,
+        mountRoutes: dbAdapter.mountRoutes
+    };
+}
+
 export async function initializeRebaseBackend(config: RebaseBackendConfig): Promise<RebaseBackendInstance> {
     // No try/catch: let init errors propagate to the caller.
     // The app entry point (e.g. startServer()) should catch and process.exit(1).
@@ -622,21 +666,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     if (config.database) {
         const dbAdapter = config.database;
         logger.info("Using DatabaseAdapter", { type: dbAdapter.type });
-        const wrappedBootstrapper: BackendBootstrapper = {
-            type: dbAdapter.type,
-            initializeDriver: (initConfig: unknown) =>
-                dbAdapter.initializeDriver(initConfig as import("@rebasepro/types").DatabaseAdapterInitConfig),
-            initializeRealtime: dbAdapter.initializeRealtime
-                ? (_config: unknown, driverResult: InitializedDriver) =>
-                    dbAdapter.initializeRealtime!(driverResult)
-                : undefined,
-            initializeAuth: dbAdapter.initializeAuth,
-            initializeHistory: dbAdapter.initializeHistory,
-            initializeWebsockets: dbAdapter.initializeWebsockets,
-            getAdmin: dbAdapter.getAdmin,
-            mountRoutes: dbAdapter.mountRoutes
-        };
-        bootstrappers = [wrappedBootstrapper];
+        bootstrappers = [wrapDatabaseAdapter(dbAdapter)];
     }
 
     if (bootstrappers.length === 0) {

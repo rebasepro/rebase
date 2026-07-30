@@ -30,10 +30,11 @@ import {
     type LoadedBundle
 } from "./bundle";
 import { resolveDataSources, resolveStorageSources } from "./sources";
-import { initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
+import { bundleResolutionRoots, initializeDataSources, probeDataSource, type InitializedDataSource } from "./driver";
 import { resolveAuthOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
 import { fetchBundle, shouldFetchBundle, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV } from "./fetch-bundle.js";
+import { describeDriverSkew, readRuntimeVersion, schemaRecoveryGuidance } from "./version-skew";
 
 /** A running runtime, and the handle to stop it. */
 export interface BootedRuntime {
@@ -149,15 +150,9 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // ── Databases ────────────────────────────────────────────────────────────
     const resolvedSources = resolveDataSources(process.env, dataSourceDefs);
     const schema = await loadBundleSchema(bundle);
-    // Where to look for driver packages. A built bundle installs its own
-    // dependencies beside it; a source boot in a workspace has them inside the
-    // package that declared them.
-    const driverRoots = [
-        bundle.dir,
-        path.join(bundle.dir, "backend"),
-        path.join(bundle.dir, "config")
-    ];
+    const driverRoots = bundleResolutionRoots(bundle.dir);
     const dataSources = await initializeDataSources(resolvedSources, schema, driverRoots);
+    warnOnDriverSkew(dataSources, readRuntimeVersion(driverRoots));
 
     // ── HTTP ─────────────────────────────────────────────────────────────────
     const app = new Hono<HonoEnv>();
@@ -563,6 +558,43 @@ export async function runFromBundle(options: BootOptions = {}): Promise<BootedRu
 
 
 /**
+ * Say so, once per boot, when a data source's driver is older than this runtime.
+ *
+ * The check exists because of how a managed deployment is assembled: the image
+ * supplies `@rebasepro/server` (the entrypoint symlinks it over the bundle's
+ * copy) while every driver comes from the bundle's own `deps.declared`, pinned
+ * by the project's package.json. So the platform can ship a fix, roll every
+ * tenant onto the new image, and still have none of them running the fixed
+ * driver. Nothing detected that before this: the halves simply disagreed in
+ * silence until some capability turned out to be missing three layers down.
+ *
+ * A warning rather than a refusal. Old drivers are usually fine — the pairing is
+ * supported, and a boot that dies on version arithmetic would be a far worse
+ * failure than the drift it is guarding against. This only has to make the skew
+ * *visible*, so that the next person reading the log starts from the right
+ * question.
+ */
+export function warnOnDriverSkew(
+    dataSources: InitializedDataSource[],
+    runtimeVersion: string | undefined
+): void {
+    if (!runtimeVersion) return;
+
+    for (const source of dataSources) {
+        const skew = describeDriverSkew(source.driverVersion, runtimeVersion);
+        if (!skew.stale) continue;
+        logger.warn(
+            `Driver version skew on data source "${source.key}": ` +
+                `"${source.driverPackage}" is at ${source.driverVersion}, this runtime is ${runtimeVersion}. ` +
+                "A driver is installed from your bundle's dependencies, NOT supplied by the platform image, " +
+                "so a newer runtime does not update it. Capabilities added after " +
+                `${source.driverVersion} are unavailable to this deployment — bump ` +
+                `"${source.driverPackage}" in your project's package.json and redeploy.`
+        );
+    }
+}
+
+/**
  * Bring the database's collection tables up to date before serving.
  *
  * Delegates to whichever driver bootstrapped the default data source; a driver
@@ -630,9 +662,22 @@ export async function ensureCollectionSchema(
         return;
     }
     if (!primary.bootstrapper.ensureCollectionSchema) {
+        // What is missing is the method on the ADAPTER — the only object boot
+        // ever sees — which is not the same as the driver package lacking the
+        // code. Three unrelated causes collapse into this one symptom: a
+        // schemaless driver, a driver too old to have it, and a driver that
+        // implements it on a class the adapter never forwards. Only the middle
+        // one is a version problem, so saying "the driver does not implement"
+        // and naming versions points at the wrong suspect two times in three —
+        // it sent one investigation after driver and runtime releases that were
+        // both fine while a wrapper silently dropped the method in between.
+        const skew = describeDriverSkew(primary.driverVersion, readRuntimeVersion(bundleResolutionRoots(bundle.dir)));
         skip(
-            `the "${primary.driverPackage}" driver (engine "${primary.engine}") does not implement collection-table creation. ` +
-                "Apply this project's schema with `rebase db push` or `rebase db migrate`.",
+            `the adapter from "${primary.driverPackage}" (engine "${primary.engine}") does not expose collection-table creation. ` +
+                (skew.detail ? `${skew.detail} ` : "") +
+                "The driver package may well implement it on a class the adapter does not forward, so check the adapter's shape before blaming its version. " +
+                "Collection tables will NOT be created, so every /api/data route will fail on a missing relation.\n" +
+                schemaRecoveryGuidance({ staleDriver: skew.stale }),
             "warn"
         );
         return;
@@ -708,10 +753,13 @@ export async function ensureCollectionPolicies(
         // The tables may exist (ensureCollectionSchema ran) but their RLS does
         // not, so every user-context read is denied. Name it: a silent skip here
         // reads from outside the pod as "the database has no data".
+        const skew = describeDriverSkew(primary.driverVersion, readRuntimeVersion(bundleResolutionRoots(bundle.dir)));
         logger.warn(
             `Collection policies: skipped — the "${primary.driverPackage}" driver (engine "${primary.engine}") ` +
-                "does not apply RLS policies at boot. Collections will deny reads until policies are applied " +
-                "with `rebase db push` or `rebase db migrate`."
+                "does not apply RLS policies at boot. " +
+                (skew.detail ? `${skew.detail} ` : "") +
+                "Collections will deny reads until policies are applied.\n" +
+                schemaRecoveryGuidance({ staleDriver: skew.stale })
         );
         return;
     }

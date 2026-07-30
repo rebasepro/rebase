@@ -10,6 +10,7 @@ import type {
 import { logger } from "../utils/logger";
 import { BundleError } from "./bundle";
 import type { ResolvedDataSourceConfig } from "./sources";
+import { findPackageDir, readPackageVersion } from "./version-skew";
 
 /**
  * Database drivers are loaded by name at runtime rather than imported.
@@ -89,6 +90,16 @@ export interface InitializedDataSource {
     key: string;
     engine: string;
     driverPackage: string;
+    /**
+     * The driver's installed version, when it could be read.
+     *
+     * Carried so a boot that finds a capability missing can say whether the
+     * driver is *old* or merely *different* — see `version-skew.ts`. Optional
+     * because a driver resolved from outside a `node_modules` tree (a linked
+     * workspace, a bare specifier) has no manifest to read, and that must not
+     * be fatal.
+     */
+    driverVersion?: string;
     bootstrapper: BackendBootstrapper;
     connection: DriverConnection;
 }
@@ -100,24 +111,25 @@ export interface BundleSchema {
 }
 
 /**
- * Locate a package by walking `node_modules` up from a directory.
+ * Where to look for packages a bundle brought with it.
  *
- * The driver has to be resolved relative to the **bundle**, not to this package.
+ * A driver has to be resolved relative to the **bundle**, not to this package.
  * A bare `import("@rebasepro/server-postgres")` resolves from wherever the
  * runtime itself is installed, which on a real deployment is somewhere else
  * entirely — the runtime image holds the server, the bundle holds the project's
  * dependencies. Resolving from the bundle is also the honest semantics: the
  * project declares which driver it uses, so the project's tree is where to look.
+ *
+ * Several roots, because a driver is installed wherever the project keeps its
+ * dependencies: beside a built bundle, but inside the backend package in a
+ * workspace running from source.
  */
-function findPackageDir(fromDir: string, packageName: string): string | undefined {
-    let dir = path.resolve(fromDir);
-    for (;;) {
-        const candidate = path.join(dir, "node_modules", ...packageName.split("/"));
-        if (fs.existsSync(path.join(candidate, "package.json"))) return candidate;
-        const parent = path.dirname(dir);
-        if (parent === dir) return undefined;
-        dir = parent;
-    }
+export function bundleResolutionRoots(bundleDir: string): string[] {
+    return [
+        bundleDir,
+        path.join(bundleDir, "backend"),
+        path.join(bundleDir, "config")
+    ];
 }
 
 /** The ESM entry a package declares, preferring `exports` over the legacy fields. */
@@ -167,17 +179,18 @@ function resolvePackageEntry(packageDir: string): string | undefined {
 async function importDriver(packageName: string, resolveFrom: string[] = []): Promise<{
     createConnection: DriverConnectionFactory;
     createAdapter: DriverAdapterFactory;
+    /** Where the driver was found, when it resolved from a `node_modules` tree. */
+    packageDir?: string;
 }> {
     let specifier = packageName;
+    let resolvedDir: string | undefined;
 
-    // Several roots, because a driver is installed wherever the project keeps
-    // its dependencies: beside a built bundle, but inside the backend package
-    // in a workspace running from source.
     for (const root of resolveFrom) {
         const packageDir = findPackageDir(root, packageName);
         const entry = packageDir ? resolvePackageEntry(packageDir) : undefined;
         if (entry) {
             specifier = pathToFileURL(entry).href;
+            resolvedDir = packageDir;
             break;
         }
     }
@@ -204,8 +217,7 @@ async function importDriver(packageName: string, resolveFrom: string[] = []): Pr
         );
     }
 
-    return { createConnection,
-createAdapter };
+    return { createConnection, createAdapter, packageDir: resolvedDir };
 }
 
 /**
@@ -265,7 +277,8 @@ export async function initializeDataSource(
     schema: BundleSchema | undefined,
     resolveFrom: string[] = []
 ): Promise<InitializedDataSource> {
-    const { createConnection, createAdapter } = await importDriver(source.driverPackage, resolveFrom);
+    const { createConnection, createAdapter, packageDir } = await importDriver(source.driverPackage, resolveFrom);
+    const driverVersion = packageDir ? readPackageVersion(packageDir) : undefined;
 
     // Every in-tree caller passes `undefined` for the connection's own schema —
     // drizzle only needs it for the relational query API, which the drivers do
@@ -284,13 +297,15 @@ export async function initializeDataSource(
     logger.info("Initialized data source", {
         key: source.key,
         engine: source.engine,
-        driver: source.driverPackage
+        driver: source.driverPackage,
+        driverVersion
     });
 
     return {
         key: source.key,
         engine: source.engine,
         driverPackage: source.driverPackage,
+        driverVersion,
         bootstrapper: adapterToBootstrapper(adapter, source.key, source.isDefault),
         connection
     };
