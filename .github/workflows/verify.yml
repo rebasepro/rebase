@@ -130,6 +130,17 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # The examples were in no pipeline and in no root script — `pnpm build`
+      # covers `./packages/*` and `./app` only — so examples/firebase stopped
+      # compiling at the BaaS/admin split and nothing said so for weeks. They
+      # resolve @rebasepro/* to built output like a real user does, not to source
+      # like `pnpm typecheck`, which is exactly why they catch a different class
+      # of drift; hence after the build.
+      - name: Examples typecheck
+        run: pnpm run check:examples
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
       - name: Run tests
         run: pnpm test
         env:

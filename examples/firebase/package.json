@@ -21,6 +21,7 @@
   "scripts": {
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
     "dev": "vite --mode development",
+    "typecheck": "tsc --noEmit",
     "build": "vite build && tsc",
     "preview": "vite build && vite preview",
     "deploy": "vite build && firebase deploy --only hosting:rebase-demo-27150"

@@ -57,6 +57,7 @@
     "check:core-types": "tsc --noEmit -p tsconfig.core.json",
     "check:baas-types": "tsc -p e2e/baas-typecheck/tsconfig.json",
     "check:templates": "node scripts/check-templates.mjs",
+    "check:examples": "pnpm --filter \"./examples/*\" -r run typecheck",
     "check:names": "node scripts/headless-guard/check-package-names.mjs",
     "check:deps": "node scripts/check-undeclared-deps.mjs",
     "harness": "node scripts/harness/harness.mjs",

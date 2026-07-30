@@ -40,6 +40,13 @@ export default [
             "**/website/**",
             "**/examples/**",
             "**/saas/**",
+            // Ad-hoc checkouts of the saas repo alongside it — `saas-sweep`,
+            // `saas-<branch>` — which agents make to avoid sharing one HEAD.
+            // They are excluded from git locally, but eslint reads its own
+            // ignores, so their generated SDK types surface as errors that CI,
+            // on a fresh runner, will never see. Same shape as the
+            // test-cli-init-* entries above.
+            "**/saas-*/**",
             ".pnp.loader.mjs",
             "update_translations.js",
             "inspect_product.mjs",
