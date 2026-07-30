@@ -19,6 +19,39 @@ import { logger } from "@rebasepro/server";
 import type { NestedPathHop } from "./nested-path";
 
 /**
+ * The ids in a to-many relation write, whatever shape the caller sent.
+ *
+ * A membership list is written as either the related rows (`[{ id: 1 }]`, what
+ * the admin UI sends back after reading them) or as bare keys (`[1]`, `["t-1"]`,
+ * what anyone writing the API by hand sends). Only the first was read, via a
+ * blind `.map(rel => rel.id)`, and a bare key therefore became `undefined`:
+ * on a numeric-keyed target that surfaced as `Invalid numeric ID: undefined`,
+ * and on a string-keyed one it did not surface at all — `String(undefined)`
+ * wrote a junction row pointing at the literal `"undefined"`, which no read
+ * would ever match. Both shapes are accepted here, in one place, because both
+ * call sites had the same assumption.
+ *
+ * An element that carries no key is refused rather than skipped: dropping it
+ * would silently write a shorter membership list than the caller asked for.
+ */
+function relationTargetIds(value: unknown, relationName: string, collectionSlug: string): (string | number)[] {
+    if (!Array.isArray(value)) return [];
+
+    return value.map((element, index) => {
+        if (typeof element === "string" || typeof element === "number") return element;
+        if (element && typeof element === "object") {
+            const id = (element as { id?: unknown }).id;
+            if (typeof id === "string" || typeof id === "number") return id;
+        }
+        throw new Error(
+            `Cannot write relation "${relationName}" on "${collectionSlug}": element ${index} carries no id. ` +
+            "Pass either the related rows (`[{ id: … }]`) or their keys (`[1, 2]`), not " +
+            `${element === null ? "null" : typeof element}.`
+        );
+    });
+}
+
+/**
  * Typed wrapper for Drizzle dynamic query innerJoin.
  * Drizzle's `$dynamic()` queries lose the `innerJoin` method from
  * their static type, but it exists at runtime. This helper bridges
@@ -840,7 +873,7 @@ export class RelationService {
             const relation = findRelation(resolvedRelations, key);
             if (!relation || relation.cardinality !== "many") continue;
 
-            const targetEntityIds = (value && Array.isArray(value)) ? value.map((rel: { id: string | number }) => rel.id) : [];
+            const targetEntityIds = relationTargetIds(value, key, collection.slug);
             const targetCollection = relation.target();
 
             // Use joinPath if available
@@ -1166,7 +1199,9 @@ export class RelationService {
                 if (newValue && Array.isArray(newValue) && newValue.length > 0) {
                     const targetPks = requirePrimaryKeys(targetCollection, this.registry);
                     const targetIdInfo = targetPks[0];
-                    const targetEntityIds = (newValue as Array<{ id: string | number } | string | number>).map((rel) => typeof rel === "object" && rel !== null ? rel.id : rel);
+                    // This path already read both shapes; the other two did not.
+                    // Same helper now, so the three cannot drift again.
+                    const targetEntityIds = relationTargetIds(newValue, relation.relationName, sourceCollection.slug);
                     const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
 
                     const newLinks = parsedTargetIds.map(targetId => ({
@@ -1238,7 +1273,7 @@ export class RelationService {
             if (newValue && Array.isArray(newValue) && newValue.length > 0) {
                 const targetPks = requirePrimaryKeys(targetCollection, this.registry);
                 const targetIdInfo = targetPks[0];
-                const targetEntityIds = (newValue as Array<{ id: string | number }>).map((rel) => rel.id);
+                const targetEntityIds = relationTargetIds(newValue, relation.relationName, sourceCollection.slug);
                 const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
 
                 const newLinks = parsedTargetIds.map(targetId => ({
