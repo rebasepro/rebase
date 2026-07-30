@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { User } from "@rebasepro/types";
-import { useAuthController, useRebaseClient } from "@rebasepro/app";
+import { apiBaseOf, useAuthController, useRebaseClient } from "@rebasepro/app";
 
 /**
  * Resolves the auth users behind `userSelect` values.
@@ -31,12 +31,12 @@ queue: new Set() };
     return cache;
 }
 
-async function fetchUsers(baseUrl: string, ids: string[], token: string | undefined): Promise<Map<string, User | null>> {
+async function fetchUsers(apiBase: string, ids: string[], token: string | undefined): Promise<Map<string, User | null>> {
     const resolved = new Map<string, User | null>();
     for (const id of ids) resolved.set(id, null);
 
     const params = new URLSearchParams({ ids: ids.join(",") });
-    const response = await fetch(`${baseUrl}/api/users?${params}`, {
+    const response = await fetch(`${apiBase}/users?${params}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
     if (!response.ok) {
@@ -103,9 +103,12 @@ function requestUser(
  * when it cannot be resolved.
  */
 export function useResolvedUser(uid: string | undefined): User | null {
-    const client = useRebaseClient<{ baseUrl?: string }>();
+    const client = useRebaseClient<{ baseUrl?: string, apiPath?: string }>();
     const { getAuthToken } = useAuthController();
-    const baseUrl = client?.baseUrl;
+    /* The API prefix, not the bare origin: it keys the cache and is what a
+       request is built from, and a backend with a non-default `basePath`
+       serves neither at `/api`. */
+    const baseUrl = apiBaseOf(client);
 
     const [user, setUser] = useState<User | null>(() =>
         (baseUrl && uid) ? getCache(baseUrl).users.get(uid) ?? null : null);

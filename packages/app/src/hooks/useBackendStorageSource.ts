@@ -10,12 +10,18 @@ import {
     DownloadConfig,
     StorageListResult
 } from "@rebasepro/types";
+import { DEFAULT_API_PATH } from "./ApiConfigContext";
 
 export interface BackendStorageSourceProps {
     /**
      * Backend API URL (e.g., 'http://localhost:3001')
      */
     apiUrl: string;
+    /**
+     * The path the backend mounts its API under. Defaults to the server's own
+     * default; pass the backend's `basePath` if it was configured otherwise.
+     */
+    apiPath?: string;
     /**
      * Function to get the current auth token
      */
@@ -39,10 +45,11 @@ export interface BackendStorageSourceProps {
  */
 export function useBackendStorageSource({
     apiUrl,
+    apiPath = DEFAULT_API_PATH,
     getAuthToken
 }: BackendStorageSourceProps): StorageSource {
 
-    const storageBasePath = `${apiUrl}/api/storage`;
+    const storageBasePath = `${apiUrl.replace(/\/+$/, "")}${apiPath}/storage`;
 
     // Cache for download URLs to avoid redundant API calls
     const urlsCache = useMemo(() => new Map<string, DownloadConfig>(), []);

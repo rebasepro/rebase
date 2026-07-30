@@ -10,6 +10,7 @@
  */
 
 import { RebaseApiError } from "@rebasepro/types";
+import { DEFAULT_API_PATH } from "../hooks/ApiConfigContext";
 
 /**
  * @deprecated Use {@link RebaseApiError} (from `@rebasepro/types`, re-exported by
@@ -113,7 +114,12 @@ export function createAuthConfigCache(): AuthConfigCache {
  * Concurrent calls are deduplicated: only one network request is made
  * and all callers share the same promise.
  */
-export async function fetchAuthConfig(apiUrl: string, cache: AuthConfigCache): Promise<AuthConfigResponse> {
+export async function fetchAuthConfig(
+    apiUrl: string,
+    cache: AuthConfigCache,
+    /** The backend's `basePath`; only needed if it is not the default. */
+    apiPath: string = DEFAULT_API_PATH
+): Promise<AuthConfigResponse> {
     if (cache.cached) {
         return cache.cached;
     }
@@ -123,7 +129,7 @@ export async function fetchAuthConfig(apiUrl: string, cache: AuthConfigCache): P
     }
 
     cache.inflight = (async () => {
-        const response = await fetchWithHandling(`${apiUrl}/api/auth/config`, {
+        const response = await fetchWithHandling(`${apiUrl.replace(/\/+$/, "")}${apiPath}/auth/config`, {
             method: "GET",
             headers: { "Content-Type": "application/json" }
         });

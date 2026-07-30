@@ -21,6 +21,7 @@ import {
 import type { User } from "@rebasepro/types";
 import type { EntityAction, UserCreationResult } from "@rebasepro/admin-types";
 import {
+    apiBaseOf,
     useAuthController,
     useRebaseClient,
     useSnackbarController,
@@ -246,7 +247,7 @@ export function ResetPasswordActionDialog({
     open: boolean;
     onClose: () => void;
 }) {
-    const client = useRebaseClient<{ baseUrl?: string }>();
+    const client = useRebaseClient<{ baseUrl?: string, apiPath?: string }>();
     const { getAuthToken } = useAuthController();
     const snackbarController = useSnackbarController();
     const { t } = useTranslation();
@@ -270,9 +271,9 @@ export function ResetPasswordActionDialog({
         setLoading(true);
         setError(null);
         try {
-            const baseUrl = client?.baseUrl || "";
+            const apiBase = apiBaseOf(client) ?? "";
             const token = await getAuthToken?.();
-            const response = await fetch(`${baseUrl}/api/admin/users/${user.uid}/reset-password`, {
+            const response = await fetch(`${apiBase}/admin/users/${user.uid}/reset-password`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

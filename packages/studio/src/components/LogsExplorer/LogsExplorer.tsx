@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDownToLineIcon, Checkbox, cls, defaultBorderMixin, Label, Select, SelectItem, TextField, Typography } from "@rebasepro/ui";
-import { useApiConfig } from "@rebasepro/app";
+import { useApiBase, useApiConfig } from "@rebasepro/app";
 
 interface LogEntry {
     id: string;
@@ -56,6 +56,7 @@ export function LogsExplorer() {
     const stickRef = useRef(true);
     const lastMaxIdRef = useRef<number | null>(null);
     const apiConfig = useApiConfig();
+    const apiBase = useApiBase();
 
     // Debounce the search box so typing doesn't refetch per keystroke.
     useEffect(() => {
@@ -82,7 +83,7 @@ export function LogsExplorer() {
             const token = apiConfig.getAuthToken ? await apiConfig.getAuthToken() : null;
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
-            const resp = await fetch(`${apiConfig.apiUrl}/api/logs?${params}`, { headers });
+            const resp = await fetch(`${apiBase}/logs?${params}`, { headers });
             if (!resp.ok) {
                 setError(resp.status === 401 || resp.status === 403
                     ? "Not authorised to read logs — an admin role is required."
@@ -108,7 +109,7 @@ export function LogsExplorer() {
         } catch (e) {
             setError(e instanceof Error ? e.message : "Could not load logs.");
         }
-    }, [level, source, search, apiConfig]);
+    }, [level, source, search, apiConfig, apiBase]);
 
     // A filter change replaces the window wholesale — "new entries since last
     // poll" stops meaning anything, so the counter starts over.

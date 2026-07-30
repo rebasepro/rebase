@@ -336,6 +336,17 @@ export interface RebaseClient<DB = unknown> {
     /** Base HTTP URL of the backend server */
     baseUrl?: string;
 
+    /**
+     * The path every API route is mounted under, appended to {@link baseUrl}.
+     *
+     * `"/api"` unless the backend was configured with a different `basePath`
+     * and the client told to match. Exposed because code that builds a URL by
+     * hand — rather than going through the client's own methods — otherwise has
+     * to guess, and guessing `/api` is wrong for exactly the projects that set
+     * the option.
+     */
+    apiPath?: string;
+
     /** WebSocket client for realtime subscriptions */
     ws?: RebaseWebSocket;
 
@@ -453,6 +464,17 @@ export interface RebaseBrowserClient<DB = unknown> {
 
     /** Base HTTP URL of the backend server */
     baseUrl?: string;
+
+    /**
+     * The path every API route is mounted under, appended to {@link baseUrl}.
+     *
+     * `"/api"` unless the backend was configured with a different `basePath`
+     * and the client told to match. Exposed because code that builds a URL by
+     * hand — rather than going through the client's own methods — otherwise has
+     * to guess, and guessing `/api` is wrong for exactly the projects that set
+     * the option.
+     */
+    apiPath?: string;
 
     /** WebSocket client for realtime subscriptions */
     ws?: RebaseWebSocket;

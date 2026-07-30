@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { useApiConfig } from "@rebasepro/app";
+import { useApiBase, useApiConfig } from "@rebasepro/app";
 import type { EntityHistoryEntry } from "@rebasepro/types";
 
 /**
@@ -31,6 +31,7 @@ export function useHistory(params: {
 }): UseEntityHistoryResult {
     const { slug, entityId, enabled = true, pageSize = 10 } = params;
     const apiConfig = useApiConfig();
+    const apiBase = useApiBase();
 
     const [entries, setEntries] = useState<HistoryEntryData[]>([]);
     const [total, setTotal] = useState(0);
@@ -59,7 +60,7 @@ export function useHistory(params: {
             };
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
-            const url = `${apiConfig.apiUrl}/api/data/${slug}/${entityId}/history?limit=${pageSize}&offset=${currentOffset}`;
+            const url = `${apiBase}/data/${slug}/${entityId}/history?limit=${pageSize}&offset=${currentOffset}`;
             const response = await fetch(url, { headers,
 signal });
 
@@ -90,7 +91,7 @@ signal });
         } finally {
             setIsLoading(false);
         }
-    }, [apiConfig, slug, entityId, enabled, pageSize]);
+    }, [apiConfig, apiBase, slug, entityId, enabled, pageSize]);
 
     // Single unified effect: reset state when entity changes, fetch when offset changes.
     // Uses AbortController to cancel stale requests on entity change or unmount.
@@ -136,7 +137,7 @@ signal });
         };
         if (token) headers["Authorization"] = `Bearer ${token}`;
 
-        const url = `${apiConfig.apiUrl}/api/data/${slug}/${entityId}/history/${historyId}/revert`;
+        const url = `${apiBase}/data/${slug}/${entityId}/history/${historyId}/revert`;
         const response = await fetch(url, { method: "POST",
 headers });
 
@@ -154,7 +155,7 @@ headers });
 
         // Return the reverted entity data so callers can update the form
         return result.data as Record<string, unknown>;
-    }, [apiConfig, slug, entityId]);
+    }, [apiConfig, apiBase, slug, entityId]);
 
     return useMemo(() => ({
         entries,

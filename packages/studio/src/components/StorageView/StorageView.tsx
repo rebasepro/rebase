@@ -41,7 +41,7 @@ import {
     VideoIcon,
     XIcon
 } from "@rebasepro/ui";
-import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiConfig } from "@rebasepro/app";
+import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig } from "@rebasepro/app";
 import { DEFAULT_STORAGE_SOURCE_KEY, type StorageListResult } from "@rebasepro/types";
 import { useSearchParams } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
@@ -532,6 +532,7 @@ export const StorageView = () => {
     const [newFolderName, setNewFolderName] = useState("");
     const [creatingFolder, setCreatingFolder] = useState(false);
     const apiConfig = useApiConfig();
+    const apiBase = useApiBase();
 
     const storageSourceRef = React.useRef(storageSource);
     useEffect(() => {
@@ -724,7 +725,7 @@ message: `Folder "${name}" already exists` });
         try {
             const folderPath = currentPath ? `default/${currentPath}/${name}` : `default/${name}`;
             const token = apiConfig.getAuthToken ? await apiConfig.getAuthToken() : null;
-            const response = await fetch(`${apiConfig.apiUrl}/api/storage/folder`, {
+            const response = await fetch(`${apiBase}/storage/folder`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -749,7 +750,7 @@ message: e instanceof Error ? e.message : String(e) });
         } finally {
             setCreatingFolder(false);
         }
-    }, [newFolderName, currentPath, apiConfig, snackbarController, fetchContents, folders]);
+    }, [newFolderName, currentPath, apiConfig, apiBase, snackbarController, fetchContents, folders]);
 
     // Drag-and-drop on main view
     const handleDropFiles = useCallback(async (droppedFiles: File[]) => {

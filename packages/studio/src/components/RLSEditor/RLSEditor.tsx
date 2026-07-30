@@ -1,5 +1,6 @@
 
 import { useStudioCollectionRegistry, useStudioCapabilities } from "@rebasepro/app";
+import { useApiBase } from "@rebasepro/app";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Alert,
@@ -155,6 +156,9 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
     const snackbarController = useSnackbarController();
     const collectionRegistry = useStudioCollectionRegistry();
     const { codebase: hasCodebase } = useStudioCapabilities();
+    /* `apiUrl` is a bare origin; the routes live under the backend's
+       `basePath`, which is `/api` only by default. */
+    const apiBase = useApiBase() ?? `${apiUrl.replace(/\/+$/, "")}/api`;
     const { t } = useTranslation();
 
     const [isLoading, setIsLoading] = useState(true);
@@ -771,7 +775,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         }
 
                                         try {
-                                            const response = await fetch(`${apiUrl}/api/schema-editor/collection/save`, {
+                                            const response = await fetch(`${apiBase}/schema-editor/collection/save`, {
                                                 method: "POST",
                                                 headers: { "Content-Type": "application/json" },
                                                 body: JSON.stringify({
@@ -970,7 +974,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                                     const newRules = [...existingRules, rule];
 
                                                                     try {
-                                                                        const response = await fetch(`${apiUrl}/api/schema-editor/collection/save`, {
+                                                                        const response = await fetch(`${apiBase}/schema-editor/collection/save`, {
                                                                             method: "POST",
                                                                             headers: { "Content-Type": "application/json" },
                                                                             body: JSON.stringify({
