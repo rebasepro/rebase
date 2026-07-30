@@ -6,6 +6,7 @@ import {
     Background,
     BackgroundVariant,
     useReactFlow,
+    useNodesInitialized,
     ReactFlowProvider,
     applyNodeChanges,
     applyEdgeChanges
@@ -88,18 +89,43 @@ function SchemaVisualizerCanvas({
         []
     );
 
-    // Fit view on first load
+    /**
+     * Fit the graph into view, once, as soon as it can be measured.
+     *
+     * This used to fire on a 200ms timer. `fitView` needs every node's real
+     * width and height, which React Flow only knows after it has laid them out
+     * and measured them — with a dozen tables, a cold Monaco-sized bundle and
+     * a slow first paint, 200ms is often too early. The fit then ran against
+     * zero-sized nodes and produced a viewport nothing lines up with, and
+     * `initialFitDone` made sure it was never retried: the ERD opened as a
+     * scatter of specks in a corner and stayed there until you hit "fit" by
+     * hand. `useNodesInitialized` is the event this was approximating.
+     */
+    const nodesInitialized = useNodesInitialized();
     useEffect(() => {
-        if (nodes.length > 0 && !initialFitDone.current) {
-            const timer = setTimeout(() => {
-                reactFlowInstance.fitView({ padding: 0.15,
+        if (!nodesInitialized || nodes.length === 0 || initialFitDone.current) return;
+        initialFitDone.current = true;
+        reactFlowInstance.fitView({ padding: 0.15,
 duration: 400 });
-                initialFitDone.current = true;
-            }, 200);
-            return () => clearTimeout(timer);
-        }
-        return undefined;
-    }, [nodes.length, reactFlowInstance]);
+    }, [nodesInitialized, nodes.length, reactFlowInstance]);
+
+    /**
+     * Re-fit after a relayout.
+     *
+     * Switching LR↔TB transposes the graph — a tall column becomes a wide band
+     * — so the viewport that framed the old shape frames the new one badly:
+     * asking for a different layout used to leave most of it off-screen until
+     * you pressed "fit" as a second step. Skipped for the very first layout,
+     * which the initial fit above already handles.
+     */
+    const lastFittedDirection = useRef(direction);
+    useEffect(() => {
+        if (!nodesInitialized || nodes.length === 0) return;
+        if (lastFittedDirection.current === direction) return;
+        lastFittedDirection.current = direction;
+        reactFlowInstance.fitView({ padding: 0.15,
+duration: 400 });
+    }, [direction, nodesInitialized, nodes, reactFlowInstance]);
 
     const handleFitView = useCallback(() => {
         reactFlowInstance.fitView({ padding: 0.15,
