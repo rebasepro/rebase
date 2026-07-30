@@ -28,6 +28,32 @@ export interface StudioBridge {
     urlController: UrlController;
     navigationState: NavigationStateController;
     breadcrumbs: BreadcrumbsController;
+    capabilities: StudioCapabilities;
+}
+
+/**
+ * What the *host* of these tools can do, as opposed to what the backend can.
+ *
+ * Studio is mounted in two very different places. In a project's own admin
+ * panel it runs next to the collection source files and can edit them through
+ * the schema-editor routes. In the hosted console it runs against somebody
+ * else's deployed container: there is no source to edit — the container is
+ * rebuilt from the customer's repository on every deploy — and the routes that
+ * would edit it are not mounted at all, because the framework switches the
+ * schema editor off under `NODE_ENV=production`.
+ *
+ * Tools that would otherwise offer a write into the codebase read this to
+ * decide whether that write is even meaningful.
+ */
+export interface StudioCapabilities {
+    /**
+     * Whether the host has the project's collection source at hand and can
+     * write to it.
+     *
+     * Defaults to `true`, which is what an admin panel running beside its own
+     * `collectionsDir` has always assumed.
+     */
+    codebase: boolean;
 }
 
 // ─── Noop defaults ──────────────────────────────────────────────────
@@ -71,12 +97,17 @@ const NOOP_BREADCRUMBS: BreadcrumbsController = {
     updateCount: () => {}
 };
 
+const DEFAULT_CAPABILITIES: StudioCapabilities = {
+    codebase: true
+};
+
 const NOOP_BRIDGE: StudioBridge = {
     collectionRegistry: NOOP_COLLECTION_REGISTRY,
     sidePanelController: NOOP_SIDE_PANEL,
     urlController: NOOP_URL_CONTROLLER,
     navigationState: NOOP_NAVIGATION_STATE,
-    breadcrumbs: NOOP_BREADCRUMBS
+    breadcrumbs: NOOP_BREADCRUMBS,
+    capabilities: DEFAULT_CAPABILITIES
 };
 
 // ─── Context & Provider ─────────────────────────────────────────────
@@ -107,10 +138,22 @@ export function StudioBridgeProvider({
     value: Partial<StudioBridge>;
     children: React.ReactNode;
 }) {
+    // Keyed on the slices rather than on `value`: callers write the object
+    // inline (`value={{ collectionRegistry }}`), so a `[value]` dependency
+    // rebuilt the context on every render of the host and re-rendered every
+    // Studio consumer with it.
     const merged = React.useMemo(
         () => ({ ...NOOP_BRIDGE,
 ...value }),
-        [value]
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [
+            value.collectionRegistry,
+            value.sidePanelController,
+            value.urlController,
+            value.navigationState,
+            value.breadcrumbs,
+            value.capabilities
+        ]
     );
     return (
         <StudioBridgeContext.Provider value={merged}>
@@ -144,6 +187,11 @@ export function useStudioNavigationState(): NavigationStateController {
 /** Breadcrumbs controller — returns noop if the admin is not present. */
 export function useStudioBreadcrumbs(): BreadcrumbsController {
     return useContext(StudioBridgeContext).breadcrumbs;
+}
+
+/** What the host can do — see {@link StudioCapabilities}. */
+export function useStudioCapabilities(): StudioCapabilities {
+    return useContext(StudioBridgeContext).capabilities;
 }
 
 // ─── Self-Assembling Bridge Registry ────────────────────────────────
