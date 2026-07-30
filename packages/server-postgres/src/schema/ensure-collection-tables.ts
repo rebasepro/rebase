@@ -253,9 +253,13 @@ export function planCollectionSchemaEnsure(
         }
     }
 
-    // 3b. A junction that already existed, but is short a column.
+    // 3b. A junction that already existed, but is short a column. One created
+    //     above already carries both — unlike a collection table, whose CREATE
+    //     declares only the identity column — so re-listing them would log two
+    //     no-op statements and inflate the count of changes applied.
     for (const junction of junctions) {
         const key = `${junction.schema}.${junction.table}`;
+        if (created.has(key)) continue;
         for (const column of junction.columns) {
             addColumn(key, junction.schema, junction.table, column.name, column.type);
         }
