@@ -1,0 +1,28 @@
+{
+  "bundleFormat": 1,
+  "runtime": {
+    "range": "^1",
+    "builtAgainst": "0.10.0",
+    "contract": 1
+  },
+  "schemaVersion": "v1:648c585ca79b6b02",
+  "app": "backend",
+  "mode": "cms",
+  "entry": {
+    "config": "config",
+    "collections": "config/collections",
+    "admin": "admin",
+    "schema": "backend/src/schema.generated.js"
+  },
+  "hooks": {
+    "native": false
+  },
+  "deps": {
+    "declared": {}
+  },
+  "build": {
+    "cli": "0.10.0",
+    "node": "22",
+    "createdAt": "2026-03-01T00:00:00.000Z"
+  }
+}

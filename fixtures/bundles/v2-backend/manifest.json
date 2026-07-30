@@ -1,0 +1,34 @@
+{
+  "bundleFormat": 2,
+  "runtime": {
+    "range": "^1",
+    "builtAgainst": "0.12.0",
+    "contract": 1
+  },
+  "schemaVersion": "v1:d1e9cfcdeb82b702",
+  "app": "backend",
+  "kind": "backend",
+  "entry": {
+    "config": "config",
+    "collections": "config/collections",
+    "static": [
+      {
+        "path": "/",
+        "dir": "static/site",
+        "spa": true
+      }
+    ],
+    "schema": "backend/src/schema.generated.js"
+  },
+  "hooks": {
+    "native": false
+  },
+  "deps": {
+    "declared": {}
+  },
+  "build": {
+    "cli": "0.12.0",
+    "node": "22",
+    "createdAt": "2026-07-30T00:00:00.000Z"
+  }
+}
