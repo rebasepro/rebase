@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { resolveCollectionRelations } from "@rebasepro/common";
+import type { CollectionConfig } from "@rebasepro/types";
 
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus, IntrospectedSchema, Queryable } from "./introspect-runtime";
 import { buildTablesMap, identifyJoinTables, TableColumn, ForeignKeyRow, PrimaryKeyRow } from "./introspect-db-logic";
@@ -121,14 +123,60 @@ describe("buildCollectionsFromSchema", () => {
         const props = posts.properties as any;
 
         expect(props.author_id).toBeUndefined();
-        expect(props.author).toEqual({
-            name: "Author",
-            type: "relation",
-            target: "authors",
-            cardinality: "one",
-            direction: "owning",
-            localKey: "author_id"
-        });
+        expect(props.author.name).toBe("Author");
+        expect(props.author.type).toBe("relation");
+        // The descriptor is nested under `relation`, carries `kind`, and its
+        // `target` is a thunk — see the resolvability test below for why none of
+        // those three are stylistic.
+        expect(props.author.relation).toMatchObject({ kind: "belongsTo", localKey: "author_id" });
+        expect(typeof props.author.relation.target).toBe("function");
+        expect(props.author.relation.target().slug).toBe("authors");
+    });
+
+    /**
+     * The shape has to be one the resolver actually reads.
+     *
+     * This path emitted `cardinality` / `direction` / a bare-string `target`
+     * flat on the property — the shape `Relation` stopped accepting, and the
+     * same drift `introspect-emits-valid-relations.test.ts` caught in the
+     * generated-file path and this one was missed by. Nothing threw:
+     * `resolveCollectionRelations` reads `property.relation`, found none, and
+     * reported a collection with no relations at all.
+     *
+     * The visible cost was writes. `assertKnownWriteFields` learns an owning
+     * relation's FK column from the *resolved* relation's `localKey`, and the FK
+     * column is deliberately absent from `properties` ("surfaces as a
+     * relation"), so with nothing resolving, `POST /api/data/orders` with
+     * `product_id` came back 400 `has no field 'product_id'` — the column was
+     * simultaneously the only way to set the relation and not a known field.
+     *
+     * Asserting the literal object is what let it drift, so this asserts
+     * through the resolver instead: a future reshape has to keep it resolvable,
+     * not merely keep the keys someone once wrote down.
+     */
+    it("emits a relation the resolver can read, so the fk column is writable", () => {
+        const schema = schemaOf(
+            [
+                column({ table_name: "products", column_name: "id", data_type: "integer", udt_name: "int4", is_nullable: "NO" }),
+                column({ table_name: "orders", column_name: "id", data_type: "integer", udt_name: "int4", is_nullable: "NO" }),
+                column({ table_name: "orders", column_name: "product_id", data_type: "integer", udt_name: "int4" })
+            ],
+            [
+                { table_name: "products", column_name: "id" },
+                { table_name: "orders", column_name: "id" }
+            ],
+            [{ table_name: "orders", column_name: "product_id", foreign_table_name: "products", foreign_column_name: "id" }]
+        );
+
+        const orders = buildCollectionsFromSchema(schema, "public").find((c) => c.slug === "orders")!;
+        const resolved = resolveCollectionRelations(orders as unknown as CollectionConfig);
+
+        expect(Object.keys(resolved)).toEqual(["product"]);
+        expect(resolved.product.kind).toBe("belongsTo");
+        // `localKey` is the field `assertKnownWriteFields` adds to the known set,
+        // which is what makes `product_id` writable. The write itself is covered
+        // end-to-end by `scripts/smoke-baas.ts` against a real database.
+        expect((resolved.product as { localKey: string }).localKey).toBe("product_id");
     });
 
     it("skips join tables — they are an edge between collections, not a collection", () => {

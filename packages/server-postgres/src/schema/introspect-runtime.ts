@@ -207,13 +207,30 @@ function buildProperties(
 }
 
 /**
- * Owning relations, derived from this table's foreign keys. Mirrors the shape
- * `generateCollectionFile` emits, except `target` uses the slug string form
- * rather than a thunk to a module import.
+ * Owning relations, derived from this table's foreign keys — the same shape
+ * `generateCollectionFile` writes into a collection file: a `relation` property
+ * whose nested descriptor carries `kind`, a `target` thunk and the `localKey`.
+ *
+ * The shape is load-bearing, not cosmetic. `resolveCollectionRelations` reads
+ * relations from `property.relation` and `resolveRelation` requires `target` to
+ * be a thunk; this used to emit `target`/`cardinality`/`localKey` flat on the
+ * property with the slug as a bare string, which satisfies neither. Nothing
+ * threw — the resolver simply skipped every such property and reported that the
+ * collection had no relations. So an introspected BaaS collection had its FK
+ * columns removed from `properties` (they "surface as relations") and then no
+ * resolvable relation to surface as, which is why writing the FK column
+ * directly came back as `has no field 'product_id'`: `assertKnownWriteFields`
+ * learns that column from the resolved relation's `localKey`.
+ *
+ * The thunk closes over the collections being built in this same pass rather
+ * than importing a module, which is what a runtime introspection has instead of
+ * generated files. It is called lazily, after the map is fully populated, so a
+ * table may reference one introspected later.
  */
 function buildRelations(
     meta: TableMeta,
-    slugByTable: Map<string, string>
+    slugByTable: Map<string, string>,
+    collectionBySlug: Map<string, PostgresCollectionConfig>
 ): Record<string, Record<string, unknown>> {
     const relations: Record<string, Record<string, unknown>> = {};
 
@@ -233,10 +250,11 @@ function buildRelations(
         relations[key] = {
             name: humanize(key),
             type: "relation",
-            target: targetSlug,
-            cardinality: "one",
-            direction: "owning",
-            localKey: fk.column_name
+            relation: {
+                kind: "belongsTo",
+                target: () => collectionBySlug.get(targetSlug),
+                localKey: fk.column_name
+            }
         };
     }
 
@@ -259,6 +277,9 @@ export function buildCollectionsFromSchema(
     }
 
     const collections: PostgresCollectionConfig[] = [];
+    // Filled as we go; the relation thunks read it lazily, so a table may point
+    // at one that has not been built yet at the moment its relation is created.
+    const collectionBySlug = new Map<string, PostgresCollectionConfig>();
 
     for (const [tableName, meta] of tablesMap) {
         if (joinTables.has(tableName)) continue;
@@ -273,11 +294,12 @@ export function buildCollectionsFromSchema(
             icon: getIconForTable(tableName),
             properties: {
                 ...buildProperties(meta, enumMap),
-                ...buildRelations(meta, slugByTable)
+                ...buildRelations(meta, slugByTable, collectionBySlug)
             }
         } as unknown as PostgresCollectionConfig;
 
         collections.push(collection);
+        collectionBySlug.set(tableName, collection);
     }
 
     return collections;
