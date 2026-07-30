@@ -585,9 +585,12 @@ describe("dual PM compatibility", () => {
             expect(pkg.scripts.start).toBe("rebase start");
         });
 
-        it("deploy script uses rebase commands", () => {
+        // `deploy` deploys. It used to be `rebase build && rebase start` —
+        // build, then run in the foreground, locally — which is not what anyone
+        // typing the word means.
+        it("deploy script deploys", () => {
             const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
-            expect(pkg.scripts.deploy).toBe("rebase build && rebase start");
+            expect(pkg.scripts.deploy).toBe("rebase cloud deploy");
         });
     });
 
