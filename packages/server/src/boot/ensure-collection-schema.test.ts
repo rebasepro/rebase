@@ -134,7 +134,7 @@ describe("ensureCollectionSchema — every exit says why", () => {
         expect(logged()).toContain("no data source");
     });
 
-    it("warns and names the driver that cannot create tables", async () => {
+    it("blames the adapter, not the driver package, for the missing method", async () => {
         await ensureCollectionSchema(
             bundle(),
             [source({ bootstrapper: {} as InitializedDataSource["bootstrapper"] })],
@@ -144,6 +144,13 @@ describe("ensureCollectionSchema — every exit says why", () => {
         expect(warnSpy).toHaveBeenCalled();
         expect(logged()).toContain("@rebasepro/server-postgres");
         expect(logged()).toContain("rebase db push");
+
+        // The real cause, twice now, was a driver that DID implement this on a
+        // class the adapter never forwarded. Wording that says "the driver does
+        // not implement" sends the reader to npm versions, which is the wrong
+        // suspect in two of the three ways this method can go missing.
+        expect(logged()).toContain("adapter");
+        expect(logged()).not.toContain("does not implement");
     });
 
     it("warns, with the path it read, when the directory holds no collections", async () => {
