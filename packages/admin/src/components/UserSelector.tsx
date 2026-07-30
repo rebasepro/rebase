@@ -21,7 +21,7 @@ import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Command as CommandPrimitive } from "cmdk";
 import { User } from "@rebasepro/types";
-import { useRebaseClient, useAuthController, UserDisplay } from "@rebasepro/app";
+import { apiBaseOf, useRebaseClient, useAuthController, UserDisplay } from "@rebasepro/app";
 import { EmptyValue } from "../preview";
 
 interface UserSelectorItem {
@@ -37,7 +37,7 @@ const DEFAULT_PAGE_SIZE = 10;
  * Local hook to fetch users from the collection REST API with search and pagination.
  */
 function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number } = {}) {
-    const client = useRebaseClient<{ baseUrl?: string }>();
+    const client = useRebaseClient<{ baseUrl?: string, apiPath?: string }>();
     const { getAuthToken } = useAuthController();
 
     const [items, setItems] = useState<UserSelectorItem[]>([]);
@@ -48,7 +48,8 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number }
     const userCacheRef = useRef<Map<string, User>>(new Map());
 
     const fetchUsers = useCallback(async (searchStr: string, offset: number, append: boolean) => {
-        if (!client?.baseUrl) return;
+        const apiBase = apiBaseOf(client);
+        if (!apiBase) return;
         setIsLoading(true);
         try {
             const token = await getAuthToken?.();
@@ -57,7 +58,7 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number }
                 offset: String(offset)
             });
             if (searchStr) params.set("search", searchStr);
-            const response = await fetch(`${client.baseUrl}/api/users?${params}`, {
+            const response = await fetch(`${apiBase}/users?${params}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
             if (!response.ok) throw new Error("Failed to fetch users");
@@ -86,7 +87,7 @@ user };
         } finally {
             setIsLoading(false);
         }
-    }, [client?.baseUrl, getAuthToken, pageSize]);
+    }, [client?.baseUrl, client?.apiPath, getAuthToken, pageSize]);
 
     useEffect(() => {
         offsetRef.current = 0;

@@ -31,11 +31,24 @@ class MockWebSocket {
     static readonly CLOSING = 2;
     static readonly CLOSED = 3;
 
+    /**
+     * Make every new socket fail to come up, as an unreachable server does.
+     *
+     * The default mock always opens, which is enough for most tests but cannot
+     * express "the server is down" — and therefore cannot exhaust the
+     * reconnect budget, since every attempt would succeed and reset it.
+     */
+    static failToConnect = false;
+
     constructor(url: string) {
         this.url = url;
         MockWebSocket.instances.push(this);
-        // Simulate async open
         setTimeout(() => {
+            if (MockWebSocket.failToConnect) {
+                this.readyState = MockWebSocket.CLOSED;
+                this.onclose?.();
+                return;
+            }
             this.readyState = MockWebSocket.OPEN;
             if (this.onopen) this.onopen();
         }, 10);
@@ -1274,6 +1287,98 @@ id: "1" }, onUpdate, onError);
             jest.runAllTimers();
 
             expect(reconnectCb).toHaveBeenCalled();
+        });
+
+        /**
+         * Five attempts with exponential backoff is about a minute. A laptop
+         * lid, a wifi handover and a backend rollout all exceed that, and the
+         * client used to treat exhausting the budget as terminal: `onclose`
+         * left the dead socket on `this.ws`, which is exactly the condition
+         * `ensureConnected` bails on, so nothing could redial for the life of
+         * the page.
+         */
+        describe("after the backoff budget runs out", () => {
+            /** Take the server away, then let every scheduled retry fire and fail. */
+            const exhaustRetries = () => {
+                MockWebSocket.failToConnect = true;
+                getWs().close();
+                // 5 attempts, the last backing off 30s. 8 x 60s clears them all.
+                for (let i = 0; i < 8; i++) jest.advanceTimersByTime(60_000);
+            };
+
+            /** Whatever a test does next happens against a reachable server. */
+            const serverIsBack = () => { MockWebSocket.failToConnect = false; };
+
+            /**
+             * A `window` with just the two methods the client uses.
+             *
+             * These tests run in the node environment, where there is none —
+             * and the client correctly installs no listener there. Standing one
+             * up is how the browser path gets covered without moving the whole
+             * file to jsdom.
+             */
+            const listeners = new Set<() => void>();
+            let hadWindow = false;
+            beforeEach(() => {
+                hadWindow = "window" in globalThis;
+                if (hadWindow) return;
+                listeners.clear();
+                (globalThis as Record<string, unknown>).window = {
+                    addEventListener: (type: string, fn: () => void) => { if (type === "online") listeners.add(fn); },
+                    removeEventListener: (type: string, fn: () => void) => { if (type === "online") listeners.delete(fn); }
+                };
+            });
+            afterEach(() => {
+                MockWebSocket.failToConnect = false;
+                if (!hadWindow) delete (globalThis as Record<string, unknown>).window;
+            });
+
+            /** Fire the browser's `online` event at whoever is listening. */
+            const goOnline = () => { for (const fn of [...listeners]) fn(); };
+
+            it("stops retrying on its own", () => {
+                createClient();
+                jest.runAllTimers();
+                exhaustRetries();
+                const settled = MockWebSocket.instances.length;
+                jest.advanceTimersByTime(120_000);
+                expect(MockWebSocket.instances).toHaveLength(settled);
+            });
+
+            it("dials again when something asks for a connection", () => {
+                const client = createClient();
+                jest.runAllTimers();
+                exhaustRetries();
+                const settled = MockWebSocket.instances.length;
+
+                serverIsBack();
+                client.ensureConnected();
+                expect(MockWebSocket.instances.length).toBeGreaterThan(settled);
+            });
+
+            it("dials again when the browser comes back online", () => {
+                createClient();
+                jest.runAllTimers();
+                exhaustRetries();
+                const settled = MockWebSocket.instances.length;
+
+                serverIsBack();
+                goOnline();
+                expect(MockWebSocket.instances.length).toBeGreaterThan(settled);
+            });
+
+            it("stays down after an explicit close, online event or not", () => {
+                const client = createClient();
+                jest.runAllTimers();
+                exhaustRetries();
+                client.disconnect(true);
+                const settled = MockWebSocket.instances.length;
+
+                serverIsBack();
+                goOnline();
+                client.ensureConnected();
+                expect(MockWebSocket.instances).toHaveLength(settled);
+            });
         });
 
         it("re-queues pending requests on disconnect", () => {

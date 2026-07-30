@@ -1,5 +1,6 @@
 
-import { useStudioCollectionRegistry } from "@rebasepro/app";
+import { useStudioCollectionRegistry, useStudioCapabilities } from "@rebasepro/app";
+import { useApiBase } from "@rebasepro/app";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Alert,
@@ -154,6 +155,10 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
     const { databaseAdmin } = useRebaseContext();
     const snackbarController = useSnackbarController();
     const collectionRegistry = useStudioCollectionRegistry();
+    const { codebase: hasCodebase } = useStudioCapabilities();
+    /* `apiUrl` is a bare origin; the routes live under the backend's
+       `basePath`, which is `/api` only by default. */
+    const apiBase = useApiBase() ?? `${apiUrl.replace(/\/+$/, "")}/api`;
     const { t } = useTranslation();
 
     const [isLoading, setIsLoading] = useState(true);
@@ -731,7 +736,26 @@ message: e instanceof Error ? e.message : String(e) });
                                 schema={activeTableData.schemaName}
                                 table={activeTableData.tableName}
                                 onSave={async (newPolicy) => {
-                                    if (activeCollection) {
+                                    /*
+                                     * Where a policy for a *mapped* table belongs depends
+                                     * on the host, not on the table.
+                                     *
+                                     * Beside its own source, the collection file is the
+                                     * right home: the rule is checked in, and the next
+                                     * migration applies it. The hosted console has no
+                                     * source — the container is rebuilt from the
+                                     * customer's repository on every deploy — and the
+                                     * schema-editor routes it would POST to are not even
+                                     * mounted, because the framework switches them off
+                                     * under NODE_ENV=production, which every tenant runs.
+                                     * So this branch used to make "Create Policy" and
+                                     * "Edit" fail with "Failed to save policy" on every
+                                     * mapped table in the console, which is most of them.
+                                     * There, the database is the only place a policy can
+                                     * live, so write it there — the same path unmapped
+                                     * tables have always used.
+                                     */
+                                    if (activeCollection && hasCodebase) {
                                         // Collection-mapped table: save via schema-editor API
                                         const rule: Record<string, unknown> = {
                                             name: newPolicy.policyname,
@@ -751,7 +775,7 @@ message: e instanceof Error ? e.message : String(e) });
                                         }
 
                                         try {
-                                            const response = await fetch(`${apiUrl}/api/schema-editor/collection/save`, {
+                                            const response = await fetch(`${apiBase}/schema-editor/collection/save`, {
                                                 method: "POST",
                                                 headers: { "Content-Type": "application/json" },
                                                 body: JSON.stringify({
@@ -770,7 +794,9 @@ message: "Policy saved successfully" });
 message: e instanceof Error ? e.message : String(e) });
                                         }
                                     } else {
-                                        // Non-collection table (internal/junction/unmapped): apply policy directly via SQL
+                                        // No codebase to write to (hosted console), or an
+                                        // unmapped table (internal/junction/other): apply
+                                        // the policy to the database directly.
                                         try {
                                             const qualifiedTable = `${sanitizeSqlIdentifier(activeTableData.schemaName)}.${sanitizeSqlIdentifier(activeTableData.tableName)}`;
                                             const policyName = sanitizeSqlIdentifier(newPolicy.policyname || "unnamed_policy");
@@ -795,7 +821,7 @@ message: e instanceof Error ? e.message : String(e) });
                                             await databaseAdmin!.executeSql!(sql);
 
                                             snackbarController.open({ type: "success",
-message: `Policy "${newPolicy.policyname}" applied directly via SQL` });
+message: `Policy "${newPolicy.policyname}" applied to the database` });
                                             setEditingPolicy(null);
                                             fetchRLSData();
                                         } catch (e: unknown) {
@@ -907,7 +933,12 @@ message: e instanceof Error ? e.message : String(e) });
                                                                     </div>
                                                                 </Tooltip>
                                                             )}
-                                                            {policy.status === "live" && (
+                                                            {/* "DB Only" is a *drift* signal — it means the
+                                                                codebase does not declare this policy. Where
+                                                                there is no codebase to compare against, every
+                                                                policy trivially qualifies, so the badge said
+                                                                nothing and said it about everything. */}
+                                                            {policy.status === "live" && hasCodebase && (
                                                                 <Tooltip title="This policy is live in the database but missing from your codebase schema.">
                                                                     <div className="px-1.5 py-0.5 rounded text-[10px] uppercase bg-orange-500/10 text-orange-600 border border-orange-500/20 shrink-0">
                                                                         DB Only
@@ -921,7 +952,10 @@ message: e instanceof Error ? e.message : String(e) });
                                                         </div>
                                                     </div>
                                                     <div className="flex gap-2 shrink-0 items-center">
-                                                        {policy.status === "live" && activeCollection && (
+                                                        {/* Writes a collection source file, so it needs a
+                                                            codebase on the other end. In the console the
+                                                            endpoint is not mounted and the button 404'd. */}
+                                                        {policy.status === "live" && activeCollection && hasCodebase && (
                                                             <Button
                                                                 size="small"
                                                                 variant="outlined"
@@ -940,7 +974,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                                     const newRules = [...existingRules, rule];
 
                                                                     try {
-                                                                        const response = await fetch(`${apiUrl}/api/schema-editor/collection/save`, {
+                                                                        const response = await fetch(`${apiBase}/schema-editor/collection/save`, {
                                                                             method: "POST",
                                                                             headers: { "Content-Type": "application/json" },
                                                                             body: JSON.stringify({

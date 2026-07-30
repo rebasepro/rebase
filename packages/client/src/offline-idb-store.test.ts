@@ -189,9 +189,28 @@ async function clearOfflineQueue(): Promise<void> {
 describe("two tabs over one database", () => {
     beforeEach(clearOfflineQueue);
 
-    /** BroadcastChannel delivery is asynchronous; give it a macrotask or two. */
-    const settle = async () => {
-        for (let i = 0; i < 3; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    /**
+     * Wait until the other tab has caught up.
+     *
+     * BroadcastChannel delivery is asynchronous and the receiving tab then does
+     * its own IndexedDB work, so there is no fixed number of turns that is
+     * both enough and not wasteful. Draining three macrotasks was enough on an
+     * idle machine and not enough when the other package suites run alongside
+     * this one — which is how this file failed under `pnpm -r test` while
+     * passing every time on its own.
+     *
+     * Polling a condition is what the test actually means, and it costs one
+     * turn in the common case rather than three.
+     */
+    const settleUntil = async (done: () => boolean | Promise<boolean>, deadlineMs = 5_000) => {
+        const started = Date.now();
+        for (;;) {
+            if (await done()) return;
+            if (Date.now() - started > deadlineMs) {
+                throw new Error(`condition never held within ${deadlineMs}ms`);
+            }
+            await new Promise((resolve) => setTimeout(resolve, 5));
+        }
     };
 
     function createServer() {
@@ -252,7 +271,7 @@ describe("two tabs over one database", () => {
 
         server.state.online = false;
         await postsA.create({ title: "from tab A" }, "xt1");
-        await settle();
+        await settleUntil(async () => (await postsB.find()).data.some((r) => r.id === "xt1"));
 
         // Without cross-tab propagation this tab would be showing a list that
         // is already wrong, and would keep showing it until a refetch.

@@ -815,6 +815,11 @@ refreshToken: session.refreshToken };
         getAuthConfig,
         getSession,
         onAuthStateChange,
+        // A client that neither persists sessions nor uses cookie auth has
+        // nowhere to restore one from, so "no session in memory" is the final
+        // answer rather than a reason to ask the server. See the docblock on
+        // `AuthClient.canRestoreSession`.
+        canRestoreSession: () => persistSession || authFlowMode === "cookie",
         isInitialized: () => isInitialized
     };
 }

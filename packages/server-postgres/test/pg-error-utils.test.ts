@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
-import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, sanitizeErrorForClient, isRoleSwitchingPermissionError } from "../src/utils/pg-error-utils";
+import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, sanitizeErrorForClient, isRoleSwitchingPermissionError, classifyConnectFailure } from "../src/utils/pg-error-utils";
 import { logger } from "@rebasepro/server";
 // Imported from the module rather than the package barrel: the barrel is
 // mocked below, so `ApiError` would come back undefined through it.
@@ -355,6 +355,50 @@ describe("pg-error-utils", () => {
         it("returns false for null/undefined", () => {
             expect(isRoleSwitchingPermissionError(null)).toBe(false);
             expect(isRoleSwitchingPermissionError(undefined)).toBe(false);
+        });
+    });
+
+    /**
+     * The boot-time connection check catches Drizzle's wrapper, whose message
+     * is `Failed query: SELECT 1`. Everything a developer needs is one level
+     * down. See `PostgresBootstrapper`.
+     */
+    describe("classifyConnectFailure", () => {
+        /** What Drizzle hands the bootstrapper for a failed `SELECT 1`. */
+        const wrapped = (code: string, message: string) =>
+            Object.assign(new Error("Failed query: SELECT 1\nparams: "), {
+                cause: Object.assign(new Error(message), { code })
+            });
+
+        it("reports the Postgres message, not the Drizzle wrapper's", () => {
+            const result = classifyConnectFailure(wrapped("3D000", 'database "shop" does not exist'));
+            expect(result.reason).toBe('database "shop" does not exist');
+            expect(result.code).toBe("3D000");
+        });
+
+        it("treats a wrong password as unrecoverable", () => {
+            expect(classifyConnectFailure(wrapped("28P01", "password authentication failed for user \"app\"")).fatal).toBe(true);
+        });
+
+        it("treats a missing database as unrecoverable", () => {
+            expect(classifyConnectFailure(wrapped("3D000", 'database "shop" does not exist')).fatal).toBe(true);
+        });
+
+        it("treats a transient failure as recoverable, so the pool may retry", () => {
+            const result = classifyConnectFailure(wrapped("57P03", "the database system is starting up"));
+            expect(result.fatal).toBe(false);
+            expect(result.reason).toBe("the database system is starting up");
+        });
+
+        it("falls back to the error's own message when nothing carries a PG code", () => {
+            const result = classifyConnectFailure(new Error("socket hang up"));
+            expect(result).toEqual({ fatal: false,
+reason: "socket hang up",
+code: undefined });
+        });
+
+        it("survives a non-Error", () => {
+            expect(classifyConnectFailure("boom").reason).toBe("boom");
         });
     });
 });

@@ -261,9 +261,16 @@ export function validateTsxInstallation(tsxBinPath: string): string | null {
 export function requireProjectRoot(): string {
     const root = findProjectRoot();
     if (!root) {
+        // Name what is actually looked for, in the order `findProjectRoot`
+        // looks for it. The old wording ("backend/, frontend/, and config/")
+        // described neither the manifest — which is the primary marker and the
+        // only one `rebase init` writes — nor a `--headless` project, which has
+        // no frontend at all and would read this as "you are in the wrong
+        // place" while standing in the right one.
         console.error(chalk.red("✗ Could not find a Rebase project root."));
-        console.error(chalk.gray("  Make sure you are inside a Rebase project directory"));
-        console.error(chalk.gray("  (one with backend/, frontend/, and config/ directories)."));
+        console.error(chalk.gray(`  Looked in this directory and every parent for a ${MANIFEST_FILENAME},`));
+        console.error(chalk.gray("  a package.json with a \"backend\" workspace, or a backend/ next to a config/."));
+        console.error(chalk.gray("  Run this from inside a project, or create one with `rebase init`."));
         process.exit(1);
     }
     return root;

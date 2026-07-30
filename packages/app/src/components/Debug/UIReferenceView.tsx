@@ -687,6 +687,14 @@ selected: true }, { name: "Tags" }].map(c => (
                                 <TextField label="With value" value="Filled value" onChange={() => {}}/>
                                 <TextField label="Error state" error value="Bad value" onChange={() => {}}/>
                                 <TextField label="Disabled" disabled value="Read only" onChange={() => {}}/>
+                                {/* The smaller sizes are the ones dialogs use, and they
+                                    were absent here — which is how a labelled `small`
+                                    field shipped with its label sitting on top of its
+                                    placeholder. Keep all four so the collision is
+                                    visible on this page rather than in a modal. */}
+                                <TextField size="medium" label="Medium" placeholder="Placeholder under the label"/>
+                                <TextField size="small" label="Small" placeholder="Placeholder under the label"/>
+                                <TextField size="smallest" label="Smallest" value="Filled value" onChange={() => {}}/>
                             </div>
                         </div>
                         <div className="col-span-12 sm:col-span-6 flex flex-col gap-4">

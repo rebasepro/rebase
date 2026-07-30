@@ -6,6 +6,7 @@ import {
     Background,
     BackgroundVariant,
     useReactFlow,
+    useNodesInitialized,
     ReactFlowProvider,
     applyNodeChanges,
     applyEdgeChanges
@@ -32,6 +33,7 @@ import {
 
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { useSchemaGraph } from "./useSchemaGraph";
+import { useLiveRlsTables } from "./useLiveRls";
 import type { TableNodeData } from "./useSchemaGraph";
 import { TableNode } from "./TableNode";
 import { RelationEdge } from "./RelationEdge";
@@ -55,6 +57,7 @@ function SchemaVisualizerCanvas({
     collections: AdminCollection[];
 }) {
     const reactFlowInstance = useReactFlow();
+    const liveRls = useLiveRlsTables();
     const {
         nodes: layoutedNodes,
         edges: layoutedEdges,
@@ -63,7 +66,7 @@ function SchemaVisualizerCanvas({
         relayout,
         tableCount,
         relationCount
-    } = useSchemaGraph(collections);
+    } = useSchemaGraph(collections, liveRls);
 
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<Edge[]>([]);
@@ -86,18 +89,43 @@ function SchemaVisualizerCanvas({
         []
     );
 
-    // Fit view on first load
+    /**
+     * Fit the graph into view, once, as soon as it can be measured.
+     *
+     * This used to fire on a 200ms timer. `fitView` needs every node's real
+     * width and height, which React Flow only knows after it has laid them out
+     * and measured them — with a dozen tables, a cold Monaco-sized bundle and
+     * a slow first paint, 200ms is often too early. The fit then ran against
+     * zero-sized nodes and produced a viewport nothing lines up with, and
+     * `initialFitDone` made sure it was never retried: the ERD opened as a
+     * scatter of specks in a corner and stayed there until you hit "fit" by
+     * hand. `useNodesInitialized` is the event this was approximating.
+     */
+    const nodesInitialized = useNodesInitialized();
     useEffect(() => {
-        if (nodes.length > 0 && !initialFitDone.current) {
-            const timer = setTimeout(() => {
-                reactFlowInstance.fitView({ padding: 0.15,
+        if (!nodesInitialized || nodes.length === 0 || initialFitDone.current) return;
+        initialFitDone.current = true;
+        reactFlowInstance.fitView({ padding: 0.15,
 duration: 400 });
-                initialFitDone.current = true;
-            }, 200);
-            return () => clearTimeout(timer);
-        }
-        return undefined;
-    }, [nodes.length, reactFlowInstance]);
+    }, [nodesInitialized, nodes.length, reactFlowInstance]);
+
+    /**
+     * Re-fit after a relayout.
+     *
+     * Switching LR↔TB transposes the graph — a tall column becomes a wide band
+     * — so the viewport that framed the old shape frames the new one badly:
+     * asking for a different layout used to leave most of it off-screen until
+     * you pressed "fit" as a second step. Skipped for the very first layout,
+     * which the initial fit above already handles.
+     */
+    const lastFittedDirection = useRef(direction);
+    useEffect(() => {
+        if (!nodesInitialized || nodes.length === 0) return;
+        if (lastFittedDirection.current === direction) return;
+        lastFittedDirection.current = direction;
+        reactFlowInstance.fitView({ padding: 0.15,
+duration: 400 });
+    }, [direction, nodesInitialized, nodes, reactFlowInstance]);
 
     const handleFitView = useCallback(() => {
         reactFlowInstance.fitView({ padding: 0.15,
@@ -176,24 +204,40 @@ duration: 400 }
         [nodes]
     );
 
+    /**
+     * The RLS answer for one collection, from the same place the graph used.
+     *
+     * `nodes` already carries it, so look it up there rather than re-deriving —
+     * that is what kept the sidebar dots, the node badges and the total from
+     * agreeing.
+     */
+    const rlsEnabledFor = useCallback(
+        (collection: AdminCollection): boolean => {
+            const table = (isPostgresCollectionConfig(collection) ? collection.table : undefined) ?? collection.slug;
+            const node = nodes.find((n) => n.id === `table-${table}`);
+            return Boolean((node?.data as TableNodeData | undefined)?.rlsEnabled);
+        },
+        [nodes]
+    );
+
     // Stats
     const stats = useMemo(
         () => ({
             tables: tableCount,
             relations: relationCount,
             junctions: junctionNodes.length,
-            withRls: postgresCollections.filter(
-                (c) =>
-                    isPostgresCollectionConfig(c) &&
-                    c.securityRules &&
-                    c.securityRules.length > 0
-            ).length
+            // Counted off the nodes, which already carry the database's answer
+            // where there was one — the same number the per-table badges show.
+            // Counting `securityRules` here instead made the total disagree
+            // with the badges, and read 0 in the hosted console, where the
+            // contract endpoint strips those rules.
+            withRls: nodes.filter((n) => (n.data as TableNodeData | undefined)?.rlsEnabled).length
         }),
         [
             tableCount,
             relationCount,
             junctionNodes.length,
-            postgresCollections
+            nodes
         ]
     );
 
@@ -293,14 +337,16 @@ duration: 400 }
                                             )}
                                         </div>
                                         <div className="flex items-center gap-1 shrink-0 ml-1">
-                                            {isPostgresCollectionConfig(collection) &&
-                                                collection.securityRules &&
-                                                collection.securityRules
-                                                    .length > 0 && (
-                                                    <Tooltip title="RLS enabled">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
-                                                    </Tooltip>
-                                                )}
+                                            {/* Same source as the node badge and the
+                                                "RLS protected" total: the database when
+                                                it could be asked, the config otherwise.
+                                                Reading `securityRules` directly here made
+                                                the three disagree. */}
+                                            {rlsEnabledFor(collection) && (
+                                                <Tooltip title="RLS enabled">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
+                                                </Tooltip>
+                                            )}
                                             {collection.history && (
                                                 <Tooltip title="History enabled">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400"/>

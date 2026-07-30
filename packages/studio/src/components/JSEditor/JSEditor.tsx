@@ -73,17 +73,34 @@ interface EditorTab {
 const STORAGE_PREFIX = "rebase_js_";
 const MAX_HISTORY = 50;
 
-const DEFAULT_CODE = `// Available: client (RebaseClient)
+/**
+ * The starter script.
+ *
+ * It runs. That is the point: the console opens with the Run button armed, and
+ * a starter that reads `collection("your_collection")` made the first thing a
+ * new user did be a 404 — a placeholder presented as working code. `slug` is
+ * the project's first collection when one is known.
+ */
+const makeDefaultCode = (slug?: string) => `// Available: client (RebaseClient)
 // Press Cmd+Enter (Ctrl+Enter) to run
 //
 // Examples:
-//   const result = await client.data.collection("your_collection").find({ limit: 10 });
 //   const users = await client.admin.listUsers();
 //   const session = client.auth.getSession();
-
-const result = await client.data.collection("your_collection").find({ limit: 10 });
+${slug
+        ? `
+const result = await client.data.collection(${JSON.stringify(slug)}).find({ limit: 10 });
 return result;
-`;
+`
+        : `
+// Name one of your collections to query it:
+//   const result = await client.data.collection("posts").find({ limit: 10 });
+//   return result;
+
+return client.auth.getSession();
+`}`;
+
+const DEFAULT_CODE = makeDefaultCode();
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -249,6 +266,26 @@ code: DEFAULT_CODE }])
     }, [collectionRegistry?.collections]);
 
     const collectionSlugs = useMemo(() => collectionInfos.map(c => c.slug), [collectionInfos]);
+
+    /**
+     * Name a real collection in the starter script once the registry knows one.
+     *
+     * The registry is empty on first paint — in the hosted console it arrives
+     * over the network — so the placeholder-free default cannot be built in the
+     * `useState` initialiser. Rewriting only a tab whose content is still
+     * *exactly* the untouched default means this can never overwrite anything
+     * anyone typed, and never fires twice.
+     */
+    const firstSlug = collectionSlugs[0];
+    useEffect(() => {
+        if (!firstSlug) return;
+        setTabs(prev => {
+            if (!prev.some(tab => tab.code === DEFAULT_CODE)) return prev;
+            const seeded = makeDefaultCode(firstSlug);
+            return prev.map(tab => (tab.code === DEFAULT_CODE ? { ...tab,
+code: seeded } : tab));
+        });
+    }, [firstSlug]);
 
     // Users list for the picker — mapped to SelectableUser shape
     const users = useMemo((): SelectableUser[] => {

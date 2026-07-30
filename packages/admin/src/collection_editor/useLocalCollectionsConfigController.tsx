@@ -4,6 +4,7 @@ import { getSubcollections } from "@rebasepro/common";
 
 import React, { useMemo, useRef } from "react";
 import type { AdminCollection } from "@rebasepro/admin-types";
+import { DEFAULT_API_PATH } from "@rebasepro/app";
 export function useLocalCollectionsConfigController(
     clientOrUrl: any,
     baseCollections: AdminCollection[] = [],
@@ -24,9 +25,13 @@ export function useLocalCollectionsConfigController(
         try {
             let token = optionsRef.current?.getAuthToken ? await optionsRef.current.getAuthToken() : null;
             let baseUrl = typeof clientOrUrl === "string" ? clientOrUrl : "";
+            // `/api` only by default — a backend configured with another
+            // `basePath` mounts the schema editor under that instead.
+            let apiPath = DEFAULT_API_PATH;
 
             if (typeof clientOrUrl === "object" && clientOrUrl !== null) {
                 baseUrl = clientOrUrl.baseUrl || baseUrl;
+                apiPath = clientOrUrl.apiPath || apiPath;
                 if (!token && clientOrUrl.resolveToken) {
                     token = await clientOrUrl.resolveToken();
                 }
@@ -37,7 +42,7 @@ export function useLocalCollectionsConfigController(
                 headers["Authorization"] = `Bearer ${token}`;
             }
 
-            const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/schema-editor${endpoint}`, {
+            const response = await fetch(`${baseUrl.replace(/\/$/, "")}${apiPath}/schema-editor${endpoint}`, {
                 method: "POST",
                 headers,
                 body: JSON.stringify(payload)

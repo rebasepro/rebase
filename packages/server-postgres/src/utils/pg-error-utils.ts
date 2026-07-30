@@ -98,6 +98,52 @@ export function extractCauseMessage(error: unknown): string | null {
 }
 
 /**
+ * Codes that mean "this connection will never work as configured".
+ *
+ * A wrong password or a database that does not exist is a settled fact about
+ * the connection string, not a transient fault — retrying produces the same
+ * answer forever.
+ */
+const UNRECOVERABLE_CONNECT_CODES = new Set([
+    "28P01", // invalid_password
+    "28000", // invalid_authorization_specification
+    "3D000", // invalid_catalog_name — the database does not exist
+    "42501"  // insufficient_privilege
+]);
+
+export interface ConnectFailure {
+    /** True when retrying cannot help: the connection string itself is wrong. */
+    fatal: boolean;
+    /** The deepest message available — the Postgres one where there is one. */
+    reason: string;
+    /** The `SQLSTATE`, when the failure came from Postgres rather than the socket. */
+    code?: string;
+}
+
+/**
+ * Describe a failed connection attempt in terms a developer can act on.
+ *
+ * The error a caller catches is Drizzle's wrapper: its message is
+ * `Failed query: SELECT 1` and its stack runs through drizzle internals, while
+ * the sentence that says what is actually wrong — "password authentication
+ * failed for user …", "database … does not exist" — sits in `.cause`. Logging
+ * the wrapper, as the bootstrapper used to, tells a developer with a typo in
+ * their `DATABASE_URL` nothing at all.
+ */
+export function classifyConnectFailure(error: unknown): ConnectFailure {
+    const pgError = extractPgError(error);
+    const reason =
+        pgError?.message ??
+        extractCauseMessage(error) ??
+        (error instanceof Error ? error.message : String(error));
+    return {
+        fatal: Boolean(pgError?.code && UNRECOVERABLE_CONNECT_CODES.has(pgError.code)),
+        reason,
+        code: pgError?.code
+    };
+}
+
+/**
  * Detect whether an error is specifically a role-switching permission failure
  * (e.g. "permission denied to set role" or "must be member of role"),
  * as opposed to a table-level permission denial.

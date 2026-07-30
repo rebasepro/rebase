@@ -159,10 +159,17 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                         "min-h-[44px]": size === "medium",
                         "min-h-[64px]": size === "large"
                     },
+                    /* A shrunk label occupies roughly the first 16px of the
+                       box (`top-[-1px]`, translated down 2px, ~15px tall at
+                       scale-75). `pt-4` put the value's first line at exactly
+                       16px, so label and content shared a row: a labelled
+                       `small` field with a placeholder rendered "Name" on top
+                       of "e.g. Analytics Pipeline". `large` was never affected
+                       — it reserves `pt-8`. */
                     label
                         ? size === "large"
                             ? "pt-8 pb-2"
-                            : "pt-4 pb-2"
+                            : "pt-5 pb-1.5"
                         : size === "smallest"
                             ? "py-0.5"
                             : size === "small"

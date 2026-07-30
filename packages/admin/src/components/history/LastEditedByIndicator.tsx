@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 ;
-import { useApiConfig } from "@rebasepro/app";
+import { useApiBase, useApiConfig } from "@rebasepro/app";
 import { useAuthController } from "@rebasepro/app";
 import { HistoryEntryData } from "../../hooks";
 import type { AdminCollection } from "@rebasepro/admin-types";
@@ -35,6 +35,7 @@ export function LastEditedByIndicator({
     collection: AdminCollection;
 }) {
     const apiConfig = useApiConfig();
+    const apiBase = useApiBase();
     const authController = useAuthController();
     const [latestEntry, setLatestEntry] = useState<HistoryEntryData | undefined>();
 
@@ -46,7 +47,7 @@ export function LastEditedByIndicator({
             const headers: Record<string, string> = {};
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
-            const url = `${apiConfig.apiUrl}/api/data/${collection.slug}/${entityId}/history?limit=1&offset=0`;
+            const url = `${apiBase}/data/${collection.slug}/${entityId}/history?limit=1&offset=0`;
             const response = await fetch(url, { headers });
 
             if (response.ok) {
@@ -59,7 +60,7 @@ export function LastEditedByIndicator({
             // Silently fail — this is a non-critical UI indicator
             console.debug("Failed to fetch latest history entry:", error);
         }
-    }, [apiConfig, entityId, collection.slug]);
+    }, [apiConfig, apiBase, entityId, collection.slug]);
 
     useEffect(() => {
         fetchLatest();

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useApiConfig, useAuthController } from "@rebasepro/app";
+import { useApiBase, useApiConfig, useAuthController } from "@rebasepro/app";
 import {
     CircularProgress,
     Typography,
@@ -24,6 +24,7 @@ import { parseOpenApiSpec } from "./parseSpec";
  */
 export function ApiExplorer() {
     const apiConfig = useApiConfig();
+    const apiBase = useApiBase();
     const authController = useAuthController();
     const apiUrl = apiConfig?.apiUrl;
 
@@ -39,7 +40,7 @@ export function ApiExplorer() {
     useEffect(() => {
         if (!apiUrl) return;
         let cancelled = false;
-        const specUrl = `${apiUrl.replace(/\/+$/, "")}/api/docs`;
+        const specUrl = `${apiBase}/docs`;
 
         (async () => {
             try {
@@ -66,7 +67,7 @@ export function ApiExplorer() {
         return () => {
             cancelled = true;
         };
-    }, [apiUrl, apiConfig, authController]);
+    }, [apiUrl, apiBase, apiConfig, authController]);
 
     // Parse spec into grouped endpoints
     const { groups, allEndpoints } = useMemo(() => {

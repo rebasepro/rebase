@@ -34,6 +34,21 @@ export function RebaseStudio({ tools, homePage }: RebaseStudioConfig) {
 
     const resolvedHomePage = homePage ?? DEFAULT_HOME_PAGE;
 
+    /**
+     * The tool list reduced to a value, so that re-rendering the host does not
+     * republish the registry.
+     *
+     * `tools` is an array, and callers write it inline — `tools={[...TOOLS]}`
+     * in the hosted console. A fresh array every render meant a fresh
+     * `devViews` every render, which meant the effect below unregistered and
+     * re-registered on every render. Because each registration builds *new*
+     * `<Suspense><SQLEditor/></Suspense>` elements, whatever view was on screen
+     * was torn down and remounted each time: a half-typed SQL query, a storage
+     * folder you had navigated into, an open policy editor — all discarded, and
+     * every mount reissued the view's initial requests.
+     */
+    const toolsKey = tools ? tools.join(",") : "";
+
     const devViews: AppView[] = useMemo(() => {
         const views: AppView[] = [];
         const activeTools = tools ?? ["sql", "js", "rls", "storage", "cron", "schema-visualizer", "branches", "backups", "api", "logs", "api-keys"];
@@ -130,19 +145,27 @@ view: suspense(<ApiKeysView/>) });
         // Note: "schema" tool is auto-injected by RebaseShell when collectionEditor is enabled.
         // It is NOT registered here anymore.
         return views;
-    }, [tools]);
+        // Keyed by the tool list's *contents*; see `toolsKey`. `tools` itself is
+        // read inside, and is exactly determined by the key.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [toolsKey]);
 
     // Use a ref for homePage so it never destabilizes the effect.
     // homePage is a React element — its identity doesn't matter for registration.
     const homePageRef = React.useRef(resolvedHomePage);
     homePageRef.current = resolvedHomePage;
 
+    // Same reasoning for `tools`: it is registered as config, but a new array
+    // with the same contents must not count as a change.
+    const toolsRef = React.useRef(tools);
+    toolsRef.current = tools;
+
     useLayoutEffect(() => {
-        dispatch.registerStudio({ tools,
+        dispatch.registerStudio({ tools: toolsRef.current,
 homePage: homePageRef.current,
 devViews });
         return () => dispatch.unregisterStudio();
-    }, [dispatch, tools, devViews]);
+    }, [dispatch, devViews]);
 
     return null;
 }

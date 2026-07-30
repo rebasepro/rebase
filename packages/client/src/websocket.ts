@@ -98,6 +98,18 @@ export class RebaseWebSocketClient {
     private closedByCaller = false;
 
     /**
+     * Set when the backoff budget ran out, cleared by anything that earns a
+     * fresh one.
+     *
+     * Unlike {@link closedByCaller} this is not final — nobody *asked* for the
+     * socket to stay down. Five attempts with exponential backoff is about a
+     * minute, which a laptop lid, a wifi handover or a backend rollout all
+     * exceed routinely; treating that as permanent meant realtime silently
+     * stopped for the rest of the page's life, with a reload the only cure.
+     */
+    private gaveUp = false;
+
+    /**
      * Whether a socket exists at all (open or still opening).
      *
      * Lets callers distinguish "authenticate the live socket" from "there is
@@ -249,9 +261,34 @@ export class RebaseWebSocketClient {
             }
             return;
         }
+        this.installOnlineListener();
         if (this.ws || this.reconnectTimeout) return;
+        // A caller asking for a connection is a fresh reason to try, so it also
+        // buys a fresh backoff budget. Without this, the first `subscribe`
+        // after a give-up would exhaust the counter on attempt one.
+        if (this.gaveUp) {
+            this.gaveUp = false;
+            this.reconnectAttempts = 0;
+        }
         this.initWebSocket();
     }
+
+    /**
+     * The browser says the network is back — the usual reason the budget ran
+     * out in the first place. Registered lazily so a Node client, or a page
+     * that never subscribes, adds no listener.
+     */
+    private installOnlineListener() {
+        if (this.onlineListener || typeof window === "undefined" || typeof window.addEventListener !== "function") return;
+        this.onlineListener = () => {
+            if (this.closedByCaller || !this.gaveUp) return;
+            console.debug("Network is back — retrying the realtime connection");
+            this.ensureConnected();
+        };
+        window.addEventListener("online", this.onlineListener);
+    }
+
+    private onlineListener: (() => void) | null = null;
 
     /**
      * Authenticate the WebSocket connection
@@ -325,6 +362,10 @@ export class RebaseWebSocketClient {
      */
     public disconnect(permanent = false): void {
         if (permanent) this.closedByCaller = true;
+        if (permanent && this.onlineListener && typeof window !== "undefined") {
+            window.removeEventListener("online", this.onlineListener);
+            this.onlineListener = null;
+        }
         this.isAuthenticated = false;
         this.authPromise = null;
         if (this.reconnectTimeout) {
@@ -354,7 +395,10 @@ export class RebaseWebSocketClient {
         }
 
         try {
-            this.ws = new this.WebSocketConstructor(this.websocketUrl);
+            // Captured so each handler can tell "my socket" from a later one:
+            // a close arriving after a redial must not clear the new socket.
+            const socket = new this.WebSocketConstructor(this.websocketUrl);
+            this.ws = socket;
 
             this.ws!.onopen = async () => {
                 console.debug("Connected to PostgreSQL backend");
@@ -403,6 +447,11 @@ export class RebaseWebSocketClient {
 
             this.ws!.onclose = () => {
                 console.debug("Disconnected from PostgreSQL backend");
+                // Release the dead socket. `ensureConnected` returns early
+                // while `this.ws` is set, so holding a closed one made the
+                // "give up after N attempts" state permanent: nothing could
+                // ever redial, not even a fresh `subscribe`.
+                if (this.ws === socket) this.ws = null;
                 this.isConnected = false;
                 this.isAuthenticated = false;
                 this.authPromise = null;
@@ -451,6 +500,7 @@ export class RebaseWebSocketClient {
             console.error("Max reconnection attempts reached");
             // Nothing will re-subscribe now, so stop every subscription that
             // never loaded from spinning forever.
+            this.gaveUp = true;
             this.failAllPendingSubscriptions(
                 new RebaseApiError("Connection lost", { code: "CONNECTION_LOST" })
             );

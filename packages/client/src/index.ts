@@ -571,6 +571,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         setOnUnauthorized: transport.setOnUnauthorized,
         resolveToken: transport.resolveToken,
         baseUrl: transport.baseUrl,
+        apiPath: transport.apiPath,
         collection,
         call: async <T = unknown>(endpoint: string, payload?: unknown): Promise<T> => {
             const prefix = endpoint.startsWith("/") ? "" : "/";

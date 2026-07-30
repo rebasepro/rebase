@@ -415,7 +415,11 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
 
     if (resolvedApiUrl) {
         return (
-            <ApiConfigProvider apiUrl={resolvedApiUrl} getAuthToken={authController.getAuthToken}>
+            <ApiConfigProvider
+                apiUrl={resolvedApiUrl}
+                apiPath={client?.apiPath}
+                getAuthToken={authController.getAuthToken}
+            >
                 {content}
             </ApiConfigProvider>
         );
