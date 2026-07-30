@@ -48,7 +48,7 @@ const EntityHistoryView = lazy(() => import("../components/history").then(m => (
 import { createFormexStub, getEntityFromCache } from "@rebasepro/app";
 import { usePermissions } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 import { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../util/view_constants";
 export { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE };

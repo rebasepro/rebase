@@ -8,7 +8,7 @@ CMS frontend — content management views, forms, routing, visual schema editor,
 pnpm add @rebasepro/admin
 ```
 
-**Peer dependencies:** `react >= 19`, `react-dom >= 19`, `react-router ^7`, `react-router-dom ^7`
+**Peer dependencies:** `react >= 19.2.7`, `react-dom >= 19.2.7`, `react-router ^8`
 
 ## What This Package Does
 

@@ -6,7 +6,7 @@ import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 
 
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import { AnalyticsEvent } from "@rebasepro/admin-types";
 import {
     Avatar,

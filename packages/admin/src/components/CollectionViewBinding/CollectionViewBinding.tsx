@@ -13,7 +13,7 @@ import {
     ViewMode
 } from "@rebasepro/admin-types";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 
 import { deepEqual as equal } from "fast-equals"
 import { CollectionRowActions, CollectionTableBinding } from "../CollectionTableBinding";

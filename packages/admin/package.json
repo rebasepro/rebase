@@ -18,7 +18,7 @@
   "types": "./dist/index.d.ts",
   "source": "src/index.ts",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22.0"
   },
   "keywords": [
     "rebase",
@@ -102,10 +102,9 @@
     "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "react": ">=19.0.0",
-    "react-dom": ">=19.0.0",
-    "react-router": "^7.0.0",
-    "react-router-dom": "^7.0.0"
+    "react": ">=19.2.7",
+    "react-dom": ">=19.2.7",
+    "react-router": "^8.3.0"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
@@ -118,8 +117,7 @@
     "@types/react-measure": "^2.0.12",
     "@vitejs/plugin-react": "^6.0.4",
     "jest": "^30.4.2",
-    "react-router": "^7.17.0",
-    "react-router-dom": "^7.18.1",
+    "react-router": "^8.3.0",
     "ts-jest": "^29.4.12",
     "typescript": "^6.0.3",
     "vite": "^8.1.5"
@@ -140,13 +138,15 @@
   },
   "jest": {
     "transform": {
-      "^.+\\.[jt]sx?$": "ts-jest"
+      "^.+\\.tsx?$": "ts-jest",
+      "^.+\\.m?jsx?$": "<rootDir>/../../scripts/jest/react-router-esm-transform.cjs"
     },
     "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
     "moduleFileExtensions": [
       "ts",
       "tsx",
       "js",
+      "mjs",
       "jsx",
       "json",
       "node"
@@ -155,9 +155,7 @@
     "testPathIgnorePatterns": [
       "/node_modules/"
     ],
-    "transformIgnorePatterns": [
-      "node_modules/(?!.*fractional-indexing)/"
-    ],
+    "transformIgnorePatterns": [],
     "setupFilesAfterEnv": [
       "<rootDir>/test/setupTests.ts"
     ],

@@ -43,7 +43,7 @@ import {
 } from "@rebasepro/ui";
 import { useStorageSource, useStorageSources, useSnackbarController, ErrorView, useApiBase, useApiConfig } from "@rebasepro/app";
 import { DEFAULT_STORAGE_SOURCE_KEY, type StorageListResult } from "@rebasepro/types";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router";
 import { useDropzone } from "react-dropzone";
 
 // ──────────────────────────────────────────────

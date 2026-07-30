@@ -18,7 +18,7 @@
   "types": "./dist/index.d.ts",
   "source": "src/index.ts",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.22.0"
   },
   "keywords": [
     "rebase",
@@ -69,10 +69,9 @@
     "react-i18next": "^17.0.11"
   },
   "peerDependencies": {
-    "react": ">=19.0.0",
-    "react-dom": ">=19.0.0",
-    "react-router": "^7.0.0",
-    "react-router-dom": "^7.0.0",
+    "react": ">=19.2.7",
+    "react-dom": ">=19.2.7",
+    "react-router": "^8.3.0",
     "typescript": ">=5.0.0"
   },
   "devDependencies": {
@@ -91,7 +90,7 @@
     "esbuild": "^0.28.1",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.4.1",
-    "react-router-dom": "^7.18.1",
+    "react-router": "^8.3.0",
     "ts-jest": "^29.4.12",
     "tsd": "^0.33.0",
     "typescript": "^6.0.3",
@@ -113,13 +112,15 @@
   },
   "jest": {
     "transform": {
-      "^.+\\.tsx?$": "ts-jest"
+      "^.+\\.tsx?$": "ts-jest",
+      "^.+\\.m?jsx?$": "<rootDir>/../../scripts/jest/react-router-esm-transform.cjs"
     },
     "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
     "moduleFileExtensions": [
       "ts",
       "tsx",
       "js",
+      "mjs",
       "jsx",
       "json",
       "node"
@@ -136,6 +137,9 @@
       "\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
       "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
       "^@rebasepro/admin-types$": "<rootDir>/../admin-types/src/index.ts"
-    }
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!.*(?:react-router|cookie-es|fractional-indexing))"
+    ]
   }
 }

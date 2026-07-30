@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Button, Typography } from "@rebasepro/ui";
 import { useTranslation } from "../hooks";
 

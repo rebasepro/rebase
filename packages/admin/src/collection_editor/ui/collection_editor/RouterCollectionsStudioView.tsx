@@ -9,7 +9,7 @@
  * (which has no react-router dependency).
  */
 import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { useUrlController } from "../../_cms_internals";
 import { CollectionsStudioView, CollectionsStudioViewProps } from "./CollectionsStudioView";
 

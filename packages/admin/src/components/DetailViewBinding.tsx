@@ -41,7 +41,7 @@ import {
 } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { getValueInPath } from "@rebasepro/utils";
 import { getEntityTitlePropertyKeyForEntity, isUserSelectProperty, resolveTitleToString } from "../util/previews";
 import { getUserLabel, useResolvedUser } from "../hooks/useResolvedUsers";

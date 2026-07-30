@@ -1,4 +1,4 @@
-// Polyfill TextEncoder/TextDecoder for JSDOM (required by react-router-dom v7)
+// Polyfill TextEncoder/TextDecoder for JSDOM (required by react-router)
 import { TextEncoder, TextDecoder } from "util";
 Object.assign(global, { TextEncoder,
 TextDecoder });

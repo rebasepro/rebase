@@ -1,9 +1,9 @@
 import type { SideDialogPanelProps, SideDialogsController } from "../hooks/useSideDialogsController";
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 ;
 import { deepEqual as equal } from "fast-equals"
-import { Location } from "react-router-dom";
+import { Location } from "react-router";
 
 interface SideDialogLocationState {
     base_location?: Location;

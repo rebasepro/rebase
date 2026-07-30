@@ -2,7 +2,7 @@ import type { AppView, HomePageSection, PluginGenericProps } from "@rebasepro/ad
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, cls, Container, ExpandablePanel, Typography } from "@rebasepro/ui";
 import { IconForView, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot } from "@rebasepro/app";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useStudioBreadcrumbs, SchemaDriftBanner } from "@rebasepro/app";
 
 /* ═══════════════════════════════════════════════════════════════

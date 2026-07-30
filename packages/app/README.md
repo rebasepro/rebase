@@ -8,7 +8,7 @@ Framework-agnostic runtime for data-driven admin panels — React hooks, provide
 pnpm add @rebasepro/app
 ```
 
-**Peer dependencies:** `react >= 19`, `react-dom >= 19`, `react-router ^7`, `react-router-dom ^7`
+**Peer dependencies:** `react >= 19.2.7`, `react-dom >= 19.2.7`, `react-router ^8`
 
 ## What This Package Does
 

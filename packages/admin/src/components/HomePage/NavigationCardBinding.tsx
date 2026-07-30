@@ -1,6 +1,6 @@
 
 import type { NavigationEntry, AdminCollection } from "@rebasepro/admin-types";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 ;
 import { IconButton, StarIcon, Tooltip } from "@rebasepro/ui";
 import { NavigationCard } from "./NavigationCard";

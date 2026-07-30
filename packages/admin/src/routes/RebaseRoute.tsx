@@ -1,10 +1,10 @@
 
 import type { ViewMode, AdminCollection } from "@rebasepro/admin-types";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { EditViewBinding } from "../components/EditViewBinding";
 import { DetailViewBinding } from "../components/DetailViewBinding";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { CollectionViewBinding } from "../components/CollectionViewBinding/CollectionViewBinding";
 import { NotFoundPage, useUserConfigurationPersistence, useComponentOverride, useNavigationBlocker } from "@rebasepro/app";
 import { resolveOpenEntityMode, resolveViewMode } from "../util/view_mode";

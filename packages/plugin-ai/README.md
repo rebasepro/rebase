@@ -8,7 +8,7 @@ AI-powered data autofill and text autocomplete plugin for Rebase.
 pnpm add @rebasepro/plugin-ai
 ```
 
-**Peer dependencies:** `react >= 19.0.0`, `react-dom >= 19.0.0`, `react-router >= 6.28.0`, `react-router-dom >= 6.28.0`
+**Peer dependencies:** `react >= 19.2.7`, `react-dom >= 19.2.7`, `react-router ^8`
 
 ## What This Package Does
 

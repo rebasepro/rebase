@@ -1,5 +1,5 @@
 import type { NavigationEntry } from "@rebasepro/admin-types";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 ;
 import { Chip, Collapse, StarIcon } from "@rebasepro/ui";
 import { useUserConfigurationPersistence } from "@rebasepro/app";

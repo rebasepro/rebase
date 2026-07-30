@@ -22,7 +22,6 @@ export default defineConfig({
             "react",
             "react-dom",
             "react-router",
-            "react-router-dom",
             "@remix-run/router"
         ]
     },

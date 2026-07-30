@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Blocker, BlockerFunction, useBlocker } from "react-router-dom";
+import { Blocker, BlockerFunction, useBlocker } from "react-router";
 
 const IDLE_BLOCKER: Blocker = {
     state: "unblocked",

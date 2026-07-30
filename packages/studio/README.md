@@ -12,8 +12,7 @@ pnpm add @rebasepro/studio
 
 - `react` >= 19.0.0
 - `react-dom` >= 19.0.0
-- `react-router` ^7.0.0
-- `react-router-dom` ^7.0.0
+- `react-router` ^8.3.0
 - `@rebasepro/admin` (optional)
 
 ## What This Package Does

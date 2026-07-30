@@ -4,7 +4,7 @@ import type { CustomizationController, SidePanelBindingProps, SideDialogPanelPro
 import { useCallback, useEffect, useRef, useMemo } from "react";
 import { CollectionRegistryController } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/admin-types";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { NavigationViewInternal } from "@rebasepro/app";
 import { getNavigationEntriesFromPath, removeInitialAndTrailingSlashes, removeTrailingSlash, resolveDefaultSelectedView } from "@rebasepro/app";
 import { resolvedSelectedEntityView } from "../util/resolutions";

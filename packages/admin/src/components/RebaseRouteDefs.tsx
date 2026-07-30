@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useMemo } from "react";
-import { Route } from "react-router-dom";
+import { Route } from "react-router";
 import {
     useRebaseRegistry,
     RebaseRoutes,

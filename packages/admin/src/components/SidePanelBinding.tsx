@@ -8,7 +8,7 @@ import { IconButton, Maximize2Icon, XIcon } from "@rebasepro/ui";
 import { EditViewBinding } from "./EditViewBinding";
 import { DetailViewBinding } from "./DetailViewBinding";
 import { useSideDialogContext } from "./SideDialogs";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { saveEntityToMemoryCache, useComponentOverride } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";

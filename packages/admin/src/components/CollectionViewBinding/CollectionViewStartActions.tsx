@@ -9,7 +9,7 @@ import { ClearFilterSortButton } from "../ClearFilterSortButton";
 import { FiltersDialog } from "./FiltersDialog";
 import { FilterPresetsButton } from "./FilterPresetsButton";
 import { toArray } from "@rebasepro/utils";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { withViewMode } from "../../util/view_mode";

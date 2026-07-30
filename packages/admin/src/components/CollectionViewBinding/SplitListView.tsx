@@ -11,7 +11,7 @@ import {
 } from "@rebasepro/ui";
 import { useLargeLayout, UnsavedChangesDialog, useNavigationBlocker } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { withViewMode } from "../../util/view_mode";

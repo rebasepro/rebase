@@ -10,7 +10,7 @@
  * (which has no react-router dependency).
  */
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { useUrlController } from "../../_cms_internals";
 import { useSnackbarController } from "@rebasepro/app";
 import { CollectionStudioView, CollectionStudioViewProps } from "./CollectionStudioView";

@@ -2,7 +2,7 @@ import type { UrlController, NavigateOptions } from "@rebasepro/admin-types";
 import { useCallback, useMemo } from "react";
 import { removeInitialAndTrailingSlashes, resolveCollectionPathIds } from "@rebasepro/app";
 import { CollectionRegistryController } from "@rebasepro/types";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 export function useBuildUrlController(props: {
     basePath: string,

@@ -1,6 +1,6 @@
 import { cardClickableMixin, cardMixin, cls, Typography } from "@rebasepro/ui";
 
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 
 export type SmallNavigationCardProps = {
     name: string,

@@ -39,9 +39,9 @@ jest.mock("@rebasepro/app", () => ({
     SchemaDriftBanner: () => <div>Schema Drift Banner</div>
 }));
 
-// Mock react-router-dom navigate
+// Mock react-router navigate
 const mockNavigate = jest.fn();
-jest.mock("react-router-dom", () => ({
+jest.mock("react-router", () => ({
     useNavigate: () => mockNavigate
 }));
 
