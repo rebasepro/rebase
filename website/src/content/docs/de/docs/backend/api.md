@@ -321,24 +321,93 @@ Eintrag kann den Speicher nicht berühren. TUS-Routen für fortsetzbare Uploads 
 (einschließlich der Offset-Prüfung und des Abbruchs), sodass ein Schlüssel mit Schreibbereich
 einen Upload eigenständig abschließen kann.
 
-### Admin-Zugriff für Agenten und MCP
+### Agenten und MCP-Server
 
-Standardmäßig erhalten API-Schlüssel die Rolle `service` (nur Datenzugriff). Fügen Sie `"admin": true` hinzu, um dem Schlüssel vollständigen Admin-Zugriff zu gewähren — einschließlich `/api/admin/*`-Routen für Schemaverwaltung, Benutzerverwaltung und mehr, plus Cron, Backups und Logs. Verwenden Sie dies für Agenten, MCP-Server und CI:
+Ein Agent braucht den *engsten* Schlüssel, der seine Aufgabe erfüllt, keinen
+Admin-Schlüssel. Beginnen Sie eingegrenzt und geben Sie ihm ein Ablaufdatum:
+
+```bash
+rebase api-keys create -n "My Agent" \
+  --permissions '[{"collection":"articles","operations":["read"]}]' \
+  --expires 30d
+```
+
+Die Operationen sind `read`, `write` und `delete`, abgeleitet aus der
+HTTP-Methode: `GET`/`HEAD`/`OPTIONS` → `read`, `POST`/`PUT`/`PATCH` → `write`,
+`DELETE` → `delete`.
+
+#### Ein eingegrenzter Schlüssel liest null Zeilen, bis eine Regel `service` gewährt
+
+Das ist der Schritt, der einen korrekt eingegrenzten Schlüssel kaputt aussehen
+lässt. Ein Nicht-Admin-Schlüssel läuft als `uid: "api-key:<id>"` mit den Rollen
+`["service"]`, und die RLS-Richtlinie, die standardmäßig in jede Collection
+injiziert wird, kompiliert zu:
+
+```sql
+auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])
+```
+
+— dem Serverkontext oder einem Admin. Ein Nicht-Admin-Schlüssel trifft auf
+keinen der beiden Zweige zu, sodass die Anfrage bei einer Collection ohne
+`securityRules` mit einem leeren Ergebnis erfolgreich ist — ohne Fehler, der das
+erklärt. Gewähren Sie die Rolle explizit:
+
+```ts
+securityRules: [
+    { operation: "select", roles: ["service"], using: "true" }
+]
+```
+
+Da `auth.uid()` die ID des Schlüssels trägt, kann eine Regel die Zeilen auch auf
+einen bestimmten Schlüssel eingrenzen:
+
+```ts
+securityRules: [
+    {
+        operation: "select",
+        condition: policy.compare(policy.authUid(), "eq", policy.literal("api-key:<id>"))
+    }
+]
+```
+
+#### Verwenden Sie `"*"` nicht für einen Nur-Lese-Schlüssel
+
+Der `"*"`-Platzhalter umfasst nicht nur Collections — er trifft auch auf den
+Namespace `functions` und auf `storage` zu. Ein `GET` zählt als `read`, und der
+Handler einer benutzerdefinierten Funktion ist beliebiger Code, der schreiben
+kann: ein vermeintlich nur lesender Platzhalter-Schlüssel kann also über eine
+Funktion Daten verändern. Werden die Collections explizit benannt, hat der Schlüssel überhaupt
+keinen Funktionszugriff.
+
+#### `--admin --full-access`: CI, Migrationen, vertrauenswürdiges eigenes Tooling
+
+`"admin": true` gewährt dem Schlüssel die Admin-Rolle — `/api/admin/*`-Routen
+für Schemaverwaltung, Benutzerverwaltung und mehr, plus Cron, Backups und Logs.
+Kombiniert mit `--full-access` (`{"collection": "*", "operations": ["read",
+"write", "delete"]}`) hält der Schlüssel jede Collection sowie den gesamten
+Speicher und jede benutzerdefinierte Funktion. Das ist die richtige Form für CI,
+Migrationen und vertrauenswürdiges eigenes Tooling — nicht für Agenten.
 
 ```bash
 # CLI
-rebase api-keys create --name "My Agent" --admin --full-access
+rebase api-keys create -n "CI" --admin --full-access
 
 # REST
 curl -X POST http://localhost:3000/api/admin/api-keys \
   -H "Authorization: Bearer <service-key>" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "My Agent",
+    "name": "CI",
     "admin": true,
     "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
   }'
 ```
+
+#### Kein Realtime über API-Schlüssel
+
+Der Realtime-WebSocket verarbeitet keine `rk_`-Tokens — er akzeptiert nur
+Benutzer-JWTs und den Service-Schlüssel. Ein mit einem API-Schlüssel
+authentifizierter Agent pollt die REST-Endpunkte, statt zu abonnieren.
 
 ### Schlüsseloptionen
 
@@ -353,7 +422,13 @@ curl -X POST http://localhost:3000/api/admin/api-keys \
 Die CLI erfordert einen expliziten Bereich: Übergeben Sie `--permissions '<json>'` oder entscheiden Sie sich für
 `--full-access` — es gibt keinen stillen Standard für vollen Zugriff.
 
-Schlüssel können über `/api/admin/api-keys` oder die CLI-Befehle `rebase api-keys` aufgelistet, aktualisiert und widerrufen werden.
+Schlüssel können über `/api/admin/api-keys` oder die CLI-Befehle
+`rebase api-keys` aufgelistet, aktualisiert und widerrufen werden — aber nicht
+von einem API-Schlüssel. Jede Anfrage an `/api/admin/api-keys`, die mit einem
+`rk_`-Schlüssel authentifiziert ist, wird mit `403
+API_KEY_SELF_MANAGEMENT_FORBIDDEN` abgelehnt, unabhängig von ihrem
+`admin`-Flag. Die Schlüsselverwaltung erfordert die Sitzung eines
+Admin-Benutzers oder den Service-Schlüssel.
 
 ## Metadaten-Endpunkt
 

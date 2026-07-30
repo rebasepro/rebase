@@ -321,24 +321,90 @@ an entry cannot touch storage. TUS resumable-upload routes count as `write`
 for every step (including the offset check and cancel), so a write-scoped key
 can complete an upload on its own.
 
-### Admin Access for Agents and MCP
+### Agents and MCP Servers
 
-By default, API keys get the `service` role (data access only). Add `"admin": true` to grant the key full admin access — including `/api/admin/*` routes for schema management, user management, and more, plus cron, backups, and logs. Use this for agents, MCP servers, and CI:
+An agent wants the *narrowest* key that does its job, not an admin one. Start
+scoped, and give it an expiry:
+
+```bash
+rebase api-keys create -n "My Agent" \
+  --permissions '[{"collection":"articles","operations":["read"]}]' \
+  --expires 30d
+```
+
+Operations are `read`, `write` and `delete`, derived from the HTTP method:
+`GET`/`HEAD`/`OPTIONS` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` →
+`delete`.
+
+#### A scoped key reads zero rows until a rule grants `service`
+
+This is the step that makes a correctly scoped key look broken. A non-admin key
+runs as `uid: "api-key:<id>"` with the roles `["service"]`, and the RLS policy
+injected into every collection by default compiles to:
+
+```sql
+auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])
+```
+
+— the server context, or an admin. A non-admin key matches neither arm, so on a
+collection with no `securityRules` the request succeeds with an empty result set
+and no error explaining why. Grant the role explicitly:
+
+```ts
+securityRules: [
+    { operation: "select", roles: ["service"], using: "true" }
+]
+```
+
+Because `auth.uid()` carries the key's id, a rule can also scope rows to one
+specific key:
+
+```ts
+securityRules: [
+    {
+        operation: "select",
+        condition: policy.compare(policy.authUid(), "eq", policy.literal("api-key:<id>"))
+    }
+]
+```
+
+#### Don't use `"*"` for a read-only key
+
+The `"*"` wildcard is not "every collection" — it also matches the `functions`
+namespace and `storage`. A `GET` counts as `read`, and a custom function's
+handler is arbitrary code that can write, so a wildcard "read-only" key can
+mutate through a function. Naming collections explicitly gives the key no
+function access at all.
+
+#### `--admin --full-access`: CI, migrations, first-party tooling
+
+`"admin": true` grants the key the admin role — `/api/admin/*` routes for schema
+management, user management, and more, plus cron, backups, and logs. Combined
+with `--full-access` (`{"collection": "*", "operations": ["read", "write",
+"delete"]}`) the key holds every collection plus all storage and every custom
+function. That is the right shape for CI, migrations, and trusted first-party
+tooling — not for agents.
 
 ```bash
 # CLI
-rebase api-keys create --name "My Agent" --admin --full-access
+rebase api-keys create -n "CI" --admin --full-access
 
 # REST
 curl -X POST http://localhost:3000/api/admin/api-keys \
   -H "Authorization: Bearer <service-key>" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "My Agent",
+    "name": "CI",
     "admin": true,
     "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
   }'
 ```
+
+#### No realtime over API keys
+
+The realtime WebSocket does not parse `rk_` tokens — it accepts user JWTs and
+the service key only. An agent authenticated with an API key polls the REST
+endpoints instead of subscribing.
 
 ### Key Options
 
@@ -353,7 +419,11 @@ curl -X POST http://localhost:3000/api/admin/api-keys \
 The CLI requires an explicit scope: pass `--permissions '<json>'` or opt into
 `--full-access` — there is no silent full-access default.
 
-Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the `rebase api-keys` CLI commands.
+Keys can be listed, updated, and revoked via `/api/admin/api-keys` or the
+`rebase api-keys` CLI commands — but not by an API key. Any request to
+`/api/admin/api-keys` authenticated with an `rk_` key is refused with `403
+API_KEY_SELF_MANAGEMENT_FORBIDDEN`, whatever its `admin` flag. Key management
+requires an admin user's session or the service key.
 
 ## Metadata Endpoint
 

@@ -321,24 +321,94 @@ entrada não pode tocar no armazenamento. As rotas de upload retomável TUS cont
 em cada etapa (incluindo a verificação de offset e o cancelamento), então uma chave com escopo de escrita
 pode concluir um upload sozinha.
 
-### Acesso de Administrador para Agentes e MCP
+### Agentes e Servidores MCP
 
-Por padrão, as chaves de API obtêm o papel `service` (somente acesso a dados). Adicione `"admin": true` para conceder à chave acesso de administrador completo — incluindo as rotas `/api/admin/*` para gerenciamento de esquema, gerenciamento de usuários e mais, além de cron, backups e logs. Use isto para agentes, servidores MCP e CI:
+Um agente precisa da chave *mais restrita* que dê conta do seu trabalho, não de
+uma chave de administrador. Comece com escopo restrito e dê a ela uma expiração:
+
+```bash
+rebase api-keys create -n "My Agent" \
+  --permissions '[{"collection":"articles","operations":["read"]}]' \
+  --expires 30d
+```
+
+As operações são `read`, `write` e `delete`, derivadas do método HTTP:
+`GET`/`HEAD`/`OPTIONS` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` →
+`delete`.
+
+#### Uma chave com escopo restrito lê zero linhas até que uma regra conceda `service`
+
+Este é o passo que faz uma chave corretamente restrita parecer quebrada. Uma
+chave não-administradora é executada como `uid: "api-key:<id>"` com os papéis
+`["service"]`, e a política de RLS injetada por padrão em cada coleção é
+compilada para:
+
+```sql
+auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])
+```
+
+— o contexto do servidor, ou um administrador. Uma chave não-administradora não
+corresponde a nenhum dos dois ramos, então em uma coleção sem `securityRules` a
+requisição é bem-sucedida com um conjunto de resultados vazio e sem nenhum erro
+que explique o motivo. Conceda o papel explicitamente:
+
+```ts
+securityRules: [
+    { operation: "select", roles: ["service"], using: "true" }
+]
+```
+
+Como `auth.uid()` carrega o id da chave, uma regra também pode restringir as
+linhas a uma chave específica:
+
+```ts
+securityRules: [
+    {
+        operation: "select",
+        condition: policy.compare(policy.authUid(), "eq", policy.literal("api-key:<id>"))
+    }
+]
+```
+
+#### Não use `"*"` para uma chave somente leitura
+
+O curinga `"*"` não abrange apenas as coleções — ele também corresponde ao
+namespace `functions` e a `storage`. Um `GET` conta como `read`, e o handler de
+uma função personalizada é código arbitrário que pode escrever: uma chave
+curinga supostamente somente leitura pode, portanto, alterar dados através de
+uma função. Nomear as coleções explicitamente deixa a chave sem nenhum acesso a
+funções.
+
+#### `--admin --full-access`: CI, migrações e ferramentas próprias
+
+`"admin": true` concede à chave o papel de administrador — as rotas
+`/api/admin/*` para gerenciamento de esquema, gerenciamento de usuários e mais,
+além de cron, backups e logs. Combinada com `--full-access` (`{"collection":
+"*", "operations": ["read", "write", "delete"]}`), a chave detém todas as
+coleções, mais todo o armazenamento e todas as funções personalizadas. Esse é o
+formato certo para CI, migrações e ferramentas próprias de confiança — não para
+agentes.
 
 ```bash
 # CLI
-rebase api-keys create --name "My Agent" --admin --full-access
+rebase api-keys create -n "CI" --admin --full-access
 
 # REST
 curl -X POST http://localhost:3000/api/admin/api-keys \
   -H "Authorization: Bearer <service-key>" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "My Agent",
+    "name": "CI",
     "admin": true,
     "permissions": [{ "collection": "*", "operations": ["read", "write", "delete"] }]
   }'
 ```
+
+#### Sem tempo real com chaves de API
+
+O WebSocket de tempo real não interpreta tokens `rk_` — ele aceita apenas JWTs
+de usuário e a chave de serviço. Um agente autenticado com uma chave de API faz
+polling nos endpoints REST em vez de se inscrever.
 
 ### Opções da Chave
 
@@ -353,7 +423,12 @@ curl -X POST http://localhost:3000/api/admin/api-keys \
 A CLI requer um escopo explícito: passe `--permissions '<json>'` ou opte por
 `--full-access` — não há um padrão silencioso de acesso completo.
 
-As chaves podem ser listadas, atualizadas e revogadas via `/api/admin/api-keys` ou pelos comandos CLI `rebase api-keys`.
+As chaves podem ser listadas, atualizadas e revogadas via `/api/admin/api-keys`
+ou pelos comandos CLI `rebase api-keys` — mas não por uma chave de API.
+Qualquer requisição a `/api/admin/api-keys` autenticada com uma chave `rk_` é
+recusada com `403 API_KEY_SELF_MANAGEMENT_FORBIDDEN`, qualquer que seja o seu
+sinalizador `admin`. O gerenciamento de chaves exige a sessão de um usuário
+administrador ou a chave de serviço.
 
 ## Endpoint de Metadados
 
