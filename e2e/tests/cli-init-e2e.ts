@@ -190,6 +190,17 @@ const backendPort = Number(process.env.E2E_BACKEND_PORT || 3099);
  */
 const DOCKER_API_PORT = Number(process.env.E2E_DOCKER_API_PORT || 3011);
 
+/**
+ * Host port for the composed `db` service, same reasoning as the api port above
+ * — and overridable for the same reason. 5433 was hardcoded in three places
+ * while the api port had an env escape hatch, so a developer machine already
+ * publishing 5433 (any other project's Postgres) failed this step at
+ * `docker compose up -d db`, before the artifact under test was exercised at
+ * all. That is precisely the "fails for a reason that has nothing to do with
+ * the artifact" case the api port was pinned to avoid.
+ */
+const DOCKER_DB_PORT = Number(process.env.E2E_DOCKER_DB_PORT || 5433);
+
 export function getCleanEnv(): Record<string, string> {
     const cleanEnv = { ...process.env } as Record<string, string>;
     for (const key of Object.keys(cleanEnv)) {
@@ -517,11 +528,11 @@ function modifyDockerComposePort(projectPath: string) {
     );
     content = content.replace(
         /- "5432:5432"/g,
-        '- "5433:5432"'
+        `- "${DOCKER_DB_PORT}:5432"`
     );
 
     fs.writeFileSync(composePath, content, "utf-8");
-    console.log(`🐳 Modified docker-compose.yml to use port ${DOCKER_API_PORT} for the api and port 5433 for db.`);
+    console.log(`🐳 Modified docker-compose.yml to use port ${DOCKER_API_PORT} for the api and port ${DOCKER_DB_PORT} for db.`);
 
     // `CORS_ORIGINS` is `${CORS_ORIGINS:?…}` in the compose file — required, with
     // no default, deliberately: "an API that guesses its allowed origins is one
@@ -1180,7 +1191,7 @@ timeout: 10000 });
             stdio: "inherit",
             env: {
                 ...cleanEnv,
-                DATABASE_URL: `postgresql://rebase:${composeDbPassword}@localhost:5433/rebase?options=-c%20search_path=public&sslmode=disable`
+                DATABASE_URL: `postgresql://rebase:${composeDbPassword}@localhost:${DOCKER_DB_PORT}/rebase?options=-c%20search_path=public&sslmode=disable`
             }
         });
         console.log("Migrations applied inside Docker.");
