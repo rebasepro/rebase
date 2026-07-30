@@ -2,6 +2,46 @@
 
 ## [Unreleased]
 
+### Breaking
+
+- **`react-router` 8, and `react-router-dom` is gone** — react-router 8 deletes the `react-router-dom` package outright. It was only ever a v6-compatibility shim: everything DOM-specific had already collapsed into `react-router` itself in v7.
+
+  `@rebasepro/admin`, `app`, `studio` and `plugin-ai` now peer `react-router ^8.3.0`. Two imports move, and only one of them is a rename:
+
+  ```diff
+  - import { createBrowserRouter, RouterProvider } from "react-router-dom";
+  + import { createBrowserRouter } from "react-router";
+  + import { RouterProvider } from "react-router/dom";
+  ```
+
+  Everything else — `useNavigate`, `useLocation`, `useSearchParams`, `useParams`, `Link`, `NavLink`, `Outlet`, `Navigate`, `Route`, `Routes`, `MemoryRouter`, `useBlocker` — is the same name from `react-router`. `RouterProvider` is the exception: it lives in `react-router/dom`.
+
+  The floors underneath move with it, because react-router 8 requires them: `react` and `react-dom` peers go to `>=19.2.7` (were `>=19.0.0`), and `engines.node` on `@rebasepro/admin` and `app` to `>=22.22.0` (was `>=20`). Declaring `>=20` while a mandatory peer needs 22.22 is a promise the package cannot keep.
+
+  This closes GHSA-qwww-vcr4-c8h2, which has no fix on the 7.x line. That advisory is an RSC-mode CSRF bypass and nothing here uses RSC mode, so the vulnerable path was unreachable — but 8.3.0 is the only patched release, and the alternative was staying on a package that no longer exists.
+
+  **If you test with Jest**, budget for this: react-router 8 is ESM-only, and it breaks ts-jest's CommonJS output in two unrelated ways. react-router guards a Vite HMR hook with `import.meta.hot`, which is a *syntax* error in CJS — and ts-jest cannot fix it, because TypeScript emits `import.meta` verbatim under `module: commonjs`. Separately, react-router depends on `cookie-es` 3, which ships `.mjs` only, and TypeScript keys module format off the file extension, so it will not emit CJS for a `.mjs` input whatever `module` says. Every affected suite dies at module load with zero tests run, which reads as a broken config rather than a dependency-format problem. `scripts/jest/react-router-esm-transform.cjs` in this repo handles both and is a reasonable thing to copy. Vitest is unaffected.
+
+### Security
+
+- **Every `overrides:` entry is a bounded security floor now.** An override replaces each transitive consumer's own range, so a bare `>=X` is not a floor — it is a floating pin that drags in the next major to publish, whatever asked for what.
+
+  One of them had inverted completely: `js-yaml: ">=4.2.0 <5"` pinned the tree *at* 4.2.0, which is precisely the version GHSA-52cp-r559-cp3m says to leave (patched in 4.3.0). The pin meant to protect was the thing holding the exposure. `uuid` had meanwhile floated from its 11.x floor to 14 unnoticed.
+
+  Closes 12 further advisories across `brace-expansion` (three live majors, so its floors are keyed per-major rather than forcing one on every consumer), `js-yaml`, `react-router`, `shell-quote` and `protobufjs`. Re-resolving moved no package version, so the bounds themselves are hardening only.
+
+- **`@hono/node-server` in the scaffolded backend goes from `^1.19.12` to `^2.0.12`**, closing GHSA-frvp-7c67-39w9 (a `serve-static` path traversal on Windows via an encoded backslash). The 1.x line has no patch, and `@rebasepro/server` already peered `^2.0.12` — a new project was being handed an adapter two majors behind the server consuming it.
+
+### Fixed
+
+- **The Firebase example compiles again.** It had not built since the property-options split, which made `url` a statement about the data — it feeds `format: "uri"` into the OpenAPI contract — and moved presentation to `admin.urlPreview`. The example's `admin: { url: "image" }` had both halves in the wrong place, and `expanded` likewise belongs in the `admin` block.
+
+### Added
+
+- **Two gates for things that were rotting silently.** `pnpm check:examples` typechecks `examples/*`, which were in no pipeline and no root script — `pnpm build` covers `./packages/*` and `./app` only — which is why the Firebase example above stayed broken for weeks. They resolve `@rebasepro/*` to built output the way an installing user does, rather than to source the way `pnpm typecheck` does, so they catch a class of drift the source-resolving gate structurally cannot see.
+
+  `pnpm check:generated` regenerates the committed website artifacts (`llms.txt`, `sitemap.md`, the changelog mirror) and fails on a diff. `llms.txt` had been sitting a commit behind the docs it summarises.
+
 ## [0.12.0] - 2026-07-29
 
 ### Breaking

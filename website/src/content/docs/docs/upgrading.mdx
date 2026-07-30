@@ -6,10 +6,11 @@ description: What breaks when you move an existing app to the current release, a
 
 # Upgrading an existing app
 
-This release renames packages, changes what `id` means, drops CJS, and — most
-importantly — **fixes a security rule that was silently permissive**. Read the
-first section before anything else: it is the only change that can alter who can
-read your data, and it is the only one that will not announce itself.
+This release renames packages, changes what `id` means, drops CJS, moves the
+admin panel to react-router 8, and — most importantly — **fixes a security rule
+that was silently permissive**. Read the first section before anything else: it
+is the only change that can alter who can read your data, and it is the only one
+that will not announce itself.
 
 Work through the sections in order. Each one names the symptom you would
 otherwise debug from the wrong end.
@@ -186,7 +187,65 @@ A CommonJS consumer must use dynamic `import()` or move to ESM.
 
 ---
 
-## 5. Package renames
+## 5. `react-router` 8, and `react-router-dom` is gone
+
+Only relevant if you use the admin panel — `@rebasepro/admin`, `app`, `studio`
+or `plugin-ai`. A headless install has no router.
+
+react-router 8 deletes the `react-router-dom` package. It was only ever a
+v6-compatibility shim; everything DOM-specific had already collapsed into
+`react-router` itself in v7. Drop the dependency and change two imports:
+
+```diff
+- import { createBrowserRouter, RouterProvider } from "react-router-dom";
++ import { createBrowserRouter } from "react-router";
++ import { RouterProvider } from "react-router/dom";
+```
+
+`RouterProvider` is the only name that moves to a subpath. Everything else —
+`useNavigate`, `useLocation`, `useSearchParams`, `useParams`, `Link`, `NavLink`,
+`Outlet`, `Navigate`, `Route`, `Routes`, `MemoryRouter`, `useBlocker` — keeps its
+name and comes from `react-router`. So for most files this is one specifier:
+
+```bash
+grep -rl '"react-router-dom"' src | xargs sed -i '' 's|"react-router-dom"|"react-router"|g'
+```
+
+Then fix up the `RouterProvider` import wherever you mount the router, which is
+usually one file.
+
+The floors underneath move with it, because react-router 8 requires them:
+`react` and `react-dom` at **19.2.7** or later, and Node **22.22.0** or later.
+
+### If your tests use Jest
+
+This is the part that will cost you an afternoon if it surprises you.
+react-router 8 is ESM-only, and it breaks ts-jest's CommonJS output two
+different ways:
+
+- react-router guards a Vite HMR hook with `import.meta.hot`. In CommonJS
+  `import.meta` is a **syntax** error, and ts-jest cannot help — TypeScript
+  emits the expression verbatim under `module: commonjs` rather than rejecting
+  or rewriting it.
+- react-router depends on `cookie-es` 3, which ships `.mjs` only, with no CJS
+  build to resolve to instead. TypeScript keys module format off the file
+  extension, so it will not emit CommonJS for a `.mjs` input whatever `module`
+  says.
+
+Every affected suite fails at **module load, with zero tests run**, so the
+output reads as a broken Jest config rather than as a dependency-format problem.
+The fix is a transformer that strips the HMR guard after ts-jest runs and
+transpiles `.mjs` under a `.js` filename; Rebase's own is
+[`scripts/jest/react-router-esm-transform.cjs`](https://github.com/rebasepro/rebase/blob/main/scripts/jest/react-router-esm-transform.cjs)
+and is meant to be copied. You will also need react-router and `cookie-es`
+lifted out of the blanket `node_modules` exclusion in
+`transformIgnorePatterns`, and `mjs` added to `moduleFileExtensions`.
+
+Vitest needs none of this.
+
+---
+
+## 6. Package renames
 
 Import paths only — no behaviour moved with them.
 
@@ -220,7 +279,7 @@ unchanged — it describes where collections come from, not the UI.
 
 ---
 
-## 6. `defaultSecurityRules` moved off the server config
+## 7. `defaultSecurityRules` moved off the server config
 
 It used to live on `RebaseBackendConfig`, where it enforced nothing: `db push`
 generates the Postgres policies — the only thing that actually enforces
@@ -245,7 +304,7 @@ database's own RLS is the whole model and there is nothing to default.
 
 ---
 
-## 7. Smaller behaviour changes
+## 8. Smaller behaviour changes
 
 **A write naming a field the collection lacks is now a 400.** Unknown keys used
 to travel into the INSERT, so a typo came back as `column "titel" does not
@@ -280,6 +339,8 @@ restores the old behaviour.
 [ ] replace not(authenticated()) with serverContext()
 [ ] SELECT ... FROM pg_policies — record the qual of every policy BEFORE
 [ ] update package names and imports
+[ ] drop react-router-dom; import RouterProvider from "react-router/dom"
+[ ] check node >= 22.22.0 and react >= 19.2.7 (react-router 8 requires both)
 [ ] move defaultSecurityRules into config/collections/index.ts
 [ ] grep for .userId
 [ ] grep for row.id on tables not keyed on id
