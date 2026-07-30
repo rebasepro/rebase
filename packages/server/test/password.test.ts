@@ -133,32 +133,50 @@ describe("Password Utilities", () => {
     });
 
     describe("timing-safe comparison", () => {
-        // This test verifies that timing attacks are mitigated
-        // by checking that verification time is relatively constant
+        /**
+         * Verification should take the same time whether the password is right
+         * or wrong, so that the response time does not leak the answer.
+         *
+         * Measured by interleaving the two cases and comparing **medians**, and
+         * both of those matter. The original timed one batch of ten correct
+         * verifications, then one batch of ten wrong ones, and compared the two
+         * totals — so a single scheduler stall landing in either batch moved the
+         * ratio by more than the threshold. It failed at 0.585 during a parallel
+         * build for exactly that reason, having nothing to say about timing
+         * safety when it did.
+         *
+         * Interleaving means a busy moment hits both samples rather than one,
+         * and a median discards the outlier instead of averaging it in.
+         */
         it("should take similar time for correct and incorrect passwords", async () => {
             const password = "TestPassword123";
             const hash = await hashPassword(password);
 
-            // Run multiple iterations to average out noise
-            const iterations = 10;
+            const samples = 15;
+            const correct: number[] = [];
+            const incorrect: number[] = [];
 
-            // Time correct password
-            const correctStart = Date.now();
-            for (let i = 0; i < iterations; i++) {
-                await verifyPassword(password, hash);
+            for (let i = 0; i < samples; i++) {
+                // Alternate which case goes first, so a periodic stall cannot
+                // settle onto one of them.
+                const correctFirst = i % 2 === 0;
+                for (const isCorrect of correctFirst ? [true, false] : [false, true]) {
+                    const start = performance.now();
+                    await verifyPassword(isCorrect ? password : "WrongPassword12", hash);
+                    (isCorrect ? correct : incorrect).push(performance.now() - start);
+                }
             }
-            const correctTime = Date.now() - correctStart;
 
-            // Time incorrect password (same length)
-            const incorrectStart = Date.now();
-            for (let i = 0; i < iterations; i++) {
-                await verifyPassword("WrongPassword12", hash);
-            }
-            const incorrectTime = Date.now() - incorrectStart;
+            const median = (xs: number[]) => {
+                const sorted = [...xs].sort((a, b) => a - b);
+                const mid = sorted.length >> 1;
+                return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+            };
 
-            // Times should be within 50% of each other
-            // (allowing for system variance)
-            const ratio = Math.abs(correctTime - incorrectTime) / Math.max(correctTime, incorrectTime);
+            const correctMedian = median(correct);
+            const incorrectMedian = median(incorrect);
+            const ratio = Math.abs(correctMedian - incorrectMedian) / Math.max(correctMedian, incorrectMedian);
+
             expect(ratio).toBeLessThan(0.5);
         });
     });

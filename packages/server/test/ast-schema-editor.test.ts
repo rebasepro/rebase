@@ -3,6 +3,16 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
+/**
+ * `saveCollection` builds a ts-morph Project, which loads the TypeScript
+ * compiler and resolves a tsconfig — seconds of work, not milliseconds, and all
+ * of it charged to whichever test touches the editor first. Jest's 5s default
+ * fits on an idle machine and not on a loaded one, so these suites failed
+ * whenever they shared a machine with a build. The work is genuinely slow; the
+ * timeout was the wrong number.
+ */
+jest.setTimeout(30_000);
+
 describe("AstSchemaEditor", () => {
     let testDir: string;
     let editor: AstSchemaEditor;

@@ -18,6 +18,16 @@ import { AstSchemaEditor, nestAdminKeys } from "../src/api/ast-schema-editor";
  * before — the policy parser's `sqlToPolicy` output had to be proven to survive
  * re-emission — so the round trip is asserted here, not just the one-way write.
  */
+
+/**
+ * `saveCollection` builds a ts-morph Project — the TypeScript compiler plus a
+ * tsconfig resolution, seconds rather than milliseconds. Jest's 5s default fits
+ * on an idle machine and not on a loaded one, so this suite failed whenever it
+ * shared a machine with a build. The work is genuinely slow; the timeout was the
+ * wrong number.
+ */
+jest.setTimeout(30_000);
+
 describe("nestAdminKeys", () => {
     it("moves presentation keys into the block and leaves the contract alone", () => {
         const result = nestAdminKeys({
