@@ -91,6 +91,38 @@ export interface DatabaseAdapter {
     ): Promise<void> | void;
 
     /**
+     * Bring the database's collection tables up to date, additively — the boot
+     * companion to `db push`. See `BackendBootstrapper.ensureCollectionSchema`
+     * for the contract (create-only; never drop, narrow, or rewrite).
+     *
+     * Optional, and MUST be forwarded by any wrapper that turns this adapter
+     * into a `BackendBootstrapper`: the runtime calls it through the bootstrapper
+     * at boot, and a wrapper that silently omits it leaves a managed tenant
+     * 500ing every data route with no create step ever having run.
+     */
+    ensureCollectionSchema?(
+        collections: unknown[],
+        driverResult: InitializedDriver,
+        log?: (message: string) => void,
+    ): Promise<{ applied: number }>;
+
+    /**
+     * Apply the collections' RLS policies (ENABLE ROW LEVEL SECURITY + the
+     * `securityRules` compiled to `CREATE POLICY`) — the boot companion to the
+     * policy half of `db push`. Idempotent; see
+     * `BackendBootstrapper.ensureCollectionPolicies`.
+     *
+     * Same forwarding requirement as `ensureCollectionSchema`: without the
+     * policies, tables exist but every user-context read is denied (a public
+     * collection answers 401).
+     */
+    ensureCollectionPolicies?(
+        collections: unknown[],
+        driverResult: InitializedDriver,
+        log?: (message: string) => void,
+    ): Promise<{ applied: number }>;
+
+    /**
      * Return admin capabilities for this database (SQL editor, schema browser, branching).
      */
     getAdmin?(driverResult: InitializedDriver): DatabaseAdmin | undefined;

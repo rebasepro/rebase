@@ -42,6 +42,20 @@ export function createPostgresAdapter(pgConfig: PostgresDriverConfig): DatabaseA
             }
         },
 
+        // Forwarded so the boot-time schema/RLS provisioning is reachable when
+        // this adapter is wrapped back into a bootstrapper. Omitting either left
+        // a managed tenant with no tables (500 on every data route) or tables
+        // but no policies (401 on every read) — the create step never ran.
+        ensureCollectionSchema: bootstrapper.ensureCollectionSchema
+            ? (collections, driverResult, log) =>
+                bootstrapper.ensureCollectionSchema!(collections, driverResult, log)
+            : undefined,
+
+        ensureCollectionPolicies: bootstrapper.ensureCollectionPolicies
+            ? (collections, driverResult, log) =>
+                bootstrapper.ensureCollectionPolicies!(collections, driverResult, log)
+            : undefined,
+
         getAdmin(driverResult) {
             if (bootstrapper.getAdmin) {
                 return bootstrapper.getAdmin(driverResult);

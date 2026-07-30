@@ -45,7 +45,28 @@ export const isIdProperty = (propName: string, prop: Property, collection: Colle
 
 type ResolveCollection = (slug: string) => CollectionConfig | undefined;
 
-const generatePolicyDdl = (collection: CollectionConfig, rule: SecurityRule, resolveCollection: ResolveCollection): string => {
+/**
+ * Render statements produced by {@link generatePolicyStatements} back into the
+ * exact string the DDL/policies files have always carried: each statement on
+ * its own line, terminated by a newline. Keeping the string form derived from
+ * the statement array means the two can never drift — the boot-time applier and
+ * the generated `policies.sql` emit the same SQL, from the same source.
+ */
+const statementsToDdl = (statements: string[]): string => statements.map(s => `${s}\n`).join("");
+
+const generatePolicyDdl = (collection: CollectionConfig, rule: SecurityRule, resolveCollection: ResolveCollection): string =>
+    statementsToDdl(generatePolicyStatements(collection, rule, resolveCollection));
+
+/**
+ * The individual SQL statements a single security rule compiles to: a
+ * `DROP POLICY IF EXISTS` / `CREATE POLICY` pair per operation, each a complete
+ * statement (terminated by `;`, no trailing newline).
+ *
+ * This is the primitive the boot-time RLS applier runs one statement at a time
+ * (the runtime's DB handle speaks the extended query protocol, which forbids
+ * multiple commands in one execute), while `db push` writes the joined string.
+ */
+export const generatePolicyStatements = (collection: CollectionConfig, rule: SecurityRule, resolveCollection: ResolveCollection): string[] => {
     const tableName = getTableName(collection);
     const ops: readonly SecurityOperation[] = rule.operations && rule.operations.length > 0
         ? rule.operations
@@ -53,12 +74,12 @@ const generatePolicyDdl = (collection: CollectionConfig, rule: SecurityRule, res
 
     const policyNames = getPolicyNamesForRule(rule, tableName);
 
-    return ops.map((op, opIdx) => {
-        return generateSinglePolicyDdl(collection, rule, op, policyNames[opIdx], resolveCollection);
-    }).join("");
+    return ops.flatMap((op, opIdx) => {
+        return generateSinglePolicyStatements(collection, rule, op, policyNames[opIdx], resolveCollection);
+    });
 };
 
-const generateSinglePolicyDdl = (collection: CollectionConfig, rule: SecurityRule, operation: SecurityOperation, policyName: string, resolveCollection: ResolveCollection): string => {
+const generateSinglePolicyStatements = (collection: CollectionConfig, rule: SecurityRule, operation: SecurityOperation, policyName: string, resolveCollection: ResolveCollection): string[] => {
     const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
     const tableName = getTableName(collection);
     const mode = (rule.mode ?? "permissive").toUpperCase();
@@ -83,11 +104,12 @@ const generateSinglePolicyDdl = (collection: CollectionConfig, rule: SecurityRul
         withCheckClause = "false";
     }
 
-    let ddl = `DROP POLICY IF EXISTS "${policyName}" ON "${schema}"."${tableName}";\n`;
-    ddl += `CREATE POLICY "${policyName}" ON "${schema}"."${tableName}" AS ${mode} FOR ${operationUpper} TO ${pgRoles.map(r => `"${r}"`).join(", ")}`;
-    if (usingClause) ddl += ` USING (${usingClause})`;
-    if (withCheckClause) ddl += ` WITH CHECK (${withCheckClause})`;
-    return `${ddl};\n`;
+    const drop = `DROP POLICY IF EXISTS "${policyName}" ON "${schema}"."${tableName}";`;
+    let create = `CREATE POLICY "${policyName}" ON "${schema}"."${tableName}" AS ${mode} FOR ${operationUpper} TO ${pgRoles.map(r => `"${r}"`).join(", ")}`;
+    if (usingClause) create += ` USING (${usingClause})`;
+    if (withCheckClause) create += ` WITH CHECK (${withCheckClause})`;
+    create += ";";
+    return [drop, create];
 };
 
 export const getSqlColumnType = (propName: string, prop: Property, collection: CollectionConfig, collections: CollectionConfig[]): string => {
@@ -472,6 +494,67 @@ export const generatePostgresDdl = async (
     }
 
     return ddl;
+};
+
+/** The RLS statements one declared collection's table needs, ready to run. */
+export interface CollectionPolicyPlan {
+    /** The table's schema (e.g. `public`, `rebase`). */
+    schema: string;
+    /** The bare table name, no schema prefix. */
+    table: string;
+    /** `schema.table` — matches the keys `readExistingSchema` returns. */
+    qualified: string;
+    /** `ALTER TABLE … ENABLE ROW LEVEL SECURITY;` — locked by default. */
+    enableRls: string;
+    /** `DROP POLICY IF EXISTS` / `CREATE POLICY` statements, in order. */
+    policyStatements: string[];
+}
+
+/**
+ * The per-table RLS plan for the *declared* collections, as executable
+ * statements — what the managed runtime applies at boot so a freshly
+ * provisioned tenant database serves data instead of 401ing every read.
+ *
+ * Mirrors the non-junction half of {@link generatePostgresPoliciesDdl} exactly
+ * (same `generatePolicyStatements`, same enable-RLS, same effective rules), so
+ * boot and `db push` produce identical policies from identical collections.
+ *
+ * Junction tables are deliberately excluded: they are derived from `through`
+ * relations, not declared collections, and the boot-time *table* creator
+ * (`ensureCollectionTables`) does not create them either — enabling RLS on a
+ * table that boot never created would fail. Their RLS stays a `db push` /
+ * `db migrate` concern, which is where those tables get created in the first
+ * place. `db push` still applies junction policies via the string generator.
+ */
+export const planCollectionPolicies = (collections: CollectionConfig[]): CollectionPolicyPlan[] => {
+    const resolveCollection: ResolveCollection = (slug) => collections.find(c => c.slug === slug || getTableName(c) === slug);
+    const plans: CollectionPolicyPlan[] = [];
+    const seen = new Set<string>();
+
+    for (const collection of collections) {
+        const tableName = getTableName(collection);
+        if (!tableName) continue;
+        const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
+        const baseTableName = tableName.includes(".") ? tableName.split(".").pop()! : tableName;
+        const qualified = `${schema}.${baseTableName}`;
+        if (seen.has(qualified)) continue;
+        seen.add(qualified);
+
+        const policyStatements: string[] = [];
+        for (const rule of getEffectiveSecurityRules(collection)) {
+            policyStatements.push(...generatePolicyStatements(collection, rule, resolveCollection));
+        }
+
+        plans.push({
+            schema,
+            table: baseTableName,
+            qualified,
+            enableRls: `ALTER TABLE "${schema}"."${baseTableName}" ENABLE ROW LEVEL SECURITY;`,
+            policyStatements
+        });
+    }
+
+    return plans;
 };
 
 export const generatePostgresPoliciesDdl = (collections: CollectionConfig[]): string => {

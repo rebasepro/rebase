@@ -14,8 +14,13 @@
  *     node --import tsx scripts/verify-selfhost.mts
  *
  * Override the database with ACCEPTANCE_DATABASE_URL. The script pushes the
- * schema itself, because collection tables are deliberately NOT created at boot
- * — a container restart must not be able to change a schema as a side effect.
+ * schema itself, up front — that is the self-host recipe, and it exercises the
+ * full `db push` path (including junction-table RLS this script's boot does not
+ * create). The runtime would otherwise create the collection tables and their
+ * RLS at boot (REBASE_MIGRATE_ON_BOOT defaults to "ensure"); pushing first just
+ * means that boot step finds nothing left to do. The managed equivalent — a
+ * fresh database served purely by boot-time provisioning, no push — is pinned
+ * in `packages/server-postgres/test/e2e/managed-boot-acceptance.test.ts`.
  *
  * Why it imports source by path rather than by package name: in a git worktree,
  * `@rebasepro/*` resolves through node_modules into the PRIMARY checkout, so a

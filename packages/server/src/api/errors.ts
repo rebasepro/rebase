@@ -258,10 +258,14 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 "┌──────────────────────────────────────────────────────────────┐",
                 "│  💡 TIP: Run `rebase doctor` for full schema diagnostics    │",
                 "│                                                             │",
-                "│  Quick fixes:                                               │",
+                "│  Quick fixes (local dev, against DATABASE_URL):             │",
                 "│    pnpm db:push      sync schema to database (dev)          │",
                 "│    pnpm db:migrate   generate + apply migration (prod)      │",
                 "│    rebase doctor     full 3-way drift report                │",
+                "│                                                             │",
+                "│  Managed cloud: the runtime applies schema + RLS at boot    │",
+                "│  (REBASE_MIGRATE_ON_BOOT); redeploy rather than db:push,    │",
+                "│  which cannot reach the tenant database.                    │",
                 "└──────────────────────────────────────────────────────────────┘",
                 ""
             ].join("\n"));
