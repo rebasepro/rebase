@@ -39,6 +39,15 @@ overrides:
   uuid: ">=11.1.1"
   # Upper bound is load-bearing: js-yaml 5 is ESM-only with no default export,
   # which breaks `import yaml from "js-yaml"` inside Astro/Starlight.
-  js-yaml: ">=4.2.0 <5"
+  js-yaml: ">=4.3.0 <5"
   tar: ">=7.5.16"
   esbuild: ">=0.28.1"
+  shell-quote: ">=1.9.0 <2"
+  protobufjs: ">=7.6.5 <8"
+  # Three live majors, each with its own patch line, so the floors are keyed by
+  # the range the dependent asks for rather than forced onto a single major.
+  brace-expansion@1: ">=1.1.16 <2"
+  brace-expansion@2: ">=2.1.2 <3"
+  brace-expansion@5: ">=5.0.8 <6"
+  react-router: ">=7.18.1 <8"
+  react-router-dom: ">=7.18.1 <8"
