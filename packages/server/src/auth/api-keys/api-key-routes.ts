@@ -8,7 +8,7 @@
  * @module
  */
 
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { ApiError, errorHandler } from "../../api/errors";
 import { createRequireAuth, requireAdmin } from "../middleware";
 import type { HonoEnv } from "../../api/types";
@@ -38,6 +38,35 @@ function validatePermissions(permissions: unknown): permissions is ApiKeyPermiss
 }
 
 /**
+ * Refuse API-key-authenticated requests to the key-management routes.
+ *
+ * `createApiKeyPreAuth` runs in front of every `/admin/*` router so that keys
+ * created with `admin: true` genuinely reach the admin surfaces — their
+ * documented behaviour, and the right behaviour everywhere except here.
+ * Applied to *this* router it means an admin key can mint a second admin key,
+ * widen its own grants through `PUT /:id`, or revoke the keys other
+ * integrations run on. Revoking the original key undoes none of that, because
+ * the keys it minted are ordinary rows with no link back to it.
+ *
+ * So key management is reserved for callers that are not themselves an API
+ * key: a human admin's session, or the service key.
+ *
+ * Reads are refused alongside writes. The list response enumerates every key's
+ * name, prefix, permission set and admin flag — reconnaissance for exactly the
+ * escalation above — and "an API key never touches API keys" is a rule with no
+ * edges left to get wrong.
+ */
+const rejectApiKeyAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
+    if (c.get("apiKey")) {
+        throw ApiError.forbidden(
+            "API keys cannot manage API keys. Authenticate as an admin user, or use the service key.",
+            "API_KEY_SELF_MANAGEMENT_FORBIDDEN"
+        );
+    }
+    return next();
+};
+
+/**
  * Create admin routes for API key management.
  */
 export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
@@ -48,6 +77,9 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
 
     // Apply auth middleware (service-key-aware)
     router.use("/*", createRequireAuth({ serviceKey }));
+    // Before requireAdmin, so a non-admin key gets the reason it was refused
+    // rather than a generic "needs admin" that implies a wider key would work.
+    router.use("/*", rejectApiKeyAuth);
     router.use("/*", requireAdmin);
 
     // GET / — List all API keys (masked)
