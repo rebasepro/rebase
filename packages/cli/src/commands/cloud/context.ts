@@ -250,7 +250,7 @@ url };
  * the ingress and the console read — see saas/backend/src/utils/tenant-domain.ts).
  *
  * The CLI cannot know this value: it is per-deployment configuration (production
- * serves tenants at `apps.rebase.pro`, a dev control plane at `localhost`). It
+ * serves tenants at `rebase.website`, a dev control plane at `localhost`). It
  * used to be hardcoded to `rebase.pro`, so `cloud projects create` congratulated
  * the user with a URL that resolves nowhere near their app.
  *

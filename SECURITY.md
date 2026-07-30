@@ -22,7 +22,7 @@ Email **security@rebase.pro**.
 Helpful things to include, as far as you have them:
 
 - What component is affected — the open-source server or SDK, the CLI, the admin
-  UI, Rebase Cloud (`app.rebase.pro` / `*.apps.rebase.pro`), or the website.
+  UI, Rebase Cloud (`app.rebase.pro` / `*.rebase.website`), or the website.
 - The version or commit you tested against.
 - Steps to reproduce, and what an attacker gets out of it.
 - Any proof-of-concept code, logs or screenshots.
@@ -52,7 +52,7 @@ monetary reward.
 
 - This repository — the Rebase server, client SDK, CLI, admin UI and packages
   published from it.
-- Rebase Cloud: `app.rebase.pro` and tenant applications on `*.apps.rebase.pro`.
+- Rebase Cloud: `app.rebase.pro` and tenant applications on `*.rebase.website`.
 - The website `rebase.pro`.
 - Issues that break tenant isolation, authentication, authorization (including
   row-level security enforcement), secret handling, or that allow remote code

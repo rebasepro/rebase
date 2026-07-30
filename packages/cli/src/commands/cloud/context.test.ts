@@ -2,7 +2,7 @@
  * Tests for tenant hostname rendering in the `rebase cloud` commands.
  *
  * The CLI used to hardcode `<subdomain>.rebase.pro`, which stopped being true
- * when tenants moved to `apps.rebase.pro` — `projects create` then printed a URL
+ * when tenants moved to `rebase.website` — `projects create` then printed a URL
  * that resolves nowhere near the user's app. The host is per-deployment config,
  * so it can only come from the control plane (`platform-config`).
  */
@@ -16,7 +16,7 @@ function fakeClient(invoke: (name: string) => Promise<unknown>): CloudClient {
 
 describe("formatTenantHost", () => {
     it("joins the subdomain to the base domain the control plane reports", () => {
-        expect(formatTenantHost("acme", "apps.rebase.pro")).toBe("acme.apps.rebase.pro");
+        expect(formatTenantHost("acme", "rebase.website")).toBe("acme.rebase.website");
     });
 
     it("does not assume a domain when the base domain is unknown", () => {
@@ -26,7 +26,7 @@ describe("formatTenantHost", () => {
     });
 
     it("renders nothing for a project with no subdomain", () => {
-        expect(formatTenantHost(undefined, "apps.rebase.pro")).toBeUndefined();
+        expect(formatTenantHost(undefined, "rebase.website")).toBeUndefined();
     });
 });
 
@@ -35,14 +35,14 @@ describe("projectHost", () => {
         // The server reads the project's cluster (admin-only under RLS, so the
         // CLI cannot) and resolves the host the ingress actually serves.
         expect(projectHost(
-            { subdomain: "acme", host: "acme.apps-europe-west1.rebase.pro" },
-            "apps.rebase.pro"
-        )).toBe("acme.apps-europe-west1.rebase.pro");
+            { subdomain: "acme", host: "acme.europe-west1.rebase.website" },
+            "rebase.website"
+        )).toBe("acme.europe-west1.rebase.website");
     });
 
     it("falls back to the base domain against a control plane without the hook", () => {
         // Verified against production, which does not yet send `host`.
-        expect(projectHost({ subdomain: "acme" }, "apps.rebase.pro")).toBe("acme.apps.rebase.pro");
+        expect(projectHost({ subdomain: "acme" }, "rebase.website")).toBe("acme.rebase.website");
     });
 
     it("falls back to the bare subdomain when neither is known", () => {
@@ -52,13 +52,13 @@ describe("projectHost", () => {
 
 describe("fetchTenantBaseDomain", () => {
     it("reads the base domain from platform-config", async () => {
-        const client = fakeClient(async () => ({ tenantBaseDomain: "apps.rebase.pro" }));
-        await expect(fetchTenantBaseDomain(client, "https://a.example")).resolves.toBe("apps.rebase.pro");
+        const client = fakeClient(async () => ({ tenantBaseDomain: "rebase.website" }));
+        await expect(fetchTenantBaseDomain(client, "https://a.example")).resolves.toBe("rebase.website");
         expect(client.functions.invoke).toHaveBeenCalledWith("platform-config", undefined, { method: "GET" });
     });
 
     it("caches per host, so a 100-row project list costs one request", async () => {
-        const client = fakeClient(async () => ({ tenantBaseDomain: "apps.rebase.pro" }));
+        const client = fakeClient(async () => ({ tenantBaseDomain: "rebase.website" }));
         const url = "https://cached.example";
         await Promise.all([fetchTenantBaseDomain(client, url), fetchTenantBaseDomain(client, url)]);
         await fetchTenantBaseDomain(client, url);

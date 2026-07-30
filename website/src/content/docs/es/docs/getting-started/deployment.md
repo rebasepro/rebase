@@ -6,7 +6,7 @@ description: Despliega tu proyecto Rebase a producción usando Docker, plataform
 
 ## Qué Sirve un Despliegue
 
-Un proyecto Rebase se despliega como **un servidor en una URL** (en Rebase Cloud: `https://<project>.apps.rebase.pro`). Ese servidor gestiona:
+Un proyecto Rebase se despliega como **un servidor en una URL** (en Rebase Cloud: `https://<project>.rebase.website`). Ese servidor gestiona:
 
 - **`/api/*`** — la API de datos, la autenticación, el tiempo real y el almacenamiento
 - **todo lo demás** — tu `frontend/` compilado como una SPA estática

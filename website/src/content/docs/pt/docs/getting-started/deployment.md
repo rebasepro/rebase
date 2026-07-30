@@ -6,7 +6,7 @@ description: Implante seu projeto Rebase em produção usando Docker, plataforma
 
 ## O que uma Implantação Serve
 
-Um projeto Rebase é implantado como **um servidor em uma URL** (na Rebase Cloud: `https://<project>.apps.rebase.pro`). Esse servidor cuida de:
+Um projeto Rebase é implantado como **um servidor em uma URL** (na Rebase Cloud: `https://<project>.rebase.website`). Esse servidor cuida de:
 
 - **`/api/*`** — a API de dados, autenticação, tempo real e armazenamento
 - **todo o resto** — o seu `frontend/` compilado como uma SPA estática

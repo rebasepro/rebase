@@ -6,7 +6,7 @@ description: Distribuisci il tuo progetto Rebase in produzione utilizzando Docke
 
 ## Cosa Serve una Distribuzione
 
-Un progetto Rebase si distribuisce come **un server a un URL** (su Rebase Cloud: `https://<project>.apps.rebase.pro`). Quel server gestisce:
+Un progetto Rebase si distribuisce come **un server a un URL** (su Rebase Cloud: `https://<project>.rebase.website`). Quel server gestisce:
 
 - **`/api/*`** — l'API dei dati, l'autenticazione, il tempo reale e l'archiviazione
 - **tutto il resto** — il tuo `frontend/` compilato come SPA statica

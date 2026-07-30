@@ -33,7 +33,7 @@ All configuration is done via environment variables in your `.env` file at the p
 >
 > Baking an absolute URL into a production bundle works right up until a second
 > hostname points at the same app: a custom domain then loads the page from
-> `example.com` and calls the API on `example.apps.rebase.pro`, which is
+> `example.com` and calls the API on `example.rebase.website`, which is
 > cross-origin, so every request fails preflight. Allowing the origin in CORS
 > does **not** fix it either — the refresh cookie is `SameSite=Lax` and is not
 > sent cross-site, so you would clear the console errors and still have broken

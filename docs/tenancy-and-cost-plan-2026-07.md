@@ -600,6 +600,17 @@ Assign plans, seed the new Stripe prices (`npm run seed:prices`), stand up
 
 ### Independently: the onboarding ceiling
 
+> **Update, 2026-07-30 — the domain moved.** Tenants are served from
+> `*.rebase.website`, not `*.apps.rebase.pro`, so read every hostname below
+> accordingly. Two things this changes rather than renames: the Let's Encrypt
+> ceiling no longer endangers `rebase.pro` renewals (tenants are a separate
+> registered domain now, so the blast radius stops at the tenant domain), and
+> the DNS delegation this section calls for is a whole-zone delegation rather
+> than a subdomain one. There is also now a second, independent fix for the same
+> ceiling — listing `rebase.website` on the Public Suffix List gives every tenant
+> its own budget (`saas/infra/PSL-SUBMISSION.md`). It composes with the wildcard;
+> it is not an alternative to it, and it takes months.
+
 The Let's Encrypt limit (§4.4) is not a cost item and does not wait for any of
 the above. It needs one DNS change — delegate `apps.rebase.pro` to a Cloud DNS
 zone — then the `letsencrypt-dns01` issuer, the wildcard certificate, the

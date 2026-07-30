@@ -6,7 +6,7 @@ description: Deploy your Rebase project to production using Docker, cloud platfo
 
 ## What a Deployment Serves
 
-A Rebase project deploys as **one server at one URL** (on Rebase Cloud: `https://<project>.apps.rebase.pro`). That server handles:
+A Rebase project deploys as **one server at one URL** (on Rebase Cloud: `https://<project>.rebase.website`). That server handles:
 
 - **`/api/*`** — the data API, authentication, realtime, and storage
 - **everything else** — your built `frontend/` as a static SPA

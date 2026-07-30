@@ -104,7 +104,12 @@ Evidence:
 
 - `privacy_policy.astro` lines 29–30 scope the notice to: "Visit our website at
   https://rebase.pro, or any website of ours that links to this privacy notice".
-  `app.rebase.pro` and `*.apps.rebase.pro` are never mentioned.
+  `app.rebase.pro` and `*.rebase.website` are never mentioned. The tenant move
+  onto `rebase.website` (2026-07-30) widens this gap rather than narrowing it:
+  tenant applications are now on a **different registrable domain**, so the
+  "any website of ours that links to this privacy notice" catch-all reaches them
+  even less plausibly than before — a tenant app has no reason to link here at
+  all. The notice needs to name the domain explicitly.
 - `terms_conditions.astro` line 191–193 defines the agreement as covering the
   "https://rebase.pro website as well as any other media form, media channel,
   mobile website or mobile application related, linked, or otherwise connected

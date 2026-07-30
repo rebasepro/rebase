@@ -510,8 +510,9 @@ import { RbacMiniDemo } from '../demos/RbacMiniDemo.tsx';
                             Every tenant namespace is created with a Kubernetes <span class="font-mono text-surface-300">NetworkPolicy</span>
                             covering both ingress and egress, so one project's pods cannot open connections to another
                             project's pods or database. Tenant applications are served from
-                            <span class="font-mono text-surface-300">*.apps.rebase.pro</span>, deliberately never from the
-                            same origin as the console.
+                            <span class="font-mono text-surface-300">*.rebase.website</span> — a separate registrable
+                            domain, deliberately never sharing one with the console, so browser cookie and same-site
+                            boundaries fall between them.
                         </p>
                     </div>
                     <div class="relative overflow-hidden rounded-2xl bg-surface-900/50 p-8 ring-1 ring-inset ring-surface-800">

@@ -6,7 +6,7 @@ description: Stellen Sie Ihr Rebase-Projekt mit Docker, Cloud-Plattformen oder m
 
 ## Was eine Bereitstellung ausliefert
 
-Ein Rebase-Projekt wird als **ein Server unter einer URL** bereitgestellt (auf Rebase Cloud: `https://<project>.apps.rebase.pro`). Dieser Server übernimmt:
+Ein Rebase-Projekt wird als **ein Server unter einer URL** bereitgestellt (auf Rebase Cloud: `https://<project>.rebase.website`). Dieser Server übernimmt:
 
 - **`/api/*`** — die Daten-API, Authentifizierung, Echtzeit und Speicher
 - **alles andere** — Ihr gebautes `frontend/` als statische SPA
