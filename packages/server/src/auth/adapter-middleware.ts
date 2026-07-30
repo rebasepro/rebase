@@ -17,6 +17,7 @@
 
 import type { MiddlewareHandler, Context } from "hono";
 import type { DataDriver, AuthAdapter } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { scopeDataDriver } from "./rls-scope";
@@ -94,7 +95,7 @@ code: "INTERNAL_ERROR" } }, 500);
         } else {
             // Not authenticated — scope as anon for RLS evaluation
             try {
-                c.set("driver", await scopeDataDriver(driver, { uid: "anon",
+                c.set("driver", await scopeDataDriver(driver, { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] }));
             } catch (error) {
                 logger.error("[AUTH-ADAPTER] Failed to create anon-scoped driver", { error: error });

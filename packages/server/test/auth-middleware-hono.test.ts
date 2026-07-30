@@ -4,6 +4,7 @@ import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { requireAuth, optionalAuth, requireAdmin, createAuthMiddleware, createRequireAuth } from "../src/auth/middleware";
 import type { HonoEnv } from "../src/api/types";
 import type { DataDriver } from "../../types/src/controllers/data_driver";
+import { ANONYMOUS_USER_ID } from "@rebasepro/types";
 
 const TEST_SECRET = "test-secret-key-for-hono-middleware-testing-1234567890";
 
@@ -319,6 +320,31 @@ roles: ["api"] };
 
             const res = await app.request("/test");
             expect(res.status).toBe(401);
+        });
+
+        it("scopes an unauthenticated request as ANONYMOUS_USER_ID, the id policies exclude", async () => {
+            // The whole point. This middleware used to scope anonymous callers
+            // as `'anon'` while `policy.authenticated()` compiled to
+            // `auth.uid() <> 'anonymous'` — so the sanctioned way to write
+            // "signed in" was true for every signed-out visitor, and rebase's
+            // own linter flagged the one spelling that actually worked.
+            // Whatever this passes to withAuth becomes `auth.uid()` in Postgres.
+            const driverWithAuth = {
+                ...mockDriver,
+                withAuth: jest.fn().mockResolvedValue({ ...mockDriver })
+            };
+
+            const app = new Hono<HonoEnv>();
+            app.use("/*", createAuthMiddleware({ driver: driverWithAuth as any, requireAuth: false }));
+            app.get("/test", (c) => c.json({ ok: true }));
+
+            await app.request("/test");
+
+            expect(driverWithAuth.withAuth).toHaveBeenCalledWith(
+                expect.objectContaining({ uid: ANONYMOUS_USER_ID })
+            );
+            const scopedAs = driverWithAuth.withAuth.mock.calls[0][0] as { uid: string };
+            expect(scopedAs.uid).not.toBe("anon");
         });
 
         it("calls withAuth on driver when available", async () => {

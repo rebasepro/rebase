@@ -1,5 +1,5 @@
 import { MiddlewareHandler, Context } from "hono";
-import { DataDriver, isPublicStoragePath } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, DataDriver, isPublicStoragePath } from "@rebasepro/types";
 import { verifyAccessToken, AccessTokenPayload, verifyDownloadToken } from "./jwt";
 import type { HonoEnv } from "../api/types";
 import { scopeDataDriver } from "./rls-scope";
@@ -281,7 +281,7 @@ roles,
                         c.set("driver", await scopeDataDriver(driver, user));
                     } else {
                         // Validator returned an object but without an ID — scope as anon
-                        c.set("driver", await scopeDataDriver(driver, { uid: "anon",
+                        c.set("driver", await scopeDataDriver(driver, { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] }));
                     }
                 } else if (authResult === true) {
@@ -293,7 +293,7 @@ roles: [] }));
                     // Not authenticated — scope as anon so RLS can evaluate.
                     // Fail closed: if anon scoping fails, reject instead of
                     // falling back to the raw driver.
-                    c.set("driver", await scopeDataDriver(driver, { uid: "anon",
+                    c.set("driver", await scopeDataDriver(driver, { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] }));
                 }
             } catch (error) {
@@ -368,7 +368,7 @@ code: "UNAUTHORIZED" } }, 401);
                 // Fail closed: if anon scoping fails, return 500 rather
                 // than silently proceeding with an unscoped driver.
                 try {
-                    c.set("driver", await scopeDataDriver(driver, { uid: "anon",
+                    c.set("driver", await scopeDataDriver(driver, { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] }));
                 } catch (error) {
                     logger.error("[AUTH] Failed to create anon-scoped driver", { error: error });

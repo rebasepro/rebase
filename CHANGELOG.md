@@ -24,6 +24,18 @@
 
 ### Security
 
+- **`policy.authenticated()` admitted anonymous visitors.** There were two sentinels for "nobody is signed in". The types, the policy compiler, the JavaScript evaluator and the anonymous-grant linter were all built on `ANONYMOUS_USER_ID` (`'anonymous'`); the request path scoped unauthenticated callers as `'anon'`. So `policy.authenticated()` — the sanctioned, documented way to write "signed in", the thing the linter *tells you to use* — compiled to `auth.uid() <> 'anonymous'` and was true for every signed-out caller.
+
+  The linter had it exactly backwards, too: it flagged `auth.uid() <> 'anon'` as a Supabase habit comparing against "a string no caller ever has", when `'anon'` was the only spelling that worked.
+
+  This is worse than a default that fails open, because it inverts a rule the author wrote deliberately. A policy that reads as a lockdown was a full grant, and nothing about it looked wrong at any layer — in one deployment it left `INSERT` on companies, company memberships and jobs open to anonymous callers, and a membership row is a privilege boundary: every anonymous visitor shares one uid, so a single claim is a membership held by the internet.
+
+  The request path now reports `ANONYMOUS_USER_ID` everywhere it scopes a caller — the JWT and adapter middlewares, the websocket handshake, the realtime service, and the rate limiter's "is this a real user" check. New: `ANONYMOUS_USER_IDS` (every spelling, newest first) and `isAnonymousUid()`.
+
+  **Existing databases are fixed by upgrading the server**, without regenerating a single policy: a stored `auth.uid() <> 'anonymous'` starts excluding anonymous callers the moment they report that id. `policy.authenticated()` now compiles to `NOT IN ('anonymous', 'anon')` rather than a single literal, because a policy is written into the database and outlives the server that generated it — one spelling is a hole in whichever direction the versions happen to skew.
+
+  **What breaks:** a policy that *grants* to anonymous callers by comparing `auth.uid() = 'anon'` stops matching. That fails closed, and `policy.not(policy.authenticated())` is the supported way to say it.
+
 - **`auth.requireAuth: false` no longer un-gates cron, logs, backups and the schema editor.** That flag answers a question about the data plane — must a caller present a token to read `/api/data`, or does RLS alone decide? — and `false` is the answer the server itself recommends at boot to anyone serving a public website from their own backend. It was also, silently, the switch that decided whether the admin surfaces were gated at all.
 
   So the documented configuration for a public job board or marketing site mounted `POST /api/cron/:id/trigger`, `GET /api/logs` and `/api/admin/backups` for anyone who could reach the service. A single `warn` per surface at boot was the only notice, and on a `--allow-unauthenticated` Cloud Run deployment "anyone who can reach the service" means the internet. Anyone whose cron jobs spend a metered third-party quota was paying for that.

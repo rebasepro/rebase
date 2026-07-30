@@ -42,12 +42,48 @@ export type PolicyExpression =
  *
  * The consequence for policy authors is that **`auth.uid() IS NOT NULL` is a
  * tautology on the user path** — it is true for anonymous visitors too. Use
- * {@link policy.authenticated} (or `auth.uid() <> 'anonymous'`) to mean "signed
- * in", and {@link policy.serverContext} to mean "the trusted server context".
+ * {@link policy.authenticated} to mean "signed in", and
+ * {@link policy.serverContext} to mean "the trusted server context". Do not
+ * hand-write the comparison: see {@link ANONYMOUS_USER_IDS} for why one
+ * literal is not enough.
  *
  * @group Models
  */
 export const ANONYMOUS_USER_ID = "anonymous";
+
+/**
+ * Every uid that has ever meant "nobody is signed in" — newest first.
+ *
+ * There are two because there were two. The types, the policy compiler, the
+ * JavaScript evaluator and the linter were all built on
+ * {@link ANONYMOUS_USER_ID}, while the request path scoped unauthenticated
+ * callers as `'anon'` — so `policy.authenticated()`, which compiled to
+ * `auth.uid() <> 'anonymous'`, was *true* for an anonymous visitor. The
+ * sanctioned way to write "signed in" granted to everyone, and the linter
+ * flagged the spelling that actually worked as a foreign convention.
+ *
+ * The request path now reports {@link ANONYMOUS_USER_ID}. `'anon'` stays here
+ * because policies outlive the server that generated them: a database still
+ * holding policies from before the fix, or a project whose server has not been
+ * upgraded yet, must not become a grant in either direction. Compile against
+ * this list, not against a single literal.
+ *
+ * No real user id is ever one of these, so a match is always "not signed in".
+ *
+ * @group Models
+ */
+export const ANONYMOUS_USER_IDS: readonly string[] = [ANONYMOUS_USER_ID, "anon"];
+
+/**
+ * Whether a uid stands for "no one is signed in", in any spelling rebase has
+ * used. `null`/`undefined` is the trusted server context, not an anonymous
+ * caller, and is therefore **not** anonymous — see {@link ANONYMOUS_USER_ID}.
+ *
+ * @group Models
+ */
+export function isAnonymousUid(uid: string | null | undefined): boolean {
+    return typeof uid === "string" && ANONYMOUS_USER_IDS.includes(uid);
+}
 
 /** Always allows. Compiles to `true`. @group Models */
 export interface TruePolicyExpression {

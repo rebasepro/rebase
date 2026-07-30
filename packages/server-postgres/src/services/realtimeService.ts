@@ -4,7 +4,7 @@ import { Client as PgClient } from "pg";
 import { randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
-import { FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, CollectionConfig, RebaseCallContext, resolveClientListLimit } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, CollectionConfig, RebaseCallContext, resolveClientListLimit } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
@@ -751,7 +751,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
             // Refetches are reads: apply the same GUCs + reader-role downgrade as the
             // driver's read path, so realtime cannot leak rows the initial fetch hid.
-            const activeAuth = authContext || { uid: "anon",
+            const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
                 await applyAuthContext(tx, { uid: activeAuth.uid, roles: activeAuth.roles }, this.rlsUserRole);
@@ -931,7 +931,7 @@ roles: activeAuth.roles },
 
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
             // Same read isolation as collection refetches: GUCs + reader-role downgrade.
-            const activeAuth = authContext || { uid: "anon",
+            const activeAuth = authContext || { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] };
             return await this.db.transaction(async (tx) => {
                 await applyAuthContext(tx, { uid: activeAuth.uid, roles: activeAuth.roles }, this.rlsUserRole);

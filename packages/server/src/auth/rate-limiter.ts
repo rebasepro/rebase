@@ -1,4 +1,5 @@
 import { MiddlewareHandler } from "hono";
+import { isAnonymousUid } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { MemoryRateLimitStore, RateLimitStore } from "./rate-limit-store";
 
@@ -221,14 +222,14 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
             const key = c.get("apiKey") as { id: string } | undefined;
             if (key) return `api-key:${key.id}`;
             const user = c.get("user") as { uid?: string } | undefined;
-            if (user?.uid && user.uid !== "anon") return `user:${user.uid}`;
+            if (user?.uid && !isAnonymousUid(user.uid)) return `user:${user.uid}`;
             return `ip:${defaultKeyGenerator(c)}`;
         },
         resolveLimit: (c) => {
             const key = c.get("apiKey") as { id: string; rate_limit?: number | null } | undefined;
             if (key) return key.rate_limit ?? apiKeyLimit;
             const user = c.get("user") as { uid?: string } | undefined;
-            if (user?.uid && user.uid !== "anon") return userLimit;
+            if (user?.uid && !isAnonymousUid(user.uid)) return userLimit;
             return anonLimit;
         }
     });

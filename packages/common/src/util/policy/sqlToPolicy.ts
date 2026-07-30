@@ -1,4 +1,4 @@
-import { ANONYMOUS_USER_ID, LiteralPolicyOperand, PolicyExpression, policy } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, ANONYMOUS_USER_IDS, LiteralPolicyOperand, PolicyExpression, policy } from "@rebasepro/types";
 
 /**
  * A tiny, regex-based SQL "parser" for security rules.
@@ -185,7 +185,12 @@ const UID_NOT_NULL = /auth\.uid\(\)\s+IS\s+NOT\s+NULL/i;
  * is how the trusted *server* context is recognised), so:
  *
  *  - `auth.uid() IS NOT NULL` is a tautology on the user path, and
- *  - `auth.uid() != 'anon'` compares against a string no caller ever has.
+ *  - `auth.uid() != 'anon'` excludes one spelling of anonymous and admits the
+ *    other. This one is not hypothetical and was not only a foreign habit:
+ *    rebase's own request path reported `'anon'` while everything that compiled
+ *    or checked a policy used `'anonymous'`, so whichever literal an author
+ *    picked, half the anonymous callers walked through. See
+ *    {@link ANONYMOUS_USER_IDS}.
  *
  * Either one turns a lockdown into a full grant, and neither looks wrong. No
  * real user id is ever one of these literals, and a user-context request is
@@ -231,7 +236,9 @@ export function findAnonymousGrants(expr: PolicyExpression): AnonymousGrantRisk[
                     detail: literal.value,
                     explanation: `'${literal.value}' is a ${platform} convention. Rebase reports an anonymous ` +
                         `request as '${ANONYMOUS_USER_ID}', so comparing against '${literal.value}' passes for ` +
-                        "every caller. Use `condition: policy.authenticated()` to mean \"signed in\"."
+                        "every caller. Use `condition: policy.authenticated()` to mean \"signed in\" — it " +
+                        `compiles to NOT IN (${ANONYMOUS_USER_IDS.map(v => `'${v}'`).join(", ")}), covering ` +
+                        "every spelling rebase has reported rather than whichever one you remember."
                 });
                 return;
             }

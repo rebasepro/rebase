@@ -1,7 +1,7 @@
 import { RealtimeService } from "./services/realtimeService";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import type { DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter } from "@rebasepro/types";
-import { isSQLAdmin, isSchemaAdmin } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, isSQLAdmin, isSchemaAdmin } from "@rebasepro/types";
 import type { User } from "@rebasepro/types";
 
 import { WebSocketServer, WebSocket } from "ws";
@@ -281,7 +281,7 @@ roles: verifiedUser.roles }
                                     roles: session.user.roles ?? []
                                 }
                                 : {
-                                    uid: "anon",
+                                    uid: ANONYMOUS_USER_ID,
                                     displayName: null,
                                     email: null,
                                     photoURL: null,
@@ -620,7 +620,7 @@ colors: true }));
                         const authContext = session?.user
                             ? { uid: session.user.uid,
 roles: session.user.roles ?? [] }
-                            : { uid: "anon",
+                            : { uid: ANONYMOUS_USER_ID,
 roles: ["anon"] };
                         // Let RealtimeService handle these messages
                         await realtimeService.handleClientMessage(clientId, {

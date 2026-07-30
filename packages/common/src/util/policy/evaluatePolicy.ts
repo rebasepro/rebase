@@ -1,4 +1,4 @@
-import { ANONYMOUS_USER_ID, Entity, PolicyCompareOperator, PolicyExpression, PolicyOperand } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, isAnonymousUid, Entity, PolicyCompareOperator, PolicyExpression, PolicyOperand } from "@rebasepro/types";
 
 /**
  * Result of evaluating a policy client-side. `"unknown"` means the expression
@@ -61,7 +61,11 @@ export function evaluatePolicy(expr: PolicyExpression, ctx: PolicyEvalContext): 
             return expr.roles.every(r => r === "public" || userRoles.includes(r));
         }
         case "authenticated":
-            return ctx.uid != null && ctx.uid !== ANONYMOUS_USER_ID;
+            // Every anonymous spelling, matching what this node compiles to in
+            // Postgres — the two evaluators disagreeing about who is signed in
+            // is the client optimistically rendering a row the database will
+            // refuse, or hiding one it would have allowed.
+            return ctx.uid != null && !isAnonymousUid(ctx.uid);
         case "serverContext":
             // A client is never the server context. Postgres decides this by
             // `auth.uid() IS NULL`, which a client request can never produce:

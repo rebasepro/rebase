@@ -99,14 +99,21 @@ describe("policy.authenticated()", () => {
     // `IS NOT NULL` alone is a tautology on the user path: the driver reports an
     // anonymous request as ANONYMOUS_USER_ID, never NULL. A rule reading as
     // "logged-in users only" therefore used to grant to anonymous visitors.
-    it("excludes the anonymous sentinel, not just NULL", () => {
+    it("excludes every anonymous sentinel, not just NULL and not just one spelling", () => {
+        // Both literals, because a policy is written into the database and
+        // outlives the server that compiled it: this clause may be enforced by
+        // a server still reporting the legacy `'anon'`. Excluding one spelling
+        // is exactly how this helper became a grant.
         expect(policyToPostgres(policy.authenticated()))
-            .toBe("auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'");
+            .toBe("auth.uid() IS NOT NULL AND auth.uid() NOT IN ('anonymous', 'anon')");
     });
 
-    it("is false for an anonymous caller", () => {
+    it("is false for an anonymous caller, in either spelling", () => {
         expect(evaluatePolicy(policy.authenticated(), { uid: null, entity: null })).toBe(false);
         expect(evaluatePolicy(policy.authenticated(), { uid: ANONYMOUS_USER_ID, entity: null })).toBe(false);
+        // The spelling the request path used to report. A client evaluating it
+        // as "signed in" renders rows the database will refuse.
+        expect(evaluatePolicy(policy.authenticated(), { uid: "anon", entity: null })).toBe(false);
     });
 
     it("is true for a signed-in caller", () => {
@@ -118,7 +125,7 @@ describe("policy.authenticated()", () => {
         // "is the server context". It means "anonymous or server" now, and
         // `serverContext()` is how you ask the narrower question.
         expect(policyToPostgres(policy.not(policy.authenticated())))
-            .toBe("NOT (auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous')");
+            .toBe("NOT (auth.uid() IS NOT NULL AND auth.uid() NOT IN ('anonymous', 'anon'))");
     });
 });
 

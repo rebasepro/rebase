@@ -1,4 +1,4 @@
-import { ANONYMOUS_USER_ID, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression } from "@rebasepro/types";
+import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { getTableName } from "../relations";
 
@@ -88,9 +88,15 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
         case "authenticated":
             // `IS NOT NULL` alone is a tautology on the user path: every
             // user-context request sets `app.uid`, and an anonymous one sets
-            // it to the sentinel. Excluding the sentinel is what makes this mean
+            // it to a sentinel. Excluding the sentinels is what makes this mean
             // "signed in" rather than "anyone at all".
-            return `auth.uid() IS NOT NULL AND auth.uid() <> ${quoteLiteral(ANONYMOUS_USER_ID)}`;
+            //
+            // Every sentinel, not just the current one. This clause is written
+            // into the database and outlives the server that generated it: a
+            // policy compiled here may be enforced against an older server that
+            // still reports `'anon'`, which is exactly how excluding one
+            // spelling turned this helper into a grant. See ANONYMOUS_USER_IDS.
+            return `auth.uid() IS NOT NULL AND auth.uid() NOT IN (${ANONYMOUS_USER_IDS.map(quoteLiteral).join(", ")})`;
         case "serverContext":
             // Only the built-in server flows leave `app.uid` unset.
             return "auth.uid() IS NULL";
