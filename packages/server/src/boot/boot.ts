@@ -8,6 +8,7 @@ import {
     DEFAULT_DATA_SOURCE_KEY,
     normalizeStorageSources,
     type DataSourceDefinition,
+    type InitializedDriver,
     type StorageSourceDefinition
 } from "@rebasepro/types";
 
@@ -645,7 +646,7 @@ export async function ensureCollectionSchema(
 
     const { applied } = await primary.bootstrapper.ensureCollectionSchema(
         collections,
-        primary.connection as never,
+        preInitDriverResult(primary),
         message => logger.info(`schema: ${message}`)
     );
     logger.info(
@@ -653,6 +654,27 @@ export async function ensureCollectionSchema(
             ? `Applied ${applied} additive schema change(s) before boot.`
             : "Collection schema is up to date."
     );
+}
+
+/**
+ * The `InitializedDriver` to hand a bootstrapper before any driver exists.
+ *
+ * Both schema hooks are declared to take the result of `initializeDriver`, but
+ * they deliberately run *before* it: the tables have to exist before the driver
+ * introspects them and registers collections. So there is no real result to
+ * pass, and the field the hooks actually read is `internals` — the driver's own
+ * opaque handle, which at this point is exactly the connection the coordinator
+ * just opened (`{ db, pool }`, where `db` is the drizzle instance).
+ *
+ * Wrapping it matters: the connection passed *bare* type-checks through any cast
+ * and then reads `undefined.db` inside the driver, which surfaces as a boot
+ * crash — `TypeError: Cannot read properties of undefined (reading 'db')` — on
+ * every project whose driver implements these hooks. The cast is narrowed to the
+ * one field a pre-init result cannot honestly supply, rather than `as never`
+ * blanketing the whole argument.
+ */
+function preInitDriverResult(source: InitializedDataSource): InitializedDriver {
+    return { internals: source.connection } as unknown as InitializedDriver;
 }
 
 /**
@@ -699,7 +721,7 @@ export async function ensureCollectionPolicies(
 
     const { applied } = await primary.bootstrapper.ensureCollectionPolicies(
         collections,
-        primary.connection as never,
+        preInitDriverResult(primary),
         message => logger.info(`policies: ${message}`)
     );
     logger.info(

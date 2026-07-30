@@ -4,7 +4,7 @@ import os from "os";
 import path from "path";
 import { BUNDLE_FORMAT_VERSION, RUNTIME_CONTRACT_VERSION, type RebaseBundleManifest } from "@rebasepro/types";
 
-import { ensureCollectionSchema } from "./boot";
+import { ensureCollectionPolicies, ensureCollectionSchema } from "./boot";
 import type { LoadedBundle } from "./bundle";
 import type { InitializedDataSource } from "./driver";
 import type { RebaseBootEnv } from "./env";
@@ -179,5 +179,75 @@ describe("ensureCollectionSchema — the path that does the work", () => {
 
         expect(logged()).toContain("up to date");
         expect(warnSpy).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * What these hooks are *handed*, not just whether they are called.
+ *
+ * Both were shipped passing the connection bare behind an `as never`, which
+ * type-checks and then dies inside the driver on `undefined.db`: a real driver
+ * reads its own opaque handle off `internals`, and a bare connection has no such
+ * field. Every test above mocked the bootstrapper and ignored its second
+ * argument, so the whole suite passed while `rebase dev` crashed at boot with
+ * `TypeError: Cannot read properties of undefined (reading 'db')`.
+ *
+ * The fakes below therefore consume the argument the way PostgresBootstrapper
+ * does — `driverResult.internals.db.execute(...)` — so the seam is asserted from
+ * the driver's side rather than the coordinator's.
+ */
+describe("the driver result the schema hooks pass", () => {
+    /** Stands in for the drizzle handle `createConnection` puts on `db`. */
+    const drizzleHandle = () => ({ execute: jest.fn(async () => ({ rows: [] })) });
+
+    it("reaches ensureCollectionSchema as `internals`, holding the live db handle", async () => {
+        fs.writeFileSync(path.join(scratch, "collections", "posts.ts"), collectionFile("posts"));
+        const db = drizzleHandle();
+        let received: unknown;
+
+        const ensure = jest.fn(async (_collections: unknown[], driverResult: unknown) => {
+            const internals = (driverResult as { internals?: { db?: typeof db } }).internals;
+            // Exactly what the driver does; throws on the pre-fix shape.
+            await internals!.db!.execute();
+            received = internals!.db;
+            return { applied: 1 };
+        });
+
+        await ensureCollectionSchema(
+            bundle(),
+            [source({
+                bootstrapper: { ensureCollectionSchema: ensure } as unknown as InitializedDataSource["bootstrapper"],
+                connection: { db } as unknown as InitializedDataSource["connection"]
+            })],
+            env()
+        );
+
+        expect(received).toBe(db);
+        expect(db.execute).toHaveBeenCalled();
+    });
+
+    it("reaches ensureCollectionPolicies the same way", async () => {
+        fs.writeFileSync(path.join(scratch, "collections", "posts.ts"), collectionFile("posts"));
+        const db = drizzleHandle();
+        let received: unknown;
+
+        const ensure = jest.fn(async (_collections: unknown[], driverResult: unknown) => {
+            const internals = (driverResult as { internals?: { db?: typeof db } }).internals;
+            await internals!.db!.execute();
+            received = internals!.db;
+            return { applied: 4 };
+        });
+
+        await ensureCollectionPolicies(
+            bundle(),
+            [source({
+                bootstrapper: { ensureCollectionPolicies: ensure } as unknown as InitializedDataSource["bootstrapper"],
+                connection: { db } as unknown as InitializedDataSource["connection"]
+            })],
+            env()
+        );
+
+        expect(received).toBe(db);
+        expect(logged()).toContain("Applied 4");
     });
 });
