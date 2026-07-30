@@ -24,6 +24,24 @@
 
 ### Security
 
+- **`auth.requireAuth: false` no longer un-gates cron, logs, backups and the schema editor.** That flag answers a question about the data plane — must a caller present a token to read `/api/data`, or does RLS alone decide? — and `false` is the answer the server itself recommends at boot to anyone serving a public website from their own backend. It was also, silently, the switch that decided whether the admin surfaces were gated at all.
+
+  So the documented configuration for a public job board or marketing site mounted `POST /api/cron/:id/trigger`, `GET /api/logs` and `/api/admin/backups` for anyone who could reach the service. A single `warn` per surface at boot was the only notice, and on a `--allow-unauthenticated` Cloud Run deployment "anyone who can reach the service" means the internet. Anyone whose cron jobs spend a metered third-party quota was paying for that.
+
+  Admin surfaces are now gated whenever there is authentication to gate them with — an `AuthAdapter`, or a `jwtSecret` — independent of `requireAuth`. Whether anonymous callers may read your posts has no bearing on whether they may run your cron jobs.
+
+  **If you deploy with `requireAuth: false`**, calls to these routes that previously succeeded unauthenticated now answer 401. They accept what every other admin surface accepts: an admin JWT, the service key, or an `rk_` API key created with `admin: true` — the API-key pre-auth runs ahead of the JWT check, so a scheduler holding an admin key keeps working. Point Cloud Scheduler (or whatever triggers your jobs) at an admin key before upgrading.
+
+  One thing comes *back*: `/api/meta/contract` is served again on these deployments. It is only mounted when it can be gated, so a public-data-plane project had been 404ing it, and with it typed client generation from another repository.
+
+- **A backend with no authentication at all now refuses its admin surfaces instead of serving them open.** With no `AuthAdapter` and no `auth.jwtSecret` there is no credential this server could check a caller against, so it cannot tell an admin from the internet. It used to mount cron, logs, backups and the schema editor anyway, ungated, with one `warn` per surface at boot as the entire defence.
+
+  They now answer **501 `ADMIN_SURFACE_UNAVAILABLE`**, with a message naming the missing switch. They stay mounted rather than disappearing on purpose: an unexplained 404 on `/api/cron` reads as a broken path or a failed deploy and gets debugged as one. A token does not change the answer — there is nothing to verify it against.
+
+  This is unlikely to touch you: every scaffolded backend and the bundle runtime configure `auth.jwtSecret` (the runtime *requires* it, and auto-generates one in development), so the affected shape is a hand-rolled entrypoint that passes no `auth` — or one whose `JWT_SECRET` quietly failed to reach the container, which is precisely the deployment that should not be serving a cron trigger to anonymous callers.
+
+  The data plane is unaffected and still answers 401 there: "show me a token" is a truthful thing to say about `/api/data`, and a dishonest one about a surface no token can open.
+
 - **Every `overrides:` entry is a bounded security floor now.** An override replaces each transitive consumer's own range, so a bare `>=X` is not a floor — it is a floating pin that drags in the next major to publish, whatever asked for what.
 
   One of them had inverted completely: `js-yaml: ">=4.2.0 <5"` pinned the tree *at* 4.2.0, which is precisely the version GHSA-52cp-r559-cp3m says to leave (patched in 4.3.0). The pin meant to protect was the thing holding the exposure. `uuid` had meanwhile floated from its 11.x floor to 14 unnoticed.

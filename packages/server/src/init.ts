@@ -1088,17 +1088,45 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // service key, and admin JWTs.
     // Whether admin surfaces get a gate at all — global for this boot, so
     // computed once rather than per router.
+    //
+    // Deliberately NOT conditioned on `requireAuth`. That flag answers a
+    // question about the *data plane* — "must a caller present a token to read
+    // /api/data, or does RLS alone decide?" — and `false` is the answer this
+    // very file recommends to anyone serving a public website from their own
+    // backend (see the `publicSelect` notice below). Reusing it here meant
+    // taking that advice silently unmounted the gate on the cron trigger, the
+    // log reader and the backup routes: one flag deciding two unrelated things,
+    // where the harmless-looking value of one is catastrophic for the other.
+    // Whether anonymous callers may read your posts has no bearing on whether
+    // they may run your cron jobs. If auth exists at all, admin surfaces use it.
     const adminSurfacesGated = !!authAdapter && (
-        isAuthAdapter(config.auth!) ||
-        ((config.auth as RebaseAuthConfig).requireAuth !== false && !!(config.auth as RebaseAuthConfig).jwtSecret)
+        isAuthAdapter(config.auth!) || !!(config.auth as RebaseAuthConfig).jwtSecret
     );
     const applyAdminGate = (router: Hono<HonoEnv>, surface: string): void => {
         if (!adminSurfacesGated) {
+            // No adapter and no `jwtSecret`: there is no credential this server
+            // could check a caller against, so it cannot tell an admin from the
+            // internet. These surfaces used to mount anyway, open, with this
+            // warning as their only defence — which is to say they served the
+            // cron trigger and the log reader to anyone, and told nobody but
+            // whoever was reading stdout at boot.
+            //
+            // They answer 501 instead, and stay mounted to say why: an
+            // unexplained 404 on `/api/cron` reads as a broken path or a failed
+            // deploy, and gets debugged as one.
             logger.warn(
-                `${surface} routes are mounted WITHOUT an auth gate ` +
-                "(no auth configured, requireAuth: false, or no jwtSecret) — " +
-                "anyone who can reach the server can call them."
+                `${surface} routes are mounted but DISABLED: no authentication is configured ` +
+                "(no auth adapter and no auth.jwtSecret), so there is no way to tell an admin " +
+                "from an anonymous caller. They answer 501 until auth is configured."
             );
+            router.use("/*", async (c) => c.json({
+                error: {
+                    code: "ADMIN_SURFACE_UNAVAILABLE",
+                    message: `${surface} is admin-only, and this server has no authentication ` +
+                        "configured to identify an admin with. Set auth.jwtSecret (or pass an " +
+                        "AuthAdapter) to enable it."
+                }
+            }, 501));
             return;
         }
         if (apiKeyPreAuth) router.use("/*", apiKeyPreAuth);
@@ -1635,12 +1663,12 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
         // schema without describing it, and is deliberately reachable by a CI
         // job holding no credentials.
         //
-        // With no way to gate it, `/contract` is not served at all. The other
-        // admin surfaces mount ungated-with-a-warning because each is behind its
-        // own opt-in, so someone chose to enable it; this one appears on every
-        // deployment that upgrades. Serving the entire schema to anonymous
-        // callers is not a reasonable thing to switch on for people by default,
-        // and a 404 is recoverable — configure auth and it returns.
+        // With no way to gate it, `/contract` is not served at all — the same
+        // answer `applyAdminGate` gives the other admin surfaces, which refuse
+        // rather than open when there is no credential to check. It differs only
+        // in status: this one is 404 because it is not an operation someone
+        // tried to perform, it is a document that is not there. Configure auth
+        // and it returns.
         if (adminSurfacesGated) {
             if (apiKeyPreAuth) contractRouter.use("/contract", apiKeyPreAuth);
             contractRouter.use(
@@ -1657,8 +1685,8 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 }
             }, 404));
             logger.warn(
-                "Contract endpoint disabled: no auth is configured (no adapter, requireAuth: false, " +
-                "or no jwtSecret), and it would otherwise expose the full collection schema to anyone. " +
+                "Contract endpoint disabled: no auth is configured (no adapter or no jwtSecret), " +
+                "and it would otherwise expose the full collection schema to anyone. " +
                 "`/api/meta/schema-version` is still served."
             );
         }
