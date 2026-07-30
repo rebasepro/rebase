@@ -29,19 +29,26 @@ minimumReleaseAgeExclude:
   - '@firecms/neat@0.9.3-canary.20260615103956'
   - '@firecms/neat@1.0.0'
   - '@firecms/neat@1.0.1'
+# Security floors. Every entry MUST carry an upper bound: an override replaces
+# each transitive consumer's own range, so a bare ">=X" is not a floor but a
+# floating pin — the next major to publish gets dragged in on the next resolve,
+# whatever asked for what. js-yaml 5 arrived that way and broke the Astro build.
 overrides:
-  dompurify: ">=3.4.11"
-  nodemailer: ">=9.0.1"
-  form-data: ">=4.0.6"
-  tmp: ">=0.2.7"
-  ws: ">=8.21.0"
+  dompurify: ">=3.4.11 <4"
+  nodemailer: ">=9.0.1 <10"
+  form-data: ">=4.0.6 <5"
+  tmp: ">=0.2.7 <0.3"
+  ws: ">=8.21.0 <9"
   undici: ">=7.28.0 <8"
-  uuid: ">=11.1.1"
+  # Already floated to 14 (ESM-only) back when this was unbounded; capped there
+  # rather than dragged back, since the tree builds and tests green on it.
+  uuid: ">=11.1.1 <15"
   # Upper bound is load-bearing: js-yaml 5 is ESM-only with no default export,
   # which breaks `import yaml from "js-yaml"` inside Astro/Starlight.
   js-yaml: ">=4.3.0 <5"
-  tar: ">=7.5.16"
-  esbuild: ">=0.28.1"
+  # Not in the tree right now; kept so it lands patched if anything pulls it back.
+  tar: ">=7.5.16 <8"
+  esbuild: ">=0.28.1 <0.29"
   shell-quote: ">=1.9.0 <2"
   protobufjs: ">=7.6.5 <8"
   # Three live majors, each with its own patch line, so the floors are keyed by

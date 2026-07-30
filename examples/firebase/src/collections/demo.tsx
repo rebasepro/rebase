@@ -70,7 +70,7 @@ export const demoCollection = defineCollection({
         amazon_link: {
             type: "string",
             name: "Amazon link",
-            admin: { url: true },
+            url: true,
             validation: {
                 required: true,
                 requiredMessage: "The amazon link is required",
@@ -197,7 +197,7 @@ export const demoCollection = defineCollection({
                     type: "number"
                 }
             },
-            expanded: true
+            admin: { expanded: true }
         },
 
         // block of content with dynamic properties

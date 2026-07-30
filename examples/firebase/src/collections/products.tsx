@@ -162,7 +162,7 @@ export const productsCollection = defineCollection({
         amazon_link: {
             type: "string",
             name: "Amazon link",
-            admin: { url: true }
+            url: true
         },
         related_products: {
             type: "array",
