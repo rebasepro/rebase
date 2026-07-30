@@ -22,7 +22,33 @@
  * packages out of the blanket `node_modules` exclusion.
  */
 const ts = require("typescript");
-const { createTransformer } = require("ts-jest").default;
+
+/**
+ * `ts-jest`, resolved from the package under test rather than from here.
+ *
+ * This file lives at the repo root and the root does not declare `ts-jest` —
+ * every consumer does (`packages/admin`, `app`, `plugin-ai`), which is the right
+ * place for it, since the transform is only reachable from a package whose own
+ * Jest config points at it. A bare `require("ts-jest")` therefore resolves by
+ * walking up from `scripts/jest/` to the root `node_modules` and finding
+ * nothing, unless pnpm happens to have hoisted it there — which it did, until an
+ * install normalised the tree and all three suites started failing with
+ * `Cannot find module 'ts-jest'` before a single test was read. A transform that
+ * works only while an unrelated hoisting accident holds is not wired up; it is
+ * lucky.
+ *
+ * Jest runs with the package directory as cwd, so that is where to look. The
+ * root is still tried first, so a future root-level `ts-jest` keeps working.
+ */
+function requireTsJest() {
+    try {
+        return require("ts-jest");
+    } catch {
+        return require(require.resolve("ts-jest", { paths: [process.cwd()] }));
+    }
+}
+
+const { createTransformer } = requireTsJest().default;
 
 // Bump when the rewriting below changes, so Jest's transform cache is not
 // reused across a change in what we emit.
