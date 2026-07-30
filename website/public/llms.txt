@@ -551,6 +551,31 @@ await initializeRebaseBackend({
 });
 ```
 
+#### Changing `basePath`
+
+`basePath` moves every API route, so the client has to be told the same thing —
+otherwise it keeps asking for `/api/...` and gets a 404 for everything:
+
+```typescript
+
+export const rebase = createRebaseClient({
+    baseUrl: "https://api.example.com",
+    apiPath: "/v1"          // must match the backend's basePath
+});
+```
+
+The admin panel picks this up from the client it is given; nothing else needs
+configuring. If you build a request URL by hand, join it from the client rather
+than writing `/api` yourself:
+
+```typescript
+
+function Widget() {
+    const apiBase = useApiBase();   // e.g. "https://api.example.com/v1"
+    // fetch(`${apiBase}/data/products`)
+}
+```
+
 ### Troubleshooting
 
 #### SQL Editor Permission Denied (`permission denied for table <name>`)
