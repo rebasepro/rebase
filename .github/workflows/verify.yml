@@ -410,10 +410,12 @@ jobs:
         env:
           RLS_CHECK_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_acceptance?sslmode=disable
 
-      # NOT here, and deliberately: the Playwright admin suite (`pnpm e2e`).
-      # Its `global-setup` signs in as a demo user that must already exist and waits
-      # for seeded collections to render, so it needs a provisioned database, not a
-      # workflow step. Wiring it means writing that seed first.
+      # The Playwright admin suite used to be excluded here, on the grounds that
+      # its `global-setup` needs a demo user that already exists and seeded
+      # collections to render — "a provisioned database, not a workflow step".
+      # That was true and is now handled: see `Admin panel E2E (Playwright)`
+      # above, which provisions and seeds one, and a `global-setup` that drives
+      # the first-run bootstrap when the user does not exist yet.
       - name: Upload E2E Screenshots
         if: always()
         uses: actions/upload-artifact@v4
