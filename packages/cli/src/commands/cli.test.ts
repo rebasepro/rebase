@@ -40,8 +40,14 @@ vi.mock("./doctor", () => ({
 vi.mock("./cloud", () => ({
     cloudCommand: vi.fn()
 }));
+vi.mock("../utils/project", () => ({
+    requireProjectRoot: vi.fn(() => "/projects/shop"),
+    MANIFEST_FILENAME: "rebase.json"
+}));
 
+import path from "path";
 import { entry } from "../cli";
+import { requireProjectRoot } from "../utils/project";
 import { cloudCommand } from "./cloud";
 import { createRebaseApp } from "./init";
 import { schemaCommand } from "./schema";
@@ -50,6 +56,7 @@ import { devCommand } from "./dev";
 import { buildCommand } from "./build";
 import { startCommand } from "./start";
 import { authCommand } from "./auth";
+import { generateSdkCommand } from "./generate_sdk";
 
 let consoleLogSpy: ReturnType<typeof vi.spyOn>;
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
@@ -153,5 +160,43 @@ describe("CLI routing", () => {
         // Help is still printed to stdout so the user sees the valid commands.
         const output = consoleLogSpy.mock.calls.map((c) => c[0]).join("\n");
         expect(output).toContain("Commands");
+    });
+});
+
+describe("generate-sdk resolves its defaults from the project root", () => {
+    /*
+     * `./config/collections` was resolved against the cwd, so this command
+     * worked from a repository root and threw "Collections directory not found"
+     * one directory down — from `backend/`, from `frontend/` — while every
+     * sibling command (`db push`, `dev`, `doctor`) worked from all of them,
+     * because they resolve the root first.
+     */
+    it("defaults both paths to the project root, not the cwd", async () => {
+        await entry(["node", "rebase", "generate-sdk"]);
+
+        expect(generateSdkCommand).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collectionsDir: path.join("/projects/shop", "config/collections"),
+                output: path.join("/projects/shop", "generated/sdk")
+            })
+        );
+    });
+
+    it("leaves an explicitly passed path alone — that one means the cwd", async () => {
+        await entry(["node", "rebase", "generate-sdk", "--collections-dir", "./elsewhere", "--output", "./out"]);
+
+        expect(generateSdkCommand).toHaveBeenCalledWith(
+            expect.objectContaining({ collectionsDir: "./elsewhere",
+output: "./out" })
+        );
+    });
+
+    it("does not demand a project root just to print its help", async () => {
+        await entry(["node", "rebase", "generate-sdk", "--help"]);
+
+        expect(generateSdkCommand).toHaveBeenCalledWith(
+            expect.objectContaining({ help: true })
+        );
+        expect(requireProjectRoot).not.toHaveBeenCalled();
     });
 });

@@ -14,6 +14,7 @@ import { skillsCommand } from "./commands/skills";
 import { apiKeysCommand } from "./commands/api-keys";
 import { cloudCommand } from "./commands/cloud";
 import { appsCommand } from "./commands/apps";
+import { requireProjectRoot } from "./utils/project";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -88,9 +89,18 @@ export async function entry(args: string[]) {
                     permissive: true
                 }
             );
+            // Defaults hang off the project root, not the cwd. `./config/
+            // collections` relative to wherever you happen to be standing meant
+            // `rebase generate-sdk` worked from the repository root and threw
+            // "Collections directory not found" one directory down — from
+            // `backend/`, from `frontend/`, from anywhere a developer actually
+            // sits — while `rebase db push` and `rebase dev` worked from all of
+            // them. An explicitly passed path still resolves against the cwd,
+            // which is where the person typing it means it.
+            const sdkRoot = sdkArgs["--help"] ? process.cwd() : requireProjectRoot();
             await generateSdkCommand({
-                collectionsDir: sdkArgs["--collections-dir"] || "./config/collections",
-                output: sdkArgs["--output"] || "./generated/sdk",
+                collectionsDir: sdkArgs["--collections-dir"] || path.join(sdkRoot, "config/collections"),
+                output: sdkArgs["--output"] || path.join(sdkRoot, "generated/sdk"),
                 from: sdkArgs["--from"],
                 token: sdkArgs["--token"],
                 help: sdkArgs["--help"],

@@ -88,4 +88,30 @@ if (!existsSync(distEntry)) {
 
 const { entry } = await import("../dist/index.es.js");
 
-entry(process.argv);
+/**
+ * The CLI's last line of defence.
+ *
+ * `entry()` returns a promise and nothing was awaiting it, so anything a
+ * command threw surfaced as an unhandled rejection: Node's own stack trace,
+ * rooted in `dist/index.es.js`, with the CLI's bundled line numbers and no
+ * exit code of its own. "Collections directory not found" is a sentence a
+ * developer can act on; the same sentence under ten frames of bundle internals
+ * reads as a crash in Rebase.
+ *
+ * The message is the error's own — commands that already print something
+ * friendly and exit never reach here. The stack is available behind
+ * `--debug`/`REBASE_DEBUG`, because when the message is *not* enough that is
+ * the only thing that helps.
+ */
+const wantsStack = process.argv.includes("--debug") || process.env.REBASE_DEBUG === "1";
+
+entry(process.argv).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`\x1b[31m✗ ${message}\x1b[0m\n`);
+    if (wantsStack && error instanceof Error && error.stack) {
+        process.stderr.write(`\n${error.stack}\n`);
+    } else {
+        process.stderr.write("\x1b[90m  Re-run with --debug for the stack trace.\x1b[0m\n");
+    }
+    process.exit(1);
+});
