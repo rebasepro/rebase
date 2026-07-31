@@ -208,11 +208,17 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
         channel: (name: string, options?: ChannelOptions) => RebaseRealtimeChannel;
     };
     /**
-     * Release the realtime socket and its reconnect timer.
+     * Release everything this client holds that can keep a process alive: the
+     * realtime socket and its reconnect timer, channel presence heartbeats, the
+     * offline manager, and the scheduled token refresh.
      *
-     * An open socket keeps the Node event loop alive, so a script that does not
-     * call this will not exit on its own. Safe when realtime was never started
-     * (`realtime: false`), and safe to call twice.
+     * Each of those keeps the Node event loop alive on its own, so a script
+     * that does not call this will not exit — and, until the refresh timer was
+     * included, one that *did* call it still would not if it had signed in.
+     *
+     * Safe when realtime was never started (`realtime: false`), safe when
+     * signed out, and safe to call twice. It does not sign the user out: a
+     * persisted session survives for the next client to restore.
      */
     close: () => void;
     storage: StorageSource;
@@ -547,11 +553,11 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             }
         },
         /**
-         * Release the realtime socket and its reconnect timer.
+         * Release every handle that can keep a process alive — see the
+         * `close` docblock on the client interface.
          *
-         * Until this returns, the open socket keeps the Node event loop alive
-         * and the process will not exit on its own. Safe to call when realtime
-         * was never started, and safe to call twice.
+         * Safe to call when realtime was never started, safe when signed out,
+         * and safe to call twice.
          */
         close: () => {
             // Channels hold presence heartbeat timers, which would otherwise
@@ -565,6 +571,12 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             // The offline retry timer is unref'd but the `online` listener is
             // not, and neither should outlive the client.
             offlineManager?.dispose();
+            // The scheduled token refresh is a plain setTimeout up to a token
+            // lifetime away, and not unref'd — so on Node it holds the event
+            // loop open all by itself. Without this, closing a SIGNED-IN client
+            // released the socket and the process still never exited, which is
+            // the opposite of what this method exists to guarantee.
+            auth.stopAutoRefresh();
         },
         setToken: transport.setToken,
         setAuthTokenGetter: transport.setAuthTokenGetter,

@@ -269,6 +269,19 @@ Rebase is structured as a modular monorepo — install only the layers you need:
 | `@rebasepro/plugin-ai` | AI-powered data enhancement plugin |
 | `@rebasepro/plugin-insights` | Analytics and insights plugin |
 
+### Versioning
+
+Rebase is `0.x`: the authored TypeScript API can still change in a minor, and
+every such change is in the [changelog](CHANGELOG.md).
+
+Separately, a small set of contracts is versioned and enforced — the bundle
+format, the bundle↔runtime contract, the auth schema version, and the hash
+identifying which collection schema a generated SDK was built against. These are
+stamped into built artifacts and live databases, checked at boot, and fail with
+a specific message rather than degrading. They are also the only things Rebase
+Cloud depends on, which is what lets a project move between self-hosting and the
+cloud. See **[docs/compatibility.md](docs/compatibility.md)**.
+
 ---
 
 ## 🎨 Standalone UI Library

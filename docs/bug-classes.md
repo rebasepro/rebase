@@ -118,6 +118,41 @@ and reports green.
 
 ---
 
+## 5. Remediation text nobody tested
+
+An error that tells the user what to do is a code path, and it is one that no
+test in this repo asserts. So the instruction rots — or is wrong from the start —
+and the failure mode is the worst kind: the user follows the advice, the state
+does not change, and they conclude the product is broken rather than the message.
+
+`rebase db push` said:
+
+> ✗ Could not find atlas binary.
+> Install it with: `pnpm add -D @ariga/atlas`
+
+`@ariga/atlas` downloads its binary in a **`preinstall`** script, and pnpm 10+
+refuses to run a dependency's scripts unless it is allowlisted. So the common
+way to reach that error is to have installed the package already: it sits on
+disk with its `install.js`, `node_modules/.bin` is empty, and the install exited
+**0**, with `Ignored build scripts: @ariga/atlas` several screens up. Running the
+suggested command puts you in precisely the same state. The advice was a loop.
+
+Note the two independent soft failures stacked here: a build step skipped
+without a non-zero exit (class 4, in somebody else's tool), and a message that
+named the wrong cause.
+
+**Sweep:** grep for user-facing strings that contain a command — `Install it
+with`, `Run `, `Try `, `Fix it with`, `pnpm add`, `npm i`. For each, ask: *what
+state produces this message, and does the command actually change that state?*
+Pay special attention to anything whose cause could be "installed but not
+built", "present but not configured", or "cached".
+
+**Fix shape:** diagnose before advising. `diagnoseMissingBin` distinguishes
+"never installed" from "installed with its build script blocked" — two states
+that look identical from a missing binary and need opposite instructions.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -163,3 +198,28 @@ comparison returned null, the loop was skipped, and the summary line still read
 half the check exists for: a lone journal is trivially monotonic, and two
 branches racing is the entire failure mode. A green line for work that never
 happened, in a gate written specifically to stop a class of silent skipping.
+
+### Last sweep — 2026-07-31
+
+Triggered by a release-readiness pass over the four paths a 0.13 has to keep
+working: `init → dev → admin`, self-host, local → cloud, and the client SDK.
+
+| checked | result |
+|---|---|
+| admin-panel Playwright suite on an **empty** database | **BUG** (class 1) — `globalSetup` waited for a "Sign in with email" button that first-run never renders, failing all ten tests at once. It passed locally only because a developer's database already has the demo user. Fixed, and it now drives the bootstrap form, so first-run is covered. |
+| `client.close()` releasing every handle it claims to | **BUG** — released the socket, channels and offline manager, never the scheduled token refresh. Any signed-in Node script hung forever after closing. Fixed; pinned by `client-close.test.ts`. |
+| `db push` advice when the atlas binary is missing | **BUG** (class 5) — the suggested command reproduces the state it is meant to fix. Fixed. |
+| OSS → cloud breakage detection | **PARTIAL** — saas CI is the only gate on the seam and ran solely on saas's own pushes, so a change merged here is invisible until somebody happens to push there. Added a nightly to saas CI. Deliberately *not* a push-triggered dispatch from this repo: that needs a token with write access to the private repo stored in the public one, and it buys hours of latency against a backstop that already exists — the deploy path builds saas, so the seam cannot break a release silently. |
+| end-user auth → RLS → storage → realtime via the SDK | **UNCOVERED** — every tier was tested and their composition was not (client tests mock the transport, `rls-enforcement` has no HTTP, the BaaS e2e uses a service key and so never exercises RLS). Added `client-sdk-e2e.ts`. |
+| bundle format / runtime contract / auth schema versioning | clean — all three are stamped, checked, and fail loudly. Written up in `docs/compatibility.md`. |
+| `cli-init-e2e` installing from real tarballs | clean — it packs and installs real tarballs, not workspace links |
+| undeclared runtime dependencies | clean — `pnpm check:deps` green |
+| `AUDIT-2026-07-28` finding A ("21 Playwright tests") | **STALE** — it is 10; the count came from grepping `test(` textually. Corrected. |
+| every other user-facing message naming a command (class 5 sweep) | `google-auth-library`, `nodemailer`, `@google-cloud/storage`, `ts-morph` — all advise `pnpm add`, and none of the four declares an install script, so the advice does resolve the state. Clean. The `rebase …` suggestions in `doctor.ts`, `policy-drift.ts`, `bundle.ts` and the cloud commands all name a command that changes the state that produced them. Clean. |
+| `init.ts` ts-morph advice | **BUG** (class 5, milder) — said `npm install` inside what is always a pnpm workspace, where npm rewrites `node_modules` into a layout pnpm then disagrees with. Advice that damages the project. Fixed. |
+
+Two of these are the same shape as the migration-order finding above: a gate
+that exists, is correct, and never runs. `saas` CI could not see this repo's
+commits, and the Playwright suite could not survive CI's database. In both cases
+the work had been done and the wiring had not, which is cheaper to find by
+asking "when does this actually execute?" than by reading the assertions.

@@ -6,6 +6,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { logger } from "@rebasepro/server";
 import {
+    diagnoseMissingBin,
     resolveLocalBin,
     getTableIncludes,
     getDevDatabaseUrl,
@@ -635,9 +636,36 @@ async function runAtlas(
 ): Promise<string> {
     const atlasBin = resolveLocalBin("atlas");
     if (!atlasBin) {
-        logger.error(chalk.red("✗ Could not find atlas binary."));
-        const installCmd = "pnpm add -D @ariga/atlas";
-        logger.error(chalk.gray(`  Install it with: ${installCmd}`));
+        // Two very different causes, and the advice for one is a loop for the
+        // other — see `diagnoseMissingBin`. This used to say "Install it with:
+        // pnpm add -D @ariga/atlas" unconditionally, which is the exact command
+        // that produces the far more common of the two states.
+        logger.error(chalk.red("\n✗ The atlas binary is missing, so the schema cannot be applied.\n"));
+
+        if (diagnoseMissingBin("@ariga/atlas") === "build-script-blocked") {
+            logger.error(chalk.yellow("  @ariga/atlas IS installed — only its binary is missing.\n"));
+            logger.error(chalk.gray(
+                "  It downloads that binary in a `preinstall` script, and pnpm 10+ does not\n" +
+                "  run a dependency's scripts unless you allow it. The install still exits 0,\n" +
+                "  so the only sign is `Ignored build scripts: @ariga/atlas` in its output.\n"
+            ));
+            logger.error("  Fix it with either:\n");
+            logger.error(chalk.bold("    pnpm approve-builds\n"));
+            logger.error("  or, to record it in the project (what `rebase init` scaffolds):\n");
+            logger.error(chalk.bold(
+                "    // package.json\n" +
+                "    \"pnpm\": { \"onlyBuiltDependencies\": [\"@ariga/atlas\"] }\n"
+            ));
+            logger.error(chalk.gray("  Then re-run `pnpm install`.\n"));
+        } else {
+            logger.error(chalk.gray("  It is not installed in this project.\n"));
+            logger.error("  Install it with:\n");
+            logger.error(chalk.bold("    pnpm add -D @ariga/atlas\n"));
+            logger.error(chalk.gray(
+                "  If pnpm then reports `Ignored build scripts`, also run `pnpm approve-builds` —\n" +
+                "  the package carries a `preinstall` script that fetches the binary.\n"
+            ));
+        }
         process.exit(1);
     }
 

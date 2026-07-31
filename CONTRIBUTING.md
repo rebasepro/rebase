@@ -72,6 +72,20 @@ Before submitting a PR, make sure all checks pass:
 
 This runs TypeScript compilation, ESLint, unit tests, and Playwright E2E tests.
 
+## Compatibility
+
+Rebase is `0.x`, so breaking changes to the authored TypeScript API are allowed
+in a minor and belong in the changelog. A small number of contracts are *not*
+in that category: they are stamped into built bundles and into live databases,
+and Rebase Cloud reads them to decide what may run where.
+
+If your change touches the bundle format, the bundle↔runtime contract, the auth
+schema version, or the collection schema hash, read
+**[docs/compatibility.md](docs/compatibility.md)** first. It says what each one
+promises, which direction it is compatible in, what a bump costs, and which gate
+will catch you. One of them invalidates every bundle ever built, so it is worth
+the five minutes.
+
 ## Submitting a Pull Request
 
 1. Create a feature branch from `main`.
