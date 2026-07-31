@@ -303,7 +303,6 @@ parentEntityIds,
         selectedSecondaryForm
     } = resolvedSelectedEntityView(customViews, customizationController, activeTab, canEdit);
 
-    const actionsAtTheBottom = layout === "side_panel" || layout === "dialog" || selectedEntityView?.includeActions === "bottom";
 
     const mainViewVisible = activeTab === MAIN_TAB_VALUE || Boolean(selectedSecondaryForm);
 
@@ -571,7 +570,6 @@ parentEntityIds,
             entity={entity}
             initialDirtyValues={initialDirtyValues}
             openEntityMode={layout}
-            forceActionsAtTheBottom={actionsAtTheBottom}
             // Save and Discard live in the identity bar now, where they stay
             // visible while the form scrolls. The form's own footer would be a
             // second copy of them.

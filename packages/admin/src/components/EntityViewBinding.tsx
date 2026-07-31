@@ -36,13 +36,17 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
 
     const customizationController: CustomizationController = useCustomizationController();
 
-    // The id is the chip in the identity bar. Listing it again as the first row
-    // of the value table is the same duplication the form removed — and here it
-    // is the first thing you read about the record.
+    // A single surrogate id is the chip in the identity bar, so listing it again
+    // as the first row here is the duplication the form already removed.
+    //
+    // A composite key is different: `entity.id` is then a synthesised address
+    // (`a:::b`), and the real key columns are data — on a junction row they say
+    // which two records this joins. Those stay in the table.
     const properties: Properties = React.useMemo(() => {
-        const entries = Object.entries(collection.properties ?? {})
-            .filter(([, property]) => !(property && "isId" in property && property.isId));
-        return Object.fromEntries(entries) as Properties;
+        const entries = Object.entries(collection.properties ?? {});
+        const idKeys = entries.filter(([, p]) => p && "isId" in p && p.isId);
+        if (idKeys.length !== 1) return collection.properties;
+        return Object.fromEntries(entries.filter(([key]) => key !== idKeys[0][0])) as Properties;
     }, [collection.properties]);
     const externalLink = customizationController?.entityLinkBuilder?.({ entity });
 

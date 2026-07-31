@@ -296,14 +296,25 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
     }
 
     /* ---- the id ---------------------------------------------------------- */
-    // Routed out of the form and into the record block unless it is still
-    // typeable. This is what `hideIdFromForm` used to be for; that flag now only
-    // decides whether the record block shows it at all.
-    const idKeys = [...available.keys()].filter(key => {
-        const property = collection.properties?.[key] as Property | undefined;
-        return isIdProperty(property) && !isIdPropertyEditable(property!, status);
-    });
-    for (const key of idKeys) available.delete(key);
+    // A single surrogate key is routed out of the form and into the record
+    // block, unless it is still typeable. This is what `hideIdFromForm` used to
+    // be for; that flag now only decides whether the record block shows it.
+    //
+    // A COMPOSITE key is not. Postgres has no `id` — a row is addressed by one
+    // or more real columns, and `entity.id` is a token we synthesise on top
+    // (`a:::b`, see `buildCompositeId`). When the key spans several columns
+    // those columns are data: on a junction row, `order_id` and `product_id`
+    // are *which order* and *which product*. Hiding them behind an address
+    // nobody can read would remove the only meaningful thing on the form.
+    const idKeys = [...available.keys()].filter(key =>
+        isIdProperty(collection.properties?.[key] as Property | undefined));
+
+    if (idKeys.length === 1) {
+        const property = collection.properties?.[idKeys[0]] as Property;
+        if (!isIdPropertyEditable(property, status)) {
+            available.delete(idKeys[0]);
+        }
+    }
 
     /* ---- audit timestamps ------------------------------------------------ */
     // Same treatment as the id, and for the same reason: the record block shows

@@ -56,7 +56,6 @@ export function EntityForm<M extends Record<string, unknown>>({
     entity,
     initialDirtyValues,
     onFormContextReady,
-    forceActionsAtTheBottom,
     initialStatus,
     className,
     onStatusChange,
@@ -67,7 +66,6 @@ export function EntityForm<M extends Record<string, unknown>>({
     Builder,
     EntityFormActionsComponent = EntityFormActions,
     showDefaultActions = true,
-    showEntityPath = true,
     navigateBack: navigateBackProp,
     children,
     // Headless callback props
@@ -575,8 +573,6 @@ export function EntityForm<M extends Record<string, unknown>>({
             </>}
 
             {afterFields}
-
-            {forceActionsAtTheBottom && <div className="h-16"/>}
 
             <Dialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen} maxWidth={"sm"}>
                 <DialogTitle>{status === "existing" ? "Discard changes?" : "Clear form?"}</DialogTitle>

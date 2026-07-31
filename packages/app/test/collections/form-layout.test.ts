@@ -122,6 +122,24 @@ describe("resolveFormLayout — derived defaults", () => {
         expect(layout.hasRail).toBe(true);
     });
 
+    it("keeps every column of a composite key visible", () => {
+        // Postgres has no `id`: a row is addressed by its key columns, and
+        // `entity.id` is a synthesised `a:::b` token. On a junction row the key
+        // columns ARE the data — which order, which product — so hiding them
+        // behind an unreadable address would empty the form.
+        const junction = collection({
+            order_id: { type: "string", isId: "manual" },
+            product_id: { type: "string", isId: "manual" },
+            quantity: { type: "number" }
+        });
+        const l = resolveFormLayout({
+            collection: junction,
+            fieldKeys: ["order_id", "product_id", "quantity"],
+            status: "existing"
+        });
+        expect(keysOf(l)).toEqual(["order_id", "product_id", "quantity"]);
+    });
+
     it("keeps a manual id in the form while creating", () => {
         const manual = collection({
             id: { type: "string", isId: "manual" },

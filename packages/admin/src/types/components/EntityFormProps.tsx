@@ -22,7 +22,6 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
     onSaved?: (params: OnUpdateParams) => void;
     initialDirtyValues?: Partial<M>; // dirty cached entity in memory
     onFormContextReady?: (formContext: FormContext<M>) => void;
-    forceActionsAtTheBottom?: boolean;
     className?: string;
     initialStatus: EntityStatus;
     onStatusChange?: (status: EntityStatus) => void;
@@ -37,11 +36,6 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
      * Include the copy and delete actions in the form
      */
     showDefaultActions?: boolean;
-
-    /**
-     * Display the entity path in the form
-     */
-    showEntityPath?: boolean;
 
     EntityFormActionsComponent?: React.FC<EntityFormActionsProps>;
 

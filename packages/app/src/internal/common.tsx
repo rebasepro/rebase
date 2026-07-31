@@ -9,13 +9,6 @@
  */
 export const CONTAINER_FULL_WIDTH = "100vw";
 
-/**
- * @internal
- * @deprecated The side panel is one width whatever tab is showing, so nothing
- * adds a per-tab allowance any more. See {@link SIDE_PANEL_DEFAULT_WIDTH}.
- */
-export const ADDITIONAL_TAB_WIDTH = "55vw";
-
 /** @internal See {@link CONTAINER_FULL_WIDTH}. */
 export const FORM_CONTAINER_WIDTH = "768px";
 
