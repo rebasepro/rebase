@@ -46,6 +46,41 @@ composite treatments; `iconSize` for icon sizing; `CHIP_COLORS` /
 `getColorSchemeForKey` / `getColorSchemeForSeed` for chip palettes.
 `.no-scrollbar` hides a scrollbar while keeping scrolling.
 
+## Sizing — one scale, shared by every control
+
+Every inline control resolves its height from one scale, so controls at the same
+`size` are **pixel-identical and share a baseline**:
+
+| `size` | height | use |
+|---|---|---|
+| `smallest` | 28px | dense tables, inline cell editors |
+| `small` | 32px | toolbars, compact forms |
+| `medium` | 40px | **default** — standard forms |
+| `large` | 48px | prominent/primary forms |
+| `xl` / `2xl` | 56 / 64px | buttons only — hero CTAs |
+
+Applies to `Button`, `LoadingButton`, `TextField`, `DebouncedTextField`,
+`Select`, `MultiSelect`, `SearchBar`, `DateTimeField`, `IconButton`, `Checkbox`.
+So `<Button size="medium">` beside `<TextField size="medium">` lines up exactly —
+just give both the same `size` and don't hand-tune heights.
+
+A **labelled** TextField sits exactly 16px taller (44/48/56/64), because the
+label takes its own row. Don't mix labelled and unlabelled fields on one line and
+expect alignment — give the unlabelled one the next size up, or label both.
+
+The scale is exported: `CONTROL_HEIGHT` (numbers) and `controlHeightMixin`
+(Tailwind classes) from the library, so custom controls can sit on it too.
+
+## Colour
+
+Every colour pair in the system meets WCAG AA except deliberately-inactive
+(disabled) controls, which the spec exempts. Two things to respect:
+
+- **`primary` passes at 4.54:1 — with almost no margin.** Don't put it on
+  anything other than white/`surface-50`, and don't lighten it for text.
+- All 15 `Chip` schemes and all 4 `Alert` colours are AA-safe in both their
+  filled and outlined forms; use them freely.
+
 ## Icons
 
 ~135 lucide icons are re-exported directly — `PlusIcon`, `Trash2Icon`,

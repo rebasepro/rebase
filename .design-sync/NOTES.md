@@ -147,6 +147,58 @@ even though the component is `React.PropsWithChildren<FileUploadProps>`.
 - **`BooleanSwitch` / `Checkbox` "on" colours read pink/red**, not the primary
   blue — that is the shipped component's own colour choice.
 
+## Coherence pass (2026-07-31) — sizing + colour
+
+Audited by measuring real rendered boxes in headless chromium, not by reading
+CSS. The harness is committed under `.design-sync/audit/`. **Re-run both after
+any change to a control's padding, height or palette** — they are the regression
+test for this work. Run them from `.ds-sync/`, which is where playwright is
+installed, and after a `package-build.mjs` (they load `ds-bundle/_ds_bundle.js`,
+so `rebuild.sh` alone is not enough — that trap cost two false readings):
+
+```
+cd .ds-sync && node ../.design-sync/audit/measure.mjs
+cd .ds-sync && node ../.design-sync/audit/measure-colors.mjs
+```
+
+**Before**: `size="large"` meant 42px on a Button and 64px on a TextField. There
+was no size name at which a Button and a TextField lined up. Nine controls each
+carried their own private height map.
+
+**Now**: one scale in `styles.ts` — `CONTROL_HEIGHT` / `controlHeightMixin` /
+`controlPaddingMixin`, 28/32/40/48 (+56/64 for buttons only). Measured spread at
+every size name across all nine inline controls: **0px**.
+
+Specific bugs the measurements exposed, all fixed:
+
+- `Button` derived height from padding alone, so it could never match a field.
+- `DateTimeField` rendered its calendar/clear adornments as default-`medium`
+  IconButtons (40px), flooring the whole field — smallest/small/medium were all
+  40px. It also had a flat `py-2`.
+- `MultiSelect` hardcoded `Chip size="medium"` inside a `py-2` row, overflowing
+  its own min-height.
+- `Checkbox` gave `smallest` and `small` the same 32px hit area.
+- `BooleanSwitch` had `medium` and `large` sharing one branch.
+- `Chip` `small`/`medium` differed only in horizontal padding — same height.
+- `SearchBar` hardcoded its own heights and had no `large`.
+- A labelled `TextField` was 50px at smallest, small AND medium — `size` was
+  effectively inert whenever a label was present.
+
+**Colour**: 61 combinations checked for WCAG AA against real composited pixels.
+`--color-secondary` was `#FF5B79` at 2.99:1 — failing as text on white *and*
+behind white text. Now `#E11D48` (rose-600, same hue family, 4.70:1). Button's
+error variants moved `red-500` → `red-600` (3.76 → 4.83:1). All 15 Chip schemes
+and all 4 Alert colours already passed and were left alone. `primary` `#0070F4`
+passes at **4.54:1 with almost no margin** — treat it as fixed.
+
+Two measurement caveats for whoever re-runs this:
+
+- The 16 disabled-state rows reported below AA are **not defects** — WCAG 1.4.3
+  exempts inactive controls. Expect them.
+- `Button filled/error` reports a nonsense `1:1` (white on white). It is a
+  harness artifact, not a bug — the button renders red with white text, verified
+  by screenshot. Its true ratio is 4.83:1. Don't chase it.
+
 ## The authoring trap: silently-dropped Tailwind classes
 
 **The single biggest time sink of this sync.** The stylesheet is compiled ONCE

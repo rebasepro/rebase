@@ -1,0 +1,89 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+  <link rel="stylesheet" href="/Users/francesco/rebase/ds-bundle/styles.css">
+  <link rel="stylesheet" href="/Users/francesco/rebase/ds-bundle/_ds_bundle.css">
+  <style>body{margin:0;padding:16px;background:#fff}
+    .probe{display:inline-block;margin:4px}</style>
+</head><body>
+  <div id="root"></div>
+  <script src="/Users/francesco/rebase/ds-bundle/_vendor/react.js"></script>
+  <script src="/Users/francesco/rebase/ds-bundle/_vendor/react-dom.js"></script>
+  <script src="/Users/francesco/rebase/ds-bundle/_ds_bundle.js"></script>
+  <script>
+  var h = React.createElement, U = window.RebaseUI, noop = function(){};
+  var items = [];
+
+  var BTN_VARIANTS = ["filled","outlined","text"];
+  var BTN_COLORS   = ["primary","secondary","error","neutral","text"];
+  BTN_VARIANTS.forEach(function(v){ BTN_COLORS.forEach(function(c){
+    items.push({ k:"Button "+v+"/"+c, el:h(U.Button,{variant:v,color:c},"Save") });
+    items.push({ k:"Button "+v+"/"+c+" disabled", el:h(U.Button,{variant:v,color:c,disabled:true},"Save") });
+  });});
+
+  ["blue","teal","yellow","pink","purple","cyan","orange","green","red","gray",
+   "indigo","violet","fuchsia","rose","emerald"].forEach(function(s){
+    items.push({ k:"Chip "+s, el:h(U.Chip,{colorScheme:s},"Label") });
+    items.push({ k:"Chip "+s+" outlined", el:h(U.Chip,{colorScheme:s,outlined:true},"Label") });
+  });
+
+  ["info","success","warning","error"].forEach(function(c){
+    items.push({ k:"Alert "+c, el:h(U.Alert,{color:c},"Message text") });
+  });
+
+  ["primary","secondary","disabled","error"].forEach(function(c){
+    items.push({ k:"Typography "+c, el:h(U.Typography,{color:c},"Body copy") });
+  });
+
+  var App = h("div",null, items.map(function(it,i){
+    return h("span",{className:"probe","data-probe":i,key:i}, it.el);
+  }));
+  ReactDOM.createRoot(document.getElementById("root")).render(App);
+
+  function parse(c){
+    var m = c && c.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/);
+    if(!m) return null;
+    return { r:+m[1], g:+m[2], b:+m[3], a: m[4]===undefined?1:+m[4] };
+  }
+  function over(fg,bg){ // alpha-composite fg over bg
+    var a = fg.a;
+    return { r: fg.r*a + bg.r*(1-a), g: fg.g*a + bg.g*(1-a), b: fg.b*a + bg.b*(1-a), a:1 };
+  }
+  function effBg(el){
+    var acc = { r:255,g:255,b:255,a:1 }, chain=[], n=el;
+    while(n && n !== document.documentElement){
+      var c = parse(getComputedStyle(n).backgroundColor);
+      if(c && c.a > 0) chain.push(c);
+      n = n.parentElement;
+    }
+    for(var i=chain.length-1;i>=0;i--) acc = over(chain[i], acc);
+    return acc;
+  }
+  function lum(c){
+    var f=function(v){ v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); };
+    return 0.2126*f(c.r)+0.7152*f(c.g)+0.0722*f(c.b);
+  }
+
+  window.__colors = function(){
+    return items.map(function(it,i){
+      var wrap = document.querySelector('[data-probe="'+i+'"]');
+      var el = wrap && wrap.firstElementChild; if(!el) return null;
+      // find the deepest node that actually holds the text
+      var textNode = el;
+      var walk = el.querySelectorAll("*");
+      for (var j=0;j<walk.length;j++){
+        var t = walk[j].textContent||"";
+        if (t.trim() && walk[j].children.length===0){ textNode = walk[j]; break; }
+      }
+      var cs = getComputedStyle(textNode);
+      var fg = parse(cs.color); if(!fg) return null;
+      var bg = effBg(textNode);
+      var fgC = fg.a < 1 ? over(fg,bg) : fg;
+      var L1 = lum(fgC), L2 = lum(bg);
+      var ratio = (Math.max(L1,L2)+0.05)/(Math.min(L1,L2)+0.05);
+      return { k: it.k, fg: cs.color, bg: "rgb("+Math.round(bg.r)+","+Math.round(bg.g)+","+Math.round(bg.b)+")",
+               size: parseFloat(cs.fontSize), weight: cs.fontWeight,
+               ratio: Math.round(ratio*100)/100 };
+    }).filter(Boolean);
+  };
+  </script>
+</body></html>

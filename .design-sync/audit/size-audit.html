@@ -1,0 +1,74 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+  <link rel="stylesheet" href="/Users/francesco/rebase/ds-bundle/styles.css">
+  <link rel="stylesheet" href="/Users/francesco/rebase/ds-bundle/_ds_bundle.css">
+  <style>body{margin:0;padding:24px;background:#fff}
+    .row{display:flex;align-items:flex-start;gap:12px;margin-bottom:8px}
+    .probe{display:inline-block}</style>
+</head><body>
+  <div id="root"></div>
+  <script src="/Users/francesco/rebase/ds-bundle/_vendor/react.js"></script>
+  <script src="/Users/francesco/rebase/ds-bundle/_vendor/react-dom.js"></script>
+  <script src="/Users/francesco/rebase/ds-bundle/_ds_bundle.js"></script>
+  <script>
+  var h = React.createElement, U = window.RebaseUI;
+  var noop = function(){};
+
+  var SPECS = [
+    { n:"Button",           sizes:["smallest","small","medium","large","xl","2xl"],
+      r:function(s){ return h(U.Button,{size:s},"Save"); } },
+    { n:"LoadingButton",    sizes:["smallest","small","medium","large","xl","2xl"],
+      r:function(s){ return h(U.LoadingButton,{size:s,loading:false},"Save"); } },
+    { n:"TextField",        sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.TextField,{size:s,placeholder:"Value"}); } },
+    { n:"TextField+label",  sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.TextField,{size:s,label:"Name",placeholder:"Value"}); } },
+    { n:"DebouncedTextField", sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.DebouncedTextField,{size:s,placeholder:"Value"}); } },
+    { n:"Select",           sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.Select,{size:s,value:"a",onValueChange:noop},
+                       h(U.SelectItem,{value:"a"},"Alpha")); } },
+    { n:"MultiSelect",      sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.MultiSelect,{size:s,value:["a"],onValueChange:noop},
+                       h(U.MultiSelectItem,{value:"a"},"Alpha")); } },
+    { n:"SearchBar",        sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.SearchBar,{size:s,placeholder:"Search"}); } },
+    { n:"DateTimeField",    sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.DateTimeField,{size:s,onChange:noop}); } },
+    { n:"IconButton",       sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.IconButton,{size:s},h(U.PlusIcon,{size:18})); } },
+    { n:"Chip",             sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.Chip,{size:s},"Tag"); } },
+    { n:"Checkbox",         sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.Checkbox,{size:s,checked:true,onCheckedChange:noop}); } },
+    { n:"BooleanSwitch",    sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.BooleanSwitch,{size:s,value:true,onValueChange:noop}); } },
+    { n:"CircularProgress", sizes:["smallest","small","medium","large"],
+      r:function(s){ return h(U.CircularProgress,{size:s}); } }
+  ];
+
+  var items = [];
+  SPECS.forEach(function(spec){
+    spec.sizes.forEach(function(s){ items.push({ n:spec.n, s:s, el:spec.r(s) }); });
+  });
+
+  var App = h("div", null, items.map(function(it,i){
+    return h("div",{className:"row",key:i},
+      h("span",{style:{width:180,fontSize:12,fontFamily:"monospace",color:"#666"}}, it.n+" / "+it.s),
+      h("span",{className:"probe","data-probe":i}, it.el));
+  }));
+  ReactDOM.createRoot(document.getElementById("root")).render(App);
+
+  window.__measure = function(){
+    return items.map(function(it,i){
+      var wrap = document.querySelector('[data-probe="'+i+'"]');
+      var el = wrap && wrap.firstElementChild;
+      var r = el ? el.getBoundingClientRect() : null;
+      if (wrap && (!r || r.height === 0)) r = wrap.getBoundingClientRect();
+      return { component: it.n, size: it.s,
+               h: r ? Math.round(r.height*10)/10 : null,
+               w: r ? Math.round(r.width*10)/10 : null };
+    });
+  };
+  </script>
+</body></html>
