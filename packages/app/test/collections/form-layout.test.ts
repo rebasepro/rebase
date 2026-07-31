@@ -226,8 +226,8 @@ describe("resolveFormLayout — derived defaults", () => {
 });
 
 describe("fillRows", () => {
-    it("leaves a half-width field with a trailing gap alone", () => {
-        // name | sku  then  brand | ␣␣ — normal wrapping, not a defect.
+    it("closes the gap left by a lone half-width field", () => {
+        // name | sku  then  brand | ␣␣ — the stranded half is what this removes.
         const l = resolveFormLayout({
             collection: collection({
                 name: { type: "string" },
@@ -238,7 +238,7 @@ describe("fillRows", () => {
             status: "existing"
         });
         const spans = l.sections[0].fields.map(f => [f.key, f.span]);
-        expect(spans).toEqual([["name", 2], ["sku", 2], ["brand", 2]]);
+        expect(spans).toEqual([["name", 2], ["sku", 2], ["brand", 4]]);
     });
 
     it("never resizes a field whose span the author set", () => {
@@ -255,7 +255,7 @@ describe("fillRows", () => {
         expect(spans).toEqual([["a", 2], ["b", 2], ["c", 2]]);
     });
 
-    it("grows a lone quarter-width field to a half, and no further", () => {
+    it("closes the gap left by a lone quarter-width field", () => {
         const l = resolveFormLayout({
             collection: collection({
                 a: { type: "number" }, b: { type: "number" },
@@ -267,8 +267,19 @@ describe("fillRows", () => {
         });
         // row one is full; `lonely` starts a row of its own with a gap of 3
         expect(l.sections[0].fields.map(f => [f.key, f.span])).toEqual([
-            ["a", 1], ["b", 1], ["c", 1], ["d", 1], ["lonely", 2]
+            ["a", 1], ["b", 1], ["c", 1], ["d", 1], ["lonely", 4]
         ]);
+    });
+
+    it("spreads the remainder across the row rather than onto the last field", () => {
+        // two quarter-width numbers and half a row spare: both grow, so you do
+        // not get one full-width input beside one quarter-width one.
+        const l = resolveFormLayout({
+            collection: collection({ a: { type: "number" }, b: { type: "number" } }),
+            fieldKeys: ["a", "b"],
+            status: "existing"
+        });
+        expect(l.sections[0].fields.map(f => f.span)).toEqual([2, 2]);
     });
 
     it("leaves a full row alone", () => {

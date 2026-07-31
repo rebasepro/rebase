@@ -4,7 +4,7 @@ import React, { useState, useCallback } from "react";
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
-import { ArrowLeftIcon, Badge, Button, cls, FilterIcon, IconButton, Tooltip } from "@rebasepro/ui";
+import { Badge, Button, cls, FilterIcon, IconButton, Tooltip, XIcon } from "@rebasepro/ui";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
 import { FiltersDialog } from "./FiltersDialog";
 import { FilterPresetsButton } from "./FilterPresetsButton";
@@ -77,14 +77,18 @@ parentEntityIds,
         navigate(withViewMode(urlController.buildUrlCollectionPath(path)));
     }, [navigate, urlController, path]);
 
+    // It closes the open record rather than navigating anywhere, so it says so.
+    // This is the split view's close control: the entity pane no longer carries
+    // an expand button of its own.
     const backButton = compact && (
-        <Tooltip title={t("back")} key={"back_tooltip"}>
+        <Tooltip title={t("close")} key={"close_tooltip"}>
             <IconButton
                 size="small"
                 onClick={handleBackClick}
+                aria-label={t("close")}
                 className="mr-1"
             >
-                <ArrowLeftIcon size={iconSize.small}/>
+                <XIcon size={iconSize.smallest}/>
             </IconButton>
         </Tooltip>
     );
@@ -107,20 +111,23 @@ parentEntityIds,
                         {activeFilterCount > 0 ? `(${activeFilterCount})` : t("filters")}
                     </Button>
                 ) : (
-                    <Button
-                        variant="text"
-                        size="small"
+                    <IconButton
+                        size={"small"}
                         onClick={() => setFiltersDialogOpen(true)}
                         className={cls(activeFilterCount > 0 && "text-primary")}
                     >
-                        <FilterIcon size={iconSize.small}/>
-                    </Button>
+                        <FilterIcon size={iconSize.smallest}/>
+                    </IconButton>
                 )}
             </Badge>
         </Tooltip>
     );
 
-    const filterPresetsButton = collection.filterPresets?.length ? (
+    // Not in the split view. The toolbar there is a strip a few hundred pixels
+    // wide above the list, and a row of preset chips crowded out the controls
+    // that act on what you are looking at. The presets are still one click away
+    // inside the filters dialog.
+    const filterPresetsButton = !compact && collection.filterPresets?.length ? (
         <FilterPresetsButton
             key={"filter_presets"}
             filterPresets={collection.filterPresets}

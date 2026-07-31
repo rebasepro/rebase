@@ -193,12 +193,14 @@ export function isAuditTimestamp(property: Property | undefined): boolean {
 }
 
 /**
- * Grow the last derived field in each row to close a trailing gap.
+ * Close the trailing gap in each row.
  *
- * Without this, a section of half-width fields with an odd count leaves a hole:
- * `name | sku` then `brand | ␣␣` — a field stranded beside a third of a row of
- * nothing, which reads as a mistake rather than a layout. Fields with an
- * explicit span are never resized; the author picked that width on purpose.
+ * Without this a section of half-width fields with an odd count leaves a hole —
+ * `name | sku` then `brand | ␣␣` — a field stranded beside half a row of
+ * nothing, which reads as a mistake rather than a layout. The remainder is
+ * spread across the row's derived fields rather than dumped on the last one, so
+ * a lone half-width field becomes full width and a pair grows evenly. Fields
+ * with an explicit span are never resized.
  */
 export function fillRows(fields: ResolvedFormField[]): ResolvedFormField[] {
     const rows: ResolvedFormField[][] = [];
@@ -218,28 +220,28 @@ export function fillRows(fields: ResolvedFormField[]): ResolvedFormField[] {
 
     return rows.flatMap(entries => {
         const total = entries.reduce((sum, f) => sum + f.span, 0);
-        const gap = GRID_COLUMNS - total;
-        if (gap > 0) {
-            for (let i = entries.length - 1; i >= 0; i--) {
-                const field = entries[i];
-                if (field.spanExplicit) continue;
-                // Only a quarter-width field, and only up to a half.
-                //
-                // A trailing gap is normal in any wrapping form and needs no
-                // rescuing — half a row of nothing after a half-width field is
-                // fine. What is not fine is a lone quarter-width number sitting
-                // in three quarters of nothing. Growing further overshoots the
-                // other way: a single-line text input stretched across the whole
-                // form reads as a mistake too.
-                if (field.span > 1) break;
-                const grown = Math.min(field.span + gap, 2);
-                if (grown !== field.span) {
-                    entries[i] = { ...field, span: grown as PropertySpan };
-                }
-                break;
-            }
+        let gap = GRID_COLUMNS - total;
+        if (gap <= 0) return entries;
+
+        // Spread the remainder across the row's derived fields rather than
+        // dumping it all on the last one: two half-width fields beside a gap
+        // become two three-quarter fields, not one full-width and one half.
+        // Fields with an explicit span keep it — the author picked that width.
+        const growable = entries
+            .map((f, i) => [f, i] as const)
+            .filter(([f]) => !f.spanExplicit);
+
+        if (!growable.length) return entries;
+
+        const next = [...entries];
+        let cursor = 0;
+        while (gap > 0) {
+            const [, index] = growable[cursor % growable.length];
+            next[index] = { ...next[index], span: (next[index].span + 1) as PropertySpan };
+            gap -= 1;
+            cursor += 1;
         }
-        return entries;
+        return next;
     });
 }
 

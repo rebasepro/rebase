@@ -3,13 +3,12 @@ import React, { useLayoutEffect, useState } from "react";
 /**
  * Below this the form is a single column and the rail is not shown.
  *
- * Set above the width a split-view pane actually gets, deliberately. In split
- * view the collection list is already a column, so a rail makes the record
- * itself span two more and the eye has three vertical rhythms to track. The
- * content column plus the rail only earns its keep when the form owns the
- * window.
+ * Roughly the 288px rail plus a content column still wide enough to hold a
+ * four-up row. Above it the rail is worth having even in the split view; below
+ * it — a narrow split pane, the side panel, the dialog, a phone — its fields
+ * fold back into the column.
  */
-export const RAIL_MIN_WIDTH = 1280;
+export const RAIL_MIN_WIDTH = 1000;
 
 /**
  * Is there room beside the form for the metadata rail?

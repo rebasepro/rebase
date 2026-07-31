@@ -654,7 +654,9 @@ parentEntityIds,
             );
         });
 
-    const fullScreenButton = !barActions && (layout === "side_panel" || layout === "split" || layout === "dialog") && entityId ? (
+    const fullScreenButton = !barActions && // Not in split: the list panel beside it carries the close control,
+    // and an expand button there competes with it.
+    (layout === "side_panel" || layout === "dialog") && entityId ? (
         <Tooltip title={"Open full screen"}>
             <IconButton
                 size="small"

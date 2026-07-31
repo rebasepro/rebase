@@ -312,7 +312,21 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     useEffect(() => {
         onFormContextReady?.(formContext);
-    }, [formex.version, collection, entityId, path]);
+        // `formex.version` only moves on `resetForm`, so these deps used to hand
+        // the container one snapshot at mount and never another. That was
+        // invisible while Save lived inside the form and read `formex` directly;
+        // once the identity bar owned Save, its `dirty` was frozen false and the
+        // button never enabled — for any field, not just the one that exposed
+        // it. Custom entity views read `formContext.values` through the same
+        // channel and were reading a stale copy too.
+        //
+        // Deps are the state *transitions* a container cares about, not
+        // `formex.values`: re-publishing on every keystroke would re-render the
+        // whole entity view per character.
+    }, [
+        formex.version, collection, entityId, path,
+        formex.dirty, formex.isSubmitting, formex.submitCount, isSavingAutoSave
+    ]);
 
     const actionsDisabled = disabled || formex.isSubmitting || (status === "existing" && !formex.dirty) || Boolean(disabledProp);
 
@@ -655,8 +669,8 @@ export function EntityForm<M extends Record<string, unknown>>({
                             className={cls(
                                 "@container/col w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
                                 openEntityMode === "dialog"
-                                    ? "pt-5 pb-10 px-6 sm:px-8"
-                                    : "pt-6 pb-12 px-5 sm:px-8"
+                                    ? "pt-5 pb-16 px-6 sm:px-8"
+                                    : "pt-6 pb-24 px-5 sm:px-8"
                             )}>
 
                             {manualApplyLocalChanges && hasLocalChanges && localChangesCacheKey &&
