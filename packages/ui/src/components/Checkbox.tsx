@@ -21,7 +21,10 @@ const sizeClasses = {
     large: "w-6 h-6 rounded-md flex items-center justify-center",
     medium: "w-5 h-5 rounded-md flex items-center justify-center",
     small: "w-4 h-4 rounded-md flex items-center justify-center",
-    smallest: "w-3.5 h-3.5 rounded-md flex items-center justify-center"
+    // `rounded-md` is a 6px radius. On a 14px box the two corner radii nearly
+    // meet (6+6 of 14) and the square reads as a circle, so this size steps the
+    // radius down with the box.
+    smallest: "w-3.5 h-3.5 rounded flex items-center justify-center"
 };
 
 // Outer box is the hit area and sets the control's rendered height, so it

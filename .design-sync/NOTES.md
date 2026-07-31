@@ -191,6 +191,14 @@ error variants moved `red-500` → `red-600` (3.76 → 4.83:1). All 15 Chip sche
 and all 4 Alert colours already passed and were left alone. `primary` `#0070F4`
 passes at **4.54:1 with almost no margin** — treat it as fixed.
 
+**Corner radius has to step down with the box.** Shrinking `Checkbox`'s
+`smallest` box from 16px to 14px while it still carried `rounded-md` (6px) made
+it render as a *circle* — 6px of radius from each side of a 14px box leaves
+almost no straight edge. It shipped that way briefly and was immediately obvious
+in the product. Anything at or below ~16px needs `rounded` (4px) or smaller. The
+height harness does not catch this: the box measured correctly the whole time,
+it just wasn't square. Eyeball shape changes, don't only measure them.
+
 Two measurement caveats for whoever re-runs this:
 
 - The 16 disabled-state rows reported below AA are **not defects** — WCAG 1.4.3
