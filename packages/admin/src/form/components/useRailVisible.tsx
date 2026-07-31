@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useLayoutEffect, useState } from "react";
 
 /**
  * Below this the form is a single column and the rail is not shown.
@@ -28,7 +28,9 @@ export function useRailVisible(ref: React.RefObject<HTMLElement | null>): boolea
 
     const [visible, setVisible] = useState(false);
 
-    useEffect(() => {
+    // Layout effect, not effect: measured before paint, so a wide form does
+    // not render single-column for a frame and then snap the rail in.
+    useLayoutEffect(() => {
         const element = ref.current;
         if (!element) return;
 

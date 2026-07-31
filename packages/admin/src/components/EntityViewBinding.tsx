@@ -36,7 +36,14 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
 
     const customizationController: CustomizationController = useCustomizationController();
 
-    const properties: Properties = collection.properties;
+    // The id is the chip in the identity bar. Listing it again as the first row
+    // of the value table is the same duplication the form removed — and here it
+    // is the first thing you read about the record.
+    const properties: Properties = React.useMemo(() => {
+        const entries = Object.entries(collection.properties ?? {})
+            .filter(([, property]) => !(property && "isId" in property && property.isId));
+        return Object.fromEntries(entries) as Properties;
+    }, [collection.properties]);
     const externalLink = customizationController?.entityLinkBuilder?.({ entity });
 
     return (

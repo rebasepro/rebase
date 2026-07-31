@@ -120,7 +120,10 @@ export function EntityIdentityBar({
 
             <div className={"flex-1"}/>
 
-            <SaveState dirty={dirty} saving={saving} status={status}/>
+            {/* Only where there is something to save. The read-only detail
+                view has no Save button, and reporting "Saved" there implies an
+                editing session the user never started. */}
+            {onSave && <SaveState dirty={dirty} saving={saving} status={status}/>}
 
             {pluginActions}
 
