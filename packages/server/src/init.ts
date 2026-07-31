@@ -1137,30 +1137,117 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // to write to and is off in baas mode (no files) and in production.
     const schemaEditorEnabled =
         config.schemaEditor ?? (!!config.collectionsDir && !introspectCollections && process.env.NODE_ENV !== "production");
+
+    /**
+     * Why the editor is off, in the words the person staring at a greyed-out
+     * "Add collection" button needs.
+     *
+     * The admin panel used to decide whether collections were editable from
+     * its *own* build mode — `process.env.NODE_ENV` inside the browser bundle.
+     * That is a different process from the one that decides whether the routes
+     * exist, and the two disagree constantly: a dev frontend against a
+     * deployed API, a `baas`-mode project, a project with no `collectionsDir`,
+     * a server without `ts-morph`. In every one of those the editor offered
+     * itself and each save came back as a bare 404. So the server says whether
+     * it can write, and says why not, and the client asks instead of guessing.
+     */
+    const schemaEditorUnavailable = (): { code: string, message: string } | undefined => {
+        if (config.schemaEditor === false) return {
+            code: "SCHEMA_EDITOR_DISABLED",
+            message: "The schema editor is turned off for this server (`schemaEditor: false`)."
+        };
+        if (!config.collectionsDir) return {
+            code: "SCHEMA_EDITOR_NO_COLLECTIONS_DIR",
+            message: "This server has no `collectionsDir`, so the schema editor has no collection files to write to."
+        };
+        if (schemaEditorEnabled) return undefined;
+        if (introspectCollections) return {
+            code: "SCHEMA_EDITOR_BAAS_MODE",
+            message: "Collections are introspected from the database on this server, so there are no " +
+                "collection source files to edit. Change the schema with a migration instead."
+        };
+        if (process.env.NODE_ENV === "production") return {
+            code: "SCHEMA_EDITOR_PRODUCTION",
+            message: "The schema editor is off under NODE_ENV=production: it edits collection source " +
+                "files, and a deployed server's files are rebuilt from your repository on every " +
+                "deploy, so an edit here would be discarded. Edit collections in development and deploy."
+        };
+        return {
+            code: "SCHEMA_EDITOR_DISABLED",
+            message: "The schema editor is not enabled on this server."
+        };
+    };
+
     if (schemaEditorEnabled && !config.collectionsDir) {
         logger.warn("schemaEditor is enabled but no collectionsDir is set — the schema editor has nowhere to write. Skipping.");
     }
 
-    if (schemaEditorEnabled && config.collectionsDir) {
+    let schemaEditorOff = schemaEditorUnavailable();
+    let schemaEditorRoutes: Hono<HonoEnv> | undefined;
+
+    if (!schemaEditorOff && config.collectionsDir) {
         // ts-morph is an optional peer dependency, so it can legitimately be
         // absent — run without the schema editor instead of failing startup.
-        let editorModule: typeof import("./api/schema-editor-routes") | undefined;
         try {
-            editorModule = await import("./api/schema-editor-routes");
+            const editorModule = await import("./api/schema-editor-routes");
+            schemaEditorRoutes = editorModule.createSchemaEditorRoutes(config.collectionsDir);
         } catch (err) {
             if ((err as { code?: string })?.code === "ERR_MODULE_NOT_FOUND") {
-                logger.warn("Schema Editor disabled: its dependency ts-morph is not installed. Run `npm install ts-morph@28.0.0` to enable it.");
+                schemaEditorOff = {
+                    code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+                    message: "The schema editor needs `ts-morph`, which is not installed on this server. " +
+                        "Run `npm install ts-morph@28.0.0` to enable it."
+                };
+                logger.warn(`Schema Editor disabled: ${schemaEditorOff.message}`);
             } else {
                 throw err;
             }
         }
-        if (editorModule) {
-            const schemaEditorRoutes = editorModule.createSchemaEditorRoutes(config.collectionsDir);
+    }
 
-            applyAdminGate(schemaEditorRoutes, "Schema editor");
+    {
+        // Gate a *fresh* router, then mount the routes into it. Hono collects
+        // matching handlers in registration order, so a `use("/*")` appended to
+        // an already-populated router runs after the handler it was meant to
+        // guard — which is to say never, because the handler has already
+        // answered. Gating `createSchemaEditorRoutes()`'s return value did
+        // exactly that, leaving `POST /api/schema-editor/collection/save`
+        // reachable with no credentials at all: unauthenticated rewrites of the
+        // project's collection source on any reachable dev server. Every other
+        // admin surface here already builds the router, gates it, and *then*
+        // routes into it; this one is now the same shape.
+        const schemaEditorRouter = new Hono<HonoEnv>();
 
-            config.app.route(`${basePath}/schema-editor`, schemaEditorRoutes);
+        applyAdminGate(schemaEditorRouter, "Schema editor");
+
+        schemaEditorRouter.get("/status", (c) => c.json(
+            schemaEditorOff
+                ? { enabled: false, reason: schemaEditorOff.message, code: schemaEditorOff.code }
+                : { enabled: true }
+        ));
+
+        if (schemaEditorRoutes) {
+            schemaEditorRouter.route("/", schemaEditorRoutes);
+        } else {
+            // Mounted-but-refusing, like the other admin surfaces: an
+            // unexplained 404 on a route the UI just called reads as a broken
+            // deploy and gets debugged as one.
+            schemaEditorRouter.all("/*", (c) => c.json({
+                error: {
+                    code: schemaEditorOff!.code,
+                    message: schemaEditorOff!.message
+                }
+            }, 501));
+        }
+
+        config.app.route(`${basePath}/schema-editor`, schemaEditorRouter);
+        if (schemaEditorRoutes) {
             logger.info("Schema Editor mounted", { path: `${basePath}/schema-editor` });
+        } else {
+            logger.debug("Schema Editor unavailable", {
+                path: `${basePath}/schema-editor`,
+                code: schemaEditorOff!.code
+            });
         }
     }
 

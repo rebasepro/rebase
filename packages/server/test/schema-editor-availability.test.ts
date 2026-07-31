@@ -1,0 +1,261 @@
+import { describe, expect, it, afterEach, beforeEach, jest } from "@jest/globals";
+import { Hono } from "hono";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+
+import { initializeRebaseBackend } from "../src/init";
+import { generateAccessToken } from "../src/auth/jwt";
+
+/**
+ * Who may reach the schema editor, and what it says when it cannot serve.
+ *
+ * Two failures met here. The editor rewrites the project's collection *source
+ * files*, so it was admin-gated — except the gate was appended to a router that
+ * already had its routes registered, and Hono runs matching handlers in
+ * registration order, so the guard ran after the handler had already written
+ * the file. `POST /api/schema-editor/collection/save` was reachable with no
+ * credentials on every dev server.
+ *
+ * The second is the mirror image. When the editor is *off* — production, `baas`
+ * mode, no `collectionsDir`, no `ts-morph` — the routes simply did not exist,
+ * and the admin panel had no way to find that out: it decided whether
+ * collections were editable from its own bundle's `NODE_ENV`, which belongs to
+ * a different process entirely. Every save came back a bare 404. The editor now
+ * stays mounted to say why it will not write.
+ */
+
+const JWT_SECRET = "schema-editor-availability-test-secret-1234567890";
+
+function collection(slug: string): CollectionConfig {
+    return {
+        name: slug,
+        slug,
+        table: slug,
+        properties: {
+            id: { name: "ID", type: "string", isId: "uuid" }
+        }
+    } as unknown as CollectionConfig;
+}
+
+function stubDriver() {
+    return {
+        fetchCollection: async () => ({ data: [], meta: { total: 0, hasMore: false } }),
+        fetchEntity: async () => undefined,
+        saveEntity: async () => ({}),
+        deleteEntity: async () => undefined,
+        countCollection: async () => 0,
+        checkUniqueField: async () => true,
+        healthCheck: async () => ({ healthy: true, latencyMs: 1 })
+    } as never;
+}
+
+function fakeBootstrapper(reports: CollectionConfig[] | undefined): BackendBootstrapper {
+    return {
+        type: "fake",
+        isDefault: true,
+        async initializeDriver(): Promise<InitializedDriver> {
+            return {
+                driver: stubDriver(),
+                collections: reports,
+                internals: {}
+            } as unknown as InitializedDriver;
+        },
+        // Enough for the built-in auth adapter to be constructed. Nothing here
+        // logs in — the JWTs are minted directly.
+        async initializeAuth() {
+            return { userService: {}, authRepository: {} };
+        }
+    } as unknown as BackendBootstrapper;
+}
+
+/** A real directory holding one real collection file, so the editor can load. */
+let collectionsDir: string;
+
+beforeEach(() => {
+    process.env.NODE_ENV = "development";
+    collectionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-editor-availability-"));
+    fs.writeFileSync(
+        path.join(collectionsDir, "posts.ts"),
+        [
+            "import { buildCollection } from \"@rebasepro/types\";",
+            "export const postsCollection = buildCollection({",
+            "    name: \"Posts\",",
+            "    slug: \"posts\",",
+            "    properties: {}",
+            "});",
+            ""
+        ].join("\n")
+    );
+});
+
+const originalNodeEnv = process.env.NODE_ENV;
+
+afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+    fs.rmSync(collectionsDir, { recursive: true, force: true });
+    jest.restoreAllMocks();
+});
+
+async function boot(config: Record<string, unknown> = {}): Promise<Hono> {
+    const app = new Hono();
+    await initializeRebaseBackend({
+        app: app as never,
+        server: {} as never,
+        collections: [collection("posts")],
+        auth: { jwtSecret: JWT_SECRET },
+        bootstrappers: [fakeBootstrapper(undefined)],
+        ...config
+    } as never);
+    return app;
+}
+
+const bearer = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
+const adminToken = () => generateAccessToken("admin-1", ["admin"]);
+
+const SAVE = "/api/schema-editor/collection/save";
+
+function save(app: Hono, init: Record<string, unknown> = {}) {
+    return app.request(SAVE, {
+        method: "POST",
+        headers: { "content-type": "application/json", ...((init.headers as object) ?? {}) },
+        body: JSON.stringify({ collectionId: "posts", collectionData: { name: "Renamed" } })
+    });
+}
+
+async function status(app: Hono): Promise<Record<string, unknown>> {
+    const res = await app.request("/api/schema-editor/status", bearer(adminToken()));
+    expect(res.status).toBe(200);
+    return await res.json() as Record<string, unknown>;
+}
+
+describe("the schema editor is admin-only", () => {
+    it("refuses an unauthenticated write, rather than performing it", async () => {
+        // The regression this file exists for. `applyAdminGate` was called on
+        // the populated router, so it never ran and this was a 200 — anyone who
+        // could reach a dev server could rewrite its collection source.
+        const app = await boot({ collectionsDir });
+
+        const before = fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8");
+        const res = await save(app);
+
+        expect(res.status).toBe(401);
+        expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toBe(before);
+    });
+
+    it("refuses a signed-in non-admin with 403", async () => {
+        const app = await boot({ collectionsDir });
+
+        const res = await save(app, { headers: { authorization: `Bearer ${generateAccessToken("editor-1", ["editor"])}` } });
+
+        expect(res.status).toBe(403);
+    });
+
+    it("gates the status endpoint too — a non-admin gets no answer about it", async () => {
+        const app = await boot({ collectionsDir });
+
+        expect((await app.request("/api/schema-editor/status")).status).toBe(401);
+    });
+
+    it("lets an admin through to the editor", async () => {
+        const app = await boot({ collectionsDir });
+
+        const res = await save(app, { headers: { authorization: `Bearer ${adminToken()}` } });
+
+        expect(res.status).toBe(200);
+        expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toContain("Renamed");
+    });
+});
+
+describe("when the editor can write, it says so", () => {
+    it("reports enabled", async () => {
+        const app = await boot({ collectionsDir });
+
+        expect(await status(app)).toEqual({ enabled: true });
+    });
+});
+
+describe("when the editor cannot write, it says why", () => {
+    /**
+     * Each of these used to be an unmounted route: the admin panel offered
+     * "Add collection", the save 404ed, and the snackbar said "404 Not Found".
+     */
+    // `collectionsDir` is a fresh temp directory per test, so each case builds
+    // its config when it runs rather than when the file is read.
+    const cases: Array<[string, () => Record<string, unknown>, string, RegExp]> = [
+        [
+            "in production, because a deploy rebuilds the files from the repository",
+            () => ({ collectionsDir, nodeEnv: "production" }),
+            "SCHEMA_EDITOR_PRODUCTION",
+            /rebuilt from your repository/
+        ],
+        [
+            "in baas mode, because the collections came from the database",
+            // A `collectionsDir` that holds nothing is what baas mode looks
+            // like in practice: the driver is the only source of collections.
+            () => ({
+                collectionsDir: path.join(collectionsDir, "empty"),
+                collections: undefined,
+                bootstrappers: [fakeBootstrapper([collection("posts")])]
+            }),
+            "SCHEMA_EDITOR_BAAS_MODE",
+            /introspected from the database/
+        ],
+        [
+            "with no collectionsDir, because there is nothing to write to",
+            () => ({}),
+            "SCHEMA_EDITOR_NO_COLLECTIONS_DIR",
+            /no `collectionsDir`/
+        ],
+        [
+            "when explicitly turned off",
+            () => ({ collectionsDir, schemaEditor: false }),
+            "SCHEMA_EDITOR_DISABLED",
+            /turned off/
+        ]
+    ];
+
+    async function bootCase(buildConfig: () => Record<string, unknown>): Promise<Hono> {
+        const { nodeEnv, ...bootConfig } = buildConfig() as { nodeEnv?: string };
+        if (nodeEnv) process.env.NODE_ENV = nodeEnv;
+        return boot(bootConfig);
+    }
+
+    it.each(cases)("%s", async (_name, buildConfig, code, messagePattern) => {
+        const app = await bootCase(buildConfig);
+
+        const reported = await status(app);
+        expect(reported.enabled).toBe(false);
+        expect(reported.code).toBe(code);
+        expect(String(reported.reason)).toMatch(messagePattern);
+    });
+
+    it.each(cases)("refuses the write with that reason instead of a 404 — %s", async (_name, buildConfig, code) => {
+        const app = await bootCase(buildConfig);
+
+        const res = await save(app, { headers: { authorization: `Bearer ${adminToken()}` } });
+
+        expect(res.status).toBe(501);
+        expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
+    });
+
+    it("warns at boot when it is forced on with nowhere to write", async () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+        const app = await boot({ schemaEditor: true });
+
+        expect(warn.mock.calls.flat().join(" ")).toMatch(/no collectionsDir/);
+        expect((await status(app)).code).toBe("SCHEMA_EDITOR_NO_COLLECTIONS_DIR");
+    });
+
+    it("leaves the collection file untouched", async () => {
+        process.env.NODE_ENV = "production";
+        const app = await boot({ collectionsDir });
+        const before = fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8");
+
+        await save(app, { headers: { authorization: `Bearer ${adminToken()}` } });
+
+        expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toBe(before);
+    });
+});
