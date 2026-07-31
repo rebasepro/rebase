@@ -168,12 +168,19 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         }
     }, [dataSources]);
 
+    // `readOnly` is left undefined unless the developer set it: the controller
+    // asks the backend whether its schema editor will accept a write, which is
+    // the only process that knows. Deciding it here from `process.env.NODE_ENV`
+    // — the *frontend bundle's* build mode — is what made the editor offer
+    // itself against production backends, `baas` projects and servers without
+    // `ts-morph`, and turned every save into a bare 404.
     const internalConfigController = useLocalCollectionsConfigController(
         rebaseClient,
         resolvedCollections,
         collectionEditorEnabled ? {
-            readOnly: collectionEditorOptions?.readOnly ?? process.env.NODE_ENV === "production",
-            getAuthToken: collectionEditorOptions?.getAuthToken ?? authController?.getAuthToken
+            readOnly: collectionEditorOptions?.readOnly,
+            getAuthToken: collectionEditorOptions?.getAuthToken ?? authController?.getAuthToken,
+            authKey: authController?.user?.uid ?? null
         } : { readOnly: true }
     );
 
@@ -275,6 +282,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
                                 collectionRegistryController={collectionRegistryController}
                                 urlController={urlController}
                                 navigationStateController={navigationStateController}
+                                canWriteToCodebase={!internalConfigController.readOnly}
                             />
                             {children}
                         </SidePanelProvider>
@@ -309,14 +317,25 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
 function BridgeAutoRegistrar({
     collectionRegistryController,
     urlController,
-    navigationStateController
+    navigationStateController,
+    canWriteToCodebase
 }: {
     collectionRegistryController: CollectionRegistryController;
     urlController: UrlController;
     navigationStateController: NavigationStateController;
+    canWriteToCodebase: boolean;
 }) {
     useBridgeRegistration("collectionRegistry", collectionRegistryController);
     useBridgeRegistration("urlController", urlController);
     useBridgeRegistration("navigationState", navigationStateController);
+
+    // Studio tools that would write into the project's collection source — the
+    // RLS editor's policy save for a mapped table, its "Import to codebase" —
+    // ask the bridge whether that write can land. The default is `true`, which
+    // is what an admin panel sitting next to its own `collectionsDir` assumes;
+    // it is wrong for exactly the same backends that make the collection editor
+    // read-only, so the two now answer from one source.
+    const capabilities = useMemo(() => ({ codebase: canWriteToCodebase }), [canWriteToCodebase]);
+    useBridgeRegistration("capabilities", capabilities);
     return null;
 }
