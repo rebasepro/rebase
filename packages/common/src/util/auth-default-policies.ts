@@ -1,5 +1,6 @@
 import { CollectionConfig, SecurityRule, SecurityOperation, AuthCollectionConfig, PolicyExpression, isPostgresCollectionConfig, policy } from "@rebasepro/types";
 import { getTableName } from "./relations";
+import { getPolicyNamesForRules } from "@rebasepro/utils";
 
 /**
  * Default RLS policies injected by the schema generator.
@@ -149,4 +150,25 @@ export function getInjectedSecurityRules(collection: CollectionConfig): Security
     // getEffectiveSecurityRules appends the defaults after the author's rules,
     // so everything past the author's count is injected.
     return getEffectiveSecurityRules(collection).slice(explicitCount);
+}
+
+/**
+ * Every policy name `rebase db push` would write for a collection.
+ *
+ * This is the answer to "did the codebase produce this live policy?", and it is
+ * more than `securityRules.map(r => r.name)` for two reasons:
+ *
+ *  - a rule without an explicit `name` compiles to `<table>_<op>_<hash>`, one
+ *    per operation, so comparing `rule.name` to `policyname` never matches it;
+ *  - the generator also injects the safe-by-default baseline
+ *    (`<table>_default_admin_*`), which is in no collection's `securityRules`.
+ *
+ * Every UI that flags drift has to get both right, and each one that derived it
+ * by hand got a different subset — which is how four policies *Rebase itself
+ * wrote* came to be badged as hand-written drift on every table in a project,
+ * with a button offering to import them back into the codebase that produced
+ * them. There is one derivation now, and this is it.
+ */
+export function getGeneratedPolicyNames(collection: CollectionConfig): Set<string> {
+    return getPolicyNamesForRules(getEffectiveSecurityRules(collection), getTableName(collection));
 }

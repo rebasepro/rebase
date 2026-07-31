@@ -38,6 +38,7 @@ import { SidePanelProvider } from "./SidePanelProvider";
 // Collection editor internals — used when collectionEditor is enabled
 import { useLocalCollectionsConfigController } from "../collection_editor/useLocalCollectionsConfigController";
 import { ConfigControllerProvider } from "../collection_editor/ConfigControllerProvider";
+import { useCollectionsConfigController } from "../collection_editor/useCollectionsConfigController";
 
 // Lazy-load the schema view — only fetched when studio schema tool is active
 const CollectionsStudioView = lazy(() =>
@@ -168,12 +169,19 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         }
     }, [dataSources]);
 
+    // `readOnly` is left undefined unless the developer set it: the controller
+    // asks the backend whether its schema editor will accept a write, which is
+    // the only process that knows. Deciding it here from `process.env.NODE_ENV`
+    // — the *frontend bundle's* build mode — is what made the editor offer
+    // itself against production backends, `baas` projects and servers without
+    // `ts-morph`, and turned every save into a bare 404.
     const internalConfigController = useLocalCollectionsConfigController(
         rebaseClient,
         resolvedCollections,
         collectionEditorEnabled ? {
-            readOnly: collectionEditorOptions?.readOnly ?? process.env.NODE_ENV === "production",
-            getAuthToken: collectionEditorOptions?.getAuthToken ?? authController?.getAuthToken
+            readOnly: collectionEditorOptions?.readOnly,
+            getAuthToken: collectionEditorOptions?.getAuthToken ?? authController?.getAuthToken,
+            authKey: authController?.user?.uid ?? null
         } : { readOnly: true }
     );
 
@@ -189,13 +197,22 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
             group: "Database",
             icon: "LayoutList",
             nestedRoutes: true,
+            // Reads the controller from context at render time rather than
+            // capturing it here. A view is a React *element*, and the
+            // navigation state controller resolves the view list once and holds
+            // on to the elements it resolved — so a controller passed as a prop
+            // is frozen at whatever it was on the first render, forever. That
+            // hid every later change: the editor stayed writable after the
+            // backend said it was read-only, and the collection list never
+            // refreshed. Everything else in the editor already reads this from
+            // `ConfigControllerProvider`, which wraps this subtree.
             view: (
                 <Suspense fallback={<CircularProgressCenter/>}>
-                    <CollectionsStudioView configController={internalConfigController}/>
+                    <CollectionsStudioViewFromContext/>
                 </Suspense>
             )
         };
-    }, [collectionEditorEnabled, registry.studioConfig, internalConfigController]);
+    }, [collectionEditorEnabled, registry.studioConfig]);
 
     const devViews = useMemo(() => {
         const base = registry.studioConfig?.devViews ?? [];
@@ -275,6 +292,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
                                 collectionRegistryController={collectionRegistryController}
                                 urlController={urlController}
                                 navigationStateController={navigationStateController}
+                                canWriteToCodebase={!internalConfigController.readOnly}
                             />
                             {children}
                         </SidePanelProvider>
@@ -302,6 +320,17 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
 }
 
 /**
+ * The injected "Edit collections" view, bound to the live config controller.
+ *
+ * Exists so the element stored in the navigation state does not close over a
+ * controller instance — see the comment at its construction site.
+ */
+function CollectionsStudioViewFromContext() {
+    const configController = useCollectionsConfigController();
+    return <CollectionsStudioView configController={configController}/>;
+}
+
+/**
  * Internal component that auto-registers admin controllers into the
  * self-assembling Studio bridge. Must be rendered inside both the
  * navigation contexts and the StudioBridgeRegistryProvider.
@@ -309,14 +338,25 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
 function BridgeAutoRegistrar({
     collectionRegistryController,
     urlController,
-    navigationStateController
+    navigationStateController,
+    canWriteToCodebase
 }: {
     collectionRegistryController: CollectionRegistryController;
     urlController: UrlController;
     navigationStateController: NavigationStateController;
+    canWriteToCodebase: boolean;
 }) {
     useBridgeRegistration("collectionRegistry", collectionRegistryController);
     useBridgeRegistration("urlController", urlController);
     useBridgeRegistration("navigationState", navigationStateController);
+
+    // Studio tools that would write into the project's collection source — the
+    // RLS editor's policy save for a mapped table, its "Import to codebase" —
+    // ask the bridge whether that write can land. The default is `true`, which
+    // is what an admin panel sitting next to its own `collectionsDir` assumes;
+    // it is wrong for exactly the same backends that make the collection editor
+    // read-only, so the two now answer from one source.
+    const capabilities = useMemo(() => ({ codebase: canWriteToCodebase }), [canWriteToCodebase]);
+    useBridgeRegistration("capabilities", capabilities);
     return null;
 }

@@ -30,7 +30,8 @@ import {
     IconButton,
     LoadingButton,
     Tab,
-    Tabs
+    Tabs,
+    Tooltip
 } from "@rebasepro/ui";
 import { EngineProperties, Entity, getDataSourceCapabilities, MapProperty, Properties, Property, TableMetadata, User } from "@rebasepro/types";
 import { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
@@ -367,6 +368,10 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     propertyConfigs: Record<string, PropertyConfig>,
 }
 ) {
+
+    /** Why the submit buttons below are dead, straight from the backend. */
+    const readOnlyTitle = configController?.readOnlyReason
+        || "This backend does not accept collection edits.";
 
     const importConfigRaw = useImportConfig();
     const urlControllerRaw = useUrlController();
@@ -747,16 +752,23 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                         )}
                         {fullScreen && !isNewCollection && (
                             <div className="flex items-center gap-2">
-                                <LoadingButton
-                                    variant="filled"
-                                    color="primary"
-                                    type="submit"
-                                    onClick={() => formController.handleSubmit()}
-                                    disabled={!dirty || isSubmitting || configController?.readOnly}
-                                    loading={isSubmitting}
-                                >
-                                    {configController?.readOnly ? "Update (Read-only)" : "Update"}
-                                </LoadingButton>
+                                {/* "(Read-only)" says the button will not work but not why.
+                                    The controller now carries the backend's own reason —
+                                    production, `baas` mode, no `collectionsDir` — so show it. */}
+                                <Tooltip title={configController?.readOnly ? readOnlyTitle : undefined}>
+                                    <div>
+                                        <LoadingButton
+                                            variant="filled"
+                                            color="primary"
+                                            type="submit"
+                                            onClick={() => formController.handleSubmit()}
+                                            disabled={!dirty || isSubmitting || configController?.readOnly}
+                                            loading={isSubmitting}
+                                        >
+                                            {configController?.readOnly ? "Update (Read-only)" : "Update"}
+                                        </LoadingButton>
+                                    </div>
+                                </Tooltip>
                             </div>
                         )}
                     </div>
@@ -962,15 +974,19 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                     {currentView === "properties" && "Create collection"}
                                 </LoadingButton>}
 
-                            {!isNewCollection && !fullScreen && <LoadingButton
-                                variant="filled"
-                                color="primary"
-                                type="submit"
-                                disabled={isSubmitting || configController?.readOnly}
-                                loading={isSubmitting}
-                            >
-                                {configController?.readOnly ? "Update collection (Read-only)" : "Update collection"}
-                            </LoadingButton>}
+                            {!isNewCollection && !fullScreen && <Tooltip title={configController?.readOnly ? readOnlyTitle : undefined}>
+                                <div>
+                                    <LoadingButton
+                                        variant="filled"
+                                        color="primary"
+                                        type="submit"
+                                        disabled={isSubmitting || configController?.readOnly}
+                                        loading={isSubmitting}
+                                    >
+                                        {configController?.readOnly ? "Update collection (Read-only)" : "Update collection"}
+                                    </LoadingButton>
+                                </div>
+                            </Tooltip>}
 
                         </div>
                     )}

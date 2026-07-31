@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
+import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
@@ -7,9 +8,12 @@ import { initializeRebaseBackend } from "../src/init";
 /**
  * Covers the `mode` contract:
  *  - baas derives collections from the driver; cms takes them from config
- *  - the schema editor follows the mode (it writes collection files, which
- *    baas mode does not have)
  *  - a driver that cannot introspect fails baas mode loudly at boot
+ *
+ * The schema editor follows the same mode — it writes collection files, which
+ * baas mode does not have — but it is no longer *unmounted* when it cannot
+ * write, so "is the route there?" stopped being the question worth asking about
+ * it. What it answers, and to whom, lives in `schema-editor-availability.test.ts`.
  */
 
 function collection(slug: string): CollectionConfig {
@@ -100,17 +104,6 @@ describe("no declared collections — derived from the database", () => {
         expect(await mounted(app, "/api/data/posts")).toBe(true);
     });
 
-    it("does not mount the schema editor — there are no collection files to edit", async () => {
-        // A collectionsDir that does not exist declares nothing, so there is
-        // nothing to write back to disk.
-        const { app } = await boot({
-            collectionsDir: "/tmp/does-not-matter",
-            bootstrappers: [fakeBootstrapper([collection("posts")])]
-        });
-
-        expect(await mounted(app, "/api/schema-editor/collection/save", "POST")).toBe(false);
-    });
-
     it("serves declared collections when there ARE any, rather than discarding them", async () => {
         // This used to be the reverse: `mode: "baas"` alongside declared
         // collections warned and threw them away. That state cannot be
@@ -157,52 +150,25 @@ describe("declared collections", () => {
         // A driver without introspection is fine here — cms declares collections.
         expect(await mounted(app, "/api/data/posts")).toBe(true);
     });
-
-    it("mounts the schema editor outside production when a collectionsDir is set", async () => {
-        const { app } = await boot({
-            collections: [collection("posts")],
-            collectionsDir: "/tmp/rebase-init-mode-test",
-            bootstrappers: [fakeBootstrapper(undefined)]
-        });
-
-        expect(await mounted(app, "/api/schema-editor/collection/save", "POST")).toBe(true);
-    });
-
-    it("does not mount the schema editor in production", async () => {
-        process.env.NODE_ENV = "production";
-
-        const { app } = await boot({
-            collections: [collection("posts")],
-            collectionsDir: "/tmp/rebase-init-mode-test",
-            bootstrappers: [fakeBootstrapper(undefined)]
-        });
-
-        expect(await mounted(app, "/api/schema-editor/collection/save", "POST")).toBe(false);
-    });
 });
 
-describe("schemaEditor override", () => {
-    it("can be forced off", async () => {
-        const { app } = await boot({
-            collections: [collection("posts")],
-            collectionsDir: "/tmp/rebase-init-mode-test",
-            schemaEditor: false,
-            bootstrappers: [fakeBootstrapper(undefined)]
-        });
-
-        expect(await mounted(app, "/api/schema-editor/collection/save", "POST")).toBe(false);
-    });
-
-    it("warns and stays off when forced on with nowhere to write", async () => {
+describe("cron", () => {
+    it("mounts the cron surface for the directory, not for the jobs in it", async () => {
+        // A directory with no loadable job files — which is also what a
+        // directory of jobs looks like when every one of them fails to import.
+        // Mounting only on `loadedJobs.length > 0` meant one syntax error took
+        // `/api/cron` and the Studio cron panel with it, leaving a 404 that
+        // reads as a broken deploy and one line in the boot log.
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
 
         const { app } = await boot({
             collections: [collection("posts")],
-            schemaEditor: true,
+            cronsDir: path.join(__dirname, "fixtures"),
+            cronPersistence: false,
             bootstrappers: [fakeBootstrapper(undefined)]
         });
 
-        expect(warn.mock.calls.flat().join(" ")).toMatch(/no collectionsDir/);
-        expect(await mounted(app, "/api/schema-editor/collection/save", "POST")).toBe(false);
+        expect(await mounted(app, "/api/cron")).toBe(true);
+        expect(warn.mock.calls.flat().join(" ")).toMatch(/no jobs loaded/);
     });
 });

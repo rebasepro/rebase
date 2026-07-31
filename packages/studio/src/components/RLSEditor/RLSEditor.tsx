@@ -30,7 +30,7 @@ import { useRebaseContext, useSnackbarController, ErrorView, useTranslation } fr
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL } from "@rebasepro/common";
 import { getPolicyNamesForRule, getPolicyNamesForRules, getPolicyOperations } from "@rebasepro/utils";
-import { resolveJunctionSpecs, getJunctionSecurityRules } from "@rebasepro/common";
+import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
@@ -66,7 +66,7 @@ function sanitizeSqlIdentifier(name: string): string {
 
 // Re-exported for the components that used to import it from here.
 export type { PostgresPolicy } from "@rebasepro/types";
-import type { PostgresPolicy } from "@rebasepro/types";
+import type { CollectionConfig, PostgresPolicy } from "@rebasepro/types";
 
 interface TableRLSStatus {
     schemaName: string;
@@ -393,8 +393,21 @@ status: "live" };
         // `<table>_<op>_<hash>`, one per operation. Skipping those rules left their
         // live policies looking like hand-written SQL ("DB Only"), so derive the
         // names the generator would emit and match on those.
-        if (activeCollection && isPostgresCollectionConfig(activeCollection) && activeCollection.securityRules) {
-            activeCollection.securityRules.forEach((rule) => {
+        //
+        // `getEffectiveSecurityRules` rather than `securityRules`, for the same
+        // reason one step further out: the generator also injects the
+        // safe-by-default baseline (`<table>_default_admin_read` and the three
+        // `_default_admin_write_*`), which appears in no collection's
+        // `securityRules`. Reading the declared rules alone made four policies
+        // *Rebase itself wrote* look like drift on every table in the project —
+        // badged "DB Only" and offered for import back into the codebase that
+        // produced them. The admin panel's own RLS tab already derived them this
+        // way; this view, its sibling, did not. Both start from
+        // `getEffectiveSecurityRules` now — this one needs the rule bodies to
+        // render a policy row, the other only the names it compiles to
+        // (`getGeneratedPolicyNames`).
+        if (activeCollection && isPostgresCollectionConfig(activeCollection)) {
+            getEffectiveSecurityRules(activeCollection as unknown as CollectionConfig).forEach((rule) => {
                 const ops = getPolicyOperations(rule);
                 const policyNames = getPolicyNamesForRule(rule, activeTableData.tableName);
 

@@ -1,6 +1,6 @@
 
 import { getPolicyNamesForRule, getPolicyNamesForRules } from "@rebasepro/utils";
-import { getEffectiveSecurityRules } from "@rebasepro/common";
+import { getGeneratedPolicyNames } from "@rebasepro/common";
 import React, { useState, useEffect, useMemo } from "react";
 
 /**
@@ -39,6 +39,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/forms";
+import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import { useRebaseContext } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/admin-types";
 import type { PostgresPolicy, SecurityOperation, SecurityRule } from "@rebasepro/types";
@@ -113,6 +114,14 @@ function toSecurityRule(policy: Partial<PostgresPolicy>): SecurityRule {
 export function CollectionRLSTab() {
     const { values, setFieldValue } = useFormex<CollectionWithSecurity>();
     const [editingPolicy, setEditingPolicy] = useState<PostgresPolicy | "new" | null>(null);
+
+    // Every other tab in this dialog disables its inputs when the backend will
+    // not accept an edit — the general and display forms behind a `fieldset
+    // disabled`, the properties editor per control. This one did not, so a
+    // read-only panel still invited you to write a policy, delete one, and
+    // reorder the lot, and only said no at the submit button on the way out.
+    const { readOnly, readOnlyReason } = useCollectionsConfigController();
+    const readOnlyTitle = readOnlyReason || "This backend does not accept collection edits.";
 
     const rules: SecurityRule[] = values.securityRules || [];
 
@@ -209,26 +218,14 @@ export function CollectionRLSTab() {
 
     const tableName = values.id || values.table || values.alias;
 
-    /**
-     * Every policy name `rebase db push` would write for this collection.
-     *
-     * Two things make this more than `rules.map(r => r.name)`:
-     *  - a rule without an explicit `name` becomes `<table>_<op>_<hash>`, so
-     *    comparing `rule.name` to `policyname` never matches for it;
-     *  - the generator also injects the safe-by-default baseline
-     *    (`<table>_default_admin_*`), which is in no collection's `securityRules`.
-     *
-     * Missing either made Rebase's own policies look hand-written, and offered to
-     * import them back into the codebase that produced them.
-     */
+    // Every policy name `rebase db push` would write for this collection — see
+    // `getGeneratedPolicyNames`. This used to be derived here by hand, and the
+    // Studio's RLS editor derived a different subset of it by hand, which is
+    // exactly how the two came to disagree about which policies were drift.
     const generatedPolicyNames = useMemo(() => {
         if (!tableName) return new Set<string>();
-        const effectiveRules = getEffectiveSecurityRules(values as AdminCollection);
-        return getPolicyNamesForRules(
-            [...rules, ...effectiveRules],
-            tableName
-        );
-    }, [rules, tableName, values]);
+        return getGeneratedPolicyNames(values as AdminCollection);
+    }, [tableName, values]);
 
     const unmappedPolicies = dbPolicies.filter(dp => !generatedPolicyNames.has(dp.policyname));
 
@@ -251,9 +248,13 @@ export function CollectionRLSTab() {
                 <div className="w-full flex flex-col">
                 <div className="flex items-center justify-between mb-8">
                     <Typography variant="h5">Row Level Security</Typography>
-                    <Button variant="filled" color="neutral" onClick={() => setEditingPolicy("new")}>
-                        CREATE POLICY
-                    </Button>
+                    <Tooltip title={readOnly ? readOnlyTitle : undefined}>
+                        <div>
+                            <Button variant="filled" color="neutral" disabled={readOnly} onClick={() => setEditingPolicy("new")}>
+                                CREATE POLICY
+                            </Button>
+                        </div>
+                    </Tooltip>
                 </div>
 
                 {rules.length === 0 ? (
@@ -282,7 +283,7 @@ export function CollectionRLSTab() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                                    <Button size="small" variant="text" onClick={() => setEditingPolicy({
+                                    <Button size="small" variant="text" disabled={readOnly} onClick={() => setEditingPolicy({
                                         policyname: rule.name ?? "",
                                         tablename: values.id || values.table || values.alias || "your_table",
                                         permissive: (rule.mode || "permissive").toUpperCase() as PostgresPolicy["permissive"],
@@ -293,7 +294,7 @@ export function CollectionRLSTab() {
                                     })}>
                                         EDIT
                                     </Button>
-                                    <IconButton size="small" onClick={() => {
+                                    <IconButton size="small" disabled={readOnly} onClick={() => {
                                         setFieldValue("securityRules", rules.filter((r: SecurityRule) => r.name !== rule.name));
                                     }}>
                                         <Trash2Icon size={iconSize.smallest} className="text-text-secondary dark:text-text-secondary-dark hover:text-red-500 dark:hover:text-red-500 transition-colors"/>
@@ -336,12 +337,19 @@ export function CollectionRLSTab() {
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                                        <Button size="small" variant="outlined" color="primary" onClick={() => {
-                                             const rule: SecurityRule = toSecurityRule(dp);
-                                            setFieldValue("securityRules", [...rules, rule]);
-                                        }}>
-                                            Import to codebase
-                                        </Button>
+                                        {/* "Import to codebase" is the one action here that
+                                            names its destination, and it is the one the
+                                            backend refuses when it has no codebase to write. */}
+                                        <Tooltip title={readOnly ? readOnlyTitle : undefined}>
+                                            <div>
+                                                <Button size="small" variant="outlined" color="primary" disabled={readOnly} onClick={() => {
+                                                    const rule: SecurityRule = toSecurityRule(dp);
+                                                    setFieldValue("securityRules", [...rules, rule]);
+                                                }}>
+                                                    Import to codebase
+                                                </Button>
+                                            </div>
+                                        </Tooltip>
                                     </div>
                                 </Paper>
                             ))}
