@@ -85,6 +85,29 @@ export default async function globalSetup(config: FullConfig) {
  * here should cost a few seconds, not the run. The failure message has to say
  * that login itself broke — that is the whole point of hoisting it out of the
  * tests, where it could only ever manifest as ten timeouts on a sidebar link.
+ *
+ * ── Two starting states ──────────────────────────────────────────────────────
+ *
+ * A developer's database already has the demo user in it. A fresh one — which is
+ * the only kind CI ever has — does not, and that difference is why this suite
+ * could not be wired into a pipeline:
+ *
+ *   * **empty `rebase.users`** — `/auth/config` reports `needsSetup`, and
+ *     LoginView renders its bootstrap form *directly*: "Welcome!", the demo
+ *     credentials already filled in, and a **Create account** button. There is no
+ *     "Sign in with email" button anywhere on the page, so the old flow below
+ *     waited 30s for one and threw — in globalSetup, which fails all ten tests at
+ *     once and reads as "the e2e is broken" rather than "the database was empty".
+ *   * **populated** — the ordinary provider-buttons screen.
+ *
+ * Driving the bootstrap form rather than seeding a user around it is deliberate:
+ * creating the first admin is the first thing every new Rebase user does, and it
+ * had no automated coverage at any tier. This way the cheapest possible fix also
+ * buys the run that proves first-run works.
+ *
+ * The two are told apart by what is on screen, not by asking `/auth/config`
+ * separately — a second source of truth can disagree with the DOM, and then the
+ * failure is about the probe rather than the product.
  */
 async function signIn(baseURL: string, attempts = 3) {
     fs.mkdirSync(path.dirname(AUTH_STATE), { recursive: true });
@@ -96,14 +119,35 @@ async function signIn(baseURL: string, attempts = 3) {
             const page = await context.newPage();
             try {
                 await page.goto("/", { waitUntil: "load" });
-                // The demo login pre-fills credentials behind a privacy checkbox,
-                // which gates the button — hence check, then click.
-                await page.getByRole("checkbox").check();
-                await page.getByRole("button", { name: /Sign in with email/i }).click();
 
-                const signIn = page.locator("button", { hasText: /^Sign in$/i }).first();
-                await signIn.waitFor({ state: "visible", timeout: 15_000 });
-                await signIn.click();
+                // Whichever screen this build is showing, one of these two
+                // buttons is on it. Racing them keeps the branch decision and
+                // the click reading the same DOM.
+                const createAccount = page.getByRole("button", { name: /^Create account$/i });
+                const withEmail = page.getByRole("button", { name: /Sign in with email/i });
+                await createAccount.or(withEmail).first()
+                    .waitFor({ state: "visible", timeout: 30_000 });
+
+                if (await createAccount.isVisible()) {
+                    // First run. DemoLoginView pre-fills the same credentials the
+                    // signed-in path uses, so the account this creates is the one
+                    // every later run then signs in with.
+                    //
+                    // No privacy checkbox to tick: the demo renders it in
+                    // `topComponent`, which LoginView only mounts on the
+                    // provider-buttons screen — bootstrap skips it, and does not
+                    // pass `disabled` down either, so the button is live.
+                    await createAccount.click();
+                } else {
+                    // The demo login pre-fills credentials behind a privacy
+                    // checkbox, which gates the button — hence check, then click.
+                    await page.getByRole("checkbox").check();
+                    await withEmail.click();
+
+                    const submit = page.locator("button", { hasText: /^Sign in$/i }).first();
+                    await submit.waitFor({ state: "visible", timeout: 15_000 });
+                    await submit.click();
+                }
 
                 // The sidebar only renders once the session is live and the
                 // collections have loaded, so it is the honest "we are in" signal.
