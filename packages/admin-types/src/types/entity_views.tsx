@@ -66,6 +66,15 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     disabled: boolean;
 
     /**
+     * A save is in flight. Covers the autosave debounce too, which `formex`
+     * cannot report because it never goes through `handleSubmit`.
+     *
+     * The identity bar reads this to label its Save button, which is what
+     * replaced the unlabelled floating status circle in the form.
+     */
+    isSaving?: boolean;
+
+    /**
      * Whether the form context is in read-only detail view mode.
      * Custom entity views can use this to adjust their rendering.
      */

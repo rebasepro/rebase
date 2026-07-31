@@ -58,6 +58,7 @@ export function StorageUploadFieldBinding({
                                               minimalistView,
                                               property,
                                               includeDescription,
+                                              hideLabel,
                                               context,
                                               isSubmitting
                                           }: FieldProps<StringProperty | ArrayProperty>) {
@@ -98,7 +99,7 @@ export function StorageUploadFieldBinding({
 
         <>
 
-            {!minimalistView &&
+            {!minimalistView && !hideLabel &&
                 <LabelWithIconAndTooltip
                     propertyKey={propertyKey}
                     icon={getIconForProperty(property, "small")}

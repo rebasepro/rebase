@@ -46,7 +46,7 @@ export function MapFieldBinding({
 
     const mapFormView = <>
         <div
-            className={cls("py-1 flex flex-col space-y-2", minimalistView && property.admin?.widthPercentage !== undefined ? "mt-8" : undefined)}>
+            className={"py-1 flex flex-col space-y-2"}>
             {Object.entries(mapProperties)
                 .filter(([_, property]) => !isHidden(property))
                 .map(([entryKey, childProperty], index) => {
@@ -96,7 +96,6 @@ export function MapFieldBinding({
 expanded }
                     });
                 }}
-                className={property.admin?.widthPercentage !== undefined ? "mt-8" : undefined}
                 innerClassName={"px-2 md:px-4 pb-2 md:pb-4 pt-1 md:pt-2 bg-white dark:bg-surface-900"}
                 title={<LabelWithIconAndTooltip
                     propertyKey={propertyKey}

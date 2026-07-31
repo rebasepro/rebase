@@ -100,6 +100,21 @@ export interface FieldProps<
     includeDescription?: boolean;
 
     /**
+     * The container is rendering the label and the description itself, so this
+     * field should render only its control.
+     *
+     * This is what the generated form sets. Field types used to disagree about
+     * where a label goes — text and number put it inside the input, select,
+     * array, storage and read-only put it above — which read as two design
+     * systems in one column. The label now belongs to the form, and the binding
+     * to the control.
+     *
+     * A custom field that ignores this still renders its own label, so it
+     * degrades to the old look rather than losing its label.
+     */
+    hideLabel?: boolean;
+
+    /**
      * Flag to indicate that the underlying value has been updated in the
      * driver
      */
@@ -223,6 +238,12 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
     disabled: boolean;
 
     /**
+     * A save is in flight, including the autosave debounce, which `formex`
+     * cannot report because it never goes through `handleSubmit`.
+     */
+    isSaving?: boolean;
+
+    /**
      * Whether the form context is in read-only detail view mode.
      * Custom entity views can use this to adjust their rendering.
      */
@@ -257,6 +278,12 @@ export interface PropertyFieldBindingProps<M extends Record<string, unknown> = R
      * Should the description be included in this field
      */
     includeDescription?: boolean;
+
+    /**
+     * The container renders the label and description; render only the control.
+     * See the note on {@link FieldProps.hideLabel}.
+     */
+    hideLabel?: boolean;
 
     /**
      * Has the value of this property been updated in the database while this

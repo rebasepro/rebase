@@ -30,6 +30,7 @@ export function UserSelectFieldBinding({
                                            touched,
                                            property,
                                            includeDescription,
+                                           hideLabel,
                                            size = "large"
                                        }: UserSelectProps) {
 
@@ -37,14 +38,14 @@ export function UserSelectFieldBinding({
 
     return (
         <>
-            <PropertyIdCopyTooltip propertyKey={propertyKey}>
+            {!hideLabel && <PropertyIdCopyTooltip propertyKey={propertyKey}>
                 <LabelWithIcon
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name}
                     className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5 my-0"}
                 />
-            </PropertyIdCopyTooltip>
+            </PropertyIdCopyTooltip>}
 
             <UserSelector
                 value={value as string | null | undefined}

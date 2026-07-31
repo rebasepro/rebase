@@ -3,10 +3,8 @@ import type { Properties } from "@rebasepro/types";
 import type { CustomizationController, AdminCollection } from "@rebasepro/admin-types";
 import React from "react";
 import { Entity } from "@rebasepro/types";
-import { cls, defaultBorderMixin, ExternalLinkIcon, IconButton, Typography } from "@rebasepro/ui";
-;
+import { ExternalLinkIcon, IconButton, Tooltip } from "@rebasepro/ui";
 import { useCustomizationController } from "@rebasepro/app";
-import { useAuthController } from "@rebasepro/app";
 import { PropertyCollectionView } from "./PropertyCollectionView";
 
 /**
@@ -19,6 +17,15 @@ export interface EntityViewBindingProps<M extends Record<string, unknown>> {
     className?: string;
 }
 
+/**
+ * The read-only rendering of a record's values.
+ *
+ * This used to prepend a synthetic `Id` row of its own. Between that row, the
+ * collection's own id property, and the `path/id` chip above it, the same UUID
+ * appeared three times — and in the ~340px split pane each copy wrapped over
+ * four lines, so most of the first screen was one id repeated. The id is now a
+ * copyable chip in the identity bar, once.
+ */
 export function EntityViewBinding<M extends Record<string, unknown>>(
     {
         entity,
@@ -30,39 +37,24 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
     const customizationController: CustomizationController = useCustomizationController();
 
     const properties: Properties = collection.properties;
+    const externalLink = customizationController?.entityLinkBuilder?.({ entity });
 
     return (
-        <div className={"w-full " + className}>
-            <div className={"w-full mb-4 p-4"}>
+        <div className={"w-full " + (className ?? "")}>
 
-                <div className={`grid grid-cols-12 gap-x-4 py-4 items-start border-b ${defaultBorderMixin}`}>
-                    <div className="col-span-4 pr-2">
-                        <Typography variant="caption"
-                            color={"secondary"}
-                            component={"span"}
-                            className="break-words">
-                            Id
-                        </Typography>
-                    </div>
-                    <div className="col-span-8">
-                        <div
-                            className="flex-grow text-surface-900 dark:text-white flex items-center">
-                            <span className="flex-grow mr-2">{entity.id}</span>
-                            {customizationController?.entityLinkBuilder &&
-                                <a href={customizationController.entityLinkBuilder({ entity })}
-                                    rel="noopener noreferrer"
-                                    target="_blank">
-                                    <IconButton>
-                                        <ExternalLinkIcon/>
-                                    </IconButton>
-                                </a>}
-                        </div>
-                    </div>
+            {externalLink && (
+                <div className={"flex justify-end mb-2"}>
+                    <Tooltip title={"Open in the live site"}>
+                        <a href={externalLink} rel={"noopener noreferrer"} target={"_blank"}>
+                            <IconButton size={"small"}>
+                                <ExternalLinkIcon/>
+                            </IconButton>
+                        </a>
+                    </Tooltip>
                 </div>
+            )}
 
-                <PropertyCollectionView data={entity.values} properties={properties} size={"medium"}/>
-
-            </div>
+            <PropertyCollectionView data={entity.values} properties={properties} size={"medium"}/>
         </div>
     );
 }

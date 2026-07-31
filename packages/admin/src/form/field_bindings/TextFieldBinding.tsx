@@ -36,6 +36,7 @@ export function TextFieldBinding<T extends string | number>({
                                                                 autoFocus,
                                                                 property,
                                                                 includeDescription,
+                                                                hideLabel,
                                                                 size = "large"
                                                             }: FieldProps<StringProperty | NumberProperty>) {
 
@@ -85,12 +86,17 @@ export function TextFieldBinding<T extends string | number>({
         else if (property.admin?.urlPreview) inputType = "url";
     }
 
-    const label = (
-        <LabelWithIcon
-            icon={getIconForProperty(property, "small")}
-            required={property.validation?.required || property.isId === true}
-            title={property.name ?? propertyKey}/>
-    );
+    // `undefined` rather than an empty element: TextField and the multiline box
+    // both reserve a label row whenever `label` is truthy, so a null-rendering
+    // element would leave the gap behind without the text.
+    const label = hideLabel
+        ? undefined
+        : (
+            <LabelWithIcon
+                icon={getIconForProperty(property, "small")}
+                required={property.validation?.required || property.isId === true}
+                title={property.name ?? propertyKey}/>
+        );
     return (<>
             <PropertyIdCopyTooltip propertyKey={propertyKey}>
                 {isMultiline ? (
@@ -98,20 +104,20 @@ export function TextFieldBinding<T extends string | number>({
                         "rounded-md relative max-w-full min-h-[64px]",
                         fieldBackgroundMixin,
                         fieldBackgroundHoverMixin,
-                        showError && error ? "border border-red-500 dark:border-red-600" : "",
-                        property.admin?.widthPercentage !== undefined ? "mt-8" : undefined
+                        showError && error ? "border border-red-500 dark:border-red-600" : ""
                     )}>
-                        <div
+                        {label && <div
                             className="pointer-events-none absolute top-1 text-xs font-medium px-3 text-text-secondary dark:text-text-secondary-dark">
                             {label}
-                        </div>
+                        </div>}
                         <TextareaAutosize
                             value={displayValue}
                             onChange={onChange}
                             autoFocus={autoFocus}
                             disabled={disabled}
                             className={cls(
-                                "rounded-md resize-none w-full outline-none p-[32px] text-base bg-transparent min-h-[64px] px-3 pt-8",
+                                "rounded-md resize-none w-full outline-none text-base bg-transparent min-h-[64px] px-3",
+                                label ? "pt-8 pb-2" : "py-2",
                                 disabled && "outline-none opacity-50 text-surface-accent-600 dark:text-surface-accent-500",
                                 showError && error ? "text-red-500 dark:text-red-600" : ""
                             )}
@@ -131,11 +137,7 @@ export function TextFieldBinding<T extends string | number>({
                         value={displayValue}
                         onChange={onChange}
                         autoFocus={autoFocus}
-                        className={property.admin?.widthPercentage !== undefined ? "mt-8" : undefined}
-                        label={<LabelWithIcon
-                            icon={getIconForProperty(property, "small")}
-                            required={property.validation?.required || property.isId === true}
-                            title={property.name ?? propertyKey}/>}
+                        label={label}
                         type={inputType}
                         disabled={disabled}
                         endAdornment={

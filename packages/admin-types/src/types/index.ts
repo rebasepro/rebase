@@ -5,6 +5,7 @@ export * from "./entity_actions";
 export * from "./entity_link_builder";
 export * from "./entity_views";
 export * from "./export_import";
+export * from "./form_layout";
 export * from "./formex";
 export * from "./locales";
 export * from "./modify_collections";

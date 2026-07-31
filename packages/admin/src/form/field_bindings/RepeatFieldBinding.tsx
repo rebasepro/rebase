@@ -104,7 +104,6 @@ export function RepeatFieldBinding({
         sortable={sortable}
         newDefaultEntry={getDefaultValueFor(property.of)}
         onValueChange={(value) => setFieldValue(propertyKey, value)}
-        className={property.admin?.widthPercentage !== undefined ? "mt-8" : undefined}
     />;
 
     const title = (<>

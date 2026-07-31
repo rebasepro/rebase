@@ -49,6 +49,7 @@ function ReferenceFieldBindingInternal({
     autoFocus,
     property,
     includeDescription,
+    hideLabel,
     size = "medium"
 }: FieldProps<ReferenceProperty>) {
     if (!property.path) {
@@ -96,7 +97,7 @@ function ReferenceFieldBindingInternal({
 
     return (
         <>
-            {!minimalistView && <LabelWithIconAndTooltip
+            {!minimalistView && !hideLabel && <LabelWithIconAndTooltip
                 propertyKey={propertyKey}
                 icon={getIconForProperty(property, "small")}
                 required={property.validation?.required}

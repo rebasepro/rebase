@@ -8,7 +8,13 @@ export interface EntityFormActionsProps {
     path: string;
     collection: AdminCollection;
     entity?: Entity;
-    layout: "bottom" | "side" | "responsive";
+    /**
+     * @deprecated Ignored. The actions render as a footer in every layout now;
+     * the sticky side rail they used to have is gone, and the container's
+     * identity bar carries Save. Kept so an override component's props still
+     * typecheck.
+     */
+    layout?: "bottom" | "side" | "responsive";
     savingError?: Error;
     formex: FormexController<Record<string, unknown>>;
     disabled: boolean;

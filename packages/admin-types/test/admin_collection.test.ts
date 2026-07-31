@@ -35,11 +35,12 @@ describe("ADMIN_COLLECTION_KEYS", () => {
         expect([...ADMIN_COLLECTION_KEYS]).toEqual(sorted);
     });
 
-    it("covers the 38 fields the split moved off the collection", () => {
+    it("covers the 39 fields the split moved off the collection", () => {
         // A bare count, as a tripwire. If this number changes, either a field was
         // added to the admin block (add it above too) or one was moved back out to
         // the contract — and the second is a decision, not a refactor.
-        expect(ADMIN_COLLECTION_KEYS).toHaveLength(38);
+        // 39 since `form` (the generated form's section/rail layout) joined.
+        expect(ADMIN_COLLECTION_KEYS).toHaveLength(39);
     });
 
     it("names nothing that belongs to the BaaS contract", () => {
@@ -75,7 +76,8 @@ describe("ADMIN_PROPERTY_KEYS", () => {
 
     it("covers the base options and every per-type extension", () => {
         // Same tripwire as above. Bump it deliberately, alongside the list.
-        expect(ADMIN_PROPERTY_KEYS).toHaveLength(25);
+        // 26 since `span` joined; `widthPercentage` stays, deprecated but read.
+        expect(ADMIN_PROPERTY_KEYS).toHaveLength(26);
     });
 
     it("names nothing that belongs to the property contract", () => {

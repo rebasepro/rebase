@@ -8,6 +8,7 @@
  */
 import type { ComponentRef, FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { ADMIN_PROPERTY_KEYS as CORE_ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
+import type { PropertySpan } from "./form_layout";
 
 /**
  * Interface including all common properties of an admin property.
@@ -18,6 +19,22 @@ export interface AdminPropertyOptions<CustomProps = unknown> {
     hideFromCollection?: boolean;
     readOnly?: boolean;
     disabled?: boolean | PropertyDisabledConfig;
+
+    /**
+     * How many of the form grid's {@link FORM_GRID_COLUMNS} columns this field
+     * occupies. Omit to let the layout derive one from the property type.
+     *
+     * Prefer this over {@link widthPercentage}: spans snap to a shared grid, so
+     * two fields line up whatever order they are declared in.
+     */
+    span?: PropertySpan;
+
+    /**
+     * @deprecated Use {@link span}. A percentage is resolved to the nearest
+     * span (≤30 → 1, ≤55 → 2, ≤80 → 3, else 4), which means it no longer
+     * produces off-grid widths. Still honoured so existing collections render
+     * unchanged.
+     */
     widthPercentage?: number;
     customProps?: CustomProps;
     Field?: ComponentRef<any>;

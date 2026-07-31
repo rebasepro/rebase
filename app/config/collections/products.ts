@@ -245,6 +245,31 @@ const productsCollection: PostgresCollectionConfig = {
         group: "E-Commerce",
         defaultViewMode: "cards",
         enabledViews: ["table", "cards"],
+        // Everything here is optional — without it the form still derives a
+        // two-column layout from the property types. This is what taking hold
+        // of that looks like when the derived grouping is not the one you want.
+        form: {
+            sidebar: ["status", "category", "is_featured"],
+            sections: [
+                { key: "basics", properties: ["name", "sku", "brand", "images"] },
+                {
+                    key: "pricing",
+                    title: "Pricing & inventory",
+                    properties: ["price", "compare_at_price", "cost", "stock_quantity", "low_stock_threshold"]
+                },
+                {
+                    key: "shipping",
+                    title: "Shipping & ratings",
+                    properties: ["weight_grams", "rating", "review_count"],
+                    collapsed: true
+                },
+                {
+                    key: "content",
+                    title: "Content",
+                    properties: ["description", "available_locales"]
+                }
+            ]
+        },
         propertiesOrder: [
             "name",
             "sku",

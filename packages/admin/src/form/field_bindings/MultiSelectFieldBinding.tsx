@@ -27,6 +27,7 @@ export function MultiSelectFieldBinding({
     disabled,
     property,
     includeDescription,
+    hideLabel,
     size = "large",
     autoFocus
 }: FieldProps<ArrayProperty, unknown, Record<string, unknown>>) {
@@ -91,7 +92,7 @@ export function MultiSelectFieldBinding({
                 value={validValue ? value.map((v) => v?.toString()) : []}
                 disabled={disabled}
                 modalPopover={true}
-                label={<LabelWithIconAndTooltip
+                label={hideLabel ? undefined : <LabelWithIconAndTooltip
                     propertyKey={propertyKey}
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}

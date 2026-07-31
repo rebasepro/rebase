@@ -16,8 +16,7 @@ import {
     XIcon
 } from "@rebasepro/ui";
 import {
-    AIIcon,
-    useLargeLayout
+    AIIcon
 } from "@rebasepro/app";
 import { EntityStatus, Properties, Property } from "@rebasepro/types";
 import { PluginFormActionProps } from "@rebasepro/admin-types";
@@ -34,7 +33,6 @@ export function FormEnhanceAction({
     openEntityMode
 }: PluginFormActionProps) {
 
-    const largeLayout = useLargeLayout();
 
     const storageKey = createLocalStorageKey(path, status);
 
@@ -118,9 +116,11 @@ export function FormEnhanceAction({
             align={"end"}
             sideOffset={8}
             className={"max-w-[100vw]"}
+            // Never full width: this used to stretch to fill the form's
+            // `w-80 2xl:w-96` side rail in full screen. That rail is gone, and
+            // in the footer a stretched button reads as the primary action.
             trigger={<Button variant={"filled"}
                 color={"neutral"}
-                fullWidth={largeLayout && openEntityMode === "full_screen"}
                 size={"small"}
                 disabled={loading}>
                 {!loading && <AIIcon size={"small"}/>}

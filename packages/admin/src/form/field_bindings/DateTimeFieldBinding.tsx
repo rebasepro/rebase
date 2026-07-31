@@ -31,7 +31,8 @@ export function DateTimeFieldBinding({
     disabled,
     touched,
     property,
-    includeDescription
+    includeDescription,
+    hideLabel
 }: DateTimeFieldProps) {
 
     const { locale } = useCustomizationController();
@@ -54,7 +55,7 @@ export function DateTimeFieldBinding({
                     locale={locale}
                     error={showError}
                     disabled={disabled}
-                    label={<LabelWithIcon
+                    label={hideLabel ? undefined : <LabelWithIcon
                         icon={getIconForProperty(property, "small")}
                         required={property.validation?.required}
                         className={showError ? "text-red-500 dark:text-red-500" : "text-text-secondary dark:text-text-secondary-dark"}

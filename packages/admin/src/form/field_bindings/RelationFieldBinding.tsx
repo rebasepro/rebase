@@ -63,6 +63,7 @@ function RelationSelectorBinding({
     isSubmitting,
     property,
     includeDescription,
+    hideLabel,
     setValue,
     relation,
     manyRelation
@@ -75,12 +76,12 @@ function RelationSelectorBinding({
 
     return (
         <div className="">
-            <LabelWithIconAndTooltip
+            {!hideLabel && <LabelWithIconAndTooltip
                 propertyKey={propertyKey}
                 icon={getIconForProperty(property, "small")}
                 required={property.validation?.required}
                 title={property.name ?? propertyKey}
-                className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>
+                className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>}
 
             <RelationSelector
                 relation={relation}
@@ -116,6 +117,7 @@ function SingleRelationFieldBinding({
     isSubmitting,
     property,
     includeDescription,
+    hideLabel,
     setValue,
     relation
 }: FieldProps<RelationProperty> & { relation: Relation | undefined }) {
@@ -150,12 +152,12 @@ function SingleRelationFieldBinding({
 
     return (
         <>
-            <LabelWithIconAndTooltip
+            {!hideLabel && <LabelWithIconAndTooltip
                 propertyKey={propertyKey}
                 icon={getIconForProperty(property, "small")}
                 required={property.validation?.required}
                 title={property.name ?? propertyKey}
-                className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>
+                className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>}
 
             {!collection && <ErrorView
                 error={"The specified collection does not exist. Check console"}/>}

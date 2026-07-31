@@ -52,6 +52,7 @@ export function BinaryFieldBinding({
     autoFocus,
     property,
     includeDescription,
+    hideLabel,
     size = "large"
 }: FieldProps<BinaryProperty>) {
 
@@ -87,11 +88,11 @@ export function BinaryFieldBinding({
     return (
         <div className="flex flex-col gap-2 w-full mt-2">
             <div className="flex items-center justify-between mb-1">
-                <LabelWithIcon
+                {!hideLabel && <LabelWithIcon
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name ?? propertyKey}
-                />
+                />}
             </div>
 
             <PropertyIdCopyTooltip propertyKey={propertyKey}>

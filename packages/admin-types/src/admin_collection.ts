@@ -43,6 +43,7 @@ import type {
     ViewMode
 } from "./collections";
 import type { EntityCustomView, FormViewConfig } from "./types/entity_views";
+import type { FormLayoutConfig } from "./types/form_layout";
 import type { EntityAction } from "./types/entity_actions";
 import type { ExportConfig } from "./types/export_import";
 import type { CollectionComponentOverrideMap } from "./types/component_overrides";
@@ -179,6 +180,22 @@ export type AdminCollectionOptions<
      * is `"view"`). In read-only mode, `formContext.readOnly` will be `true`.
      */
     formView?: FormViewConfig;
+
+    /**
+     * How the generated form is laid out: which properties are grouped into
+     * sections in the main column, and which are pulled out into the metadata
+     * rail beside it.
+     *
+     * Entirely optional. With no `form` block the layout is derived from the
+     * properties themselves — see {@link FormLayoutConfig} — which is what most
+     * collections should rely on. Reach for this when the derived grouping is
+     * wrong for your domain, not to restate it.
+     *
+     * Unlike {@link FormViewConfig}, this does not replace the generated form:
+     * every field keeps its validation, error focus, local-changes restore and
+     * autosave wiring.
+     */
+    form?: FormLayoutConfig<M>;
 
     /**
      * Prevent default actions from being displayed or executed on this collection.

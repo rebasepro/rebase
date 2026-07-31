@@ -37,6 +37,7 @@ export function VectorFieldBinding({
     autoFocus,
     property,
     includeDescription,
+    hideLabel,
     size = "large"
 }: FieldProps<VectorProperty>) {
     const isVectorObject = (val: unknown): val is { value: number[] } => {
@@ -86,7 +87,7 @@ export function VectorFieldBinding({
         });
     };
 
-    const label = (
+    const label = hideLabel ? null : (
         <LabelWithIcon
             icon={getIconForProperty(property, "small")}
             required={property.validation?.required}

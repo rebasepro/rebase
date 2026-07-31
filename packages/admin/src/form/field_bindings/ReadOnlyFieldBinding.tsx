@@ -27,6 +27,7 @@ export function ReadOnlyFieldBinding({
     minimalistView,
     property,
     includeDescription,
+    hideLabel,
     context
 }: FieldProps<Property>) {
 
@@ -39,7 +40,7 @@ export function ReadOnlyFieldBinding({
 
         <>
 
-            {!minimalistView && <LabelWithIconAndTooltip
+            {!minimalistView && !hideLabel && <LabelWithIconAndTooltip
                 propertyKey={propertyKey}
                 icon={getIconForProperty(property, "small")}
                 required={property.validation?.required}

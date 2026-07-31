@@ -27,7 +27,8 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
                                                                   disabled,
                                                                   size = "large",
                                                                   property,
-                                                                  includeDescription
+                                                                  includeDescription,
+                                                                  hideLabel
                                                               }: FieldProps<BooleanProperty>) {
 
     useClearRestoreValue({
@@ -44,8 +45,11 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
                     value={value as boolean | null}
                     onValueChange={(v) => setValue(v)}
                     error={showError}
-                    className={property.admin?.widthPercentage !== undefined ? "mt-8" : undefined}
-                    label={<LabelWithIcon
+                    // The control is `justify-between`, so with the label lifted
+                    // out the switch would drift to the far edge of an otherwise
+                    // empty box. Anchor it to the start instead.
+                    position={hideLabel ? "start" : undefined}
+                    label={hideLabel ? undefined : <LabelWithIcon
                         icon={getIconForProperty(property, "small")}
                         required={property.validation?.required}
                         title={property.name ?? propertyKey}/>}

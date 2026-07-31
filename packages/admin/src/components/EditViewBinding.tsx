@@ -42,9 +42,9 @@ import { EntityFormBinding } from "../form";
 import type { EntityFormBindingProps } from "../form";
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { EditFormActions } from "./EditFormActions";
-import { JsonPreviewBinding } from "../components/JsonPreviewBinding";
-// Lazy-load history view — only loaded when user clicks the HistoryIcon tab
-const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
+import { EntityIdentityBar } from "./EntityIdentityBar";
+import { EntityInspector } from "./EntityInspector";
+import { useEntityDisplayTitle } from "../hooks/useEntityDisplayTitle";
 import { createFormexStub, getEntityFromCache } from "@rebasepro/app";
 import { usePermissions } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
@@ -265,22 +265,31 @@ parentEntityIds,
     const customViewsCount = customViews?.length ?? 0;
     const includeJsonView = collection.includeJsonView === undefined ? true : collection.includeJsonView;
     const includeHistoryView = Boolean(collection.history);
-    const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0 || includeJsonView || includeHistoryView;
+    // The inspector holds the developer tools; the tab strip holds destinations.
+    // A strip with only the record in it has nothing to choose between, so it
+    // does not render at all.
+    const hasInspector = includeJsonView || includeHistoryView;
+    const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0;
 
     const {
         resolvedEntityViews
     } = resolvedSelectedEntityView(customViews, customizationController, undefined, canEdit);
 
+    // JSON and history are no longer tab values, but a bookmarked or in-flight
+    // URL may still name one. They resolve to the record, and open the
+    // inspector on that pane, so an old link keeps working.
+    const legacyInspectorTab = selectedTab === JSON_TAB_VALUE
+        ? "json"
+        : selectedTab === HISTORY_TAB_VALUE ? "history" : undefined;
+
     const validTabValues = useMemo(() => {
         const set = new Set<string>([
             MAIN_TAB_VALUE,
-            ...(includeJsonView ? [JSON_TAB_VALUE] : []),
-            ...(includeHistoryView ? [HISTORY_TAB_VALUE] : []),
             ...resolvedEntityViews.map(v => v.key),
             ...subcollections.map(s => s.slug)
         ]);
         return set;
-    }, [includeJsonView, includeHistoryView, resolvedEntityViews, subcollections]);
+    }, [resolvedEntityViews, subcollections]);
 
     const activeTab = validTabValues.has(selectedTab) ? selectedTab : MAIN_TAB_VALUE;
 
@@ -381,35 +390,32 @@ parentEntityIds,
 
     const globalLoading = (dataLoading && !usedEntity) || (canEdit === undefined && (status === "existing" || status === "copy"));
 
-    // Only mount JSON view when its tab is selected (or was previously selected)
-    const jsonTabMounted = mountedTabsRef.current.has(JSON_TAB_VALUE);
-    const jsonView = (activeTab === JSON_TAB_VALUE || jsonTabMounted) ? <div
-        className={cls("relative flex-1 h-full overflow-auto w-full",
-            { "hidden": activeTab !== JSON_TAB_VALUE })}
-        key={"json_view"}
-        role="tabpanel">
-        <ErrorBoundary>
-            <JsonPreviewBinding
-                values={formContext?.values ?? entity?.values ?? {}} />
-        </ErrorBoundary>
-    </div> : null;
+    /* ---- identity bar ---------------------------------------------------- */
 
-    // Only mount history view when its tab is actually selected
-    const historyView = includeHistoryView && activeTab === HISTORY_TAB_VALUE ? <div
-        className={"relative flex-1 h-full overflow-auto w-full"}
-        key={"history_view"}
-        role="tabpanel">
-        <ErrorBoundary>
-            <Suspense fallback={<CircularProgressCenter />}>
-                <EntityHistoryView
-                    collection={collection}
-                    entity={usedEntity}
-                    formContext={formContext as FormContext<Record<string, unknown>>}
-                    modifiedValues={formContext?.values ?? usedEntity?.values}
-                />
-            </Suspense>
-        </ErrorBoundary>
-    </div> : null;
+    const displayTitle = useEntityDisplayTitle({
+        collection,
+        values: (formContext?.values ?? usedEntity?.values) as Record<string, unknown> | undefined,
+        entityId,
+        status
+    });
+
+    const formex = formContext?.formex;
+    const hasFormErrors = Boolean(formex && Object.keys(formex.errors).length > 0 && formex.submitCount > 0);
+    // Same rule the footer used: an untouched existing record has nothing to save.
+    const saveDisabled = Boolean(
+        !formContext
+        || formContext.disabled
+        || formex?.isSubmitting
+        || (status === "existing" && !formex?.dirty)
+    );
+
+    const [inspectorOpen, setInspectorOpen] = useState(false);
+
+    // A URL still naming the old `json`/`history` tab opens the inspector on
+    // that pane instead of 404-ing into the record with nothing shown.
+    useEffect(() => {
+        if (legacyInspectorTab) setInspectorOpen(true);
+    }, [legacyInspectorTab]);
 
     const subCollectionsViews = childViews && childViews.map(({ collection: subcollection }) => {
         const subcollectionId = subcollection.slug;
@@ -521,6 +527,10 @@ parentEntityIds,
             initialDirtyValues={initialDirtyValues}
             openEntityMode={layout}
             forceActionsAtTheBottom={actionsAtTheBottom}
+            // Save and Discard live in the identity bar now, where they stay
+            // visible while the form scrolls. The form's own footer would be a
+            // second copy of them.
+            showDefaultActions={false}
             initialStatus={status}
             className={cls((!mainViewVisible || !canEdit) && !selectedSecondaryForm ? "hidden" : "", formProps?.className)}
             EntityFormActionsComponent={ResolvedFormActions as React.FC<typeof ResolvedFormActions extends React.ComponentType<infer P> ? P : never>}
@@ -601,8 +611,6 @@ parentEntityIds,
             );
         });
 
-    const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel" || layout === "dialog";
-
     const fullScreenButton = !barActions && (layout === "side_panel" || layout === "split" || layout === "dialog") && entityId ? (
         <Tooltip title={"Open full screen"}>
             <IconButton
@@ -620,59 +628,59 @@ parentEntityIds,
 
     let result = <div className="relative flex flex-col h-full w-full bg-white dark:bg-surface-800">
 
-        {shouldShowTopBar && <div
-            className={cls("h-[52px] items-center flex overflow-hidden w-full border-b pl-2 pr-2 flex bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+        <EntityIdentityBar
+            collection={collection as AdminCollection}
+            title={displayTitle}
+            entityId={status === "existing" ? entityId : undefined}
+            status={status}
+            dirty={Boolean(formContext?.formex?.dirty)}
+            saving={Boolean(formContext?.isSaving)}
+            hasErrors={hasFormErrors}
+            saveDisabled={!canEdit || saveDisabled}
+            onSave={canEdit && formContext ? () => formContext.submit() : undefined}
+            onDiscard={canEdit && formContext ? () => formContext.formex.resetForm() : undefined}
+            onInspect={hasInspector ? () => setInspectorOpen(true) : undefined}
+            trailing={<>
+                {pluginActionsTop}
+                {fullScreenButton}
+                {barActions?.({
+                    path,
+                    entityId,
+                    values: formContext?.values ?? usedEntity?.values ?? {},
+                    status
+                })}
+            </>}
+        />
 
-            {fullScreenButton}
+        {/* Destinations only: the record is the page, so its tab leads rather
+            than sitting third behind two unlabelled developer tools. The row
+            disappears entirely when there is nowhere else to go. */}
+        {hasAdditionalViews && <div className={cls(
+            "h-10 shrink-0 flex items-stretch border-b px-2 min-w-0",
+            defaultBorderMixin
+        )}>
+            <Tabs
+                className={"!w-full"}
+                innerClassName={"h-full"}
+                variant={"boxy"}
+                value={activeTab}
+                onValueChange={(value) => {
+                    onSideTabClick(value);
+                }}>
 
-            {barActions?.({
-                path,
-                entityId,
-                values: formContext?.values ?? usedEntity?.values ?? {},
-                status
-            })}
+                <Tab value={MAIN_TAB_VALUE}>
+                    <span className="flex items-center gap-1.5">
+                        {getIcon(collection.icon, undefined, undefined, "smallest")}
+                        {collection.singularName ?? collection.name}
+                    </span>
+                </Tab>
 
-            {pluginActionsTop}
+                {customViewTabsStart}
 
-            {hasAdditionalViews && <div className={"flex-1 flex justify-end min-w-0 shrink-0"}>
-                <Tabs
-                    className={"!w-fit max-w-full"}
-                    value={activeTab}
-                    onValueChange={(value) => {
-                        onSideTabClick(value);
-                    }}>
+                {customViewTabsEnd}
 
-                    {includeJsonView && <Tab
-                        disabled={!hasAdditionalViews}
-                        value={JSON_TAB_VALUE}
-                        className={"text-sm"}>
-                        <CodeIcon size={iconSize.smallest} />
-                    </Tab>}
-
-                    {includeHistoryView && <Tab
-                        disabled={!hasAdditionalViews}
-                        value={HISTORY_TAB_VALUE}
-                        className={"text-sm"}>
-                        <HistoryIcon size={iconSize.smallest} />
-                    </Tab>}
-
-                    <Tab
-                        disabled={!hasAdditionalViews}
-                        value={MAIN_TAB_VALUE}
-                        className={"text-sm min-w-[90px]"}>
-                        <span className="flex items-center gap-1.5">
-                            {getIcon(collection.icon, undefined, undefined, "smallest")}
-                            {collection.singularName ?? collection.name}
-                        </span>
-                    </Tab>
-
-                    {customViewTabsStart}
-
-                    {customViewTabsEnd}
-
-                    {subcollectionTabs}
-                </Tabs>
-            </div>}
+                {subcollectionTabs}
+            </Tabs>
         </div>}
 
         {globalLoading
@@ -682,13 +690,18 @@ parentEntityIds,
                 {entityView}
             </>}
 
-        {jsonView}
-
-        {historyView}
-
         {customViewsView}
 
         {subCollectionsViews}
+
+        <EntityInspector
+            open={inspectorOpen}
+            onClose={() => setInspectorOpen(false)}
+            collection={collection as AdminCollection}
+            entity={usedEntity as Entity<Record<string, unknown>> | undefined}
+            formContext={formContext as FormContext<Record<string, unknown>> | undefined}
+            values={formContext?.values ?? usedEntity?.values}
+            includeHistory={includeHistoryView}/>
 
     </div>;
 

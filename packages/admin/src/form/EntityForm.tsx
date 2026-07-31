@@ -8,17 +8,19 @@ import type { EntityFormProps, OnUpdateParams } from "../types/components/Entity
 import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary } from "@rebasepro/ui";
-import { AlignLeftIcon, CheckIcon, LoaderIcon, PencilIcon, useDebouncedCallback } from "@rebasepro/ui";
+import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
 import { getDefaultValuesFor } from "@rebasepro/common";
-import { isHidden, isReadOnly } from "@rebasepro/app";
+import { isReadOnly } from "@rebasepro/app";
 
 import { useCustomizationController } from "@rebasepro/app";
-import { getFormFieldKeys } from "@rebasepro/app";
-import { Alert, Button, Chip, cls, Dialog, DialogActions, DialogContent, DialogTitle, iconSize, paperMixin, Tooltip, Typography } from "@rebasepro/ui";
+import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
+import type { ResolvedFormField } from "@rebasepro/app";
+import { Alert, Button, cls, Dialog, DialogActions, DialogContent, DialogTitle, iconSize, paperMixin, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 
-import { FormEntry } from "./components/FormEntry";
-import { FormLayout } from "./components/FormLayout";
+import { FieldBlock, isSelfLabellingProperty } from "./components/FieldBlock";
+import { FormRail } from "./components/FormRail";
+import { FormSections } from "./components/FormSections";
 import { LabelWithIconAndTooltip } from "./components/LabelWithIconAndTooltip";
 import { PropertyFieldBinding } from "./PropertyFieldBinding";
 import { flattenKeys } from "@rebasepro/app";
@@ -28,9 +30,7 @@ import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
 
-import { getEntityTitlePropertyKeyForEntity, isUserSelectProperty, resolveTitleToString } from "../util/previews";
-import { getUserLabel, useResolvedUser } from "../hooks/useResolvedUsers";
-import { getValueInPath, mergeDeep } from "@rebasepro/utils";
+import { mergeDeep } from "@rebasepro/utils";
 import {
     getChanges,
     zodToFormErrors
@@ -307,7 +307,8 @@ export function EntityForm<M extends Record<string, unknown>>({
         savingError,
         status,
         openEntityMode,
-        disabled
+        disabled,
+        isSaving: formex.isSubmitting || isSavingAutoSave
     };
 
     useEffect(() => {
@@ -316,17 +317,9 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const actionsDisabled = disabled || formex.isSubmitting || (status === "existing" && !formex.dirty) || Boolean(disabledProp);
 
-    const titlePropertyKey = getEntityTitlePropertyKeyForEntity(collection, formex.values as Record<string, unknown> | undefined, entityId);
-    const rawTitle = formex.values && titlePropertyKey ? getValueInPath(formex.values, titlePropertyKey) : undefined;
-    // A user picker stores an id: resolve it to the person, like a relation.
-    const titleUser = useResolvedUser(isUserSelectProperty(collection, titlePropertyKey) && typeof rawTitle === "string"
-        ? rawTitle
-        : undefined);
-    const title = titleUser
-        ? getUserLabel(titleUser)
-        : (rawTitle !== undefined && rawTitle !== null
-            ? resolveTitleToString(rawTitle)
-            : (collection.singularName ?? collection.name));
+    // The record's title is resolved by the container that renders the identity
+    // bar (see `useEntityDisplayTitle`), not here — the form no longer draws a
+    // heading of its own.
 
     const modified = formex.dirty;
 
@@ -370,6 +363,137 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const formFieldKeys = getFormFieldKeys(collection);
 
+    const layout = useMemo(() => resolveFormLayout({
+        collection,
+        fieldKeys: formFieldKeys,
+        status
+    }), [collection, formFieldKeys.join(","), status]);
+
+    // Collapsed sections are per-section-key so a renamed title keeps its state,
+    // and initial state comes from the config rather than being forced open.
+    const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+        () => new Set(layout.sections.filter(s => s.collapsed).map(s => s.key))
+    );
+    const toggleSection = useCallback((key: string) => {
+        setCollapsedSections(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+    }, []);
+
+    const errorKeys = useMemo(
+        () => new Set(formex.submitCount > 0 ? Object.keys(formex.errors) : []),
+        [formex.errors, formex.submitCount]
+    );
+
+    // Autofocus lands on the first field the user can actually type into. Tracked
+    // across the whole layout rather than per section, so a collapsed leading
+    // group does not steal it.
+    const autoFocusKey = useMemo(() => {
+        if (status !== "new" && status !== "copy") return undefined;
+        const ordered = [...layout.sections.flatMap(s => s.fields), ...layout.sidebar];
+        return ordered.find(field => {
+            const property = collection.properties?.[field.key];
+            return property ? !isFieldDisabled(property) : false;
+        })?.key;
+    }, [layout, collection, status, disabledProp]);
+
+    function isFieldDisabled(property: NonNullable<typeof collection.properties[string]>): boolean {
+        const isNew = status === "new" || status === "copy";
+        const isStringOrNumber = property.type === "string" || property.type === "number";
+        const isIdAndAuto = isStringOrNumber && "isId" in property && typeof property.isId === "string" && property.isId !== "manual";
+        return Boolean(
+            disabledProp
+            || (!autoSave && formex.isSubmitting)
+            || isReadOnly(property)
+            || Boolean(property.admin?.disabled)
+            || (!isNew && "isId" in property && Boolean(property.isId))
+            || (isNew && isIdAndAuto)
+        );
+    }
+
+    const renderField = (field: ResolvedFormField): React.ReactNode => {
+
+        if (field.additional) {
+            const additionalField = collection.additionalFields?.find(f => f.key === field.key);
+            if (!additionalField || !entity) return null;
+
+            const AdditionalFieldBuilder = additionalField.Builder;
+            if (!AdditionalFieldBuilder && !additionalField.value) {
+                throw new Error("When using additional fields you need to provide a Builder or a value");
+            }
+            const additionalFieldContext = formContext as unknown as AdditionalFieldDelegateProps["context"];
+            const child = AdditionalFieldBuilder
+                ? <AdditionalFieldBuilder entity={entity} context={additionalFieldContext}/>
+                : <div className={"w-full"}>
+                    {additionalField.value?.({
+                        entity,
+                        context: additionalFieldContext
+                    })?.toString()}
+                </div>;
+
+            return (
+                <div key={`additional_${field.key}`}
+                    className={spanClass(field.span)}>
+                    <LabelWithIconAndTooltip
+                        propertyKey={field.key}
+                        icon={<AlignLeftIcon size={iconSize.small}/>}
+                        title={additionalField.name}
+                        className={"text-text-secondary dark:text-text-secondary-dark"}/>
+                    <div className={cls(paperMixin, "w-full min-h-14 p-4 md:p-6 overflow-x-auto no-scrollbar")}>
+                        <ErrorBoundary>
+                            {child}
+                        </ErrorBoundary>
+                    </div>
+                </div>
+            );
+        }
+
+        const property = collection.properties?.[field.key];
+        if (!property) {
+            console.warn(`Property ${field.key} not found in collection ${collection.name} in properties or additional fields. Skipping.`);
+            return null;
+        }
+
+        const underlyingValueHasChanged: boolean =
+            !!underlyingChanges &&
+            Object.keys(underlyingChanges).includes(field.key) &&
+            formex.touched[field.key];
+
+        const disabled = isFieldDisabled(property);
+        // The panel-style editors carry their own header; everything else is
+        // labelled by FieldBlock, which is what puts every label in one place.
+        const selfLabelling = isSelfLabellingProperty(property);
+
+        const cmsFormFieldProps: PropertyFieldBindingProps<M> = {
+            propertyKey: field.key,
+            disabled,
+            property,
+            // FieldBlock owns the description now, so the binding must not
+            // repeat it — it still renders validation errors, which belong
+            // against the control rather than under the label.
+            includeDescription: false,
+            hideLabel: !selfLabelling,
+            underlyingValueHasChanged: underlyingValueHasChanged && !autoSave,
+            context: formContext,
+            partOfArray: false,
+            minimalistView: false,
+            autoFocus: autoFocusKey === field.key
+        };
+
+        return (
+            <div key={`field_${field.key}`} className={spanClass(field.span)}>
+                <FieldBlock propertyKey={field.key}
+                    property={property}
+                    span={field.span}
+                    showLabel={!selfLabelling}>
+                    <PropertyFieldBinding {...cmsFormFieldProps}/>
+                </FieldBlock>
+            </div>
+        );
+    };
+
     const formFields = () => {
 
         if (Builder) {
@@ -380,89 +504,13 @@ export function EntityForm<M extends Record<string, unknown>>({
                 formContext={formContext}
             />;
         }
-        const isNewEntity = status === "new" || status === "copy";
-        let firstFocusableIndex = -1;
 
-        return (
-            <FormLayout>
-                {formFieldKeys.map((key) => {
-                    const property = collection.properties?.[key];
-                    if (property) {
-
-                        const underlyingValueHasChanged: boolean =
-                            !!underlyingChanges &&
-                            Object.keys(underlyingChanges).includes(key) &&
-                            formex.touched[key];
-                        const isNew = status === "new" || status === "copy";
-                        const isStringOrNumber = property.type === "string" || property.type === "number";
-                        const isIdAndAuto = isStringOrNumber && "isId" in property && typeof property.isId === "string" && property.isId !== "manual";
-                        const disabled = disabledProp || (!autoSave && formex.isSubmitting) || isReadOnly(property) || Boolean(property.admin?.disabled) || (!isNew && "isId" in property && Boolean(property.isId)) || (isNew && isIdAndAuto);
-                        const hidden = isHidden(property);
-                        if (hidden) return null;
-                        const widthPercentage = property.admin?.widthPercentage ?? 100;
-
-                        const shouldAutoFocus = isNewEntity && !disabled && firstFocusableIndex === -1;
-                        if (shouldAutoFocus) firstFocusableIndex = 0;
-
-                        const cmsFormFieldProps: PropertyFieldBindingProps<M> = {
-                            propertyKey: key,
-                            disabled,
-                            property,
-                            includeDescription: Boolean(property.description),
-                            underlyingValueHasChanged: underlyingValueHasChanged && !autoSave,
-                            context: formContext,
-                            partOfArray: false,
-                            minimalistView: false,
-                            autoFocus: shouldAutoFocus
-                        };
-
-                        return (
-                            <FormEntry propertyKey={key}
-                                widthPercentage={widthPercentage}
-                                key={`field_${key}`}>
-                                <PropertyFieldBinding {...cmsFormFieldProps}/>
-                            </FormEntry>
-                        );
-                    }
-
-                    const additionalField = collection.additionalFields?.find(f => f.key === key);
-                    if (additionalField && entity) {
-                        const AdditionalFieldBuilder = additionalField.Builder;
-                        if (!AdditionalFieldBuilder && !additionalField.value) {
-                            throw new Error("When using additional fields you need to provide a Builder or a value");
-                        }
-                        const additionalFieldContext = formContext as unknown as AdditionalFieldDelegateProps['context'];
-                        const child = AdditionalFieldBuilder
-                            ? <AdditionalFieldBuilder entity={entity} context={additionalFieldContext}/>
-                            : <div className={"w-full"}>
-                                {additionalField.value?.({
-                                    entity,
-                                    context: additionalFieldContext
-                                })?.toString()}
-                            </div>;
-
-                        return (
-                            <div key={`additional_${key}`} className={"w-full"}>
-                                <LabelWithIconAndTooltip
-                                    propertyKey={key}
-                                    icon={<AlignLeftIcon size={iconSize.small}/>}
-                                    title={additionalField.name}
-                                    className={"text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>
-                                <div
-                                    className={cls(paperMixin, "w-full min-h-14 p-4 md:p-6 overflow-x-scroll no-scrollbar")}>
-                                    <ErrorBoundary>
-                                        {child}
-                                    </ErrorBoundary>
-                                </div>
-                            </div>
-                        );
-                    }
-
-                    console.warn(`Property ${key} not found in collection ${collection.name} in properties or additional fields. Skipping.`);
-                    return null;
-                }).filter(Boolean)}
-            </FormLayout>
-        );
+        return <FormSections
+            sections={layout.sections}
+            collapsed={collapsedSections}
+            onToggle={toggleSection}
+            errorKeys={errorKeys}
+            renderField={renderField}/>;
     };
 
     const formRef = useRef<HTMLDivElement>(null);
@@ -473,25 +521,15 @@ export function EntityForm<M extends Record<string, unknown>>({
         <>
             {beforeFields}
 
-            {!Builder && <div className={"w-full flex flex-col items-start my-4 lg:my-6"}>
-                <Typography
-                    className={"my-4 grow line-clamp-1 " + (collection.hideIdFromForm ? "mb-6" : "")}
-                    variant={"h4"}>
-                    {title ?? collection.singularName ?? collection.name}
-                </Typography>
+            {/* The title, the `path/id` chip and the 72px gap under them used to
+                live here — 219px above the first field, carrying nothing, and
+                scrolling the record's identity away on the first wheel click.
+                It is now in the persistent bar, where it stays put. */}
 
-                {!entity?.values && initialStatus === "existing" &&
-                    <Alert color={"warning"} size={"small"} outerClassName={"w-full mb-4 text-xs"}>
-                        This entity does not exist yet
-                    </Alert>}
-
-                {showEntityPath && <Alert color={"base"} outerClassName={"w-full"} size={"small"}>
-                    <code
-                        className={"text-xs select-all text-text-secondary dark:text-text-secondary-dark"}>
-                        {entity?.path ?? path}/{entityId}
-                    </code>
+            {!entity?.values && initialStatus === "existing" &&
+                <Alert color={"warning"} size={"small"} outerClassName={"w-full mb-4 text-xs"}>
+                    This entity does not exist yet
                 </Alert>}
-            </div>}
 
             {children}
 
@@ -504,7 +542,7 @@ export function EntityForm<M extends Record<string, unknown>>({
             </Alert>}
 
             {formContext && <>
-                <div className="mt-12 flex flex-col gap-8" ref={formRef}>
+                <div ref={formRef}>
                     {formFields()}
                     <ErrorFocus containerRef={formRef}/>
                 </div>
@@ -553,7 +591,6 @@ export function EntityForm<M extends Record<string, unknown>>({
         collection={collection}
         path={path}
         entity={entity}
-        layout={forceActionsAtTheBottom ? "bottom" : "responsive"}
         savingError={savingError}
         formex={formex as FormexController<Record<string, unknown>>}
         disabled={actionsDisabled}
@@ -578,21 +615,23 @@ export function EntityForm<M extends Record<string, unknown>>({
                     }
                 }}
                 noValidate
-                className={cls("@container flex-1 flex flex-row w-full overflow-y-auto justify-center", className)}>
-                <div
-                    id={`form_${path}`}
-                    className={cls("relative flex flex-row max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit")}>
+                className={cls("@container/form flex-1 flex flex-row w-full min-h-0", className)}>
 
-                    <div className={cls(
-                        "flex flex-col w-full",
-                        openEntityMode === "dialog"
-                            ? "pt-4 pb-12 px-6 sm:px-8"
-                            : "pt-12 pb-16 px-4 sm:px-8 md:px-10"
-                    )}>
-                        <div
-                            className={"flex flex-row gap-4 justify-end h-0 overflow-visible sticky top-4 z-10"}>
+                {/* Main column. Its own container scope, so a field's span
+                    answers to the column it sits in rather than to the window —
+                    the same form renders at four very different widths. */}
+                <div className={"flex-1 min-w-0 overflow-y-auto flex justify-center"}>
+                    <div
+                        id={`form_${path}`}
+                        className={cls(
+                            "@container/col w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
+                            openEntityMode === "dialog"
+                                ? "pt-5 pb-12 px-6 sm:px-8"
+                                : "pt-6 pb-16 px-5 sm:px-8"
+                        )}>
 
-                            {manualApplyLocalChanges && hasLocalChanges && localChangesCacheKey &&
+                        {manualApplyLocalChanges && hasLocalChanges && localChangesCacheKey &&
+                            <div className={"flex justify-end mb-3"}>
                                 <LocalChangesMenu<M>
                                     cacheKey={localChangesCacheKey}
                                     properties={collection.properties}
@@ -602,32 +641,19 @@ export function EntityForm<M extends Record<string, unknown>>({
                                         setLocalChangesCleared(true);
                                         onClearLocalChanges?.();
                                     }}
-                                />}
-
-                            {isSavingAutoSave
-                                ? <Tooltip title={"Saving…"}>
-                                    <Chip size={"small"} className={"py-1"} colorScheme={"blueDarker"}>
-                                        <LoaderIcon size={iconSize.smallest} className={"animate-spin"}/>
-                                    </Chip>
-                                </Tooltip>
-                                : formex.dirty
-                                    ? <Tooltip title={"Form has been modified"}>
-                                        <Chip size={"small"} className={"py-1"} colorScheme={"orangeDarker"}>
-                                            <PencilIcon size={iconSize.smallest}/>
-                                        </Chip>
-                                    </Tooltip>
-                                    : <Tooltip title={"Form is in sync"}>
-                                        <Chip size={"small"} className={"py-1"}>
-                                            <CheckIcon size={iconSize.smallest}/>
-                                        </Chip>
-                                    </Tooltip>}
-                        </div>
+                                />
+                            </div>}
 
                         {formView}
 
                     </div>
-
                 </div>
+
+                {!Builder && <FormRail
+                    fields={layout.sidebar}
+                    showRecordMeta={layout.showRecordMeta && status === "existing"}
+                    entity={entity as Entity<Record<string, unknown>> | undefined}
+                    renderField={renderField}/>}
 
                 {dialogActions}
 
@@ -635,6 +661,25 @@ export function EntityForm<M extends Record<string, unknown>>({
 
         </Formex>
     );
+}
+
+/**
+ * Grid placement for a span.
+ *
+ * Written out as literal class strings rather than composed, because Tailwind
+ * scans source text: a template literal would produce classes that exist at
+ * runtime and were never generated into the stylesheet.
+ *
+ * Below the column breakpoint every field takes the single available column, so
+ * the side panel, the dialog and mobile all get a plain stack.
+ */
+function spanClass(span: 1 | 2 | 3 | 4): string {
+    switch (span) {
+        case 1: return "@2xl/col:col-span-1";
+        case 2: return "@2xl/col:col-span-2";
+        case 3: return "@2xl/col:col-span-3";
+        case 4: return "@2xl/col:col-span-4";
+    }
 }
 
 function useOnAutoSave<M extends Record<string, unknown>>(autoSave: undefined | boolean, formex: FormexController<M>, lastSavedValues: React.MutableRefObject<EntityValues<M> | undefined>, save: (values: EntityValues<M>) => Promise<Entity<M> | void>) {

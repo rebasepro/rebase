@@ -8,6 +8,8 @@ import { PluginProviderStack, resolveComponentRef, useComponentOverride, Collect
 
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { EntityViewBinding } from "./EntityViewBinding";
+import { EntityIdentityBar } from "./EntityIdentityBar";
+import { EntityInspector } from "./EntityInspector";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
     Alert,
@@ -45,9 +47,7 @@ import { useNavigate } from "react-router";
 import { getValueInPath } from "@rebasepro/utils";
 import { getEntityTitlePropertyKeyForEntity, isUserSelectProperty, resolveTitleToString } from "../util/previews";
 import { getUserLabel, useResolvedUser } from "../hooks/useResolvedUsers";
-import { JsonPreviewBinding } from "../components/JsonPreviewBinding";
 
-const EntityHistoryView = lazy(() => import("../components/history").then(m => ({ default: m.EntityHistoryView })));
 
 import { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../util/view_constants";
 
@@ -189,7 +189,17 @@ entityId }
     const customViewsCount = customViews?.length ?? 0;
     const includeJsonView = collection.includeJsonView === undefined ? true : collection.includeJsonView;
     const includeHistoryView = Boolean(collection.history);
-    const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0 || includeJsonView || includeHistoryView;
+    // Same split as the edit view: the strip is for destinations, the inspector
+    // for the developer tools that used to sit in front of them.
+    const hasInspector = includeJsonView || includeHistoryView;
+    const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0;
+
+    const [inspectorOpen, setInspectorOpen] = useState(false);
+
+    const legacyInspectorTab = selectedTab === JSON_TAB_VALUE || selectedTab === HISTORY_TAB_VALUE;
+    useEffect(() => {
+        if (legacyInspectorTab) setInspectorOpen(true);
+    }, [legacyInspectorTab]);
 
     const {
         resolvedEntityViews
@@ -198,13 +208,11 @@ entityId }
     const validTabValues = useMemo(() => {
         const set = new Set<string>([
             MAIN_TAB_VALUE,
-            ...(includeJsonView ? [JSON_TAB_VALUE] : []),
-            ...(includeHistoryView ? [HISTORY_TAB_VALUE] : []),
             ...resolvedEntityViews.map(v => v.key),
             ...subcollections.map(s => s.slug)
         ]);
         return set;
-    }, [includeJsonView, includeHistoryView, resolvedEntityViews, subcollections]);
+    }, [resolvedEntityViews, subcollections]);
 
     const activeTab = validTabValues.has(selectedTab) ? selectedTab : MAIN_TAB_VALUE;
 
@@ -320,35 +328,6 @@ entityId }
         }).filter(Boolean);
 
     const globalLoading = dataLoading && !usedEntity;
-
-    // JSON view
-    const jsonTabMounted = mountedTabsRef.current.has(JSON_TAB_VALUE);
-    const jsonView = (activeTab === JSON_TAB_VALUE || jsonTabMounted) ? <div
-        className={cls("relative flex-1 h-full overflow-auto w-full",
-            { "hidden": activeTab !== JSON_TAB_VALUE })}
-        key={"json_view"}
-        role="tabpanel">
-        <ErrorBoundary>
-            <JsonPreviewBinding values={usedEntity?.values ?? {}} />
-        </ErrorBoundary>
-    </div> : null;
-
-    // History view
-    const historyView = includeHistoryView && activeTab === HISTORY_TAB_VALUE ? <div
-        className={"relative flex-1 h-full overflow-auto w-full"}
-        key={"history_view"}
-        role="tabpanel">
-        <ErrorBoundary>
-            <Suspense fallback={<CircularProgressCenter />}>
-                <EntityHistoryView
-                    collection={collection}
-                    entity={usedEntity}
-                    formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
-                    modifiedValues={usedEntity?.values}
-                />
-            </Suspense>
-        </ErrorBoundary>
-    </div> : null;
 
     // Subcollection views
     const subCollectionsViews = childViews && childViews.map(({ collection: subcollection }) => {
@@ -516,130 +495,89 @@ entityId }
         </Button>
     ) : null;
 
-    // Main content view with title and properties
+    // Main content view. The title, the `path/id` chip and the empty band under
+    // them have moved into the identity bar, and the `w-80 2xl:w-96` rail that
+    // held a single Edit button is gone — the bar holds it now.
     const mainView = <div
         className={cls(
             "flex-1 flex flex-row w-full overflow-y-auto justify-center",
             !mainViewVisible ? "hidden" : ""
         )}>
-        <div
-            className={cls("relative flex flex-row max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit")}>
-            <div className={cls(
-                "flex flex-col w-full",
-                layout === "dialog"
-                    ? "pt-4 pb-12 px-6 sm:px-8"
-                    : "pt-12 pb-16 px-4 sm:px-8 md:px-10"
-            )}>
-                {/* Title and entity path */}
-                <div className={"w-full flex flex-col items-start my-4 lg:my-6"}>
-                    <div className="flex items-center justify-between w-full">
-                        <Typography
-                            className={cls("my-4 grow line-clamp-1", collection.hideIdFromForm ? "mb-6" : "")}
-                            variant={"h4"}>
-                            {title}
-                        </Typography>
-                        {editButton}
-                    </div>
-
-                    <Alert color={"base"} outerClassName={"w-full"} size={"small"}>
-                        <code
-                            className={"text-xs select-all text-text-secondary dark:text-text-secondary-dark"}>
-                            {usedEntity?.path ?? path}/{entityId}
-                        </code>
-                    </Alert>
-                </div>
-
-                {/* Property detail display */}
-                <div className="mt-12 flex flex-col gap-8">
-                    {propertyDetailView()}
-                </div>
-
-                <div className="h-16" />
-            </div>
-
-            {/* Side action bar for large screens */}
-            {canEdit && onEditClick && layout === "full_screen" && <div
-                className={cls(
-                    "overflow-auto h-full hidden @6xl:flex flex-col gap-2 w-80 2xl:w-96 px-4 py-16 sticky top-0 border-l",
-                    defaultBorderMixin
-                )}>
-                <Button
-                    fullWidth={true}
-                    variant="filled"
-                    color="primary"
-                    startIcon={<PencilIcon size={iconSize.small} />}
-                    onClick={onEditClick}>
-                    {t("edit_entity")}
-                </Button>
-            </div>}
+        <div className={cls(
+            "w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
+            layout === "dialog"
+                ? "pt-5 pb-12 px-6 sm:px-8"
+                : "pt-6 pb-16 px-5 sm:px-8"
+        )}>
+            {propertyDetailView()}
         </div>
     </div>;
 
     let result = <div className="relative flex flex-col h-full w-full bg-white dark:bg-surface-800">
 
-        {shouldShowTopBar && <div
-            className={cls("h-[52px] items-center flex overflow-hidden w-full border-b pl-2 pr-2 flex bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+        <EntityIdentityBar
+            collection={collection as AdminCollection}
+            title={title}
+            entityId={entityId}
+            status={"existing"}
+            dirty={false}
+            saving={false}
+            onInspect={hasInspector ? () => setInspectorOpen(true) : undefined}
+            trailing={<>
+                {editButton}
+                {pluginActionsTop}
+                {backToCollectionButton}
+                {fullScreenButton}
+                {barActions?.({
+                    path,
+                    entityId,
+                    values: usedEntity?.values ?? {},
+                    status: "existing"
+                })}
+            </>}
+        />
 
-            {backToCollectionButton}
+        {hasAdditionalViews && <div className={cls(
+            "h-10 shrink-0 flex items-stretch border-b px-2 min-w-0",
+            defaultBorderMixin
+        )}>
+            <Tabs
+                className={"!w-full"}
+                innerClassName={"h-full"}
+                variant={"boxy"}
+                value={activeTab}
+                onValueChange={(value) => {
+                    onSideTabClick(value);
+                }}>
 
-            {fullScreenButton}
+                <Tab value={MAIN_TAB_VALUE}>
+                    <span className="flex items-center gap-1.5">
+                        {getIcon(collection.icon, undefined, undefined, "smallest")}
+                        {collection.singularName ?? collection.name}
+                    </span>
+                </Tab>
 
-            {barActions?.({
-                path,
-                entityId,
-                values: usedEntity?.values ?? {},
-                status: "existing"
-            })}
-
-            {pluginActionsTop}
-
-            {hasAdditionalViews && <div className={"flex-1 flex justify-end min-w-0 shrink-0"}>
-                <Tabs
-                    className={"!w-fit max-w-full"}
-                    value={activeTab}
-                    onValueChange={(value) => {
-                        onSideTabClick(value);
-                    }}>
-
-                    {includeJsonView && <Tab
-                        disabled={!hasAdditionalViews}
-                        value={JSON_TAB_VALUE}
-                        className={"text-sm"}>
-                        <CodeIcon size={iconSize.smallest} />
-                    </Tab>}
-
-                    {includeHistoryView && <Tab
-                        disabled={!hasAdditionalViews}
-                        value={HISTORY_TAB_VALUE}
-                        className={"text-sm"}>
-                        <HistoryIcon size={iconSize.smallest} />
-                    </Tab>}
-
-                    <Tab
-                        disabled={!hasAdditionalViews}
-                        value={MAIN_TAB_VALUE}
-                        className={"text-sm min-w-[90px]"}>
-                        <span className="flex items-center gap-1.5">
-                            {getIcon(collection.icon, undefined, undefined, "smallest")}
-                            {collection.singularName ?? collection.name}
-                        </span>
-                    </Tab>
-
-                    {customViewTabsStart}
-                    {customViewTabsEnd}
-                    {subcollectionTabs}
-                </Tabs>
-            </div>}
+                {customViewTabsStart}
+                {customViewTabsEnd}
+                {subcollectionTabs}
+            </Tabs>
         </div>}
 
         {globalLoading
             ? <DetailViewSkeleton collection={collection} />
             : mainView}
 
-        {jsonView}
-        {historyView}
         {customViewsView}
         {subCollectionsViews}
+
+        <EntityInspector
+            open={inspectorOpen}
+            onClose={() => setInspectorOpen(false)}
+            collection={collection as AdminCollection}
+            entity={usedEntity as Entity<Record<string, unknown>> | undefined}
+            formContext={readOnlyFormContext as FormContext<Record<string, unknown>> | undefined}
+            values={usedEntity?.values}
+            includeHistory={includeHistoryView}/>
 
     </div>;
 

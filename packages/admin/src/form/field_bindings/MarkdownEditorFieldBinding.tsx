@@ -74,6 +74,7 @@ export function MarkdownEditorFieldBinding({
     value,
     setValue,
     includeDescription,
+    hideLabel,
     showError,
     error,
     minimalistView,
@@ -216,12 +217,12 @@ export function MarkdownEditorFieldBinding({
     return (
         <>
             <div className="flex items-center w-full">
-                <LabelWithIconAndTooltip
+                {!hideLabel && <LabelWithIconAndTooltip
                     propertyKey={propertyKey}
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name ?? propertyKey}
-                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>
+                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>}
                 <div className="flex-grow"/>
                 {property.admin?.clearable && !disabled && (
                     <IconButton

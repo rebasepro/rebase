@@ -31,6 +31,7 @@ export function SelectFieldBinding({
     touched,
     property,
     includeDescription,
+    hideLabel,
     size = "large"
 }: FieldProps<StringProperty | NumberProperty>) {
 
@@ -58,7 +59,7 @@ export function SelectFieldBinding({
                 fullWidth={true}
                 position="item-aligned"
                 inputClassName={cls("w-full")}
-                label={
+                label={hideLabel ? undefined : (
                     <PropertyIdCopyTooltip propertyKey={propertyKey}>
                         <LabelWithIcon
                             icon={getIconForProperty(property, "small")}
@@ -66,7 +67,7 @@ export function SelectFieldBinding({
                             title={property.name ?? propertyKey}
                             className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5 my-0"}
                         />
-                    </PropertyIdCopyTooltip>}
+                    </PropertyIdCopyTooltip>)}
                 endAdornment={
                     property.admin?.clearable && !disabled && <IconButton
                         size="small"

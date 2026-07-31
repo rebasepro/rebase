@@ -9,8 +9,6 @@ import { getIcon } from "@rebasepro/app";
 import {
     AlertCircleIcon,
     Button,
-    cls,
-    defaultBorderMixin,
     DialogActions,
     IconButton,
     LoadingButton,
@@ -19,11 +17,20 @@ import {
 } from "@rebasepro/ui";
 import { FormexController } from "@rebasepro/forms";
 
+/**
+ * The form's own action bar.
+ *
+ * There used to be two variants: this one, and a `w-80 2xl:w-96` sticky rail
+ * holding the same two buttons above several hundred pixels of nothing — a
+ * fifth of a 1440px viewport reserved for a Save button. The rail is gone. When
+ * the container supplies its own actions (the entity view's identity bar does)
+ * it passes `showDefaultActions={false}`, and this renders only what the bar
+ * cannot host: the saving error, plugin actions, and collection form actions.
+ */
 export function EntityFormActions({
     path,
     collection,
     entity,
-    layout,
     savingError,
     formex,
     disabled,
@@ -31,10 +38,11 @@ export function EntityFormActions({
     pluginActions,
     openEntityMode,
     navigateBack,
-    formContext
+    formContext,
+    showDefaultActions = true
 }: EntityFormActionsProps) {
 
-    const bottomActionsProps = {
+    return buildBottomActions({
         path,
         savingError,
         entity,
@@ -46,35 +54,8 @@ export function EntityFormActions({
         navigateBack,
         formContext,
         formex,
-        className: layout === "responsive" ? "@6xl:hidden" : undefined
-    };
-
-    const sideActionsProps = {
-        path,
-        savingError,
-        entity,
-        collection,
-        disabled,
-        status,
-        pluginActions,
-        openEntityMode,
-        navigateBack,
-        formContext,
-        formex,
-        className: layout === "responsive" ? "hidden @6xl:flex" : undefined
-    };
-
-    const bottomActions = buildBottomActions(bottomActionsProps);
-    const sideActions = buildSideActions(sideActionsProps);
-
-    if (layout === "responsive") {
-        return <>
-            {bottomActions}
-            {sideActions}
-        </>;
-    }
-
-    return layout === "bottom" ? bottomActions : sideActions;
+        showDefaultActions
+    });
 }
 
 type ActionsViewProps<M extends Record<string, unknown>> = {
@@ -90,6 +71,7 @@ type ActionsViewProps<M extends Record<string, unknown>> = {
     navigateBack: () => void;
     formContext: FormContext,
     formex: FormexController<Record<string, unknown>>;
+    showDefaultActions: boolean;
     className?: string;
 };
 
@@ -106,10 +88,21 @@ function buildBottomActions<M extends Record<string, unknown>>({
     navigateBack,
     formContext,
     formex,
+    showDefaultActions,
     className
 }: ActionsViewProps<M>) {
 
     const hasErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
+    const entityActions = entity ? (formActions ?? []) : [];
+    const hasPluginActions = Boolean(pluginActions && (pluginActions as React.ReactNode[]).length > 0);
+
+    // Nothing to show means no footer at all, rather than an empty bar pinned
+    // over the last field. This is also what made `showDefaultActions` start
+    // meaning something: it was accepted as a prop and then never read, so
+    // passing `false` silently kept the buttons.
+    if (!showDefaultActions && !savingError && !entityActions.length && !hasPluginActions) {
+        return null;
+    }
 
     return <DialogActions position={"absolute"} className={className}>
         {savingError &&
@@ -117,8 +110,8 @@ function buildBottomActions<M extends Record<string, unknown>>({
                 <Typography color={"error"}>{savingError.message}</Typography>
             </div>
         }
-        {entity && (formActions ?? []).length > 0 && <div className="grow flex overflow-auto no-scrollbar">
-            {(formActions ?? []).map(action => (
+        {entityActions.length > 0 && <div className="grow flex overflow-auto no-scrollbar">
+            {entityActions.map(action => (
                 <IconButton
                     key={action.name}
                     color="primary"
@@ -142,68 +135,26 @@ function buildBottomActions<M extends Record<string, unknown>>({
             ))}
         </div>}
         {pluginActions}
-        <Button variant="text" disabled={disabled || formex.isSubmitting}
-            color={"primary"}
-            type="reset">
-            {status === "existing" ? "Discard" : "Clear"}
-        </Button>
-        <Tooltip title={hasErrors ? "Fix highlighted errors before saving" : undefined}>
-            <LoadingButton variant={"filled"}
-                color="primary"
-                type="submit"
-                loading={formex.isSubmitting}
-                disabled={disabled || formex.isSubmitting}
-                startIcon={hasErrors ? <AlertCircleIcon/> : undefined}>
-                {status === "existing" && "Save"}
-                {status === "copy" && "Create copy"}
-                {status === "new" && "Create"}
-            </LoadingButton>
-        </Tooltip>
+
+        {showDefaultActions && <>
+            <Button variant="text" disabled={disabled || formex.isSubmitting}
+                color={"primary"}
+                type="reset">
+                {status === "existing" ? "Discard" : "Clear"}
+            </Button>
+            <Tooltip title={hasErrors ? "Fix highlighted errors before saving" : undefined}>
+                <LoadingButton variant={"filled"}
+                    color="primary"
+                    type="submit"
+                    loading={formex.isSubmitting}
+                    disabled={disabled || formex.isSubmitting}
+                    startIcon={hasErrors ? <AlertCircleIcon/> : undefined}>
+                    {status === "existing" && "Save"}
+                    {status === "copy" && "Create copy"}
+                    {status === "new" && "Create"}
+                </LoadingButton>
+            </Tooltip>
+        </>}
 
     </DialogActions>;
-}
-
-function buildSideActions<M extends Record<string, unknown>>({
-    savingError,
-    entity,
-    formActions,
-    path,
-    openEntityMode,
-    collection,
-    disabled,
-    status,
-    pluginActions,
-    formex,
-    className
-}: ActionsViewProps<M>) {
-
-    const hasErrors = Object.keys(formex.errors).length > 0 && formex.submitCount > 0;
-
-    return <div
-        className={cls("overflow-auto h-full flex flex-col gap-2 w-80 2xl:w-96 px-4 py-16 sticky top-0 border-l", defaultBorderMixin, className)}>
-        <Tooltip title={hasErrors ? "Fix highlighted errors before saving" : undefined}>
-            <LoadingButton fullWidth={true}
-                variant="filled"
-                color="primary"
-                type="submit"
-                loading={formex.isSubmitting}
-                startIcon={hasErrors ? <AlertCircleIcon/> : undefined}
-                disabled={disabled || formex.isSubmitting}>
-                {status === "existing" && "Save"}
-                {status === "copy" && "Create copy"}
-                {status === "new" && "Create"}
-            </LoadingButton>
-        </Tooltip>
-        <Button fullWidth={true} variant="text" disabled={disabled || formex.isSubmitting} type="reset">
-            {status === "existing" ? "Discard" : "Clear"}
-        </Button>
-
-        {pluginActions}
-
-        {savingError &&
-            <div className="text-right">
-                <Typography color={"error"}>{savingError.message}</Typography>
-            </div>
-        }
-    </div>;
 }
