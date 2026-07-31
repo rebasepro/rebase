@@ -618,6 +618,142 @@ export function collectDeclaredDependencies(projectRoot: string): Record<string,
     return declared;
 }
 
+/** One `@rebasepro/*` dependency as some package.json in the project declares it. */
+export interface DeclaredFrameworkDep {
+    name: string;
+    range: string;
+    /** Project-relative package.json it was declared in. */
+    file: string;
+}
+
+export interface FrameworkDepDrift {
+    /** Declared at a version that can never reach the CLI's own. */
+    behind: DeclaredFrameworkDep[];
+    /**
+     * The distinct lower bounds found across all declared `@rebasepro/*`, when
+     * there is more than one — the project is pinning mixed-era framework
+     * packages against each other.
+     */
+    disagreeing: string[];
+}
+
+/**
+ * Lowest version a range could resolve to, or null if it is not a range.
+ *
+ * Kept deliberately tiny and local. The published range grammar here is a caret,
+ * a tilde, an exact version or a `>=` floor, and the alternative — a semver
+ * dependency in the CLI — buys breadth this does not need.
+ */
+function lowerBoundOf(range: string): [number, number, number] | null {
+    const raw = range.trim().replace(/^[\^~]/, "").replace(/^>=\s*/, "").replace(/^v/, "");
+    if (!/^\d+(\.\d+){0,2}$/.test(raw)) return null;
+    const [major, minor = 0, patch = 0] = raw.split(".").map(Number);
+    return [major, minor, patch];
+}
+
+/** Highest version a range could resolve to (exclusive), or null. */
+function upperBoundOf(range: string): [number, number, number] | null {
+    const trimmed = range.trim();
+    const min = lowerBoundOf(trimmed);
+    if (!min) return null;
+    if (trimmed.startsWith(">=")) return null; // open — reaches anything
+    const [major, minor, patch] = min;
+    if (trimmed.startsWith("^")) {
+        if (major > 0) return [major + 1, 0, 0];
+        if (minor > 0) return [0, minor + 1, 0];
+        return [0, 0, patch + 1];
+    }
+    if (trimmed.startsWith("~")) {
+        return trimmed.replace(/^~v?/, "").split(".").length >= 2
+            ? [major, minor + 1, 0]
+            : [major + 1, 0, 0];
+    }
+    const parts = trimmed.replace(/^v/, "").split(".").length;
+    if (parts === 1) return [major + 1, 0, 0];
+    if (parts === 2) return [major, minor + 1, 0];
+    return [major, minor, patch + 1];
+}
+
+function compareTriples(a: [number, number, number], b: [number, number, number]): number {
+    for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+    return 0;
+}
+
+/**
+ * Whether a declared range could EVER resolve at or above `target`.
+ *
+ * The same question the control plane asks at intake, asked here first. Only a
+ * range whose entire span sits below the target is reported — `^0.10.0` can
+ * never cross to 0.12 whatever npm publishes — because a false alarm on a build
+ * that would have worked trains people to ignore the warning that matters.
+ */
+function canReach(range: string, target: string): boolean | null {
+    const ceiling = upperBoundOf(range);
+    const floor = lowerBoundOf(target);
+    if (!floor || !lowerBoundOf(range)) return null;
+    if (!ceiling) return true;
+    return compareTriples(ceiling, floor) > 0;
+}
+
+/**
+ * Find `@rebasepro/*` dependencies pinned to a version older than this CLI.
+ *
+ * This is the only place a developer can be told. In development, every
+ * `@rebasepro/*` resolves through pnpm's `link:`/`workspace:` overrides to the
+ * checkout, so the version STRINGS in package.json are never exercised — the
+ * project runs fine locally on whatever is on disk, and the declared numbers are
+ * first honoured when the runtime npm-installs them from a bundle in the cloud.
+ * A project scaffolded at 0.10.0 therefore keeps working on a developer's
+ * machine indefinitely while being, in the cloud, a 0.10.0 driver.
+ *
+ * That matters because the image supplies only `@rebasepro/server`; the database
+ * driver comes from these declarations and a newer runtime never updates it.
+ * Every package.json is scanned, `dependencies` and `devDependencies` both,
+ * because they have to be bumped together and the one that gets forgotten is the
+ * one nobody looks at.
+ */
+export function detectFrameworkDepDrift(projectRoot: string, cliVersion: string): FrameworkDepDrift {
+    const found: DeclaredFrameworkDep[] = [];
+
+    for (const relative of [
+        "package.json",
+        "backend/package.json",
+        "config/package.json",
+        "frontend/package.json"
+    ]) {
+        const file = path.join(projectRoot, relative);
+        if (!fs.existsSync(file)) continue;
+        try {
+            const pkg = JSON.parse(fs.readFileSync(file, "utf8")) as {
+                dependencies?: Record<string, string>;
+                devDependencies?: Record<string, string>;
+            };
+            for (const block of [pkg.dependencies, pkg.devDependencies]) {
+                for (const [name, range] of Object.entries(block ?? {})) {
+                    if (!name.startsWith("@rebasepro/")) continue;
+                    if (typeof range !== "string") continue;
+                    found.push({ name, range, file: relative });
+                }
+            }
+        } catch {
+            // Unparseable package.json: nothing to judge from it.
+        }
+    }
+
+    const behind = found.filter(d => canReach(d.range, cliVersion) === false);
+
+    // Mixed-era pins. Compared by lower bound rather than by string so `^0.12.0`
+    // and `0.12.0` are not reported as a disagreement — they are not one.
+    const bounds = new Set(
+        found
+            .map(d => lowerBoundOf(d.range))
+            .filter((b): b is [number, number, number] => b != null)
+            .map(b => b.join("."))
+    );
+
+    return { behind, disagreeing: bounds.size > 1 ? [...bounds].sort() : [] };
+}
+
 /**
  * Rewrite relative import specifiers in emitted JavaScript so Node can resolve them.
  *
@@ -1268,7 +1404,7 @@ function resolveServerVersion(projectRoot: string): string {
     return "unknown";
 }
 
-function resolveCliVersion(): string {
+export function resolveCliVersion(): string {
     try {
         const here = path.dirname(new URL(import.meta.url).pathname);
         let dir = here;

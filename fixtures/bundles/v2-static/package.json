@@ -1,0 +1,6 @@
+{
+  "name": "corpus-v2-static",
+  "private": true,
+  "type": "module",
+  "dependencies": {}
+}

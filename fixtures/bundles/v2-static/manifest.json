@@ -1,0 +1,13 @@
+{
+  "bundleFormat": 2,
+  "runtime": { "range": "^1", "builtAgainst": "0.12.0", "contract": 1 },
+  "schemaVersion": "",
+  "app": "web",
+  "kind": "static",
+  "entry": {
+    "static": [{ "path": "/", "dir": "static/site", "spa": true }]
+  },
+  "hooks": { "native": false },
+  "deps": { "declared": {} },
+  "build": { "cli": "0.12.0", "node": "22", "createdAt": "2026-07-30T00:00:00.000Z" }
+}

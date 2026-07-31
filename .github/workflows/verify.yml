@@ -245,6 +245,32 @@ jobs:
           NODE_OPTIONS: "--max_old_space_size=4096"
           ACCEPTANCE_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_acceptance
 
+      # Every bundle shape we have ever shipped, booted on the runtime as it is
+      # now. The managed tier moves projects onto new images automatically,
+      # without anyone rebuilding them, and the only thing that had been standing
+      # behind that promise was a health gate watching request and error rates —
+      # which sees a crash loop and cannot see a bundle that stopped loading its
+      # collections, a schema version that changed identity under a deployed
+      # project, or an old manifest shape that now parses to something subtly
+      # different. Those are the regressions a fleet-wide auto-upgrade turns into
+      # one simultaneous outage.
+      #
+      # The fixtures are frozen and hand-authored, NOT built here: a fixture the
+      # builder regenerates moves whenever the builder moves, which is the one
+      # thing a regression corpus must not do. When one fails, the finding is
+      # that a bundle already deployed would fail — see fixtures/bundles/README.md.
+      #
+      # `always()` for the same reason as its neighbours: different ground, and
+      # it still fails the job on its own.
+      - name: Bundle corpus
+        if: always()
+        run: |
+          docker exec rebase-postgres createdb -U rebase rebase_corpus
+          pnpm run verify:corpus
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+          CORPUS_DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_corpus
+
       # The product's real security coverage, orphaned until now (this suite ran
       # in NO pipeline, so a change breaking RLS shipped green — AUDIT P0 #2).
       # rls-enforcement boots a real Postgres and asserts DB state after every

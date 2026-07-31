@@ -21,7 +21,13 @@ import type { RebaseAppConfig, RebaseStaticAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { buildableApps, findBackendApp, loadManifest, ManifestError } from "../manifest";
-import { buildBundle, buildStaticBundle, DEFAULT_BUNDLE_DIR } from "../bundle";
+import {
+    buildBundle,
+    buildStaticBundle,
+    detectFrameworkDepDrift,
+    resolveCliVersion,
+    DEFAULT_BUNDLE_DIR
+} from "../bundle";
 import { assertBuiltForPath, foldFrontendIntoBundle } from "../fold-static";
 
 function printHelp(): void {
@@ -156,6 +162,33 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 const names = (result.manifest.hooks.nativeModules ?? []).map(m => m.name).join(", ");
                 console.log(chalk.yellow(`    ⚠ native dependencies detected: ${names}`));
                 console.log(chalk.dim("      These cannot run on the managed runtime. See `rebase doctor`."));
+            }
+
+            /* Framework pins older than this CLI.
+
+               Warned here because this is the only moment anyone can be told.
+               Locally every `@rebasepro/*` resolves through pnpm's workspace and
+               `link:` overrides to the checkout, so the version strings in
+               package.json are never exercised — the project runs fine on a
+               developer's machine while declaring something years old. Those
+               strings are first honoured when the runtime npm-installs them in
+               the cloud, and by then the symptom is a tenant that boots and then
+               misbehaves against its database.
+
+               A warning rather than a hard failure: the CLI cannot know that a
+               newer package has actually been published, and refusing to build
+               over a guess would be worse than saying it out loud. */
+            const drift = detectFrameworkDepDrift(projectRoot, resolveCliVersion());
+            if (drift.behind.length > 0) {
+                console.log(chalk.yellow(`    ⚠ framework dependencies older than this CLI (${resolveCliVersion()}):`));
+                for (const dep of drift.behind) {
+                    console.log(chalk.dim(`      ${dep.name}@${dep.range}  (${dep.file})`));
+                }
+                console.log(chalk.dim("      The image supplies the server, but your bundle supplies the database"));
+                console.log(chalk.dim("      driver — a newer runtime does not update it. Bump these and rebuild."));
+            } else if (drift.disagreeing.length > 0) {
+                console.log(chalk.yellow(`    ⚠ mixed @rebasepro versions declared: ${drift.disagreeing.join(", ")}`));
+                console.log(chalk.dim("      These are published together and expect to run together; pin them alike."));
             }
 
             /* Fold the project's static apps into the backend bundle, so ONE
