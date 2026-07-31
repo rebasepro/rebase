@@ -1663,13 +1663,13 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         const loadedCronJobs = await loadCronJobsFromDirectory(config.cronsDir);
 
+        cronScheduler = new CronScheduler();
+
+        // The cron scheduler uses the same serverClient as the singleton.
+        // ctx.client inside cron handlers IS the same `rebase` instance.
+        cronScheduler.setClient(serverClient);
+
         if (loadedCronJobs.length > 0) {
-            cronScheduler = new CronScheduler();
-
-            // The cron scheduler uses the same serverClient as the singleton.
-            // ctx.client inside cron handlers IS the same `rebase` instance.
-            cronScheduler.setClient(serverClient);
-
             cronScheduler.registerJobs(loadedCronJobs);
 
             // Attach database persistence if the driver supports SQL and persistence is enabled
@@ -1679,22 +1679,33 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 await store.ensureTable();
                 cronScheduler.setStore(store);
             }
+        }
 
-            const cronRouter = new Hono<HonoEnv>();
+        // Mounted for the directory, not for the jobs in it. Mounting only when
+        // something loaded meant a single unparseable file — a syntax error, an
+        // import that throws, a module the loader could not read — took the
+        // whole cron surface with it: `/api/cron` 404ed, the Studio panel broke,
+        // and the only trace was one line in the boot log. An empty list is the
+        // honest answer, and it is a debuggable one.
+        const cronRouter = new Hono<HonoEnv>();
 
-            // Cron admin routes require authentication + admin role
-            applyAdminGate(cronRouter, "Cron");
+        // Cron admin routes require authentication + admin role
+        applyAdminGate(cronRouter, "Cron");
 
-            cronRouter.route("/", createCronRoutes(cronScheduler));
-            config.app.route(`${basePath}/cron`, cronRouter);
+        cronRouter.route("/", createCronRoutes(cronScheduler));
+        config.app.route(`${basePath}/cron`, cronRouter);
 
-            // Start the scheduler
+        if (loadedCronJobs.length > 0) {
             cronScheduler.start();
-
             logger.info("Mounted cron jobs", {
                 count: loadedCronJobs.length,
                 path: `${basePath}/cron`
             });
+        } else {
+            logger.warn(
+                `Cron routes mounted at ${basePath}/cron, but no jobs loaded from ${config.cronsDir}. ` +
+                "Nothing is scheduled — check the messages above for files that failed to load."
+            );
         }
     }
 

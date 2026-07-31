@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { Hono } from "hono";
+import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
@@ -148,5 +149,26 @@ describe("declared collections", () => {
 
         // A driver without introspection is fine here — cms declares collections.
         expect(await mounted(app, "/api/data/posts")).toBe(true);
+    });
+});
+
+describe("cron", () => {
+    it("mounts the cron surface for the directory, not for the jobs in it", async () => {
+        // A directory with no loadable job files — which is also what a
+        // directory of jobs looks like when every one of them fails to import.
+        // Mounting only on `loadedJobs.length > 0` meant one syntax error took
+        // `/api/cron` and the Studio cron panel with it, leaving a 404 that
+        // reads as a broken deploy and one line in the boot log.
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+        const { app } = await boot({
+            collections: [collection("posts")],
+            cronsDir: path.join(__dirname, "fixtures"),
+            cronPersistence: false,
+            bootstrappers: [fakeBootstrapper(undefined)]
+        });
+
+        expect(await mounted(app, "/api/cron")).toBe(true);
+        expect(warn.mock.calls.flat().join(" ")).toMatch(/no jobs loaded/);
     });
 });
