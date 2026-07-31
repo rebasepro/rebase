@@ -47,6 +47,19 @@ export default [
             // on a fresh runner, will never see. Same shape as the
             // test-cli-init-* entries above.
             "**/saas-*/**",
+            // …and the ones that pattern cannot catch by name. A worktree is
+            // named after the work, not the repository, so `cloud-fleet-safety`
+            // is a checkout of the saas repo that looks like nothing of the
+            // sort. Same shape and same consequence as every entry above.
+            "cloud-fleet-safety/**",
+            // DesignSync's working directories: the bundle it vendors and the
+            // previews it renders. Untracked output of a tool rather than
+            // source, and `_vendor` alone carries 1,339 errors in third-party
+            // JS — enough to read as a catastrophic regression on any machine
+            // that has run it, while CI, which never has, stays green.
+            "ds-bundle/**",
+            ".ds-sync/**",
+            ".design-sync/**",
             ".pnp.loader.mjs",
             "update_translations.js",
             "inspect_product.mjs",
