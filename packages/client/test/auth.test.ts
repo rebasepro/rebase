@@ -195,7 +195,36 @@ expiresAt: Date.now() + 100000 }));
     // auto-refresh resilience
     // -----------------------------------------------------------------------
     describe("auto-refresh resilience", () => {
-        const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
+        /*
+         * These used to `await Promise.resolve()` eight times and assert.
+         *
+         * Eight was however many microtasks the refresh path happened to take
+         * when they were written; it grew (rotation became concurrency-safe,
+         * which added awaits) and the sign-out assertion started failing on a
+         * code path that was still correct. The sibling test hid it: "the
+         * session is NOT null" passes trivially when nothing has run yet, so
+         * the suite reported one failure where it should have reported that
+         * both tests had stopped meaning anything.
+         *
+         * Waiting for the condition instead of for a tick count is what makes
+         * this stable. Still no timers and no wall-clock — it drains the
+         * microtask queue, so it is as deterministic as the counting was, and
+         * a real regression fails it in milliseconds rather than hanging.
+         */
+        const TICK_BUDGET = 1000;
+
+        /** Drain microtasks until `predicate` holds, or the budget runs out. */
+        const settle = async (predicate: () => boolean) => {
+            for (let i = 0; i < TICK_BUDGET; i++) {
+                if (predicate()) return;
+                await Promise.resolve();
+            }
+        };
+
+        /** Drain the whole budget — for asserting something does NOT happen. */
+        const drain = async () => {
+            for (let i = 0; i < TICK_BUDGET; i++) await Promise.resolve();
+        };
 
         it("retries instead of signing out on a transient refresh failure (5xx)", async () => {
             const storage = createMemoryStorage();
@@ -209,9 +238,12 @@ expiresAt: Date.now() + 100000 }));
             });
 
             const auth = createAuth(transport, { storage });
-            await flush();
+            await drain();
 
-            // A transient 5xx must NOT drop the session — a retry is scheduled instead.
+            // A transient 5xx must NOT drop the session — a retry is scheduled
+            // instead. Drained fully, so the refresh has definitely been
+            // attempted and its failure handled before this is asserted.
+            expect(mockFetch).toHaveBeenCalled();
             expect(auth.getSession()).not.toBeNull();
         });
 
@@ -226,7 +258,7 @@ expiresAt: Date.now() + 100000 }));
             });
 
             const auth = createAuth(transport, { storage });
-            await flush();
+            await settle(() => auth.getSession() === null);
 
             expect(auth.getSession()).toBeNull();
         });
