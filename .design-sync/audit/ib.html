@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="/Users/francesco/rebase/ds-bundle/styles.css">
+<link rel="stylesheet" href="/Users/francesco/rebase/ds-bundle/_ds_bundle.css">
+<style>body{margin:0;padding:14px;background:#0d0d0d;color:#888;font:11px monospace}
+td{padding:5px 10px;text-align:center}</style></head><body>
+<div id="r"></div>
+<script src="/Users/francesco/rebase/ds-bundle/_vendor/react.js"></script>
+<script src="/Users/francesco/rebase/ds-bundle/_vendor/react-dom.js"></script>
+<script src="/Users/francesco/rebase/ds-bundle/_ds_bundle.js"></script>
+<script>
+var h = React.createElement, U = window.RebaseUI;
+document.documentElement.classList.add("dark");
+var BTN = ["smallest", "small", "medium", "large"];
+var ICO = [null, 14, 16, 18, 20, 24];
+
+var head = h("tr", { key: "head" },
+  [h("td", { key: "corner" }, "btn/icon")].concat(
+    ICO.map(function (i) { return h("td", { key: "h" + i }, i === null ? "default" : String(i)); })));
+
+var rows = BTN.map(function (b) {
+  return h("tr", { key: b },
+    [h("td", { key: "lbl" }, b)].concat(
+      ICO.map(function (i) {
+        return h("td", { key: b + i, "data-m": b + "/" + (i === null ? "def" : i) },
+          h(U.IconButton, { size: b }, h(U.PencilIcon, i === null ? null : { size: i })));
+      })));
+});
+
+ReactDOM.createRoot(document.getElementById("r")).render(
+  h("table", null, h("tbody", null, [head].concat(rows))));
+
+window.__ib = function () {
+  var out = [];
+  document.querySelectorAll("[data-m]").forEach(function (td) {
+    var btn = td.querySelector("button") || td.firstElementChild;
+    var svg = td.querySelector("svg");
+    if (!btn || !svg) return;
+    var b = btn.getBoundingClientRect(), s = svg.getBoundingClientRect();
+    out.push({
+      k: td.getAttribute("data-m"),
+      btn: Math.round(b.width) + "x" + Math.round(b.height),
+      icon: Math.round(s.width) + "x" + Math.round(s.height),
+      square: Math.round(s.width) === Math.round(s.height),
+      overflows: s.width > b.width + 0.5 || s.height > b.height + 0.5
+    });
+  });
+  return out;
+};
+</script></body></html>

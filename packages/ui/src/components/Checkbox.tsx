@@ -37,13 +37,14 @@ const outerSizeClasses = {
     large: "w-12 h-12 ",
     smallest: "w-7 h-7"
 }
-// Per-size, for the same reason as IconButton: a flat p-2 left only 12px of
-// content inside the 28px `smallest` hit area, squashing the 16px box to 12x16.
+// Flat p-2, as it always was. `shrink-0` on the box below is what stops it
+// being squashed; changing the padding here only shifts the control's optical
+// weight relative to the icons beside it.
 const paddingClasses = {
-    medium: "p-2.5",
+    medium: "p-2",
     small: "p-2",
-    large: "p-3",
-    smallest: "p-1.5"
+    large: "p-2",
+    smallest: "p-2"
 }
 
 const colorClasses = {
