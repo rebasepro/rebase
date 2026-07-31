@@ -23,22 +23,17 @@ export type {
 } from "./CollectionViewTypes";
 
 // Components
+//
+// `CollectionView` is the entry point. The per-mode views
+// (table/card/list/kanban), the toolbar and the default cell renderer are
+// internal: `CollectionView` selects and wires them from `mode`, and nothing
+// outside this package consumed them directly. Their prop types stay exported
+// so callers can still type overrides.
 export { CollectionView } from "./CollectionView";
 export type { CollectionViewProps } from "./CollectionView";
 
-export { CollectionViewToolbar } from "./CollectionViewToolbar";
 export type { CollectionViewToolbarProps } from "./CollectionViewToolbar";
-
-export { CollectionTableView } from "./CollectionTableView";
 export type { CollectionTableViewProps } from "./CollectionTableView";
-
-export { CollectionCardView } from "./CollectionCardView";
 export type { CollectionCardViewProps } from "./CollectionCardView";
-
-export { CollectionListView } from "./CollectionListView";
 export type { CollectionListViewProps } from "./CollectionListView";
-
-export { CollectionKanbanView } from "./CollectionKanbanView";
 export type { CollectionKanbanViewProps } from "./CollectionKanbanView";
-
-export { DefaultCellRenderer } from "./DefaultCellRenderer";

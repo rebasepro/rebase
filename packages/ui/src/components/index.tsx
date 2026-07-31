@@ -1,4 +1,5 @@
-export * from "./common/SelectInputLabel";
+// ./common/SelectInputLabel is internal — Select and MultiSelect render it for
+// a string `label`. Pass a ReactNode `label` to override it.
 export * from "./Autocomplete";
 export * from "./Alert";
 export * from "./Avatar";

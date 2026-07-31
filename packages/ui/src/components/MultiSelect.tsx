@@ -224,12 +224,16 @@ export const MultiSelect = React.forwardRef<
                                 {
                                     "min-h-[28px]": size === "smallest",
                                     "min-h-[32px]": size === "small",
-                                    "min-h-[44px]": size === "medium",
-                                    "min-h-[64px]": size === "large"
+                                    "min-h-[40px]": size === "medium",
+                                    "min-h-[48px]": size === "large"
                                 },
                                 {
-                                    "py-1": size === "small" || size === "smallest",
-                                    "py-2": size === "medium" || size === "large"
+                                    // Kept tight so the min-height above governs:
+                                    // py-2 plus a medium Chip overflowed it and made
+                                    // smallest/small render at the same height.
+                                    "py-0": size === "smallest",
+                                    "py-0.5": size === "small",
+                                    "py-1": size === "medium" || size === "large"
                                 },
                                 {
                                     "px-2": size === "small" || size === "smallest",
@@ -256,7 +260,7 @@ export const MultiSelect = React.forwardRef<
                                             }
                                             return (
                                                 <Chip
-                                                    size={"medium"}
+                                                    size={size === "smallest" || size === "small" ? "smallest" : "small"}
                                                     key={String(value)}
                                                     className={cls("flex flex-row items-center p-1")}
                                                 >

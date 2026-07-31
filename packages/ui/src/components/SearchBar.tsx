@@ -22,7 +22,7 @@ interface SearchBarProps {
      * - "medium": 44px height (matches TextField medium)
      * @default "medium"
      */
-    size?: "smallest" | "small" | "medium";
+    size?: "smallest" | "small" | "medium" | "large";
     innerClassName?: string;
     className?: string;
     autoFocus?: boolean;
@@ -74,9 +74,11 @@ export function SearchBar({
     }, [onTextSearch]);
 
     // Height classes matching TextField sizes
-    const heightClass = size === "smallest" ? "h-8" : size === "small" ? "h-[36px]" : "h-[44px]";
-    const iconPaddingClass = size === "smallest" ? "px-2" : size === "small" ? "px-2" : "px-4";
-    const inputPaddingClass = size === "smallest" ? "pl-8" : size === "small" ? "pl-8" : "pl-12";
+    // Heights come from the shared control scale (styles.ts) so a SearchBar
+    // lines up with the Button and Select beside it in a toolbar.
+    const heightClass = { smallest: "h-[28px]", small: "h-[32px]", medium: "h-[40px]", large: "h-[48px]" }[size];
+    const iconPaddingClass = size === "smallest" || size === "small" ? "px-2" : size === "medium" ? "px-3" : "px-4";
+    const inputPaddingClass = size === "smallest" || size === "small" ? "pl-8" : size === "medium" ? "pl-10" : "pl-12";
 
     return (
         <div

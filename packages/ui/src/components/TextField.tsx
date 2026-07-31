@@ -156,8 +156,8 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                     {
                         "min-h-[28px]": size === "smallest",
                         "min-h-[32px]": size === "small",
-                        "min-h-[44px]": size === "medium",
-                        "min-h-[64px]": size === "large"
+                        "min-h-[40px]": size === "medium",
+                        "min-h-[48px]": size === "large"
                     },
                     /* A shrunk label occupies roughly the first 16px of the
                        box (`top-[-1px]`, translated down 2px, ~15px tall at
@@ -167,9 +167,12 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                        of "e.g. Analytics Pipeline". `large` was never affected
                        — it reserves `pt-8`. */
                     label
-                        ? size === "large"
-                            ? "pt-8 pb-2"
-                            : "pt-5 pb-1.5"
+                        // Labelled fields sit exactly 16px above the unlabelled
+                        // scale (44/48/56/64 against 28/32/40/48). smallest,
+                        // small and medium all used to share `pt-5 pb-1.5`, so
+                        // they rendered at an identical 50px and `size` looked
+                        // inert whenever a label was present.
+                        ? { smallest: "pt-4 pb-1", small: "pt-5 pb-1", medium: "pt-6 pb-2", large: "pt-8 pb-2" }[size]
                         : size === "smallest"
                             ? "py-0.5"
                             : size === "small"
@@ -201,8 +204,8 @@ export const TextField = forwardRef<HTMLDivElement, TextFieldProps<string | numb
                     {
                         "min-h-[28px]": size === "smallest",
                         "min-h-[32px]": size === "small",
-                        "min-h-[44px]": size === "medium",
-                        "min-h-[64px]": size === "large"
+                        "min-h-[40px]": size === "medium",
+                        "min-h-[48px]": size === "large"
                     },
                     className
                 )}

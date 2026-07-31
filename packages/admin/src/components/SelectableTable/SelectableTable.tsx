@@ -3,7 +3,7 @@ import type { Property, WhereFilterOp } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { Entity, FilterValues } from "@rebasepro/types";
 import { CollectionSize, EntityTableController, SelectedCellProps, AdminCollection } from "@rebasepro/admin-types";
-import { CellRendererParams, TableView, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams } from "@rebasepro/ui";
+import { CellRendererParams, VirtualTable, VirtualTableColumn, VirtualTableFilterValues, OnRowClickParams } from "@rebasepro/ui";
 import { DEFAULT_PAGE_SIZE, DataCollectionTableController, OnCellValueChange, OnColumnResizeParams } from "@rebasepro/app";
 import { FilterFormFieldProps } from "@rebasepro/ui";
 import { useOutsideAlerter } from "@rebasepro/ui";
@@ -270,7 +270,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
             <div className="h-full w-full flex flex-col bg-white dark:bg-surface-900"
                 ref={ref}>
 
-                 <TableView
+                 <VirtualTable
                     data={data as unknown as Record<string, unknown>[]}
                     columns={columns}
                     cellRenderer={(props) => cellRenderer(props as unknown as CellRendererParams<Entity<M>>)}

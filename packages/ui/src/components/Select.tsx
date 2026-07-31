@@ -147,8 +147,8 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                 {
                     "min-h-[28px]": size === "smallest",
                     "min-h-[32px]": size === "small",
-                    "min-h-[44px]": size === "medium",
-                    "min-h-[64px]": size === "large",
+                    "min-h-[40px]": size === "medium",
+                    "min-h-[48px]": size === "large",
                     "w-fit": !fullWidth,
                     "w-full": fullWidth
                 }
@@ -177,8 +177,8 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                         {
                             "min-h-[28px]": size === "smallest",
                             "min-h-[32px]": size === "small",
-                            "min-h-[44px]": size === "medium",
-                            "min-h-[64px]": size === "large",
+                            "min-h-[40px]": size === "medium",
+                            "min-h-[48px]": size === "large",
                             "w-full": fullWidth,
                             "w-fit": !fullWidth
                         },
@@ -193,8 +193,8 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
                             {
                                 "min-h-[28px]": size === "smallest",
                                 "min-h-[32px]": size === "small",
-                                "min-h-[44px]": size === "medium",
-                                "min-h-[64px]": size === "large"
+                                "min-h-[40px]": size === "medium",
+                                "min-h-[48px]": size === "large"
                             }
                         )}>
                         <SelectPrimitive.Value

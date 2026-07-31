@@ -21,14 +21,17 @@ const sizeClasses = {
     large: "w-6 h-6 rounded-md flex items-center justify-center",
     medium: "w-5 h-5 rounded-md flex items-center justify-center",
     small: "w-4 h-4 rounded-md flex items-center justify-center",
-    smallest: "w-4 h-4 rounded-md flex items-center justify-center"
+    smallest: "w-3.5 h-3.5 rounded-md flex items-center justify-center"
 };
 
+// Outer box is the hit area and sets the control's rendered height, so it
+// tracks the shared 28/32/40/48 scale. `smallest` used to reuse `small`'s
+// 32px box, which made the two sizes identical.
 const outerSizeClasses = {
     medium: "w-10 h-10",
     small: "w-8 h-8",
     large: "w-12 h-12 ",
-    smallest: "w-8 h-8"
+    smallest: "w-7 h-7"
 }
 const paddingClasses = {
     medium: "p-2",

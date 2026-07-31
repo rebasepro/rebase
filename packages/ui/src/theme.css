@@ -34,7 +34,9 @@
     --color-primary: #0070F4;
     --color-primary-light: oklch(from var(--color-primary) calc(l + 0.15) c h);
     --color-primary-dark: oklch(from var(--color-primary) calc(l - 0.15) c h);
-    --color-secondary: #FF5B79;
+    /* rose-600. #FF5B79 was only 2.99:1 against white, so white text on it
+       and it as text both failed WCAG AA. Same hue family, 4.70:1. */
+    --color-secondary: #E11D48;
     --color-secondary-light: oklch(from var(--color-secondary) calc(l + 0.15) c h);
     --color-secondary-dark: oklch(from var(--color-secondary) calc(l - 0.15) c h);
 

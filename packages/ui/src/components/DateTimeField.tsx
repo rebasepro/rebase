@@ -55,6 +55,11 @@ export const DateTimeField: React.FC<DateTimeFieldProps> = ({
     const [isTyping, setIsTyping] = useState(false);
     const invalidValue = value !== undefined && value !== null && (!(value instanceof Date) || isNaN(value.getTime()));
 
+    // The calendar/clear adornments are IconButtons. Left at their default
+    // (`medium`, 40px) they floored the whole field at 40px, so smallest/small
+    // rendered identically to medium. Keep them a step below the field.
+    const adornmentSize = size === "large" ? "medium" : size === "medium" ? "small" : "smallest";
+
     useInjectStyles("DateTimeField", inputStyles);
 
     const handleClear = (e: React.MouseEvent) => {
@@ -231,8 +236,8 @@ hour12: false,
                     {
                         "min-h-[28px]": size === "smallest",
                         "min-h-[32px]": size === "small",
-                        "min-h-[44px]": size === "medium",
-                        "min-h-[64px]": size === "large"
+                        "min-h-[40px]": size === "medium",
+                        "min-h-[48px]": size === "large"
                     },
                     className
                 )}
@@ -251,7 +256,7 @@ hour12: false,
                                 ? focused
                                     ? "text-primary"
                                     : "text-text-secondary dark:text-text-secondary-dark"
-                                : "text-red-500 dark:text-red-500",
+                                : "text-red-600 dark:text-red-500",
                             disabled ? "opacity-50" : ""
                         )}
                         shrink={true}
@@ -276,16 +281,22 @@ hour12: false,
                         {
                             "min-h-[28px]": size === "smallest",
                             "min-h-[32px]": size === "small",
-                            "min-h-[44px]": size === "medium",
-                            "min-h-[64px]": size === "large"
+                            "min-h-[40px]": size === "medium",
+                            "min-h-[48px]": size === "large"
                         },
-                        label ? "pt-8 pb-2" : "py-2",
+                        // A flat py-2 (16px) plus the text-base line box floored
+                        // the field at 40px, so smallest/small/medium all
+                        // rendered the same height. Scale it with `size`.
+                        label
+                            ? "pt-8 pb-2"
+                            : { smallest: "py-0.5", small: "py-1", medium: "py-2", large: "py-3" }[size],
                         inputClassName,
                         disabled &&
                         "border border-transparent outline-hidden opacity-50 dark:opacity-50 text-surface-accent-600 dark:text-surface-accent-500"
                     )}
                 />
                 <IconButton
+                    size={adornmentSize}
                     onClick={(e) => {
                         e.stopPropagation();
                         inputRef.current?.showPicker();
@@ -296,6 +307,7 @@ hour12: false,
                 </IconButton>
                 {clearable && value && (
                     <IconButton
+                        size={adornmentSize}
                         onClick={handleClear}
                         className="absolute right-14 top-1/2 transform -translate-y-1/2 text-surface-accent-400 "
                     >

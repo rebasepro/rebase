@@ -16,11 +16,14 @@ export interface ChipProps {
     style?: React.CSSProperties;
 }
 
+// `small` and `medium` used to differ only in horizontal padding, so both
+// rendered at the same height and the step was invisible. Vertical rhythm now
+// increases across the whole scale.
 const sizeClassNames = {
     smallest: "px-1.5 py-px text-[10px]",
     small: "px-2 py-0.5 text-xs",
-    medium: "px-2.5 py-0.5 text-xs",
-    large: "px-3 py-1 text-xs"
+    medium: "px-2.5 py-1 text-xs",
+    large: "px-3 py-1.5 text-sm"
 }
 
 /**
