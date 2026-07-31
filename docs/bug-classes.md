@@ -153,6 +153,43 @@ that look identical from a missing binary and need opposite instructions.
 
 ---
 
+## 6. Tests that time an async path by counting ticks
+
+`packages/client/test/auth.test.ts` awaited `Promise.resolve()` exactly eight
+times and then asserted that a fatally-rejected token refresh had signed the
+user out. Eight was however many microtasks that path took when the test was
+written. The path grew — refresh-token rotation became concurrency-safe, which
+added awaits — the sign-out stopped landing inside eight ticks, and a code path
+that was still correct began reporting as a security regression. CI runs
+`pnpm test`, so main was red on it.
+
+The sibling test is what made it hard to read. "The session is NOT null" passes
+trivially when nothing has run yet, so a file where *both* tests had stopped
+waiting for anything reported exactly one failure, and the failure pointed at
+the product rather than at the clock.
+
+**Sweep:** `grep -rn "for (let i = 0; i < [0-9]*; i++) await Promise.resolve()"`
+over the test suites, then neutralise each helper (set the loop bound to `0`)
+and re-run. A test that still passes was never waiting for the thing it names.
+Checked 2026-07-31: `channel-bus.test.ts` and `cdc-realtime.test.ts` both fail
+when zeroed — they are genuinely synchronising — and
+`packages/client/test/subscription-resilience.test.ts` passes when zeroed, but
+its assertions are positive and specific (`onError` called, exactly one
+subscribe frame), so growth there fails loudly rather than silently. Left alone.
+
+**Fix shape:** wait for the condition, not for a tick count. Drain the microtask
+queue until the predicate holds (positive assertions), or drain a fixed generous
+budget before asserting something did *not* happen (negative assertions). Still
+no timers and no wall-clock, so determinism is unchanged, and a real regression
+fails in milliseconds instead of hanging.
+
+**Watch for:** a negative assertion (`not.toBeNull`, `not.toHaveBeenCalled`)
+sitting next to a positive one behind the same wait helper. The negative one
+cannot fail early, so it will keep passing long after the helper stopped
+working, and it will make the positive one look like the bug.
+
+---
+
 ## The discipline
 
 When you find a bug:
