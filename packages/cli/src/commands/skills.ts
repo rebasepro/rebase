@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import inquirer from "inquirer";
 import { createRequire } from "module";
+import { findProjectRoot } from "../utils/project";
 
 const require = createRequire(import.meta.url);
 
@@ -168,7 +169,15 @@ function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
 }
 
 async function skillsInstall(rawArgs: string[] = []) {
-    const projectDir = process.cwd();
+    // The project root, not the cwd. Agent skills belong beside the repository's
+    // other agent configuration — `.claude/`, `.cursor/` — which is both what
+    // `detectAgents` looks for and where an assistant reads them from. Resolving
+    // against wherever the command happened to be typed put them in
+    // `backend/.claude/skills` when run from `backend/`, detected no agent
+    // there, and left the skills somewhere nothing would look. Outside a project
+    // the cwd is still the honest answer: this command is useful in a repository
+    // that is not a Rebase one.
+    const projectDir = findProjectRoot() ?? process.cwd();
 
     // 1. Load skills from @rebasepro/agent-skills
     let skillsDir: string;
@@ -228,7 +237,11 @@ async function skillsInstall(rawArgs: string[] = []) {
     for (const agentKey of agents) {
         const agent = AGENTS[agentKey];
         const count = installForAgent(agentKey, skills, projectDir);
-        console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — ${count} skills installed to ${chalk.gray(agent.targetDir)}`);
+        // Relative to where the command was typed, now that the destination is
+        // the project root rather than the cwd — otherwise `.claude/skills`
+        // names a directory that is not the one it wrote to.
+        const shown = path.relative(process.cwd(), path.join(projectDir, agent.targetDir)) || agent.targetDir;
+        console.log(`  ${chalk.green("✓")} ${chalk.bold(agent.label)} — ${count} skills installed to ${chalk.gray(shown)}`);
     }
 
     console.log("");
