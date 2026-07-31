@@ -38,6 +38,7 @@ import { SidePanelProvider } from "./SidePanelProvider";
 // Collection editor internals — used when collectionEditor is enabled
 import { useLocalCollectionsConfigController } from "../collection_editor/useLocalCollectionsConfigController";
 import { ConfigControllerProvider } from "../collection_editor/ConfigControllerProvider";
+import { useCollectionsConfigController } from "../collection_editor/useCollectionsConfigController";
 
 // Lazy-load the schema view — only fetched when studio schema tool is active
 const CollectionsStudioView = lazy(() =>
@@ -196,13 +197,22 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
             group: "Database",
             icon: "LayoutList",
             nestedRoutes: true,
+            // Reads the controller from context at render time rather than
+            // capturing it here. A view is a React *element*, and the
+            // navigation state controller resolves the view list once and holds
+            // on to the elements it resolved — so a controller passed as a prop
+            // is frozen at whatever it was on the first render, forever. That
+            // hid every later change: the editor stayed writable after the
+            // backend said it was read-only, and the collection list never
+            // refreshed. Everything else in the editor already reads this from
+            // `ConfigControllerProvider`, which wraps this subtree.
             view: (
                 <Suspense fallback={<CircularProgressCenter/>}>
-                    <CollectionsStudioView configController={internalConfigController}/>
+                    <CollectionsStudioViewFromContext/>
                 </Suspense>
             )
         };
-    }, [collectionEditorEnabled, registry.studioConfig, internalConfigController]);
+    }, [collectionEditorEnabled, registry.studioConfig]);
 
     const devViews = useMemo(() => {
         const base = registry.studioConfig?.devViews ?? [];
@@ -307,6 +317,17 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     }
 
     return navigationContent;
+}
+
+/**
+ * The injected "Edit collections" view, bound to the live config controller.
+ *
+ * Exists so the element stored in the navigation state does not close over a
+ * controller instance — see the comment at its construction site.
+ */
+function CollectionsStudioViewFromContext() {
+    const configController = useCollectionsConfigController();
+    return <CollectionsStudioView configController={configController}/>;
 }
 
 /**
