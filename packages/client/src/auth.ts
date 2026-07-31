@@ -268,6 +268,30 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         refreshTimeout = setTimeout(() => { void attemptScheduledRefresh(0); }, delay);
     }
 
+    /**
+     * Stop the scheduled token refresh, leaving the session itself alone.
+     *
+     * This is teardown, not sign-out. `scheduleRefresh` arms an ordinary
+     * `setTimeout` up to a token lifetime away, and it is not `unref`'d — so on
+     * Node it holds the event loop open by itself. `client.close()` promised
+     * that "a script that does not call this will not exit on its own", which
+     * was true, while the converse it plainly implies was not: a signed-in
+     * client that closed its socket still hung, because this timer outlived it.
+     * Any script, cron handler or job that signs in hit that.
+     *
+     * Deliberately does NOT clear the session, touch storage, or emit
+     * SIGNED_OUT. Closing a client is not the user signing out — `signOut()`
+     * POSTs /logout and revokes the whole sign-in, which is the wrong hammer
+     * (see `abandonSessionLocally`) — and a persisted session must still be
+     * there for the next client to restore.
+     */
+    function stopAutoRefresh() {
+        if (refreshTimeout) {
+            clearTimeout(refreshTimeout);
+            refreshTimeout = null;
+        }
+    }
+
     function handleAuthResponse(data: { tokens: AuthTokens, user: Record<string, unknown> }, event?: AuthChangeEvent): RebaseSession {
         const user: User = mapRawUser(data.user);
         const session: RebaseSession = {
@@ -796,6 +820,7 @@ refreshToken: session.refreshToken };
         signInWithSlack,
         signInWithSpotify,
         signOut,
+        stopAutoRefresh,
         refreshSession,
         handleUnauthorized,
         getUser,
