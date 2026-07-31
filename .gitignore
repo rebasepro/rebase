@@ -159,3 +159,9 @@ dist-bundle-acceptance/
 
 # Agent harness: session traces and preflight stamps (local, per-machine)
 .claude/harness/
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+packages/ui/dist/_design-sync-compiled.css

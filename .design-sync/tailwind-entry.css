@@ -1,0 +1,62 @@
+/* ---------------------------------------------------------------------------
+ * Tailwind entry for design-sync.
+ *
+ * @rebasepro/ui ships NO compiled CSS: dist/index.css is Tailwind *source*
+ * (@theme tokens + @apply-built .typography-* rules) and every component styles
+ * itself with utility classes that consumers are expected to generate. So the
+ * sync compiles them here and points cfg.cssEntry at the output.
+ *
+ * Mirrors app/frontend/src/index.css (the real consumer) with one deliberate
+ * difference: index.css is imported UNLAYERED. The app wraps it in layer(base)
+ * to sit under its own utilities; a standalone DS stylesheet has nothing to sit
+ * under, and packages/ui/dist/theme.css documents that a layered import stops
+ * its @theme block from registering.
+ *
+ * Regenerate with .design-sync/build-css.sh (see NOTES.md).
+ * ------------------------------------------------------------------------- */
+
+@import 'tailwindcss';
+@import '../packages/ui/dist/index.css';
+@plugin "@tailwindcss/typography";
+
+/* Dark mode is CLASS-based (.dark), not prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Class detection: the DS source is what the shipped components reference;
+   the authored previews are what the cards themselves reference. */
+@source '../packages/ui/src/**/*.{ts,tsx}';
+@source './previews/**/*.tsx';
+
+/* Safelist of layout/typography glue.
+ *
+ * Why this exists: the stylesheet is compiled once per sync, but preview files
+ * are authored continuously afterwards. A utility that appears for the first
+ * time in a new preview would not be in the compiled CSS, so the card renders
+ * unstyled and grades wrong. Pre-generating the common glue makes authoring
+ * safe without a CSS rebuild between every preview.
+ */
+@source inline('{flex,inline-flex,grid,block,inline-block,hidden}');
+@source inline('flex-{col,row,wrap,nowrap,1,none}');
+@source inline('items-{start,center,end,baseline,stretch}');
+@source inline('justify-{start,center,end,between,around,evenly}');
+@source inline('grid-cols-{1,2,3,4,5,6,12}');
+@source inline('col-span-{1,2,3,4,6,12}');
+@source inline('{gap,gap-x,gap-y}-{0,1,1.5,2,2.5,3,4,5,6,8,10,12}');
+@source inline('{p,px,py,pt,pr,pb,pl}-{0,1,1.5,2,2.5,3,4,5,6,8,10,12}');
+@source inline('{m,mx,my,mt,mr,mb,ml}-{0,1,2,3,4,5,6,8}');
+@source inline('space-{x,y}-{1,2,3,4,6}');
+@source inline('w-{full,auto,px,4,5,6,8,10,12,16,20,24,32,40,48,56,64,72,80,96}');
+@source inline('h-{full,auto,px,4,5,6,8,10,12,16,20,24,32,40,48,56,64,72,80,96}');
+@source inline('{min,max}-w-{none,full,xs,sm,md,lg,xl,2xl}');
+@source inline('text-{left,center,right,justify}');
+@source inline('text-{xs,sm,base,lg,xl,2xl,3xl,4xl}');
+@source inline('font-{mono,sans,headers,normal,medium,semibold,bold}');
+@source inline('rounded{,-sm,-md,-lg,-xl,-2xl,-full}');
+@source inline('border{,-0,-2,-t,-r,-b,-l}');
+@source inline('{truncate,uppercase,lowercase,capitalize,italic,underline}');
+@source inline('overflow-{auto,hidden,visible,x-auto,y-auto}');
+@source inline('text-surface-{300,400,500,600,700,800,900}');
+@source inline('bg-surface-{50,100,200,800,900,950}');
+@source inline('{text,bg,border}-primary');
+@source inline('shrink-0');
+@source inline('grow');
