@@ -1,6 +1,6 @@
 
 import { getPolicyNamesForRule, getPolicyNamesForRules } from "@rebasepro/utils";
-import { getEffectiveSecurityRules } from "@rebasepro/common";
+import { getGeneratedPolicyNames } from "@rebasepro/common";
 import React, { useState, useEffect, useMemo } from "react";
 
 /**
@@ -218,26 +218,14 @@ export function CollectionRLSTab() {
 
     const tableName = values.id || values.table || values.alias;
 
-    /**
-     * Every policy name `rebase db push` would write for this collection.
-     *
-     * Two things make this more than `rules.map(r => r.name)`:
-     *  - a rule without an explicit `name` becomes `<table>_<op>_<hash>`, so
-     *    comparing `rule.name` to `policyname` never matches for it;
-     *  - the generator also injects the safe-by-default baseline
-     *    (`<table>_default_admin_*`), which is in no collection's `securityRules`.
-     *
-     * Missing either made Rebase's own policies look hand-written, and offered to
-     * import them back into the codebase that produced them.
-     */
+    // Every policy name `rebase db push` would write for this collection — see
+    // `getGeneratedPolicyNames`. This used to be derived here by hand, and the
+    // Studio's RLS editor derived a different subset of it by hand, which is
+    // exactly how the two came to disagree about which policies were drift.
     const generatedPolicyNames = useMemo(() => {
         if (!tableName) return new Set<string>();
-        const effectiveRules = getEffectiveSecurityRules(values as AdminCollection);
-        return getPolicyNamesForRules(
-            [...rules, ...effectiveRules],
-            tableName
-        );
-    }, [rules, tableName, values]);
+        return getGeneratedPolicyNames(values as AdminCollection);
+    }, [tableName, values]);
 
     const unmappedPolicies = dbPolicies.filter(dp => !generatedPolicyNames.has(dp.policyname));
 
