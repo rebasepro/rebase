@@ -105,6 +105,39 @@ import { isEconnrefused } from "./cli-errors";
 import { classifyConnectFailure } from "./utils/pg-error-utils";
 
 /**
+ * Which table name the boot-time drift check should look for, for one collection.
+ *
+ * A declared `table` IS the table name, not a hint to be second-guessed. This
+ * used to ask the registry whether it had indexed the declared name and fall
+ * back to the SLUG when it had not — but "the registry does not know this table"
+ * is exactly the condition the drift check exists to report, so the fallback
+ * fired precisely when it was most harmful.
+ *
+ * A collection with `slug: "usage-daily", table: "usage_daily"` was reported as
+ * missing table `usage-daily`: a name that does not exist, should never exist,
+ * and that nobody can find by looking. Worse, the remediation the caller prints
+ * says to run `rebase db push` — which would then CREATE that invented table
+ * beside the correct one, the same "second copy" hazard the misplaced-schema
+ * branch further down exists to prevent. Seen in production, where a correctly
+ * migrated database reported drift on every boot.
+ *
+ * The slug is used only when nothing was declared, which is the config shape
+ * where the slug genuinely is the table name.
+ *
+ * Exported for its own test: the caller needs a live pool and a real database,
+ * and this is the part that was wrong.
+ */
+export function resolveDriftCheckName(
+    col: CollectionConfig,
+    registeredTableNames: string[]
+): string {
+    const declaredTable = isRelationalCollectionConfig(col) ? col.table : undefined;
+    return declaredTable
+        ?? registeredTableNames.find((k) => k === col.slug)
+        ?? col.slug;
+}
+
+/**
  * Default PostgreSQL bootstrapper.
  *
  * Use it to register Postgres with `initializeRebaseBackend()`:
@@ -556,18 +589,7 @@ table: link.table });
                         if ((col as { auth?: { enabled?: boolean } }).auth?.enabled) continue;
 
                         const schemaName = "schema" in col && col.schema ? col.schema : "public";
-                        const declaredTable = isRelationalCollectionConfig(col) ? col.table : undefined;
-                        const tableName = registry.hasTableForCollection(
-                            declaredTable ?? col.slug
-                        )
-                            ? (declaredTable ?? col.slug)
-                            : col.slug;
-                        // Resolve the actual table name the registry stored
-                        const resolvedTable = registry.getTableNames().find((k) =>
-                            k === tableName ||
-                            k === col.slug
-                        );
-                        const checkName = resolvedTable ?? tableName;
+                        const checkName = resolveDriftCheckName(col, registry.getTableNames());
                         const fullCheckName = schemaName === "public" ? checkName : `${schemaName}.${checkName}`;
                         if (!dbTables.has(fullCheckName)) {
                             // Report what was actually looked up: an unqualified
