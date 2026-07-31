@@ -9,8 +9,27 @@
  */
 export const CONTAINER_FULL_WIDTH = "100vw";
 
-/** @internal See {@link CONTAINER_FULL_WIDTH}. */
+/**
+ * @internal
+ * @deprecated The side panel is one width whatever tab is showing, so nothing
+ * adds a per-tab allowance any more. See {@link SIDE_PANEL_DEFAULT_WIDTH}.
+ */
 export const ADDITIONAL_TAB_WIDTH = "55vw";
 
 /** @internal See {@link CONTAINER_FULL_WIDTH}. */
 export const FORM_CONTAINER_WIDTH = "768px";
+
+/**
+ * How wide the side panel opens when neither the caller nor the collection
+ * says otherwise.
+ *
+ * Sized from what it has to hold rather than from a round number: the form's
+ * content column plus its metadata rail plus gutters, which is also the width
+ * at which the form stops being a single stack and picks up the same
+ * two-column layout it has in full screen. Capped against the viewport so a
+ * panel never becomes the whole window on a laptop — at that point you want
+ * full screen, and there is a button for it.
+ *
+ * @internal See {@link CONTAINER_FULL_WIDTH}.
+ */
+export const SIDE_PANEL_DEFAULT_WIDTH = "min(1160px, 88vw)";

@@ -8,7 +8,7 @@ import { useLocation } from "react-router";
 import { NavigationViewInternal } from "@rebasepro/app";
 import { getNavigationEntriesFromPath, removeInitialAndTrailingSlashes, removeTrailingSlash, resolveDefaultSelectedView } from "@rebasepro/app";
 import { resolvedSelectedEntityView } from "../util/resolutions";
-import { ADDITIONAL_TAB_WIDTH, CONTAINER_FULL_WIDTH, FORM_CONTAINER_WIDTH } from "@rebasepro/app";
+import { CONTAINER_FULL_WIDTH, SIDE_PANEL_DEFAULT_WIDTH } from "@rebasepro/app";
 import { useCustomizationController, useLargeLayout, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../components/EditViewBinding";
 import React from "react";
@@ -39,71 +39,32 @@ function ResolvedSidePanelBinding(props: SidePanelBindingProps) {
 const NEW_URL_HASH = "new_side";
 const SIDE_URL_HASH = "side";
 
+/**
+ * How wide the side panel opens.
+ *
+ * One width for the whole panel, whatever tab is showing. It used to depend on
+ * the selected tab — the form got one width and a subcollection or custom view
+ * got `calc(55vw + 768px)` — so the panel physically resized under the cursor
+ * every time you switched tabs. And the "form" width was derived from how
+ * deeply nested the collection's *properties* were, which is not a thing anyone
+ * can predict from looking at the panel.
+ *
+ * Now: `width` prop, then the collection's `sideDialogWidth`, then a default
+ * sized for the content the panel actually has to hold — the form column plus
+ * its metadata rail — capped so it never eats the whole window.
+ */
 export function getEntityViewWidth(props: SidePanelBindingProps<any>, small: boolean, customizationController: CustomizationController): string {
     if (small) return CONTAINER_FULL_WIDTH;
 
-    const {
-        selectedSecondaryForm
-    } = resolvedSelectedEntityView(props.collection?.entityViews, customizationController, props.selectedTab);
-
-    const shouldUseSmallLayout = !props.selectedTab || props.selectedTab === "edit" || props.selectedTab === JSON_TAB_VALUE || props.selectedTab === HISTORY_TAB_VALUE || Boolean(selectedSecondaryForm);
-
-    let resolvedWidth: string | undefined;
     if (props.width) {
-        resolvedWidth = typeof props.width === "number" ? `${props.width}px` : props.width;
-    } else if (props.collection?.sideDialogWidth) {
-        resolvedWidth = typeof props.collection.sideDialogWidth === "number" ? `${props.collection.sideDialogWidth}px` : props.collection.sideDialogWidth;
+        return typeof props.width === "number" ? `${props.width}px` : props.width;
     }
-
-    if (!shouldUseSmallLayout) {
-        return `calc(${ADDITIONAL_TAB_WIDTH} + ${resolvedWidth ?? FORM_CONTAINER_WIDTH})`
-    } else {
-        if (resolvedWidth) {
-            return resolvedWidth
-        } else if (!props.collection) {
-            return FORM_CONTAINER_WIDTH;
-        } else {
-            return calculateCollectionDesiredWidth(props.collection);
-        }
+    if (props.collection?.sideDialogWidth) {
+        return typeof props.collection.sideDialogWidth === "number"
+            ? `${props.collection.sideDialogWidth}px`
+            : props.collection.sideDialogWidth;
     }
-}
-
-const collectionViewWidthCache: { [key: string]: string } = {};
-
-function calculateCollectionDesiredWidth(collection: AdminCollection<any>): string {
-    if (collectionViewWidthCache[collection.slug]) {
-        return collectionViewWidthCache[collection.slug];
-    }
-
-    let result = FORM_CONTAINER_WIDTH
-    if (collection?.properties) {
-        const values = Object.values(collection.properties).map((p: Property) => getNestedPropertiesDepth(p));
-        const maxDepth = Math.max(...values);
-        if (maxDepth < 3) {
-            result = FORM_CONTAINER_WIDTH;
-        } else {
-            result = 768 + 32 * (maxDepth - 2) + "px";
-        }
-    }
-    collectionViewWidthCache[collection.slug] = result;
-    return result;
-}
-
-function getNestedPropertiesDepth(property: Property, accumulator = 0): number {
-    if (property.type === "map" && property.properties) {
-        const values = Object.values(property.properties).flatMap((childProperty) => getNestedPropertiesDepth(childProperty as Readonly<Property>, accumulator + 1));
-        return Math.max(...values);
-    } else if (property.type === "array" && property.oneOf) {
-        return accumulator + 3;
-    } else if (property.type === "array" && property.of) {
-        if (Array.isArray(property.of)) {
-            return Math.max(...property.of.map((p) => getNestedPropertiesDepth(p, accumulator + 1)));
-        } else {
-            return getNestedPropertiesDepth(property.of, accumulator + 1);
-        }
-    } else {
-        return accumulator + 1;
-    }
+    return SIDE_PANEL_DEFAULT_WIDTH;
 }
 
 export const useBuildSidePanel = (collectionRegistryController: CollectionRegistryController,
