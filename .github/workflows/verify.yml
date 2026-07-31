@@ -224,6 +224,87 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # `@rebasepro/client`, driven the way a browser application drives it.
+      #
+      # Every tier of this path was covered and the composition of them was not:
+      # the client's own tests use a mocked transport, `rls-enforcement` proves
+      # RLS at the database tier with no HTTP or tokens, and `Run BaaS E2E`
+      # above drives the real SDK over the network but authenticates with a
+      # SERVICE KEY — the server-to-server path, which bypasses user identity
+      # and therefore never exercises RLS at all.
+      #
+      # So: register, sign in, have the server derive auth.uid() from the token,
+      # have Postgres scope rows to it, refresh, upload a file, receive a
+      # realtime event, sign out. Each tier can be individually correct and
+      # still disagree at the seam, and the seam is what this covers.
+      #
+      # It brings its own Postgres container (random host port, no clash with
+      # the service above) and boots the reference backend on a real socket —
+      # not `app.fetch()`, because a token that never crosses a socket proves
+      # nothing about headers and realtime is a WebSocket upgrade an in-process
+      # fetch cannot perform.
+      #
+      # ~10s once the packages are built. It already earned its place: it found
+      # that `client.close()` left the scheduled token-refresh timer armed, so
+      # any signed-in Node script hung forever after closing.
+      #
+      # `always()` for the same reason as its neighbours.
+      - name: Client SDK E2E (end-user auth, RLS, storage, realtime)
+        if: always()
+        run: npx tsx e2e/tests/client-sdk-e2e.ts
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+
+      # The admin panel itself, driven in a browser. `cli-init-e2e` proves a
+      # scaffolded project installs and answers HTTP; nothing until now opened
+      # the UI that project exists to provide, so every collection view, the
+      # collection editor and the SQL console could break and stay green.
+      #
+      # This suite was written to be deterministic (pinned API port, adopt-or-
+      # start detection, teardown that reaps only servers it owns) and then ran
+      # in no pipeline — AUDIT-2026-07-28 finding A left it open because nobody
+      # had watched an unattended run. It has now been run repeatedly, in CI mode
+      # with a cold server boot, against both a fresh database and a populated
+      # one: 10 tests, ~33s, green each time.
+      #
+      # The reason it could not simply be switched on is the database. CI's is
+      # always empty, so `/auth/config` reports `needsSetup` and LoginView shows
+      # its bootstrap form instead of the sign-in screen — globalSetup waited for
+      # a "Sign in with email" button that first-run never renders and failed all
+      # ten tests at once. It now drives whichever screen is up, which means this
+      # step also covers creating the first admin: the first thing every new user
+      # of Rebase does, and previously tested at no tier.
+      #
+      # Schema then seed, both against a database created here: `db push` is what
+      # a developer runs, so a break in it fails here rather than in somebody's
+      # first ten minutes.
+      #
+      # `always()` for the same reason as its neighbours: different ground, and
+      # it still fails the job on its own.
+      - name: Admin panel E2E (Playwright)
+        if: always()
+        run: |
+          docker exec rebase-postgres createdb -U rebase rebase_admin_e2e
+          (cd app && pnpm exec rebase db push --yes)
+          (cd app/backend && npx tsx src/seed.ts)
+          npx playwright test -c e2e/playwright.config.ts
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
+          # sslmode=disable: the CI Postgres container serves no TLS, and Atlas
+          # (which `db push` shells out to) negotiates SSL first and fails with
+          # "SSL is not enabled on the server" rather than falling back.
+          DATABASE_URL: postgres://rebase:rebase@localhost:5432/rebase_admin_e2e?sslmode=disable
+          JWT_SECRET: ci-admin-e2e-secret-ci-admin-e2e-secret-0123456789
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
       # The self-host acceptance run: build a real bundle from the reference
       # app's collections, fold two static apps in at different paths, boot it
       # against a real database and fetch it as a browser would.
