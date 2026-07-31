@@ -29,10 +29,10 @@ export function FormRail({
 
     return (
         <aside className={cls(
-            // Hidden below the breakpoint rather than stacked: at side-panel and
-            // dialog widths the resolver has already folded these fields back
-            // into the main column, so showing the rail too would double them.
-            "hidden @5xl:flex flex-col gap-6 shrink-0 w-72 border-l overflow-y-auto",
+            // No responsive hiding here. The caller decides whether the rail is
+            // shown, by measuring; a CSS `hidden` would leave the fields the
+            // resolver moved in here unreachable rather than folding them back.
+            "flex flex-col gap-6 shrink-0 w-72 border-l overflow-y-auto",
             "px-5 py-6 bg-surface-50 dark:bg-surface-900",
             defaultBorderMixin
         )}>

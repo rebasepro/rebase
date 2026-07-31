@@ -156,6 +156,23 @@ function isIdProperty(property: Property | undefined): boolean {
     return Boolean(property && "isId" in property && property.isId);
 }
 
+/**
+ * An audit timestamp the database maintains — `created_at`, `updated_at`.
+ *
+ * Not a guess from the name: `autoValue` says the column is written by the
+ * system on create or update, so the field is never typed. Rendering it as an
+ * input in the middle of the form promised an edit that cannot happen, and the
+ * record block already shows both values — the same two dates twice on one
+ * screen.
+ */
+export function isAuditTimestamp(property: Property | undefined): boolean {
+    return Boolean(
+        property
+        && property.type === "date"
+        && property.autoValue
+    );
+}
+
 /* -------------------------------------------------------------------------- */
 /* resolution                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -217,6 +234,20 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
     });
     for (const key of idKeys) available.delete(key);
 
+    /* ---- audit timestamps ------------------------------------------------ */
+    // Same treatment as the id, and for the same reason: the record block shows
+    // them, so leaving them in the column renders each date twice — once as a
+    // disabled input the user cannot change, once as metadata.
+    const showRecordMetaResolved = config?.showRecordMeta ?? !collection.hideIdFromForm;
+    if (showRecordMetaResolved) {
+        for (const key of [...available.keys()]) {
+            const property = collection.properties?.[key] as Property | undefined;
+            // An explicit `sidebar` entry wins — the author asked for it there.
+            if (config?.sidebar?.includes(key as never)) continue;
+            if (isAuditTimestamp(property)) available.delete(key);
+        }
+    }
+
     /* ---- the rail -------------------------------------------------------- */
     const sidebar: ResolvedFormField[] = [];
     if (config?.sidebar) {
@@ -228,7 +259,7 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
         }
     }
 
-    const showRecordMeta = config?.showRecordMeta ?? !collection.hideIdFromForm;
+    const showRecordMeta = showRecordMetaResolved;
 
     /* ---- sections -------------------------------------------------------- */
     const sections: ResolvedFormSection[] = [];

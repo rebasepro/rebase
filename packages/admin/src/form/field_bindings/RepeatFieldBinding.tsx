@@ -85,6 +85,10 @@ export function RepeatFieldBinding({
             context,
             partOfArray: true,
             minimalistView: false,
+            // The panel header already names the field; repeating "Locale" on
+            // every row of a three-item array is noise, and the label was what
+            // made each row a 76px card around a two-character value.
+            hideLabel: true,
             autoFocus: internalId === lastAddedId
         };
         return <ErrorBoundary>

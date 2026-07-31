@@ -155,6 +155,46 @@ describe("resolveFormLayout — derived defaults", () => {
         expect(keysOf(l)).toEqual(["name"]);
     });
 
+    it("routes audit timestamps to the record block instead of the column", () => {
+        // They were rendering as disabled inputs mid-form while the record block
+        // showed the same two dates — each timestamp twice on one screen.
+        const audited = collection({
+            name: { type: "string" },
+            created_at: { type: "date", autoValue: "on_create", admin: { readOnly: true } },
+            updated_at: { type: "date", autoValue: "on_update", admin: { readOnly: true } },
+            publish_date: { type: "date" }
+        });
+        const l = resolveFormLayout({
+            collection: audited,
+            fieldKeys: ["name", "created_at", "updated_at", "publish_date"],
+            status: "existing"
+        });
+        expect(keysOf(l)).toEqual(["name", "publish_date"]);
+        expect(l.showRecordMeta).toBe(true);
+    });
+
+    it("keeps an audit timestamp the author explicitly put in the sidebar", () => {
+        const audited = collection({
+            name: { type: "string" },
+            created_at: { type: "date", autoValue: "on_create" }
+        }, { form: { sidebar: ["created_at"] } });
+        const l = resolveFormLayout({
+            collection: audited,
+            fieldKeys: ["name", "created_at"],
+            status: "existing"
+        });
+        expect(l.sidebar.map(f => f.key)).toEqual(["created_at"]);
+    });
+
+    it("keeps a plain date field, which is not an audit timestamp", () => {
+        const l = resolveFormLayout({
+            collection: collection({ publish_date: { type: "date" } }),
+            fieldKeys: ["publish_date"],
+            status: "existing"
+        });
+        expect(keysOf(l)).toEqual(["publish_date"]);
+    });
+
     it("honours hideIdFromForm by suppressing the record block too", () => {
         const hidden = collection({
             id: { type: "string", isId: "uuid" },

@@ -21,6 +21,7 @@ import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 import { FieldBlock, isSelfLabellingProperty } from "./components/FieldBlock";
 import { FormRail } from "./components/FormRail";
 import { FormSections } from "./components/FormSections";
+import { useRailVisible } from "./components/useRailVisible";
 import { LabelWithIconAndTooltip } from "./components/LabelWithIconAndTooltip";
 import { PropertyFieldBinding } from "./PropertyFieldBinding";
 import { flattenKeys } from "@rebasepro/app";
@@ -369,6 +370,12 @@ export function EntityForm<M extends Record<string, unknown>>({
         status
     }), [collection, formFieldKeys.join(","), status]);
 
+    const formElementRef = useRef<HTMLFormElement>(null);
+    // Measured, not a breakpoint: the rail holds fields the resolver moved
+    // out of the column, so when it cannot be shown they have to come back.
+    const railVisible = useRailVisible(formElementRef);
+    const showRail = !Builder && layout.hasRail && railVisible;
+
     // Collapsed sections are per-section-key so a renamed title keeps its state,
     // and initial state comes from the config rather than being forced open.
     const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
@@ -507,8 +514,22 @@ export function EntityForm<M extends Record<string, unknown>>({
             />;
         }
 
+        const sections = showRail || !layout.sidebar.length
+            ? layout.sections
+            : [
+                // Leading, untitled: these are the record's headline facts, which
+                // is why they were in the rail in the first place.
+                {
+                    key: "__rail",
+                    collapsible: false,
+                    collapsed: false,
+                    fields: layout.sidebar
+                },
+                ...layout.sections
+            ];
+
         return <FormSections
-            sections={layout.sections}
+            sections={sections}
             collapsed={collapsedSections}
             onToggle={toggleSection}
             errorKeys={errorKeys}
@@ -607,6 +628,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     return (
         <Formex value={formex}>
             <form
+                ref={formElementRef}
                 onSubmit={formex.handleSubmit}
                 onReset={(e) => {
                     e.preventDefault();
@@ -657,7 +679,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                         </div>
                     </div>
 
-                    {!Builder && <FormRail
+                    {showRail && <FormRail
                         fields={layout.sidebar}
                         showRecordMeta={layout.showRecordMeta && status === "existing"}
                         entity={entity as Entity<Record<string, unknown>> | undefined}

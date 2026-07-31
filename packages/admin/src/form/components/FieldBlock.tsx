@@ -23,12 +23,24 @@ export function isSelfLabellingProperty(property: Property | undefined): boolean
             // `spreadChildren` inlines the children into the parent grid, so
             // there is no panel and therefore no header to reuse as the label.
             return !property.admin?.spreadChildren;
-        case "array":
-            // A plain array of primitives renders as an inline control (chips,
-            // a multi-select) rather than a panel, so the form labels it.
+        case "array": {
+            // Most arrays render as an expandable panel whose header is the
+            // label — `repeat`, `block`, `custom_array`, `multi_references`.
+            // The exceptions are the ones that resolve to an inline control:
+            // an enum array is a multi-select and a storage array is a
+            // dropzone, and both take their label from the form.
+            //
+            // This mirrors `getFieldConfig`'s array branch. Getting it backwards
+            // is visible: an array of plain strings is a `repeat` panel, and
+            // treating it as inline printed "Available Locales" twice, once
+            // from the form and once from the panel's own header.
             if (property.oneOf) return true;
             if (Array.isArray(property.of) || !property.of) return true;
-            return property.of.type === "map";
+            const of = property.of;
+            if (of.type === "string" && (of.enum || of.storage)) return false;
+            if (of.type === "number" && of.enum) return false;
+            return true;
+        }
         default:
             return false;
     }

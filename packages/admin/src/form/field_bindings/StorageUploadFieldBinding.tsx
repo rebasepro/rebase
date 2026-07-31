@@ -44,7 +44,12 @@ import { useClearRestoreValue } from "../useClearRestoreValue";
 // Height comes from the thumbnails now. It used to be a flat `min-h-[254px]`
 // on top of another 250px inside, so a field holding one small image
 // reserved close to 300px of the form for mostly empty space.
-const dropZoneClasses = "box-border relative pt-[2px] items-center border border-transparent outline-none rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary-solid";
+// One fixed height for the whole zone — 126px of preview row, 34px of hint,
+// and the padding between. Pinned on the root rather than on the children
+// because the hint reflows once files exist ("Drag to reorder"), and any
+// content-driven height makes a filled field taller than the same field
+// empty. Extra thumbnails scroll horizontally instead of growing it.
+const dropZoneClasses = "box-border relative pt-[2px] h-[172px] items-center border border-transparent outline-none rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary-solid";
 const disabledClasses = fieldBackgroundDisabledMixin;
 const nonActiveDropClasses = fieldBackgroundHoverMixin
 const activeDropClasses = "pt-0 border-2 border-solid"
@@ -316,9 +321,10 @@ function FileDropComponent({
             <div
                 className={cls("flex items-center gap-2 p-1 px-3 no-scrollbar",
                     multipleFilesSupported && internalValue.length ? "overflow-auto" : "",
-                    // One height whether or not it holds files, so adding the
-                    // first upload does not shove the rest of the form down.
-                    "min-h-[104px]"
+                    // A fixed height, not a minimum: the 118px preview overflowed
+                    // a `min-h`, so a field with a file stood taller than the same
+                    // field empty. 126px is the preview plus its padding.
+                    "h-[126px]"
                 )}
             >
                 <input
@@ -345,7 +351,10 @@ function FileDropComponent({
             </div>
 
             <div
-                className="box-border mx-3 mb-2.5 text-center">
+                // Two lines' worth, fixed: the hint gains "Drag to reorder" once
+                // the field holds something, and a reflow there put the filled
+                // state 25px taller than the empty one.
+                className="box-border mx-3 mb-2.5 h-[34px] flex items-center justify-center text-center">
                 <Typography align={"center"}
                             variant={"caption"}
                             className={disabled ? "text-surface-accent-600 dark:text-surface-accent-500" : ""}>

@@ -79,7 +79,11 @@ export function useStorageUploadController<M extends Record<string, unknown>>({
     const processFile = storage?.processFile;
 
     const metadata: Record<string, unknown> | undefined = storage?.metadata;
-    const size = multipleFilesSupported ? "medium" : "large";
+    // One preview size. A single-file field asked for "large" (a 220px
+    // thumbnail) while a multi-file field asked for "medium" (118px), so two
+    // upload fields in the same form reserved wildly different heights and
+    // neither matched its own empty state.
+    const size = "medium";
 
     const imageResize = storage?.imageResize;
 
