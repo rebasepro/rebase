@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="/Users/francesco/rebase/ds-bundle/styles.css">
+<link rel="stylesheet" href="/Users/francesco/rebase/ds-bundle/_ds_bundle.css">
+<style>body{margin:0;padding:16px;background:#0d0d0d;color:#888;font:11px monospace}
+td{padding:8px 14px;text-align:center}</style></head><body>
+<div id="r"></div>
+<script src="/Users/francesco/rebase/ds-bundle/_vendor/react.js"></script>
+<script src="/Users/francesco/rebase/ds-bundle/_vendor/react-dom.js"></script>
+<script src="/Users/francesco/rebase/ds-bundle/_ds_bundle.js"></script>
+<script>
+var h = React.createElement, U = window.RebaseUI, noop = function () {};
+document.documentElement.classList.add("dark");
+var SIZES = ["smallest", "small", "medium", "large"];
+var STATES = [["off", false], ["on", true]];
+
+var head = h("tr", { key: "h" }, [h("td", { key: "c" }, "")].concat(
+    SIZES.map(function (s) { return h("td", { key: s }, s); })));
+var rows = STATES.map(function (st) {
+    return h("tr", { key: st[0] }, [h("td", { key: "l" }, st[0])].concat(
+        SIZES.map(function (s) {
+            return h("td", { key: s, "data-sw": s + "/" + st[0] },
+                h(U.BooleanSwitch, { size: s, value: st[1], onValueChange: noop }));
+        })));
+});
+ReactDOM.createRoot(document.getElementById("r")).render(
+    h("table", null, h("tbody", null, [head].concat(rows))));
+
+// Assert the knob is inset by the same amount at both ends, and that the
+// off/on classes actually resolve (a dropped class pins the knob at x=0).
+window.__sw = function () {
+    var out = [];
+    document.querySelectorAll("[data-sw]").forEach(function (td) {
+        var track = td.querySelector("button") || td.firstElementChild;
+        var knob = track && track.querySelector("div");
+        if (!track || !knob) return;
+        var t = track.getBoundingClientRect(), k = knob.getBoundingClientRect();
+        out.push({
+            k: td.getAttribute("data-sw"),
+            track: Math.round(t.width) + "x" + Math.round(t.height),
+            knob: Math.round(k.width) + "x" + Math.round(k.height),
+            leftGap: Math.round(k.left - t.left),
+            rightGap: Math.round(t.right - k.right),
+            topGap: Math.round(k.top - t.top),
+            transition: getComputedStyle(knob).transitionProperty
+        });
+    });
+    return out;
+};
+</script></body></html>

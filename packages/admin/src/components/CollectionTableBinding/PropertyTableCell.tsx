@@ -205,6 +205,16 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
             }
         };
 
+        // `getTableBindingForProperty` builds its `Component` as a fresh inline
+        // arrow function on every call. Calling it during render therefore gave
+        // React a new component *type* each pass, so the cell was unmounted and
+        // remounted instead of updated — which is why a BooleanSwitch in the
+        // table never animated (a replaced element cannot run a CSS transition)
+        // and why every cell re-created its subtree on unrelated renders.
+        const tableBinding = useMemo(
+            () => getTableBindingForProperty(property, selected),
+            [property, selected]);
+
         let innerComponent: React.ReactNode | undefined;
         let allowScroll = false;
         let showExpandIcon = false;
@@ -243,8 +253,6 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
         }
 
         if (!customField && (!customPreview || selected)) {
-            const tableBinding = getTableBindingForProperty(property, selected);
-
             if (tableBinding) {
                 const Component = tableBinding.Component;
                 innerComponent = <Component
