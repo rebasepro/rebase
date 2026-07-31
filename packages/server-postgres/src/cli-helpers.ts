@@ -2,6 +2,7 @@ import { isManyToMany } from "@rebasepro/types";
 import path from "path";
 import fs from "fs";
 import { execSync } from "child_process";
+import { createRequire } from "module";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { logger } from "@rebasepro/server";
@@ -9,6 +10,49 @@ import type { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
 
 
+
+/**
+ * Why is a dependency's binary missing — never installed, or installed with its
+ * build script blocked?
+ *
+ * These need opposite advice, and getting it wrong is not a cosmetic miss. pnpm
+ * 10+ refuses to run a dependency's lifecycle scripts unless it is allowlisted
+ * (`pnpm.onlyBuiltDependencies`, or `allowBuilds` in `pnpm-workspace.yaml`).
+ * `@ariga/atlas` downloads its platform binary in `preinstall`, so a blocked
+ * script leaves a state that looks like a successful install: the package is on
+ * disk with its `install.js` and `package.json`, `node_modules/.bin` is empty,
+ * the install exits 0, and the only signal is `ERR_PNPM_IGNORED_BUILDS` several
+ * screens up.
+ *
+ * Telling somebody in that state to install the package again sends them round
+ * the same loop forever — the add succeeds, the script is blocked again,
+ * nothing changes. Verified by doing it: `pnpm add @ariga/atlas` into a bare
+ * project yields exactly this, three "Failed to create bin … ENOENT" warnings
+ * and no binary.
+ *
+ * Resolution is attempted from the user's project first and this package
+ * second, matching the order {@link resolveLocalBin} searches — the driver may
+ * be installed a level up from where the command runs.
+ */
+export function diagnoseMissingBin(packageName: string): "not-installed" | "build-script-blocked" {
+    const bases = [
+        pathToFileURL(path.join(process.cwd(), "package.json")),
+        pathToFileURL(path.join(__helpersDirname, "package.json"))
+    ];
+
+    for (const base of bases) {
+        try {
+            // `package.json` rather than the package root: a package with an
+            // `exports` map that omits `.` is unresolvable by name even when it
+            // is perfectly installed, which would misreport it as absent.
+            createRequire(base).resolve(`${packageName}/package.json`);
+            return "build-script-blocked";
+        } catch {
+            // Try the next base.
+        }
+    }
+    return "not-installed";
+}
 
 export function resolveLocalBin(binName: string): string | null {
     // Try to find node_modules/.bin upwards from __helpersDirname first (package-relative)

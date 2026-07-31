@@ -1149,7 +1149,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
             editorModule = await import("./api/schema-editor-routes");
         } catch (err) {
             if ((err as { code?: string })?.code === "ERR_MODULE_NOT_FOUND") {
-                logger.warn("Schema Editor disabled: its dependency ts-morph is not installed. Run `npm install ts-morph@28.0.0` to enable it.");
+                // `pnpm`, not `npm`: a Rebase project is a pnpm workspace, and
+                // running npm inside one rewrites node_modules into a hoisted
+                // layout that pnpm then disagrees with. Advice that damages the
+                // project is worse than no advice — see docs/bug-classes.md §5.
+                logger.warn("Schema Editor disabled: its dependency ts-morph is not installed. Run `pnpm add -D ts-morph@28.0.0` to enable it.");
             } else {
                 throw err;
             }
