@@ -1196,7 +1196,11 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 schemaEditorOff = {
                     code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
                     message: "The schema editor needs `ts-morph`, which is not installed on this server. " +
-                        "Run `npm install ts-morph@28.0.0` to enable it."
+                        // `pnpm`, not `npm`: a Rebase project is a pnpm workspace, and
+                        // running npm inside one rewrites node_modules into a hoisted
+                        // layout that pnpm then disagrees with. Advice that damages the
+                        // project is worse than no advice — see docs/bug-classes.md §5.
+                        "Run `pnpm add -D ts-morph@28.0.0` to enable it."
                 };
                 logger.warn(`Schema Editor disabled: ${schemaEditorOff.message}`);
             } else {
