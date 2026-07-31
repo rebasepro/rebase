@@ -12,16 +12,21 @@ export function VirtualTableDateField(props: {
     updateValue: (newValue: (Date | null)) => void;
     focused: boolean;
     disabled: boolean;
+    small?: boolean;
     locale?: string;
     onBlur?: React.FocusEventHandler<HTMLInputElement | HTMLTextAreaElement>;
 }) {
-    const { disabled, error, mode, timezone, internalValue, updateValue, locale } = props;
+    const { disabled, error, mode, timezone, internalValue, updateValue, small = false, locale } = props;
 
     return (
         <DateTimeField
             value={internalValue ?? undefined}
             onChange={(dateValue) => updateValue(dateValue ?? null)}
             invisible={true}
+            // Without this the field falls back to DateTimeField's own default of
+            // `size="large"` (min-h-64px), which overflows a table cell and makes
+            // the value collide with the cell border.
+            size={small ? "small" : "medium"}
             inputClassName={cls("w-full h-full", focusedDisabled)}
             className={cls("w-full h-full", focusedDisabled)}
             mode={mode}

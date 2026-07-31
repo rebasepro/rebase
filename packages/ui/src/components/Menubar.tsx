@@ -10,15 +10,26 @@ import { usePortalContainer } from "../hooks/PortalContainerContext";
 export function Menubar({
                             children,
                             onSelect,
+                            value,
+                            defaultValue,
+                            onValueChange,
                             className
                         }: {
     children: React.ReactNode,
     onSelect?: (event: React.SyntheticEvent) => void,
+    /** Value of the open menu, controlled. Pair with `onValueChange`. */
+    value?: string,
+    /** Value of the menu open on mount, uncontrolled. */
+    defaultValue?: string,
+    onValueChange?: (value: string) => void,
     className?: string
 }) {
     return (
         <MenubarPrimitive.Root
             onSelect={onSelect}
+            value={value}
+            defaultValue={defaultValue}
+            onValueChange={onValueChange}
             className={cls("z-10 flex bg-white dark:bg-surface-900 p-[3px] rounded-lg shadow-sm", className)}>
             {children}
         </MenubarPrimitive.Root>
@@ -26,10 +37,15 @@ export function Menubar({
 }
 
 export function MenubarMenu({
-                                children
-                            }: { children: React.ReactNode }) {
+                                children,
+                                value
+                            }: {
+    children: React.ReactNode,
+    /** Identifies this menu to the parent Menubar's `value`/`defaultValue`. */
+    value?: string
+}) {
     return (
-        <MenubarPrimitive.Menu>
+        <MenubarPrimitive.Menu value={value}>
             {children}
         </MenubarPrimitive.Menu>
     )

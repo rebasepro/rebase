@@ -859,7 +859,7 @@ roles: [] }
                                         <TableCell>
                                             <div className="flex flex-wrap gap-2">
                                                 {user.roles.map(role => (
-                                                    <Chip key={role.id} colorScheme={role.isAdmin ? "purpleDark" : "blueDark"} size="small">
+                                                    <Chip key={role.id} colorScheme={role.isAdmin ? "purple" : "blue"} size="small">
                                                         {role.name}
                                                     </Chip>
                                                 ))}

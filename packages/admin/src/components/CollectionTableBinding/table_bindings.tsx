@@ -189,13 +189,14 @@ export function getTableBindingForProperty(
         };
     } else if (property.type === "date") {
         return {
-            Component: ({ propertyKey, error, validationError, disabled, selected, property, internalValue, updateValue }: TableFieldBindingProps) => {
+            Component: ({ propertyKey, error, validationError, disabled, selected, size, property, internalValue, updateValue }: TableFieldBindingProps) => {
                 const { locale } = useCustomizationController();
                 return (
                     <VirtualTableDateField
                         name={propertyKey}
                         error={validationError ?? error}
                         disabled={disabled}
+                        small={getPreviewSizeFrom(size) !== "medium"}
                         mode={(property as DateProperty).mode}
                         focused={selected}
                         internalValue={internalValue as Date}
