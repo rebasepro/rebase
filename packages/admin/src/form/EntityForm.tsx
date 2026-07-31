@@ -663,14 +663,19 @@ export function EntityForm<M extends Record<string, unknown>>({
                     {/* Main column. Its own container scope, so a field's span
                         answers to the column it sits in rather than to the window —
                         the same form renders at four very different widths. */}
-                    <div className={"flex-1 min-w-0 overflow-y-auto flex justify-center"}>
+                    {/* `items-start`: the column is a flex item, so without it the cross-axis
+                        default stretches it to the scroller's height. Its content then
+                        overflows its own box and the bottom padding sits at the bottom of
+                        the *viewport* instead of after the last field — which is why the
+                        form appeared to have no padding however large `pb-*` grew. */}
+                    <div className={"flex-1 min-w-0 overflow-y-auto flex justify-center items-start"}>
                         <div
                             id={`form_${path}`}
                             className={cls(
                                 "@container/col w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
                                 openEntityMode === "dialog"
-                                    ? "pt-5 pb-16 px-6 sm:px-8"
-                                    : "pt-6 pb-24 px-5 sm:px-8"
+                                    ? "pt-5 pb-8 px-6 sm:px-8"
+                                    : "pt-6 pb-12 px-5 sm:px-8"
                             )}>
 
                             {manualApplyLocalChanges && hasLocalChanges && localChangesCacheKey &&

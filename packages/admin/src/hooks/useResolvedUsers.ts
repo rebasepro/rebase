@@ -36,7 +36,9 @@ async function fetchUsers(apiBase: string, ids: string[], token: string | undefi
     for (const id of ids) resolved.set(id, null);
 
     const params = new URLSearchParams({ ids: ids.join(",") });
-    const response = await fetch(`${apiBase}/users?${params}`, {
+    // Same route as the selector — see the note there; `/api/users` is a 404,
+    // so every `userSelect` value rendered as a bare id.
+    const response = await fetch(`${apiBase}/admin/users?${params}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
     if (!response.ok) {

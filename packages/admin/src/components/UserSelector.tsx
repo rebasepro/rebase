@@ -58,7 +58,12 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number }
                 offset: String(offset)
             });
             if (searchStr) params.set("search", searchStr);
-            const response = await fetch(`${apiBase}/users?${params}`, {
+            // `/admin/users`, not `/users`. `apiBaseOf` returns the API root
+            // (`/api`), and the users endpoint lives under the auth adapter's
+            // admin router — `/api/users` is a 404, which is why this list was
+            // always empty. The collection route `/api/data/users` would answer,
+            // but it serves the raw row, `passwordHash` included.
+            const response = await fetch(`${apiBase}/admin/users?${params}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
             if (!response.ok) throw new Error("Failed to fetch users");
@@ -66,7 +71,7 @@ function useUserSelector({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number }
             const rows: Record<string, unknown>[] = data.data ?? data.users ?? [];
             const newItems: UserSelectorItem[] = rows.map((r: Record<string, unknown>) => {
                 const user: User = {
-                    uid: (r.id as string) ?? "",
+                    uid: (r.uid as string) ?? (r.id as string) ?? "",
                     email: (r.email as string) ?? "",
                     displayName: (r.displayName as string) ?? (r.display_name as string) ?? null,
                     photoURL: (r.photoURL as string) ?? (r.photo_url as string) ?? null,
