@@ -17,14 +17,15 @@ export interface CheckboxProps {
     "aria-label"?: string;
 }
 
+// Radius steps down with the box. `rounded-md` is 6px — on a 16-20px box that
+// is most of the edge, so the control reads as a squircle rather than a
+// checkbox. Box sizes match the icon glyph scale (16/16/20/24) so a Checkbox
+// sitting beside IconButtons in a table row is the same visual size.
 const sizeClasses = {
-    large: "w-6 h-6 rounded-md flex items-center justify-center",
-    medium: "w-5 h-5 rounded-md flex items-center justify-center",
-    small: "w-4 h-4 rounded-md flex items-center justify-center",
-    // `rounded-md` is a 6px radius. On a 14px box the two corner radii nearly
-    // meet (6+6 of 14) and the square reads as a circle, so this size steps the
-    // radius down with the box.
-    smallest: "w-3.5 h-3.5 rounded flex items-center justify-center"
+    large: "w-6 h-6 rounded flex items-center justify-center",
+    medium: "w-5 h-5 rounded flex items-center justify-center",
+    small: "w-4 h-4 rounded-sm flex items-center justify-center",
+    smallest: "w-4 h-4 rounded-sm flex items-center justify-center"
 };
 
 // Outer box is the hit area and sets the control's rendered height, so it
@@ -36,11 +37,13 @@ const outerSizeClasses = {
     large: "w-12 h-12 ",
     smallest: "w-7 h-7"
 }
+// Per-size, for the same reason as IconButton: a flat p-2 left only 12px of
+// content inside the 28px `smallest` hit area, squashing the 16px box to 12x16.
 const paddingClasses = {
-    medium: "p-2",
+    medium: "p-2.5",
     small: "p-2",
-    large: "p-2",
-    smallest: "p-2"
+    large: "p-3",
+    smallest: "p-1.5"
 }
 
 const colorClasses = {
@@ -88,7 +91,7 @@ export const Checkbox = React.memo(({
             )}>
                 <div
                     className={cls(
-                        "border-2 relative transition-colors ease-in-out duration-150",
+                        "border-2 shrink-0 relative transition-colors ease-in-out duration-150",
                         sizeClasses[size],
                         disabled
                             ? (indeterminate || isChecked ? "bg-surface-accent-400 dark:bg-surface-accent-600" : "bg-surface-accent-400 dark:bg-surface-accent-600")

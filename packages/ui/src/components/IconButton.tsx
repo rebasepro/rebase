@@ -16,13 +16,18 @@ export type IconButtonProps<C extends React.ElementType> =
 }
 
 const buttonClasses = "hover:bg-surface-accent-200 hover:bg-opacity-75 hover:bg-surface-accent-200/75 dark:hover:bg-surface-accent-800 hover:scale-[1.04] active:scale-95 transition-transform";
-const baseClasses = "inline-flex items-center justify-center p-2 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-colors ease-in-out duration-150";
+// `[&>svg]:shrink-0` is load-bearing: without it flex compresses the icon to
+// whatever width is left after padding, so an 18px icon in a 28px button
+// rendered 12x18 — visibly squashed rather than merely small.
+const baseClasses = "inline-flex items-center justify-center text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-colors ease-in-out duration-150 [&>svg]:shrink-0";
 const colorClasses = "text-surface-accent-500 visited:text-surface-accent-500 dark:text-surface-accent-300 dark:visited:text-surface-accent-300";
+// Padding is per-size so the glyph always fits: a flat p-2 left only 12px of
+// content width at `smallest`, which is what squashed the icon.
 const sizeClasses = {
-    medium: "w-10 !h-10 min-w-10 min-h-10",
-    small: "w-8 !h-8 min-w-8 min-h-8",
-    smallest: "w-7 !h-7 min-w-7 min-h-7",
-    large: "w-12 !h-12 min-w-12 min-h-12"
+    medium: "w-10 !h-10 min-w-10 min-h-10 p-2.5",
+    small: "w-8 !h-8 min-w-8 min-h-8 p-1.5",
+    smallest: "w-7 !h-7 min-w-7 min-h-7 p-1.5",
+    large: "w-12 !h-12 min-w-12 min-h-12 p-3"
 }
 const shapeClasses = {
     circular: "rounded-full",
