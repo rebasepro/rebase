@@ -5,13 +5,17 @@ import {
     Button,
     CheckIcon,
     cls,
+    CodeIcon,
     CopyIcon,
     defaultBorderMixin,
     IconButton,
     iconSize,
     LoadingButton,
     ArrowLeftIcon,
+    Menu,
+    MenuItem,
     MoreVerticalIcon,
+    Separator,
     Tooltip,
     Typography
 } from "@rebasepro/ui";
@@ -32,8 +36,25 @@ export interface EntityIdentityBarProps {
     saveDisabled?: boolean;
     hasErrors?: boolean;
 
+    /**
+     * Save and dismiss, for the side panel and the dialog where the dominant
+     * action is "done with this record" rather than "keep editing".
+     */
+    onSaveAndClose?: () => void;
+
     onBack?: () => void;
     onInspect?: () => void;
+
+    /**
+     * Actions performed *on* the record — copy, delete, whatever the collection
+     * adds — as menu items under the overflow button. They live here rather
+     * than in a footer, which is what let the footer go away entirely.
+     */
+    recordActions?: React.ReactNode;
+
+    /** Plugin-contributed actions, rendered inline before Save. */
+    pluginActions?: React.ReactNode;
+
     /** Close / full-screen buttons supplied by the panel that owns this view. */
     trailing?: React.ReactNode;
 }
@@ -59,12 +80,17 @@ export function EntityIdentityBar({
     onDiscard,
     saveDisabled,
     hasErrors,
+    onSaveAndClose,
     onBack,
     onInspect,
+    recordActions,
+    pluginActions,
     trailing
 }: EntityIdentityBarProps) {
 
     const saveLabel = status === "existing" ? "Save" : status === "copy" ? "Create copy" : "Create";
+    const closeLabel = status === "existing" ? "Save and close" : "Create and close";
+    const hasMenu = Boolean(recordActions) || Boolean(onInspect);
 
     return (
         <div className={cls(
@@ -96,6 +122,8 @@ export function EntityIdentityBar({
 
             <SaveState dirty={dirty} saving={saving} status={status}/>
 
+            {pluginActions}
+
             {onDiscard && dirty && !saving && (
                 <Button variant={"text"} size={"small"} onClick={onDiscard}>
                     {status === "existing" ? "Discard" : "Clear"}
@@ -104,10 +132,13 @@ export function EntityIdentityBar({
 
             {onSave && (
                 <Tooltip title={hasErrors ? "Fix highlighted errors before saving" : undefined}>
-                    <LoadingButton variant={"filled"}
+                    <LoadingButton
+                        // Where there is something to close, closing is the
+                        // dominant intent and takes the filled treatment.
+                        variant={onSaveAndClose ? "text" : "filled"}
                         color={"primary"}
                         size={"small"}
-                        loading={saving}
+                        loading={saving && !onSaveAndClose}
                         disabled={saveDisabled}
                         onClick={onSave}>
                         {saveLabel}
@@ -115,12 +146,33 @@ export function EntityIdentityBar({
                 </Tooltip>
             )}
 
-            {onInspect && (
-                <Tooltip title={"Inspect — raw values and history"}>
-                    <IconButton size={"small"} onClick={onInspect} aria-label={"Inspect"}>
-                        <MoreVerticalIcon size={iconSize.smallest}/>
-                    </IconButton>
-                </Tooltip>
+            {onSaveAndClose && (
+                <LoadingButton variant={"filled"}
+                    color={"primary"}
+                    size={"small"}
+                    loading={saving}
+                    disabled={saveDisabled}
+                    onClick={onSaveAndClose}>
+                    {closeLabel}
+                </LoadingButton>
+            )}
+
+            {hasMenu && (
+                <Menu align={"end"}
+                    trigger={
+                        <IconButton size={"small"} aria-label={"More actions"}>
+                            <MoreVerticalIcon size={iconSize.smallest}/>
+                        </IconButton>
+                    }>
+                    {recordActions}
+                    {recordActions && onInspect && <Separator orientation={"horizontal"}/>}
+                    {onInspect && (
+                        <MenuItem onClick={onInspect}>
+                            <CodeIcon size={iconSize.smallest}/>
+                            Inspect record
+                        </MenuItem>
+                    )}
+                </Menu>
             )}
 
             {trailing}

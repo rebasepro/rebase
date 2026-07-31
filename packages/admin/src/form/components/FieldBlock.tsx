@@ -1,7 +1,7 @@
 import type { Property } from "@rebasepro/types";
-import type { PropertySpan } from "@rebasepro/admin-types";
 import React from "react";
-import { cls, ErrorBoundary, iconSize, InfoIcon, Tooltip, Typography } from "@rebasepro/ui";
+import { cls, ErrorBoundary, Typography } from "@rebasepro/ui";
+import { getIconForProperty } from "../../util/property_utils";
 import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
 
 /**
@@ -37,36 +37,32 @@ export function isSelfLabellingProperty(property: Property | undefined): boolean
 export interface FieldBlockProps {
     propertyKey: string;
     property?: Property;
-    /** Columns this field occupies. Only used to decide the description layout. */
-    span: PropertySpan;
     /** Rendered by the form rather than by the field, unless self-labelling. */
     showLabel: boolean;
     children: React.ReactNode;
 }
 
 /**
- * One field's worth of the form grid: label, description, control.
+ * One field's worth of the form grid: label, control, description.
  *
- * The description sits directly under the label rather than under the control,
- * so a caption reads as belonging to the field above it instead of floating
- * between two. At a single-column span there is no room for prose next to a
- * narrow input — three-line wraps crowded the label badly — so it collapses to
- * an info affordance on the label itself.
+ * The label carries a small type icon so a number reads differently from a
+ * relation at a glance, and the description sits under the control where it
+ * annotates what you just filled in.
  */
 export function FieldBlock({
     propertyKey,
     property,
-    span,
     showLabel,
     children
 }: FieldBlockProps) {
 
     const description = property?.description?.trim();
     const required = Boolean(property?.validation?.required);
-    const inlineDescription = Boolean(description) && span >= 2;
-    const tooltipDescription = Boolean(description) && span < 2;
 
     return (
+        // Top-aligned: with the description below the control, every label is a
+        // single line, so the controls line up on their own. (Bottom-aligning
+        // was only needed while the description sat between label and control.)
         <div
             id={`form_field_${propertyKey}`}
             className={"relative flex flex-col min-w-0"}>
@@ -74,41 +70,38 @@ export function FieldBlock({
             {showLabel && (
                 <PropertyIdCopyTooltip propertyKey={propertyKey}>
                     <div className={cls(
-                        "text-sm font-medium leading-tight mb-1.5",
+                        "flex items-center gap-1.5 text-sm font-medium leading-tight mb-1.5",
                         "text-text-secondary dark:text-text-secondary-dark"
                     )}>
-                        {property?.name ?? propertyKey}
-                        {required && <span className={"text-red-500 dark:text-red-500 ml-0.5"}>*</span>}
-                        {tooltipDescription && (
-                            // `className` lands on Tooltip's own wrapper, which
-                            // is a block `div` by default — inline-flex is what
-                            // keeps the icon on the label's last line instead of
-                            // dropping it onto a line of its own.
-                            <Tooltip title={description} className={"inline-flex align-middle ml-1"}>
-                                <InfoIcon
-                                    size={14}
-                                    className={"text-text-disabled dark:text-text-disabled-dark cursor-help"}/>
-                            </Tooltip>
+                        {/* Small and quiet: enough to tell a number from a
+                            relation at a glance, not enough to compete with the
+                            field name. */}
+                        {property && (
+                            <span className={"shrink-0 text-text-disabled dark:text-text-disabled-dark"}>
+                                {getIconForProperty(property, "smallest")}
+                            </span>
                         )}
+                        <span className={"truncate"}>{property?.name ?? propertyKey}</span>
+                        {required && <span className={"text-red-500 dark:text-red-500 -ml-1"}>*</span>}
                     </div>
                 </PropertyIdCopyTooltip>
             )}
 
-            {showLabel && inlineDescription && (
-                <Typography variant={"caption"}
-                    color={"disabled"}
-                    className={"mb-1.5 leading-snug"}>
-                    {description}
-                </Typography>
-            )}
-
-            {/* Pushed to the bottom so controls share a baseline across a row
-                even when one field's description wrapped and another's did not. */}
-            <div className={"mt-auto min-w-0"}>
+            <div className={"min-w-0"}>
                 <ErrorBoundary>
                     {children}
                 </ErrorBoundary>
             </div>
+
+            {/* Under the control, where it reads as a note about the thing you
+                just filled in rather than a subtitle of the next label. */}
+            {showLabel && description && (
+                <Typography variant={"caption"}
+                    color={"disabled"}
+                    className={"mt-1.5 ml-0.5 leading-snug"}>
+                    {description}
+                </Typography>
+            )}
         </div>
     );
 }

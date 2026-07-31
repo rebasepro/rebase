@@ -104,7 +104,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
         return null;
     }
 
-    return <DialogActions position={"absolute"} className={className}>
+    return <DialogActions position={"sticky"} className={className}>
         {savingError &&
             <div className="text-right">
                 <Typography color={"error"}>{savingError.message}</Typography>

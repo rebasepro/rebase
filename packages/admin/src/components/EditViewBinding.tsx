@@ -18,6 +18,7 @@ import {
     HistoryIcon,
     IconButton,
     Maximize2Icon,
+    MenuItem,
     Skeleton,
     Tab,
     Tabs,
@@ -43,6 +44,9 @@ import type { EntityFormBindingProps } from "../form";
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { EditFormActions } from "./EditFormActions";
 import { EntityIdentityBar } from "./EntityIdentityBar";
+import { useRecordActions } from "../hooks/useRecordActions";
+import { useSideDialogContext } from "./SideDialogs";
+import { useAdminContext } from "../hooks/useAdminContext";
 import { EntityInspector } from "./EntityInspector";
 import { useEntityDisplayTitle } from "../hooks/useEntityDisplayTitle";
 import { createFormexStub, getEntityFromCache } from "@rebasepro/app";
@@ -198,6 +202,7 @@ export function EditViewBindingInner<M extends Record<string, unknown>>({
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
 
     const context = useRebaseContext();
+    const adminContext = useAdminContext();
     const urlController = useUrlController();
     const navigate = useNavigate();
 
@@ -410,6 +415,46 @@ parentEntityIds,
     );
 
     const [inspectorOpen, setInspectorOpen] = useState(false);
+
+    /* ---- record actions, in the bar's overflow menu ---------------------- */
+
+    const sideDialogContext = useSideDialogContext();
+    const canCloseAfterSave = layout === "side_panel" || layout === "dialog";
+
+    const recordActions = useRecordActions({
+        collection,
+        path,
+        entity: usedEntity
+    });
+
+    const recordActionItems = usedEntity && recordActions.length
+        ? recordActions.map((action, index) => {
+            const clickProps = {
+                view: "form" as const,
+                entity: usedEntity,
+                path,
+                collection,
+                context,
+                sidePanelController: adminContext.sidePanelController,
+                openEntityMode: layout,
+                navigateBack: navigateBack ?? (() => undefined),
+                formContext
+            };
+            const enabled = !action.isEnabled || action.isEnabled(clickProps as never);
+            return (
+                <MenuItem key={action.key ?? action.name ?? index}
+                    disabled={!enabled}
+                    onClick={() => action.onClick(clickProps as never)}>
+                    {getIcon(action.icon, undefined, undefined, "smallest")}
+                    {action.name}
+                </MenuItem>
+            );
+        })
+        : null;
+
+    // Plugin form actions (Autofill and friends) render inline in the bar; the
+    // form no longer has a footer to put them in.
+    const formPluginActions = useSlot("form.actions", formActionTopProps);
 
     // A URL still naming the old `json`/`history` tab opens the inspector on
     // that pane instead of 404-ing into the record with nothing shown.
@@ -637,9 +682,18 @@ parentEntityIds,
             saving={Boolean(formContext?.isSaving)}
             hasErrors={hasFormErrors}
             saveDisabled={!canEdit || saveDisabled}
-            onSave={canEdit && formContext ? () => formContext.submit() : undefined}
+            onSave={canEdit && formContext ? () => {
+                sideDialogContext.setPendingClose?.(false);
+                formContext.submit();
+            } : undefined}
+            onSaveAndClose={canEdit && formContext && canCloseAfterSave ? () => {
+                sideDialogContext.setPendingClose?.(true);
+                formContext.submit();
+            } : undefined}
             onDiscard={canEdit && formContext ? () => formContext.formex.resetForm() : undefined}
             onInspect={hasInspector ? () => setInspectorOpen(true) : undefined}
+            recordActions={recordActionItems}
+            pluginActions={formPluginActions}
             trailing={<>
                 {pluginActionsTop}
                 {fullScreenButton}

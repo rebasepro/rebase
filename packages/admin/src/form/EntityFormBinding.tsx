@@ -287,7 +287,9 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
         disabled: false
     }), [entityId, parentCollectionSlugs, parentEntityIds, path, status, collection, context, openEntityMode]);
 
-    const pluginFormActions = useSlot("form.actions", formActionProps);
+    // `form.actions` is rendered by the entity view's identity bar, which has
+    // the real formContext and does not cost a footer. Rendering it here too
+    // would show Autofill twice.
     const pluginFormBefore = useSlot("form.before", formActionProps);
     const pluginFormAfter = useSlot("form.after", formActionProps);
 
@@ -314,7 +316,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
             // Slots
             beforeFields={pluginFormBefore}
             afterFields={pluginFormAfter}
-            pluginActions={pluginFormActions ?? []}
+            pluginActions={[]}
             // Local changes
             computedInitialValues={computedInitialValues as Partial<M>}
             hasLocalChanges={hasLocalChanges}

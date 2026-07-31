@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import {
+    controlHeightMixin,
     fieldBackgroundDisabledMixin,
     fieldBackgroundHoverMixin,
     fieldBackgroundMixin,
@@ -72,12 +73,11 @@ export const BooleanSwitchWithLabel = function BooleanSwitchWithLabel({
                 "rounded-lg max-w-full justify-between box-border relative inline-flex items-center",
                 !invisible && focus && !disabled ? focusedClasses : "",
                 error ? "text-red-500 dark:text-red-600" : (focus && !disabled ? "text-primary" : (!disabled ? "text-text-primary dark:text-text-primary-dark" : "text-text-secondary dark:text-text-secondary-dark")),
-                {
-                    "min-h-[28px]": size === "smallest",
-                    "min-h-[32px]": size === "small",
-                    "min-h-[44px]": size === "medium",
-                    "min-h-[64px]": size === "large"
-                },
+                // The one control size scale — 28/32/40/48. This component still
+                // carried its own map (…/44/64), so a switch at `large` stood
+                // 16px taller than the text field beside it, which read as a
+                // giant empty box once the label moved out of the control.
+                controlHeightMixin[size],
                 size === "small" || size === "smallest" ? "pl-2" : "pl-4",
                 size === "small" || size === "smallest" ? "pr-4" : "pr-6",
                 position === "end" ? "flex-row-reverse" : "flex-row",

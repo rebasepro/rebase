@@ -41,7 +41,10 @@ import {
 } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 
-const dropZoneClasses = "box-border relative pt-[2px] items-center border border-transparent min-h-[254px] outline-none rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary-solid";
+// Height comes from the thumbnails now. It used to be a flat `min-h-[254px]`
+// on top of another 250px inside, so a field holding one small image
+// reserved close to 300px of the form for mostly empty space.
+const dropZoneClasses = "box-border relative pt-[2px] items-center border border-transparent outline-none rounded-md duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] focus:border-primary-solid";
 const disabledClasses = fieldBackgroundDisabledMixin;
 const nonActiveDropClasses = fieldBackgroundHoverMixin
 const activeDropClasses = "pt-0 border-2 border-solid"
@@ -311,9 +314,11 @@ function FileDropComponent({
                 })}
         >
             <div
-                className={cls("flex items-center p-1 px-4 no-scrollbar",
+                className={cls("flex items-center gap-2 p-1 px-3 no-scrollbar",
                     multipleFilesSupported && internalValue.length ? "overflow-auto" : "",
-                    multipleFilesSupported && internalValue.length ? "min-h-[180px]" : "min-h-[250px]"
+                    // One height whether or not it holds files, so adding the
+                    // first upload does not shove the rest of the form down.
+                    "min-h-[104px]"
                 )}
             >
                 <input
@@ -340,9 +345,9 @@ function FileDropComponent({
             </div>
 
             <div
-                className="flex-grow min-h-[38px] box-border m-2 text-center">
+                className="box-border mx-3 mb-2.5 text-center">
                 <Typography align={"center"}
-                            variant={"label"}
+                            variant={"caption"}
                             className={disabled ? "text-surface-accent-600 dark:text-surface-accent-500" : ""}>
                     {helpText}
                 </Typography>

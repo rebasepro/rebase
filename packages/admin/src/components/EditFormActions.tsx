@@ -148,20 +148,19 @@ function buildBottomActions<M extends Record<string, unknown>>({
     const canClose = openEntityMode === "side_panel" || openEntityMode === "dialog";
     const showBackToDetail = collection.defaultEntityAction === "view" && status === "existing";
 
-    // With Save and Discard in the identity bar, a footer holding nothing else
-    // is 60px of empty chrome pinned over the last field.
-    const hasContent = showDefaultActions
-        || canClose
-        || showBackToDetail
-        || Boolean(savingError)
-        || formActions.length > 0
-        || Boolean(pluginActions && pluginActions.length > 0);
+    // When the container carries the actions — the entity view's identity bar
+    // does — this renders nothing at all. A full-width bar holding a copy icon
+    // and a delete icon is the same waste as the side rail it replaced: the
+    // record actions moved into the bar's overflow menu, and Save, Discard and
+    // "save and close" are buttons up there too.
+    const hasContent = showDefaultActions || Boolean(savingError);
 
     if (!hasContent) return null;
 
     return <DialogActions
         className={className}
-        position={"absolute"}>
+        // In normal flow at the foot of the form column, not overlaying it.
+        position={"sticky"}>
         {savingError &&
             <div className="text-right">
                 <Typography color={"error"}>{savingError.message}</Typography>

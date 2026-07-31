@@ -479,6 +479,9 @@ export function EntityForm<M extends Record<string, unknown>>({
             context: formContext,
             partOfArray: false,
             minimalistView: false,
+            // One height for every control in the form. Left to their own
+            // defaults, a text field came out 48px, a select 44 and a switch 64.
+            size: "large",
             autoFocus: autoFocusKey === field.key
         };
 
@@ -486,7 +489,6 @@ export function EntityForm<M extends Record<string, unknown>>({
             <div key={`field_${field.key}`} className={spanClass(field.span)}>
                 <FieldBlock propertyKey={field.key}
                     property={property}
-                    span={field.span}
                     showLabel={!selfLabelling}>
                     <PropertyFieldBinding {...cmsFormFieldProps}/>
                 </FieldBlock>
@@ -615,45 +617,52 @@ export function EntityForm<M extends Record<string, unknown>>({
                     }
                 }}
                 noValidate
-                className={cls("@container/form flex-1 flex flex-row w-full min-h-0", className)}>
+                className={cls("@container/form flex-1 flex flex-col w-full min-h-0", className)}>
 
-                {/* Main column. Its own container scope, so a field's span
-                    answers to the column it sits in rather than to the window —
-                    the same form renders at four very different widths. */}
-                <div className={"flex-1 min-w-0 overflow-y-auto flex justify-center"}>
-                    <div
-                        id={`form_${path}`}
-                        className={cls(
-                            "@container/col w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
-                            openEntityMode === "dialog"
-                                ? "pt-5 pb-12 px-6 sm:px-8"
-                                : "pt-6 pb-16 px-5 sm:px-8"
-                        )}>
+                {/* The actions bar is a sibling of this row rather than absolutely
+                    positioned over it, so the scroll area ends where the bar
+                    begins. As an overlay it hid the last field, and the bottom
+                    padding that compensated was a guess at its height. */}
+                <div className={"flex-1 min-h-0 flex flex-row w-full"}>
 
-                        {manualApplyLocalChanges && hasLocalChanges && localChangesCacheKey &&
-                            <div className={"flex justify-end mb-3"}>
-                                <LocalChangesMenu<M>
-                                    cacheKey={localChangesCacheKey}
-                                    properties={collection.properties}
-                                    cachedData={localChangesData as Partial<M>}
-                                    formex={formex}
-                                    onClearLocalChanges={() => {
-                                        setLocalChangesCleared(true);
-                                        onClearLocalChanges?.();
-                                    }}
-                                />
-                            </div>}
+                    {/* Main column. Its own container scope, so a field's span
+                        answers to the column it sits in rather than to the window —
+                        the same form renders at four very different widths. */}
+                    <div className={"flex-1 min-w-0 overflow-y-auto flex justify-center"}>
+                        <div
+                            id={`form_${path}`}
+                            className={cls(
+                                "@container/col w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
+                                openEntityMode === "dialog"
+                                    ? "pt-5 pb-10 px-6 sm:px-8"
+                                    : "pt-6 pb-12 px-5 sm:px-8"
+                            )}>
 
-                        {formView}
+                            {manualApplyLocalChanges && hasLocalChanges && localChangesCacheKey &&
+                                <div className={"flex justify-end mb-3"}>
+                                    <LocalChangesMenu<M>
+                                        cacheKey={localChangesCacheKey}
+                                        properties={collection.properties}
+                                        cachedData={localChangesData as Partial<M>}
+                                        formex={formex}
+                                        onClearLocalChanges={() => {
+                                            setLocalChangesCleared(true);
+                                            onClearLocalChanges?.();
+                                        }}
+                                    />
+                                </div>}
 
+                            {formView}
+
+                        </div>
                     </div>
-                </div>
 
-                {!Builder && <FormRail
-                    fields={layout.sidebar}
-                    showRecordMeta={layout.showRecordMeta && status === "existing"}
-                    entity={entity as Entity<Record<string, unknown>> | undefined}
-                    renderField={renderField}/>}
+                    {!Builder && <FormRail
+                        fields={layout.sidebar}
+                        showRecordMeta={layout.showRecordMeta && status === "existing"}
+                        entity={entity as Entity<Record<string, unknown>> | undefined}
+                        renderField={renderField}/>}
+                </div>
 
                 {dialogActions}
 
