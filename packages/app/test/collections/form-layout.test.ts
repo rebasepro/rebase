@@ -207,6 +207,65 @@ describe("resolveFormLayout — derived defaults", () => {
     });
 });
 
+describe("fillRows", () => {
+    it("leaves a half-width field with a trailing gap alone", () => {
+        // name | sku  then  brand | ␣␣ — normal wrapping, not a defect.
+        const l = resolveFormLayout({
+            collection: collection({
+                name: { type: "string" },
+                sku: { type: "string" },
+                brand: { type: "string" }
+            }),
+            fieldKeys: ["name", "sku", "brand"],
+            status: "existing"
+        });
+        const spans = l.sections[0].fields.map(f => [f.key, f.span]);
+        expect(spans).toEqual([["name", 2], ["sku", 2], ["brand", 2]]);
+    });
+
+    it("never resizes a field whose span the author set", () => {
+        const l = resolveFormLayout({
+            collection: collection({
+                a: { type: "string" },
+                b: { type: "string" },
+                c: { type: "string", admin: { span: 2 } }
+            }),
+            fieldKeys: ["a", "b", "c"],
+            status: "existing"
+        });
+        const spans = l.sections[0].fields.map(f => [f.key, f.span]);
+        expect(spans).toEqual([["a", 2], ["b", 2], ["c", 2]]);
+    });
+
+    it("grows a lone quarter-width field to a half, and no further", () => {
+        const l = resolveFormLayout({
+            collection: collection({
+                a: { type: "number" }, b: { type: "number" },
+                c: { type: "number" }, d: { type: "number" },
+                lonely: { type: "number" }
+            }),
+            fieldKeys: ["a", "b", "c", "d", "lonely"],
+            status: "existing"
+        });
+        // row one is full; `lonely` starts a row of its own with a gap of 3
+        expect(l.sections[0].fields.map(f => [f.key, f.span])).toEqual([
+            ["a", 1], ["b", 1], ["c", 1], ["d", 1], ["lonely", 2]
+        ]);
+    });
+
+    it("leaves a full row alone", () => {
+        const l = resolveFormLayout({
+            collection: collection({
+                a: { type: "number" }, b: { type: "number" },
+                c: { type: "number" }, d: { type: "number" }
+            }),
+            fieldKeys: ["a", "b", "c", "d"],
+            status: "existing"
+        });
+        expect(l.sections[0].fields.map(f => f.span)).toEqual([1, 1, 1, 1]);
+    });
+});
+
 describe("resolveFormLayout — explicit config", () => {
     const posts = collection({
         title: { type: "string" },

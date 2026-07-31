@@ -517,15 +517,18 @@ export function EntityForm<M extends Record<string, unknown>>({
         const sections = showRail || !layout.sidebar.length
             ? layout.sections
             : [
-                // Leading, untitled: these are the record's headline facts, which
-                // is why they were in the rail in the first place.
+                ...layout.sections,
+                // Trailing, not leading. Beside the column these read as
+                // peripheral; stacked above it they pushed the record's own name
+                // below its status, which is the wrong thing to meet first.
+                // Settings come after the content they apply to.
                 {
                     key: "__rail",
+                    title: "Settings",
                     collapsible: false,
                     collapsed: false,
                     fields: layout.sidebar
-                },
-                ...layout.sections
+                }
             ];
 
         return <FormSections

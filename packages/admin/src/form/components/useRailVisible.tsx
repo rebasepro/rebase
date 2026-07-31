@@ -2,9 +2,14 @@ import React, { useEffect, useState } from "react";
 
 /**
  * Below this the form is a single column and the rail is not shown.
- * Roughly: the 780px content column, the 288px rail, and gutters.
+ *
+ * Set above the width a split-view pane actually gets, deliberately. In split
+ * view the collection list is already a column, so a rail makes the record
+ * itself span two more and the eye has three vertical rhythms to track. The
+ * content column plus the rail only earns its keep when the form owns the
+ * window.
  */
-export const RAIL_MIN_WIDTH = 1100;
+export const RAIL_MIN_WIDTH = 1280;
 
 /**
  * Is there room beside the form for the metadata rail?

@@ -113,8 +113,14 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
 
     const multipleDeleteEnabled = canDelete(collection, path, null);
 
+    // Only once something is selected. A permanently-disabled bin sat in every
+    // collection toolbar — and in the split view, where the toolbar is a narrow
+    // strip above the list, it was a third of the visible controls doing
+    // nothing. It appears the moment you tick a row, which is when you want it.
+    const hasSelection = Boolean(selectedEntities?.length);
+
     let multipleDeleteButton: React.ReactNode | undefined;
-    {
+    if (hasSelection) {
         const button = largeLayout && !compact
             ? <Button
                 variant={"text"}

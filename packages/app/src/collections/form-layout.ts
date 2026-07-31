@@ -20,13 +20,32 @@ import type {
 import type { Property } from "@rebasepro/types";
 import { isHidden } from "./property_presentation";
 
+/**
+ * Columns in the form grid.
+ *
+ * A local literal rather than an import of `FORM_GRID_COLUMNS`: everything else
+ * this module takes from `@rebasepro/admin-types` is a *type*, erased at build
+ * time, and a runtime value would make this pure function depend on that
+ * package's built output — which is exactly what broke the dev server, since
+ * `@rebasepro/app` resolves that package to its dist. `satisfies PropertySpan`
+ * keeps the two honest: a full-width field and the column count are the same
+ * number by definition.
+ */
+const GRID_COLUMNS = 4 satisfies PropertySpan;
+
 /** A field placed on the grid. */
 export interface ResolvedFormField {
     key: string;
-    /** Columns occupied, out of `FORM_GRID_COLUMNS`. Ignored in the rail. */
+    /** Columns occupied, out of `GRID_COLUMNS`. Ignored in the rail. */
     span: PropertySpan;
     /** True for an `additionalFields` entry rather than a property. */
     additional: boolean;
+    /**
+     * The span came from `admin.span` / `widthPercentage` rather than being
+     * derived. Row filling leaves these alone: an author who wrote a width
+     * meant it.
+     */
+    spanExplicit?: boolean;
 }
 
 export interface ResolvedFormSection {
@@ -173,6 +192,57 @@ export function isAuditTimestamp(property: Property | undefined): boolean {
     );
 }
 
+/**
+ * Grow the last derived field in each row to close a trailing gap.
+ *
+ * Without this, a section of half-width fields with an odd count leaves a hole:
+ * `name | sku` then `brand | ␣␣` — a field stranded beside a third of a row of
+ * nothing, which reads as a mistake rather than a layout. Fields with an
+ * explicit span are never resized; the author picked that width on purpose.
+ */
+export function fillRows(fields: ResolvedFormField[]): ResolvedFormField[] {
+    const rows: ResolvedFormField[][] = [];
+    let row: ResolvedFormField[] = [];
+    let used = 0;
+
+    for (const field of fields) {
+        if (used + field.span > GRID_COLUMNS && row.length) {
+            rows.push(row);
+            row = [];
+            used = 0;
+        }
+        row.push(field);
+        used += field.span;
+    }
+    if (row.length) rows.push(row);
+
+    return rows.flatMap(entries => {
+        const total = entries.reduce((sum, f) => sum + f.span, 0);
+        const gap = GRID_COLUMNS - total;
+        if (gap > 0) {
+            for (let i = entries.length - 1; i >= 0; i--) {
+                const field = entries[i];
+                if (field.spanExplicit) continue;
+                // Only a quarter-width field, and only up to a half.
+                //
+                // A trailing gap is normal in any wrapping form and needs no
+                // rescuing — half a row of nothing after a half-width field is
+                // fine. What is not fine is a lone quarter-width number sitting
+                // in three quarters of nothing. Growing further overshoots the
+                // other way: a single-line text input stretched across the whole
+                // form reads as a mistake too.
+                if (field.span > 1) break;
+                const grown = Math.min(field.span + gap, 2);
+                if (grown !== field.span) {
+                    entries[i] = { ...field, span: grown as PropertySpan };
+                }
+                break;
+            }
+        }
+        return entries;
+    });
+}
+
 /* -------------------------------------------------------------------------- */
 /* resolution                                                                 */
 /* -------------------------------------------------------------------------- */
@@ -194,12 +264,13 @@ function buildField<M extends Record<string, unknown>>(
     if (isHidden(property)) return undefined;
 
     const admin = property.admin;
+    const explicit = admin?.span !== undefined || typeof admin?.widthPercentage === "number";
     const span: PropertySpan = admin?.span
         ?? (typeof admin?.widthPercentage === "number"
             ? spanFromWidthPercentage(admin.widthPercentage)
             : deriveSpan(property, key === titlePropertyKey));
 
-    return { key, span, additional: false };
+    return { key, span, additional: false, spanExplicit: explicit };
 }
 
 /**
@@ -306,7 +377,9 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
 
     // A configured section that ended up empty (every key hidden, unknown, or
     // claimed by the rail) would render as a heading over nothing.
-    const nonEmpty = sections.filter(s => s.fields.length > 0);
+    const nonEmpty = sections
+        .filter(s => s.fields.length > 0)
+        .map(s => ({ ...s, fields: fillRows(s.fields) }));
 
     return {
         sections: nonEmpty,
