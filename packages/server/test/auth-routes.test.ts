@@ -1013,14 +1013,53 @@ withEmail: false }); // Hack to pass empty list of providers
 
     // ── Forgot Password ─────────────────────────────────────────────────
     describe("POST /auth/forgot-password", () => {
-        it("always returns success (timing-safe)", async () => {
+        /*
+         * This was named "always returns success (timing-safe)" and checked
+         * neither claim: it exercised only the *unknown* address and measured
+         * nothing about timing. The property that actually defends against
+         * account enumeration is that the two cases are indistinguishable — and
+         * a response that differed by so much as a field would have passed,
+         * because the existing-user branch was never asked what it returns.
+         *
+         * "Timing-safe" is dropped from the name rather than pretended at: this
+         * handler does real work (token, template, SMTP) only for a user that
+         * exists, so it is *not* constant-time, and a unit test asserting
+         * otherwise would be the most misleading kind of green.
+         */
+        it("answers an unknown address and a real one identically", async () => {
             const app = createApp({ withEmail: true });
-            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null); // user doesn't exist
 
-            const res = await app.request("/auth/forgot-password", json({ email: "nobody@test.com" }));
-            expect(res.status).toBe(200);
-            const body = await res.json() as any;
-            expect(body.success).toBe(true);
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
+            const unknown = await app.request("/auth/forgot-password", json({ email: "nobody@test.com" }));
+            const unknownBody = await unknown.json();
+
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
+            const known = await app.request("/auth/forgot-password", json({ email: "test@example.com" }));
+            const knownBody = await known.json();
+
+            // Status, and every byte of the body: anything that differs here is
+            // an oracle telling an attacker which addresses have accounts.
+            expect(unknown.status).toBe(200);
+            expect(known.status).toBe(unknown.status);
+            expect(knownBody).toEqual(unknownBody);
+            expect((unknownBody as { success: boolean }).success).toBe(true);
+        });
+
+        it("says the same thing when sending the email fails", async () => {
+            // The catch around `emailService.send` exists so an SMTP outage does
+            // not become the same oracle. Nothing covered it.
+            const app = createApp({ withEmail: true });
+
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
+            const unknown = await app.request("/auth/forgot-password", json({ email: "nobody@test.com" }));
+            const unknownBody = await unknown.json();
+
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
+            mockEmailService.send.mockRejectedValueOnce(new Error("smtp down"));
+            const known = await app.request("/auth/forgot-password", json({ email: "test@example.com" }));
+
+            expect(known.status).toBe(unknown.status);
+            expect(await known.json()).toEqual(unknownBody);
         });
 
         it("sends reset email when user exists", async () => {
