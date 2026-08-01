@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as neatModule from "@firecms/neat";
 
 interface NeatGradientConfig {
@@ -120,6 +120,19 @@ const NEAT_BASE_CONFIG = {
     cameraZoom: 2.05,
 };
 
+// Neat frames a "ribbon" with an orthographic camera whose *vertical* extent is
+// fixed: the horizontal half-width is `25 * aspect / zoom` while the canvas is
+// landscape, but the moment it turns portrait the width stops following the
+// aspect and pins at `25 * 1.05 / zoom`. See updateCamera() in @firecms/neat.
+const RIBBON_HALF_SIZE = 25;
+// The canvas shape the divider camera offsets below were composed against
+// (a 600px-tall divider on a ~1440px desktop).
+const REFERENCE_ASPECT = 2.4;
+
+function frustumHalfWidth(aspect: number, zoom: number) {
+    return (aspect >= 1 ? RIBBON_HALF_SIZE * aspect : RIBBON_HALF_SIZE * 1.05) / zoom;
+}
+
 const VARIANT_OVERRIDES: Record<string, Partial<any>> = {
     hero: {},
     a: {
@@ -148,20 +161,43 @@ const VARIANT_OVERRIDES: Record<string, Partial<any>> = {
     },
 };
 
+// Neat reads cameraX once, at construction, so the framing above can only follow
+// a rotation by rebuilding the gradient. Orientation flips are rare enough that
+// paying for a shader recompile is fine; plain resizes are left alone.
+function useOrientation() {
+    const [portrait, setPortrait] = useState(false);
+
+    useEffect(() => {
+        const query = window.matchMedia?.("(orientation: portrait)");
+        if (!query) return;
+        setPortrait(query.matches);
+        const onChange = (event: MediaQueryListEvent) => setPortrait(event.matches);
+        query.addEventListener("change", onChange);
+        return () => query.removeEventListener("change", onChange);
+    }, []);
+
+    return portrait;
+}
+
 export function NeatBackground({ variant = "hero", randomize = true }: { variant?: "hero" | "a" | "b"; randomize?: boolean }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const portrait = useOrientation();
 
     useEffect(() => {
         if (!canvasRef.current) return;
 
-        // Respect users who prefer reduced motion: skip the animated WebGL gradient entirely.
-        // The surrounding sections have their own dark backgrounds, so this degrades gracefully.
+        // Respect users who prefer reduced motion. This used to skip the gradient
+        // outright, which is a bigger concession than the preference asks for and
+        // costs more than it looks: iOS Safari reports `reduce` for the whole of
+        // Low Power Mode, so a phone on a low battery lost every gradient on the
+        // page and got flat black in their place. Keep the art, drop the motion —
+        // speed 0 freezes the shader clock, so it renders as a still image.
         const prefersReducedMotion =
             typeof window !== "undefined" &&
             window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-        if (prefersReducedMotion) return;
 
         const config = { ...NEAT_BASE_CONFIG, ...(VARIANT_OVERRIDES[variant] ?? {}) };
+        if (prefersReducedMotion) config.speed = 0;
 
         // Add a tiny touch of randomness to position/shape so each instance feels unique (if enabled)
         // Only affects camera position and shape — never colors or textures.
@@ -188,6 +224,23 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
         const startGradient = () => {
             if (cancelled || !NeatGradient) return;
 
+            // The divider variants park the camera 25-30 world units to one side, which
+            // puts the ribbon's centre at the edge of frame on a wide canvas. On a phone
+            // the frustum is less than half as wide, so that same offset lands the camera
+            // past the end of the ribbon (which only spans +/-25) and the divider renders
+            // as a black band with a sliver of art in one corner. Re-express the offset as
+            // a fraction of the frustum we actually get. Never scale it up: at or above the
+            // reference aspect this is a no-op, so wide screens keep their composition.
+            const aspect = canvas.clientWidth / canvas.clientHeight;
+            if (Number.isFinite(aspect) && aspect > 0) {
+                const zoom = config.cameraZoom ?? 1;
+                const framing = Math.min(
+                    1,
+                    frustumHalfWidth(aspect, zoom) / frustumHalfWidth(REFERENCE_ASPECT, zoom),
+                );
+                config.cameraX = (config.cameraX ?? 0) * framing;
+            }
+
             neat = new NeatGradient({
                 ref: canvas,
                 ...config,
@@ -210,6 +263,16 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
             addEventListener("load", scheduleGradient, { once: true });
         }
 
+        // Scroll parallax is motion too, so reduced-motion viewers keep the still
+        // frame the config above froze rather than having it driven by the page.
+        if (prefersReducedMotion) {
+            return () => {
+                cancelled = true;
+                removeEventListener("load", scheduleGradient);
+                if (neat) neat.destroy();
+            };
+        }
+
         scrollHandler = () => {
             if (!neat) return;
             if (variant === "hero") {
@@ -230,7 +293,7 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
             if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
             if (neat) neat.destroy();
         };
-    }, [variant, randomize]);
+    }, [variant, randomize, portrait]);
 
     if (variant === "hero") {
         return (

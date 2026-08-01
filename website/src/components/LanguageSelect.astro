@@ -25,6 +25,7 @@ const { iconOnly = false } = Astro.props;
                 {Object.entries(languages).map(([code, label]) => (
                         <option
                                 value={code === "en" ? currentUnlocalizedPath : `/${code}${currentUnlocalizedPath}`}
+                                data-lang={code}
                                 selected={code === currentLang}
                         >
                             {label}
@@ -47,6 +48,7 @@ const { iconOnly = false } = Astro.props;
                 {Object.entries(languages).map(([code, label]) => (
                         <option
                                 value={code === "en" ? currentUnlocalizedPath : `/${code}${currentUnlocalizedPath}`}
+                                data-lang={code}
                                 selected={code === currentLang}
                         >
                             {label}
@@ -68,20 +70,14 @@ const { iconOnly = false } = Astro.props;
             const select = this.querySelector('select');
             if (!select) return;
 
-            // Sync select to the current URL path on init (handles Firebase Hosting
-            // auto-redirects based on Accept-Language that may conflict with user choice)
-            this._syncToCurrentPath(select);
+            // Show the language actually being rendered, not the one the URL implies
+            this._syncToRenderedLang(select);
 
             select.addEventListener('change', (e) => {
                 if (e.currentTarget instanceof HTMLSelectElement) {
+                    const option = e.currentTarget.selectedOptions[0];
                     const targetPath = e.currentTarget.value;
-                    // Persist the user's explicit language preference
-                    try {
-                        const knownLangs = ['es', 'de', 'fr'];
-                        const firstSegment = targetPath.split('/').filter(Boolean)[0];
-                        const lang = knownLangs.includes(firstSegment) ? firstSegment : 'en';
-                        localStorage.setItem('preferred-lang', lang);
-                    } catch (_) {}
+                    this._persistLang(option?.dataset.lang);
                     window.location.pathname = targetPath;
                 }
             });
@@ -91,8 +87,36 @@ const { iconOnly = false } = Astro.props;
             // not the user's explicit choice)
             window.addEventListener('pageshow', (event) => {
                 if (!event.persisted) return;
-                this._syncToCurrentPath(select);
+                this._syncToRenderedLang(select);
             });
+        }
+
+        // Firebase Hosting content-negotiates "/" against Accept-Language (the
+        // `i18n` block in firebase.json), so a Spanish phone gets Spanish HTML at
+        // the English URL. `firebase-language-override` is the documented way to
+        // pin that: without it, picking "English" navigates to "/" and Firebase
+        // negotiates straight back to Spanish, with no way out of the loop.
+        _persistLang(lang: string | undefined) {
+            if (!lang) return;
+            try {
+                const secure = window.location.protocol === 'https:' ? '; secure' : '';
+                document.cookie = `firebase-language-override=${lang}; path=/; max-age=31536000; samesite=lax${secure}`;
+            } catch (_) {}
+        }
+
+        // The URL is not the source of truth while negotiation is on: "/" can render
+        // any locale. What was actually served is, so read it off <html lang>.
+        _syncToRenderedLang(select: HTMLSelectElement) {
+            const rendered = document.documentElement.lang;
+            if (rendered) {
+                for (let i = 0; i < select.options.length; i++) {
+                    if (select.options[i].dataset.lang === rendered) {
+                        select.selectedIndex = i;
+                        return;
+                    }
+                }
+            }
+            this._syncToCurrentPath(select);
         }
 
         _syncToCurrentPath(select: HTMLSelectElement) {
