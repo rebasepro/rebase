@@ -7,6 +7,7 @@ import { rebaseReviver } from "./reviver";
 // `import { RebaseApiError } from ".../transport"` path used across the SDK.
 export { RebaseApiError } from "@rebasepro/types";
 export type { RebaseErrorInit } from "@rebasepro/types";
+import { RebaseClientError } from "@rebasepro/types";
 
 export interface RebaseClientConfig {
     /**
@@ -133,6 +134,47 @@ export const ANONYMOUS_SERVER_CLIENT_WARNING =
 export type FindParams<M extends Record<string, unknown> = Record<string, unknown>> = TypesFindParams<M>;
 export type FindResponse<T> = TypesFindResponse<T extends Record<string, unknown> ? T : Record<string, unknown>>;
 
+/**
+ * Refuse a filter whose *value* is missing.
+ *
+ * `where: { status: ["==", undefined] }` used to serialize to the literal
+ * string, so `status=eq.undefined` went out on the wire and the server dutifully
+ * looked for rows whose status is the four-letter word "undefined". The caller
+ * saw an empty page, not an error — the classic shape of a variable that was
+ * never set.
+ *
+ * Dropping the condition instead would be worse than sending it: the query
+ * would come back *unfiltered*, which for an ownership or tenant filter means
+ * returning rows the caller never asked to see. So this is a hard error, and
+ * both correct spellings are named in the message: omit the key to skip the
+ * filter, or use `["is-null", null]` to match SQL NULL (which still
+ * serializes — `null` is a value, `undefined` is the absence of one).
+ */
+function assertNoUndefinedFilterValues(where: Record<string, unknown>): void {
+    const reject = (field: string, op: unknown): never => {
+        throw new RebaseClientError(
+            `Filter on "${field}" has an undefined value (["${String(op)}", undefined]). `
+            + `Omit "${field}" from \`where\` to skip the filter, or use ["is-null", null] to match SQL NULL.`
+        );
+    };
+
+    for (const [field, condition] of Object.entries(where)) {
+        // An entirely absent condition is the documented way to skip a filter.
+        if (condition === undefined) continue;
+        if (!Array.isArray(condition)) continue;
+
+        // Either one `[op, value]` tuple or an array of them.
+        const tuples = Array.isArray(condition[0]) ? condition as unknown[][] : [condition as unknown[]];
+        for (const tuple of tuples) {
+            if (!Array.isArray(tuple) || tuple.length !== 2) continue;
+            const [op, value] = tuple;
+            if (value === undefined) reject(field, op);
+            // `["in", [...]]` — a hole in the list is the same mistake.
+            if (Array.isArray(value) && value.some(v => v === undefined)) reject(field, op);
+        }
+    }
+}
+
 export function buildQueryString(params?: FindParams): string {
     if (!params) return "";
     const parts: string[] = [];
@@ -161,6 +203,7 @@ export function buildQueryString(params?: FindParams): string {
     }
 
     if (params.where) {
+        assertNoUndefinedFilterValues(params.where);
         const serialized = serializeFilter(params.where);
         for (const [field, value] of Object.entries(serialized)) {
             if (Array.isArray(value)) {

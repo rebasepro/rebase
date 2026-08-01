@@ -15,6 +15,25 @@ import { RelationService } from "../src/services/RelationService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import type { CollectionConfig, Relation } from "@rebasepro/types";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { inArray } from "drizzle-orm";
+
+// The `where()` mock below is a no-op that returns the chain, so nothing about
+// the emitted predicate is otherwise observable: sending 50 duplicate FK values
+// instead of 1 looks exactly like sending 1. Spying on the real `inArray` (which
+// still runs) is what lets the dedup assertions see the id list.
+jest.mock("drizzle-orm", () => {
+    const actual = jest.requireActual("drizzle-orm");
+    return { ...actual,
+        inArray: jest.fn((...args: unknown[]) => (actual.inArray as (...a: unknown[]) => unknown)(...args)) };
+});
+
+const inArrayMock = inArray as unknown as jest.Mock;
+
+/** Values the Nth `inArray(column, values)` call was given. */
+function inArrayValues(callIndex: number): unknown[] {
+    expect(inArrayMock.mock.calls.length).toBeGreaterThan(callIndex);
+    return inArrayMock.mock.calls[callIndex][1] as unknown[];
+}
 
 // ─── Mock Tables ──────────────────────────────────────────────────
 const mockAuthorsTable = {
@@ -153,6 +172,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", (
     }
 
     beforeEach(() => {
+        inArrayMock.mockClear();
         registry = new PostgresCollectionRegistry();
 
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
@@ -283,6 +303,13 @@ name: "Shared Author" }];
 
         // Still exactly 2 queries
         expect(selectCallCount).toBe(2);
+
+        // The FK lookup still asks for every parent…
+        expect(inArrayValues(0)).toHaveLength(NUM_POSTS);
+        // …but the target fetch must collapse the 50 identical FK values to one.
+        // A query count of 2 alone does not prove this: `IN (1,1,1,…)` is also
+        // one query, and it is what ships to Postgres if the dedup set is lost.
+        expect(inArrayValues(1)).toEqual([1]);
 
         // All 50 posts should resolve to the same author
         for (const post of sameAuthorPosts) {

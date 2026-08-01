@@ -4,22 +4,22 @@ import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 describe("CollectionRegistry Dual-Layer Store", () => {
     it("preserves un-mutated definitions when resolving relations", () => {
         const postsCollection: CollectionConfig = {
-            id: "posts",
             name: "Posts",
             slug: "posts", // `get()` resolves against table or slug!
             table: "posts",
             properties: {
-                title: { type: "string" }
+                title: { name: "Title",
+type: "string" }
             }
         };
 
         const rawAuthorsCollection: CollectionConfig = {
-            id: "authors",
             name: "Authors",
             slug: "authors",
             table: "authors",
             properties: {
                 author_posts: {
+                    name: "Posts",
                     type: "relation",
                     relation: {
                         kind: "hasMany",
@@ -29,9 +29,11 @@ describe("CollectionRegistry Dual-Layer Store", () => {
                     }
                 },
                 map_field: {
+                    name: "Map field",
                     type: "map",
                     properties: {
                         nested_relation: {
+                            name: "Nested posts",
                             type: "relation",
                             relation: {
                                 kind: "hasMany",

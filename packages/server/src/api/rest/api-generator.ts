@@ -3,7 +3,7 @@ import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError, isRebaseApiError } from "../errors";
 import { parseQueryOptions, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
-import { assertKnownWriteFields } from "./write-validation";
+import { assertKnownWriteFields, projectResponseFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
@@ -212,6 +212,9 @@ export class RestApiGenerator {
                     collection.slug,
                     {
                         filter: queryOptions.where,
+                        // `?or=`/`?and=` were parsed and then dropped right here,
+                        // so a filtered read returned every row RLS allowed.
+                        logical: queryOptions.logical,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
                         orderBy: queryOptions.orderBy?.[0]?.field,
@@ -226,7 +229,12 @@ export class RestApiGenerator {
             const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
             return c.json({
-                data: entities,
+                data: projectResponseFields(
+                    entities as Record<string, unknown>[],
+                    queryOptions.fields,
+                    resolvedCollection,
+                    { include: queryOptions.include }
+                ),
                 meta: {
                     total,
                     limit: queryOptions.limit,
@@ -254,7 +262,12 @@ export class RestApiGenerator {
                 throw ApiError.notFound("Entity not found");
             }
 
-            return c.json(entity);
+            return c.json(projectResponseFields(
+                [entity as Record<string, unknown>],
+                queryOptions.fields,
+                resolvedCollection,
+                { include: queryOptions.include }
+            )[0]);
         });
 
         // POST /collection/bulk - Write many rows as one transaction.
@@ -557,7 +570,15 @@ values: entity as Record<string, unknown> },
         // or "authors/111094/posts" into
         // { collectionPath: "authors/111094/posts", id: undefined }
         const parseSubPath = (rawPath: string): { collectionPath: string; id?: string } | null => {
-            const segments = rawPath.split("/").filter(s => s && s !== "undefined");
+            const segments = rawPath.split("/").filter(Boolean);
+            // A literal "undefined" segment is a client that interpolated a
+            // variable it did not have. The whole-`rest` case is already refused
+            // by the route guards above; this used to *drop* the segment, so
+            // `/authors/123/undefined/posts` was quietly answered with the
+            // contents of `/authors/123/posts`. Serving a path nobody asked for
+            // is worse than refusing the one they did: the caller gets rows,
+            // concludes the address it built was right, and the bug ships.
+            if (segments.some(s => s === "undefined")) return null;
             // Need at least 3 segments for a subcollection path (parent/id/child)
             if (segments.length < 3) return null;
 
@@ -630,6 +651,9 @@ id: parsed.id });
                 const fetchService = driver.restFetchService;
                 const listOptions = {
                     filter: queryOptions.where,
+                    // Same omission the comment above describes, one parameter
+                    // later: parsed, then dropped, so `?or=` widened the read.
+                    logical: queryOptions.logical,
                     limit: queryOptions.limit,
                     offset: queryOptions.offset,
                     orderBy: queryOptions.orderBy?.[0]?.field,
@@ -644,6 +668,7 @@ id: parsed.id });
                 const total = driver.count ? await driver.count({
                     path: parsed.collectionPath,
                     filter: queryOptions.where,
+                    logical: queryOptions.logical,
                     searchString
                 }) : entities.length;
 
@@ -780,6 +805,10 @@ id: parsed.id });
             path: getCollectionDataPath(collection),
             collection,
             filter: queryOptions.where,
+            // The fallback every driver without a `restFetchService` uses —
+            // mongo, firebase, anything a developer registers. It dropped the
+            // group exactly as the Postgres path did.
+            logical: queryOptions.logical,
             limit: queryOptions.limit,
             orderBy: queryOptions.orderBy?.[0]?.field,
             order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
@@ -799,6 +828,9 @@ id: parsed.id });
             path: getCollectionDataPath(collection),
             collection,
             filter: queryOptions.where,
+            // Counted as well as fetched, or `total` describes a different set
+            // of rows from the one that was served.
+            logical: queryOptions.logical,
             searchString
         }) : 0;
     }

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import type { HonoEnv } from "../api/types";
 import { safeCompare } from "../auth/crypto-utils";
+import { extractBearerToken } from "../auth/bearer-token";
 
 /**
  * Runtime metrics, in Prometheus text format.
@@ -327,8 +328,7 @@ export function createMetricsRoutes(registry: MetricsRegistry, token?: string): 
 
     router.get("/", (c) => {
         if (token) {
-            const header = c.req.header("authorization") ?? "";
-            const provided = header.startsWith("Bearer ") ? header.slice(7) : "";
+            const provided = extractBearerToken(c.req.header("authorization")) ?? "";
             if (!provided || !safeCompare(provided, token)) {
                 return c.text("Unauthorized", 401);
             }

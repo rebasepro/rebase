@@ -1,10 +1,10 @@
-import { and, asc, count, desc, eq, getTableName, gt, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
+import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, lt, or, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, ResolvedRelation, LogicalCondition, isManyToMany } from "@rebasepro/types";
 import type { VectorSearchParams } from "@rebasepro/types";
 import { resolveCollectionRelations, findRelation, createRelationRef, createRelationRefWithData } from "@rebasepro/common";
 import { generateForeignKeyName } from "@rebasepro/utils";
-import { DrizzleConditionBuilder, type FilterCompilationOptions } from "../utils/drizzle-conditions";
+import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
     getTableForCollection,
@@ -22,7 +22,7 @@ import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { toCmsRow, toRestRow, isJunctionRelation } from "./row-pipeline";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
-import { logger } from "@rebasepro/server";
+import { ApiError, logger } from "@rebasepro/server";
 
 /** Type-safe accessor for Drizzle's relational query API via dynamic table name */
 type DbQueryAccessor = Record<string, RelationalQueryBuilder<any, any>> | undefined;
@@ -129,12 +129,10 @@ export class FetchService {
         if (direct) return direct;
 
         // Owning relation, resolved: the relation names its own local key.
-        if (collection) {
-            const relation = resolveCollectionRelations(collection)[orderBy];
-            if (relation?.kind === "belongsTo") {
-                const foreignKey = columnAt(relation.localKey);
-                if (foreignKey) return foreignKey;
-            }
+        const declaredRelation = collection ? resolveCollectionRelations(collection)[orderBy] : undefined;
+        if (declaredRelation?.kind === "belongsTo") {
+            const foreignKey = columnAt(declaredRelation.localKey);
+            if (foreignKey) return foreignKey;
         }
 
         // No collection in hand — the two shapes an owning relation's key takes
@@ -145,7 +143,61 @@ export class FetchService {
             if (foreignKey) return foreignKey;
         }
 
-        return undefined;
+        // Nothing resolved. Returning `undefined` is exactly what the docblock
+        // above describes: the caller drops the ORDER BY and hands back rows in
+        // whatever order Postgres pleases, while the requester believes they
+        // are sorted. `?orderBy=titel` answered 200 with unsorted data and no
+        // hint that the sort had been ignored.
+        //
+        // A *filter* naming a field that does not exist is already refused for
+        // precisely this reason — it "used to widen results silently". An
+        // unresolvable sort field is the same drift between a query and the
+        // schema, so it answers the same way and honours the same switch: one
+        // knob, because a deployment that wants the lenient behaviour wants it
+        // for both.
+        const collectionName = collection?.slug ?? collection?.name;
+        const onCollection = collectionName ? ` on collection '${collectionName}'` : "";
+
+        // A declared to-many relation is a different mistake from a typo, and
+        // saying "unknown field" about a field the collection plainly declares
+        // sends the reader looking for a spelling error that is not there.
+        // There is simply no single value per row to order by — `posts.tags` is
+        // a set — so no ORDER BY exists to write, with or without a typo.
+        if (declaredRelation && declaredRelation.kind !== "belongsTo") {
+            throw ApiError.badRequest(
+                `Cannot sort by '${orderBy}'${onCollection}: it is a to-many relation ` +
+                `(${declaredRelation.kind}), which has no single value per row to order by.`,
+                "ORDER_BY_FIELD_NOT_SORTABLE",
+                { field: orderBy, kind: declaredRelation.kind, ...(collectionName && { collection: collectionName }) }
+            );
+        }
+
+        if (getUnknownFilterFieldsMode() === "warn") {
+            logger.warn(
+                `Sorting by field '${orderBy}'${onCollection}, but it does not exist in the table — ` +
+                "the ORDER BY was dropped and these rows are unsorted."
+            );
+            return undefined;
+        }
+
+        let validFields: string[] = [];
+        try {
+            validFields = Object.keys(getTableColumns(table)).sort();
+        } catch {
+            // A table stand-in without Drizzle's column symbols — the message
+            // is worth less without the list, but not worth failing over.
+        }
+
+        throw ApiError.badRequest(
+            `Unknown orderBy field '${orderBy}'${onCollection}` +
+            (validFields.length > 0 ? `. Valid fields: ${validFields.join(", ")}` : ""),
+            "UNKNOWN_ORDER_BY_FIELD",
+            {
+                field: orderBy,
+                ...(collectionName && { collection: collectionName }),
+                ...(validFields.length > 0 && { validFields })
+            }
+        );
     }
 
     /**
@@ -942,6 +994,7 @@ relatedTo: hop });
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            logical?: LogicalCondition;
             searchString?: string;
             databaseId?: string;
         } = {}
@@ -971,6 +1024,13 @@ relatedTo: hop });
         if (options.filter) {
             const filterConditions = this.buildFilterConditions(options.filter, table, effectivePath);
             if (filterConditions.length > 0) allConditions.push(...filterConditions);
+        }
+
+        if (options.logical) {
+            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(
+                options.logical, table, effectivePath, this.filterContext(effectivePath, table)
+            );
+            if (logicalCondition) allConditions.push(logicalCondition);
         }
 
         if (allConditions.length > 0) {
@@ -1043,6 +1103,8 @@ relatedTo: hop });
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            /** An `or(...)`/`and(...)` group, applied alongside `filter`. */
+            logical?: LogicalCondition;
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;

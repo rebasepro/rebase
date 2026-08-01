@@ -36,13 +36,17 @@ describe("data-source routing pipeline (RebaseNavigation wiring)", () => {
     const dsRegistry = createDataSourceRegistry(definitions);
 
     const products: CollectionConfig = {
-        id: "products", name: "Products", path: "products", slug: "products",
-        table: "products", properties: { title: { type: "string" } }
+        name: "Products", slug: "products",
+        table: "products", properties: { title: { name: "Title",
+type: "string" } }
     } as CollectionConfig;
 
     const events: CollectionConfig = {
-        id: "events", name: "Events", path: "events", slug: "events",
-        dataSource: "analytics", properties: { title: { type: "string" } }
+        // `table` + `dataSource` and no `engine`: the author names a data source
+        // and lets the registry resolve the engine from its definition.
+        name: "Events", slug: "events", table: "events",
+        dataSource: "analytics", properties: { title: { name: "Title",
+type: "string" } }
     } as CollectionConfig;
 
     function buildRouted() {

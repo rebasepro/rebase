@@ -64,7 +64,14 @@ width: 800 }
             });
 
             const formData = mockTransport.request.mock.calls[0][1]!.body as FormData;
-            expect(formData.get("file")).toBeDefined();
+            // FormData.get() returns null for an absent key, and null IS
+            // "defined" — so the file part has to be identified by its contents,
+            // not merely probed for existence.
+            const filePart = formData.get("file") as File;
+            expect(filePart).toBeInstanceOf(File);
+            expect(filePart.name).toBe("photo.jpg");
+            expect(filePart.type).toBe("image/jpeg");
+            await expect(filePart.text()).resolves.toBe("data");
             expect(formData.get("key")).toBe("images/photo.jpg");
             expect(formData.get("bucket")).toBe("media");
             expect(formData.get("metadata_alt")).toBe("A photo");
@@ -82,7 +89,10 @@ key: "file.bin" });
             expect(result).toEqual({ key: "file.bin" });
 
             const formData = mockTransport.request.mock.calls[0][1]!.body as FormData;
-            expect(formData.get("file")).toBeDefined();
+            const filePart = formData.get("file") as File;
+            expect(filePart).toBeInstanceOf(File);
+            expect(filePart.name).toBe("file.bin");
+            await expect(filePart.text()).resolves.toBe("data");
             expect(formData.get("key")).toBe("file.bin");
             expect(formData.get("bucket")).toBeNull();
         });

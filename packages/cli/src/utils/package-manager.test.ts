@@ -9,9 +9,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import os from "os";
+
+// The real `spawnSync`, wrapped in a spy: detection behaves exactly as it does
+// on this machine, and the caching test can count how many processes it cost.
+vi.mock("child_process", async (importOriginal) => {
+    const actual = await importOriginal<typeof import("child_process")>();
+    return { ...actual,
+spawnSync: vi.fn(actual.spawnSync) };
+});
+import { spawnSync } from "child_process";
+
 import {
     detectPackageManager,
     getPMCommands,
+    isPnpmAvailable,
     pnpmAvailabilityFromProbe,
     resetPnpmAvailabilityCache
 } from "./package-manager";
@@ -277,12 +288,56 @@ describe("pnpmAvailabilityFromProbe", () => {
 });
 
 describe("pnpm probe caching", () => {
-    it("resetPnpmAvailabilityCache lets a fresh probe run", () => {
+
+    const probeCalls = () =>
+        vi.mocked(spawnSync).mock.calls.filter(([bin]) => bin === "pnpm").length;
+
+    beforeEach(() => {
+        vi.mocked(spawnSync).mockClear();
+        resetPnpmAvailabilityCache();
+    });
+
+    afterEach(() => {
+        resetPnpmAvailabilityCache();
+    });
+
+    it("probes once and reuses the answer", () => {
         // Detection is called several times in one CLI run; without memoisation
         // each call spawned its own process, multiplying the chance that one of
-        // them hit the timeout.
+        // them hit the timeout. Counting spawns is the only thing that shows
+        // the memoisation is still there — the old assertions held with the
+        // cache deleted.
+        const first = isPnpmAvailable();
+        expect(probeCalls()).toBe(1);
+
+        for (let i = 0; i < 5; i++) expect(isPnpmAvailable()).toBe(first);
+        expect(probeCalls()).toBe(1);
+
+        // ...and through the caller that matters: an empty dir has no lock file,
+        // so detection falls through to the probe every time.
+        detectPackageManager(tmpDir);
+        detectPackageManager(tmpDir);
+        expect(probeCalls()).toBe(1);
+    });
+
+    it("resetPnpmAvailabilityCache lets a fresh probe run", () => {
+        isPnpmAvailable();
+        expect(probeCalls()).toBe(1);
+
         resetPnpmAvailabilityCache();
-        expect(() => detectPackageManager(tmpDir)).not.toThrow();
-        expect(detectPackageManager(tmpDir)).toBe(detectPackageManager(tmpDir));
+        isPnpmAvailable();
+        expect(probeCalls()).toBe(2);
+    });
+
+    it("caches a negative answer too, rather than re-probing a missing binary", () => {
+        vi.mocked(spawnSync).mockReturnValueOnce({
+            status: null,
+            signal: null,
+            error: Object.assign(new Error("ENOENT"), { code: "ENOENT" })
+        } as unknown as ReturnType<typeof spawnSync>);
+
+        expect(isPnpmAvailable()).toBe(false);
+        expect(isPnpmAvailable()).toBe(false);
+        expect(probeCalls()).toBe(1);
     });
 });

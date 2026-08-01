@@ -98,7 +98,7 @@ describe("getGeneratedPolicyNames", () => {
             securityRules: [{ operation: "select", using: "true" }]
         } as Partial<CollectionConfig>);
 
-        const declaredOnly = getPolicyNamesForRules(c.securityRules ?? [], "authors");
+        const declaredOnly = getPolicyNamesForRules([...(c.securityRules ?? [])], "authors");
         const generated = getGeneratedPolicyNames(c);
 
         for (const name of declaredOnly) expect(generated.has(name)).toBe(true);

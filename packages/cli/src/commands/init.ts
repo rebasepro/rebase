@@ -1008,6 +1008,32 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             `REBASE_SERVICE_KEY=${serviceKey}`
         );
 
+        // Read back rather than hardcoded, so this tracks whatever PORT the
+        // generated .env ends up carrying. `docker-compose.yml` publishes the
+        // api as `${PORT:-3001}:3001`.
+        const composeApiPort = /^PORT=(\d+)/m.exec(envContent)?.[1] ?? "3001";
+
+        // Also ships commented out, and left that way the very first command
+        // this project tells you to run does not work.
+        //
+        // `docker-compose.yml` declares `CORS_ORIGINS: ${CORS_ORIGINS:?…}` on
+        // the `api` service — deliberately required, because an API that
+        // guesses its allowed origins eventually allows the wrong one. But
+        // Compose interpolates the WHOLE file before selecting services, so
+        // `docker compose up -d db` — step 1 of the "Next steps" printed at the
+        // end of `rebase init` — failed on a variable the `db` service does not
+        // use. So did `docker compose config`: the file could not be read at all.
+        //
+        // The guard is right; a generated project should satisfy it. The compose
+        // stack serves the bundled admin from the `api` container on ${PORT},
+        // so that is the origin a browser loads it from. A deployment still has
+        // to set its own, and gets a visible CORS failure rather than a silent
+        // one if it forgets.
+        envContent = envContent.replace(
+            /^#\s*CORS_ORIGINS=.*$/m,
+            `CORS_ORIGINS=http://localhost:${composeApiPort}`
+        );
+
         // Pin the runtime image `docker-compose.yml` pulls.
         //
         // The compose file reads `rebasepro/server:${REBASE_VERSION:-latest}`,

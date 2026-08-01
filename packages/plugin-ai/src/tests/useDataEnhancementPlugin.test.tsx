@@ -18,7 +18,7 @@ if (typeof window !== "undefined") {
 }
 
 import { renderHook } from "@testing-library/react";
-import { useDataEnhancementPlugin } from "../useDataEnhancementPlugin";
+import { DEFAULT_API_KEY, useDataEnhancementPlugin } from "../useDataEnhancementPlugin";
 
 jest.mock("@rebasepro/admin", () => ({
     useUrlController: () => ({})
@@ -29,12 +29,21 @@ describe("useDataEnhancementPlugin hook", () => {
         const { result } = renderHook(() => useDataEnhancementPlugin());
         const plugin = result.current;
 
-        expect(plugin.key).toBe("data_enhancement");
-        expect(plugin.slots).toBeDefined();
-        expect(plugin.slots[0].slot).toBe("form.actions");
-        expect(plugin.providers).toBeDefined();
-        expect(plugin.providers[0].scope).toBe("form");
-        expect(plugin.providers[0].props.apiKey).toBe("fcms-U9jdDii0xXWSDC34asfrf54lbkFJBfKfRWcEDEwdc4V5wDWEDF");
+        // Matched as one shape rather than indexed field by field. `slots` and
+        // `providers` are optional on `Plugin`, and a preceding
+        // `expect(...).toBeDefined()` does not narrow them for TypeScript — so
+        // the indexed form only compiled because nothing type-checked this file.
+        // `toMatchObject` needs no narrowing and pins the fields together, which
+        // is what "correct metadata" actually means.
+        //
+        // `apiKey` is compared against the exported constant, not a copy of it:
+        // a copy pins the key rather than the wiring that hands it to the
+        // provider.
+        expect(plugin).toMatchObject({
+            key: "data_enhancement",
+            slots: [{ slot: "form.actions" }],
+            providers: [{ scope: "form", props: { apiKey: DEFAULT_API_KEY } }]
+        });
     });
 
     it("accepts and forwards custom apiKey and host props", () => {
@@ -45,7 +54,8 @@ describe("useDataEnhancementPlugin hook", () => {
         const { result } = renderHook(() => useDataEnhancementPlugin(customProps));
         const plugin = result.current;
 
-        expect(plugin.providers[0].props.apiKey).toBe("custom-key");
-        expect(plugin.providers[0].props.host).toBe("https://custom-host.com");
+        expect(plugin).toMatchObject({
+            providers: [{ props: { apiKey: "custom-key", host: "https://custom-host.com" } }]
+        });
     });
 });

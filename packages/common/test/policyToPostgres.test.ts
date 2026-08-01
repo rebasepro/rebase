@@ -66,7 +66,9 @@ describe("policyToPostgres — existsIn (membership)", () => {
             collection: "team_members",
             where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
         });
-        expect(evaluatePolicy(expr, { uid: "u1", roles: [] })).toBe("unknown");
+        expect(evaluatePolicy(expr, { uid: "u1",
+roles: [],
+entity: null })).toBe("unknown");
     });
 });
 
@@ -155,6 +157,55 @@ describe("authUid operand", () => {
         const notAnon = policy.compare(policy.authUid(), "neq", policy.literal(ANONYMOUS_USER_ID));
         expect(evaluatePolicy(notAnon, { uid: null, entity: null })).toBe(false);
         expect(evaluatePolicy(notAnon, { uid: "u1", entity: null })).toBe(true);
+    });
+});
+
+/*
+ * Keyword detection has to see word boundaries.
+ *
+ * `isKeywordAt` exists so that a column named `brand` is not split into
+ * `br AND d`, and `border` into `b OR der`. Nothing tested it: mutation flipped
+ * the `&&` joining the before/after boundary checks to `||` — which makes a
+ * keyword match whenever *either* side is a boundary — and the whole package
+ * suite stayed green.
+ *
+ * This parser has already shipped one real defect (an AND hoisted out of an
+ * EXISTS), and it decides how a security rule is understood, so a
+ * mis-tokenised column name is not a cosmetic failure.
+ */
+describe("sqlToPolicy tokenises on word boundaries", () => {
+    const roundTrips = (sql: string) => {
+        const expr = sqlToPolicy(sql);
+        // A rule it cannot parse is preserved verbatim as `raw`; that is the
+        // documented fallback and is what a mis-tokenised name must NOT do
+        // silently in the middle of an otherwise-parsed expression.
+        return expr;
+    };
+
+    it.each([
+        ["brand", "a column containing AND"],
+        ["border", "a column containing OR"],
+        ["notes", "a column containing NOT"],
+        ["android_id", "AND at the start"],
+        ["organisation", "OR at the start"]
+    ])("does not split %s (%s)", (column) => {
+        const expr = roundTrips(`${column} = 'x'`);
+
+        // Whatever shape it produces, it must be ONE comparison — not an
+        // and/or tree invented out of the column's own letters.
+        expect(expr.kind).not.toBe("and");
+        expect(expr.kind).not.toBe("or");
+    });
+
+    it("still splits on a real keyword with spaces around it", () => {
+        expect(sqlToPolicy("a = 'x' AND b = 'y'").kind).toBe("and");
+        expect(sqlToPolicy("a = 'x' OR b = 'y'").kind).toBe("or");
+    });
+
+    it("still splits on a keyword bounded by parentheses rather than spaces", () => {
+        // The boundary class is [\s()], so `(a = 'x')AND(b = 'y')` is a real
+        // conjunction even with no whitespace.
+        expect(sqlToPolicy("(a = 'x')AND(b = 'y')").kind).toBe("and");
     });
 });
 

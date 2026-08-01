@@ -78,7 +78,47 @@ name: "A" } as Property,
 name: "B" } as Property
         };
         const order = buildPropertiesOrder(properties, ["b", "a"]);
-        expect(order).toEqual(["a", "b"]); // sorted alphabetically then by priority
+        expect(order).toEqual(["b", "a"]);
+    });
+
+    it("keeps a provided order even when a key would otherwise be prioritized", () => {
+        const properties: Properties = {
+            zzz: { type: "string",
+name: "ZZZ" } as Property,
+            title: { type: "string",
+name: "Title" } as Property
+        };
+        // "title" outranks everything when the order is derived; an explicit
+        // order is a decision that has already been made and must outrank that.
+        expect(buildPropertiesOrder(properties, ["zzz", "title"])).toEqual(["zzz", "title"]);
+    });
+
+    it("appends properties the provided order does not mention", () => {
+        const properties: Properties = {
+            b: { type: "string",
+name: "B" } as Property,
+            description: { type: "string",
+name: "Description" } as Property,
+            title: { type: "string",
+name: "Title" } as Property
+        };
+        // A newly inferred column still has to show up, ranked as it would be
+        // if the whole order had been derived.
+        expect(buildPropertiesOrder(properties, ["b"])).toEqual(["b", "title", "description"]);
+    });
+
+    it("does not reorder the array it was given", () => {
+        const properties: Properties = {
+            a: { type: "string",
+name: "A" } as Property,
+            title: { type: "string",
+name: "Title" } as Property
+        };
+        // Sorting in place mutated the caller's collection config, so the
+        // *stored* order changed as a side effect of asking what it was.
+        const providedOrder = ["a", "title"];
+        buildPropertiesOrder(properties, providedOrder);
+        expect(providedOrder).toEqual(["a", "title"]);
     });
 
     it("handles empty properties", () => {

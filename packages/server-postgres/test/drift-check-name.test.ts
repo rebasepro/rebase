@@ -61,6 +61,12 @@ table: "usage_daily" }), ["usage-daily"])
         // The invariant the bug violated, stated directly: whatever comes back
         // is either what the author wrote or something the registry actually
         // holds. A name assembled from neither is unfindable by definition.
+        //
+        // The slug is only one of those things when no `table` is declared —
+        // there the slug IS the table name. Once a `table` is declared the slug
+        // names nothing, so it must not sit in the acceptable set: that is what
+        // the production bug reported, and an acceptable set that always
+        // included the slug would have watched it go by.
         const cases: Array<{ col: CollectionConfig; registered: string[] }> = [
             { col: relational({ slug: "usage-daily",
 table: "usage_daily" }),
@@ -77,9 +83,8 @@ registered: [] }
         for (const { col, registered } of cases) {
             const resolved = resolveDriftCheckName(col, registered);
             const declared = (col as PostgresCollectionConfig).table;
-            const acceptable = [declared, ...registered, col.slug].filter(Boolean);
+            const acceptable = declared ? [declared] : [...registered, col.slug];
             expect(acceptable).toContain(resolved);
-            if (declared) expect(resolved).toBe(declared);
         }
     });
 });

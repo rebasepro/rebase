@@ -1,4 +1,5 @@
 import { enumToObjectEntries, getLabelOrConfigFrom } from "../src/util/enums";
+import type { EnumValues } from "@rebasepro/types";
 
 describe("enums utils", () => {
     describe("enumToObjectEntries", () => {
@@ -27,7 +28,9 @@ color: "green" },
                 stop: { label: "Stop",
 color: "red" }
             };
-            const result = enumToObjectEntries(obj);
+            // The values lack `id` on purpose — supplying it is what this
+            // function does — so the fixture cannot be a well-typed `EnumValues`.
+            const result = enumToObjectEntries(obj as unknown as EnumValues);
             expect(result).toEqual([
                 { id: "start",
 label: "Start",

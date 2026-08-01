@@ -29,6 +29,7 @@ import type { HonoEnv } from "../../api/types";
 import type { ApiKeyStore } from "./api-key-store";
 import type { ApiKeyMasked } from "./api-key-types";
 import { scopeDataDriver } from "../rls-scope";
+import { extractBearerToken } from "../bearer-token";
 import { httpMethodToOperation, isFunctionAllowed, isStorageAllowed } from "./api-key-permission-guard";
 import { logger } from "../../utils/logger";
 
@@ -271,8 +272,7 @@ export function createApiKeyPreAuth(options: ApiKeyAuthOptions): MiddlewareHandl
         // the store twice.
         if (c.get("apiKey")) return next();
 
-        const authHeader = c.req.header("authorization") || "";
-        const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+        const token = extractBearerToken(c.req.header("authorization")) ?? "";
         if (!token || !isApiKeyToken(token)) return next();
 
         const result = await validateApiKey(c, token, options);

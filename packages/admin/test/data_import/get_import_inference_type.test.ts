@@ -30,6 +30,13 @@ describe("getInferenceType utility function", () => {
     test("should infer map type for objects", () => {
         expect(getInferenceType({})).toBe("map");
         expect(getInferenceType({ key: "value" })).toBe("map");
-        expect(getInferenceType(null)).toBe("map"); // typeof null is 'object' and doesn't match other checks
+    });
+
+    test("should not infer a missing value as a map", () => {
+        // An empty CSV cell arrives as null. `typeof null === "object"` used to
+        // carry it past every check and out the "map" fallthrough, so a column
+        // of blanks was offered to the user as a nested object.
+        expect(getInferenceType(null)).toBe("string");
+        expect(getInferenceType(undefined)).toBe("string");
     });
 });

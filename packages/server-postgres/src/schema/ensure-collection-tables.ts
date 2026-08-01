@@ -32,7 +32,8 @@ import {
     resolveColumnName,
     isIdProperty,
     planRelationalColumns,
-    planJunctionTables
+    planJunctionTables,
+    quoteSqlLiteral
 } from "./generate-postgres-ddl-logic";
 
 /**
@@ -136,11 +137,6 @@ function requiredEnums(collection: CollectionConfig): { name: string; values: st
     return out;
 }
 
-/** Single-quote escaping for an enum label. */
-function quoteLiteral(value: string): string {
-    return `'${value.replace(/'/g, "''")}'`;
-}
-
 /**
  * Decide what to add. Pure — the caller supplies what exists and runs the result.
  *
@@ -165,7 +161,7 @@ export function planCollectionSchemaEnsure(
             actions.push({
                 kind: "create-enum",
                 target: name,
-                sql: `CREATE TYPE "${schema}"."${typeName}" AS ENUM (${values.map(quoteLiteral).join(", ")});`
+                sql: `CREATE TYPE "${schema}"."${typeName}" AS ENUM (${values.map(quoteSqlLiteral).join(", ")});`
             });
         }
     }

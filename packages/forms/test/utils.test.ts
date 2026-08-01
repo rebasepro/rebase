@@ -122,8 +122,11 @@ b: 2 });
 
     test("sets a deeply nested value", () => {
         const obj = { a: { b: { c: 1 } } };
-        const result = setIn(obj, "a.b.c", 99);
-        expect(result.a.b.c).toBe(99);
+        // Compared whole rather than by reading `result.a.b.c`: `setIn` returns
+        // `unknown` (its return shape is not its argument's), so a property read
+        // needs a cast, and a cast here would be asserting the shape this test
+        // exists to establish. `toEqual` also pins that nothing else changed.
+        expect(setIn(obj, "a.b.c", 99)).toEqual({ a: { b: { c: 99 } } });
         expect(obj.a.b.c).toBe(1); // original not mutated
     });
 
@@ -150,8 +153,7 @@ b: 2 };
     test("deletes key when value is undefined (nested)", () => {
         const obj = { a: { b: 1,
 c: 2 } };
-        const result = setIn(obj, "a.b", undefined);
-        expect(result.a).toEqual({ c: 2 });
+        expect(setIn(obj, "a.b", undefined)).toEqual({ a: { c: 2 } });
     });
 
     test("returns original object if value hasn't changed", () => {
@@ -176,8 +178,7 @@ deletedAt: null });
 
     test("sets value inside existing arrays", () => {
         const obj = { items: ["a", "b", "c"] };
-        const result = setIn(obj, "items[1]", "B");
-        expect(result.items[1]).toBe("B");
+        expect(setIn(obj, "items[1]", "B")).toEqual({ items: ["a", "B", "c"] });
         expect(obj.items[1]).toBe("b");
     });
 
@@ -187,8 +188,13 @@ deletedAt: null });
         }
         const instance = new Custom(10);
         const obj = { wrapper: instance };
-        // Setting a sibling property should preserve the class instance
-        const result = setIn(obj, "other", "test");
-        expect(result.wrapper).toBe(instance);
+        // Setting a sibling property should preserve the class instance.
+        // `toStrictEqual` — not `toEqual` — because it compares prototypes:
+        // a `Custom` flattened into a plain `{ value: 10 }` by an over-eager
+        // clone would satisfy `toEqual` and is exactly the failure this guards.
+        expect(setIn(obj, "other", "test")).toStrictEqual({
+            wrapper: new Custom(10),
+            other: "test"
+        });
     });
 });

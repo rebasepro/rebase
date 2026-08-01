@@ -136,6 +136,25 @@ describe("importing a table and saving the collection", () => {
 
         const relations = (posts as { relations?: { target: unknown }[] }).relations ?? [];
         expect(relations).toHaveLength(2);
+        // The point of the round trip: `target` is a thunk in memory and a slug
+        // on the wire, and every consumer calls it. A relation that comes back
+        // still holding the string typechecks — the serializable shape erases
+        // the difference — and fails at the first `target()`.
+        for (const relation of relations) {
+            expect(typeof relation.target).toBe("function");
+        }
+        expect((relations as { target: () => { slug: string } }[]).map(r => r.target().slug))
+            .toEqual(["authors", "tags"]);
+    });
+
+    it("throws a pointed error when a relation target was not deserialized with it", () => {
+        // `authors` and `tags` deliberately left out of the set.
+        const [posts] = fromSerializableCollectionConfigs([
+            toSerializableCollectionConfig(imported as unknown as AdminCollection)
+        ]);
+
+        const relations = (posts as { relations?: { target: () => unknown }[] }).relations ?? [];
+        expect(() => relations[0].target()).toThrow(/authors/);
     });
 
     it("maps the columns to properties, id included", () => {

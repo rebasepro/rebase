@@ -12,6 +12,8 @@ import {
     generateDownloadToken,
     verifyDownloadToken
 } from "../src/auth/jwt";
+import { Hono } from "hono";
+import { setRefreshCookie } from "../src/auth/cookie-utils";
 
 describe("JWT Utilities", () => {
     const testSecret = "test-secret-key-for-jwt-testing-1234567890";
@@ -262,13 +264,44 @@ refreshExpiresIn: "invalid" });
             expect(expiry.getTime()).toBeLessThanOrEqual(expected + 1000);
         });
 
-        it("caps the cookie Max-Age at what browsers actually honour", () => {
+        it("caps the cookie Max-Age at what browsers actually honour", async () => {
             // Config may ask for more; Chrome and RFC 6265bis rewrite anything
             // past 400 days, so the cookie must not claim otherwise.
+            //
+            // The cap has to be read off the header the server actually sends.
+            // This test used to apply `Math.min` itself and assert the result,
+            // which measured the test's own arithmetic — `setRefreshCookie` could
+            // have emitted ten years and nothing here would have noticed.
             configureJwt({ secret: testSecret,
 refreshExpiresIn: "3650d" });
             expect(getRefreshTokenTtlMs()).toBe(3650 * 24 * 60 * 60 * 1000);
-            expect(Math.min(getRefreshTokenTtlMs(), MAX_COOKIE_AGE_MS)).toBe(MAX_COOKIE_AGE_MS);
+
+            const app = new Hono();
+            app.get("/", (c) => {
+                setRefreshCookie(c as never, "refresh-token-value", { cookieName: "__rb_refresh" });
+                return c.body(null);
+            });
+
+            const cookie = (await app.request("/")).headers.get("set-cookie") ?? "";
+            const maxAge = Number(/Max-Age=(\d+)/.exec(cookie)?.[1]);
+            expect(maxAge).toBe(MAX_COOKIE_AGE_MS / 1000);
+        });
+
+        it("uses the configured TTL for the cookie when it is under the ceiling", async () => {
+            // The other half of the cap: it is a ceiling, not a fixed value.
+            // Without this, `Max-Age` could be hardcoded to 400 days and pass.
+            configureJwt({ secret: testSecret,
+refreshExpiresIn: "7d" });
+
+            const app = new Hono();
+            app.get("/", (c) => {
+                setRefreshCookie(c as never, "refresh-token-value", { cookieName: "__rb_refresh" });
+                return c.body(null);
+            });
+
+            const cookie = (await app.request("/")).headers.get("set-cookie") ?? "";
+            const maxAge = Number(/Max-Age=(\d+)/.exec(cookie)?.[1]);
+            expect(maxAge).toBe(7 * 24 * 60 * 60);
         });
     });
 
@@ -283,6 +316,22 @@ refreshExpiresIn: "3650d" });
         it("should reject known weak secrets like 'changeme'", () => {
             // 'changeme' is only 8 chars, fails the length check first
             expect(() => configureJwt({ secret: "changeme" })).toThrow("JWT secret is too short");
+        });
+
+        // Every candidate above is under 32 characters, so the length check
+        // answers first and the weak-secret list is never consulted — deleting
+        // it left this whole describe green. These two are the only cases where
+        // the list is what refuses, which is the case that matters: the defaults
+        // people actually ship are long enough to look fine.
+        it("rejects a known weak secret that is long enough to pass the length check", () => {
+            expect(() => configureJwt({ secret: "your-super-secret-jwt-key-change-in-production" }))
+                .toThrow("known default/weak value");
+        });
+
+        it("rejects a known weak secret regardless of casing", () => {
+            // The lookup lowercases first, so shouting the default is still the default.
+            expect(() => configureJwt({ secret: "REBASE_SAAS_JWT_SECRET_MUST_BE_LONG_LONG_LONG_LONG" }))
+                .toThrow("known default/weak value");
         });
 
         it("should reject secret that is exactly 31 characters", () => {
@@ -304,19 +353,26 @@ refreshExpiresIn: "3650d" });
     // ── Expired token ────────────────────────────────────────
     describe("expired token handling", () => {
         it("should return null for an expired token", () => {
-            // Configure with 1 second expiry
+            // This test asserted that the token was *valid* and left a comment
+            // saying expiry could not easily be waited for. It can: the clock
+            // `jsonwebtoken` compares `exp` against is `Date.now()`, which fake
+            // timers own. A `verifyAccessToken` that dropped `expiresIn`, or
+            // passed `ignoreExpiration`, used to pass this.
             configureJwt({ secret: testSecret,
 accessExpiresIn: "1s" });
             const token = generateAccessToken("user-1", ["admin"]);
 
-            // Immediately verify should work
             const payload = verifyAccessToken(token);
             expect(payload).not.toBeNull();
-
-            // We can't easily wait for expiry in a unit test,
-            // but we can verify the token structure is correct
             expect(payload!.uid).toBe("user-1");
             expect(payload!.roles).toEqual(["admin"]);
+
+            jest.useFakeTimers().setSystemTime(Date.now() + 2_000);
+            try {
+                expect(verifyAccessToken(token)).toBeNull();
+            } finally {
+                jest.useRealTimers();
+            }
         });
     });
 
@@ -367,10 +423,25 @@ accessExpiresIn: "1s" });
             expect(decoded).toBeNull();
         });
 
+        it("should return null for a malformed download token", () => {
+            expect(verifyDownloadToken("invalid.download.token")).toBeNull();
+        });
+
         it("should return null for expired download tokens", () => {
-            // Configure custom quick expiry if supported, but let's test invalid string / signature mismatch first
-            const decoded = verifyDownloadToken("invalid.download.token");
-            expect(decoded).toBeNull();
+            // Expiry is the whole point of a download token: it travels in a URL
+            // that ends up in logs, Referer headers and chat messages, so the
+            // window in which a leaked one is useful has to be short. This test
+            // used to hand in a malformed string, which the signature check
+            // rejects long before `exp` is ever looked at.
+            const token = generateDownloadToken("default/photos/file.jpg", 1);
+            expect(verifyDownloadToken(token)).not.toBeNull();
+
+            jest.useFakeTimers().setSystemTime(Date.now() + 2_000);
+            try {
+                expect(verifyDownloadToken(token)).toBeNull();
+            } finally {
+                jest.useRealTimers();
+            }
         });
     });
 });

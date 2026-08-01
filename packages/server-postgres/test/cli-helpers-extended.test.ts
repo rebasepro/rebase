@@ -1,4 +1,4 @@
-import { getDevDatabaseUrl, getTableIncludesFromCollections } from "../src/cli-helpers";
+import { getDevDatabaseUrl, getTableExcludes, getTableIncludesFromCollections } from "../src/cli-helpers";
 import { CollectionConfig } from "@rebasepro/types";
 import * as fs from "fs";
 import * as path from "path";
@@ -75,15 +75,17 @@ describe("CLI Helpers — Extended", () => {
         // that is known to exist (like "jest") vs. one that doesn't.
 
         it("should find a binary that exists in node_modules/.bin", () => {
-            // "jest" should be installed in the monorepo node_modules
             const { resolveLocalBin } = require("../src/cli-helpers");
+            // "jest" is running this very test, so it is by definition installed
+            // in a node_modules/.bin above the source directory. Guarding these
+            // assertions behind `if (result !== null)` — as this test used to —
+            // turns the interesting failure (the upward walk stops early and
+            // finds nothing) into a silent pass.
             const result = resolveLocalBin("jest");
-            // Should either find it or return null (depending on install structure)
-            // We just check the contract: string | null
-            if (result !== null) {
-                expect(typeof result).toBe("string");
-                expect(result).toContain("jest");
-            }
+            expect(result).not.toBeNull();
+            expect(typeof result).toBe("string");
+            expect(result).toContain(path.join("node_modules", ".bin", "jest"));
+            expect(fs.existsSync(result)).toBe(true);
         });
 
         it("should return null for a binary that definitely does not exist", () => {
@@ -160,34 +162,39 @@ describe("CLI Helpers — Extended", () => {
 
     describe("getTableExcludes (via getTableIncludesFromCollections path)", () => {
 
+        // Only the DB introspection is stubbed: the includes are derived from
+        // real collections by the real `getTableIncludesFromCollections`, so the
+        // whole collections → includes → excludes chain runs. `--exclude` is the
+        // only thing keeping `db push` from dropping tables Rebase doesn't own,
+        // so "some table went missing from the exclude list" has to fail here.
+        const collections: CollectionConfig[] = [
+            {
+                slug: "users",
+                table: "users",
+                name: "Users",
+                properties: { name: { type: "string" } },
+            },
+        ];
+
+        const runExcludes = () => getTableExcludes("postgres://x/db", "/collections", {
+            getIncludes: () => getTableIncludesFromCollections(collections),
+            queryExistingTables: async () => ["public.users", "public.sessions", "public.migrations"],
+        });
+
         it("should always include atlas_schema_revisions.* in excludes", async () => {
-            // We test the logic indirectly: getTableExcludes calls getTableIncludes
-            // then queries the DB. We mock pg to return known tables.
+            const excludes = await runExcludes();
+            expect(excludes).toContain("atlas_schema_revisions.*");
+            // The framework-owned schemas go in whole *and* by contents —
+            // excluding only the contents still lets Atlas plan a DROP SCHEMA.
+            expect(excludes).toEqual(expect.arrayContaining(["auth", "auth.*", "rebase", "rebase.*"]));
+        });
 
-            mockConnect.mockResolvedValue(undefined);
-            mockEnd.mockResolvedValue(undefined);
-            mockQuery.mockResolvedValue({
-                rows: [
-                    { full_name: "public.users" },
-                    { full_name: "public.sessions" },
-                    { full_name: "public.migrations" },
-                ],
-            });
-
-            // We can't easily mock getTableIncludes (it does dynamic imports of collection files)
-            // So we test the subcomponent: getTableIncludesFromCollections
-            const collections: CollectionConfig[] = [
-                {
-                    slug: "users",
-                    table: "users",
-                    name: "Users",
-                    properties: { name: { type: "string" } },
-                },
-            ];
-
-            const includes = await getTableIncludesFromCollections(collections);
-            expect(includes).toContain("public.users");
-            expect(includes).not.toContain("public.sessions");
+        it("should exclude live tables no collection maps, and only those", async () => {
+            const excludes = await runExcludes();
+            expect(excludes).toContain("public.sessions");
+            expect(excludes).toContain("public.migrations");
+            // `users` backs a collection, so `db push` must be allowed to manage it.
+            expect(excludes).not.toContain("public.users");
         });
     });
 

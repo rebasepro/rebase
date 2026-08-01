@@ -21,6 +21,7 @@ describe("generateSdkCommand", () => {
 
     beforeEach(() => {
         tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-sdk-test-"));
+        vi.mocked(sdkGen.generateSDK).mockClear();
         consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
         processExitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
     });
@@ -69,7 +70,35 @@ force: true });
         const content = fs.readFileSync(path.join(outputDir, "database.types.ts"), "utf-8");
         expect(content).toBe("export type Database = {};");
 
-        // Verify generator was called with loaded collections
-        expect(sdkGen.generateSDK).toHaveBeenCalled();
+        // Verify the generator was called with the collections that were loaded.
+        // `toHaveBeenCalled()` alone left the loader free to regress to `[]`.
+        expect(sdkGen.generateSDK).toHaveBeenCalledTimes(1);
+        const [collections] = vi.mocked(sdkGen.generateSDK).mock.calls[0];
+        expect(collections).toHaveLength(1);
+        expect(collections[0]).toMatchObject({ slug: "posts",
+name: "Posts" });
+    });
+
+    it("passes every collection through, sorted by slug for a stable SDK", async () => {
+        const collectionsDir = path.join(tmpDir, "collections");
+        fs.mkdirSync(collectionsDir);
+        fs.writeFileSync(path.join(collectionsDir, "index.js"), `
+            module.exports = [
+                { slug: "posts", name: "Posts", fields: [] },
+                { slug: "tags", name: "Tags", fields: [] },
+                { slug: "authors", name: "Authors", fields: [] }
+            ];
+        `, "utf-8");
+
+        await generateSdkCommand({
+            collectionsDir,
+            output: path.join(tmpDir, "out"),
+            cwd: tmpDir
+        });
+
+        const [collections] = vi.mocked(sdkGen.generateSDK).mock.calls[0];
+        // Declaration order is deliberately not preserved: the command sorts by
+        // slug so regenerating produces the same file for the same schema.
+        expect(collections.map((c) => c.slug)).toEqual(["authors", "posts", "tags"]);
     });
 });

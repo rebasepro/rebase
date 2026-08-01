@@ -108,7 +108,7 @@ zIndex: 20 }}>
  *
  * @group Components
  */
-export const VirtualTable = React.memo<VirtualTableProps<Record<string, unknown>>>(
+const VirtualTableInner = React.memo<VirtualTableProps<Record<string, unknown>>>(
     function VirtualTable<T extends Record<string, unknown>>({
         data,
         onResetPagination,
@@ -427,6 +427,24 @@ export const VirtualTable = React.memo<VirtualTableProps<Record<string, unknown>
     },
     equal
 );
+
+/**
+ * `React.memo` is not generic-preserving: it takes the props type as its own
+ * type argument, so annotating the call with
+ * `VirtualTableProps<Record<string, unknown>>` pinned `T` at the boundary and
+ * discarded the `<T>` the inner function declares. The exported component was
+ * therefore not generic at all — every consumer got `Record<string, unknown>`,
+ * `columns` and `cellRenderer` were unrelated to `data`, and a caller writing
+ * `<VirtualTable<Post> …>` was told the component expects no type arguments.
+ *
+ * Re-asserting the call signature is the standard way to carry a type parameter
+ * across `memo`; it is the only cast here, and it restores the generic the
+ * implementation always had. Runtime behaviour is unchanged — this is the same
+ * memoized component under a type that describes it.
+ */
+export const VirtualTable = VirtualTableInner as <T extends Record<string, unknown>>(
+    props: VirtualTableProps<T>
+) => React.ReactElement | null;
 // Wrapper that applies sortable transforms to cells
 const SortableCellWrapper = ({
     columnKey,

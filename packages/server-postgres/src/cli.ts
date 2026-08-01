@@ -12,12 +12,12 @@ import {
     getDevDatabaseUrl,
     ensureDevDatabaseExists,
     getTableExcludes,
-    ExcludeIntrospectionError
+    ExcludeIntrospectionError,
+    promptConfirm
 } from "./cli-helpers";
 import { checkDatabaseConnectivity, diagnoseDbError } from "./cli-errors";
 import { AUTH_BOOTSTRAP_SQL } from "./schema/auth-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
-import readline from "readline";
 
 const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -610,23 +610,6 @@ function timeAgo(date: Date): string {
 }
 
 
-
-/**
- * Ask a yes/no question on an interactive terminal. Non-interactive shells
- * (CI, pipes, agents) can't answer, so this must only be reached after
- * {@link decidePushSafety} has already ruled that interactive confirmation is
- * possible.
- */
-async function promptConfirm(question: string): Promise<boolean> {
-    if (!process.stdin.isTTY) return false;
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    try {
-        const answer: string = await new Promise((resolve) => rl.question(question, resolve));
-        return /^y(es)?$/i.test(answer.trim());
-    } finally {
-        rl.close();
-    }
-}
 
 async function runAtlas(
     domain: "schema" | "migrate",

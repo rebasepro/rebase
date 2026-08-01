@@ -62,6 +62,36 @@ const PACKAGE_SRC_DIRS = [
     path.join(REPO_ROOT, "packages/studio/src"),
 ];
 
+// ── 0. Positive control ──────────────────────────────────────────────────
+
+/**
+ * Every test below asserts that a scan found *nothing*. `collectTsFiles`
+ * returns `[]` for a directory that does not exist, so renaming or moving a
+ * package silently turns this whole file into eleven assertions that `[]`
+ * equals `[]`. This control fails loudly in that case, instead of the rest
+ * reporting green over an empty scan.
+ */
+describe("scan coverage", () => {
+
+    it("every scanned directory exists and yields source files", () => {
+        for (const dir of PACKAGE_SRC_DIRS) {
+            const relative = path.relative(REPO_ROOT, dir);
+            expect({ relative,
+exists: fs.existsSync(dir) }).toEqual({ relative,
+exists: true });
+            expect({ relative,
+hasFiles: collectTsFiles(dir).length > 0 }).toEqual({ relative,
+hasFiles: true });
+        }
+    });
+
+    it("the scanner reports matches when the pattern is present", () => {
+        // A scanner that always returned [] would pass every test in this file.
+        // "Entity" is the noun the rename settled on, so it is everywhere.
+        expect(scanFiles(PACKAGE_SRC_DIRS, /\bEntity\b/).length).toBeGreaterThan(100);
+    });
+});
+
 // ── 1. No Snapshot-noun type names (except Firebase SDK) ─────────────────
 
 describe("No Snapshot as record noun", () => {

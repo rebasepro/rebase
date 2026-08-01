@@ -1,6 +1,18 @@
 import { Hono } from "hono";
 import type { CollectionConfig } from "@rebasepro/types";
 import { computeSchemaVersion, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
+
+// `computeSchemaVersion` is the expensive call the route caches, and counting it
+// is the only way to observe that cache. The barrel re-exports it as a getter,
+// which `jest.spyOn` cannot redefine, so the whole module is wrapped instead —
+// every export keeps its real behaviour, this one just also counts.
+jest.mock("@rebasepro/types", () => {
+    const actual = jest.requireActual("@rebasepro/types") as Record<string, unknown>;
+    return {
+        ...actual,
+        computeSchemaVersion: jest.fn(actual.computeSchemaVersion as (...args: unknown[]) => unknown)
+    };
+});
 import { createContractRoutes } from "../src/api/contract-routes";
 import type { HonoEnv } from "../src/api/types";
 
@@ -64,23 +76,24 @@ describe("contract routes", () => {
         // `/schema-version` is unauthenticated and meant to be polled. Walking
         // and canonicalizing every collection on each request would turn a CI
         // convenience into CPU amplification anyone could aim at the server.
-        let reads = 0;
+        //
+        // The old assertions here — a stable value across two requests, and a
+        // non-zero registry read count — hold just as well with no cache at all,
+        // since recomputing the same collections yields the same hash. The cache
+        // is only observable by counting the hashing itself.
+        const hash = computeSchemaVersion as unknown as jest.Mock;
+        hash.mockClear();
+
         const app = mount({
-            collectionRegistry: {
-                getRawCollections: () => {
-                    reads++;
-                    return [collection("posts")];
-                }
-            }
+            collectionRegistry: { getRawCollections: () => [collection("posts")] }
         });
 
         const first = await (await app.request("/api/meta/schema-version")).json() as { schemaVersion: string };
         const second = await (await app.request("/api/meta/schema-version")).json() as { schemaVersion: string };
+        await app.request("/api/meta/contract");
 
         expect(second.schemaVersion).toBe(first.schemaVersion);
-        // The registry may be read each time; the expensive hash must not be
-        // recomputed, which shows up as a stable value from a cached path.
-        expect(reads).toBeGreaterThan(0);
+        expect(hash).toHaveBeenCalledTimes(1);
     });
 
     it("omits security rules from the contract payload", async () => {

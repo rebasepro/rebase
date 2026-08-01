@@ -9,6 +9,20 @@ import { MongoClient, Db, ObjectId } from "mongodb";
 import { EntityReference } from "@rebasepro/types";
 import { MongoDataService } from "../src/db/MongoDataService";
 
+/**
+ * `save` and `fetchOne` return flat rows typed `Record<string, unknown>` — the
+ * primary key is a column like any other, so `row.id` is `unknown` and cannot
+ * be fed straight back into an `id: string | number` parameter. Narrow it once,
+ * loudly, rather than casting at every call site.
+ */
+function rowId(row: Record<string, unknown>): string | number {
+    const id = row.id;
+    if (typeof id !== "string" && typeof id !== "number") {
+        throw new Error(`expected the row to carry a string or number id, got ${JSON.stringify(id)}`);
+    }
+    return id;
+}
+
 describe("MongoDataService", () => {
     let mongoServer: MongoMemoryServer;
     let client: MongoClient;
@@ -61,7 +75,9 @@ email: "test@example.com" };
             const entity = await dataService.save("users", values);
 
             expect(entity.id).toBeDefined();
-            expect(ObjectId.isValid(entity.id as string)).toBe(true);
+            // Mongo ids come back as the hex string form of the ObjectId
+            expect(typeof entity.id).toBe("string");
+            expect(ObjectId.isValid(String(entity.id))).toBe(true);
             expect(entity.name).toBe("Test User");
             expect(entity.email).toBe("test@example.com");
         });
@@ -87,7 +103,7 @@ email: "test@example.com" };
                 "users",
                 { name: "Updated Name",
 email: "test@example.com" },
-                created.id
+                rowId(created)
             );
 
             expect(updated.id).toBe(created.id);
@@ -143,13 +159,17 @@ createdAt: now };
             const created = await dataService.save("posts", { title: "Hi",
 author: ref });
 
-            const fetched = await dataService.fetchOne<{ title: string; author: EntityReference }>(
+            // NB: `fetchOne`'s type parameter never reaches its return type, so
+            // a type argument here would be decorative — the row comes back as
+            // `Record<string, unknown>` and the reference is narrowed below.
+            const fetched = await dataService.fetchOne(
                 "posts",
-                created.id
+                rowId(created)
             );
 
             const fetchedRef = fetched!.author;
             expect(fetchedRef).toBeInstanceOf(EntityReference);
+            if (!(fetchedRef instanceof EntityReference)) throw new Error("author did not decode into an EntityReference");
             expect(fetchedRef.isEntityReference()).toBe(true);
             expect(fetchedRef.id).toBe(ref.id);
             expect(fetchedRef.path).toBe("authors");
@@ -167,13 +187,14 @@ author: ref });
 path: "authors" }
             } as never);
 
-            const fetched = await dataService.fetchOne<{ author: EntityReference }>(
+            const fetched = await dataService.fetchOne(
                 "posts",
                 legacyId.toString()
             );
 
             const fetchedRef = fetched!.author;
             expect(fetchedRef).toBeInstanceOf(EntityReference);
+            if (!(fetchedRef instanceof EntityReference)) throw new Error("author did not decode into an EntityReference");
             expect(fetchedRef.id).toBe("abc123");
             expect(fetchedRef.path).toBe("authors");
         });
@@ -188,7 +209,7 @@ path: "/maps/somewhere",
 label: "HQ" }
             };
             const created = await dataService.save("posts", values);
-            const fetched = await dataService.fetchOne<typeof values>("posts", created.id);
+            const fetched = await dataService.fetchOne("posts", rowId(created));
 
             expect(fetched!.location).not.toBeInstanceOf(EntityReference);
             expect(fetched!.location).toEqual({ id: "loc-1",
@@ -203,7 +224,7 @@ label: "HQ" });
 email: "test@example.com" };
             const created = await dataService.save("users", values);
 
-            const fetched = await dataService.fetchOne("users", created.id);
+            const fetched = await dataService.fetchOne("users", rowId(created));
 
             expect(fetched).toBeDefined();
             expect(fetched?.id).toBe(created.id);
@@ -344,9 +365,9 @@ status: "pending" }
             const values = { name: "To Delete" };
             const created = await dataService.save("users", values);
 
-            await dataService.delete("users", created.id);
+            await dataService.delete("users", rowId(created));
 
-            const fetched = await dataService.fetchOne("users", created.id);
+            const fetched = await dataService.fetchOne("users", rowId(created));
             expect(fetched).toBeUndefined();
         });
 

@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { ApiError } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { requireAuth } from "./middleware";
+import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
 import { strictAuthLimiter, defaultAuthLimiter } from "./rate-limiter";
 import { hashRefreshToken } from "./jwt";
@@ -92,10 +93,10 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
 
         // Call afterLogout hook (fire-and-forget)
         // Extract uid from the access token if present
-        const authHeader = c.req.header("authorization");
-        if (ops.afterLogout && authHeader?.startsWith("Bearer ")) {
+        const accessToken = extractBearerToken(c.req.header("authorization"));
+        if (ops.afterLogout && accessToken !== undefined) {
             const { verifyAccessToken } = await import("./jwt");
-            const payload = verifyAccessToken(authHeader.substring(7));
+            const payload = verifyAccessToken(accessToken);
             if (payload) {
                 ops.afterLogout(payload.uid).catch((err: unknown) => {
                     logger.error("[AuthHooks] afterLogout error", {

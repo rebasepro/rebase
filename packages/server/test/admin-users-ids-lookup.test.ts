@@ -41,8 +41,8 @@ offset: 0 })
 getUserWithRoles };
 }
 
-function bearer(userId: string): Record<string, string> {
-    return { authorization: `Bearer ${generateAccessToken(userId, ["admin"])}` };
+function bearer(userId: string, roles: string[] = ["admin"]): Record<string, string> {
+    return { authorization: `Bearer ${generateAccessToken(userId, roles)}` };
 }
 
 describe("GET /users?ids=", () => {
@@ -86,12 +86,32 @@ accessExpiresIn: "1h" });
         expect(getUserWithRoles).toHaveBeenCalledTimes(100);
     });
 
-    it("requires admin", async () => {
-        const { repo } = mockRepo([user("u1")]);
+    // This lookup turns an id into an email and a display name, so it is a user
+    // directory for anyone who can reach it. `status >= 400` used to be the whole
+    // assertion, and only for the anonymous case — which requireAuth answers on
+    // its own, leaving requireAdmin unmeasured. Both statuses are pinned exactly,
+    // and the non-admin case is the one that fails if the admin gate is dropped.
+    it("rejects an anonymous caller with 401", async () => {
+        const { repo, getUserWithRoles } = mockRepo([user("u1")]);
         const app = createAdminUsersRoute({ authRepo: repo });
 
         const res = await app.request("/users?ids=u1");
 
-        expect(res.status).toBeGreaterThanOrEqual(400);
+        expect(res.status).toBe(401);
+        expect(getUserWithRoles).not.toHaveBeenCalled();
+    });
+
+    it("rejects a signed-in non-admin with 403", async () => {
+        const { repo, getUserWithRoles } = mockRepo([user("u1", "Priscila")]);
+        const app = createAdminUsersRoute({ authRepo: repo });
+
+        const res = await app.request("/users?ids=u1", { headers: bearer("editor-1", ["editor"]) });
+
+        expect(res.status).toBe(403);
+        const raw = await res.text();
+        expect((JSON.parse(raw) as { error: { code: string } }).error.code).toBe("FORBIDDEN");
+        // Nothing about u1 leaked on the way to the refusal.
+        expect(getUserWithRoles).not.toHaveBeenCalled();
+        expect(raw).not.toContain("Priscila");
     });
 });

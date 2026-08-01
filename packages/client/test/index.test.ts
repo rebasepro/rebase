@@ -263,13 +263,29 @@ photoURL: null }
             expect(session?.accessToken).toBe("active-token");
         });
 
-        it("passes custom admin path configuration", () => {
+        it("passes custom admin path configuration", async () => {
+            const urls: string[] = [];
+            const mockFetch = jest.fn(async (url: RequestInfo | URL) => {
+                urls.push(String(url));
+                return {
+                    ok: true,
+                    status: 200,
+                    text: async () => JSON.stringify({ users: [] }),
+                    json: async () => ({ users: [] }),
+                    headers: new Headers()
+                } as unknown as Response;
+            }) as unknown as typeof globalThis.fetch;
+
             const client = createRebaseClient({
-                baseUrl: "https://api.example.com",
+                baseUrl: "http://localhost",
+                fetch: mockFetch,
                 admin: { adminPath: "/custom-admin" }
             });
 
-            expect(client.admin).toBeDefined();
+            // `client.admin` is always truthy, so only the URL it dials can show
+            // whether the configured path was carried through to createAdmin.
+            await client.admin.listUsers();
+            expect(urls).toEqual(["http://localhost/api/custom-admin/users"]);
         });
     });
 
@@ -277,14 +293,63 @@ photoURL: null }
     // WebSocket URL derivation
     // -----------------------------------------------------------------------
     describe("WebSocket URL derivation", () => {
+        /**
+         * The resolved URL is private to RebaseWebSocketClient and is only
+         * observable at the moment it dials, so capture the constructor
+         * argument. Node ships a global WebSocket, so without this stub the
+         * client would open a real connection to the example host.
+         */
+        function withCapturedSockets<T>(fn: (urls: string[]) => T): T {
+            const urls: string[] = [];
+            class FakeSocket {
+                static OPEN = 1;
+                readyState = 0;
+                onopen: (() => void) | null = null;
+                onclose: (() => void) | null = null;
+                onerror: (() => void) | null = null;
+                onmessage: (() => void) | null = null;
+                constructor(url: string) { urls.push(url); }
+                send() { /* never reached: the socket never opens */ }
+                close() { /* no-op */ }
+            }
+            const original = (globalThis as any).WebSocket;
+            (globalThis as any).WebSocket = FakeSocket;
+            try {
+                return fn(urls);
+            } finally {
+                (globalThis as any).WebSocket = original;
+            }
+        }
+
         it("uses explicit websocketUrl when provided", () => {
-            const client = createRebaseClient({
-                baseUrl: "https://api.example.com",
-                websocketUrl: "wss://custom-ws.example.com"
+            withCapturedSockets((urls) => {
+                const client = createRebaseClient({
+                    baseUrl: "https://api.example.com",
+                    websocketUrl: "wss://custom-ws.example.com"
+                });
+                client.ws!.ensureConnected();
+                expect(urls).toEqual(["wss://custom-ws.example.com"]);
             });
-            // If ws exists it would be configured with the custom URL
-            // Since we don't have a real WebSocket in test env, we just check it doesn't crash
-            expect(client).toBeDefined();
+        });
+
+        it("derives wss:// from an https baseUrl when websocketUrl is omitted", () => {
+            withCapturedSockets((urls) => {
+                const client = createRebaseClient({ baseUrl: "https://api.example.com" });
+                client.ws!.ensureConnected();
+                expect(urls).toEqual(["wss://api.example.com"]);
+            });
+        });
+
+        it("does not create a socket at all when realtime is disabled", () => {
+            withCapturedSockets((urls) => {
+                const client = createRebaseClient({
+                    baseUrl: "https://api.example.com",
+                    websocketUrl: "wss://custom-ws.example.com",
+                    realtime: false
+                });
+                expect(client.ws).toBeUndefined();
+                expect(urls).toEqual([]);
+            });
         });
     });
 
@@ -292,21 +357,93 @@ photoURL: null }
     // onUnauthorized auto-setup
     // -----------------------------------------------------------------------
     describe("onUnauthorized auto-setup", () => {
-        it("auto-configures onUnauthorized to refresh auth session", () => {
+        /** A JSON `Response` double — the transport only reads these members. */
+        const jsonRes = (status: number, body: unknown) => ({
+            ok: status < 400,
+            status,
+            statusText: status === 401 ? "Unauthorized" : "OK",
+            text: async () => JSON.stringify(body),
+            json: async () => body,
+            headers: new Headers()
+        } as unknown as Response);
+
+        const seededStorage = () => {
+            const storage = createMemoryStorage();
+            storage.setItem("rebase_auth", JSON.stringify({
+                accessToken: "expired-jwt",
+                refreshToken: "valid-refresh",
+                expiresAt: Date.now() + 1000000,
+                user: { uid: "u",
+email: "u@m.com",
+displayName: "u",
+photoURL: null }
+            }));
+            return storage;
+        };
+
+        it("auto-configures onUnauthorized to auth.handleUnauthorized, not a bare refresh", async () => {
+            // The distinction matters: a bare `refreshSession` would leave the
+            // app believing it is still signed in after the server rejected the
+            // refresh token outright. `handleUnauthorized` drops the session and
+            // emits SIGNED_OUT so UIs can show their login screen.
+            const urls: string[] = [];
+            const mockFetch = jest.fn(async (url: RequestInfo | URL) => {
+                urls.push(String(url));
+                if (String(url).includes("/auth/refresh")) {
+                    return jsonRes(401, { error: { message: "expired",
+code: "TOKEN_EXPIRED" } });
+                }
+                return jsonRes(401, { error: { message: "Token expired",
+code: "UNAUTHORIZED" } });
+            }) as unknown as typeof globalThis.fetch;
+
             const client = createRebaseClient({
-                baseUrl: "https://api.example.com"
+                baseUrl: "http://localhost",
+                fetch: mockFetch,
+                auth: { storage: seededStorage(),
+autoRefresh: false }
             });
-            // The onUnauthorized should have been auto-set
-            expect(client).toBeDefined();
+
+            const events: string[] = [];
+            client.auth.onAuthStateChange((event) => { events.push(event); });
+
+            await expect(client.data.collection("posts").find()).rejects.toThrow();
+
+            expect(urls.some(u => u.includes("/auth/refresh"))).toBe(true);
+            expect(events).toContain("SIGNED_OUT");
+            expect(client.auth.getSession()).toBeNull();
         });
 
-        it("does not override custom onUnauthorized", () => {
-            const customHandler = jest.fn().mockResolvedValue(true);
+        it("does not override custom onUnauthorized", async () => {
+            const customHandler = jest.fn(async () => true);
+            const urls: string[] = [];
+            let seen401 = false;
+            const mockFetch = jest.fn(async (url: RequestInfo | URL) => {
+                urls.push(String(url));
+                if (!seen401) {
+                    seen401 = true;
+                    return jsonRes(401, { error: { message: "Token expired",
+code: "UNAUTHORIZED" } });
+                }
+                return jsonRes(200, { data: [{ id: 1 }],
+meta: { total: 1 } });
+            }) as unknown as typeof globalThis.fetch;
+
             const client = createRebaseClient({
-                baseUrl: "https://api.example.com",
-                onUnauthorized: customHandler
+                baseUrl: "http://localhost",
+                fetch: mockFetch,
+                onUnauthorized: customHandler,
+                auth: { storage: seededStorage(),
+autoRefresh: false }
             });
-            expect(client).toBeDefined();
+
+            await client.data.collection("posts").find();
+
+            // The caller's handler owns recovery: it ran, it said "retry", and
+            // the client did NOT also fire its own token refresh behind it.
+            expect(customHandler).toHaveBeenCalledTimes(1);
+            expect(urls.some(u => u.includes("/auth/refresh"))).toBe(false);
+            expect(urls).toHaveLength(2);
         });
 
         it("auto-refresh retries the request after 401 (wiring regression test)", async () => {

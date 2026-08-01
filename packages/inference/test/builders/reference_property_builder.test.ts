@@ -1,5 +1,5 @@
 import { buildReferenceProperty } from "../../src/builders/reference_property_builder";
-import type { ValuesCountEntry } from "../../src/types";
+import type { InferencePropertyBuilderProps, ValuesCountEntry } from "../../src/types";
 import type { ReferenceProperty } from "@rebasepro/types";
 
 function makeRefValues(paths: string[]): ValuesCountEntry {
@@ -56,10 +56,12 @@ describe("buildReferenceProperty", () => {
     });
 
     it("name defaults to empty string when not provided", () => {
+        // `name` is required by the type but the builder still guards it with
+        // `?? ""`, because callers reach it through untyped inference input.
+        // Passing "" explicitly tested the caller, not the guard.
         const result = buildReferenceProperty({
-            name: "",
             totalDocsCount: 5
-        });
+        } as InferencePropertyBuilderProps);
         expect(result.name).toBe("");
     });
 

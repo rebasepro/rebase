@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { execSync } from "child_process";
 import { createRequire } from "module";
+import readline from "readline";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
 import { logger } from "@rebasepro/server";
@@ -276,3 +277,28 @@ export async function getTableExcludes(
     return excludes;
 }
 
+
+/**
+ * Ask a yes/no question on an interactive terminal.
+ *
+ * The `isTTY` guard is the contract, not an optimisation: non-interactive
+ * shells (CI, pipes, agents) can never answer, and `readline` on a
+ * non-TTY stdin resolves with whatever the pipe happens to contain — or never
+ * resolves at all. Returning false there is what makes an unattended
+ * `db push` abort instead of auto-confirming a destructive change. Callers
+ * should already have gone through {@link decidePushSafety}, which decides
+ * whether interactive confirmation is even possible; this is the backstop.
+ *
+ * Lives here rather than in cli.ts so it is reachable from a test — cli.ts uses
+ * `import.meta` and cannot be imported by the jest runner.
+ */
+export async function promptConfirm(question: string): Promise<boolean> {
+    if (!process.stdin.isTTY) return false;
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    try {
+        const answer: string = await new Promise((resolve) => rl.question(question, resolve));
+        return /^y(es)?$/i.test(answer.trim());
+    } finally {
+        rl.close();
+    }
+}

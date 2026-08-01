@@ -15,6 +15,11 @@ export {
     isAuthAdapter,
     isDatabaseAdapter
 } from "./init";
+// The single answer to "does this server require an authenticated caller?".
+// Exported because the drivers' realtime sockets are the other enforcement
+// point, and while they computed it themselves they computed it differently —
+// open where this is closed. See `auth/require-auth.ts`.
+export { resolveRequireAuth } from "./auth/require-auth";
 export type {
     RebaseBackendConfig,
     RebaseBackendInstance,

@@ -45,6 +45,55 @@ accessExpiresIn: "1h" });
         return app;
     }
 
+    describe("who may call it", () => {
+        // Everything else in this file signs in as an admin, so the route's
+        // `createRequireAuth` + `requireAdmin` pair could be deleted outright
+        // without a single failure. Resetting another account's password is the
+        // most complete takeover this API offers; these two are the only tests
+        // that notice if the gate goes away.
+        beforeEach(() => {
+            mockAuthRepo.getUserById.mockResolvedValue({
+                id: "user-123",
+                email: "user@example.com",
+                displayName: "User One"
+            } as any);
+        });
+
+        it("rejects an anonymous caller with 401", async () => {
+            const app = createApp();
+
+            const res = await app.request("/api/admin/users/user-123/reset-password", {
+                method: "POST"
+            });
+
+            expect(res.status).toBe(401);
+            expect(mockAuthRepo.getUserById).not.toHaveBeenCalled();
+            expect(mockAuthRepo.updatePassword).not.toHaveBeenCalled();
+            expect(mockAuthRepo.createPasswordResetToken).not.toHaveBeenCalled();
+            expect(mockEmailService.send).not.toHaveBeenCalled();
+        });
+
+        it("rejects a signed-in non-admin with 403", async () => {
+            const app = createApp();
+            const editorToken = generateAccessToken("editor-user", ["editor", "viewer"]);
+
+            const res = await app.request("/api/admin/users/user-123/reset-password", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${editorToken}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ password: "StrongPass123" })
+            });
+
+            expect(res.status).toBe(403);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe("FORBIDDEN");
+            expect(mockAuthRepo.getUserById).not.toHaveBeenCalled();
+            expect(mockAuthRepo.updatePassword).not.toHaveBeenCalled();
+        });
+    });
+
     it("falls back to default password reset logic when no hook is provided", async () => {
         mockAuthRepo.getUserById.mockResolvedValue({
             id: "user-123",

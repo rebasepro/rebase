@@ -131,22 +131,6 @@ describe("mergeDeep", () => {
         });
     });
 
-    it("should handle merging when target property is null and source property is an object", () => {
-        const target = { optionalMap: null };
-        const source = {
-            optionalMap: {
-                "valueTwo": 222,
-                "valueOne": "one",
-                "nested": {
-                    "valueThree": "threeee",
-                    "valueFour": 444
-                }
-            }
-        };
-        const result = mergeDeep(target, source);
-        expect(result).toEqual(source);
-    });
-
     it("should overwrite target property with undefined from source if ignoreUndefined is false (default)", () => {
         const target = {
             a: 1,

@@ -4,7 +4,7 @@
  * Translates Rebase filter conditions to MongoDB query operators.
  */
 
-import { FilterValues, WhereFilterOp } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { Filter, Document } from "mongodb";
 import { logger } from "@rebasepro/server";
 
@@ -115,12 +115,16 @@ export class MongoConditionBuilder {
      * Build search conditions for text search
      *
      * @param searchString - Text to search for
-     * @param properties - Properties to search in
+     * @param properties - The collection's properties, searched for string fields
      * @returns Array of MongoDB filter objects for text search
      */
     static buildSearchConditions(
         searchString: string,
-        properties: Record<string, any>
+        // Typed as the real property map, not `Record<string, any>`. The loose
+        // type is what let the `dataType` bug below survive: a caller — and,
+        // more to the point, a test fixture — could invent any key it liked and
+        // nothing checked it against a property a user can actually declare.
+        properties: CollectionConfig["properties"]
     ): Filter<Document>[] {
         if (!searchString) return [];
 
@@ -130,8 +134,17 @@ export class MongoConditionBuilder {
         const searchRegex = new RegExp(escapedSearch, "i");
 
         for (const [key, prop] of Object.entries(properties)) {
-            // Only search in string-type properties
-            if (prop?.dataType === "string" || typeof prop === "string") {
+            // `type`, not `dataType`. No property in `@rebasepro/types` has ever
+            // had a `dataType` field — a real collection carries `type:
+            // "string"` — so this matched nothing for every collection a user
+            // could actually declare. With no field matching, the fallback
+            // below took over and every search became a `$text` query, which
+            // needs a text index and throws `IndexNotFound` without one.
+            //
+            // The suite passed because its fixtures were written with the same
+            // wrong key, so the test data agreed with the bug and the two
+            // never met a real collection between them.
+            if (prop?.type === "string" || typeof prop === "string") {
                 orConditions.push({
                     [key]: { $regex: searchRegex }
                 });
@@ -179,7 +192,7 @@ export class MongoConditionBuilder {
     static buildQuery<M extends Record<string, any>>(options: {
         filter?: FilterValues<Extract<keyof M, string>>;
         searchString?: string;
-        properties?: Record<string, any>;
+        properties?: CollectionConfig["properties"];
     }): Filter<Document> {
         const conditions: Filter<Document>[] = [];
 

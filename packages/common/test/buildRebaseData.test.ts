@@ -1,5 +1,15 @@
 import { buildRebaseData } from "../src/data/buildRebaseData";
-import { DataDriver, Entity } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, Entity, RebaseData } from "@rebasepro/types";
+
+/**
+ * `RebaseData`'s dynamic index signature is a union of a collection accessor
+ * and the `collection()` method that shares the namespace with it, so tsc
+ * cannot narrow a bare `data.products` on its own. A project generates a
+ * `Database` type and gets the narrowing for free; a test does it here.
+ */
+function at(data: RebaseData, slug: string): CollectionAccessor {
+    return data[slug] as CollectionAccessor;
+}
 
 // ── Mock driver ─────────────────────────────────────────────
 function createMockDriver(overrides: Partial<DataDriver> = {}): DataDriver {
@@ -13,8 +23,9 @@ function createMockDriver(overrides: Partial<DataDriver> = {}): DataDriver {
         })),
         delete: jest.fn().mockResolvedValue(undefined),
         count: jest.fn().mockResolvedValue(0),
+        checkUniqueField: jest.fn().mockResolvedValue(true),
         ...overrides
-    };
+    } as unknown as DataDriver;
 }
 
 describe("buildRebaseData", () => {
@@ -24,11 +35,11 @@ describe("buildRebaseData", () => {
 
         expect(data.products).toBeDefined();
         expect(data.users).toBeDefined();
-        expect(typeof data.products.find).toBe("function");
-        expect(typeof data.products.findById).toBe("function");
-        expect(typeof data.products.create).toBe("function");
-        expect(typeof data.products.update).toBe("function");
-        expect(typeof data.products.delete).toBe("function");
+        expect(typeof at(data, "products").find).toBe("function");
+        expect(typeof at(data, "products").findById).toBe("function");
+        expect(typeof at(data, "products").create).toBe("function");
+        expect(typeof at(data, "products").update).toBe("function");
+        expect(typeof at(data, "products").delete).toBe("function");
     });
 
     it("caches accessor instances", () => {
@@ -93,7 +104,7 @@ name: "Camera" }
             });
             const data = buildRebaseData(driver);
 
-            const result = await data.products.find({ limit: 10 });
+            const result = await at(data, "products").find({ limit: 10 });
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(
                 expect.objectContaining({ path: "products",
@@ -114,9 +125,12 @@ name: "Camera" } }
             });
             const data = buildRebaseData(driver);
 
-            await data.products.find({
+            // Legacy PostgREST-encoded strings: the accessor converts them, but
+            // `FindParams["where"]` only admits `[op, value]` tuples, so the
+            // fixture cannot be well typed.
+            await at(data, "products").find({
                 where: { status: "eq.published",
-price: "gte.100" }
+price: "gte.100" } as never
             });
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(
@@ -135,8 +149,8 @@ price: "gte.100" }
             });
             const data = buildRebaseData(driver);
 
-            await data.products.find({
-                where: { role: "in.(admin,editor)" }
+            await at(data, "products").find({
+                where: { role: "in.(admin,editor)" } as never
             });
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(
@@ -154,7 +168,7 @@ price: "gte.100" }
             });
             const data = buildRebaseData(driver);
 
-            await data.products.find({ orderBy: ["created_at", "desc"] });
+            await at(data, "products").find({ orderBy: ["created_at", "desc"] });
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -178,7 +192,7 @@ price: "gte.100" }
             });
             const data = buildRebaseData(driver);
 
-            const result = await data.products.find({ limit: 20 });
+            const result = await at(data, "products").find({ limit: 20 });
             expect(result.meta.hasMore).toBe(true);
             expect(result.meta.total).toBe(100);
 
@@ -187,7 +201,7 @@ price: "gte.100" }
             // 5 returned, total still 100 → offset 0 + 5 < 100 → hasMore=true
             // but typically the driver returns fewer when near the end
             (driver.count as jest.Mock).mockResolvedValue(5);
-            const result2 = await data.products.find({ limit: 20 });
+            const result2 = await at(data, "products").find({ limit: 20 });
             expect(result2.meta.hasMore).toBe(false);
             expect(result2.meta.total).toBe(5);
         });
@@ -204,7 +218,7 @@ name: "Camera" };
             });
             const data = buildRebaseData(driver);
 
-            const result = await data.products.findById("abc");
+            const result = await at(data, "products").findById("abc");
             expect(result).toEqual({ id: "abc",
 path: "products",
 values: { id: "abc",
@@ -220,7 +234,7 @@ id: "abc" });
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
-            await data.products.create({ name: "Camera",
+            await at(data, "products").create({ name: "Camera",
 price: 299 });
 
             expect(driver.save).toHaveBeenCalledWith(
@@ -237,7 +251,7 @@ price: 299 },
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
-            await data.products.create({ name: "Camera" }, "custom-id");
+            await at(data, "products").create({ name: "Camera" }, "custom-id");
 
             expect(driver.save).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -254,7 +268,7 @@ price: 299 },
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
-            await data.products.update("prod-1", { price: 399 });
+            await at(data, "products").update("prod-1", { price: 399 });
 
             expect(driver.save).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -273,7 +287,7 @@ price: 299 },
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
-            await data.products.delete("prod-1");
+            await at(data, "products").delete("prod-1");
 
             expect(driver.delete).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -290,15 +304,15 @@ path: "products" })
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
-            expect(data.products.count).toBeDefined();
-            const result = await data.products.count!();
+            expect(at(data, "products").count).toBeDefined();
+            const result = await at(data, "products").count!();
             expect(driver.count).toHaveBeenCalled();
         });
 
         it("is undefined when driver has no count", () => {
             const driver = createMockDriver({ count: undefined });
             const data = buildRebaseData(driver);
-            expect(data.products.count).toBeUndefined();
+            expect(at(data, "products").count).toBeUndefined();
         });
     });
 
@@ -308,7 +322,7 @@ path: "products" })
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
 
-            await data.products
+            await at(data, "products")
                 .where("price", ">", 100)
                 .orderBy("createdAt", "desc")
                 .limit(5)

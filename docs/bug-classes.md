@@ -153,6 +153,203 @@ that look identical from a missing binary and need opposite instructions.
 
 ---
 
+## 6. Tests that time an async path by counting ticks
+
+`packages/client/test/auth.test.ts` awaited `Promise.resolve()` exactly eight
+times and then asserted that a fatally-rejected token refresh had signed the
+user out. Eight was however many microtasks that path took when the test was
+written. The path grew — refresh-token rotation became concurrency-safe, which
+added awaits — the sign-out stopped landing inside eight ticks, and a code path
+that was still correct began reporting as a security regression. CI runs
+`pnpm test`, so main was red on it.
+
+The sibling test is what made it hard to read. "The session is NOT null" passes
+trivially when nothing has run yet, so a file where *both* tests had stopped
+waiting for anything reported exactly one failure, and the failure pointed at
+the product rather than at the clock.
+
+**Sweep:** `grep -rn "for (let i = 0; i < [0-9]*; i++) await Promise.resolve()"`
+over the test suites, then neutralise each helper (set the loop bound to `0`)
+and re-run. A test that still passes was never waiting for the thing it names.
+Checked 2026-07-31: `channel-bus.test.ts` and `cdc-realtime.test.ts` both fail
+when zeroed — they are genuinely synchronising — and
+`packages/client/test/subscription-resilience.test.ts` passes when zeroed, but
+its assertions are positive and specific (`onError` called, exactly one
+subscribe frame), so growth there fails loudly rather than silently. Left alone.
+
+**Fix shape:** wait for the condition, not for a tick count. Drain the microtask
+queue until the predicate holds (positive assertions), or drain a fixed generous
+budget before asserting something did *not* happen (negative assertions). Still
+no timers and no wall-clock, so determinism is unchanged, and a real regression
+fails in milliseconds instead of hanging.
+
+**Watch for:** a negative assertion (`not.toBeNull`, `not.toHaveBeenCalled`)
+sitting next to a positive one behind the same wait helper. The negative one
+cannot fail early, so it will keep passing long after the helper stopped
+working, and it will make the positive one look like the bug.
+
+---
+
+## 7. A test and the code agreeing on a fiction
+
+`MongoConditionBuilder` picked searchable columns with
+`prop?.dataType === "string"`. No property in `@rebasepro/types` has ever had a
+`dataType` field — a real collection carries `type` — so the loop matched
+nothing for every collection a user could declare, and every search fell
+through to `$text`, which needs a text index and throws without one.
+
+The suite was green because its fixtures were written with the same wrong key.
+The test data agreed with the bug, and neither ever met a real collection.
+
+This is the failure mode `tsconfig.tests.json` was created to stop, and its own
+docblock records an earlier instance. But it covers only two packages: measured
+2026-08-01, including every test directory yields **1,668** type errors
+(server-postgres 974, client 266, server 122, common 106, admin 80, app 52,
+then a tail of nine packages with 21 or fewer). Everything outside those two is
+invisible to tsc, and the runners strip types without checking them.
+
+A second instance sits in `common/test/collection_registry_property_gates.test.ts`,
+which declares collections with `driver:` instead of `engine:` — so the engine
+gates it exists to test are never exercised at all.
+
+**Sweep:** for any fixture key, `grep` it in `packages/types/src`. Zero hits on
+a field the production code branches on is this bug. Then check whether that
+test directory is in `tsconfig.tests.json`; if not, it cannot warn you.
+
+**Fix shape:** fix the source, switch the fixtures to the real shape, and earn
+the package a line in `include` so it cannot drift again. The tail packages are
+cheap — 68 errors across nine of them.
+
+---
+
+## 8. A security-labelled test watching the wrong mechanism
+
+Four tests named "CVE-FIX: registration NEVER assigns admin role, even for
+first user" each asserted that `assignDefaultRole` was not called with
+`"admin"`. The first user is promoted through a different call —
+`setUserRoles(id, ["admin"])`, on both the password and OAuth paths — and in
+that branch `assignDefaultRole` is never reached at all.
+
+So they watched a function the escalation path does not use, and passed by
+construction. Measured: changing `if (isFirstUser)` to `if (true)`, so that
+*every* registrant becomes an admin, left three of the four green; the fourth
+failed only incidentally, because that mutation also skips the `defaultRole`
+branch.
+
+Their names were also simply wrong about the system. Registration *does* make
+the first user an admin — the documented bootstrap, asserted 1,100 lines
+earlier in the same file. A reader of that block was told the opposite, under a
+CVE label.
+
+**Sweep:** for any test whose name contains NEVER, CVE, or a vulnerability id,
+find the line of source that would have to change for the claim to break, and
+check the test observes *that* line. A spy on a neighbouring function is the
+signature.
+
+**Fix shape:** assert the property, not a proxy for it — here, "no non-first
+registration reaches admin **by any mechanism**", which reads every route to
+the role rather than one of them. Pair it with a positive test that the
+bootstrap still works, or the negatives can go green on a build where the
+feature quietly died.
+
+---
+
+## 9. `toBeDefined()` on an API that returns `null`
+
+`Headers.get` and `FormData.get` return `null` for a missing key, and `null`
+*is* defined. So `expect(res.headers.get("Retry-After")).toBeDefined()` cannot
+fail: the header could be dropped entirely and the rate-limiter test would stay
+green. The same shape appeared on `formData.get("file")`, and on
+`auth.getSession()`, which is typed `RebaseSession | null`.
+
+**Sweep:** `grep -rn "toBeDefined()" ` over the test suites and, for each,
+answer what the expression returns when the thing is absent. `null`, `[]`, `""`
+and `0` all pass `toBeDefined()`.
+
+**Fix shape:** `toBeTruthy()`, or better, assert the value. The nearby
+`rate-limit-data.test.ts` already got this right, which is the tell that the
+weaker one was a slip rather than a decision.
+
+---
+
+## 10. A flag whose `false` grants instead of skipping
+
+`requireAuth` on both realtime sockets was resolved as
+
+```ts
+const requireAuth = authConfig?.requireAuth !== false && !!authConfig?.jwtSecret;
+```
+
+and the connection handler then seeded each session with
+`authenticated: !requireAuth`. So the flag does not gate a check — it *is* the
+check, inverted. Computing `false` did not skip authentication, it granted it to
+everyone who connected, at connect time, silently. `requireAuth: true` on a
+server whose auth came from an adapter rather than a local `jwtSecret`
+evaluated to `false`: asking for authentication was what turned it off.
+
+**Sweep:** grep for a boolean derived from config that is later consumed
+*negated* — `!flag`, `flag ? x : y` where `y` is the permissive branch, or a
+default assignment like `authenticated: !requireAuth`, `allowed: !restricted`,
+`isPublic: !requireX`. For each, ask what the value is when the feature is
+requested but its prerequisite is absent. If that state grants rather than
+refuses, it is this class.
+
+**Fix shape:** fail closed, and say so. An explicit request for a restriction is
+honoured on its own; when there is no credential to enforce it with, refuse
+everyone and log at boot. Refusing is visible and gets reported; admitting is
+not, and does not.
+
+---
+
+## 11. Two interfaces for one call, disagreeing
+
+`init.ts` passes the AuthAdapter as the fifth argument to
+`initializeWebsockets`. `BackendBootstrapper` declares five parameters.
+`DatabaseAdapter` — the other type describing the same hop — declared four. The
+wrapper in `PostgresAdapter` was written against the shorter one and dropped the
+argument. JavaScript discards a surplus argument without complaint, and
+TypeScript had nothing to object to, because each side was individually
+consistent.
+
+What went missing was the argument that makes the socket secure by default. The
+same file already carried a comment explaining that `ensureCollectionSchema` and
+`ensureCollectionPolicies` had been dropped at this exact boundary before, with
+the same silence — which is the tell that the boundary, not the method, is the
+defect.
+
+**Sweep:** for every hop where an object is re-wrapped or forwarded, diff the
+two type declarations parameter by parameter, and diff both against the call
+site. `grep -n "<method>" packages/types/src` will usually turn up more than one
+declaration; if their arities differ, something is being dropped right now.
+
+**Fix shape:** one declaration, or make the narrower one reference the wider.
+Then pin it with a test that asserts the forwarded call receives *every*
+argument, not that the method exists — a wrapper that drops an argument is still
+a function of the right name.
+
+---
+
+## 12. A prop the component does not have
+
+`render(<Alert severity="error">…</Alert>)` in a test named "renders alert with
+correct message". `AlertProps` has no `severity`; the prop is `color`. React
+drops an unknown prop silently, so the alert rendered in its default blue while
+the test — which read only the text — passed. It is class 7 with a JSX face, and
+it survived because `packages/ui/test` was not in `tsconfig.tests.json`.
+
+Its neighbour in the same file was the inverse: `<VirtualTable<any> …>` did not
+compile, and the reason was a product bug. `React.memo` takes the props type as
+its *own* type argument, so `React.memo<VirtualTableProps<Record<string, unknown>>>(…)`
+pinned `T` at the boundary and discarded the `<T>` the inner function declares.
+The exported component was not generic at all.
+
+**Sweep:** put the test directory in `tsconfig.tests.json` — that is the whole
+sweep, and it is why the include list is the unit of progress rather than the
+individual fix. Then read what tsc rejects rather than suppressing it: half of
+these are the test's mistake and half are the product's.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -223,3 +420,43 @@ that exists, is correct, and never runs. `saas` CI could not see this repo's
 commits, and the Playwright suite could not survive CI's database. In both cases
 the work had been done and the wiring had not, which is cheaper to find by
 asking "when does this actually execute?" than by reading the assertions.
+
+### Last sweep — 2026-08-01
+
+Triggered by a mutation-testing campaign over every package, and a read of all
+402 test files. Mutation scores at the start (comment-masked, sampled):
+`common` 72%, `client` 59%, `server-postgres` 48%, `inference` 40%,
+`server-mongo` 37%, `cli` 31%, `server` 33%, `admin` 12%.
+
+| checked | result |
+|---|---|
+| `requireAuth` on the Postgres and Mongo sockets | **BUG** (class 10) — an explicit `requireAuth: true` resolved to `false` without a local `jwtSecret`, marking every connecting client authenticated. Both fixed, fail closed, warn at boot. |
+| `DatabaseAdapter.initializeWebsockets` arity vs `BackendBootstrapper` | **BUG** (class 11) — four parameters against five, so the AuthAdapter was dropped and secure-by-default was lost through `createPostgresAdapter`. Fixed and pinned. |
+| Mongo `clientSessions` map | **BUG** — module-level, shared by every socket in the process; two servers read each other's sessions. Scoped to the factory, as Postgres already was. |
+| `parseSubPath` and a literal `undefined` segment | **BUG** — `/authors/123/undefined/posts` was answered with `/authors/123/posts`. Now 404. |
+| `S3StorageController.deleteObject` on a missing key | **BUG** — 200 on AWS, 500 on MinIO/Ceph. Idempotent now, matching the local controller. |
+| `Bearer` scheme case-sensitivity | **BUG** — against RFC 7235 §2.1; `bearer` was a 401 indistinguishable from a bad token. Fixed. |
+| client `where: { f: ["==", undefined] }` | **BUG** — serialized to `f=eq.undefined`, a search for the literal string. Now refused, because silently dropping the condition returns the query *unfiltered*. |
+| `count()` forwarding `include` | **BUG** — a non-matching join drops rows, so the total disagreed with the `find()` it describes. |
+| enum labels in generated DDL | **BUG** — interpolated unescaped, and emitted twice for two collections on one table. Both fixed. |
+| `singularize("knives")` | **BUG** — `"knif"`, and `archives → archif` with it. Closed f/fe map. |
+| `getInferenceType(null)` | **BUG** — `"map"`, disagreeing with `inferTypeFromValue` on the same value (class 2). |
+| `buildPropertiesOrder` | **BUG** — overwrote the caller's order and sorted it in place. No internal callers. |
+| `fromSerializableCollectionConfig` relations | **BUG** — rebuilt property thunks but not the collection-level array; imported tables threw "target is not a function". |
+| `<Alert severity="error">` | **BUG** (class 12) — a prop that does not exist, silently dropped by React. |
+| `VirtualTable`'s generic | **BUG** (class 12) — discarded by `React.memo`; the exported component was not generic. |
+| `packages/app/test/components/useBoardDataController.test.ts` | **BUG** (class 3) — never imported the hook, and could not: it lives in `admin`, which depends on `app`. Rewritten in `admin`. |
+| `VirtualTable.performance.test.tsx` | **BUG** (class 3) — ~300 lines that never ran; it triggered a `ResizeObserver` the mocked `react-use-measure` never constructs. |
+| `reset-password-admin`, `admin-users-ids-lookup` | **BUG** (class 8) — no 401 or 403 at all, so dropping `requireAdmin` passed. |
+| `websocket.test.ts` admin gate | **BUG** (class 8) — stubbed the token verifier to return an admin unconditionally, so only the happy path could ever run. |
+| `mfa-service.test.ts` | **BUG** — counted calls without reading the statements; dropping `AND uid = …` from a factor delete passed. |
+| every method on `DatabaseAdapter` vs `BackendBootstrapper` (class 11 sweep) | clean apart from the fix above — `initializeRealtime` takes a `config` on one side and not the other, but every implementation names it `_config` and ignores it, so nothing is lost. The other seven agree parameter for parameter. |
+| every security flag consumed negated (class 10 sweep) | clean — the only `authenticated: !flag` sites are the two sockets fixed here. `resolveRequireAuth`, `openapi-generator`'s `requireAuth ?? true` and the API-key guard all default closed. |
+| the HTTP and socket answers to "is auth required?" | **BUG** (class 2 + 10) — two implementations of one predicate, disagreeing in the open direction: with no auth configured, `/api/data` answered 401 while the socket served the same rows. Extracted to `resolveRequireAuth`; both call it, and the tests pin agreement rather than restating answers. |
+| test directories invisible to tsc | **BUG** (class 7/12, systemic) — six more packages added to `tsconfig.tests.json`; 47 errors fixed, no `as any`, no `@ts-ignore`. |
+
+The two socket findings are worth keeping together, because they are the same
+bug reached two different ways: once by a boolean expression that inverted its
+own meaning, once by a type signature that silently ate the argument which would
+have made the expression irrelevant. Neither had a test, and the test that
+existed for the gate stubbed the verifier so that it could not have failed.

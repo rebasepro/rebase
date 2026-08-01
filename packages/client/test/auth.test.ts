@@ -97,22 +97,35 @@ describe("createAuth", () => {
             expect(transport.setToken).toHaveBeenCalledWith("fake-jwt");
         });
 
-        it("attempts refresh when stored session is expired", () => {
+        it("attempts refresh when stored session is expired", async () => {
             const storage = createMemoryStorage();
             const expiredSession = mockSessionObj(Date.now() - 1000);
             storage.setItem("rebase_auth", JSON.stringify(expiredSession));
 
+            const newExpiry = Date.now() + 3600000;
             // Mock the refresh fetch call
             mockFetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
-                    tokens: mockTokens(Date.now() + 3600000)
+                    tokens: { ...mockTokens(newExpiry),
+accessToken: "refreshed-jwt" }
                 })
             });
 
             const auth = createAuth(transport, { storage });
-            // Session should exist (refresh is attempted in background)
-            expect(auth.getSession()).toBeDefined();
+            await auth.isInitialized();
+
+            // Boot restores the expired session optimistically and fires
+            // /refresh underneath it. `getSession()` is nullable, so asserting
+            // it "toBeDefined" would also pass on the null the failure path
+            // leaves behind — i.e. with no refresh attempted at all. Assert the
+            // network call the test is named for.
+            expect(mockFetch).toHaveBeenCalledWith(
+                "http://localhost/api/v1/auth/refresh",
+                expect.objectContaining({ method: "POST" })
+            );
+            expect(auth.getSession()?.accessToken).toBe("refreshed-jwt");
+            expect(auth.getSession()?.expiresAt).toBe(newExpiry);
         });
 
         it("skips session restore when persistSession is false", () => {
@@ -148,7 +161,11 @@ expiresAt: Date.now() + 100000 }));
 
             const auth = createAuth(transport, { storage });
             await expect(auth.isInitialized()).resolves.toBeUndefined();
-            expect(auth.getSession()).toBeDefined();
+            // `toBeDefined()` on a `RebaseSession | null` getter is satisfied by
+            // null, so it would not notice a restore that silently dropped the
+            // session — pin the token that was actually restored.
+            expect(auth.getSession()?.accessToken).toBe("fake-jwt");
+            expect(auth.getSession()?.expiresAt).toBe(session.expiresAt);
         });
 
         it("resolves isInitialized after failed restore", async () => {
@@ -195,7 +212,36 @@ expiresAt: Date.now() + 100000 }));
     // auto-refresh resilience
     // -----------------------------------------------------------------------
     describe("auto-refresh resilience", () => {
-        const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
+        /*
+         * These used to `await Promise.resolve()` eight times and assert.
+         *
+         * Eight was however many microtasks the refresh path happened to take
+         * when they were written; it grew (rotation became concurrency-safe,
+         * which added awaits) and the sign-out assertion started failing on a
+         * code path that was still correct. The sibling test hid it: "the
+         * session is NOT null" passes trivially when nothing has run yet, so
+         * the suite reported one failure where it should have reported that
+         * both tests had stopped meaning anything.
+         *
+         * Waiting for the condition instead of for a tick count is what makes
+         * this stable. Still no timers and no wall-clock — it drains the
+         * microtask queue, so it is as deterministic as the counting was, and
+         * a real regression fails it in milliseconds rather than hanging.
+         */
+        const TICK_BUDGET = 1000;
+
+        /** Drain microtasks until `predicate` holds, or the budget runs out. */
+        const settle = async (predicate: () => boolean) => {
+            for (let i = 0; i < TICK_BUDGET; i++) {
+                if (predicate()) return;
+                await Promise.resolve();
+            }
+        };
+
+        /** Drain the whole budget — for asserting something does NOT happen. */
+        const drain = async () => {
+            for (let i = 0; i < TICK_BUDGET; i++) await Promise.resolve();
+        };
 
         it("retries instead of signing out on a transient refresh failure (5xx)", async () => {
             const storage = createMemoryStorage();
@@ -209,9 +255,12 @@ expiresAt: Date.now() + 100000 }));
             });
 
             const auth = createAuth(transport, { storage });
-            await flush();
+            await drain();
 
-            // A transient 5xx must NOT drop the session — a retry is scheduled instead.
+            // A transient 5xx must NOT drop the session — a retry is scheduled
+            // instead. Drained fully, so the refresh has definitely been
+            // attempted and its failure handled before this is asserted.
+            expect(mockFetch).toHaveBeenCalled();
             expect(auth.getSession()).not.toBeNull();
         });
 
@@ -226,7 +275,7 @@ expiresAt: Date.now() + 100000 }));
             });
 
             const auth = createAuth(transport, { storage });
-            await flush();
+            await settle(() => auth.getSession() === null);
 
             expect(auth.getSession()).toBeNull();
         });
@@ -988,14 +1037,26 @@ autoRefresh: true });
             mockFetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
-                    tokens: mockTokens(Date.now() + 3600000)
+                    tokens: { ...mockTokens(Date.now() + 3600000),
+accessToken: "refreshed-jwt" }
                 })
             });
 
-            // Advance time to trigger the refresh
-            jest.advanceTimersByTime(300000);
-            // Allow promises to settle
-            await Promise.resolve();
+            // The refresh is armed for REFRESH_BUFFER_MS (2 min) *before*
+            // expiry, not at expiry — a timer that only fires once the token is
+            // already dead is the bug this pins. One tick short of the buffer
+            // boundary nothing may have gone out yet.
+            expect(jest.getTimerCount()).toBe(1);
+            await jest.advanceTimersByTimeAsync(300000 - 120000 - 1);
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+
+            await jest.advanceTimersByTimeAsync(1);
+            expect(mockFetch).toHaveBeenCalledTimes(2);
+            expect(mockFetch).toHaveBeenLastCalledWith(
+                "http://localhost/api/v1/auth/refresh",
+                expect.objectContaining({ method: "POST" })
+            );
+            expect(auth.getSession()?.accessToken).toBe("refreshed-jwt");
         });
 
         it("disables auto-refresh when autoRefresh option is false", async () => {

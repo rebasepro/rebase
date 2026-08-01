@@ -1013,14 +1013,53 @@ withEmail: false }); // Hack to pass empty list of providers
 
     // ── Forgot Password ─────────────────────────────────────────────────
     describe("POST /auth/forgot-password", () => {
-        it("always returns success (timing-safe)", async () => {
+        /*
+         * This was named "always returns success (timing-safe)" and checked
+         * neither claim: it exercised only the *unknown* address and measured
+         * nothing about timing. The property that actually defends against
+         * account enumeration is that the two cases are indistinguishable — and
+         * a response that differed by so much as a field would have passed,
+         * because the existing-user branch was never asked what it returns.
+         *
+         * "Timing-safe" is dropped from the name rather than pretended at: this
+         * handler does real work (token, template, SMTP) only for a user that
+         * exists, so it is *not* constant-time, and a unit test asserting
+         * otherwise would be the most misleading kind of green.
+         */
+        it("answers an unknown address and a real one identically", async () => {
             const app = createApp({ withEmail: true });
-            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null); // user doesn't exist
 
-            const res = await app.request("/auth/forgot-password", json({ email: "nobody@test.com" }));
-            expect(res.status).toBe(200);
-            const body = await res.json() as any;
-            expect(body.success).toBe(true);
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
+            const unknown = await app.request("/auth/forgot-password", json({ email: "nobody@test.com" }));
+            const unknownBody = await unknown.json();
+
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
+            const known = await app.request("/auth/forgot-password", json({ email: "test@example.com" }));
+            const knownBody = await known.json();
+
+            // Status, and every byte of the body: anything that differs here is
+            // an oracle telling an attacker which addresses have accounts.
+            expect(unknown.status).toBe(200);
+            expect(known.status).toBe(unknown.status);
+            expect(knownBody).toEqual(unknownBody);
+            expect((unknownBody as { success: boolean }).success).toBe(true);
+        });
+
+        it("says the same thing when sending the email fails", async () => {
+            // The catch around `emailService.send` exists so an SMTP outage does
+            // not become the same oracle. Nothing covered it.
+            const app = createApp({ withEmail: true });
+
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
+            const unknown = await app.request("/auth/forgot-password", json({ email: "nobody@test.com" }));
+            const unknownBody = await unknown.json();
+
+            mockAuthRepo.getUserByEmail.mockResolvedValueOnce(mockUser());
+            mockEmailService.send.mockRejectedValueOnce(new Error("smtp down"));
+            const known = await app.request("/auth/forgot-password", json({ email: "test@example.com" }));
+
+            expect(known.status).toBe(unknown.status);
+            expect(await known.json()).toEqual(unknownBody);
         });
 
         it("sends reset email when user exists", async () => {
@@ -1363,6 +1402,131 @@ ipAddress: "1.2.3.4" }
             const res2 = await app.request("/auth/sessions", { method: "DELETE" });
             expect(res2.status).toBe(401);
         });
+
+        it("DELETE /auth/sessions/:id revokes the family of the token that was named", async () => {
+            // The id in the URL names one token row, and the route resolves it
+            // to the session family behind it — a device holds several rotated
+            // siblings, and killing one leaves the device signed in. Nothing
+            // checked *which* row it resolved: with more than one session on
+            // file, matching the wrong row signs the user out of the laptop they
+            // are sitting at and leaves the phone they were revoking alive.
+            const app = createApp();
+            mockAuthRepo.listRefreshTokensForUser.mockResolvedValueOnce([
+                { id: "tok-laptop",
+uid: "user-1",
+tokenHash: "h1",
+sessionId: "sess-laptop",
+expiresAt: new Date(),
+createdAt: new Date() },
+                { id: "tok-phone",
+uid: "user-1",
+tokenHash: "h2",
+sessionId: "sess-phone",
+expiresAt: new Date(),
+createdAt: new Date() }
+            ] as never);
+
+            const res = await app.request("/auth/sessions/tok-phone", {
+                method: "DELETE",
+                headers: { ...authHeader() }
+            });
+
+            expect(res.status).toBe(200);
+            expect(mockAuthRepo.revokeRefreshTokenSession).toHaveBeenCalledTimes(1);
+            expect(mockAuthRepo.revokeRefreshTokenSession).toHaveBeenCalledWith("sess-phone");
+            // …and the row-level fallback is not also fired.
+            expect(mockAuthRepo.deleteRefreshTokenById).not.toHaveBeenCalled();
+        });
+
+        it("DELETE /auth/sessions/:id falls back to the single row when the id is not the caller's", async () => {
+            // `owned` is already scoped to the caller, so an id that is not in it
+            // is either stale or someone else's. The fallback deletes by id *and*
+            // uid, which is the layer that keeps it from touching another user.
+            const app = createApp();
+            mockAuthRepo.listRefreshTokensForUser.mockResolvedValueOnce([
+                { id: "tok-laptop",
+uid: "user-1",
+tokenHash: "h1",
+sessionId: "sess-laptop",
+expiresAt: new Date(),
+createdAt: new Date() }
+            ] as never);
+
+            const res = await app.request("/auth/sessions/tok-someone-else", {
+                method: "DELETE",
+                headers: { ...authHeader() }
+            });
+
+            expect(res.status).toBe(200);
+            expect(mockAuthRepo.revokeRefreshTokenSession).not.toHaveBeenCalled();
+            expect(mockAuthRepo.deleteRefreshTokenById).toHaveBeenCalledWith("tok-someone-else", "user-1");
+        });
+    });
+
+    // ── MFA challenge ownership ─────────────────────────────────────────
+    describe("POST /auth/mfa/challenge", () => {
+        /**
+         * A challenge is the step between "password accepted" and "session
+         * upgraded to aal2". Opening one against a factor belonging to somebody
+         * else would let a caller drive another account's second factor — so the
+         * route checks that the factor's uid is the caller's. Nothing tested
+         * that check: inverting it (`!==` → `===`) left the whole suite green.
+         */
+        function withFactor(app: ReturnType<typeof createApp>, factor: unknown) {
+            (mockAuthRepo as unknown as Record<string, unknown>).getMfaFactorById =
+                jest.fn().mockResolvedValue(factor);
+            (mockAuthRepo as unknown as Record<string, unknown>).createMfaChallenge =
+                jest.fn().mockResolvedValue({ id: "challenge-1",
+factorId: "factor-1" });
+            return app;
+        }
+
+        function challenge(app: ReturnType<typeof createApp>, uid = "user-1") {
+            return app.request("/auth/mfa/challenge", {
+                ...json({ factorId: "factor-1" }),
+                headers: { "Content-Type": "application/json",
+...authHeader(uid) }
+            });
+        }
+
+        it("opens a challenge against the caller's own factor", async () => {
+            const app = withFactor(createApp(), { id: "factor-1",
+uid: "user-1",
+verified: true });
+
+            const res = await challenge(app);
+
+            expect(res.status).toBe(200);
+            const body = await res.json() as { challengeId: string; factorId: string };
+            expect(body.challengeId).toBe("challenge-1");
+            expect(body.factorId).toBe("factor-1");
+        });
+
+        it("refuses a factor that belongs to another user", async () => {
+            const app = withFactor(createApp(), { id: "factor-1",
+uid: "someone-else",
+verified: true });
+
+            const res = await challenge(app);
+
+            expect(res.status).toBe(404);
+            expect((await res.json() as { error: { message: string } }).error.message)
+                .toBe("MFA factor not found");
+            // No challenge is minted for a factor the caller does not own — a
+            // 404 that still created one would be a leak with a polite status.
+            expect((mockAuthRepo as unknown as { createMfaChallenge: jest.Mock }).createMfaChallenge)
+                .not.toHaveBeenCalled();
+        });
+
+        it("refuses a factor id that does not exist", async () => {
+            const app = withFactor(createApp(), null);
+
+            const res = await challenge(app);
+
+            expect(res.status).toBe(404);
+            expect((mockAuthRepo as unknown as { createMfaChallenge: jest.Mock }).createMfaChallenge)
+                .not.toHaveBeenCalled();
+        });
     });
 
     // ── Auth Config ─────────────────────────────────────────────────────
@@ -1439,11 +1603,58 @@ isBootstrapCompleted: async () => false });
     // These tests directly verify the exploit scenarios from the security audit.
     // ═════════════════════════════════════════════════════════════════════
 
+    /*
+     * These were four tests named "CVE-FIX: … NEVER assigns admin role, even
+     * for first user", and not one of them could fail.
+     *
+     * Each asserted `assignDefaultRole` was not called with "admin". But the
+     * first user is promoted through a different call entirely —
+     * `setUserRoles(id, ["admin"])` (routes.ts, and again on the OAuth path) —
+     * and in that branch `assignDefaultRole` is never reached at all. So they
+     * watched a function the escalation path does not use, and passed by
+     * construction.
+     *
+     * Their names were also simply wrong about the system: registration *does*
+     * make the first user an admin. That is the documented bootstrap, asserted
+     * 1,100 lines above in "empty database: admits the first registration …
+     * and promotes it to admin". A reader of this block was told the opposite,
+     * under a CVE label.
+     *
+     * The real property is narrower and is what these now assert: the bootstrap
+     * is for the *first* user only, and no later registration reaches admin by
+     * any mechanism.
+     */
     describe("Security: privilege escalation prevention", () => {
-        it("CVE-FIX: registration NEVER assigns admin role, even for first user", async () => {
+        /** Every route by which a caller could end up holding "admin". */
+        const grantedAdmin = () =>
+            mockAuthRepo.setUserRoles.mock.calls.some(([, roles]: [string, string[]]) =>
+                Array.isArray(roles) && roles.includes("admin"))
+            || mockAuthRepo.assignDefaultRole.mock.calls.some(([, role]: [string, string]) =>
+                role === "admin");
+
+        it("promotes the genuine first user — the documented bootstrap", async () => {
+            // Stated positively, so this block starts from what the system does
+            // rather than from a claim that contradicts it. Without this, the
+            // "never promotes" tests below would also pass on a build where the
+            // bootstrap had silently stopped working.
             const app = createApp({ allowRegistration: true });
-            // Simulate first user (empty database before, one user after create)
-            mockAuthRepo.listUsers.mockResolvedValueOnce([]);
+            const first = mockUser({ id: "boot-1", email: "first@test.com" });
+            mockAuthRepo.createUser.mockResolvedValueOnce(first as never);
+            mockAuthRepo.listUsers.mockResolvedValueOnce([first] as never);
+
+            const res = await app.request("/auth/register", json({
+                email: "first@test.com",
+                password: "StrongPass1"
+            }));
+
+            expect(res.status).toBe(201);
+            expect(mockAuthRepo.setUserRoles).toHaveBeenCalledWith("boot-1", ["admin"]);
+        });
+
+        it("never promotes a registration that is not the first user", async () => {
+            const app = createApp({ allowRegistration: true });
+            // Somebody is already there, so this registrant is not the first.
+            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
 
             const res = await app.request("/auth/register", json({
                 email: "hacker@evil.com",
@@ -1452,117 +1663,59 @@ isBootstrapCompleted: async () => false });
             }));
 
             expect(res.status).toBe(201);
-            const body = await res.json() as any;
-
-            // The critical assertion: admin must NOT be in the roles
-            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalledWith(
-                expect.any(String), "admin"
-            );
-            // Verify the user was created but NOT given admin
-            expect(mockAuthRepo.createUser).toHaveBeenCalledTimes(1);
+            expect(grantedAdmin()).toBe(false);
         });
 
-        it("CVE-FIX: OAuth registration NEVER assigns admin role, even for first user", async () => {
+        it("never promotes a non-first OAuth sign-in either", async () => {
             const app = createApp({ allowRegistration: true });
             mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
+            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
 
+            // 200, not 404: a 404 here would mean no provider was injected and
+            // the escalation path was never reached, which is how a test like
+            // this passes without testing anything.
             const res = await app.request("/auth/google", json({ idToken: "valid-token" }));
             expect(res.status).toBe(200);
 
-            // The critical assertion: admin must NOT be assigned
-            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalledWith(
-                expect.any(String), "admin"
-            );
+            expect(grantedAdmin()).toBe(false);
         });
 
-        it("CVE-FIX: the bootstrap window admits only the genuine first user — a racer is rolled back", async () => {
-            // The empty-table bootstrap exception is the same trust model as
-            // the public setup screen it backs: whoever reaches a fresh
-            // deployment first becomes its admin. What must NOT happen is the
-            // window minting a second account: once anyone else exists, a
-            // registration that slipped past the empty-table check is undone.
-            const app = createApp({ allowRegistration: false });
-            const hacker = mockUser({ id: "hacker-1",
-email: "hacker@evil.com" });
-            const winner = mockUser({ id: "winner-1",
-email: "first@test.com" });
-            mockAuthRepo.createUser.mockResolvedValueOnce(hacker as any);
-            // gate's paginated count saw an empty table (default mock);
-            // the real first user beat them to the post-create check
-            mockAuthRepo.listUsers.mockResolvedValueOnce([winner, hacker] as any);
-
-            const res = await app.request("/auth/register", json({
-                email: "hacker@evil.com",
-                password: "HackRebase2026!",
-                displayName: "Hacker"
-            }));
-
-            expect(res.status).toBe(403);
-            const body = await res.json() as any;
-            expect(body.error.code).toBe("REGISTRATION_DISABLED");
-            expect(mockAuthRepo.deleteUser).toHaveBeenCalledWith("hacker-1");
-            expect(mockAuthRepo.setUserRoles).not.toHaveBeenCalled();
-        });
-
-        it("CVE-FIX: registration is blocked when allowRegistration=false and any user exists", async () => {
-            const app = createApp({ allowRegistration: false });
-            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser()],
-total: 1,
-limit: 1,
-offset: 0 } as any);
-
-            const res = await app.request("/auth/register", json({
-                email: "hacker@evil.com",
-                password: "HackRebase2026!",
-                displayName: "Hacker"
-            }));
-
-            expect(res.status).toBe(403);
-            const body = await res.json() as any;
-            expect(body.error.code).toBe("REGISTRATION_DISABLED");
-            expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
-        });
-
-        it("CVE-FIX: concurrent registration attempts cannot produce multiple admins", async () => {
+        it("produces at most one admin across concurrent registrations", async () => {
             const app = createApp({ allowRegistration: true });
+            // The table is no longer empty by the time these land.
+            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
 
-            // Simulate 5 concurrent registration requests
-            const requests = Array.from({ length: 5 }, (_, i) =>
-                app.request("/auth/register", json({
-                    email: `concurrent-${i}@evil.com`,
-                    password: "StrongPass1",
-                    displayName: `Concurrent ${i}`
-                }))
+            const responses = await Promise.all(
+                Array.from({ length: 5 }, (_, i) =>
+                    app.request("/auth/register", json({
+                        email: `concurrent-${i}@evil.com`,
+                        password: "StrongPass1",
+                        displayName: `Concurrent ${i}`
+                    })))
             );
 
-            const responses = await Promise.all(requests);
-            const successfulRegistrations = responses.filter(r => r.status === 201);
+            // The old version computed this and never asserted on it, so the
+            // test also passed if every request 500'd.
+            expect(responses.filter(r => r.status === 201).length).toBeGreaterThan(0);
 
-            // Even if multiple registrations succeed, NONE should get admin
-            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalledWith(
-                expect.any(String), "admin"
-            );
+            const adminGrants = mockAuthRepo.setUserRoles.mock.calls
+                .filter(([, roles]: [string, string[]]) => Array.isArray(roles) && roles.includes("admin"));
+            expect(adminGrants).toHaveLength(0);
         });
 
-        it("CVE-FIX: defaultRole cannot be set to 'admin' to grant admin via registration", async () => {
-            // Even if someone misconfigures defaultRole as 'admin',
-            // this test documents the current behavior — it would assign admin.
-            // The fix is in the config validation at startup (outside routes).
-            // Here we verify the defaultRole IS what's passed, and the auto-escalation is gone.
-            const app = createApp({ allowRegistration: true,
-defaultRole: "viewer" });
+        it("assigns only the configured default role, never admin alongside it", async () => {
+            const app = createApp({ allowRegistration: true, defaultRole: "viewer" });
+            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
 
             await app.request("/auth/register", json({
                 email: "new@test.com",
                 password: "StrongPass1"
             }));
 
-            // Only the configured default role is assigned, never auto-admin
-            expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledWith(
-                expect.any(String), "viewer"
-            );
+            expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledWith(expect.any(String), "viewer");
             expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledTimes(1);
+            expect(grantedAdmin()).toBe(false);
         });
     });
 

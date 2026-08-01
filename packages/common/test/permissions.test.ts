@@ -2,7 +2,8 @@ import {
     canReadCollection,
     canEditEntity,
     canCreateEntity,
-    canDeleteEntity
+    canDeleteEntity,
+    checkOperation
 } from "../src/util/permissions";
 import { Entity, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
 import { AuthController } from "@rebasepro/admin-types";
@@ -15,6 +16,8 @@ function makeAuthController(overrides: Partial<{ uid: string; roles: string[] }>
         email: "test@example.com",
         displayName: "Test",
         photoURL: null,
+        providerId: "password",
+        isAnonymous: false,
         roles: overrides.roles ?? []
     };
     return { user } as AuthController<User>;
@@ -362,14 +365,18 @@ mode: "permissive" } as SecurityRule
         it("handles complex nested parentheses in SQL", () => {
             const col = makeCollection([
                 {
-                    operation: "select",
+                    operation: "update",
                     mode: "permissive",
                     using: "((status = 'published'))"
                 } as SecurityRule
             ]);
             const auth = makeAuthController();
-            const entity = makeEntity({ status: "published" });
-            expect(canReadCollection(col, auth)).toBe(true);
+            // `canReadCollection` passes `entity: null`, so a row predicate is
+            // undecidable and the optimistic unknown->allow path answers instead
+            // of the parser. Go through an entity-aware check so the predicate is
+            // the thing under test, and pin both outcomes.
+            expect(canEditEntity(col, auth, "products", makeEntity({ status: "published" }))).toBe(true);
+            expect(canEditEntity(col, auth, "products", makeEntity({ status: "draft" }))).toBe(false);
         });
 
         it("optimistically allows IN / EXISTS queries (fallback)", () => {
@@ -391,14 +398,19 @@ mode: "permissive" } as SecurityRule
         it("evaluates != to true when values differ", () => {
             const col = makeCollection([
                 {
-                    operation: "select",
+                    operation: "update",
                     mode: "permissive",
                     using: "status != 'deleted'"
                 } as SecurityRule
             ]);
             const auth = makeAuthController();
+            // Same trap as the parentheses case: with `entity: null` the answer
+            // came from unknown->allow, not from `!=`. Re-checking under
+            // `onUnknown: "deny"` is what proves the `true` was decided by the
+            // operator rather than handed over by the fallback.
             const entity = makeEntity({ status: "active" });
-            expect(canReadCollection(col, auth)).toBe(true);
+            expect(canEditEntity(col, auth, "products", entity)).toBe(true);
+            expect(checkOperation(col, auth, entity, "update", { onUnknown: "deny" })).toBe(true);
         });
 
         it("evaluates != to false when values match", () => {

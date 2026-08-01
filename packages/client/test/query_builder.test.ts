@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { QueryBuilder } from "../src/query_builder";
+import { and, cond, or, QueryBuilder } from "../src/query_builder";
 import { CollectionClient } from "../src/collection";
-import { FindParams } from "@rebasepro/types";
+import { buildQueryString } from "../src/transport";
+import { FindParams, WhereFilterOp } from "@rebasepro/types";
 
 function getParams(qb: QueryBuilder<any>): any {
     return (qb as unknown as { params: FindParams }).params;
@@ -32,58 +33,64 @@ describe("QueryBuilder", () => {
     });
 
     // -----------------------------------------------------------------------
-    // Operator mapping
+    // Operator storage
+    //
+    // These titles used to claim a mapping ("maps == to eq") that the builder
+    // never performs: `where()` stores the canonical tuple verbatim, and the
+    // translation to REST short codes happens later, in `buildQueryString`.
+    // The mapping itself is covered by "REST wire mapping" at the bottom of
+    // this file — at the layer that actually does it.
     // -----------------------------------------------------------------------
-    describe("Operator mapping", () => {
-        it("maps == to eq (renders as plain value)", () => {
+    describe("Operator storage (canonical tuples, unmapped)", () => {
+        it("stores == verbatim", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("age", "==", 18);
             expect(getParams(qb).where).toEqual({ age: ["==", 18] });
         });
 
-        it("maps != to neq", () => {
+        it("stores != verbatim", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("age", "!=", 18);
             expect(getParams(qb).where).toEqual({ age: ["!=", 18] });
         });
 
-        it("maps > to gt", () => {
+        it("stores > verbatim", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("score", ">", 100);
             expect(getParams(qb).where).toEqual({ score: [">", 100] });
         });
 
-        it("maps >= to gte", () => {
+        it("stores >= verbatim", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("score", ">=", 50);
             expect(getParams(qb).where).toEqual({ score: [">=", 50] });
         });
 
-        it("maps < to lt", () => {
+        it("stores < verbatim", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("score", "<", 10);
             expect(getParams(qb).where).toEqual({ score: ["<", 10] });
         });
 
-        it("maps <= to lte", () => {
+        it("stores <= verbatim", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("score", "<=", 0);
             expect(getParams(qb).where).toEqual({ score: ["<=", 0] });
         });
 
-        it("maps array-contains to cs", () => {
+        it("stores array-contains verbatim", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("tags", "array-contains", "featured");
             expect(getParams(qb).where).toEqual({ tags: ["array-contains", "featured"] });
         });
 
-        it("maps array-contains-any to csa with array", () => {
+        it("stores array-contains-any verbatim, array value intact", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("tags", "array-contains-any", ["a", "b"]);
             expect(getParams(qb).where).toEqual({ tags: ["array-contains-any", ["a", "b"]] });
         });
 
-        it("maps not-in to nin with array", () => {
+        it("stores not-in verbatim, array value intact", () => {
             const qb = new QueryBuilder(mockCollection);
             qb.where("status", "not-in", ["deleted", "archived"]);
             expect(getParams(qb).where).toEqual({ status: ["not-in", ["deleted", "archived"]] });
@@ -380,5 +387,133 @@ meta: {} });
             const result = qb.listen(jest.fn());
             expect(result).toBe(unsubFn);
         });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Repeated where() on the SAME column
+//
+// The only non-trivial branch in `where()`: a second condition on a column
+// that already has one does not overwrite it — the two collapse into an array
+// of tuples, which is how a range (`>= 18` AND `< 65`) is expressed at all.
+// Overwriting instead would silently widen every range query to its second
+// bound alone.
+// ---------------------------------------------------------------------------
+describe("QueryBuilder — repeated where() on one column", () => {
+    it("collapses two conditions into an array of tuples", () => {
+        const qb = new QueryBuilder(createMockCollection());
+        qb.where("age", ">=", 18).where("age", "<", 65);
+        expect(getParams(qb).where).toEqual({ age: [[">=", 18], ["<", 65]] });
+    });
+
+    it("appends a third condition to the existing array", () => {
+        const qb = new QueryBuilder(createMockCollection());
+        qb.where("age", ">=", 18).where("age", "<", 65).where("age", "!=", 40);
+        expect(getParams(qb).where).toEqual({
+            age: [[">=", 18], ["<", 65], ["!=", 40]]
+        });
+    });
+
+    it("keeps other columns as single tuples", () => {
+        const qb = new QueryBuilder(createMockCollection());
+        qb.where("age", ">=", 18).where("age", "<", 65).where("status", "==", "active");
+        expect(getParams(qb).where).toEqual({
+            age: [[">=", 18], ["<", 65]],
+            status: ["==", "active"]
+        });
+    });
+
+    it("survives the trip to the wire as repeated params", () => {
+        const qb = new QueryBuilder(createMockCollection());
+        qb.where("age", ">=", 18).where("age", "<", 65);
+        const decoded = decodeURIComponent(buildQueryString(getParams(qb)));
+        expect(decoded).toContain("age=gte.18");
+        expect(decoded).toContain("age=lt.65");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// where(logicalCondition) overload
+// ---------------------------------------------------------------------------
+describe("QueryBuilder — where(logicalCondition)", () => {
+    it("stores an or(...) group under `logical`, not under `where`", () => {
+        const qb = new QueryBuilder(createMockCollection());
+        qb.where(or(cond("status", "==", "draft"), cond("status", "==", "review")));
+
+        const params = getParams(qb);
+        expect(params.logical).toEqual({
+            type: "or",
+            conditions: [
+                { column: "status", operator: "==", value: "draft" },
+                { column: "status", operator: "==", value: "review" }
+            ]
+        });
+        // The group is a separate axis: it must not leak into the column
+        // filters, where it would serialize as a nonsense `status=` param.
+        expect(params.where).toEqual({});
+    });
+
+    it("composes with ordinary column filters", () => {
+        const qb = new QueryBuilder(createMockCollection());
+        qb.where("published", "==", true)
+            .where(or(cond("author", "==", "a"), cond("author", "==", "b")));
+
+        const decoded = decodeURIComponent(buildQueryString(getParams(qb)));
+        expect(decoded).toContain("published=eq.true");
+        expect(decoded).toContain("or=(author.eq.a,author.eq.b)");
+    });
+
+    it("a second logical group replaces the first", () => {
+        const qb = new QueryBuilder(createMockCollection());
+        qb.where(or(cond("a", "==", 1))).where(and(cond("b", "==", 2)));
+        expect(getParams(qb).logical).toEqual({
+            type: "and",
+            conditions: [{ column: "b", operator: "==", value: 2 }]
+        });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// REST wire mapping
+//
+// This is the layer the builder's tests used to claim: canonical operators
+// become PostgREST short codes here, and nowhere earlier.
+// ---------------------------------------------------------------------------
+describe("canonical → REST mapping (buildQueryString)", () => {
+    const wire = (op: WhereFilterOp, value: unknown) =>
+        decodeURIComponent(buildQueryString({ where: { a: [op, value] } as any }));
+
+    it.each([
+        ["==", 1, "?a=eq.1"],
+        ["!=", 1, "?a=neq.1"],
+        [">", 1, "?a=gt.1"],
+        [">=", 1, "?a=gte.1"],
+        ["<", 1, "?a=lt.1"],
+        ["<=", 1, "?a=lte.1"],
+        ["like", "x%", "?a=like.x%"],
+        ["ilike", "x%", "?a=ilike.x%"],
+        ["not-like", "x%", "?a=nlike.x%"],
+        ["not-ilike", "x%", "?a=nilike.x%"],
+        ["is-null", null, "?a=isnull.null"],
+        ["is-not-null", null, "?a=notnull.null"]
+    ] as [WhereFilterOp, unknown, string][])("%s serializes to %s", (op, value, expected) => {
+        expect(wire(op, value)).toBe(expected);
+    });
+
+    it.each([
+        ["in", ["x", "y"], "?a=in.(x,y)"],
+        ["not-in", ["x", "y"], "?a=nin.(x,y)"],
+        ["array-contains", "x", "?a=cs.x"],
+        ["array-contains-any", ["x", "y"], "?a=csa.(x,y)"]
+    ] as [WhereFilterOp, unknown, string][])("%s serializes to %s", (op, value, expected) => {
+        expect(wire(op, value)).toBe(expected);
+    });
+
+    it("rejects an operator that is not canonical", () => {
+        // The builder happily stores whatever it is handed, so an unknown
+        // operator only surfaces here — loudly, rather than as a query the
+        // server cannot parse.
+        expect(() => buildQueryString({ where: { a: ["gt" as WhereFilterOp, 5] } as any }))
+            .toThrow(/unknown operator/);
     });
 });

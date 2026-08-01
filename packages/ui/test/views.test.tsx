@@ -4,7 +4,7 @@
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { ListView, CardView, TableView, KanbanView, BoardItem, BoardItemViewProps } from "../src";
+import { ListView, CardView, VirtualTable, KanbanView, BoardItem, BoardItemViewProps } from "../src";
 
 // Mock react-use-measure so virtualized elements measure a fixed container size in tests
 jest.mock("react-use-measure", () => {
@@ -236,7 +236,13 @@ describe("Decoupled UI Views", () => {
         });
     });
 
-    describe("TableView Component", () => {
+    // `TableView` was a pure alias of `VirtualTable` and was un-exported when the
+    // control-size refactor tidied this package's public surface. The alias went;
+    // the behaviour it was standing in for did not, so the test follows the
+    // deprecation note rather than the name — it kept rendering `undefined` and
+    // failing with "Element type is invalid", which reads as a broken component
+    // rather than a moved export.
+    describe("VirtualTable Component", () => {
         const columns = [
             { key: "id", title: "ID", width: 100 },
             { key: "name", title: "Name", width: 200 }
@@ -250,9 +256,9 @@ describe("Decoupled UI Views", () => {
             cellRendererMock.mockClear();
         });
 
-        it("renders TableView with headers and cell data", () => {
+        it("renders the table with headers and cell data", () => {
             render(
-                <TableView<any>
+                <VirtualTable<Record<string, unknown>>
                     data={mockData as any}
                     columns={columns}
                     cellRenderer={cellRendererMock}
@@ -262,6 +268,23 @@ describe("Decoupled UI Views", () => {
             // Verify header title exists in the DOM
             expect(screen.getByText("ID")).toBeInTheDocument();
             expect(screen.getByText("Name")).toBeInTheDocument();
+
+            // The headers render from `columns` alone and say nothing about
+            // whether a row ever reached a cell. `cellRenderer` is the seam the
+            // component exists to drive: once per column per row, each call
+            // carrying that row's value for its own column.
+            expect(cellRendererMock).toHaveBeenCalledTimes(mockData.length * columns.length);
+            expect(cellRendererMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    column: columns[1],
+                    columnIndex: 1,
+                    cellData: "Task 1",
+                    rowData: mockData[0],
+                    rowIndex: 0
+                })
+            );
+            expect(screen.getAllByTestId("table-cell").map(c => c.textContent))
+                .toEqual(expect.arrayContaining(["1", "Task 1", "2", "Task 2", "3", "Task 3"]));
         });
     });
 

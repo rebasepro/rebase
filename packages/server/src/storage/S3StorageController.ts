@@ -293,7 +293,22 @@ export class S3StorageController implements StorageController {
             Key: resolvedPath
         });
 
-        await client.send(command);
+        // Deleting something that is already gone is the outcome the caller
+        // wanted, so it is not an error. AWS itself answers DeleteObject with
+        // 204 for a key that never existed, but S3-compatible backends (MinIO,
+        // Ceph, R2 in some configurations) do raise NoSuchKey — and the local
+        // controller has always returned quietly in this case. Without this,
+        // which of those a deployment happens to run decides whether
+        // `DELETE /api/storage/:path` on a stale reference is a 200 or a 500.
+        try {
+            await client.send(command);
+        } catch (error: unknown) {
+            const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+            if (s3Error.name === "NoSuchKey" || s3Error.$metadata?.httpStatusCode === 404) {
+                return;
+            }
+            throw error;
+        }
     }
 
     async listObjects(prefix: string, options?: {

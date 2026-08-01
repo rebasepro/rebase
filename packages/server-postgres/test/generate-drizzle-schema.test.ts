@@ -212,7 +212,10 @@ relationName: "editors" }
     describe("generateDrizzleSchema Column Types", () => {
 
         describe("String Property", () => {
-            it("should default to varchar if no columnType or isId is specified", async () => {
+            // The name used to say "varchar", which is the opposite guarantee:
+            // `varchar` is the bounded choice you have to ask for by name, and
+            // `text` is what a property that says nothing actually compiles to.
+            it("should default to text if no columnType or isId is specified", async () => {
                 const collections: CollectionConfig[] = [{
                     slug: "texts",
 table: "texts",
@@ -532,6 +535,11 @@ columnType: "jsonb" }
 
     describe("RLS policy generation", () => {
         it("should generate ownerField policy with USING and WITH CHECK for 'all'", async () => {
+            // Scoped to the authored policy on purpose: every table also gets the
+            // injected `default_admin_*` policies, and between them they always
+            // emit a `using:` and a `withCheck:` somewhere in the file. Searching
+            // the whole output for either clause therefore passes even if the
+            // `for: "all"` policy emitted neither.
             const collections: CollectionConfig[] = [{
                 slug: "notes",
                 table: "notes",
@@ -548,13 +556,13 @@ ownerField: "user_id" }
             }];
 
             const result = await generateSchema(collections);
-            expect(result).toContain("pgPolicy");
-            expect(result).toContain('as: "permissive"');
-            expect(result).toContain('for: "all"');
-            expect(result).toContain("(user_id)::text = auth.uid()");
-            // 'all' needs both using and withCheck
-            expect(result).toContain("using:");
-            expect(result).toContain("withCheck:");
+            const allPolicy = result.split("pgPolicy(").find(p => p.includes('for: "all"'));
+            expect(allPolicy).toBeDefined();
+            expect(allPolicy).toContain('as: "permissive"');
+            // 'all' needs both, and both must carry the owner predicate — a
+            // `withCheck: sql\`false\`` fallback would still contain "withCheck:".
+            expect(allPolicy).toContain("using: sql`(user_id)::text = auth.uid()`");
+            expect(allPolicy).toContain("withCheck: sql`(user_id)::text = auth.uid()`");
         });
 
         it("should generate SELECT policy with only USING clause", async () => {
@@ -1133,7 +1141,12 @@ roles: ["admin", "user"] }
         expect(matchSorted).not.toBeNull();
         expect(matchUnsorted![1]).toEqual(matchSorted![1]);
 
-        // The actual generated sql bodies should also be identical due to sorting
+        // The whole file, not just the policy name: the name hash is sorted
+        // independently of the SQL body and the `to:` list, so matching hashes
+        // prove nothing about whether the emitted policy is order-stable.
+        // Two configs differing only in array order must generate byte-identical
+        // schemas, or a `db push` would see spurious drift on every reorder.
+        expect(resultUnsorted).toEqual(resultSorted);
         expect(resultUnsorted).toContain("string_to_array(auth.roles(), ',') && ARRAY['admin','manager','user']");
         expect(resultUnsorted).toContain('to: ["app_role", "service_role"]');
     });
@@ -1165,7 +1178,11 @@ isId: "uuid" }
         expect(cleanResult).toContain("custom_id: uuid(\"custom_id\").primaryKey().defaultRandom()");
     });
 
-    it("should generate a serial primary key when isId is 'increment'", async () => {
+    // Not `serial`, despite the old name: the generator emits an IDENTITY
+    // column. The two are different DDL — `serial` creates an owned sequence
+    // with a column default, identity is a column property — so a name
+    // promising `serial` would send a reader looking for the wrong thing.
+    it("should generate an identity primary key when isId is 'increment'", async () => {
         const collections: CollectionConfig[] = [{
             slug: "tickets",
             table: "tickets",

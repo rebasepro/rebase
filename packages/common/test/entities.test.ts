@@ -1,6 +1,4 @@
 import {
-    isReadOnly,
-    isHidden,
     isPropertyBuilder,
     getDefaultValuesFor,
     getDefaultValueFor,
@@ -18,7 +16,7 @@ import {
 } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
-// isReadOnly
+// isPropertyBuilder
 // ─────────────────────────────────────────────────────────────
 describe("isPropertyBuilder", () => {
     it("returns true for property with dynamicProps function", () => {
@@ -76,9 +74,11 @@ defaultValue: "draft" } as Property)).toBe("draft");
     });
 
     it("allows null as defaultValue", () => {
+        // `StringProperty["defaultValue"]` is `string | undefined`; the point of
+        // this case is that an explicit null survives rather than being replaced.
         expect(getDefaultValueFor({ type: "string",
 name: "Status",
-defaultValue: null } as Property)).toBeNull();
+defaultValue: null } as unknown as Property)).toBeNull();
     });
 
     it("returns default values for map with nested properties", () => {
@@ -126,6 +126,14 @@ name: "Tags" } as Property
 describe("updateDateAutoValues", () => {
     const NOW = "TIMESTAMP_NOW";
 
+    /** The row shape these fixtures describe — otherwise `M` is inferred from
+        each `inputValues` literal and the stamped columns are not on it. */
+    interface Row extends Record<string, unknown> {
+        title?: string;
+        created_at?: unknown;
+        updated_at?: unknown;
+    }
+
     const properties: Properties = {
         title: { type: "string",
 name: "Title" } as Property,
@@ -138,7 +146,7 @@ autoValue: "on_update" } as Property
     };
 
     it("sets on_create and on_update for new entities", () => {
-        const result = updateDateAutoValues({
+        const result = updateDateAutoValues<Row>({
             inputValues: { title: "Test" },
             properties,
             status: "new",
@@ -150,7 +158,7 @@ autoValue: "on_update" } as Property
 
     it("sets on_update but not on_create for existing entities", () => {
         const existingDate = new Date("2023-01-01");
-        const result = updateDateAutoValues({
+        const result = updateDateAutoValues<Row>({
             inputValues: { title: "Test",
 created_at: existingDate },
             properties,
@@ -162,7 +170,7 @@ created_at: existingDate },
     });
 
     it("sets both on_create and on_update for copy status", () => {
-        const result = updateDateAutoValues({
+        const result = updateDateAutoValues<Row>({
             inputValues: { title: "Copy" },
             properties,
             status: "copy",
@@ -173,7 +181,7 @@ created_at: existingDate },
     });
 
     it("does not alter non-date properties", () => {
-        const result = updateDateAutoValues({
+        const result = updateDateAutoValues<Row>({
             inputValues: { title: "Hello" },
             properties,
             status: "new",

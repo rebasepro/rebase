@@ -70,3 +70,71 @@ export function assertKnownWriteFields(
         "VALIDATION_UNKNOWN_FIELDS"
     );
 }
+
+/**
+ * Narrow response rows to the fields the caller asked for.
+ *
+ * `?fields=id,title` is documented in the generated OpenAPI — "Comma-separated
+ * list of fields to return (field selection)" — and it is the first thing shown
+ * on every endpoint in the API Explorer. It was parsed into `options.fields`
+ * and then read by nothing at all: no driver referenced it, and every request
+ * came back with every column. A caller asking for two fields of a `posts` row
+ * still received its whole `content`.
+ *
+ * This shapes the *response*, which is what the parameter says it does; it is
+ * not a column pushdown, so it saves bandwidth rather than database work.
+ *
+ * `id` always survives. Rows are addressed by it everywhere above this layer —
+ * the admin table, realtime reconciliation, the offline cache — and a row that
+ * arrives without one is not a smaller row, it is an unusable one. Asking for
+ * `fields=title` and being unable to open the record you clicked is a worse
+ * answer than one extra key.
+ */
+export function projectResponseFields<T extends Record<string, unknown>>(
+    rows: T[],
+    fields: readonly string[] | undefined,
+    collection: CollectionConfig,
+    options?: { include?: readonly string[] }
+): T[] {
+    if (!fields || fields.length === 0) return rows;
+
+    const declared = new Set<string>(Object.keys(collection.properties ?? {}));
+    // The record is keyed by the property name the relation is reached under,
+    // which is the name a caller would put in `fields`.
+    for (const [key, relation] of Object.entries(resolveCollectionRelations(collection))) {
+        declared.add(key);
+        if (relation.kind === "belongsTo") declared.add((relation as ResolvedBelongsTo).localKey);
+    }
+    // `include` decides what is *loaded*; `fields` decides what is *returned*.
+    // So `include=author&fields=title,author` yields both, and naming the
+    // relation in `fields` without including it yields nothing for it — there
+    // was nothing fetched to return. Included names are accepted here so that
+    // a relation reached only through `include` (one the collection does not
+    // declare as a property) is not rejected as unknown.
+    for (const included of options?.include ?? []) declared.add(included);
+    declared.add("id");
+
+    // A collection that declares nothing describes nothing to check against —
+    // the same reasoning `assertKnownWriteFields` applies one function up.
+    if (declared.size > 1) {
+        const unknown = fields.filter(field => !declared.has(field));
+        if (unknown.length > 0) {
+            throw ApiError.badRequest(
+                `'${collection.slug}' has no field${unknown.length > 1 ? "s" : ""} ` +
+                `${unknown.map(f => `'${f}'`).join(", ")} to return. ` +
+                `Known fields: ${[...declared].sort().map(f => `'${f}'`).join(", ")}.`,
+                "UNKNOWN_RESPONSE_FIELD",
+                { fields: unknown, collection: collection.slug }
+            );
+        }
+    }
+
+    const keep = new Set<string>([...fields, "id"]);
+    return rows.map(row => {
+        const projected: Record<string, unknown> = {};
+        for (const key of Object.keys(row)) {
+            if (keep.has(key)) projected[key] = row[key];
+        }
+        return projected as T;
+    });
+}

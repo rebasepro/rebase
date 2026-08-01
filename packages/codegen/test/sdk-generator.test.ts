@@ -29,8 +29,15 @@ describe("Utils", () => {
         it("converts snake_case to PascalCase", () => {
             expect(toPascalCase("private_notes")).toBe("PrivateNotes");
         });
-        it("handles already PascalCase input", () => {
-            expect(toPascalCase("TestEntities")).toBe("Testentities"); // Note: toPascalCase implementation lowercases follow-up chars per word split
+        it("leaves already PascalCase input alone", () => {
+            expect(toPascalCase("TestEntities")).toBe("TestEntities");
+            expect(toPascalCase("GitRepoUrl")).toBe("GitRepoUrl");
+        });
+        it("keeps capitals inside a chunk when joining chunks", () => {
+            expect(toPascalCase("private_testEntities")).toBe("PrivateTestEntities");
+        });
+        it("folds SHOUTING_CASE down to one capital per word", () => {
+            expect(toPascalCase("PRIVATE_NOTES")).toBe("PrivateNotes");
         });
         it("handles kebab-case", () => {
             expect(toPascalCase("private-notes")).toBe("PrivateNotes");
@@ -595,7 +602,25 @@ isId: "uuid" }
 describe("generateSDK configurations", () => {
     it("does not generate README.md if includeReadme is false", () => {
         const files = generateSDK([authorsCollection], { includeReadme: false });
-        expect(files.length).toBe(1);
-        expect(files[0].path).toBe("database.types.ts");
+        expect(files.map(f => f.path)).toEqual(["database.types.ts"]);
+    });
+
+    it("generates the README by default", () => {
+        // Only the opt-out branch was covered, so `includeReadme` defaulting to
+        // off — or the README disappearing entirely — went unnoticed.
+        for (const options of [undefined, {}, { includeReadme: true }]) {
+            const files = generateSDK([authorsCollection], options);
+            expect(files.map(f => f.path)).toEqual(["database.types.ts", "README.md"]);
+            const readme = files.find(f => f.path === "README.md")!;
+            expect(readme.content).toContain("createRebaseClient");
+            expect(readme.content).toContain("@rebasepro/client");
+        }
+    });
+
+    it("always emits the typedefs, and they reflect the collections passed in", () => {
+        const files = generateSDK([authorsCollection]);
+        const types = files.find(f => f.path === "database.types.ts")!;
+        expect(types.content).toContain("export interface Database");
+        expect(types.content).toContain("authors:");
     });
 });

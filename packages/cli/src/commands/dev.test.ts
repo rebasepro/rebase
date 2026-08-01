@@ -2,24 +2,21 @@
  * Tests for the dev command's deterministic port logic.
  *
  * These verify that `getProjectPort` produces stable, non-colliding ports
- * and that the port resolution strategy (flag → env → file → hash) works correctly.
+ * and that the port resolution strategy (flag → env → file → hash) works
+ * correctly.
+ *
+ * They used to reproduce `getProjectPort` locally, on the grounds that it was
+ * not exported — so every assertion exercised the copy in this file and dev.ts
+ * could have been deleted without a failure. `resolveStartPort`, which the
+ * docblock claimed to cover, was never called at all. Both are exported now and
+ * imported here.
  */
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import fs from "fs";
+import os from "os";
+import path from "path";
 
-// Since getProjectPort and resolveStartPort are not exported, we reproduce
-// the pure-function logic here for testing. This also serves as a
-// specification for the expected behavior.
-
-/**
- * Reproduce the hash-based port assignment from dev.ts.
- */
-function getProjectPort(projectRoot: string): number {
-    let hash = 0;
-    for (let i = 0; i < projectRoot.length; i++) {
-        hash = ((hash << 5) - hash + projectRoot.charCodeAt(i)) | 0;
-    }
-    return 3001 + (Math.abs(hash) % 999);
-}
+import { DEV_PORT_FILENAME, getProjectPort, resolveStartPort } from "./dev";
 
 describe("getProjectPort", () => {
     it("returns a port in the range 3001–3999", () => {
@@ -72,5 +69,66 @@ describe("port collision resistance", () => {
         // With 999 possible values and 100 inputs, collisions are possible
         // but having fewer than 50 unique values would indicate a broken hash
         expect(ports.size).toBeGreaterThan(50);
+    });
+});
+
+describe("resolveStartPort", () => {
+
+    let projectRoot: string;
+    let savedPortEnv: string | undefined;
+
+    beforeEach(() => {
+        projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-dev-port-"));
+        savedPortEnv = process.env.PORT;
+        delete process.env.PORT;
+    });
+
+    afterEach(() => {
+        if (savedPortEnv === undefined) delete process.env.PORT;
+        else process.env.PORT = savedPortEnv;
+        fs.rmSync(projectRoot, { recursive: true,
+force: true });
+    });
+
+    const writePortFile = (port: string) =>
+        fs.writeFileSync(path.join(projectRoot, DEV_PORT_FILENAME), port, "utf-8");
+
+    it("falls back to the project hash when nothing else says otherwise", () => {
+        expect(resolveStartPort(projectRoot)).toBe(getProjectPort(projectRoot));
+    });
+
+    it("prefers the saved port file over the hash", () => {
+        writePortFile("4321");
+        expect(resolveStartPort(projectRoot)).toBe(4321);
+    });
+
+    it("prefers PORT over the saved port file", () => {
+        writePortFile("4321");
+        process.env.PORT = "5555";
+        expect(resolveStartPort(projectRoot)).toBe(5555);
+    });
+
+    it("prefers the explicit flag over everything", () => {
+        writePortFile("4321");
+        process.env.PORT = "5555";
+        expect(resolveStartPort(projectRoot, 6006)).toBe(6006);
+    });
+
+    it("ignores a port file holding an out-of-range or unparseable value", () => {
+        const hashed = getProjectPort(projectRoot);
+        for (const bad of ["0", "-1", "65536", "999999", "not-a-port", ""]) {
+            writePortFile(bad);
+            expect(resolveStartPort(projectRoot)).toBe(hashed);
+        }
+    });
+
+    it("tolerates trailing whitespace in the port file", () => {
+        writePortFile("4321\n");
+        expect(resolveStartPort(projectRoot)).toBe(4321);
+    });
+
+    it("falls back to the hash when the project directory does not exist", () => {
+        const missing = path.join(projectRoot, "gone");
+        expect(resolveStartPort(missing)).toBe(getProjectPort(missing));
     });
 });

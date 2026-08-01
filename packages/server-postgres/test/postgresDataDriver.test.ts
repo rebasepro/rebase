@@ -4,6 +4,7 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import type { CollectionConfig, Entity } from "@rebasepro/types";
 
@@ -498,7 +499,14 @@ callbacks: {} as unknown as Record<string, unknown> });
             expect(unsub).toBe(mockUnsubscribe);
         });
 
-        it("should NOT skip authContext injection if subscription has a non-driver clientId", () => {
+        it("should skip authContext injection if the last subscription has a non-driver clientId", () => {
+            // `injectAuthContext` writes into whichever subscription happens to be
+            // LAST in the map, on the assumption that the delegate call it just
+            // made registered it. The `clientId === "driver"` guard is what keeps
+            // that assumption honest: without it, a subscription registered by
+            // some other client — a websocket session belonging to a different
+            // user — would be stamped with this request's uid and roles, and the
+            // RLS-aware poller would then read rows as the wrong user.
             const mockUnsubscribe = jest.fn();
             mockRealtimeService.subscriptions.clear();
             jest.spyOn(delegate, "listenCollection").mockImplementationOnce(() => {
@@ -509,7 +517,6 @@ authContext: undefined });
             authDelegate.listenCollection({ path: "test",
 collection: {} as unknown as CollectionConfig,
 callbacks: {} as unknown as Record<string, unknown> });
-            // authContext should NOT be injected because clientId !== 'driver'
             expect(mockRealtimeService.subscriptions.get("sub-ext").authContext).toBeUndefined();
         });
 
@@ -569,14 +576,22 @@ email: "hacker@evil.com" };
 collection: { slug: "x",
 properties: {} } as unknown as CollectionConfig });
 
-            // The SQL template tag should have the uid as a parameter value, not embedded in the SQL string
-            const sqlObj = mockTx.execute.mock.calls[0][0];
-            const serialized = JSON.stringify(sqlObj);
-            expect(serialized).toContain("set_config");
-            // The malicious string should appear as a bound parameter, not as raw SQL
-            expect(serialized).toContain("admin'; DROP TABLE users; --");
-            // Verify it's using Drizzle's tagged template, which inherently parameterizes
-            expect(sqlObj).toHaveProperty("queryChunks");
+            // Compile the SQL object the way the pg driver does, rather than
+            // stringifying it. A fully interpolated sql.raw() statement ALSO
+            // yields an object with `queryChunks` whose JSON contains both
+            // "set_config" and the uid, so the old assertions passed just as
+            // happily on a query that concatenated the uid straight into the
+            // statement text. Splitting the compiled text from the compiled
+            // params is what tells the two apart.
+            const { sql: text, params } = new PgDialect().sqlToQuery(mockTx.execute.mock.calls[0][0]);
+
+            expect(text).toContain("set_config('app.uid'");
+            // The uid reaches Postgres as a bound parameter only — it must not
+            // appear anywhere in the statement text.
+            expect(text).not.toContain("DROP TABLE");
+            expect(text).not.toContain(maliciousUser.uid);
+            expect(text).toMatch(/set_config\('app\.uid', \$\d+, true\)/);
+            expect(params).toContain(maliciousUser.uid);
         });
 
         it("should produce a valid JWT payload in set_config even with exotic roles", async () => {
@@ -617,9 +632,22 @@ roles: [{ name: "viewer" }, 42, null] };
 collection: { slug: "x",
 properties: {} } as unknown as CollectionConfig });
 
-            const serialized = JSON.stringify(mockTx.execute.mock.calls[0][0]);
-            // Objects without id → String({name:'viewer'}) = "[object Object]", 42 → "42", null → "null"
-            expect(serialized).toContain("set_config");
+            const { params } = new PgDialect().sqlToQuery(mockTx.execute.mock.calls[0][0]);
+
+            // The point of the fallback is that `app.user_roles` is always a
+            // comma-joined string of scalars, never `undefined` — a role that is
+            // neither a string nor an `{ id }` must still normalize to something,
+            // because `normalizedRoles.join(",")` on an `undefined` entry yields
+            // an empty slot and silently drops the role from every `auth.roles()`
+            // check. Objects without `id` → "[object Object]", 42 → "42",
+            // null → "null" (the `?.` short-circuits before `String()` sees it).
+            //
+            // Params are positional: uid, uid, user_roles, jwt.
+            expect(params[2]).toBe("[object Object],42,null");
+            // The JWT keeps the ORIGINAL role values, not the normalized ones —
+            // `auth.jwt()` is meant to reflect what the caller presented.
+            expect(params[3]).toBe(JSON.stringify({ sub: "u1",
+roles: [{ name: "viewer" }, 42, null] }));
         });
 
         it("should wrap delete in a transaction with RLS", async () => {

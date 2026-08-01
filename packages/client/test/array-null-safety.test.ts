@@ -1,5 +1,6 @@
 import { describe, it, expect } from "@jest/globals";
 import { buildQueryString } from "../src/transport";
+import { RebaseClientError } from "../src/errors";
 
 // --------------------------------------------------------------------------
 // 1. buildQueryString — logical conditions null safety
@@ -182,13 +183,36 @@ describe("buildQueryString — combined params with null arrays", () => {
 // 4. serializeFilter edge cases (tested indirectly through buildQueryString)
 // --------------------------------------------------------------------------
 describe("serializeFilter edge cases (via buildQueryString)", () => {
-    it("serializes ['==', undefined] without crashing", () => {
-        const result = buildQueryString({
+    it("refuses ['==', undefined] instead of filtering on the string \"undefined\"", () => {
+        // This used to emit `field=eq.undefined`, so the server searched for
+        // rows whose `field` is the literal text "undefined" and the caller got
+        // an empty page rather than an error. Omitting the condition would be
+        // worse still — the query would come back unfiltered.
+        expect(() => buildQueryString({
             where: { field: ["==", undefined] },
-        });
-        expect(result).toBeDefined();
-        const decoded = decodeURIComponent(result);
-        expect(decoded).toContain("field=eq.undefined");
+        })).toThrow(RebaseClientError);
+        expect(() => buildQueryString({
+            where: { field: ["==", undefined] },
+        })).toThrow(/undefined value/);
+    });
+
+    it("refuses an undefined item inside an ['in', [...]] list", () => {
+        expect(() => buildQueryString({
+            where: { field: ["in", ["a", undefined]] },
+        })).toThrow(RebaseClientError);
+    });
+
+    it("still omits a field whose whole condition is undefined", () => {
+        // The documented way to skip a filter, and the reason the guard above
+        // has to look at the tuple's value rather than the entry.
+        expect(buildQueryString({ where: { field: undefined } as any })).toBe("");
+    });
+
+    it("still serializes ['is-null', null] — SQL NULL is a real filter", () => {
+        const decoded = decodeURIComponent(buildQueryString({
+            where: { field: ["is-null", null] },
+        }));
+        expect(decoded).toContain("field=isnull.null");
     });
 
     it("serializes ['==', ''] as eq. (empty string value)", () => {

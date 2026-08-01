@@ -244,9 +244,23 @@ describe("parseQueryOptions — PostgREST filters", () => {
     });
 
     it("handles string values with dots that are not operators (fallback to eq)", () => {
-        const result = parseQueryOptions({ email: "user@example.com" });
-        // "user@example" is not a valid operator, so fallback to eq
-        expect(result.where?.email).toBeDefined();
+        // The value has to survive intact. `toBeDefined()` was satisfied by any
+        // truthy result, including the one this test exists to rule out — a
+        // parser that read "user@example" as an operator prefix and filtered on
+        // the leftover "com", quietly matching the wrong rows.
+        expect(parseQueryOptions({ email: "user@example.com" }).where?.email)
+            .toEqual(["==", "user@example.com"]);
+
+        // Several dots, none of them an operator, and none of them consumed.
+        expect(parseQueryOptions({ name: "a.b.c" }).where?.name)
+            .toEqual(["==", "a.b.c"]);
+
+        // And a real prefix is still stripped, so the fallback above is not
+        // simply "never parse operators".
+        expect(parseQueryOptions({ email: "eq.user@example.com" }).where?.email)
+            .toEqual(["==", "user@example.com"]);
+        expect(parseQueryOptions({ age: "gte.18" }).where?.age)
+            .toEqual([">=", "18"]);
     });
 
     it("removes empty where object", () => {

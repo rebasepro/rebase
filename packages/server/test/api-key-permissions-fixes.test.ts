@@ -416,39 +416,86 @@ operations: ["read", "write", "delete"] }]);
 // registers it first; this test pins the ordering semantics.
 
 describe("storage upload body limit ordering", () => {
-    async function makeApp(limitFirst: boolean) {
-        const { bodyLimit } = await import("hono/body-limit");
-        const routes = new Hono<HonoEnv>();
-        const limit = bodyLimit({
-            maxSize: 10,
-            onError: (c) => c.json({ error: { code: "PAYLOAD_TOO_LARGE" } }, 413)
-        });
-        if (limitFirst) {
-            const wrapper = new Hono<HonoEnv>();
-            wrapper.use("/upload", limit);
-            routes.post("/upload", (c) => c.json({ ok: true }));
-            wrapper.route("/", routes);
-            return wrapper;
-        }
-        routes.post("/upload", (c) => c.json({ ok: true }));
-        routes.use("/upload", limit); // the old, broken order
-        return routes;
-    }
+    // This used to build two throwaway Hono apps and register a bodyLimit in
+    // each order, which demonstrates how Hono composes middleware but never
+    // touches init.ts — the file where the bug was and where it could return.
+    // Both spellings stayed green forever. So the app under test is now the real
+    // one, booted through `initializeRebaseBackend`, and the limit is the one
+    // init.ts derives from `storage.maxFileSize`.
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalForce = process.env.FORCE_LOCAL_STORAGE;
+    let tempDir: string;
 
-    const bigBody = "x".repeat(100);
-
-    it("enforces the limit when registered before the routes (the fix)", async () => {
-        const app = await makeApp(true);
-        const res = await app.request("/upload", { method: "POST",
-body: bigBody });
-        expect(res.status).toBe(413);
+    beforeAll(async () => {
+        const fs = await import("fs");
+        const os = await import("os");
+        const path = await import("path");
+        tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-body-limit-"));
     });
 
-    it("documents that the old order never ran the limit (the bug)", async () => {
-        const app = await makeApp(false);
-        const res = await app.request("/upload", { method: "POST",
-body: bigBody });
-        expect(res.status).toBe(200);
+    afterAll(async () => {
+        const fs = await import("fs");
+        await fs.promises.rm(tempDir, { recursive: true, force: true });
+        process.env.NODE_ENV = originalNodeEnv;
+        if (originalForce === undefined) delete process.env.FORCE_LOCAL_STORAGE;
+        else process.env.FORCE_LOCAL_STORAGE = originalForce;
+    });
+
+    async function bootWithUploadLimit(maxFileSize: number) {
+        process.env.NODE_ENV = "development";
+        const { initializeRebaseBackend } = await import("../src/init");
+        const app = new Hono();
+        await initializeRebaseBackend({
+            app: app as never,
+            server: {} as never,
+            collections: [],
+            bootstrappers: [{
+                type: "fake",
+                isDefault: true,
+                async initializeDriver() {
+                    return { driver: {} as never,
+collections: [],
+internals: {} };
+                }
+            }] as never,
+            storage: { type: "local",
+basePath: tempDir,
+maxFileSize },
+            storagePublicRead: true
+        } as never);
+        return app;
+    }
+
+    it("rejects a body over the configured maxFileSize with 413", async () => {
+        const app = await bootWithUploadLimit(10);
+
+        const res = await app.request("/api/storage/upload", {
+            method: "POST",
+            body: "x".repeat(100)
+        });
+
+        expect(res.status).toBe(413);
+        expect((await res.json() as { error: { code: string } }).error.code).toBe("PAYLOAD_TOO_LARGE");
+    });
+
+    it("runs the limit before the route's own auth gate", async () => {
+        // The ordering is the whole point: a limit registered after the routes
+        // sits deeper than them and never executes. An oversized *anonymous*
+        // upload proves the limit ran first — otherwise the auth gate would
+        // answer 401 and the body would already have been read in full.
+        const app = await bootWithUploadLimit(10);
+
+        const oversized = await app.request("/api/storage/upload", {
+            method: "POST",
+            body: "x".repeat(100)
+        });
+        const small = await app.request("/api/storage/upload", {
+            method: "POST",
+            body: "x"
+        });
+
+        expect(oversized.status).toBe(413);
+        expect(small.status).not.toBe(413);
     });
 });
 

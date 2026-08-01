@@ -388,20 +388,20 @@ text: "Wow" } as any
             expect(mockDriver.delete).not.toHaveBeenCalled();
         });
 
-        it("nested undefined segment is filtered: GET /authors/123/undefined/posts → 404 (not enough valid segments)", async () => {
-            // After filtering "undefined", segments = ["authors", "123", "posts"] → 3 segments → odd → collection path
-            // But the wildcard is "undefined/posts", which is NOT the literal "undefined", so the guard won't catch it.
-            // However, parseSubPath filters "undefined" from segments: ["authors", "123", "posts"] → valid 3-segment path.
+        it("GET /authors/123/undefined/posts → 404, no driver calls", async () => {
+            // Pinned deliberately, replacing a test that asserted 200 while its
+            // own comment said "this should either 200 or 404" — a guess written
+            // down as a guarantee. An `undefined` segment means the client
+            // interpolated a variable it did not have, and the three siblings
+            // above already refuse that with a 404 and no driver call. Dropping
+            // the segment instead answered a *different* address,
+            // `authors/123/posts`, with real rows — which tells the caller its
+            // broken URL works. Behaviour change: it is now refused.
             const app = createFlatApp();
             mockDriver.fetchCollection.mockResolvedValue([]);
             const res = await app.request("/authors/123/undefined/posts");
-            // This should either 200 (if parseSubPath accepts "authors/123/posts") or 404
-            // Since wildcard = "undefined/posts" which is truthy and not === "undefined", the guard lets it through.
-            // parseSubPath filters "undefined" segments → ["authors", "123", "posts"] → 3 segments → collection path.
-            expect(res.status).toBe(200);
-            expect(mockDriver.fetchCollection).toHaveBeenCalledWith(
-                expect.objectContaining({ path: "authors/123/posts" })
-            );
+            expect(res.status).toBe(404);
+            expect(mockDriver.fetchCollection).not.toHaveBeenCalled();
         });
 
         it("returns 404 for bare parent without wildcard - GET /xyz", async () => {

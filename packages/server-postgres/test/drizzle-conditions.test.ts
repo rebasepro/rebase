@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { eq } from "drizzle-orm";
+import { eq, SQL } from "drizzle-orm";
 import { integer, pgTable, PgDialect, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
 import { CollectionConfig, EntityRelation, Relation } from "@rebasepro/types";
 import { resolveRelation } from "@rebasepro/common";
@@ -52,6 +52,13 @@ const createMockRegistry = () => {
     return registry;
 };
 
+// Rendering is the only assertion that can tell a *correct* condition from a
+// merely present one. Counting conditions, or checking that `innerJoin` was
+// called, holds just as well when the junction's two columns are swapped —
+// which is the defect this file exists to catch, and which produces exactly the
+// same shape with the wrong rows behind it.
+const renderSql = (condition: SQL) => new PgDialect().sqlToQuery(condition);
+
 describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     let mockRegistry: PostgresCollectionRegistry;
 
@@ -84,7 +91,18 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             );
 
             expect(result.joinConditions).toHaveLength(1);
+            expect(result.joinConditions[0].table).toBe(mockPostsTagsTable);
+            // The join hangs the junction off the *target's* key via
+            // `targetColumn`, and the where pins the *parent* via
+            // `sourceColumn`. Swap the two and every count and listing still
+            // builds, returning the rows of the mirror relation.
+            expect(renderSql(result.joinConditions[0].condition).sql)
+                .toBe('"tags"."id" = "posts_tags"."tag_id"');
             expect(result.whereConditions).toHaveLength(1);
+            expect(renderSql(result.whereConditions[0])).toMatchObject({
+                sql: '"posts_tags"."post_id" = $1',
+                params: [1]
+            });
             expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
         });
 
@@ -112,6 +130,13 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
             expect(result.joinConditions).toHaveLength(1);
             expect(result.whereConditions).toHaveLength(1);
+            // A list of parents has to widen to `IN`. `eq(column, [1, 2, 3])`
+            // builds too — it binds the array as a single parameter and matches
+            // no row at all.
+            expect(renderSql(result.whereConditions[0])).toMatchObject({
+                sql: '"posts_tags"."post_id" in ($1, $2, $3)',
+                params: [1, 2, 3]
+            });
         });
     });
 
@@ -139,7 +164,17 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             );
 
             expect(result.joinConditions).toHaveLength(1);
+            expect(result.joinConditions[0].table).toBe(mockPostsTagsTable);
+            // The mirror of the owning case: same junction, columns exchanged.
+            // The two suites asserted identical things and so could not have
+            // told the mirror image from the original.
+            expect(renderSql(result.joinConditions[0].condition).sql)
+                .toBe('"posts"."id" = "posts_tags"."post_id"');
             expect(result.whereConditions).toHaveLength(1);
+            expect(renderSql(result.whereConditions[0])).toMatchObject({
+                sql: '"posts_tags"."tag_id" = $1',
+                params: [20]
+            });
             expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
         });
 
@@ -167,6 +202,10 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
             expect(result.joinConditions).toHaveLength(1);
             expect(result.whereConditions).toHaveLength(1);
+            expect(renderSql(result.whereConditions[0])).toMatchObject({
+                sql: '"posts_tags"."tag_id" in ($1, $2, $3)',
+                params: [20, 21, 22]
+            });
         });
     });
 
@@ -310,7 +349,23 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     });
 
     describe("Junction Table Discovery", () => {
+        // The previous version of this test declared `from: "posts.id"` — a
+        // column that exists — so the direct join succeeded and the naming loop
+        // it is named for was never entered. It then asserted `.not.toThrow()`,
+        // which the direct path satisfies just as well, so nothing about
+        // junction discovery was under test at all.
         it("should try multiple naming patterns for junction tables", () => {
+            // Neither table carries the other's foreign key, which is what
+            // sends `buildSingleJoinCondition` looking for a junction.
+            const postsNoDirect = pgTable("posts", {
+                id: serial("id").primaryKey(),
+                title: varchar("title").notNull()
+            });
+            const tagsNoDirect = pgTable("tags", {
+                id: serial("id").primaryKey(),
+                name: varchar("name").notNull()
+            });
+
             const relation: Relation = {
                 kind: "via",
                 relationName: "test_junction",
@@ -320,36 +375,51 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                     {
                         table: "tags",
                         on: {
-                            from: "posts.id",
+                            from: "posts.tag_id",
                             to: "tags.id"
                         }
                     }
                 ]
             };
 
-            // Mock the registry to return undefined for first attempts, then return junction table
+            // Only the *reversed* name resolves, so a lookup that gave up after
+            // `<from>_<to>` would fail here.
             const mockRegistryWithPatterns = {
                 getTable: jest.fn()
             } as unknown as PostgresCollectionRegistry;
 
-            (mockRegistryWithPatterns.getTable as jest.Mock)
-                .mockReturnValueOnce(mockPostsTable) // posts table
-                .mockReturnValueOnce(mockTagsTable) // tags table
-                .mockReturnValueOnce(undefined) // posts_tags (first attempt)
-                .mockReturnValueOnce(undefined) // tags_posts (second attempt)
-                .mockReturnValueOnce(mockPostsTagsTable); // Found it!
+            (mockRegistryWithPatterns.getTable as jest.Mock).mockImplementation((tableName: string) => {
+                switch (tableName) {
+                    case "posts": return postsNoDirect;
+                    case "tags": return tagsNoDirect;
+                    case "tags_posts": return mockPostsTagsTable;
+                    default: return undefined;
+                }
+            });
 
-            expect(() => {
-                DrizzleConditionBuilder.buildRelationConditions(
-                    relation,
-                    1,
-                    mockTagsTable,
-                    mockPostsTable,
-                    mockPostsTable.id,
-                    mockTagsTable.id,
-                    mockRegistryWithPatterns
-                );
-            }).not.toThrow();
+            const result = DrizzleConditionBuilder.buildRelationConditions(
+                relation,
+                1,
+                tagsNoDirect,
+                postsNoDirect,
+                postsNoDirect.id,
+                tagsNoDirect.id,
+                mockRegistryWithPatterns
+            );
+
+            expect(mockRegistryWithPatterns.getTable).toHaveBeenCalledWith("posts_tags");
+            expect(mockRegistryWithPatterns.getTable).toHaveBeenCalledWith("tags_posts");
+
+            // Discovery emits the pair: target→junction, then junction→source.
+            expect(result.joinConditions.map(j => j.table)).toEqual([mockPostsTagsTable, postsNoDirect]);
+            expect(result.joinConditions.map(j => renderSql(j.condition).sql)).toEqual([
+                '"tags"."id" = "posts_tags"."post_id"',
+                '"posts"."id" = "posts_tags"."tag_id"'
+            ]);
+            expect(renderSql(result.whereConditions[0])).toMatchObject({
+                sql: '"posts"."id" = $1',
+                params: [1]
+            });
         });
     });
 
@@ -460,8 +530,18 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 mockRegistry
             );
 
-            expect(mockBaseQuery.innerJoin).toHaveBeenCalled();
-            expect(mockBaseQuery.where).toHaveBeenCalled();
+            // `toHaveBeenCalled()` on its own passed for either direction of the
+            // junction, so this suite's two cases were indistinguishable.
+            expect(mockBaseQuery.innerJoin).toHaveBeenCalledTimes(1);
+            const [joinedTable, joinCondition] = mockBaseQuery.innerJoin.mock.calls[0];
+            expect(joinedTable).toBe(mockPostsTagsTable);
+            expect(renderSql(joinCondition as SQL).sql).toBe('"tags"."id" = "posts_tags"."tag_id"');
+
+            expect(renderSql(mockBaseQuery.where.mock.calls[0][0] as SQL)).toMatchObject({
+                sql: '"posts_tags"."post_id" = $1',
+                params: [1]
+            });
+            expect(result).toBe(mockBaseQuery);
         });
 
         it("should build correct count query for inverse many-to-many relation", () => {
@@ -493,8 +573,16 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 mockRegistry
             );
 
-            expect(mockBaseQuery.innerJoin).toHaveBeenCalled();
-            expect(mockBaseQuery.where).toHaveBeenCalled();
+            expect(mockBaseQuery.innerJoin).toHaveBeenCalledTimes(1);
+            const [joinedTable, joinCondition] = mockBaseQuery.innerJoin.mock.calls[0];
+            expect(joinedTable).toBe(mockPostsTagsTable);
+            expect(renderSql(joinCondition as SQL).sql).toBe('"posts"."id" = "posts_tags"."post_id"');
+
+            expect(renderSql(mockBaseQuery.where.mock.calls[0][0] as SQL)).toMatchObject({
+                sql: '"posts_tags"."tag_id" = $1',
+                params: [20]
+            });
+            expect(result).toBe(mockBaseQuery);
         });
     });
 
@@ -531,8 +619,18 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 additionalFilters
             );
 
-            expect(mockBaseQuery.innerJoin).toHaveBeenCalled();
-            expect(mockBaseQuery.where).toHaveBeenCalled();
+            expect(mockBaseQuery.innerJoin).toHaveBeenCalledTimes(1);
+            expect(renderSql(mockBaseQuery.innerJoin.mock.calls[0][1] as SQL).sql)
+                .toBe('"tags"."id" = "posts_tags"."tag_id"');
+
+            // The caller's filters have to survive into the same `where` as the
+            // relation scope. Dropping them left a nested listing showing every
+            // related row regardless of what was filtered on.
+            expect(renderSql(mockBaseQuery.where.mock.calls[0][0] as SQL)).toMatchObject({
+                sql: '("posts_tags"."post_id" = $1 and "tags"."name" = $2)',
+                params: [1, "javascript"]
+            });
+            expect(result).toBe(mockBaseQuery);
         });
 
         it("should build correct query for inverse many-to-many relation with additional filters", () => {
@@ -567,8 +665,15 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 additionalFilters
             );
 
-            expect(mockBaseQuery.innerJoin).toHaveBeenCalled();
-            expect(mockBaseQuery.where).toHaveBeenCalled();
+            expect(mockBaseQuery.innerJoin).toHaveBeenCalledTimes(1);
+            expect(renderSql(mockBaseQuery.innerJoin.mock.calls[0][1] as SQL).sql)
+                .toBe('"posts"."id" = "posts_tags"."post_id"');
+
+            expect(renderSql(mockBaseQuery.where.mock.calls[0][0] as SQL)).toMatchObject({
+                sql: '("posts_tags"."tag_id" = $1 and "posts"."title" = $2)',
+                params: [20, "Test Post"]
+            });
+            expect(result).toBe(mockBaseQuery);
         });
     });
 
@@ -603,8 +708,20 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             // Verify the registry was called correctly
             expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
 
-            // This should no longer throw "Foreign key column 'tags_id' not found in target table"
-            expect(() => result).not.toThrow();
+            // This used to read `expect(() => result).not.toThrow()`, which
+            // cannot fail: `result` was computed on the line above, and a
+            // closure that only returns a value has nothing left to throw. The
+            // question the scenario actually asks is whether tag 20 reaches
+            // *posts* — the junction resolved from the tags side, not the
+            // target's own `tags_id`, which is the column the old lookup went
+            // hunting for and never found.
+            expect(result.joinConditions[0].table).toBe(mockPostsTagsTable);
+            expect(renderSql(result.joinConditions[0].condition).sql)
+                .toBe('"posts"."id" = "posts_tags"."post_id"');
+            expect(renderSql(result.whereConditions[0])).toMatchObject({
+                sql: '"posts_tags"."tag_id" = $1',
+                params: [20]
+            });
         });
 
 

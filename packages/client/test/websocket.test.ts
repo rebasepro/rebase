@@ -274,11 +274,25 @@ code: "AUTH_FAILED" } }
             await expect(authPromise).rejects.toThrow("Invalid token");
         });
 
-        it("setAuthTokenGetter sets the getter function", () => {
+        it("setAuthTokenGetter authenticates a socket that is already open", async () => {
+            // Asserting `client.getAuthToken === getter` only restates the
+            // assignment. What the setter is for is the useEffect ordering
+            // where the token arrives *after* connect: the socket must then
+            // authenticate itself rather than sit there anonymous.
             const client = createClient();
-            const getter = jest.fn().mockResolvedValue("new-token");
+            await jest.advanceTimersByTimeAsync(10); // let the socket open
+            const ws = getWs();
+            ws.sentMessages.length = 0;
+
+            const getter = jest.fn(async () => "new-token");
             client.setAuthTokenGetter(getter);
-            expect(client.getAuthToken).toBe(getter);
+            await jest.advanceTimersByTimeAsync(0);
+
+            expect(getter).toHaveBeenCalled();
+            expect(ws.sentMessages.map(m => JSON.parse(m))).toContainEqual(
+                expect.objectContaining({ type: "AUTHENTICATE",
+payload: { token: "new-token" } })
+            );
         });
     });
 
@@ -300,8 +314,19 @@ code: "AUTH_FAILED" } }
                 WebSocket: undefined as any
             });
             createdClients.push(client);
-            // Should not throw
-            client.disconnect();
+
+            // "Should not throw" was a comment, so the runner was never told
+            // what this test was for: it reported a pass whether `disconnect()`
+            // guarded the missing socket or silently stopped doing anything.
+            // Both halves are stated now — it must not throw, and it must still
+            // leave the client disconnected, which is the reason to call it.
+            expect(() => client.disconnect()).not.toThrow();
+            // And it is still teardown: nothing armed survives it, and calling
+            // it again on an already-torn-down client is safe. Asserting the
+            // pending-timer count rather than spying on a call keeps this true
+            // of whatever internal path removes the handle.
+            expect(jest.getTimerCount()).toBe(0);
+            expect(() => client.disconnect()).not.toThrow();
         });
     });
 
@@ -658,6 +683,10 @@ id: "1" });
                 payload: { error: { message: "Detailed error",
 code: "ERR_001" } }
             }) });
+
+            // Guard first: everything below lives in a catch block, so a
+            // promise that *resolved* would run zero assertions and pass.
+            await expect(promise).rejects.toThrow("Detailed error");
 
             try {
                 await promise;
@@ -1263,15 +1292,32 @@ id: "1" }, onUpdate, onError);
     // -----------------------------------------------------------------------
     describe("Reconnection", () => {
         it("attempts reconnection on close with exponential backoff", () => {
-            const client = createClient();
+            createClient();
             jest.runAllTimers(); // connect
 
-            const ws = getWs();
-            ws.close(); // Disconnect
+            // The delay is 1000 * 2^attempt, capped at 30s. Pinning the whole
+            // schedule is the point: "a second socket exists after 2s" holds
+            // just as well for a client that redials immediately, or on a flat
+            // interval, which is what the backoff is there to prevent.
+            MockWebSocket.failToConnect = true;
+            try {
+                getWs().close();
 
-            // Should attempt reconnection
-            jest.advanceTimersByTime(2000);
-            expect(MockWebSocket.instances).toHaveLength(2); // Original + reconnect
+                const expectedDelays = [2000, 4000, 8000, 16000, 30000];
+                let sockets = 1;
+                for (const delay of expectedDelays) {
+                    jest.advanceTimersByTime(delay - 1);
+                    expect(MockWebSocket.instances).toHaveLength(sockets);
+                    jest.advanceTimersByTime(1);
+                    sockets++;
+                    expect(MockWebSocket.instances).toHaveLength(sockets);
+                    // The failed dial reports its close on the next tick, which
+                    // is what schedules the following retry.
+                    jest.advanceTimersByTime(10);
+                }
+            } finally {
+                MockWebSocket.failToConnect = false;
+            }
         });
 
         it("emits reconnect event on subsequent connections", () => {
@@ -1398,28 +1444,29 @@ id: "1" }, onUpdate, onError);
         });
 
         it("stops reconnecting after max attempts", () => {
-            const client = createClient();
+            createClient();
             jest.runAllTimers();
+            expect(MockWebSocket.instances).toHaveLength(1);
 
-            // Close the initial connection
-            getWs().close();
+            // The server has to stay away for the budget to be exhausted at
+            // all: a socket that comes up resets `reconnectAttempts`, so a
+            // client that let each retry succeed would redial forever and
+            // still satisfy a ">= 2 sockets" assertion.
+            MockWebSocket.failToConnect = true;
+            try {
+                getWs().close();
+                // 5 retries, the last backing off 30s — 10 x 60s is far more
+                // than enough for every one of them to fire and fail.
+                for (let i = 0; i < 10; i++) jest.advanceTimersByTime(60_000);
 
-            // Each reconnect creates a new WS, opens, then we close it
-            // maxReconnectAttempts is 5, so after 5 reconnect cycles it should stop
-            for (let i = 0; i < 10; i++) {
-                jest.advanceTimersByTime(60000);
-                jest.runAllTimers();
-                const ws = getWs();
-                if (ws.readyState === MockWebSocket.OPEN) {
-                    ws.close();
-                }
+                // maxReconnectAttempts is 5: the initial dial plus exactly five
+                // retries, and then nothing, however long we wait.
+                expect(MockWebSocket.instances).toHaveLength(6);
+                jest.advanceTimersByTime(10 * 60_000);
+                expect(MockWebSocket.instances).toHaveLength(6);
+            } finally {
+                MockWebSocket.failToConnect = false;
             }
-
-            // 1 initial + at most 5 reconnects = 6 max
-            // But each successful reconnect resets the counter, so we need
-            // to only close without allowing open to fire.
-            // Let's just verify the client doesn't crash and stops eventually
-            expect(MockWebSocket.instances.length).toBeGreaterThanOrEqual(2);
         });
     });
 
@@ -1672,64 +1719,46 @@ ws: getWs() };
         });
 
         it("'still loading' uses shorter backoff (500ms) than generic errors (1000ms)", async () => {
-            let callCount = 0;
-            const getter = jest.fn(async (): Promise<string> => {
-                callCount++;
-                if (callCount <= 2) {
-                    throw new Error("Auth is still loading");
-                }
-                return "token";
-            });
+            /**
+             * The two branches differ in nothing but the sleep between
+             * attempts, so only the clock can tell them apart: start the retry
+             * loop, then probe one tick either side of the expected delay.
+             * A test that merely advances until AUTHENTICATE appears passes for
+             * both delays — and for no delay at all.
+             */
+            const startRetryLoop = async (errorMessage: string) => {
+                const getter = jest.fn(async (): Promise<string> => {
+                    throw new Error(errorMessage);
+                });
+                const { client } = await setupWithTokenGetter(getter as any);
 
-            const { client, ws } = await setupWithTokenGetter(getter as any);
-
-            // Reset after auto-auth
-            callCount = 0;
-            getter.mockClear();
-            getter.mockImplementation(async () => {
-                callCount++;
-                if (callCount <= 2) {
-                    throw new Error("Auth is still loading");
-                }
-                return "token";
-            });
-
-            const fetchPromise = client.fetchCollection({ path: "test" });
-
-            // Progressively advance timers and flush microtasks until AUTHENTICATE appears
-            for (let i = 0; i < 10; i++) {
-                jest.advanceTimersByTime(500);
+                const fetchPromise = client.fetchCollection({ path: "test" });
+                // The getter never yields a token, so this request is doomed;
+                // claim the rejection now so it is never unhandled.
+                const settled = fetchPromise.then(() => undefined, () => undefined);
                 await flushMicrotasks();
-                if (ws.sentMessages.some(m => JSON.parse(m).type === "AUTHENTICATE")) break;
-            }
+                expect(getter).toHaveBeenCalledTimes(1);
+                return { getter,
+settled };
+            };
 
-            // Third call succeeds, authenticate
-            const authMsg = ws.sentMessages.find(m => JSON.parse(m).type === "AUTHENTICATE");
-            expect(authMsg).toBeDefined();
+            const loading = await startRetryLoop("Auth is still loading");
+            await jest.advanceTimersByTimeAsync(499);
+            expect(loading.getter).toHaveBeenCalledTimes(1);
+            await jest.advanceTimersByTimeAsync(1);
+            expect(loading.getter).toHaveBeenCalledTimes(2);
+            // Let the loop run out (attempt 2 sleeps 1000ms) so its timers do
+            // not bleed into the measurement below.
+            await jest.advanceTimersByTimeAsync(5000);
+            await loading.settled;
 
-            const parsed = JSON.parse(authMsg!);
-            ws.onmessage!({ data: JSON.stringify({
-                type: "AUTH_SUCCESS",
-                requestId: parsed.requestId,
-                payload: {}
-            }) });
-            await flushMicrotasks();
-
-            // Respond to fetch
-            const fetchMsg = ws.sentMessages.find(m => JSON.parse(m).type === "FETCH_COLLECTION");
-            expect(fetchMsg).toBeDefined();
-
-            const fetchParsed = JSON.parse(fetchMsg!);
-            ws.onmessage!({ data: JSON.stringify({
-                requestId: fetchParsed.requestId,
-                payload: { rows: [] }
-            }) });
-
-            const result = await fetchPromise;
-            expect(result).toEqual([]);
-
-            // Verify the getter was called 3 times by ensureAuthenticated
-            expect(getter).toHaveBeenCalledTimes(3);
+            const generic = await startRetryLoop("boom");
+            await jest.advanceTimersByTimeAsync(999);
+            expect(generic.getter).toHaveBeenCalledTimes(1);
+            await jest.advanceTimersByTimeAsync(1);
+            expect(generic.getter).toHaveBeenCalledTimes(2);
+            await jest.advanceTimersByTimeAsync(5000);
+            await generic.settled;
         });
     });
 

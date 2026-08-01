@@ -1,6 +1,6 @@
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { UserService, RefreshTokenService, PasswordResetTokenService, Role } from "../src/auth/services";
-import { users, refreshTokens, passwordResetTokens } from "../src/schema/auth-schema";
+import { users, refreshTokens, passwordResetTokens, userIdentities } from "../src/schema/auth-schema";
 import { UserData } from "@rebasepro/server";
 
 // Mock the drizzle-orm functions
@@ -28,6 +28,37 @@ type: "sql-join" }))
         relations: jest.fn(() => ({}))
     };
 });
+
+/**
+ * Read a statement back out of the mocked `sql` tag above.
+ *
+ * The mock keeps the template's literal parts and its interpolations instead of
+ * compiling a query, so what a service actually sends is only visible by
+ * reassembling the two: `sql.raw` fragments are literal SQL and belong in the
+ * text, everything else is a bound value and belongs in `values`. Asserting on
+ * the pair is what distinguishes "a statement was executed" from "the right
+ * table was updated, scoped to the right row".
+ */
+function readSql(query: unknown): { text: string; values: unknown[] } {
+    const { strings = [], values = [] } = (query ?? {}) as {
+        strings?: readonly string[];
+        values?: unknown[];
+    };
+    const isRaw = (v: unknown): v is { val: string } =>
+        typeof v === "object" && v !== null && (v as { type?: string }).type === "sql-raw";
+
+    const text = strings
+        .map((part, i) => {
+            if (i >= values.length) return part;
+            return part + (isRaw(values[i]) ? (values[i] as { val: string }).val : "?");
+        })
+        .join("")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    return { text,
+        values: values.filter((v) => !isRaw(v)) };
+}
 
 function mockUserData(overrides: Partial<UserData>): UserData {
     return {
@@ -231,10 +262,18 @@ email: "test@example.com" };
             it("should lowercase email for lookup", async () => {
                 mockSelectWhere.mockResolvedValueOnce([]);
 
-                await userService.getUserByEmail("TEST@EXAMPLE.COM");
+                await userService.getUserByEmail("  TEST@Example.COM ");
 
-                // The eq function will be called with lowercase email
-                expect(mockSelectWhere).toHaveBeenCalled();
+                // This is the only lookup every sign-in path has. The column is
+                // byte-exact, so a comparison that keeps the caller's casing (or
+                // its stray whitespace) misses a row that is right there and the
+                // account reports as nonexistent.
+                expect(mockSelectWhere).toHaveBeenCalledTimes(1);
+                expect(mockSelectWhere).toHaveBeenCalledWith({
+                    type: "eq",
+                    field: users.email,
+                    value: "test@example.com"
+                });
             });
         });
 
@@ -254,18 +293,97 @@ email: "test@example.com" }));
 
         describe("getUserIdentities", () => {
             it("should fetch user identities", async () => {
-                mockExecute.mockResolvedValueOnce({ rows: [] });
+                const createdAt = new Date("2026-01-01T00:00:00Z");
+                const updatedAt = new Date("2026-01-02T00:00:00Z");
+                mockExecute.mockResolvedValueOnce({
+                    rows: [
+                        {
+                            id: "identity-1",
+                            uid: "user-123",
+                            provider: "google",
+                            provider_id: "google-abc",
+                            profile_data: { email: "test@test.com" },
+                            created_at: createdAt,
+                            updated_at: updatedAt
+                        },
+                        {
+                            id: "identity-2",
+                            uid: "user-123",
+                            provider: "github",
+                            provider_id: "gh-9",
+                            profile_data: null,
+                            created_at: createdAt,
+                            updated_at: updatedAt
+                        }
+                    ]
+                });
 
                 const result = await userService.getUserIdentities("user-123");
 
-                expect(mockExecute).toHaveBeenCalled();
+                const { text, values } = readSql(mockExecute.mock.calls[0][0]);
+                expect(text).toContain('FROM "rebase"."user_identities"');
+                // Bound, and scoped to one user: this answers "which providers
+                // can sign this account in", so an unscoped read would hand a
+                // caller every account's identities.
+                expect(text).toContain("WHERE uid = ?");
+                expect(values).toEqual(["user-123"]);
+
+                // The row is snake_case and the interface is camelCase. A column
+                // left unmapped reads as `undefined` at every call site rather
+                // than failing, which is how a linked provider becomes invisible.
+                expect(result).toEqual([
+                    {
+                        id: "identity-1",
+                        uid: "user-123",
+                        provider: "google",
+                        providerId: "google-abc",
+                        profileData: { email: "test@test.com" },
+                        createdAt,
+                        updatedAt
+                    },
+                    {
+                        id: "identity-2",
+                        uid: "user-123",
+                        provider: "github",
+                        providerId: "gh-9",
+                        profileData: null,
+                        createdAt,
+                        updatedAt
+                    }
+                ]);
             });
         });
 
         describe("linkUserIdentity", () => {
             it("should insert user identity", async () => {
                 await userService.linkUserIdentity("user-123", "google", "123", { email: "test@test.com" });
-                expect(db.insert).toHaveBeenCalled();
+
+                expect(db.insert).toHaveBeenCalledWith(userIdentities);
+                expect(mockInsertValues).toHaveBeenCalledWith({
+                    uid: "user-123",
+                    provider: "google",
+                    providerId: "123",
+                    profileData: { email: "test@test.com" }
+                });
+
+                // Linking is reached again on every subsequent sign-in with the
+                // same provider account, so the conflict target is what keeps
+                // one identity one row instead of one row per sign-in.
+                const insertChain = mockInsertValues.mock.results[0].value;
+                expect(insertChain.onConflictDoNothing).toHaveBeenCalledWith({
+                    target: [userIdentities.provider, userIdentities.providerId]
+                });
+            });
+
+            it("stores a missing profile as null, not undefined", async () => {
+                // `undefined` is dropped from the insert entirely, which leaves
+                // the column to its default rather than recording that this
+                // provider returned no profile.
+                await userService.linkUserIdentity("user-123", "google", "123");
+
+                expect(mockInsertValues).toHaveBeenCalledWith(
+                    expect.objectContaining({ profileData: null })
+                );
             });
         });
 
@@ -426,10 +544,19 @@ email: "test@example.com" };
         });
 
         describe("setUserRoles", () => {
-            it("should delete existing and insert new roles", async () => {
+            it("should replace the whole role array in one update", async () => {
                 await userService.setUserRoles("user-123", ["admin", "editor"]);
 
-                expect(mockExecute).toHaveBeenCalled();
+                // Call 0 is the GUC reset withServerContext runs first; the
+                // statement under test is the one inside the transaction.
+                const { text, values } = readSql(mockExecute.mock.calls[1][0]);
+                expect(text).toContain('UPDATE "rebase"."users"');
+                expect(text).toContain("SET roles = ?::text[]");
+                expect(text).toContain("WHERE id = ?");
+                // The roles are handed to Postgres as one array literal, so the
+                // exact spelling is the whole contract: a JSON array or a bare
+                // comma list is either rejected or stored as a single junk role.
+                expect(values).toEqual(["{admin,editor}", "user-123"]);
             });
         });
 
@@ -437,13 +564,24 @@ email: "test@example.com" };
             it("should assign default role to user", async () => {
                 await userService.assignDefaultRole("user-123", "editor");
 
-                expect(mockExecute).toHaveBeenCalled();
+                const { text, values } = readSql(mockExecute.mock.calls[1][0]);
+                expect(text).toContain('UPDATE "rebase"."users"');
+                // Appends to whatever the user already has. An assignment would
+                // silently strip the roles an admin granted before this ran.
+                expect(text).toContain("SET roles = array_append(roles, ?)");
+                expect(text).toContain("WHERE id = ?");
+                expect(values.slice(0, 2)).toEqual(["editor", "user-123"]);
             });
 
-            it("should use editor as default role", async () => {
+            it("does not append a role the user already holds", async () => {
                 await userService.assignDefaultRole("user-123", "editor");
 
-                expect(mockExecute).toHaveBeenCalled();
+                // Runs on every sign-up path and is retried on some, so without
+                // the guard a role accumulates duplicates in the array — and
+                // `roles` is what the RLS policies read.
+                const { text, values } = readSql(mockExecute.mock.calls[1][0]);
+                expect(text).toContain("NOT (? = ANY(roles))");
+                expect(values).toEqual(["editor", "user-123", "editor"]);
             });
         });
 
@@ -580,9 +718,22 @@ expiresAt });
                 await passwordResetTokenService.createToken("user-123", "token-hash", expiresAt);
 
                 // First deletes existing unused tokens
-                expect(mockExecute).toHaveBeenCalled();
+                const { text, values } = readSql(mockExecute.mock.calls[0][0]);
+                expect(text).toContain('DELETE FROM "rebase"."password_reset_tokens"');
+                // Both halves of the predicate carry weight: `uid` keeps one
+                // user's reset request from invalidating everyone else's, and
+                // `used_at IS NULL` keeps the record of tokens already spent —
+                // which is what makes a replayed link detectable.
+                expect(text).toContain("WHERE uid = ? AND used_at IS NULL");
+                expect(values).toEqual(["user-123"]);
+
                 // Then inserts new token
                 expect(db.insert).toHaveBeenCalledWith(passwordResetTokens);
+                expect(mockInsertValues).toHaveBeenCalledWith({
+                    uid: "user-123",
+                    tokenHash: "token-hash",
+                    expiresAt
+                });
             });
         });
 
@@ -643,7 +794,13 @@ expiresAt }]);
             it("should delete expired tokens", async () => {
                 await passwordResetTokenService.deleteExpired();
 
-                expect(mockExecute).toHaveBeenCalled();
+                const { text, values } = readSql(mockExecute.mock.calls[0][0]);
+                expect(text).toContain('DELETE FROM "rebase"."password_reset_tokens"');
+                // This is housekeeping run unattended against live rows, so the
+                // predicate is the only thing standing between it and every
+                // valid reset link in flight.
+                expect(text).toContain("WHERE expires_at < NOW()");
+                expect(values).toEqual([]);
             });
         });
     });

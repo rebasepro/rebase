@@ -8,9 +8,17 @@ count: 0 }),
     };
 }
 
+/**
+ * These test names used to describe a PostgREST-style prefix encoding — "maps
+ * >= to gte prefix", "maps array-contains to cs prefix", "formats null as the
+ * string 'null'" — that the builder has never done. It accumulates `[op, value]`
+ * tuples and hands them to the accessor untouched; the encoding belongs to
+ * whichever transport is underneath. The assertions were right and the names
+ * were describing a different implementation.
+ */
 describe("QueryBuilder", () => {
     describe("where()", () => {
-        it("maps == operator to bare value (no prefix)", async () => {
+        it("passes == through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
             const qb = new QueryBuilder(collection as never);
 
@@ -23,7 +31,7 @@ describe("QueryBuilder", () => {
             );
         });
 
-        it("maps >= operator to gte prefix", async () => {
+        it("passes >= through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
             const qb = new QueryBuilder(collection as never);
 
@@ -36,7 +44,7 @@ describe("QueryBuilder", () => {
             );
         });
 
-        it("maps > operator to gt prefix", async () => {
+        it("passes > through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
             const qb = new QueryBuilder(collection as never);
 
@@ -49,7 +57,7 @@ describe("QueryBuilder", () => {
             );
         });
 
-        it("maps != operator to neq prefix", async () => {
+        it("passes != through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
             const qb = new QueryBuilder(collection as never);
 
@@ -62,7 +70,7 @@ describe("QueryBuilder", () => {
             );
         });
 
-        it("maps < operator to lt prefix", async () => {
+        it("passes < through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
             const qb = new QueryBuilder(collection as never);
 
@@ -75,7 +83,7 @@ describe("QueryBuilder", () => {
             );
         });
 
-        it("maps <= operator to lte prefix", async () => {
+        it("passes <= through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
             const qb = new QueryBuilder(collection as never);
 
@@ -88,7 +96,7 @@ describe("QueryBuilder", () => {
             );
         });
 
-        it("maps array-contains to cs prefix", async () => {
+        it("passes array-contains through as an [op, value] tuple", async () => {
             const collection = createMockCollection();
             const qb = new QueryBuilder(collection as never);
 
@@ -101,30 +109,31 @@ describe("QueryBuilder", () => {
             );
         });
 
-        it("formats array values with parentheses for in operator", async () => {
+        it("keeps an array value as an array for the in operator", async () => {
             const collection = createMockCollection();
             const qb = new QueryBuilder(collection as never);
 
             await qb.where("status", "in" as never, ["active", "pending"]).find();
 
-            expect(collection.find).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    where: { status: ["in", ["active", "pending"]] }
-                })
-            );
+            const [op, value] = collection.find.mock.calls[0][0].where.status;
+            expect(op).toBe("in");
+            // Not "(active,pending)" or any other flattening: whatever encoding a
+            // transport needs is the transport's business, and doing it here
+            // would leave the driver parsing a string back into a list.
+            expect(Array.isArray(value)).toBe(true);
+            expect(value).toEqual(["active", "pending"]);
         });
 
-        it("formats null value as string 'null'", async () => {
+        it("keeps a null value as literal null, never the string \"null\"", async () => {
             const collection = createMockCollection();
             const qb = new QueryBuilder(collection as never);
 
             await qb.where("deletedAt", "==", null).find();
 
-            expect(collection.find).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    where: { deletedAt: ["==", null] }
-                })
-            );
+            const [op, value] = collection.find.mock.calls[0][0].where.deletedAt;
+            expect(op).toBe("==");
+            expect(value).toBeNull();
+            expect(typeof value).not.toBe("string");
         });
 
         it("supports chaining multiple where clauses", async () => {

@@ -5,31 +5,41 @@ import {
     MongoDBCollectionConfig,
     ReferenceProperty,
     RelationProperty,
-    StringProperty
+    StringProperty,
+    getDataSourceCapabilities
 } from "@rebasepro/types";
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 
+/**
+ * These fixtures used to declare the engine as `driver: "firestore"` /
+ * `driver: "mongodb"`. There is no `driver` field — the discriminant is
+ * `engine` — so every one of them resolved to the default Postgres engine and
+ * no engine gate was ever crossed. The file was not in `tsconfig.tests.json`,
+ * so nothing caught it. Each test now asserts the resolved engine and its
+ * capabilities, which is what the names claim to be about.
+ */
 describe("CollectionRegistry — engine-specific property gates", () => {
 
     it("registers and retrieves a Postgres collection with relation properties", () => {
         const postsCollection: CollectionConfig = {
-            id: "posts",
             name: "Posts",
             slug: "posts",
             table: "posts",
             properties: {
-                title: { type: "string" }
+                title: { name: "Title",
+type: "string" }
             }
         };
 
         const authorsCollection: PostgresCollectionConfig = {
-            id: "authors",
             name: "Authors",
             slug: "authors",
             table: "authors",
             properties: {
-                name: { type: "string" },
+                name: { name: "Name",
+type: "string" },
                 posts: {
+                    name: "Posts",
                     type: "relation",
                     relation: {
                         kind: "hasMany",
@@ -45,6 +55,8 @@ describe("CollectionRegistry — engine-specific property gates", () => {
 
         const result = registry.get("authors");
         expect(result).toBeDefined();
+        expect(result!.engine).toBe("postgres");
+        expect(getDataSourceCapabilities(result!.engine).supportsRelations).toBe(true);
         expect(result!.properties.name.type).toBe("string");
         expect(result!.properties.posts.type).toBe("relation");
 
@@ -56,13 +68,14 @@ describe("CollectionRegistry — engine-specific property gates", () => {
 
     it("registers and retrieves a Firestore collection with reference properties", () => {
         const fsCollection: FirebaseCollectionConfig = {
-            id: "articles",
             name: "Articles",
             slug: "articles",
-            driver: "firestore",
+            engine: "firestore",
             properties: {
-                title: { type: "string" },
+                title: { name: "Title",
+type: "string" },
                 author: {
+                    name: "Author",
                     type: "reference",
                     path: "users"
                 }
@@ -73,6 +86,10 @@ describe("CollectionRegistry — engine-specific property gates", () => {
 
         const result = registry.get("articles");
         expect(result).toBeDefined();
+        expect(result!.engine).toBe("firestore");
+        const capabilities = getDataSourceCapabilities(result!.engine);
+        expect(capabilities.supportsReferences).toBe(true);
+        expect(capabilities.supportsRelations).toBe(false);
         expect(result!.properties.title.type).toBe("string");
         expect(result!.properties.author.type).toBe("reference");
         const refProp = result!.properties.author as ReferenceProperty;
@@ -81,13 +98,14 @@ describe("CollectionRegistry — engine-specific property gates", () => {
 
     it("registers and retrieves a MongoDB collection with reference properties", () => {
         const mongoCollection: MongoDBCollectionConfig = {
-            id: "comments",
             name: "Comments",
             slug: "comments",
-            driver: "mongodb",
+            engine: "mongodb",
             properties: {
-                body: { type: "string" },
+                body: { name: "Body",
+type: "string" },
                 post: {
+                    name: "Post",
                     type: "reference",
                     path: "posts"
                 }
@@ -98,6 +116,10 @@ describe("CollectionRegistry — engine-specific property gates", () => {
 
         const result = registry.get("comments");
         expect(result).toBeDefined();
+        expect(result!.engine).toBe("mongodb");
+        const capabilities = getDataSourceCapabilities(result!.engine);
+        expect(capabilities.supportsReferences).toBe(true);
+        expect(capabilities.supportsRelations).toBe(false);
         expect(result!.properties.body.type).toBe("string");
         expect(result!.properties.post.type).toBe("reference");
         const refProp = result!.properties.post as ReferenceProperty;
@@ -106,42 +128,49 @@ describe("CollectionRegistry — engine-specific property gates", () => {
 
     it("handles a mixed-engine registry with Postgres, Firestore, and MongoDB collections", () => {
         const pgCol: PostgresCollectionConfig = {
-            id: "users",
             name: "Users",
             slug: "users",
             table: "users",
             properties: {
-                email: { type: "string", email: true }
+                email: { name: "Email",
+type: "string",
+email: true }
             }
         };
 
         const fsCol: FirebaseCollectionConfig = {
-            id: "docs",
             name: "Docs",
             slug: "docs",
-            driver: "firestore",
+            engine: "firestore",
             properties: {
-                content: { type: "string" },
-                owner: { type: "reference", path: "users" }
+                content: { name: "Content",
+type: "string" },
+                owner: { name: "Owner",
+type: "reference",
+path: "users" }
             }
         };
 
         const mongoCol: MongoDBCollectionConfig = {
-            id: "logs",
             name: "Logs",
             slug: "logs",
-            driver: "mongodb",
+            engine: "mongodb",
             properties: {
-                message: { type: "string" },
-                user: { type: "reference", path: "users" }
+                message: { name: "Message",
+type: "string" },
+                user: { name: "User",
+type: "reference",
+path: "users" }
             }
         };
 
         const registry = new CollectionRegistry([pgCol, fsCol, mongoCol]);
 
-        expect(registry.get("users")).toBeDefined();
-        expect(registry.get("docs")).toBeDefined();
-        expect(registry.get("logs")).toBeDefined();
+        // Each collection keeps its own engine — registering them together does
+        // not flatten them all onto the default.
+        expect(registry.get("users")!.engine).toBe("postgres");
+        expect(registry.get("docs")!.engine).toBe("firestore");
+        expect(registry.get("logs")!.engine).toBe("mongodb");
 
         // Verify engine-specific property types are preserved
         expect(registry.get("users")!.properties.email.type).toBe("string");
@@ -149,17 +178,27 @@ describe("CollectionRegistry — engine-specific property gates", () => {
         expect(registry.get("logs")!.properties.user.type).toBe("reference");
     });
 
-    it("StringProperty does not carry a reference field after normalization", () => {
+    it("StringProperty does not carry a reference field", () => {
+        // A runtime `toBeUndefined()` on a field the fixture never sets cannot
+        // fail. `reference` was removed from `StringProperty` at the type level,
+        // so assert it at the type level: if the field ever comes back, the
+        // `@ts-expect-error` goes unused and tsc reports it.
+        const description = {
+            name: "Description",
+            type: "string",
+            // @ts-expect-error `reference` is not a StringProperty field — a
+            // reference is its own property type.
+            reference: "users"
+        } satisfies StringProperty;
+
         const col: CollectionConfig = {
-            id: "items",
             name: "Items",
             slug: "items",
             table: "items",
             properties: {
-                description: {
-                    type: "string",
-                    multiline: true
-                }
+                description: { name: "Description",
+type: "string",
+columnType: "text" }
             }
         };
 
@@ -169,30 +208,30 @@ describe("CollectionRegistry — engine-specific property gates", () => {
 
         const sp = result!.properties.description as StringProperty;
         expect(sp.type).toBe("string");
-        expect(sp.multiline).toBe(true);
-        // StringProperty.reference was removed — verify it doesn't exist
-        expect((sp as Record<string, unknown>).reference).toBeUndefined();
+        expect(sp.columnType).toBe("text");
+        expect(description.name).toBe("Description");
     });
 
     it("preserves raw collection data when using narrowed Postgres types", () => {
         const postsCollection: CollectionConfig = {
-            id: "posts",
             name: "Posts",
             slug: "posts",
             table: "posts",
             properties: {
-                title: { type: "string" }
+                title: { name: "Title",
+type: "string" }
             }
         };
 
         const col: PostgresCollectionConfig = {
-            id: "categories",
             name: "Categories",
             slug: "categories",
             table: "categories",
             properties: {
-                name: { type: "string" },
+                name: { name: "Name",
+type: "string" },
                 posts: {
+                    name: "Posts",
                     type: "relation",
                     relation: {
                         kind: "hasMany",
@@ -216,5 +255,8 @@ describe("CollectionRegistry — engine-specific property gates", () => {
         // The raw layer keeps what the author wrote; only the resolved stamp is absent.
         expect((raw!.properties.posts as RelationProperty).relation).toBeDefined();
         expect((raw!.properties.posts as RelationProperty).resolvedRelation).toBeUndefined();
+        // ...and so is the engine stamp.
+        expect(normalized!.engine).toBe("postgres");
+        expect(raw!.engine).toBeUndefined();
     });
 });

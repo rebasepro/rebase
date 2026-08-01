@@ -22,24 +22,38 @@ function makeWebhook(overrides: Partial<WebhookConfig> = {}): WebhookConfig {
 
 describe("WebhookDispatcher", () => {
     describe("setWebhooks", () => {
-        it("filters out disabled webhooks", () => {
+        it("filters out disabled webhooks", async () => {
+            // This test had no `expect` at all: it registered three webhooks,
+            // primed `fetch`, and ended on a comment describing the assertion it
+            // never made. `enabled` is how an operator switches a delivery off —
+            // often because the endpoint is gone or compromised — so what has to
+            // be checked is that the disabled one receives nothing.
             const dispatcher = new WebhookDispatcher();
             dispatcher.setWebhooks([
                 makeWebhook({ id: "wh_1",
+url: "https://example.com/one",
 enabled: true }),
                 makeWebhook({ id: "wh_2",
+url: "https://example.com/disabled",
 enabled: false }),
                 makeWebhook({ id: "wh_3",
+url: "https://example.com/three",
 enabled: true })
             ]);
 
-            // Disabled webhook should not trigger
             mockFetch.mockResolvedValue({
                 status: 200,
                 text: () => Promise.resolve("OK")
             });
 
-            // This should only match enabled webhooks
+            const results = await dispatcher.onEntityChange(
+                "users", "INSERT", "id_1", { id: "id_1" }
+            );
+
+            expect(results.map(r => r.webhookId)).toEqual(["wh_1", "wh_3"]);
+            expect(mockFetch).toHaveBeenCalledTimes(2);
+            const calledUrls = mockFetch.mock.calls.map((call: unknown[]) => call[0]);
+            expect(calledUrls).toEqual(["https://example.com/one", "https://example.com/three"]);
         });
     });
 

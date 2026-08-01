@@ -1,4 +1,4 @@
-import type { Properties, Property } from "@rebasepro/types";
+import type { Properties, Property, RelationProperty } from "@rebasepro/types";
 import React from "react";
 import { getTableCellAlignment, getTablePropertyColumnWidth } from "./internal/common";
 import { FilterValues } from "@rebasepro/types";
@@ -52,7 +52,7 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
                 align: getTableCellAlignment(property),
                 icon: getIconForProperty(property, "small"),
                 title: property.name ?? key as string,
-                sortable: sortable,
+                sortable: sortable && sortableProperty(property),
                 filter: !disabledFilter && filterable,
                 width: getTablePropertyColumnWidth(property),
                 resizable: true,
@@ -65,6 +65,30 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
                     : undefined
             } satisfies VirtualTableColumn;
         });
+}
+
+/**
+ * Whether this column can be ordered by.
+ *
+ * `sortable` arrived as one flag for the whole table while `filter` was
+ * computed per property, so every column advertised a sort — including the ones
+ * no `ORDER BY` can be written for. A to-many relation is a *set* per row
+ * (`posts.tags`), and there is no single value to order on; the driver used to
+ * answer by silently dropping the sort and returning rows in whatever order
+ * Postgres pleased, which is how a header that did nothing went unnoticed.
+ *
+ * Now that the driver refuses instead, offering the control would turn a
+ * useless header into a failed request. Same authority as the filter side: ask
+ * the property, not the table.
+ */
+function sortableProperty(property: Property): boolean {
+    if (property.type !== "relation") return true;
+    const relationProperty = property as RelationProperty;
+    const kind = relationProperty.relation?.kind ?? relationProperty.resolvedRelation?.kind;
+    // An unresolved relation keeps the benefit of the doubt — the same choice
+    // `isFilterableRelation` makes for a kind it cannot see.
+    if (!kind) return true;
+    return kind === "belongsTo";
 }
 
 function filterableProperty(property: Property, partOfArray = false, engine?: string): boolean {

@@ -236,18 +236,58 @@ hasMore: false }
         });
     });
 
-    describe("count() is defined", () => {
-        it("should have count as a defined function on the accessor", () => {
-            const client = createCollectionClient(transport, "products");
-            expect(typeof client.count).toBe("function");
-            expect(client.count).toBeDefined();
+    /**
+     * `listen()` branches on `client.count` being present, and consumers such
+     * as EntitiesCount do the same. Asserting `typeof client.count ===
+     * "function"` on an object literal the factory just built cannot fail;
+     * what can regress is the branch downstream of it — whether the
+     * authoritative total actually reaches the subscriber, or whether the
+     * heuristic row count silently stands in for it.
+     */
+    describe("listen() total comes from count()", () => {
+        /** A WS double that hands the collection callback one page of rows. */
+        function wsDeliveringRows(rows: Record<string, unknown>[]) {
+            let emit: ((rows: Record<string, unknown>[]) => void) | undefined;
+            const ws = {
+                listenCollection: jest.fn((_params: unknown, onUpdate: any) => {
+                    emit = onUpdate;
+                    return () => undefined;
+                })
+            };
+            return { ws: ws as any,
+deliver: () => emit!(rows) };
+        }
+
+        it("reports the authoritative count, not the number of rows delivered", async () => {
+            (transport.request as ReturnType<typeof jest.fn>).mockResolvedValue({ count: 137 });
+            const { ws, deliver } = wsDeliveringRows([{ id: "1" }, { id: "2" }]);
+
+            const client = createCollectionClient(transport, "products", ws);
+            const updates: any[] = [];
+            client.listen!({ limit: 2 }, (res) => { updates.push(res); });
+            deliver();
+            await new Promise(r => setImmediate(r));
+
+            expect(updates).toHaveLength(1);
+            expect(updates[0].meta.total).toBe(137);
+            // 0 + 2 < 137, so the page is not the end of the collection.
+            expect(updates[0].meta.hasMore).toBe(true);
         });
 
-        it("should pass the accessor.count truthiness check (used by EntitiesCount component)", () => {
-            const client = createCollectionClient(transport, "products");
-            // The EntitiesCount component does `if (accessor.count) { ... }`
-            // This verifies that check would pass
-            expect(!!client.count).toBe(true);
+        it("falls back to the row count when the count request fails", async () => {
+            (transport.request as ReturnType<typeof jest.fn>).mockRejectedValue(new Error("boom"));
+            const { ws, deliver } = wsDeliveringRows([{ id: "1" }, { id: "2" }]);
+
+            const client = createCollectionClient(transport, "products", ws);
+            const updates: any[] = [];
+            client.listen!({ limit: 2 }, (res) => { updates.push(res); });
+            deliver();
+            await new Promise(r => setImmediate(r));
+
+            expect(updates).toHaveLength(1);
+            expect(updates[0].meta.total).toBe(2);
+            // A full page with no authoritative total: assume there is more.
+            expect(updates[0].meta.hasMore).toBe(true);
         });
     });
 });

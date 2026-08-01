@@ -1,12 +1,26 @@
 import { buildRebaseData, buildSdkData, wrapAsSdkData, wrapAsEntityData } from "../src/data/buildRebaseData";
-import { DataDriver } from "@rebasepro/types";
+import { CollectionAccessor, DataDriver, RebaseData, RebaseSdkData, SDKCollectionClient } from "@rebasepro/types";
+
+/**
+ * Both data namespaces expose collections through a dynamic index signature
+ * that is a union with the `collection()` method sharing the namespace, so tsc
+ * cannot narrow a bare `data.products`. A project generates a `Database` type
+ * and gets the narrowing for free; a test does it here.
+ */
+function sdk(data: RebaseSdkData, slug: string): SDKCollectionClient {
+    return data[slug] as SDKCollectionClient;
+}
+
+function entity(data: RebaseData, slug: string): CollectionAccessor {
+    return data[slug] as CollectionAccessor;
+}
 
 /**
  * Guard for the symmetric-SDK contract.
  *
  * The developer-facing SDK is the SAME shape on both sides of the stack:
- *   - frontend `client.data.products.find()`
- *   - backend  `context.data.products.find()`  (built by `buildSdkData`)
+ *   - frontend `client.sdk(data, "products").find()`
+ *   - backend  `context.sdk(data, "products").find()`  (built by `buildSdkData`)
  * Both return FLAT rows (`{ id, ...columns }`) — never `.values`.
  *
  * The admin CMS is the ONLY surface that uses the Entity view-model
@@ -34,7 +48,7 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
 
     it("buildSdkData.find() returns FLAT rows — direct field access, no .values", async () => {
         const data = buildSdkData(createMockDriver());
-        const { data: rows } = await data.products.find();
+        const { data: rows } = await sdk(data, "products").find();
 
         expect(rows).toHaveLength(1);
         // Flat access — this is what a developer writes on BOTH front and back.
@@ -49,22 +63,22 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
     it("buildSdkData.findById()/create()/update() return flat rows", async () => {
         const data = buildSdkData(createMockDriver());
 
-        const one = await data.products.findById("p1");
+        const one = await sdk(data, "products").findById("p1");
         expect(one?.name).toBe("Widget");
         expect((one as any).values).toBeUndefined();
 
-        const created = await data.products.create({ name: "New", price: 1 });
+        const created = await sdk(data, "products").create({ name: "New", price: 1 });
         expect(created.name).toBe("New");
         expect((created as any).values).toBeUndefined();
 
-        const updated = await data.products.update("p1", { price: 2 });
+        const updated = await sdk(data, "products").update("p1", { price: 2 });
         expect(updated.price).toBe(2);
         expect((updated as any).values).toBeUndefined();
     });
 
     it("buildRebaseData.find() returns Entities — the admin CMS view-model", async () => {
         const data = buildRebaseData(createMockDriver());
-        const { data: entities } = await data.products.find();
+        const { data: entities } = await entity(data, "products").find();
 
         expect(entities).toHaveLength(1);
         expect(entities[0].id).toBe("p1");
@@ -74,8 +88,8 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
 
     it("the flat SDK row and the Entity's .values carry the same fields", async () => {
         const driver = createMockDriver();
-        const flat = (await buildSdkData(driver).products.find()).data[0];
-        const snap = (await buildRebaseData(driver).products.find()).data[0];
+        const flat = (await sdk(buildSdkData(driver), "products").find()).data[0];
+        const snap = (await entity(buildRebaseData(driver), "products").find()).data[0];
 
         expect(flat).toEqual(snap.values);
         expect(flat.id).toBe(snap.id);
@@ -84,11 +98,11 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
     it("wrapAsSdkData ∘ buildRebaseData is flat; wrapAsEntityData round-trips back", async () => {
         const driver = createMockDriver();
 
-        const flat = (await wrapAsSdkData(buildRebaseData(driver)).products.find()).data[0];
+        const flat = (await sdk(wrapAsSdkData(buildRebaseData(driver)), "products").find()).data[0];
         expect(flat.name).toBe("Widget");
         expect((flat as any).values).toBeUndefined();
 
-        const reSnap = (await wrapAsEntityData(buildSdkData(driver)).products.find()).data[0];
+        const reSnap = (await entity(wrapAsEntityData(buildSdkData(driver)), "products").find()).data[0];
         expect(reSnap.path).toBe("products");
         expect(reSnap.values.name).toBe("Widget");
         expect(reSnap.id).toBe("p1");
@@ -96,7 +110,7 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
 
     it("the fluent query builder on the flat SDK also returns flat rows", async () => {
         const data = buildSdkData(createMockDriver());
-        const { data: rows } = await data.products.where("price", ">=", 5).orderBy("name").find();
+        const { data: rows } = await sdk(data, "products").where("price", ">=", 5).orderBy("name").find();
         expect(rows[0].name).toBe("Widget");
         expect((rows[0] as any).values).toBeUndefined();
     });
@@ -108,17 +122,17 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
         } as any);
 
         let flatRows: any;
-        buildSdkData(driver).products.listen!(undefined, (r) => { flatRows = r.data; });
+        sdk(buildSdkData(driver), "products").listen!(undefined, (r) => { flatRows = r.data; });
         expect(flatRows[0].name).toBe("Widget");
         expect(flatRows[0].values).toBeUndefined();
 
         let flatOne: any;
-        buildSdkData(driver).products.listenById!("p1", (row) => { flatOne = row; });
+        sdk(buildSdkData(driver), "products").listenById!("p1", (row) => { flatOne = row; });
         expect(flatOne.name).toBe("Widget");
         expect(flatOne.values).toBeUndefined();
 
         let snaps: any;
-        buildRebaseData(driver).products.listen!(undefined, (r) => { snaps = r.data; });
+        entity(buildRebaseData(driver), "products").listen!(undefined, (r) => { snaps = r.data; });
         expect(snaps[0].path).toBe("products");
         expect(snaps[0].values.name).toBe("Widget");
     });
@@ -198,8 +212,8 @@ describe("SDK relation shape (one shape, with or without `include`)", () => {
     it("find() returns the same relation shape with and without include", async () => {
         const data = buildSdkData(createRelationDriver());
 
-        const plain = (await data.jobs.find()).data[0];
-        const included = (await data.jobs.find({ include: ["company"] })).data[0];
+        const plain = (await sdk(data, "jobs").find()).data[0];
+        const included = (await sdk(data, "jobs").find({ include: ["company"] })).data[0];
 
         // The foreign key is a foreign key either way — this is the assertion
         // that used to fail, with "scalar" on one side and "relation-envelope"
@@ -219,14 +233,14 @@ describe("SDK relation shape (one shape, with or without `include`)", () => {
     it("no read through the SDK returns a `__type: \"relation\"` envelope", async () => {
         const data = buildSdkData(createRelationDriver());
 
-        const fromFind = (await data.jobs.find()).data[0];
-        const fromInclude = (await data.jobs.find({ include: ["company"] })).data[0];
-        const fromFindById = await data.jobs.findById("j1");
+        const fromFind = (await sdk(data, "jobs").find()).data[0];
+        const fromInclude = (await sdk(data, "jobs").find({ include: ["company"] })).data[0];
+        const fromFindById = await sdk(data, "jobs").findById("j1");
 
         let fromListen: any;
-        data.jobs.listen!(undefined, (r) => { fromListen = r.data[0]; });
+        sdk(data, "jobs").listen!(undefined, (r) => { fromListen = r.data[0]; });
         let fromListenById: any;
-        data.jobs.listenById!("j1", (row) => { fromListenById = row; });
+        sdk(data, "jobs").listenById!("j1", (row) => { fromListenById = row; });
 
         for (const row of [fromFind, fromInclude, fromFindById, fromListen, fromListenById]) {
             for (const value of Object.values(row as Record<string, unknown>)) {
@@ -241,15 +255,15 @@ describe("SDK relation shape (one shape, with or without `include`)", () => {
         // the relation.
         const data = buildSdkData(createRelationDriver({ shadowFk: true }));
 
-        expect((await data.jobs.find()).data[0].company_id).toBe("c1");
-        expect((await data.jobs.findById("j1"))!.company_id).toBe("c1");
+        expect((await sdk(data, "jobs").find()).data[0].company_id).toBe("c1");
+        expect((await sdk(data, "jobs").findById("j1"))!.company_id).toBe("c1");
     });
 
     it("findById() agrees with find() on the same row", async () => {
         const data = buildSdkData(createRelationDriver());
 
-        const fromFind = (await data.jobs.find()).data[0];
-        const fromFindById = await data.jobs.findById("j1");
+        const fromFind = (await sdk(data, "jobs").find()).data[0];
+        const fromFindById = await sdk(data, "jobs").findById("j1");
 
         expect(fromFindById).toEqual(fromFind);
     });
@@ -261,11 +275,11 @@ describe("SDK relation shape (one shape, with or without `include`)", () => {
         const driver = createRelationDriver();
         delete (driver as { restFetchService?: unknown }).restFetchService;
 
-        const entity = (await buildRebaseData(driver).jobs.find()).data[0];
-        expect(shapeOf(entity.values.company)).toBe("relation-envelope");
+        const row = (await entity(buildRebaseData(driver), "jobs").find()).data[0];
+        expect(shapeOf(row.values.company)).toBe("relation-envelope");
 
         let live: any;
-        buildRebaseData(driver).jobs.listen!(undefined, (r) => { live = r.data[0]; });
+        entity(buildRebaseData(driver), "jobs").listen!(undefined, (r: { data: unknown[] }) => { live = r.data[0]; });
         expect(shapeOf(live.values.company)).toBe("relation-envelope");
     });
 });

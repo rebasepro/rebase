@@ -22,6 +22,7 @@ import type { HonoEnv } from "../api/types";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { scopeDataDriver } from "./rls-scope";
 import { validateApiKey } from "./api-keys/api-key-middleware";
+import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
 
 export interface AdapterAuthMiddlewareOptions {
@@ -55,8 +56,7 @@ export function createAdapterAuthMiddleware(options: AdapterAuthMiddlewareOption
         const driver = resolveDriver ? resolveDriver(c) : baseDriver;
         // ── API Key check (Rebase-level, independent of auth adapter) ────
         if (apiKeyStore) {
-            const authHeader = c.req.header("authorization") || "";
-            const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+            const token = extractBearerToken(c.req.header("authorization")) ?? "";
             if (token.startsWith("rk_")) {
                 const result = await validateApiKey(c, token, { store: apiKeyStore,
 driver });

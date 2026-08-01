@@ -455,13 +455,22 @@ title: "E" });
         await c.findById("a/b");
         expect(mockRequest).toHaveBeenCalledWith("/data/posts/a%2Fb", { method: "GET" });
     });
-    it("BUG: no include support on findById", async () => {
+    /**
+     * LIMITATION, not a contract: `findById(id)` takes no params, so there is
+     * no way to ask it for relations — callers who need them use
+     * `find({ where: { id: ["==", id] }, include: [...] })`.
+     *
+     * This test therefore FAILS THE DAY findById GAINS PARAMS. That is
+     * deliberate: it is a reminder to delete it, not a reason to keep the
+     * signature. Do not "fix" a failure here by re-dropping the parameter.
+     */
+    it("findById sends a bare row URL — it has no params, so no include", async () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "T" });
         await c.findById(1);
         expect((mockRequest.mock.calls[0][0] as string)).toBe("/data/posts/1");
-        expect((mockRequest.mock.calls[0][0] as string)).not.toContain("include");
+        expect(c.findById.length).toBe(1);
     });
 });
 
@@ -594,9 +603,20 @@ name: "A" });
         expect(qb.orderBy("title")).toBe(qb); expect(qb.limit(1)).toBe(qb);
         expect(qb.offset(1)).toBe(qb); expect(qb.search("x")).toBe(qb); expect(qb.include("r")).toBe(qb);
     });
-    it("BUG: QueryBuilder has no findById", () => {
+    /**
+     * LIMITATION, not a contract: the fluent builder collects list params
+     * (where/orderBy/limit/include) and terminates in `find()`. A by-id read
+     * ignores every one of them, so the builder deliberately does not offer
+     * `findById` — `client.collection(...).findById(id)` is the way.
+     *
+     * If a builder-level `findById` is ever added, DELETE this test; do not
+     * remove the method to make it pass again.
+     */
+    it("the fluent builder deliberately terminates in find(), not findById", () => {
         const c = createCollectionClient<PostModel>(transport, "posts");
-        expect((c.include("author") as any).findById).toBeUndefined();
+        const builder = c.include("author") as any;
+        expect(builder.findById).toBeUndefined();
+        expect(typeof builder.find).toBe("function");
     });
 });
 
@@ -613,7 +633,17 @@ describe("listen() — include", () => {
         const { transport } = createMockTransport();
         expect(createCollectionClient<PostModel>(transport, "posts").listen).toBeUndefined();
     });
-    it("BUG: include dropped in WS subscription", () => {
+    /**
+     * LIMITATION, not a contract: the realtime subscription payload
+     * (`FetchCollectionProps`) carries no `include` — the server pushes rows,
+     * not joined graphs — so a `listen({ include })` silently gets flat rows.
+     * The rest of the params must still survive the trip, which is the half of
+     * this that IS a contract.
+     *
+     * If the subscribe protocol ever learns `include`, DELETE this test rather
+     * than re-dropping the field to keep it green.
+     */
+    it("listen carries every param the subscribe protocol has — include is not one of them", () => {
         const mockWs = { listenCollection: jest.fn().mockReturnValue(() => {}),
 listenOne: jest.fn().mockReturnValue(() => {}) } as any;
         const { transport } = createMockTransport();
@@ -822,22 +852,26 @@ total: 100 }]));
 });
 
 // ==========================================================================
-// 16. QueryBuilder operator mapping
+// 16. QueryBuilder operator storage
 // ==========================================================================
-describe("QueryBuilder operator mapping", () => {
+// Named "operator mapping" for a long time, while asserting the opposite:
+// `where()` keeps the canonical tuple exactly as handed to it. The REST short
+// codes (eq, neq, gte, cs, …) are produced by buildQueryString, and are
+// covered there — see test/query_builder.test.ts, "canonical → REST mapping".
+describe("QueryBuilder operator storage (canonical tuples, unmapped)", () => {
     const { transport } = createMockTransport();
     function qb() { return new QueryBuilder(createCollectionClient<any>(transport, "t")); }
 
-    it("== → eq (plain value)", () => { expect((qb().where("a", "==", 1) as any).params.where.a).toEqual(["==", 1]); });
-    it("!= → neq", () => { expect((qb().where("a", "!=", 1) as any).params.where.a).toEqual(["!=", 1]); });
-    it("> → gt", () => { expect((qb().where("a", ">", 1) as any).params.where.a).toEqual([">", 1]); });
-    it(">= → gte", () => { expect((qb().where("a", ">=", 1) as any).params.where.a).toEqual([">=", 1]); });
-    it("< → lt", () => { expect((qb().where("a", "<", 1) as any).params.where.a).toEqual(["<", 1]); });
-    it("<= → lte", () => { expect((qb().where("a", "<=", 1) as any).params.where.a).toEqual(["<=", 1]); });
-    it("array-contains → cs", () => { expect((qb().where("a", "array-contains", "x") as any).params.where.a).toEqual(["array-contains", "x"]); });
-    it("array-contains-any → csa", () => { expect((qb().where("a", "array-contains-any", ["x", "y"]) as any).params.where.a).toEqual(["array-contains-any", ["x", "y"]]); });
-    it("not-in → nin", () => { expect((qb().where("a", "not-in", ["x", "y"]) as any).params.where.a).toEqual(["not-in", ["x", "y"]]); });
-    it("in → in", () => { expect((qb().where("a", "in", ["x", "y"]) as any).params.where.a).toEqual(["in", ["x", "y"]]); });
+    it("== stored verbatim", () => { expect((qb().where("a", "==", 1) as any).params.where.a).toEqual(["==", 1]); });
+    it("!= stored verbatim", () => { expect((qb().where("a", "!=", 1) as any).params.where.a).toEqual(["!=", 1]); });
+    it("> stored verbatim", () => { expect((qb().where("a", ">", 1) as any).params.where.a).toEqual([">", 1]); });
+    it(">= stored verbatim", () => { expect((qb().where("a", ">=", 1) as any).params.where.a).toEqual([">=", 1]); });
+    it("< stored verbatim", () => { expect((qb().where("a", "<", 1) as any).params.where.a).toEqual(["<", 1]); });
+    it("<= stored verbatim", () => { expect((qb().where("a", "<=", 1) as any).params.where.a).toEqual(["<=", 1]); });
+    it("array-contains stored verbatim", () => { expect((qb().where("a", "array-contains", "x") as any).params.where.a).toEqual(["array-contains", "x"]); });
+    it("array-contains-any stored verbatim", () => { expect((qb().where("a", "array-contains-any", ["x", "y"]) as any).params.where.a).toEqual(["array-contains-any", ["x", "y"]]); });
+    it("not-in stored verbatim", () => { expect((qb().where("a", "not-in", ["x", "y"]) as any).params.where.a).toEqual(["not-in", ["x", "y"]]); });
+    it("in stored verbatim", () => { expect((qb().where("a", "in", ["x", "y"]) as any).params.where.a).toEqual(["in", ["x", "y"]]); });
     it("null value", () => { expect((qb().where("a", "==", null) as any).params.where.a).toEqual(["==", null]); });
     it("boolean true", () => { expect((qb().where("a", "==", true) as any).params.where.a).toEqual(["==", true]); });
     it("boolean false", () => { expect((qb().where("a", "==", false) as any).params.where.a).toEqual(["==", false]); });
@@ -1004,15 +1038,27 @@ describe("Transport errors during find with include", () => {
 });
 
 // ==========================================================================
-// 19. BUG: count() not implemented in CollectionClient
+// 19. count() alongside include
 // ==========================================================================
-describe("BUG: count() not implemented", () => {
-    it("count is not defined on CollectionClient", () => {
-        const { transport } = createMockTransport();
+// This block was titled "BUG: count() not implemented" while asserting that
+// count IS defined — the name outlived the fix, and the body only restated
+// that the factory builds what it builds. `count()` is implemented, so what is
+// worth pinning here is that it addresses the /count endpoint and drops
+// `include`: relations cost joins, and a count never reads them.
+describe("count()", () => {
+    it("hits /count and drops include", async () => {
+        const { transport, mockRequest } = createMockTransport();
         const c = createCollectionClient<PostModel>(transport, "posts");
-        // CollectionAccessor type declares count?() as optional, but
-        // createCollectionClient doesn't implement it
-        expect((c as any).count).toBeDefined();
+        mockRequest.mockResolvedValueOnce({ count: 3 });
+
+        const total = await c.count({ include: ["author"],
+where: { title: ["==", "T"] } });
+
+        expect(total).toBe(3);
+        const url = mockRequest.mock.calls[0][0] as string;
+        expect(url.startsWith("/data/posts/count")).toBe(true);
+        expect(url).toContain("title=eq.T");
+        expect(url).not.toContain("include");
     });
 });
 

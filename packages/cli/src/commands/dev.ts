@@ -111,14 +111,14 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
 }
 
 /** Well-known filename the backend writes its actual port to. */
-const DEV_PORT_FILENAME = ".rebase-dev-port";
+export const DEV_PORT_FILENAME = ".rebase-dev-port";
 
 /**
  * Compute a deterministic port from the project root path.
  * Range: 3001–3999 (avoids privileged ports and common services).
  * Two different project directories will almost always get different ports.
  */
-function getProjectPort(projectRoot: string): number {
+export function getProjectPort(projectRoot: string): number {
     let hash = 0;
     for (let i = 0; i < projectRoot.length; i++) {
         hash = ((hash << 5) - hash + projectRoot.charCodeAt(i)) | 0;
@@ -133,7 +133,7 @@ function getProjectPort(projectRoot: string): number {
  * 3. Previously used port from .rebase-dev-port (port affinity across restarts)
  * 4. Deterministic hash from project path (unique per project)
  */
-function resolveStartPort(projectRoot: string, explicitPort?: number): number {
+export function resolveStartPort(projectRoot: string, explicitPort?: number): number {
     // 1. Explicit flag
     if (explicitPort) return explicitPort;
 

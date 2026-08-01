@@ -32,9 +32,28 @@ refreshExpiresIn: "30d" });
             expect(() => configureJwt({ secret: "your-super-secret-jwt-key-change-in-production" })).toThrow("weak");
         });
 
-        it("rejects 'changeme' and variations", () => {
-            expect(() => configureJwt({ secret: "changeme-padding-for-32-chars!!!" })).not.toThrow();
+        /*
+         * Named "rejects 'changeme' and variations", and its body asserted that
+         * a variation is *accepted*. The guard is a Set of exact strings, so the
+         * name was describing a substring scan that has never existed.
+         *
+         * Renaming rather than widening the guard: a secret is only weak because
+         * it is a published default someone forgot to replace, and a variation
+         * is by definition not that string. Matching on substrings would start
+         * refusing perfectly good secrets that happen to contain "test" or
+         * "password". So the exact-match behaviour is the intended one, and this
+         * pins it honestly in both directions.
+         */
+        it("matches the weak-secret list exactly, after lowercasing", () => {
+            // In the list, but caught by the length check first.
             expect(() => configureJwt({ secret: "changeme" })).toThrow("too short");
+            // Long enough to reach the list, and in it — this is the case the
+            // list exists for, and the one nothing else in this file covered.
+            expect(() => configureJwt({ secret: "rebase_saas_jwt_secret_must_be_long_long_long_long" })).toThrow("weak");
+            // Same value, shouted: casing is normalised before the lookup.
+            expect(() => configureJwt({ secret: "REBASE_SAAS_JWT_SECRET_MUST_BE_LONG_LONG_LONG_LONG" })).toThrow("weak");
+            // Merely *containing* a weak word is a different secret, and allowed.
+            expect(() => configureJwt({ secret: "changeme-padding-for-32-chars!!!" })).not.toThrow();
         });
 
         it("accepts strong, random secrets", () => {
@@ -64,13 +83,46 @@ refreshExpiresIn: "30d" });
             expect(t1).not.toBe(t2);
         });
 
-        it("throws when secret is not configured", () => {
-            // Force empty secret
+        /*
+         * This test was, in full: a `defineProperty` that does nothing, followed
+         * by two comments saying so ("This won't work since jwtConfig is
+         * module-scoped… We'll test via configureJwt + clearing") and no
+         * assertion at all. It passed unconditionally, in a file called
+         * `jwt-security`, reporting a guard as covered that nothing touched.
+         *
+         * `jwtConfig` being module-scoped is exactly why the module has to be
+         * loaded fresh: `jest.isolateModules` gives a registry where
+         * `configureJwt` has never been called, which is the state a server that
+         * forgot to configure JWT actually boots into. Reaching for the private
+         * `jwtConfig` was the wrong lever; the module boundary is the right one.
+         *
+         * Worth having for real: the same guard fired in production this week
+         * from a second copy of the package whose config had never been set, and
+         * every request that hit it failed with this message.
+         */
+        it("throws when the secret was never configured", () => {
+            jest.isolateModules(() => {
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                const freshJwt = require("../src/auth/jwt");
 
-            Object.defineProperty(require("../src/auth/jwt"), "jwtConfig", { value: { secret: "" },
-writable: true });
-            // This won't work since jwtConfig is module-scoped, but generateAccessToken has its own check
-            // We'll test via configureJwt + clearing
+                expect(() => freshJwt.generateAccessToken("user-1", ["admin"]))
+                    .toThrow("JWT secret not configured");
+            });
+        });
+
+        it("refuses to verify a token when the secret was never configured", () => {
+            // The verify side has its own guard, and it is the one an
+            // unconfigured *reader* hits — a server that mints tokens elsewhere
+            // and only checks them here.
+            const token = generateAccessToken("user-1", ["admin"]);
+
+            jest.isolateModules(() => {
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                const freshJwt = require("../src/auth/jwt");
+
+                expect(() => freshJwt.verifyAccessToken(token))
+                    .toThrow("JWT secret not configured");
+            });
         });
     });
 

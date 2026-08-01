@@ -26,14 +26,23 @@ describe("server backup-common", () => {
     });
 
     describe("local listing + reading", () => {
+        let root: string;
         let dir: string;
         beforeAll(() => {
-            dir = fs.mkdtempSync(path.join(os.tmpdir(), "core-backup-test-"));
+            // The backup directory is nested one level down so that "outside the
+            // backup directory" is a real place with a real file in it. When the
+            // traversal target did not exist, `readBackupBytes` returned null at
+            // its `existsSync` check and the guard above it was never reached —
+            // the test passed with the guard deleted.
+            root = fs.mkdtempSync(path.join(os.tmpdir(), "core-backup-test-"));
+            dir = path.join(root, "backups");
+            fs.mkdirSync(dir);
             fs.writeFileSync(path.join(dir, "rebase-app-20260714T030000Z.dump"), "AAA");
             fs.writeFileSync(path.join(dir, "rebase-app-20260101T000000Z.dump"), "BB");
             fs.writeFileSync(path.join(dir, "notes.txt"), "ignore me");
+            fs.writeFileSync(path.join(root, "escape.dump"), "SECRET");
         });
-        afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+        afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 
         it("lists only .dump files, newest first, with size + timestamp", async () => {
             const list = await listBackupObjects(parseBackupDestination(dir));
@@ -58,7 +67,15 @@ describe("server backup-common", () => {
             const dest = parseBackupDestination(dir);
             expect(await readBackupBytes(dest, "/etc/passwd")).toBeNull();
             expect(await readBackupBytes(dest, path.join(dir, "notes.txt"))).toBeNull();
-            expect(await readBackupBytes(dest, path.join(dir, "..", "escape.dump"))).toBeNull();
+
+            // A readable, correctly-named .dump that simply is not in the backup
+            // directory. Only the containment check can refuse this one, so it
+            // is the only assertion here that measures it. `existsSync` first,
+            // to keep a rename of the fixture from silently making it vacuous
+            // again.
+            const escape = path.join(dir, "..", "escape.dump");
+            expect(fs.existsSync(escape)).toBe(true);
+            expect(await readBackupBytes(dest, escape)).toBeNull();
         });
     });
 

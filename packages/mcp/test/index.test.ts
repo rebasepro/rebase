@@ -11,7 +11,10 @@ import {
     DESTRUCTIVE_TOOLS
 } from "../src/index";
 import type { PackageManager } from "../src/index";
-import { resolve } from "node:path";
+import { spawn } from "node:child_process";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
 
 // Mock the child_process spawn for CLI tools
 const mockSpawn = {
@@ -272,7 +275,11 @@ data: { title: "New Doc" } }
         // As an admin, it should execute the CLI command
         mockClient.auth.getUser.mockResolvedValueOnce({ uid: "admin-id", email: "admin@rebase.pro", roles: ["admin"] });
         
-        // Mock stdout capture for spawn
+        // Feed the spawned child some stdout, then a clean exit.
+        mockSpawn.stdout.on.mockImplementation((event: string, callback: any) => {
+            if (event === "data") setTimeout(() => callback(Buffer.from("🌿 1 branch(es):\n  ● main\n")), 0);
+            return mockSpawn.stdout;
+        });
         mockSpawn.on.mockImplementation((event: string, callback: any) => {
             if (event === "close") {
                 setTimeout(() => callback(0), 10);
@@ -287,21 +294,76 @@ data: { title: "New Doc" } }
                 arguments: {}
             }
         });
-        expect(result.content[0].text).toBeDefined();
+        // `toBeDefined()` was satisfied by the error result too — the same shape
+        // the denied call above returns — so an admin being refused would have
+        // passed here. Assert the success shape and the CLI output it carries.
+        expect(result.isError).toBeFalsy();
+        expect(result.content[0].text).toContain("branch(es)");
+        expect(result.content[0].text).not.toContain("Admin authorization failed");
+        // A clean exit must not be reported as a failure either.
+        expect(result.content[0].text).not.toContain("Command exited with code");
+        const spawnArgs = vi.mocked(spawn).mock.calls.at(-1)![1] as string[];
+        expect(spawnArgs).toContain("rebase");
+        expect(spawnArgs).toContain("branch");
     });
 });
 
 describe("detectPackageManager", () => {
+
+    let projectDir: string;
+
+    beforeEach(() => {
+        projectDir = mkdtempSync(join(tmpdir(), "rebase-mcp-pm-"));
+    });
+
+    afterEach(() => {
+        rmSync(projectDir, { recursive: true,
+force: true });
+    });
+
+    const withLockFile = (name: string, subdir?: string): string => {
+        const dir = subdir ? join(projectDir, subdir) : projectDir;
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, name), "");
+        return projectDir;
+    };
+
     it("detects pnpm from pnpm-lock.yaml", () => {
-        // The test project itself uses pnpm (has pnpm-workspace.yaml)
-        const result = detectPackageManager(resolve(__dirname, "../../.."));
-        expect(result).toBe("pnpm");
+        // "pnpm" is also the hard-coded fallback, so this case alone would pass
+        // with the whole detection loop deleted — see the yarn and npm cases.
+        expect(detectPackageManager(withLockFile("pnpm-lock.yaml"))).toBe("pnpm");
+    });
+
+    it("detects pnpm from pnpm-workspace.yaml", () => {
+        expect(detectPackageManager(withLockFile("pnpm-workspace.yaml"))).toBe("pnpm");
+    });
+
+    it("detects yarn from yarn.lock", () => {
+        expect(detectPackageManager(withLockFile("yarn.lock"))).toBe("yarn");
+    });
+
+    it("detects npm from package-lock.json", () => {
+        expect(detectPackageManager(withLockFile("package-lock.json"))).toBe("npm");
+    });
+
+    it("prefers pnpm when several lock files are present", () => {
+        withLockFile("package-lock.json");
+        withLockFile("yarn.lock");
+        expect(detectPackageManager(withLockFile("pnpm-lock.yaml"))).toBe("pnpm");
+    });
+
+    it("looks in app/ for a scaffolded project", () => {
+        expect(detectPackageManager(withLockFile("yarn.lock", "app"))).toBe("yarn");
+    });
+
+    it("prefers a lock file at the root over one in app/", () => {
+        withLockFile("yarn.lock", "app");
+        expect(detectPackageManager(withLockFile("package-lock.json"))).toBe("npm");
     });
 
     it("returns pnpm as default when no lock file is found", () => {
-        // Use /tmp which shouldn't have any lock files
-        const result = detectPackageManager("/tmp/nonexistent-project-" + Date.now());
-        expect(result).toBe("pnpm");
+        expect(detectPackageManager(projectDir)).toBe("pnpm");
+        expect(detectPackageManager(resolve(projectDir, "does-not-exist"))).toBe("pnpm");
     });
 });
 

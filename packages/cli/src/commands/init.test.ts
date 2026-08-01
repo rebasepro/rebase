@@ -509,7 +509,9 @@ describe("template package.json contracts", () => {
     it("frontend package.json has required dependencies", () => {
         const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "package.json"), "utf-8"));
         expect(pkg.dependencies).toHaveProperty("@rebasepro/app");
-        expect(pkg.dependencies).toHaveProperty("@rebasepro/app");
+        // `@rebasepro/admin` used to be a second copy of the `app` assertion, so
+        // the panel package the template actually ships went unchecked.
+        expect(pkg.dependencies).toHaveProperty("@rebasepro/admin");
         expect(pkg.dependencies).toHaveProperty("@rebasepro/client");
         expect(pkg.dependencies).toHaveProperty("react");
         expect(pkg.dependencies).toHaveProperty("react-dom");
@@ -666,8 +668,19 @@ describe(".env.example", () => {
     });
 
     it("contains setup instructions for required values", () => {
+        // "contains the word 'required' somewhere" was satisfied by any comment
+        // in the file. What a developer copying this needs is: which variables
+        // must be filled in, that they ship empty, and how to produce a value.
         const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
-        expect(envContent).toContain("required");
+
+        expect(envContent).toMatch(/Database connection string \(required\)/);
+        expect(envContent).toMatch(/JWT Authentication \(required\)/);
+
+        // JWT_SECRET must ship empty — a default here is a shared signing key.
+        expect(envContent).toMatch(/^JWT_SECRET=$/m);
+        // ...with the command that generates one right above it.
+        expect(envContent).toContain("randomBytes");
+        expect(envContent).toContain("at least 32 characters");
     });
     it("has optional SMTP section commented out", () => {
         const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
@@ -728,6 +741,49 @@ describe(".env.example", () => {
         expect(envContent).not.toMatch(/^#\s*REBASE_SERVICE_KEY=/m);
     });
 
+    it("configureEnvFile writes a CORS_ORIGINS the compose file can read", async () => {
+        /*
+         * `docker-compose.yml` declares `CORS_ORIGINS: ${CORS_ORIGINS:?…}` on
+         * the `api` service, and Compose interpolates the WHOLE file before it
+         * selects services. Left commented out, `docker compose up -d db` —
+         * step 1 of the "Next steps" printed at the end of `rebase init` —
+         * failed on a variable the `db` service does not use, and so did
+         * `docker compose config`. A brand-new project could not run its own
+         * first instruction.
+         */
+        const targetDir = await simulateInit("env-cors-app");
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+
+        const match = envContent.match(/^CORS_ORIGINS=(.+)$/m);
+        expect(match).toBeTruthy();
+        // The compose stack serves the admin from the api container on ${PORT}.
+        const port = envContent.match(/^PORT=(\d+)/m)![1];
+        expect(match![1]).toBe(`http://localhost:${port}`);
+
+        // The commented placeholder must be gone, not merely accompanied —
+        // otherwise the required-variable guard still has nothing to read.
+        expect(envContent).not.toMatch(/^#\s*CORS_ORIGINS=/m);
+    });
+
+    it("leaves the compose file's other required variables satisfied too", async () => {
+        // Every `${VAR:?…}` in docker-compose.yml has to be answerable from the
+        // generated .env, or the file cannot be parsed at all.
+        const targetDir = await simulateInit("env-compose-required-app");
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+        const compose = fs.readFileSync(path.join(targetDir, "docker-compose.yml"), "utf-8");
+
+        const required = [...compose.matchAll(/\$\{([A-Z0-9_]+):\?/g)].map(m => m[1]);
+        expect(required.length).toBeGreaterThan(0);
+
+        for (const name of required) {
+            expect(envContent).toMatch(new RegExp(`^${name}=.+$`, "m"));
+        }
+    });
+
     it("configureEnvFile correctly uses provided databaseUrl, pinned to public", async () => {
         const targetDir = await simulateInit("env-custom-db-app");
         const customDbUrl = "postgresql://user:pass@remote:5432/db";
@@ -780,11 +836,17 @@ describe("docker-compose.yml", () => {
     it("mounts a durable volume wherever it acknowledges local storage", () => {
         // FORCE_LOCAL_STORAGE without a durable mount is how uploads get
         // silently destroyed on the next restart.
+        //
+        // The whole body used to sit inside `if (compose.includes(...))`, so
+        // deleting the FORCE_LOCAL_STORAGE line — the very thing that makes the
+        // mount necessary — turned this into an empty test rather than a failure.
         const compose = fs.readFileSync(path.join(TEMPLATE_DIR, "docker-compose.yml"), "utf-8");
-        if (compose.includes("FORCE_LOCAL_STORAGE")) {
-            expect(compose).toContain("STORAGE_PATH: /uploads");
-            expect(compose).toContain("uploads:/uploads");
-        }
+        expect(compose).toContain("FORCE_LOCAL_STORAGE");
+        expect(compose).toContain("STORAGE_PATH: /uploads");
+        expect(compose).toContain("uploads:/uploads");
+        // ...and the volume has to be declared, not just referenced.
+        expect(compose).toMatch(/^volumes:/m);
+        expect(compose).toMatch(/^\s{2}uploads:/m);
     });
 
     it("backend depends on healthy db", () => {

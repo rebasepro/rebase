@@ -249,20 +249,46 @@ name: "Body" } }
     });
 
     it("handles circular subcollection references via visitedSlugs", () => {
-        const circularA: CollectionConfig = {
+        // A collection that lists itself as its own subcollection. Without the
+        // visitedSlugs guard the comparison descends into it forever and blows
+        // the stack, so "returns at all" is the assertion that matters here.
+        const makeCircular = (): CollectionConfig => {
+            const collection = {
+                id: "self",
+                name: "Self",
+                path: "self",
+                slug: "self",
+                properties: {},
+                childCollections: () => [collection]
+            } as unknown as CollectionConfig;
+            return collection;
+        };
+
+        expect(areCollectionsEqual(makeCircular(), makeCircular())).toBe(true);
+    });
+
+    it("stops descending once a slug has already been visited", () => {
+        // Same slug, different properties. The visitedSlugs short-circuit fires
+        // before any comparison, so this is `true` — that early return is the
+        // only reason a cycle terminates, and this pins it apart from a plain
+        // structural equality result, which would be false.
+        const seen = {
             id: "self",
             name: "Self",
             path: "self",
             slug: "self",
-            properties: {}
+            properties: { title: { type: "string",
+name: "Title" } }
         } as unknown as CollectionConfig;
 
-        const circularB: CollectionConfig = {
-            ...circularA
+        const other = {
+            ...seen,
+            properties: { body: { type: "string",
+name: "Body" } }
         } as unknown as CollectionConfig;
 
-        // Simulating that we already visited this slug
-        expect(areCollectionsEqual(circularA, circularB, ["self"])).toBe(true);
+        expect(areCollectionsEqual(seen, other, ["self"])).toBe(true);
+        expect(areCollectionsEqual(seen, other)).toBe(false);
     });
 });
 

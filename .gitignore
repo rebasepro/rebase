@@ -165,3 +165,12 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 packages/ui/dist/_design-sync-compiled.css
+
+# Generated coverage reports.
+#
+# 151 of these were tracked (4.7 MB of HTML across five packages) because
+# nothing ignored them. Beyond the diff noise on every `--coverage` run, a
+# committed report is actively misleading: `git grep` returns its inlined
+# source with stale "statement not covered" annotations, as if those were
+# claims about the code today.
+coverage/

@@ -32,12 +32,28 @@ describe("client.data proxy — strict mode (collections dictionary provided)", 
         expect(typeof accessor.create).toBe("function");
     });
 
-    it("resolves a known camelCase key (blogPosts) via dictionary", () => {
-        // Should not throw — blogPosts is in the dictionary
-        const products = (client.data as Record<string, unknown>)["products"];
-        expect(products).toBeDefined();
-        const blogPosts = (client.data as Record<string, unknown>)["blogPosts"];
-        expect(blogPosts).toBeDefined();
+    it("resolves a known camelCase key (blogPosts) to the dictionary's slug", async () => {
+        // The accessor is always "defined"; the whole job of the dictionary is
+        // that `blogPosts` addresses `blog-posts` on the wire — and NOT the
+        // `blog_posts` that the untyped snake_case fallback would produce.
+        // A client of its own: the shared one above captured `globalThis.fetch`
+        // when this file was collected, which is before `beforeAll` swaps it.
+        const fetchMock = jest.fn<typeof fetch>(async () => new Response("{}"));
+        const wired = createRebaseClient({
+            baseUrl: "http://localhost:3000",
+            fetch: fetchMock as typeof fetch,
+            collections: { ...COLLECTIONS }
+        });
+
+        const products = (wired.data as Record<string, any>)["products"];
+        await products.find();
+        expect(String(fetchMock.mock.calls[0][0])).toContain("/data/products");
+
+        const blogPosts = (wired.data as Record<string, any>)["blogPosts"];
+        await blogPosts.find();
+        const url = String(fetchMock.mock.calls[1][0]);
+        expect(url).toContain("/data/blog-posts");
+        expect(url).not.toContain("blog_posts");
     });
 
     it("throws RebaseClientError on unknown key with suggestion", () => {

@@ -18,6 +18,13 @@ export interface PostgresDataDriverConfig {
 
 export interface PostgresDataDriver extends DataDriver {
     client?: RebaseWebSocketClient;
+    /**
+     * Human-readable name for this driver. `DataDriver` only carries the
+     * machine `key`; the hook has always set this too, but the returned object
+     * used to be cast to `PostgresDataDriver`, so the extra property was
+     * invisible to every consumer — and to the test asserting on it.
+     */
+    name?: string;
 }
 
 
@@ -27,7 +34,7 @@ export function usePostgresClientDriver(config: PostgresDataDriverConfig): Postg
     return useMemo(() => {
         if (!client) throw new Error("RebaseWebSocketClient must be provided in config.wsClient");
 
-        return {
+        const driver: PostgresDataDriver = {
 
         key: "postgres",
 
@@ -148,7 +155,8 @@ databaseId },
                 return client.listBranches();
             }
         }
-    } as PostgresDataDriver;
+    };
+        return driver;
     }, [client]);
 
 }

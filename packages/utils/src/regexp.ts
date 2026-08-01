@@ -23,10 +23,19 @@ export function hydrateRegExp(input?: string): RegExp | undefined {
     }
 }
 
+/**
+ * Is `input` something {@link hydrateRegExp} can turn into a working RegExp?
+ *
+ * This used to pattern-match the *shape* of a regex literal and, failing that,
+ * fall back to "does it contain any regex-ish character" — which said yes to
+ * malformed input like `/[a-z/g`. The only answer that matters to a caller is
+ * whether hydration succeeds, so ask the engine instead of approximating it.
+ */
 export function isValidRegExp(input: string): boolean {
-    const fullRegexp = input.match(/\/((?![*+?])(?:[^\r\n[/\\]|\\.|\[(?:[^\r\n\]\\]|\\.)*])+)\/((?:g(?:im?|mi?)?|i(?:gm?|mg?)?|m(?:gi?|ig?)?)?)/);
-    if (fullRegexp)
-        return true;
-    const simpleRegexp = input.match(/((?![*+?])(?:[^\r\n[/\\]|\\.|\[(?:[^\r\n\]\\]|\\.)*])+)/);
-    return !!simpleRegexp;
+    if (!input) return false;
+    try {
+        return hydrateRegExp(input) !== undefined;
+    } catch {
+        return false;
+    }
 }

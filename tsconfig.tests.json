@@ -28,7 +28,56 @@
     // here it asserted against `driver:`, `collectionPath` and a `StringProperty`
     // shape that had all been gone for months, passing every run.
     "packages/types/test",
-    "packages/types/src"
+    "packages/types/src",
+    // The driver's own fixtures. `buildSearchConditions` read `prop.dataType`,
+    // a field no property in `@rebasepro/types` has ever had, so search matched
+    // no field on any real collection and every query fell through to `$text` —
+    // which throws `IndexNotFound` without a text index. The fixtures were
+    // written with the same wrong key, so the test data agreed with the bug.
+    // They are real `CollectionConfig` properties now, and this line is what
+    // keeps them that way.
+    "packages/server-mongo/test",
+    // The hook cast its returned object to `PostgresDataDriver`, which hid an
+    // undeclared `name` and the fact that `admin` — and every capability on it
+    // — is optional. The cast is gone; this earns the test the real `SaveProps`
+    // and `DeleteProps` shapes, in place of the ones it was inventing.
+    "packages/client-postgres/test",
+    // `InsightsCache.test.ts` lives *under* `src`, so the package's `src` is
+    // what has to be listed. It built `InsightDataResult` fixtures of
+    // `{ data, columns }` — a shape the type has not had since it became
+    // `{ rows }`, and that no production code still produces.
+    "packages/plugin-insights/src",
+    // `useDataEnhancementPlugin.test.tsx` indexed `plugin.slots[0]` and
+    // `plugin.providers[0]`, both optional on `Plugin`. An
+    // `expect(...).toBeDefined()` on the line above narrows nothing for tsc, so
+    // the indexed reads only compiled because no one was checking. They are
+    // `toMatchObject` shapes now, which need no narrowing.
+    "packages/plugin-ai/src",
+    // `useLiveRls.test.tsx` built its `executeSql` stub with a bare `jest.fn()`,
+    // which infers a non-promise return and so collapses every
+    // `mockResolvedValue` argument to `never` — the rows this hook parses were
+    // never checked against the shape it parses them into.
+    "packages/studio/test",
+    // `utils.test.ts` read `result.a.b.c` off a `setIn` that returns `unknown`
+    // by contract (its return shape is not its argument's). Those assertions
+    // compare whole objects now, which is both cast-free and stricter.
+    "packages/forms/test",
+    // `components.test.tsx` rendered `<Alert severity="error">` — a prop
+    // `AlertProps` does not declare, silently dropped by React, so a test named
+    // "renders alert with correct message" was passing against a default-blue
+    // info alert. And `views.test.tsx` wrote `VirtualTable<any>`, which tsc
+    // rejects: `React.memo` had pinned the component's type parameter, so the
+    // exported component was not generic at all.
+    "packages/ui/test",
+    // The collection registry, permissions and policy tests.
+    // `collection_registry_property_gates.test.ts` declared its fixtures with
+    // `driver: "firestore"` / `driver: "mongodb"`. The field is `engine`; there
+    // is no `driver`. So every "Firestore" and "MongoDB" case in it was a
+    // default-Postgres collection and no engine gate was ever crossed — for as
+    // long as this line was missing, nothing could say so.
+    // `src` joins `test` because some of these tests sit beside the code.
+    "packages/common/test",
+    "packages/common/src"
   ],
   "exclude": [
     "**/node_modules",

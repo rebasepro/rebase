@@ -5,8 +5,7 @@ describe("InsightsCache", () => {
     it("should set and get values from cache", () => {
         const cache = new InsightsCache();
         const data: InsightDataResult = {
-            data: [{ count: 10 }],
-            columns: ["count"]
+            rows: [{ count: 10 }]
         };
         cache.set("query_key", data);
         expect(cache.get("query_key")).toEqual(data);
@@ -15,8 +14,7 @@ describe("InsightsCache", () => {
     it("should return null for expired keys", () => {
         const cache = new InsightsCache(-1); // -1ms TTL to force immediate expiry
         const data: InsightDataResult = {
-            data: [{ count: 10 }],
-            columns: ["count"]
+            rows: [{ count: 10 }]
         };
         cache.set("query_key", data);
         // Expired immediately
@@ -25,9 +23,8 @@ describe("InsightsCache", () => {
 
     it("should manage inflight requests", () => {
         const cache = new InsightsCache();
-        const promise = Promise.resolve({
-            data: [],
-            columns: []
+        const promise = Promise.resolve<InsightDataResult>({
+            rows: []
         });
         expect(cache.getInflight("query_key")).toBeNull();
 
@@ -35,16 +32,14 @@ describe("InsightsCache", () => {
         expect(cache.getInflight("query_key")).toBe(promise);
 
         // Setting a result should remove the inflight reference
-        const data: InsightDataResult = { data: [],
-columns: [] };
+        const data: InsightDataResult = { rows: [] };
         cache.set("query_key", data);
         expect(cache.getInflight("query_key")).toBeNull();
     });
 
     it("should invalidate entries", () => {
         const cache = new InsightsCache();
-        const data: InsightDataResult = { data: [],
-columns: [] };
+        const data: InsightDataResult = { rows: [] };
         cache.set("key_1", data);
         cache.set("key_2", data);
 

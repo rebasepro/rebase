@@ -23,6 +23,40 @@ function resolvesTo(rows: unknown[]) {
     return chain;
 }
 
+/**
+ * Flatten a Drizzle condition or order expression into the text it compiles to.
+ *
+ * The db here is a mock: it answers with whatever rows a test hands it, so
+ * asserting on the rows proves nothing about the query. What the source
+ * actually controls is the expression it hands the query builder, and this is
+ * how a test reads it. `PgDialect.sqlToQuery` is the real renderer but needs
+ * real `Column` instances, and the tables in this file are plain objects — so
+ * this walks `queryChunks` directly: columns render as their name, string
+ * chunks verbatim, and bound values as themselves.
+ */
+function compiled(node: unknown): string {
+    if (node === null || node === undefined) return String(node);
+    if (Array.isArray(node)) return node.map(compiled).join(", ");
+    if (typeof node === "object") {
+        const chunk = node as Record<string, unknown>;
+        if (Array.isArray(chunk.queryChunks)) return chunk.queryChunks.map(compiled).join("");
+        if (Array.isArray(chunk.value)) return chunk.value.join("");
+        if (typeof chunk.name === "string") return chunk.name;
+        if ("value" in chunk) return compiled(chunk.value);
+    }
+    return String(node);
+}
+
+/** The table a `db.insert(t)` / `db.update(t)` / `db.delete(t)` call addressed. */
+function tableNames(mock: jest.Mock): string[] {
+    return mock.mock.calls.map(([table]) => (table as { _def: { tableName: string } })._def.tableName);
+}
+
+/** The payloads handed to `.set(...)`, in call order. */
+function setPayloads(mock: jest.Mock): unknown[] {
+    return mock.mock.calls.map(([payload]) => payload);
+}
+
 const collectionRegistry = new PostgresCollectionRegistry();
 
 describe("DataService - Relation Types Tests", () => {
@@ -316,24 +350,36 @@ price: 20 }
         it("should create many-to-many relations correctly", async () => {
             const newOrder = {
                 total: 300,
-                customer: { id: "1",
-path: "customers",
+                products: [
+                    { id: "1",
+path: "products",
+__type: "relation" },
+                    { id: "2",
+path: "products",
 __type: "relation" }
+                ]
             };
 
             db.returning.mockResolvedValue([{ id: 4 }]);
             db.limit.mockResolvedValue([{
                 id: 4,
-                total: 300,
-                customer_id: 1
+                total: 300
             }]);
 
-            const entity = await dataService.save("orders", newOrder);
+            await dataService.save("orders", newOrder as never);
 
-            expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
-                total: 300,
-                customer_id: "1"
-            }));
+            // A to-many key is never a column on the row. It is stripped from
+            // the INSERT and written afterwards as one junction row per id,
+            // against the id the INSERT came back with — which is why the link
+            // cannot be written before the row exists.
+            expect(tableNames(db.insert as jest.Mock)).toEqual(["orders", "order_items"]);
+            expect(db.values).toHaveBeenNthCalledWith(1, { total: 300 });
+            expect(db.values).toHaveBeenNthCalledWith(2, [
+                { order_id: "4",
+product_id: "1" },
+                { order_id: "4",
+product_id: "2" }
+            ]);
         });
     });
 
@@ -430,12 +476,19 @@ customer_id: 1 }
             // RelationService ends query chain with where()
             db.where.mockReturnValue(resolvesTo(mockOrders) as never);
 
-            const entities = await dataService.fetchCollection("customers/1/orders", {
+            await dataService.fetchCollection("customers/1/orders", {
                 filter: { total: [">=", 100] }
             });
 
-            expect(entities).toHaveLength(1);
-            expect(db.where).toHaveBeenCalled();
+            // The rows come back from the mock whatever the query says, so
+            // counting them passes with the filter deleted from the source.
+            // The condition the listing composed is the part the source owns —
+            // and it has to carry *both* halves: the parent scope narrows the
+            // relation, the filter narrows within it, and a nested listing that
+            // dropped either one would serve rows the caller did not ask for.
+            const where = compiled(db.where.mock.calls[0][0]);
+            expect(where).toContain("customer_id = 1");
+            expect(where).toContain("total >= 100");
         });
 
         it("should order related entities correctly", async () => {
@@ -447,17 +500,22 @@ customer_id: 1 },
 total: 100,
 customer_id: 1 }
             ];
-            // RelationService ends query chain with where()
-            db.where.mockReturnValue(resolvesTo(mockOrders) as never);
+            // The chain `where()` returns is where ORDER BY lands, so the test
+            // has to hold on to it — `db.orderBy` is never the one called.
+            const chain = resolvesTo(mockOrders);
+            db.where.mockReturnValue(chain as never);
 
-            const entities = await dataService.fetchCollection("customers/1/orders", {
+            await dataService.fetchCollection("customers/1/orders", {
                 orderBy: "total",
                 order: "desc"
             });
 
-            expect(entities[0].total).toBe(200);
-            // where() is always called for relation queries
-            expect(db.where).toHaveBeenCalled();
+            // Returning the mock's rows in the order the mock listed them says
+            // nothing: only what reached ORDER BY does. The id tiebreaker
+            // trails the requested key so the order is total, and keyset
+            // pagination has a unique cursor to advance on.
+            const orderBy = (chain.orderBy as jest.Mock).mock.calls[0].map(compiled);
+            expect(orderBy).toEqual(["total desc", "id desc"]);
         });
     });
 
@@ -484,9 +542,12 @@ __type: "relation" }
         });
 
         it("should handle removing relations", async () => {
-            const orderWithoutCustomer = {
-                // Not setting customer property means it should remain unchanged
-            };
+            // An explicit null is a request to unlink, and the only way to make
+            // one: the owning key lives on this row, so removal is an UPDATE
+            // that writes NULL to it. Serialization drops `undefined` values,
+            // and a null that goes the same way leaves the old link in place —
+            // the save reports success and the relation never changes.
+            const orderWithoutCustomer = { customer: null };
 
             db.returning.mockResolvedValue([{ id: 1 }]);
             db.limit.mockResolvedValue([{
@@ -495,9 +556,26 @@ __type: "relation" }
                 customer_id: null
             }]);
 
-            const entity = await dataService.save("orders", orderWithoutCustomer, 1);
+            await dataService.save("orders", orderWithoutCustomer as never, 1);
 
-            // Since no customer property was provided, nothing should be set
+            expect(db.update).toHaveBeenCalledWith(mockOrdersTable);
+            expect(db.set).toHaveBeenCalledWith({ customer_id: null });
+        });
+
+        it("should leave an omitted relation untouched", async () => {
+            // Absent and null are different requests. With the key omitted and
+            // nothing else in the payload there is no column to write at all,
+            // and Drizzle rejects an empty `set` — so the source has to skip
+            // the UPDATE rather than issue one.
+            db.returning.mockResolvedValue([{ id: 1 }]);
+            db.limit.mockResolvedValue([{
+                id: 1,
+                total: 100,
+                customer_id: 2
+            }]);
+
+            await dataService.save("orders", {}, 1);
+
             expect(db.set).not.toHaveBeenCalled();
         });
     });
@@ -585,15 +663,44 @@ path: "user_profiles",
 __type: "relation" }
                 };
 
+                // The link is written through the parent's own foreign key, so
+                // the source reads that column back before it writes anything.
+                // The mock answers every select the same way, so this one is
+                // picked out by the projection the source asks for — which is
+                // also what makes the projection assertable below.
+                let parentKeyRead: Record<string, unknown> | undefined;
+                db.select.mockImplementation(((selection?: Record<string, unknown>) => {
+                    if (selection && "val" in selection) {
+                        parentKeyRead = selection;
+                        const chain: Record<string, unknown> = {};
+                        chain.from = () => chain;
+                        chain.where = () => chain;
+                        chain.limit = () => Promise.resolve([{ val: 7 }]);
+                        return chain;
+                    }
+                    return db;
+                }) as never);
+
                 db.returning.mockResolvedValue([{ id: 1 }]);
                 db.limit.mockResolvedValue([{ id: 1,
 title: "Test Post",
-author_id: 1 }]);
+author_id: 7 }]);
 
-                const entity = await dataService.save("posts_jp", newPost);
+                await dataService.save("posts_jp", newPost);
 
-                // Should have captured the joinPath relation update
-                expect(db.transaction).toHaveBeenCalled();
+                // Asserting a transaction ran says nothing — every save is
+                // wrapped in one. These are the writes the joinPath produced.
+                //
+                // The chain is posts.author_id → authors.id → user_profiles.
+                // The value written into the profile is the *parent's*
+                // author_id, not the post's id: reading the wrong end of the
+                // first hop links the profile to a row it has no relation to.
+                expect(parentKeyRead?.val).toBe(mockPostsTable.author_id);
+                expect(tableNames(db.update as jest.Mock)).toEqual(["user_profiles", "user_profiles"]);
+                // To-one: whoever currently holds the parent's key is cleared
+                // before the named target takes it, or the pair ends up with
+                // two profiles claiming the same author.
+                expect(setPayloads(db.set as jest.Mock)).toEqual([{ user_id: null }, { user_id: 7 }]);
             });
 
             it("applies joinPath updates BEFORE main UPDATE on existing entities to prevent stale data corruption", async () => {
@@ -657,10 +764,17 @@ __type: "relation" }
                 db.limit.mockResolvedValue([{ id: 1,
 name: "John Doe" }]);
 
-                const entity = await dataService.save("customers", customerWithProfile);
+                await dataService.save("customers", customerWithProfile);
 
-                // Should trigger inverse relation update
-                expect(db.transaction).toHaveBeenCalled();
+                // The customers row carries no profile column: the key lives on
+                // user_profiles, so the write lands there. A transaction ran
+                // either way — every save opens one — which is why that alone
+                // never showed whether the relation was written.
+                expect(tableNames(db.update as jest.Mock)).toEqual(["user_profiles", "user_profiles"]);
+                // Clear-then-set, in that order: a profile that used to point
+                // at this customer has to let go before the named one takes
+                // over, or a to-one relation ends up with two holders.
+                expect(setPayloads(db.set as jest.Mock)).toEqual([{ user_id: null }, { user_id: "1" }]);
             });
         });
 
@@ -710,14 +824,36 @@ path: "user_profiles",
 __type: "relation" }
                 };
 
+                // See the owning joinPath test above: the parent's key is read
+                // back before the link is written, and the mock picks that read
+                // out by its projection.
+                let parentKeyRead: Record<string, unknown> | undefined;
+                db.select.mockImplementation(((selection?: Record<string, unknown>) => {
+                    if (selection && "val" in selection) {
+                        parentKeyRead = selection;
+                        const chain: Record<string, unknown> = {};
+                        chain.from = () => chain;
+                        chain.where = () => chain;
+                        chain.limit = () => Promise.resolve([{ val: 3 }]);
+                        return chain;
+                    }
+                    return db;
+                }) as never);
+
                 db.returning.mockResolvedValue([{ id: 1 }]);
                 db.limit.mockResolvedValue([{ id: 1,
 name: "Jane Author" }]);
 
-                const entity = await dataService.save("authors_jp", newAuthor);
+                await dataService.save("authors_jp", newAuthor);
 
-                // Should trigger inverse joinPath relation update
-                expect(db.transaction).toHaveBeenCalled();
+                // This chain starts authors.id → customers.id, so the value
+                // carried to the profile is the author's own id — the contrast
+                // with the owning case above, where it was an intermediate FK.
+                // Resolving the same column for both would write one of them
+                // against a value from the wrong table.
+                expect(parentKeyRead?.val).toBe(mockAuthorsTable.id);
+                expect(tableNames(db.update as jest.Mock)).toEqual(["user_profiles", "user_profiles"]);
+                expect(setPayloads(db.set as jest.Mock)).toEqual([{ user_id: null }, { user_id: 3 }]);
             });
         });
 
@@ -740,10 +876,25 @@ __type: "relation" }
                 db.limit.mockResolvedValue([{ id: 1,
 total: 500 }]);
 
-                const entity = await dataService.save("orders", orderWithProducts);
+                // An update, unlike the create covered above: the row already
+                // has links, so the set has to be *replaced* rather than added
+                // to.
+                await dataService.save("orders", orderWithProducts as never, 1);
 
-                // Should manage junction table entries
-                expect(db.transaction).toHaveBeenCalled();
+                expect(db.set).toHaveBeenCalledWith({ total: 500 });
+                expect(tableNames(db.delete as jest.Mock)).toEqual(["order_items"]);
+                expect(db.values).toHaveBeenCalledWith([
+                    { order_id: "1",
+product_id: "1" },
+                    { order_id: "1",
+product_id: "2" }
+                ]);
+                // Delete first, insert second, both inside the save's
+                // transaction: inserting before clearing would leave the
+                // removed products linked, which is the whole difference
+                // between "replace the set" and "add to it".
+                expect((db.delete as jest.Mock).mock.invocationCallOrder[0])
+                    .toBeLessThan((db.insert as jest.Mock).mock.invocationCallOrder[0]);
             });
         });
 
@@ -842,10 +993,19 @@ __type: "relation" }
                 db.limit.mockResolvedValue([{ id: 1,
 name: "Big Customer" }]);
 
-                const entity = await dataService.save("customers", customerWithOrders);
+                await dataService.save("customers", customerWithOrders);
 
-                // Should update FK on target entities
-                expect(db.transaction).toHaveBeenCalled();
+                // No junction here — the key is a column on orders, so the set
+                // is expressed as two UPDATEs on that column.
+                expect(tableNames(db.update as jest.Mock)).toEqual(["orders", "orders"]);
+                // The first clears the customer off every order that is no
+                // longer in the list, the second stamps it onto the ones that
+                // are. Without the clearing pass a removed order keeps pointing
+                // at this customer and silently stays in the collection.
+                expect(setPayloads(db.set as jest.Mock)).toEqual([
+                    { customer_id: null },
+                    { customer_id: "1" }
+                ]);
             });
         });
 

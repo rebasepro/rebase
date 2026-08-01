@@ -82,12 +82,21 @@ export interface DatabaseAdapter {
 
     /**
      * Initialize WebSocket server for realtime operations.
+     *
+     * `adapter` is the configured AuthAdapter, if any. It is what makes the
+     * socket secure by default: an implementation that receives one requires
+     * authentication regardless of whether a local `jwtSecret` exists. The
+     * parameter was missing from this signature while the caller in `init.ts`
+     * already passed it, so it was dropped at every adapter that routed through
+     * here — turning an adapter-authenticated server's socket into one that
+     * accepted every client as already authenticated.
      */
     initializeWebsockets?(
         server: unknown,
         realtimeService: RealtimeProvider,
         driver: DataDriver,
         config?: unknown,
+        adapter?: import("./auth_adapter").AuthAdapter,
     ): Promise<void> | void;
 
     /**

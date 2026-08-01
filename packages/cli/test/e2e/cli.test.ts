@@ -251,12 +251,18 @@ force: true });
         expect(updatedHash.length).toBeGreaterThan(20); // Password hashes are typically much longer
 
         console.log("11. Testing CLI help and version commands...");
+        // `stdio: "inherit"` captures nothing, so the results these were assigned
+        // to were empty and then unasserted — the steps proved only that the
+        // processes exited 0. Capture the output and check what it is for.
         const helpRes = await execa("node", [cliBin, "--help"], { cwd: scaffoldedDir,
-stdio: "inherit",
 env: cleanEnv });
+        for (const command of ["init", "dev", "build", "db", "schema", "generate-sdk"]) {
+            expect(helpRes.stdout).toContain(command);
+        }
+
         const versionRes = await execa("node", [cliBin, "--version"], { cwd: scaffoldedDir,
-stdio: "inherit",
 env: cleanEnv });
+        expect(versionRes.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
 
         console.log("12. Testing generate-sdk command...");
         await execa("node", [
@@ -341,6 +347,11 @@ env: cleanEnv });
             env: cleanEnv
         });
 
+        // Captured, not inherited: `list` has to actually report the branch that
+        // was just created, and report it gone once it is deleted. Inheriting
+        // stdio left `listRes` empty and unasserted, so create/list/delete
+        // passed as long as three processes exited 0 — including if `create`
+        // created nothing.
         const listRes = await execa("node", [
             cliBin,
             "db",
@@ -348,9 +359,9 @@ env: cleanEnv });
             "list"
         ], {
             cwd: scaffoldedDir,
-            stdio: "inherit",
             env: cleanEnv
         });
+        expect(listRes.stdout).toContain("e2e-test-branch");
 
         await execa("node", [
             cliBin,
@@ -363,5 +374,16 @@ env: cleanEnv });
             stdio: "inherit",
             env: cleanEnv
         });
+
+        const afterDelete = await execa("node", [
+            cliBin,
+            "db",
+            "branch",
+            "list"
+        ], {
+            cwd: scaffoldedDir,
+            env: cleanEnv
+        });
+        expect(afterDelete.stdout).not.toContain("e2e-test-branch");
     }, 240_000); // 4 minutes total execution allowance
 });

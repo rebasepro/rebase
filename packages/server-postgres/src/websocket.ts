@@ -7,7 +7,7 @@ import type { User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
@@ -116,11 +116,20 @@ export function createPostgresWebSocket(
         logger.error("❌ [WebSocket Server] Error", { error: err });
     });
 
-    // Auth is required when either: an adapter is present (secure by default),
-    // OR the config has a jwtSecret and requireAuth !== false.
-    const requireAuth = authAdapter
-        ? true
-        : (authConfig?.requireAuth !== false && !!authConfig?.jwtSecret);
+    // The same predicate the HTTP data routes use, from the same function —
+    // this socket is the other enforcement point for one product decision, and
+    // while it computed the answer itself it computed a different one. See
+    // `resolveRequireAuth` for what its local copy got wrong and why a `false`
+    // here grants access rather than skipping a check.
+    const requireAuth = !!authAdapter || resolveRequireAuth(authConfig as never);
+
+    if (requireAuth && !authAdapter && !authConfig?.jwtSecret && !authConfig?.serviceKey) {
+        logger.warn(
+            "🔐 [WebSocket Server] Authentication is required but no adapter, jwtSecret or " +
+            "serviceKey is configured — no client can complete AUTH, so every realtime " +
+            "message will be refused with UNAUTHORIZED."
+        );
+    }
 
     wss.on("connection", (ws) => {
         const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

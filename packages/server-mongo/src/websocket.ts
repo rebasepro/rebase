@@ -3,7 +3,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
 import type { AccessTokenPayload } from "@rebasepro/server";
-import { extractUserFromToken } from "@rebasepro/server";
+import { extractUserFromToken, resolveRequireAuth } from "@rebasepro/server";
 import type { RebaseAuthConfig } from "@rebasepro/server";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
@@ -25,7 +25,6 @@ interface ClientSession {
     messageWindowStart: number;
 }
 
-const clientSessions = new Map<string, ClientSession>();
 const WS_RATE_LIMIT = 2000;
 const WS_RATE_WINDOW_MS = 60_000;
 
@@ -53,6 +52,11 @@ export function createMongoWebSocket(
     authConfig?: RebaseAuthConfig,
     admin?: DatabaseAdmin
 ) {
+    // Scoped to this factory invocation rather than the module, so sessions do
+    // not leak across hot reloads or a second server on the same process — the
+    // Postgres socket keeps it here for the same reason.
+    const clientSessions = new Map<string, ClientSession>();
+
     const isProduction = process.env.NODE_ENV === "production";
     const wsDebug = (...args: unknown[]) => { if (!isProduction) console.debug(...args); };
     const wss = new WebSocketServer({ server });
@@ -62,7 +66,18 @@ export function createMongoWebSocket(
         logger.error("❌ [WebSocket Server] Error", { error: err });
     });
 
-    const requireAuth = authConfig?.requireAuth !== false && authConfig?.jwtSecret;
+    // The same predicate the HTTP data routes use, from the same function. See
+    // `resolveRequireAuth` for what this socket's local copy got wrong — most
+    // importantly that a `false` here does not skip a check, it marks every
+    // session `authenticated` at connect time.
+    const requireAuth = resolveRequireAuth(authConfig);
+
+    if (requireAuth && !authConfig?.jwtSecret) {
+        logger.warn(
+            "🔐 [WebSocket Server] Authentication is required but no jwtSecret is configured — " +
+            "no client can complete AUTH, so every realtime message will be refused."
+        );
+    }
 
     wss.on("connection", (ws) => {
         const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

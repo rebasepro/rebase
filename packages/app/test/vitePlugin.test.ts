@@ -312,8 +312,13 @@ describe("rebaseCollectionsPlugin — transform hook", () => {
         const input = 'const c = { Field: "../../components/MyField" };';
         const result = transform(input);
         expect(result).not.toBeNull();
-        expect(result!.map).toBeDefined();
-        expect(result!.map).not.toBeNull();
+        // An empty or placeholder map object is "defined" and "not null" too,
+        // and Vite would accept it and then point every stack frame at the
+        // wrong line. The mappings are the part that does the work.
+        expect(result!.map).toMatchObject({
+            version: 3,
+            mappings: expect.stringMatching(/.+/)
+        });
     });
 });
 
