@@ -81,17 +81,11 @@ export interface RebaseStudioConfig {
  * `@rebasepro/server`, which is the *backend* auth configuration: JWT secrets,
  * OAuth providers, password hooks, the users collection. Two unrelated shapes
  * under one name, one of them exported from a package whose whole job is to be
- * imported alongside the other. The old name is kept as a deprecated alias.
+ * imported alongside the other.
  */
 export interface RebaseAuthViewConfig {
     loginView?: ReactNode;
 }
-
-/**
- * @deprecated Use {@link RebaseAuthViewConfig}. This name collides with
- * `RebaseAuthConfig` from `@rebasepro/server`, which configures the backend.
- */
-export type RebaseAuthConfig = RebaseAuthViewConfig;
 
 export interface RebaseRegistryController {
     // Current state

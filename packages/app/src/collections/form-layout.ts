@@ -41,9 +41,8 @@ export interface ResolvedFormField {
     /** True for an `additionalFields` entry rather than a property. */
     additional: boolean;
     /**
-     * The span came from `admin.span` / `widthPercentage` rather than being
-     * derived. Row filling leaves these alone: an author who wrote a width
-     * meant it.
+     * The span was written on the property rather than derived from its type.
+     * Row filling leaves these alone: an author who wrote a width meant it.
      */
     spanExplicit?: boolean;
 }
@@ -86,19 +85,6 @@ export interface ResolveFormLayoutParams<M extends Record<string, unknown>> {
 /* -------------------------------------------------------------------------- */
 /* span derivation                                                            */
 /* -------------------------------------------------------------------------- */
-
-/**
- * A percentage lands on the nearest span rather than an arbitrary width, so a
- * collection carrying the deprecated `widthPercentage` still snaps to the grid
- * everything else is on. Boundaries are generous on the low side because the
- * common legacy values are 50 and 33.
- */
-export function spanFromWidthPercentage(pct: number): PropertySpan {
-    if (pct <= 30) return 1;
-    if (pct <= 55) return 2;
-    if (pct <= 80) return 3;
-    return 4;
-}
 
 /** Does this property's editor need the full width of the column? */
 function needsFullWidth(property: Property): boolean {
@@ -266,11 +252,8 @@ function buildField<M extends Record<string, unknown>>(
     if (isHidden(property)) return undefined;
 
     const admin = property.admin;
-    const explicit = admin?.span !== undefined || typeof admin?.widthPercentage === "number";
-    const span: PropertySpan = admin?.span
-        ?? (typeof admin?.widthPercentage === "number"
-            ? spanFromWidthPercentage(admin.widthPercentage)
-            : deriveSpan(property, key === titlePropertyKey));
+    const explicit = admin?.span !== undefined;
+    const span: PropertySpan = admin?.span ?? deriveSpan(property, key === titlePropertyKey);
 
     return { key, span, additional: false, spanExplicit: explicit };
 }

@@ -162,7 +162,7 @@ Innerhalb von `admin`, außer `history` — das ist eine Backend-Funktion und bl
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Ungespeicherte Änderungen sichern |
 | `hideIdFromForm` | `boolean` | `false` | Die Entitäts-ID aus dem Formular ausblenden |
 | `hideIdFromCollection` | `boolean` | `false` | Die ID-Spalte aus der Tabelle ausblenden |
-| `includeJsonView` | `boolean` | `false` | Einen JSON-Tab in der Entitätsansicht anzeigen |
+| `includeJsonView` | `boolean` | `true` | Die Rohwerte im Datensatz-Inspektor anbieten |
 | `history` | `boolean` | `false` | Änderungen in der Entitätshistorie verfolgen |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Standardwerte bei jedem Speichern anwenden |
 | `previewProperties` | `string[]` | — | Eigenschaften, die in Referenzvorschauen angezeigt werden sollen |

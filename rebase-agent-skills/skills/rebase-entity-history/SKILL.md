@@ -5,7 +5,7 @@ description: Guide for tracking and reverting entity changes with Rebase's built
 
 # Rebase Entity History
 
-Rebase includes a built-in entity history system that records entities of every create, update, and delete operation. History entries are stored in a dedicated PostgreSQL table and exposed via REST API endpoints. The Studio admin panel provides a visual history tab with one-click revert.
+Rebase includes a built-in entity history system that records entities of every create, update, and delete operation. History entries are stored in a dedicated PostgreSQL table and exposed via REST API endpoints. The admin panel shows the revisions in the record inspector, with one-click revert.
 
 > **IMPORTANT FOR AGENTS:** Entity history requires **two** things to be enabled: (1) the global `history` flag in the backend config, AND (2) `history: true` on each individual collection. If either is missing, no history is recorded for that collection.
 
@@ -366,9 +366,12 @@ export default {
 };
 ```
 
-## Studio Integration
+## Admin Panel Integration
 
-When history is enabled for a collection, Rebase Studio automatically adds a **History tab** in the entity edit view. This tab:
+When history is enabled for a collection, the admin panel offers **History** in
+the record's overflow (`⋮`) menu, beside **Inspect record**. Both open the record
+inspector — a panel beside the form, not a tab in front of it — so the record
+you are inspecting stays on screen while you read its revisions. The panel:
 
 - Displays a paginated list of history entries with infinite scroll
 - Shows the action type, changed fields, timestamp, and user who made the change
@@ -376,13 +379,18 @@ When history is enabled for a collection, Rebase Studio automatically adds a **H
 - After revert, resets the form with the restored values (no page refresh needed)
 - Warns users to save or discard unsaved changes before reverting
 
-No additional configuration is needed — the History tab appears automatically for any collection with `history: true`.
+Columns the backend stamps itself — the audit timestamps and the primary key —
+are left out of each entry's diff: they change on every write, and the entry
+already states when it happened and which record it belongs to.
+
+No additional configuration is needed — the menu entry appears for any
+collection with `history: true`.
 
 ## Client SDK Usage
 
 There is currently **no dedicated client SDK method** for entity history. History is accessed via the REST API directly (as shown in the endpoints section above).
 
-The Studio admin panel uses an internal `useHistory` React hook that:
+The admin panel uses an internal `useHistory` React hook that:
 - Fetches history from `GET /api/data/:slug/:entityId/history`
 - Supports pagination via offset-based loading
 - Provides a `revert()` function that calls `POST /api/data/:slug/:entityId/history/:historyId/revert`

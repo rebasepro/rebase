@@ -4,7 +4,6 @@ import {
     deriveSpan,
     isIdPropertyEditable,
     resolveFormLayout,
-    spanFromWidthPercentage
 } from "../../src/collections/form-layout";
 
 const collection = (properties: Record<string, unknown>, admin: Record<string, unknown> = {}) =>
@@ -21,22 +20,6 @@ const keysOf = (layout: { sections: { fields: { key: string }[] }[] }) =>
 
 const spanOf = (layout: { sections: { fields: { key: string, span: number }[] }[] }, key: string) =>
     layout.sections.flatMap(s => s.fields).find(f => f.key === key)?.span;
-
-describe("spanFromWidthPercentage", () => {
-    it("snaps the common legacy values onto the grid", () => {
-        expect(spanFromWidthPercentage(25)).toBe(1);
-        expect(spanFromWidthPercentage(33)).toBe(2);
-        expect(spanFromWidthPercentage(50)).toBe(2);
-        expect(spanFromWidthPercentage(75)).toBe(3);
-        expect(spanFromWidthPercentage(100)).toBe(4);
-    });
-
-    it("never returns an off-grid value, however odd the input", () => {
-        for (const pct of [0, 1, 31, 56, 81, 99, 140]) {
-            expect([1, 2, 3, 4]).toContain(spanFromWidthPercentage(pct));
-        }
-    });
-});
 
 describe("deriveSpan", () => {
     const p = (v: unknown) => v as Property;
@@ -393,11 +376,11 @@ describe("resolveFormLayout — explicit config", () => {
         expect(l.hasRail).toBe(false);
     });
 
-    it("prefers an explicit span over the derived one, and over widthPercentage", () => {
+    it("prefers an explicit span over the derived one", () => {
         const explicit = collection({
             a: { type: "number", admin: { span: 4 } },
-            b: { type: "number", admin: { widthPercentage: 50 } },
-            c: { type: "number", admin: { span: 3, widthPercentage: 25 } }
+            b: { type: "number", admin: { span: 2 } },
+            c: { type: "number", admin: { span: 3 } }
         });
         const l = resolveFormLayout({ collection: explicit, fieldKeys: ["a", "b", "c"], status: "existing" });
         expect(spanOf(l, "a")).toBe(4);

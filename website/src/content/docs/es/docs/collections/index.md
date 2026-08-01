@@ -162,7 +162,7 @@ Dentro de `admin`, excepto `history`, que es una función del backend y permanec
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Realizar copia de seguridad de cambios no guardados |
 | `hideIdFromForm` | `boolean` | `false` | Ocultar el ID de la entidad del formulario |
 | `hideIdFromCollection` | `boolean` | `false` | Ocultar la columna ID de la tabla |
-| `includeJsonView` | `boolean` | `false` | Mostrar una pestaña JSON en la vista de entidad |
+| `includeJsonView` | `boolean` | `true` | Ofrecer los valores en bruto en el inspector del registro |
 | `history` | `boolean` | `false` | Rastrear cambios en el historial de la entidad |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Aplicar valores predeterminados en cada guardado |
 | `previewProperties` | `string[]` | — | Propiedades a mostrar en las vistas previas de referencia |

@@ -160,6 +160,7 @@ export default productsCollection;
 | `admin.defaultEntityAction` | `"edit" \| "view"` | `"edit"` | Click behavior: open form or read-only view |
 | `admin.kanban` | `{ columnProperty: string }` | — | Kanban column config (requires enum property) |
 | `admin.propertiesOrder` | `string[]` | — | Field display order in forms and table |
+| `admin.form` | `FormLayoutConfig` | — | Form layout: `sidebar`, `sections`, `showRecordMeta`. See **Form layout** below |
 | `admin.entityViews` | `(string \| EntityCustomView)[]` | — | Custom tabs on entity detail |
 | `admin.titleProperty` | `string` | first text prop | Property used as entity title in previews |
 | `admin.previewProperties` | `string[]` | — | Properties shown when this collection is referenced |
@@ -178,12 +179,12 @@ export default productsCollection;
 | `admin.formAutoSave` | `boolean` | `false` | Auto-save form on field change |
 | `admin.formView` | `FormViewConfig` | — | Custom component replacing the default entity form |
 | `admin.hideFromNavigation` | `boolean` | `false` | Hide from sidebar (still accessible via URL) |
-| `admin.hideIdFromForm` | `boolean` | `false` | Hide ID field in entity form |
+| `admin.hideIdFromForm` | `boolean` | `false` | Hide ID field in entity form. Prefer `admin.form.showRecordMeta`, which moves the id to the metadata rail instead of hiding it |
 | `admin.hideIdFromCollection` | `boolean` | `false` | Hide ID column in collection table |
 | `admin.defaultSelectedView` | `string \| Function` | — | Auto-open a custom view/subcollection tab |
 | `admin.sideDialogWidth` | `number \| string` | — | Width of side dialog in pixels |
 | `admin.alwaysApplyDefaultValues` | `boolean` | `false` | Re-apply defaults on every update |
-| `admin.includeJsonView` | `boolean` | `false` | Show a JSON tab in entity detail |
+| `admin.includeJsonView` | `boolean` | `true` | Offer the raw values in the record inspector |
 | `admin.localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Local changes backup strategy |
 | `admin.disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | — | Disable built-in actions |
 | `admin.additionalFields` | `AdditionalFieldDelegate[]` | — | Virtual computed columns for views |
@@ -278,10 +279,61 @@ All property types support a `admin` object for display configuration:
 | `admin.hideFromCollection` | `boolean` | — | Hide from collection table view |
 | `admin.readOnly` | `boolean` | — | Render as read-only preview |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | — | Disable editing |
-| `admin.widthPercentage` | `number` | — | Width as percentage of form |
+| `admin.span` | `1 \| 2 \| 3 \| 4` | — | Field width over the four-column form grid |
 | `admin.customProps` | `unknown` | — | Custom props passed to the field component |
 | `admin.Field` | `ComponentRef` | — | Custom field component |
 | `admin.Preview` | `ComponentRef` | — | Custom preview/cell component |
+
+### Form layout
+
+The entity form derives a two-column layout from the property types on its own:
+the id and the audit timestamps go to a metadata rail, short enums, booleans,
+dates and numbers take a narrow span, long text, markdown, arrays, maps and
+storage fields take the full width, everything else takes half. A collection
+that says nothing about layout still gets a form rather than one long run of
+full-width inputs.
+
+Reach for `admin.form` when that answer is wrong for the domain:
+
+```typescript
+import { defineCollection } from "@rebasepro/admin-types";
+
+const postsCollection = defineCollection({
+    slug: "posts",
+    table: "posts",
+    name: "Posts",
+    properties: {
+        title: { name: "Title", type: "string" },
+        body: { name: "Body", type: "string", admin: { markdown: true } },
+        status: { name: "Status", type: "string" },
+        published_at: { name: "Published at", type: "date" },
+        notes: { name: "Notes", type: "string" }
+    },
+    admin: {
+        form: {
+            // Fields beside the main column rather than in it.
+            sidebar: ["status", "published_at"],
+            sections: [
+                { key: "content", properties: ["title", "body"] },
+                {
+                    key: "internal",
+                    title: "Internal",
+                    properties: ["notes"],
+                    collapsed: true
+                }
+            ],
+            // id / created / updated at the foot of the rail. Default `true`.
+            showRecordMeta: true
+        }
+    }
+});
+```
+
+A property no section names is never dropped — it lands in a trailing group, so
+adding a column to the database cannot make a field silently invisible. A
+validation error inside a collapsed section expands it. On layouts too narrow
+for a rail (side panel, split pane, phone) the rail renders as a leading
+section and spans are ignored.
 
 ## String Properties
 

@@ -76,8 +76,8 @@ describe("ADMIN_PROPERTY_KEYS", () => {
 
     it("covers the base options and every per-type extension", () => {
         // Same tripwire as above. Bump it deliberately, alongside the list.
-        // 26 since `span` joined; `widthPercentage` stays, deprecated but read.
-        expect(ADMIN_PROPERTY_KEYS).toHaveLength(26);
+        // 25: `span` joined and `widthPercentage`, which it replaced, is gone.
+        expect(ADMIN_PROPERTY_KEYS).toHaveLength(25);
     });
 
     it("names nothing that belongs to the property contract", () => {

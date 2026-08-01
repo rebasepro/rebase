@@ -162,7 +162,7 @@ Dentro de `admin`, exceto `history`, que é um recurso do backend e permanece no
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Fazer backup de mudanças não salvas |
 | `hideIdFromForm` | `boolean` | `false` | Ocultar o ID da entidade do formulário |
 | `hideIdFromCollection` | `boolean` | `false` | Ocultar a coluna de ID da tabela |
-| `includeJsonView` | `boolean` | `false` | Mostrar uma aba JSON na visualização de entidade |
+| `includeJsonView` | `boolean` | `true` | Oferecer os valores em bruto no inspetor do registo |
 | `history` | `boolean` | `false` | Rastrear mudanças no histórico da entidade |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Aplicar valores padrão em cada salvamento |
 | `previewProperties` | `string[]` | — | Propriedades a serem exibidas nas pré-visualizações de referência |

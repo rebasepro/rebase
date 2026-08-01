@@ -290,7 +290,7 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Backup unsaved changes |
 | `hideIdFromForm` | `boolean` | `false` | Hide the entity ID from the form |
 | `hideIdFromCollection` | `boolean` | `false` | Hide the ID column from the table |
-| `includeJsonView` | `boolean` | `false` | Show a JSON tab in the entity view |
+| `includeJsonView` | `boolean` | `true` | Offer the raw values in the record inspector |
 | `history` | `boolean` | `false` | Track changes in entity history |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Apply default values on every save |
 | `previewProperties` | `string[]` | — | Properties to display in reference previews |

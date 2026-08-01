@@ -162,7 +162,7 @@ Dentro `admin`, tranne `history`, che è una funzionalità del backend e resta a
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Backup delle modifiche non salvate |
 | `hideIdFromForm` | `boolean` | `false` | Nasconde l'ID dell'entità dal modulo |
 | `hideIdFromCollection` | `boolean` | `false` | Nasconde la colonna ID dalla tabella |
-| `includeJsonView` | `boolean` | `false` | Mostra una scheda JSON nella vista entità |
+| `includeJsonView` | `boolean` | `true` | Offre i valori grezzi nell'ispettore del record |
 | `history` | `boolean` | `false` | Traccia le modifiche nella cronologia dell'entità |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Applica i valori predefiniti ad ogni salvataggio |
 | `previewProperties` | `string[]` | — | Proprietà da visualizzare nelle anteprime di riferimento |

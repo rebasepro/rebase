@@ -118,7 +118,6 @@ export const ADMIN_PROPERTY_KEYS = [
     "spreadChildren",
     "urlPreview",
     "widget",
-    "widthPercentage"
 ] as const;
 
 /** A key of a property's `admin` block. @group Models */

@@ -8,6 +8,17 @@ title: Changelog
 
 ### Breaking
 
+- **`admin.widthPercentage` is gone — use `admin.span`.** Field width is a span over a shared four-column grid now, so two fields line up whatever order they were declared in. A raw percentage could not line up with anything: `33` and `35` produced different widths that looked like a mistake, and nothing snapped to a common edge.
+
+  ```diff
+  - admin: { widthPercentage: 50 }
+  + admin: { span: 2 }
+  ```
+
+  If you are migrating: `≤30 → 1`, `≤55 → 2`, `≤80 → 3`, otherwise `4`. Spans are ignored where the form is too narrow for two columns — the side panel, the split pane, a phone — which was also true of percentages.
+
+- **`RebaseAuthConfig` is gone from `@rebasepro/admin-types` — use `RebaseAuthViewConfig`.** It was a compatibility alias for a name that collides head-on with `RebaseAuthConfig` in `@rebasepro/server`, which configures the *backend* auth: JWT secrets, OAuth providers, password hooks. Two unrelated shapes under one name, exported from two packages whose whole job is to be imported together.
+
 - **`react-router` 8, and `react-router-dom` is gone** — react-router 8 deletes the `react-router-dom` package outright. It was only ever a v6-compatibility shim: everything DOM-specific had already collapsed into `react-router` itself in v7.
 
   `@rebasepro/admin`, `app`, `studio` and `plugin-ai` now peer `react-router ^8.3.0`. Two imports move, and only one of them is a rename:
@@ -28,6 +39,18 @@ title: Changelog
 
 ### Security
 
+- **`policy.authenticated()` admitted anonymous visitors.** There were two sentinels for "nobody is signed in". The types, the policy compiler, the JavaScript evaluator and the anonymous-grant linter were all built on `ANONYMOUS_USER_ID` (`'anonymous'`); the request path scoped unauthenticated callers as `'anon'`. So `policy.authenticated()` — the sanctioned, documented way to write "signed in", the thing the linter *tells you to use* — compiled to `auth.uid() <> 'anonymous'` and was true for every signed-out caller.
+
+  The linter had it exactly backwards, too: it flagged `auth.uid() <> 'anon'` as a Supabase habit comparing against "a string no caller ever has", when `'anon'` was the only spelling that worked.
+
+  This is worse than a default that fails open, because it inverts a rule the author wrote deliberately. A policy that reads as a lockdown was a full grant, and nothing about it looked wrong at any layer — in one deployment it left `INSERT` on companies, company memberships and jobs open to anonymous callers, and a membership row is a privilege boundary: every anonymous visitor shares one uid, so a single claim is a membership held by the internet.
+
+  The request path now reports `ANONYMOUS_USER_ID` everywhere it scopes a caller — the JWT and adapter middlewares, the websocket handshake, the realtime service, and the rate limiter's "is this a real user" check. New: `ANONYMOUS_USER_IDS` (every spelling, newest first) and `isAnonymousUid()`.
+
+  **Existing databases are fixed by upgrading the server**, without regenerating a single policy: a stored `auth.uid() <> 'anonymous'` starts excluding anonymous callers the moment they report that id. `policy.authenticated()` now compiles to `NOT IN ('anonymous', 'anon')` rather than a single literal, because a policy is written into the database and outlives the server that generated it — one spelling is a hole in whichever direction the versions happen to skew.
+
+  **What breaks:** a policy that *grants* to anonymous callers by comparing `auth.uid() = 'anon'` stops matching. That fails closed, and `policy.not(policy.authenticated())` is the supported way to say it.
+
 - **`auth.requireAuth: false` no longer un-gates cron, logs, backups and the schema editor.** That flag answers a question about the data plane — must a caller present a token to read `/api/data`, or does RLS alone decide? — and `false` is the answer the server itself recommends at boot to anyone serving a public website from their own backend. It was also, silently, the switch that decided whether the admin surfaces were gated at all.
 
   So the documented configuration for a public job board or marketing site mounted `POST /api/cron/:id/trigger`, `GET /api/logs` and `/api/admin/backups` for anyone who could reach the service. A single `warn` per surface at boot was the only notice, and on a `--allow-unauthenticated` Cloud Run deployment "anyone who can reach the service" means the internet. Anyone whose cron jobs spend a metered third-party quota was paying for that.
@@ -44,6 +67,8 @@ title: Changelog
 
   This is unlikely to touch you: every scaffolded backend and the bundle runtime configure `auth.jwtSecret` (the runtime *requires* it, and auto-generates one in development), so the affected shape is a hand-rolled entrypoint that passes no `auth` — or one whose `JWT_SECRET` quietly failed to reach the container, which is precisely the deployment that should not be serving a cron trigger to anonymous callers.
 
+  The data plane is unaffected and still answers 401 there: "show me a token" is a truthful thing to say about `/api/data`, and a dishonest one about a surface no token can open.
+
 - **Every `overrides:` entry is a bounded security floor now.** An override replaces each transitive consumer's own range, so a bare `>=X` is not a floor — it is a floating pin that drags in the next major to publish, whatever asked for what.
 
   One of them had inverted completely: `js-yaml: ">=4.2.0 <5"` pinned the tree *at* 4.2.0, which is precisely the version GHSA-52cp-r559-cp3m says to leave (patched in 4.3.0). The pin meant to protect was the thing holding the exposure. `uuid` had meanwhile floated from its 11.x floor to 14 unnoticed.
@@ -54,9 +79,37 @@ title: Changelog
 
 ### Fixed
 
+- **Several concurrent realtime subscriptions hung on a cold page load.** A view that opens more than one at once — a Kanban board opens one per column — reported `Subscription timed out` for all but one of them, thirty seconds in. The socket was healthy: probed directly, six concurrent `subscribe_collection` frames all answered inside 15ms. The frames were never sent.
+
+  `ensureAuthenticated` published its in-flight guard only *after* awaiting the token getter, so every caller arriving in that gap started an attempt of its own — and the message queue flushing on connect delivers exactly that. Each attempt then registered under ``auth_${Date.now()}``, the one request id with no random suffix, so attempts in the same millisecond collided in a `Map` and only the last survived. One promise settled; the frames waiting behind the others never reached the socket. Client-side navigation skips the path (`isAuthenticated` is already true), which is why the same view worked on every visit after the first.
+
+- **Kanban drag-and-drop put cards in the wrong place, and did not persist a column change at all.** `handleDragOver` moves the card between columns while the pointer is still down, so looking it up by id at drop time finds it in its *destination* — the board reported every cross-column drop as a same-column reorder and never wrote the column property. Separately, the drop handler passed every card in every column to `onItemsReorder`, whose consumer reads it as the target column and takes the moved card's neighbours from it to compute a sort key.
+
+  Also: releasing over a column rather than a card no longer forces an append (which sent a card dropped mid-column to the bottom), dropping onto an empty column no longer aborts the save, and collision detection is `closestCorners` — the default only reports a target while the dragged rect overlaps one, so a card held over a gap reported nothing.
+
+- **Board sort keys are `fractional-indexing` keys the database can sort.** The library's default base62 output only orders correctly under byte comparison, and the sort is done by Postgres, whose default collation is not byte comparison: under `en_US.UTF-8`, `"aa"` sorts before `"aC"`. A board dragged around enough to reach the upper-case digits stopped agreeing with its own keys. Keys are base36 and single case now. Existing keys no longer validate, which is what surfaces the board's **Initialize** bar — and that bar works now: it only ever looked for a *null* order value, so a column full of unusable-but-present values offered a button that updated nothing and never went away.
+
+- **Kanban columns could not be scrolled.** A `flex-1` item defaults to `min-height: auto`, so the view holding the board grew to the board's full content height — 1230px inside an 883px area — and the ancestor's `overflow-hidden` cut off the rest. Each column had a working scroller that never reached its limit.
+
+- **A failed column subscription rendered as an empty column.** Entities cleared, no error surfaced, "No items" under a header still counting eleven of them. It falls back to a one-shot read, reports a failure only if that fails too, and no longer waits out the client's full 30-second watchdog before painting anything.
+
+- **Date previews required a `Date` instance**, so every audit column in every revision-history entry rendered as a red "Unexpected value" box. History is raw API payload, where a timestamp is still the string Postgres sent. Any value that unambiguously names a date is accepted now.
+
+- **Chips lost three quarters of their palette.** A cleanup flattened `CHIP_COLORS` from four tones per hue to one, which left every `colorScheme="blueDark"` resolving to `undefined` — a chip with a colour in its config rendering with no colour at all — and made seeded chips pick from ten schemes, so a five-value enum routinely drew the same background three times. The tones are generated from a per-hue table now, and `ChipColorKey` is a real union rather than `keyof Record<string, …>`, which is why none of it was a type error.
+
 - **The Firebase example compiles again.** It had not built since the property-options split, which made `url` a statement about the data — it feeds `format: "uri"` into the OpenAPI contract — and moved presentation to `admin.urlPreview`. The example's `admin: { url: "image" }` had both halves in the wrong place, and `expanded` likewise belongs in the `admin` block.
 
 ### Added
+
+- **The entity form has a layout.** It had exactly one — a single centred column of full-width cards in declaration order — and one escape hatch, `formView.Builder`, which replaces the whole form. Nothing in between.
+
+  There is now a four-column grid, titled sections that collapse, and a metadata rail for the fields that describe a record rather than constitute it. All of it is derived by default: a collection that configures nothing gets a two-column form, its id and audit timestamps in the rail, long text and arrays full width, short enums and booleans narrow. `admin.form` is for when the derived answer is wrong. See [Form Layout](/docs/frontend/form-layout).
+
+  On the demo's products form this is 2932px of scroll down to 1587px, and 219px of dead space above the first field down to 24px.
+
+- **The record's identity and its actions live in persistent chrome.** The title, the id and the Save/Discard buttons used to sit *inside* the scrolling form, so the moment you touched the wheel nothing on screen said which record you were editing. They are in a bar above it now, which is also what let the 320px footer holding two buttons go away entirely.
+
+- **JSON and revision history moved out of the tab strip and into a record inspector.** They were the first two tabs — icon-only, unlabelled, ahead of the record you opened the page to edit. They are developer tools, so they sit behind the overflow (`⋮`) menu and open in a panel beside the form; the tab strip is for destinations. Old `#json` / `#history` URLs open the inspector on the pane they name.
 
 - **Two gates for things that were rotting silently.** `pnpm check:examples` typechecks `examples/*`, which were in no pipeline and no root script — `pnpm build` covers `./packages/*` and `./app` only — which is why the Firebase example above stayed broken for weeks. They resolve `@rebasepro/*` to built output the way an installing user does, rather than to source the way `pnpm typecheck` does, so they catch a class of drift the source-resolving gate structurally cannot see.
 

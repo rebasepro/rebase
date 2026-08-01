@@ -162,7 +162,7 @@ Dans `admin`, sauf `history`, qui est une fonctionnalité du backend et reste au
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Sauvegarder les modifications non enregistrées |
 | `hideIdFromForm` | `boolean` | `false` | Masquer l'ID de l'entité du formulaire |
 | `hideIdFromCollection` | `boolean` | `false` | Masquer la colonne ID du tableau |
-| `includeJsonView` | `boolean` | `false` | Afficher un onglet JSON dans la vue entité |
+| `includeJsonView` | `boolean` | `true` | Proposer les valeurs brutes dans l'inspecteur de l'enregistrement |
 | `history` | `boolean` | `false` | Suivre les modifications dans l'historique de l'entité |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Appliquer les valeurs par défaut à chaque sauvegarde |
 | `previewProperties` | `string[]` | — | Propriétés à afficher dans les aperçus de référence |

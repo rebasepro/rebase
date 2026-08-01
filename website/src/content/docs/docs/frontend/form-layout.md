@@ -51,8 +51,10 @@ const productsCollection = defineCollection({
 ```
 
 Spans snap to a shared grid, which is what makes two fields line up regardless
-of the order they were declared in. `admin.widthPercentage` still works and is
-resolved to the nearest span, so existing collections render unchanged.
+of the order they were declared in. They replaced `admin.widthPercentage`,
+whose raw percentages could not line up with anything; a collection still
+carrying one should pick the nearest span (≤30 → `1`, ≤55 → `2`, ≤80 → `3`,
+otherwise `4`).
 
 On layouts too narrow for two columns — the side panel, the split pane, a phone
 — the grid collapses to a single column and spans are ignored.
