@@ -476,10 +476,12 @@ export interface RebaseBackendConfig {
 /**
  * Type guard to detect whether the `auth` config is an `AuthAdapter`
  * (has a `verifyRequest` method) vs a plain `RebaseAuthConfig` (plain object).
+ *
+ * Re-exported from `auth/require-auth`, which is where it now lives so the
+ * drivers can reach `resolveRequireAuth` without importing this entry point.
  */
-export function isAuthAdapter(auth: RebaseAuthConfig | AuthAdapter): auth is AuthAdapter {
-    return typeof auth === "object" && auth !== null && "verifyRequest" in auth && typeof (auth as AuthAdapter).verifyRequest === "function";
-}
+import { isAuthAdapter, resolveRequireAuth } from "./auth/require-auth";
+export { isAuthAdapter } from "./auth/require-auth";
 
 /**
  * Type guard to detect whether `database` is a `DatabaseAdapter`.
@@ -488,18 +490,6 @@ export function isDatabaseAdapter(db: unknown): db is DatabaseAdapter {
     return typeof db === "object" && db !== null && "initializeDriver" in db && "type" in db && !("initializeAuth" in db);
 }
 
-/**
- * Resolve the `requireAuth` flag from either a `RebaseAuthConfig` or an `AuthAdapter`.
- *
- * - `RebaseAuthConfig` has an explicit `requireAuth` boolean
- * - `AuthAdapter` always implies auth is required (secure by default)
- * - If no auth config is provided at all, default to `true`
- */
-function resolveRequireAuth(auth?: RebaseAuthConfig | AuthAdapter): boolean {
-    if (!auth) return true;
-    if (isAuthAdapter(auth)) return true; // AuthAdapters are always secure-by-default
-    return (auth as RebaseAuthConfig).requireAuth !== false;
-}
 
 export interface RebaseBackendInstance {
     driverRegistry: DriverRegistry;

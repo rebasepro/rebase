@@ -3,7 +3,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
 import type { AccessTokenPayload } from "@rebasepro/server";
-import { extractUserFromToken } from "@rebasepro/server";
+import { extractUserFromToken, resolveRequireAuth } from "@rebasepro/server";
 import type { RebaseAuthConfig } from "@rebasepro/server";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
 import { MongoDriver } from "./services/MongoDriver";
@@ -66,15 +66,11 @@ export function createMongoWebSocket(
         logger.error("❌ [WebSocket Server] Error", { error: err });
     });
 
-    // An explicit `requireAuth: true` is honoured on its own. ANDing it with the
-    // presence of a jwtSecret (as this did) means the one setting that exists to
-    // demand authentication evaluates to false when no local secret is
-    // configured — and `false` here does not skip a check, it marks every
-    // session `authenticated` at connect time. Asking for auth must never be
-    // what grants it; with no credential to verify against the socket now
-    // refuses everyone, which is a visible failure rather than a silent one.
-    const requireAuth = authConfig?.requireAuth === true
-        || (authConfig?.requireAuth !== false && !!authConfig?.jwtSecret);
+    // The same predicate the HTTP data routes use, from the same function. See
+    // `resolveRequireAuth` for what this socket's local copy got wrong — most
+    // importantly that a `false` here does not skip a check, it marks every
+    // session `authenticated` at connect time.
+    const requireAuth = resolveRequireAuth(authConfig);
 
     if (requireAuth && !authConfig?.jwtSecret) {
         logger.warn(

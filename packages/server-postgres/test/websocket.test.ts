@@ -28,10 +28,16 @@ jest.mock("@rebasepro/server", () => {
     return {
         extractUserFromToken: (token: string) => mockExtractUserFromToken(token),
         safeCompare: (a: string, b: string) => a === b,
-        logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() }
+        logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
+        // The real predicate, not a stub: the point of the block at the end of
+        // this file is that the socket and the HTTP routes give the same answer,
+        // which a mocked copy could not show.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        resolveRequireAuth: require("../../server/src/auth/require-auth").resolveRequireAuth
     };
 });
 
+import { resolveRequireAuth } from "../../server/src/auth/require-auth";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -504,9 +510,36 @@ describe("WebSocket Server requireAuth resolution", () => {
         expect(mockDriver.fetchCollection).toHaveBeenCalled();
     });
 
-    it("admits an anonymous client when nothing about auth is configured at all", async () => {
+    /**
+     * The case that made this socket disagree with the rest of the server.
+     *
+     * `resolveRequireAuth(undefined)` is `true` — the HTTP data routes answer
+     * 401 to every read when no auth is configured. The socket's own copy of the
+     * predicate returned `false` for the same input, so the same rows the REST
+     * API refused were served over the socket. Not a weaker gate: the opposite
+     * answer, from the other half of one decision.
+     */
+    it("requires auth when nothing about auth is configured — matching the HTTP routes", async () => {
         createPostgresWebSocket(mockServer, mockRealtimeService, mockDriver, {});
 
-        expect(await anonymousIsRefused()).toBe(false);
+        expect(await anonymousIsRefused()).toBe(true);
+        expect(mockDriver.fetchCollection).not.toHaveBeenCalled();
+    });
+
+    it("agrees with resolveRequireAuth on every config it is given", async () => {
+        // Reading the shared predicate rather than restating its answers: the
+        // point of this block is that the socket does not have opinions of its
+        // own, so a future change to the rule must move both sides together.
+        const cases = [undefined, {}, { requireAuth: true }, { requireAuth: false },
+            { jwtSecret: "s" }, { requireAuth: false, jwtSecret: "s" }];
+
+        for (const authConfig of cases) {
+            jest.clearAllMocks();
+            mockWssInstance = null;
+            createPostgresWebSocket(mockServer, mockRealtimeService, mockDriver, authConfig);
+
+            expect({ authConfig, refused: await anonymousIsRefused() })
+                .toEqual({ authConfig, refused: resolveRequireAuth(authConfig) });
+        }
     });
 });

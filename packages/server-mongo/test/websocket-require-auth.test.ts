@@ -1,4 +1,3 @@
-import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { Server } from "http";
 
 /**
@@ -34,7 +33,11 @@ jest.mock("ws", () => ({
 
 jest.mock("@rebasepro/server", () => ({
     extractUserFromToken: jest.fn(),
-    logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() }
+    logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
+    // The real predicate, not a stub — this file exists to pin that the socket
+    // answers exactly what the HTTP routes answer.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    resolveRequireAuth: require("../../server/src/auth/require-auth").resolveRequireAuth
 }));
 
 import { createMongoWebSocket } from "../src/websocket";
@@ -115,10 +118,16 @@ describe("Mongo WebSocket requireAuth resolution", () => {
         expect(driver.fetchCollection).toHaveBeenCalled();
     });
 
-    it("admits an anonymous client when nothing about auth is configured", async () => {
+    /**
+     * `resolveRequireAuth(undefined)` is `true`: the HTTP data routes answer 401
+     * to every read when no auth is configured. This socket's own copy returned
+     * `false` for the same input, so what REST refused, realtime served.
+     */
+    it("requires auth when nothing about auth is configured — matching the HTTP routes", async () => {
         createMongoWebSocket(mockServer, realtimeService, driver, {} as never);
 
-        expect(await anonymousIsRefused()).toBe(false);
+        expect(await anonymousIsRefused()).toBe(true);
+        expect(driver.fetchCollection).not.toHaveBeenCalled();
     });
 
     /**

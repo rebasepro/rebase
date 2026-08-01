@@ -7,7 +7,7 @@ import type { User } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth } from "@rebasepro/server";
 import { logger } from "@rebasepro/server";
 
 /** Minimal subset of RebaseAuthConfig used by the WebSocket layer. */
@@ -116,21 +116,12 @@ export function createPostgresWebSocket(
         logger.error("❌ [WebSocket Server] Error", { error: err });
     });
 
-    // Auth is required when an adapter is present (secure by default), when
-    // `requireAuth: true` is set explicitly, or when a jwtSecret is configured
-    // and `requireAuth` is not switched off.
-    //
-    // The explicit-`true` arm is not redundant. It used to be ANDed with
-    // `!!jwtSecret`, so `requireAuth: true` on a server whose auth comes from an
-    // adapter rather than a local secret evaluated to *false* — and a `false`
-    // here does not merely skip a check, it opens every session with
-    // `authenticated: true` at connect time. A setting whose whole purpose is to
-    // demand authentication silently granted it instead. It now fails closed:
-    // asking for auth you have no credential to verify makes the socket refuse
-    // everyone, which is visible, rather than admit everyone, which is not.
-    const requireAuth = !!authAdapter
-        || authConfig?.requireAuth === true
-        || (authConfig?.requireAuth !== false && !!authConfig?.jwtSecret);
+    // The same predicate the HTTP data routes use, from the same function —
+    // this socket is the other enforcement point for one product decision, and
+    // while it computed the answer itself it computed a different one. See
+    // `resolveRequireAuth` for what its local copy got wrong and why a `false`
+    // here grants access rather than skipping a check.
+    const requireAuth = !!authAdapter || resolveRequireAuth(authConfig as never);
 
     if (requireAuth && !authAdapter && !authConfig?.jwtSecret && !authConfig?.serviceKey) {
         logger.warn(
