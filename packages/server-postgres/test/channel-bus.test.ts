@@ -527,8 +527,20 @@ describe("Channel bus — frame parsing", () => {
     });
 
     it("measures frames in bytes, not characters", () => {
-        const frame: ChannelBusFrame = { kind: "broadcast", sid: "i", channel: "c", event: "e", payload: "é".repeat(10) };
-        expect(frameByteLength(frame)).toBeGreaterThan(JSON.stringify(frame).length - 10);
+        // The limit this feeds is measured in bytes (NOTIFY caps a payload at
+        // 8000 of them), so a character count under-reports every non-ASCII
+        // frame and lets an oversized one through. The payloads are chosen so
+        // the two answers cannot coincide — "é" is one character and two UTF-8
+        // bytes, "🚀" is two UTF-16 characters and four bytes — and the
+        // expectations are exact, because any inequality against the character
+        // count is also satisfied by counting characters.
+        const accented: ChannelBusFrame = { kind: "broadcast", sid: "i", channel: "c", event: "e", payload: "é".repeat(10) };
+        expect(JSON.stringify(accented)).toHaveLength(79);
+        expect(frameByteLength(accented)).toBe(89);
+
+        const emoji: ChannelBusFrame = { kind: "broadcast", sid: "i", channel: "c", event: "e", payload: "🚀".repeat(4) };
+        expect(JSON.stringify(emoji)).toHaveLength(77);
+        expect(frameByteLength(emoji)).toBe(85);
     });
 });
 

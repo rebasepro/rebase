@@ -30,6 +30,20 @@ pks,
 fks };
 }
 
+/**
+ * Slice out the generated block for one property. Assertions about a mapped
+ * column type have to be anchored to the column they belong to: a whole-file
+ * `toContain('type: "number"')` is satisfied by ANY numeric column, so a
+ * generator that swapped two columns' type mappings would still pass.
+ */
+function propertyBlock(generated: string, propertyKey: string): string {
+    const open = generated.indexOf(`\n        ${propertyKey}: {`);
+    if (open === -1) throw new Error(`No generated property "${propertyKey}" in:\n${generated}`);
+    const close = generated.indexOf("\n        },", open);
+    if (close === -1) throw new Error(`Unterminated generated property "${propertyKey}" in:\n${generated}`);
+    return generated.slice(open, close);
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // generateCollectionFile() — property generation
 // ═══════════════════════════════════════════════════════════════════════
@@ -64,11 +78,11 @@ udt_name: "timestamp" }),
 udt_name: "jsonb" })
             ]);
             const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            expect(result).toContain('type: "string"'); // id
-            expect(result).toContain('type: "number"');
-            expect(result).toContain('type: "boolean"');
-            expect(result).toContain('type: "date"');
-            expect(result).toContain('type: "map"');
+            expect(propertyBlock(result, "id")).toContain('type: "string"');
+            expect(propertyBlock(result, "count")).toContain('type: "number"');
+            expect(propertyBlock(result, "active")).toContain('type: "boolean"');
+            expect(propertyBlock(result, "created_at")).toContain('type: "date"');
+            expect(propertyBlock(result, "metadata")).toContain('type: "map"');
         });
 
         it("skips FK columns from properties (they become relations)", () => {

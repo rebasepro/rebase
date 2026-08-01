@@ -22,10 +22,26 @@ describe("singularize", () => {
         expect(singularize("stories")).toBe("story");
     });
 
-    it("converts -ves to -f", () => {
+    it("converts -ves to -f or -fe depending on the word", () => {
         expect(singularize("wolves")).toBe("wolf");
         expect(singularize("leaves")).toBe("leaf");
-        expect(singularize("knives")).toBe("knif"); // known edge-case
+        expect(singularize("shelves")).toBe("shelf");
+        expect(singularize("thieves")).toBe("thief");
+        // The -fe half of the rule: one blanket "-ves" -> "-f" branch yields
+        // "knif"/"wif"/"lif" here.
+        expect(singularize("knives")).toBe("knife");
+        expect(singularize("wives")).toBe("wife");
+        expect(singularize("lives")).toBe("life");
+    });
+
+    it("treats an ordinary -ive noun as a plain -s plural", () => {
+        // These only *look* like the f/fe swap. A blanket "-ves" rule turns
+        // them into "archif"/"olif"/"objectif" — names an introspected project
+        // then carries in its generated config forever.
+        expect(singularize("archives")).toBe("archive");
+        expect(singularize("olives")).toBe("olive");
+        expect(singularize("objectives")).toBe("objective");
+        expect(singularize("drives")).toBe("drive");
     });
 
     it("converts -ches, -shes, -sses, -xes, -zes", () => {

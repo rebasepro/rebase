@@ -4,6 +4,43 @@ import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 const collectionRegistry = new PostgresCollectionRegistry();
 
+/**
+ * The literal SQL a condition will emit — string fragments and column names,
+ * and nothing else.
+ *
+ * The db here is a mock, so no statement is ever prepared and "it did not
+ * throw" proves nothing about how a value was handled. Splitting a condition
+ * into the text it renders and the data it carries does: a value that appears
+ * in {@link sqlTextOf} was spliced into the statement, and one that appears in
+ * {@link boundValuesOf} was handed to the driver as a parameter.
+ *
+ * `PgDialect.sqlToQuery` is the real renderer, but it needs real `Column`
+ * instances and the table below is a plain object — hence the walk over
+ * `queryChunks`.
+ */
+function sqlTextOf(node: unknown): string {
+    if (node && typeof node === "object") {
+        const chunk = node as Record<string, unknown>;
+        if (Array.isArray(chunk.queryChunks)) return chunk.queryChunks.map(sqlTextOf).join("");
+        if (Array.isArray(chunk.value)) return chunk.value.join("");
+        if (typeof chunk.name === "string") return chunk.name;
+    }
+    return "";
+}
+
+/** The data a condition carries, in the order the driver would bind it. */
+function boundValuesOf(node: unknown): unknown[] {
+    if (node && typeof node === "object") {
+        const chunk = node as Record<string, unknown>;
+        if (Array.isArray(chunk.queryChunks)) return chunk.queryChunks.flatMap(boundValuesOf);
+        if (Array.isArray(chunk.value)) return [];
+        if (typeof chunk.name === "string") return [];
+        if ("value" in chunk) return [chunk.value];
+        return [];
+    }
+    return [node];
+}
+
 describe("DataService - Error Handling & Edge Cases", () => {
     let dataService: DataService;
     let db: jest.Mocked<NodePgDatabase<any>>;
@@ -168,10 +205,30 @@ name: "Test" };
             ).rejects.toThrow("Invalid relation path: collection/id");
         });
 
-        it("should reject single segment paths (not nested)", async () => {
-            // Single collection paths should work fine, but let's test the path parsing logic
+        it("should read a single segment path as a root collection, not a relation path", async () => {
+            // A slug never contains a separator, so "no separator" is exactly
+            // what tells a root path from a nested one. This is the accepting
+            // half of the rejections around it: widen what counts as nested and
+            // every ordinary listing starts failing as a malformed relation
+            // path — which is why the acceptance needs a test of its own.
+            db.orderBy.mockResolvedValue([{ id: 7,
+name: "Root row" }]);
+
             const entities = await dataService.fetchCollection("test", {});
-            expect(entities).toBeDefined(); // Should work for single collection
+
+            expect(entities).toHaveLength(1);
+            expect(entities[0].name).toBe("Root row");
+        });
+
+        it("should reject a path whose last segment names no relation", async () => {
+            // Well-formed shape, unresolvable meaning: three segments make a
+            // relation path, but `test` declares no relations, so nothing can
+            // be served. Named in the error, so a caller with a typo is told
+            // which segment is wrong instead of reading an empty listing as
+            // "no rows".
+            await expect(
+                dataService.fetchCollection("test/1/missing_relation", {})
+            ).rejects.toThrow("Relation 'missing_relation' not found in collection 'test'");
         });
 
         it("should reject empty path segments", async () => {
@@ -211,7 +268,19 @@ name: "Updated" }]);
             const results = await Promise.all(promises);
 
             expect(results).toHaveLength(5);
-            // All should succeed due to transaction handling
+            // Each concurrent save gets its own transaction — sharing one would
+            // let a rollback in the loser take the winner's write with it.
+            expect(db.transaction).toHaveBeenCalledTimes(5);
+            // And each is an UPDATE of the id it was given. Five saves that
+            // fell through to INSERT would still resolve five times, which is
+            // all "they all succeeded" ever checked.
+            expect(db.update).toHaveBeenCalledTimes(5);
+            expect(db.insert).not.toHaveBeenCalled();
+            // Sorted, because the five saves interleave: what matters is that
+            // each carried its own payload to SET rather than five copies of
+            // whichever one won a shared buffer.
+            const written = db.set.mock.calls.map(([payload]) => (payload as { name: string }).name).sort();
+            expect(written).toEqual(["Update 0", "Update 1", "Update 2", "Update 3", "Update 4"]);
         });
     });
 
@@ -248,17 +317,28 @@ name: "Updated" }]);
     });
 
     describe("Data Integrity", () => {
-        it("should validate required fields are present", async () => {
-            const incompleteEntity = {}; // Missing required fields
+        it("should report a missing required field by name", async () => {
+            // The driver validates nothing itself — the NOT NULL constraint is
+            // the only thing that knows which fields are required, so an
+            // incomplete row is sent and the database decides. What the driver
+            // owns is the answer: a raw PG error reaches the caller as
+            // `Failed query: insert into ...` with the parameters attached,
+            // which names neither the field nor the row.
+            const notNullViolation = Object.assign(
+                new Error("null value in column \"name\" violates not-null constraint"),
+                { code: "23502",
+column: "name",
+table: "test_table" }
+            );
+            db.returning.mockRejectedValue(notNullViolation);
 
-            db.returning.mockResolvedValue([{ id: 1 }]);
-            db.limit.mockResolvedValue([{ id: 1,
-name: null }]);
+            await expect(
+                dataService.save("test", {})
+            ).rejects.toThrow("Missing required field: \"name\" in \"test_table\" cannot be empty.");
 
-            // The service should handle validation at the collection level
-            // This test verifies the service doesn't crash with incomplete data
-            const entity = await dataService.save("test", incompleteEntity);
-            expect(entity.id).toBe(1);
+            // Sent, not rejected up front: the empty row still reaches the
+            // INSERT, which is what makes the database the authority here.
+            expect(db.insert).toHaveBeenCalled();
         });
 
         it("should handle NULL values in database correctly", async () => {
@@ -286,14 +366,21 @@ name: null }]);
         it("should handle SQL injection attempts in IDs safely", async () => {
             const maliciousId = "1; DROP TABLE test_table;--";
 
-            // The service should handle this safely through parameterized queries
-            // This test should not throw an error because of proper parameterization
             const mockEntity = { id: 1,
 name: "Safe" };
             db.limit.mockResolvedValue([mockEntity]);
 
-            const entity = await dataService.fetchOne("test", maliciousId);
-            expect(entity).toBeDefined(); // Should work safely
+            await dataService.fetchOne("test", maliciousId);
+
+            // Nothing is executed here, so "it did not throw" is not evidence
+            // of anything. The condition the lookup composed is: the id is
+            // carried as data, and the only SQL text is the comparison itself.
+            const condition = db.where.mock.calls[0][0];
+            expect(sqlTextOf(condition)).toBe("id = ");
+            // A numeric key parses the address before comparing it, so what is
+            // bound is the number 1 — the trailing statement never even
+            // survives as data, let alone as SQL.
+            expect(boundValuesOf(condition)).toEqual([1]);
         });
 
         it("should handle extremely long input values", async () => {
@@ -304,8 +391,13 @@ name: "Safe" };
             db.limit.mockResolvedValue([{ id: 1,
 name: veryLongString }]);
 
-            const entity = await dataService.save("test", entityWithLongValue);
-            expect(entity.name).toBe(veryLongString);
+            await dataService.save("test", entityWithLongValue);
+
+            // Whatever the mock echoes back is the mock's, not the driver's.
+            // The value written is the assertion: serialization walks every
+            // field on the way in, and a length limit imposed there would
+            // truncate the row without the write ever failing.
+            expect(db.values).toHaveBeenCalledWith({ name: veryLongString });
         });
 
         it("should handle special characters in string values", async () => {
@@ -316,8 +408,12 @@ name: veryLongString }]);
             db.limit.mockResolvedValue([{ id: 1,
 name: specialChars }]);
 
-            const entity = await dataService.save("test", entityWithSpecialChars);
-            expect(entity.name).toBe(specialChars);
+            await dataService.save("test", entityWithSpecialChars);
+
+            // Byte-for-byte, quotes and backslashes included: escaping belongs
+            // to the driver that binds the parameter, and a layer that escaped
+            // on the way in would store the escapes.
+            expect(db.values).toHaveBeenCalledWith({ name: specialChars });
         });
     });
 

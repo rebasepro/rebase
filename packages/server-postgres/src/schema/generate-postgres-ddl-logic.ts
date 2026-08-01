@@ -116,6 +116,16 @@ const generateSinglePolicyStatements = (collection: CollectionConfig, rule: Secu
     return [drop, create];
 };
 
+/**
+ * Single-quote escaping for a SQL string literal (PostgreSQL doubles the
+ * quote). Enum labels come straight from user-authored collection config, so a
+ * label like `it's` closes the literal early and the whole generated file stops
+ * parsing at the `CREATE TYPE`. Lives here rather than next to its other caller
+ * because ensure-collection-tables already imports from this module — the
+ * reverse would be a cycle.
+ */
+export const quoteSqlLiteral = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+
 export const getSqlColumnType = (propName: string, prop: Property, collection: CollectionConfig, collections: CollectionConfig[]): string => {
     switch (prop.type) {
         case "string": {
@@ -242,6 +252,13 @@ export const generatePostgresDdl = async (
     if (uniqueSchemas.length > 0) ddl += "\n";
 
     // 2. Generate Enums
+    //
+    // The enum type name is derived from table + column, so two collections
+    // mapped onto the same table — or two properties whose `columnName`
+    // resolves to the same column — land on the same name. `CREATE TYPE` has no
+    // IF NOT EXISTS, so emitting it twice aborts the whole file on the second
+    // statement. Dedupe by name, matching planCollectionSchemaEnsure.
+    const emittedEnums = new Set<string>();
     collections.forEach(collection => {
         const collectionTable = getTableName(collection);
         const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
@@ -253,8 +270,9 @@ export const generatePostgresDdl = async (
                         String(typeof v === "object" && v !== null && "id" in v ? v.id : v)
                     )
                     : Object.keys(prop.enum);
-                if (values.length > 0) {
-                    ddl += `CREATE TYPE "${schema}"."${enumDbName}" AS ENUM (${values.map(v => `'${v}'`).join(", ")});\n`;
+                if (values.length > 0 && !emittedEnums.has(`${schema}.${enumDbName}`)) {
+                    emittedEnums.add(`${schema}.${enumDbName}`);
+                    ddl += `CREATE TYPE "${schema}"."${enumDbName}" AS ENUM (${values.map(quoteSqlLiteral).join(", ")});\n`;
                 }
             }
         });

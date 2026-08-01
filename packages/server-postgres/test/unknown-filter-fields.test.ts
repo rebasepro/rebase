@@ -424,8 +424,16 @@ describe("unknown filter fields", () => {
                 "posts"
             );
             // Pre-fix behaviour, preserved verbatim: the disjunction keeps only
-            // the branch that compiled.
-            expect(condition).not.toBeNull();
+            // the branch that compiled. `not.toBeNull()` cannot see that — it is
+            // equally true of a disjunction that kept a placeholder for the
+            // unknown leaf, which is the widening this whole file guards
+            // against. Compiling it shows exactly one branch survived, and
+            // which one: `or()` of a single condition returns that condition
+            // itself, so there is no `or` left in the output at all.
+            const { PgDialect } = require("drizzle-orm/pg-core");
+            const query = new PgDialect().sqlToQuery(condition);
+            expect(query.sql).toBe('"posts"."title" = $1');
+            expect(query.params).toEqual(["hello"]);
         });
 
         it("honours an explicit per-call override without touching the default", () => {

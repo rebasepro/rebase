@@ -1,9 +1,19 @@
 import { CollectionConfig, StringProperty, NumberProperty, DateProperty, ArrayProperty, Property } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
-import { checkCollectionsVsSchema, getExpectedColumnType } from "../src/schema/doctor";
+import { checkCollectionsVsSchema, getExpectedColumnType, runDoctor } from "../src/schema/doctor";
+import { loadCollectionsFromDirectory, logger } from "@rebasepro/server";
 import * as fs from "fs";
 import * as path from "path";
 import { tmpdir } from "os";
+
+// `runDoctor` loads collections off disk via the server package. Stubbing only
+// that one export lets the summary be driven from in-memory collections while
+// the phase checks, the counting and the renderer all stay real.
+jest.mock("@rebasepro/server", () => {
+    const actual = jest.requireActual("@rebasepro/server");
+    return { ...actual,
+        loadCollectionsFromDirectory: jest.fn() };
+});
 
 // Re-export for testing — we need to access the internal helper
 // but since it's not exported, we test it indirectly via checkCollectionsVsSchema
@@ -189,30 +199,78 @@ inactive: "Inactive" }
     });
 
     describe("report generation", () => {
-        it("should correctly count errors and warnings in summary", () => {
-            const issues = [
-                { severity: "error" as const,
-category: "missing_table" as const,
-table: "t1",
-message: "m",
-fix: "f" },
-                { severity: "warning" as const,
-category: "type_mismatch" as const,
-table: "t2",
-message: "m",
-fix: "f" },
-                { severity: "error" as const,
-category: "missing_column" as const,
-table: "t3",
-message: "m",
-fix: "f" }
-            ];
+        const collections: CollectionConfig[] = [{
+            slug: "products",
+            table: "products",
+            name: "Products",
+            properties: { name: { type: "string" } }
+        }];
 
-            const errors = issues.filter(i => i.severity === "error").length;
-            const warnings = issues.filter(i => i.severity === "warning").length;
+        let logSpy: jest.SpyInstance;
 
-            expect(errors).toBe(2);
-            expect(warnings).toBe(1);
+        beforeEach(() => {
+            (loadCollectionsFromDirectory as jest.Mock).mockResolvedValue(collections);
+            // The renderer writes the whole drift report to the logger; the
+            // counts are what is under test, not the noise.
+            logSpy = jest.spyOn(logger, "info").mockImplementation(() => undefined);
+        });
+
+        afterEach(() => {
+            logSpy.mockRestore();
+            jest.clearAllMocks();
+        });
+
+        it("counts errors, warnings and passing phases across every phase", async () => {
+            const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-summary-"));
+            // A stale (not missing) SDK file is the only way to get a *warning*
+            // out of a phase — a missing one is deliberately reported as info.
+            const sdkPath = path.join(dir, "rebase.d.ts");
+            fs.writeFileSync(sdkPath, "// generated before the collections changed\n", "utf-8");
+
+            try {
+                const report = await runDoctor({
+                    collectionsPath: dir,
+                    // Missing schema file → one error from phase 1.
+                    schemaPath: path.join(dir, "schema.generated.ts"),
+                    sdkPath
+                    // No databaseUrl → phase 2 is skipped and counts as passing.
+                });
+
+                expect(report.collectionsToSchema.passed).toBe(false);
+                expect(report.collectionsToSdk.passed).toBe(false);
+                expect(report.schemaToDatabase.passed).toBe(true);
+
+                // Errors and warnings are summed across ALL phases, not per phase;
+                // `passed` counts phases, not issues.
+                expect(report.summary).toEqual({ passed: 1,
+warnings: 1,
+errors: 1 });
+            } finally {
+                fs.rmSync(dir, { recursive: true });
+            }
+        });
+
+        it("reports a clean summary when every phase is in sync", async () => {
+            const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-summary-clean-"));
+            const schemaPath = path.join(dir, "schema.generated.ts");
+            fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
+
+            try {
+                const report = await runDoctor({
+                    collectionsPath: dir,
+                    schemaPath,
+                    // An absent SDK is informational, so it must not count as a
+                    // warning or the phase would never come back clean.
+                    sdkPath: path.join(dir, "rebase.d.ts")
+                });
+
+                expect(report.collectionsToSdk.issues.map(i => i.severity)).toEqual(["info"]);
+                expect(report.summary).toEqual({ passed: 3,
+warnings: 0,
+errors: 0 });
+            } finally {
+                fs.rmSync(dir, { recursive: true });
+            }
         });
     });
 });

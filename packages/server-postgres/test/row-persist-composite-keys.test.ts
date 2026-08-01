@@ -2,6 +2,7 @@ import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { is, Param, SQL } from "drizzle-orm";
 
 const collectionRegistry = new PostgresCollectionRegistry();
 
@@ -59,6 +60,47 @@ const itemsCollection: CollectionConfig = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Compile a condition handed to `.where()` into readable SQL plus its values.
+ *
+ * `PgDialect` is no use against these mock tables: its column check is an
+ * `instanceof`, so every plain-object column above renders as a bind parameter
+ * and the column names — the half of the WHERE clause that says *which* row is
+ * being written — disappear from the output. Walking the chunks keeps them.
+ *
+ * The mock chains also swallow the condition entirely, so `toHaveBeenCalled()`
+ * on `.where()` is satisfied by any condition at all, including one that
+ * constrains a single key of a composite primary key.
+ */
+function renderCondition(condition: unknown): { sql: string; params: unknown[] } {
+    const params: unknown[] = [];
+    const walk = (node: unknown): string => {
+        if (is(node, SQL)) return (node as SQL).queryChunks.map(walk).join("");
+        if (is(node, Param)) {
+            params.push((node as Param).value);
+            return `$${params.length}`;
+        }
+        if (node && typeof node === "object") {
+            const chunk = node as { value?: unknown; name?: unknown };
+            // StringChunk carries the literal SQL fragments; a mock column is
+            // any other object with a `name`.
+            if (Array.isArray(chunk.value)) return chunk.value.join("");
+            if (typeof chunk.name === "string") return `"${chunk.name}"`;
+        }
+        params.push(node);
+        return `$${params.length}`;
+    };
+    return { sql: walk(condition),
+        params };
+}
+
+/** The condition of the last `.where()` call — cursor conditions re-issue it. */
+function lastWhereCondition(db: jest.Mocked<NodePgDatabase>): { sql: string; params: unknown[] } {
+    const calls = (db.where as jest.Mock).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    return renderCondition(calls[calls.length - 1][0]);
+}
 
 /** Build the standard chainable mock db used throughout the existing test suite. */
 function createMockDb() {
@@ -213,12 +255,17 @@ describe("PersistService – composite key delete bug", () => {
     });
 
     it("delete should parse composite ID correctly before deletion", async () => {
-        // Verifies that calling delete with a composite ID doesn't
-        // throw a parsing error – the ID is split on ":::" and each part
-        // is assigned to its corresponding PK field.
+        // The ID is split on ":::" and the parts are assigned *positionally*,
+        // in `primaryKeys` order. Not throwing says nothing about that order:
+        // swap the two and the statement is still valid SQL that deletes some
+        // other row, or none.
         await expect(
             dataService.delete("project_users", "projA:::userB")
         ).resolves.toBeUndefined();
+
+        const { sql, params } = lastWhereCondition(db);
+        expect(sql).toBe('("project_id" = $1 and "user_id" = $2)');
+        expect(params).toEqual(["projA", "userB"]);
     });
 
     it("delete should throw for malformed composite IDs", async () => {
@@ -263,6 +310,15 @@ describe("FetchService – cursor pagination combined with filters", () => {
 
         // Filter + cursor both generate WHERE conditions that must be combined
         expect(db.where).toHaveBeenCalled();
+
+        // …and "combined" is the whole point: the cursor re-issues `.where()`
+        // with the filter carried along, so losing the filter here would serve
+        // the next page of the *unfiltered* table. Ascending order compares
+        // with `>`, and the id tie-breaker is what keeps rows with an equal
+        // `name` from being skipped or repeated across pages.
+        const { sql, params } = lastWhereCondition(db);
+        expect(sql).toBe('("name" = $1 and ("name" > $2 or ("name" = $3 and "id" > $4)))');
+        expect(params).toEqual(["Item C", "Item E", "Item E", 5]);
     });
 
     it("should apply cursor without orderBy (simple id < cursorId)", async () => {
@@ -274,6 +330,13 @@ describe("FetchService – cursor pagination combined with filters", () => {
         });
 
         expect(db.where).toHaveBeenCalled();
+
+        // With no orderBy the rows come back `id DESC`, so "after" means a
+        // *smaller* id. The bound value must also be the parsed number: `id`
+        // is numeric here, and a string cursor would compare as text.
+        const { sql, params } = lastWhereCondition(db);
+        expect(sql).toBe('"id" < $1');
+        expect(params).toEqual([10]);
     });
 
     it("should apply cursor with desc ordering", async () => {
@@ -289,6 +352,21 @@ describe("FetchService – cursor pagination combined with filters", () => {
         // The fallback path applies where() + orderBy()
         expect(db.where).toHaveBeenCalled();
         expect(db.orderBy).toHaveBeenCalled();
+
+        // `order: "desc"` has to invert both halves of the keyset comparison.
+        // Leave either as `>` and the "next" page walks back over rows the
+        // caller has already seen.
+        const { sql, params } = lastWhereCondition(db);
+        expect(sql).toBe('("name" < $1 or ("name" = $2 and "id" < $3))');
+        expect(params).toEqual(["Alpha", "Alpha", 20]);
+
+        // The ORDER BY must agree with the comparison, and always end on the
+        // id — an ordering that is not total makes the cursor ambiguous.
+        const orderExpressions = (db.orderBy as jest.Mock).mock.calls[0];
+        expect(orderExpressions.map(e => renderCondition(e).sql)).toEqual([
+            '"name" desc',
+            '"id" desc'
+        ]);
     });
 
     it("should return empty array when no results match cursor + filter", async () => {
@@ -300,6 +378,12 @@ describe("FetchService – cursor pagination combined with filters", () => {
             limit: 10
         });
 
+        // `[]` on its own is the mock's own answer echoed back. What the
+        // service decides is the query behind it: both narrowings AND-ed, and
+        // no row invented for an empty driver result.
+        const { sql, params } = lastWhereCondition(db);
+        expect(sql).toBe('("name" = $1 and "id" < $2)');
+        expect(params).toEqual(["nonexistent", 1]);
         expect(entities).toEqual([]);
     });
 });
@@ -378,19 +462,29 @@ describe("FetchService – count", () => {
     });
 
     it("should handle search strings with ILIKE metacharacters (%, _)", async () => {
-        // Even if the searchString contains SQL wildcards, the service
-        // should not crash. The underlying ilike() call wraps the value
-        // with `%…%`, so metacharacters in user input become literal
-        // characters only if properly escaped by drizzle-orm.
-        // This test documents the pass-through behaviour.
         (db as unknown as Record<string, jest.Mock>).then = jest.fn(
             (resolve: (v: unknown[]) => void) => resolve([{ count: 1 }])
         );
 
-        // Should not throw even with %, _, and backslash
+        const searchString = "100%_done\\!";
         await expect(
-            dataService.count("items", { searchString: "100%_done\\!" })
+            dataService.count("items", { searchString })
         ).resolves.toBeDefined();
+
+        // The one guarantee that matters: the user's text is *bound*, never
+        // spliced into the statement. `%`, `_` and `\` reach the driver
+        // untouched inside the `%…%` wrapper — nothing here escapes them, so
+        // they still act as LIKE wildcards — but they can never terminate the
+        // literal and become SQL, which is what "should not crash" was quietly
+        // standing in for.
+        const { sql, params } = lastWhereCondition(db);
+        expect(sql).toBe('("name" ilike $1 or "description" ilike $2)');
+        expect(params).toEqual([`%${searchString}%`, `%${searchString}%`]);
+        expect(params.every(p => typeof p === "string" && p.includes("%_done\\!"))).toBe(true);
+
+        // Every searchable string property is OR-ed in; drop one and the
+        // search silently stops looking in that column.
+        expect(sql).not.toContain('"id"');
     });
 });
 

@@ -8,10 +8,9 @@
  *    all inverse results when Drizzle returned string IDs for numeric PKs.
  *    Fixed by using Set<string> + String() normalization.
  *
- * 2. 🟡 Inverse M2M `through` write-path warning
- *    — updateRelationsUsingJoins had no explicit handler for inverse M2M
- *    through relations; they fell to a generic warning. Now emits a
- *    specific, actionable message.
+ * 2. 🟡 M2M `through` write path
+ *    — updateRelationsUsingJoins replaces a row's junction links on save:
+ *    delete every existing link, then insert one row per target id.
  *
  * 3. 🟢 resolveRelation junction table naming convention
  *    — Verifies that auto-inferred junction table names from sorted slugs
@@ -148,7 +147,11 @@ function createMockDb(resolveResults: () => unknown[]) {
         innerJoinCount: 0,
         fromTable: undefined as string | undefined,
         deleteCalls: [] as unknown[],
-        insertCalls: [] as unknown[]
+        insertCalls: [] as unknown[],
+        // The junction rows themselves. `insertCalls` records only WHICH table
+        // was written, so without this a save that inserts nothing at all is
+        // indistinguishable from one that writes the right links.
+        insertedValues: [] as unknown[]
     };
 
     function makeChainable(): Record<string, unknown> {
@@ -177,7 +180,12 @@ function createMockDb(resolveResults: () => unknown[]) {
             }),
             insert: jest.fn((table: unknown) => {
                 recorder.insertCalls.push(table);
-                return { values: jest.fn(() => chain) };
+                return {
+                    values: jest.fn((rows: unknown) => {
+                        recorder.insertedValues.push(rows);
+                        return chain;
+                    })
+                };
             }),
             set: jest.fn(() => chain),
             values: jest.fn(() => chain),
@@ -324,10 +332,10 @@ author_id: "999" }
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// 2. Inverse M2M write-path warning
+// 2. M2M `through` write path
 // ═══════════════════════════════════════════════════════════════════════
 
-describe("updateRelationsUsingJoins: inverse M2M through warning", () => {
+describe("updateRelationsUsingJoins: M2M through junction writes", () => {
     let registry: PostgresCollectionRegistry;
 
     beforeEach(() => {
@@ -360,13 +368,14 @@ describe("updateRelationsUsingJoins: inverse M2M through warning", () => {
     // Removed with the behaviour it covered — there is no inverse M2M to warn about: both sides are manyToMany and both may be saved.
 
 
-    it("should NOT warn for owning M2M through relations (normal save path)", async () => {
-        const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
-
-        const { db } = createMockDb(() => []);
+    // This used to grep console.warn for "Inverse M2M", a string that no longer
+    // exists anywhere in src — so the filter always came back empty and the
+    // test could not fail. It now asserts what the save is actually for: the
+    // junction rows.
+    it("replaces the junction rows for an owning M2M save", async () => {
+        const { db, recorder } = createMockDb(() => []);
         const service = new RelationService(db, registry);
 
-        // Owning side save should work normally (or at least not trigger the inverse warning)
         await service.updateRelationsUsingJoins(
             db as any,
             postsCollection,
@@ -374,13 +383,32 @@ describe("updateRelationsUsingJoins: inverse M2M through warning", () => {
             { tags: [{ id: 1 }, { id: 2 }] }
         );
 
-        // Should NOT have the inverse M2M warning
-        const inverseCalls = consoleSpy.mock.calls.filter(
-            call => typeof call[0] === "string" && call[0].includes("Inverse M2M")
-        );
-        expect(inverseCalls).toHaveLength(0);
+        // Delete-then-insert, both against the junction and not the target
+        // table: an insert aimed at `tags` would create tag rows instead of
+        // links, which is the failure mode this shape guards.
+        expect(recorder.deleteCalls).toEqual([mockPostsTagsTable]);
+        expect(recorder.insertCalls).toEqual([mockPostsTagsTable]);
+        expect(recorder.insertedValues).toEqual([[
+            { post_id: 1, tag_id: 1 },
+            { post_id: 1, tag_id: 2 }
+        ]]);
+    });
 
-        consoleSpy.mockRestore();
+    it("clears the junction rows without reinserting when the relation is emptied", async () => {
+        const { db, recorder } = createMockDb(() => []);
+        const service = new RelationService(db, registry);
+
+        await service.updateRelationsUsingJoins(
+            db as any,
+            postsCollection,
+            1,
+            { tags: [] }
+        );
+
+        // The delete still has to run — otherwise "remove all tags" silently
+        // leaves every existing link in place.
+        expect(recorder.deleteCalls).toEqual([mockPostsTagsTable]);
+        expect(recorder.insertCalls).toEqual([]);
     });
 });
 
@@ -796,25 +824,12 @@ fkValue: null }]
 
 import { createRelationRefWithData } from "@rebasepro/common";
 import { EntityRelation } from "@rebasepro/types";
-
-// Inline reviver for test isolation (matches packages/client/src/reviver.ts)
-function rebaseReviver(_key: string, value: unknown): unknown {
-    if (value && typeof value === "object" && "__type" in value) {
-        const record = value as Record<string, unknown>;
-        switch (record.__type) {
-            case "relation":
-            case "EntityRelation":
-                return new EntityRelation(
-                    record.id as string | number,
-                    record.path as string,
-                    record.data as any
-                );
-            default:
-                return value;
-        }
-    }
-    return value;
-}
+// The real client-side reviver, not a copy. This suite exists to prove the
+// server's wire format survives the trip to the client, so a local
+// re-implementation would only ever agree with itself — the two halves could
+// drift apart and this file would keep passing. Imported by path because the
+// reviver is deliberately not on the `@rebasepro/client` public barrel.
+import { rebaseReviver } from "../../client/src/reviver";
 
 describe("Relation data JSON round-trip", () => {
     it("should preserve relation data through JSON.stringify → JSON.parse with reviver", () => {

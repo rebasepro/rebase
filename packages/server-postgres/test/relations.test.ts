@@ -108,26 +108,44 @@ describe("resolveRelation", () => {
             expect(normalized.foreignKeyOnTarget).toEqual("custom_author_fk");
         });
 
-        it("should work with inverseRelationName property", () => {
-            const relation: Partial<Relation> = {
+        it("ignores the retired `inverseRelationName` property", () => {
+            // `inverseRelationName` belongs to the pre-union relation shape that
+            // `resolveRelation` replaced; the target-side name is now derived, and
+            // `introspect-emits-valid-relations` lists the field as one codegen
+            // must never emit again. Worth asserting rather than assuming: a
+            // config written against the old shape still reaches this function
+            // (nothing strips unknown keys), so the field surviving into the
+            // resolved relation — via a `...relation` spread, say — would let
+            // downstream consumers pair against a name the generator never used,
+            // and Drizzle silently drops relations whose two sides disagree.
+            const relation = {
                 kind: "hasOne",
                 relationName: "profile",
                 target: () => mockPostCollection,
-                };
+                inverseRelationName: "author_profile"
+            } as unknown as Relation;
             const normalized = resolveRelation(relation, mockAuthorCollection);
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
+            expect(normalized).not.toHaveProperty("inverseRelationName");
         });
     });
 
     // --- Has-Many (cardinality: 'many', direction: 'inverse') ---
     describe("Has-Many (one-to-many)", () => {
         it("should generate default foreignKeyOnTarget for a simple has-many relation", () => {
+            // The default FK is built from the SOURCE collection's slug
+            // (`author` → `author_id`), never from the relation name — naming the
+            // relation "posts" must not point it at `posts_id`. The body used to
+            // declare `hasOne`, so the hasMany branch's own default was never
+            // reached and the two kinds could drift apart unnoticed.
             const relation: Partial<Relation> = {
-                kind: "hasOne",
+                kind: "hasMany",
                 relationName: "posts",
                 target: () => mockPostCollection,
                 };
             const normalized = resolveRelation(relation, mockAuthorCollection);
+            expect(normalized.kind).toEqual("hasMany");
+            expect(normalized.cardinality).toEqual("many");
             expect(normalized.foreignKeyOnTarget).toEqual("author_id");
         });
 
@@ -167,15 +185,21 @@ describe("resolveRelation", () => {
 
     // --- Fallback/Default Behavior ---
     describe("Fallback Behavior", () => {
-        it("should fallback to has-many for ambiguous 'many' without direction or through", () => {
-            const relation: Partial<Relation> = {
-                kind: "hasOne",
+        it("should throw on an ambiguous 'many' instead of falling back to has-many", () => {
+            // This is the behaviour the predecessor (`sanitizeRelation`) got
+            // wrong: it inferred the kind from whichever optional fields were
+            // set, and a `many` it could not classify fell through a try/catch
+            // to has-many — so an unclassifiable relation read the wrong column
+            // and produced empty results rather than an error. The switch is now
+            // exhaustive and an unrecognised kind throws. The old body declared
+            // `hasOne`, i.e. it exercised the classified path it was written to
+            // rule out.
+            const relation = {
+                kind: "many",
                 relationName: "posts",
-                target: () => mockPostCollection,
-                };
-            const normalized = resolveRelation(relation, mockAuthorCollection);
-            // Should default to has-many (inverse) behavior
-            expect(normalized.foreignKeyOnTarget).toEqual("author_id");
+                target: () => mockPostCollection
+            } as unknown as Relation;
+            expect(() => resolveRelation(relation, mockAuthorCollection)).toThrow(/Unknown relation kind/);
         });
 
         it("should handle 'one' with 'owning' direction", () => {
@@ -1023,9 +1047,12 @@ describe("Duplicate relation deduplication regression", () => {
         for (const name of allNames) {
             nameCountMap.set(name, (nameCountMap.get(name) ?? 0) + 1);
         }
-        // Every relation name should appear exactly twice (once per side)
+        // Exactly twice, not at most twice: Drizzle pairs an owning one() with
+        // its inverse many() by identical `relationName`, so a name that appears
+        // ONCE is an unpaired side — the very regression this file guards — and
+        // `toBeLessThanOrEqual(2)` accepts it happily.
         for (const [name, count] of nameCountMap) {
-            expect(count).toBeLessThanOrEqual(2);
+            expect(`${name}:${count}`).toBe(`${name}:2`);
         }
     });
 

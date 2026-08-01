@@ -158,15 +158,23 @@ describe("checkPolicyDrift", () => {
     it("also flags the tautology in a WITH CHECK clause", async () => {
         const cols = [collection("posts")];
         const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const withCheck = expected.filter((p) => p.hasWithCheck);
+        // Asserted rather than assumed: if the generator ever stopped emitting a
+        // WITH CHECK for these rules the fixture would carry no tautology at
+        // all, and every assertion below would be vacuously satisfied.
+        expect(withCheck.length).toBeGreaterThan(0);
+
         const live = expected.map((p) => liveRow(p, {
             with_check: p.hasWithCheck ? "(auth.uid() IS NOT NULL)" : null
         }));
 
         const drift = await checkPolicyDrift(dbWith(live), cols);
 
-        const flagged = drift.insecure.some((i) => /WITH CHECK/.test(i.reason));
-        // Only assert when the fixture actually had a WITH CHECK policy to carry it.
-        if (expected.some((p) => p.hasWithCheck)) expect(flagged).toBe(true);
+        // Every WITH CHECK policy carries the tautology and no USING clause
+        // does, so anything flagged here came from the WITH CHECK scan — the
+        // half that a check reading only `qual` would miss entirely.
+        expect(drift.insecure.map((i) => i.policy.name)).toEqual(withCheck.map((p) => p.name));
+        expect(drift.insecure.every((i) => /WITH CHECK/.test(i.reason))).toBe(true);
     });
 
     it("parses roles when the driver returns the raw {a,b} text form", async () => {

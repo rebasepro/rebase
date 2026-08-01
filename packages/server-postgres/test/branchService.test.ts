@@ -1,10 +1,30 @@
 import { BranchService } from "../src/services/BranchService";
 import { DatabasePoolManager } from "../src/databasePoolManager";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
+
+const dialect = new PgDialect();
+
+/**
+ * Compile the statement a given `db.execute` call actually issued.
+ *
+ * The mock swallows the SQL object whole, so counting calls says nothing about
+ * what was run: a service that emitted the wrong DDL, dropped an
+ * `IF NOT EXISTS`, or spliced a user-supplied name into an identifier would
+ * produce exactly the same call count. Compiling through the real dialect is
+ * what makes those visible — and it also shows which values were *bound* rather
+ * than interpolated.
+ */
+function statementAt(db: jest.Mocked<NodePgDatabase>, index: number): { sql: string; params: unknown[] } {
+    const chunk = (db.execute as jest.Mock).mock.calls[index][0];
+    const query = dialect.sqlToQuery(chunk as never);
+    return { sql: query.sql.replace(/\s+/g, " ").trim(),
+        params: query.params };
+}
 
 /** Create a minimal mock DrizzleClient with a configurable `execute` spy. */
 function createMockDb() {
@@ -67,11 +87,18 @@ describe("BranchService", () => {
             // Two calls: one for the schema, one for the table
             expect(db.execute).toHaveBeenCalledTimes(2);
 
-            const firstArg = (db.execute as jest.Mock).mock.calls[0][0];
-            expect(firstArg).toBeDefined();
+            expect(statementAt(db, 0).sql).toBe("CREATE SCHEMA IF NOT EXISTS rebase");
 
-            const secondArg = (db.execute as jest.Mock).mock.calls[1][0];
-            expect(secondArg).toBeDefined();
+            // The metadata table has to land in the `rebase` schema, and every
+            // column `createBranch`/`listBranches` later read or write has to
+            // exist — an unqualified or under-specified CREATE TABLE only fails
+            // at the next statement, on a real database.
+            const table = statementAt(db, 1).sql;
+            expect(table).toContain("CREATE TABLE IF NOT EXISTS rebase.branches");
+            expect(table).toContain("name TEXT PRIMARY KEY");
+            expect(table).toContain("db_name TEXT NOT NULL UNIQUE");
+            expect(table).toContain("parent_db TEXT NOT NULL");
+            expect(table).toContain("created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
         });
 
         it("should be idempotent (safe to call multiple times)", async () => {
@@ -80,6 +107,19 @@ describe("BranchService", () => {
 
             // Each call issues 2 executes → total 4
             expect(db.execute).toHaveBeenCalledTimes(4);
+
+            // "Idempotent" is a property of the statements, not of the count:
+            // the second run re-issues exactly the same DDL, and it is a no-op
+            // only because both statements are guarded. Drop either guard and
+            // this boot-time call starts throwing on every restart after the
+            // first.
+            const run1 = [statementAt(db, 0), statementAt(db, 1)];
+            const run2 = [statementAt(db, 2), statementAt(db, 3)];
+            expect(run2).toEqual(run1);
+            for (const statement of run1) {
+                expect(statement.sql).toContain("IF NOT EXISTS");
+                expect(statement.params).toEqual([]);
+            }
         });
     });
 
@@ -130,6 +170,25 @@ describe("BranchService", () => {
             const result = await service.createBranch("my-feature/branch!@#");
 
             expect(result.name).toBe("myfeaturebranch");
+
+            // The returned name proves nothing about the statement: a database
+            // name cannot be a bind parameter, so the sanitised value is spliced
+            // into the DDL text and any surviving character lands inside the
+            // identifier. Both identifiers must also be double-quoted, or a name
+            // that merely *starts* legal (`myfeature drop...`) would parse as
+            // more than one token.
+            expect(statementAt(db, 1).sql).toBe(
+                'CREATE DATABASE "rb_myfeaturebranch" TEMPLATE "my_app_db"'
+            );
+            expect(statementAt(db, 1).params).toEqual([]);
+
+            // The metadata row, by contrast, is fully parameterised.
+            expect(statementAt(db, 2).params).toEqual([
+                "myfeaturebranch",
+                "rb_myfeaturebranch",
+                "my_app_db",
+                expect.any(String)
+            ]);
         });
 
         it("should throw when the branch already exists in metadata", async () => {
@@ -364,6 +423,13 @@ created_at: now }]
 
             // Should still call execute (with sanitized name)
             expect(db.execute).toHaveBeenCalledTimes(1);
+
+            // A lookup by the raw name would silently miss, because the row was
+            // stored under the sanitised one — so the branch would read as
+            // "not found" rather than as itself.
+            const statement = statementAt(db, 0);
+            expect(statement.params).toEqual(["mybranch"]);
+            expect(statement.sql).toContain("b.name = $1");
         });
     });
 

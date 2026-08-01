@@ -1,7 +1,22 @@
 import { HistoryService, findChangedFields } from "../src/history/HistoryService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../src/interfaces";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+
+/**
+ * Render a drizzle `SQL` the way the driver would.
+ *
+ * The statement and its bound parameters are the only thing the database ever
+ * sees; the builder object around them is drizzle's business. Rendering with
+ * drizzle's own dialect keeps the assertions on the former.
+ */
+function renderSql(query: unknown): { text: string; params: unknown[] } {
+    const { sql: text, params } = new PgDialect().sqlToQuery(query as SQL);
+    return { text,
+params };
+}
 
 describe("HistoryService - changedFields and history insertion logic", () => {
     describe("findChangedFields", () => {
@@ -129,13 +144,33 @@ tags: [{ id: 2 }] }
         it("should properly perform query during entity creation (insert)", async () => {
             await historyService.recordHistory({
                 tableName: "posts",
-                id: "1",
+                id: 1,
                 action: "create",
                 previousValues: undefined,
-                values: { title: "new" }
+                values: { title: "new" },
+                updatedBy: "user-9"
             });
 
-            expect(db.execute.mock.calls.length).toBeGreaterThanOrEqual(1);
+            // The first statement is the INSERT; whatever follows is the prune
+            // pass, which is fire-and-forget and says nothing about what was
+            // recorded.
+            const { text, params } = renderSql(db.execute.mock.calls[0][0]);
+
+            expect(text).toContain("INSERT INTO rebase.entity_history");
+            // A create has no previous row to diff, so `changed_fields` is the
+            // literal NULL rather than an empty ARRAY[] — an empty array would
+            // read back as "nothing changed" and hide the row's own creation.
+            expect(text).toContain("NULL");
+            expect(text).not.toContain("ARRAY[");
+            // The id is bound as text: entity_id is a varchar column, so a
+            // numeric id has to be stringified or the insert fails outright.
+            expect(params).toEqual([
+                "posts",
+                "1",
+                "create",
+                JSON.stringify({ title: "new" }),
+                "user-9"
+            ]);
         });
     });
 });

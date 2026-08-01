@@ -40,13 +40,37 @@ describe("patchPgArrayNullSafety", () => {
     });
 
     it("should not patch non-array columns", () => {
-        patchPgArrayNullSafety({ test_items: testTable });
+        // A table of its own: the shared `testTable` is patched by the tests
+        // above, so a "was it touched?" check against it could never see the
+        // before state.
+        const mixedTable = pgTable("mixed_items", {
+            id: text("id").primaryKey(),
+            name: text("name"),
+            tags: text("tags").array(),
+        });
 
-        const columns = getTableColumns(testTable);
+        const columns = getTableColumns(mixedTable);
         const nameColumn = columns.name;
+        const tagsColumn = columns.tags;
 
-        // Non-array columns should not be PgArray instances
+        // `instanceof PgArray` is drizzle's own fact about `text()` — true
+        // before the patch runs and true after, so it holds even for a patch
+        // that wrapped every column on the table. What the patch controls is
+        // the mapper: it installs an own-property wrapper on the columns it
+        // touches, so an untouched column still resolves `mapFromDriverValue`
+        // to the same inherited function.
+        const nameMapperBefore = nameColumn.mapFromDriverValue;
+        const tagsMapperBefore = tagsColumn.mapFromDriverValue;
+
+        patchPgArrayNullSafety({ mixed_items: mixedTable });
+
         expect(nameColumn instanceof PgArray).toBe(false);
+        expect(nameColumn.mapFromDriverValue).toBe(nameMapperBefore);
+        expect(Object.getOwnPropertyDescriptor(nameColumn, "mapFromDriverValue")).toBeUndefined();
+
+        // …and the array column in the same table proves the patch did run,
+        // so the check above is a real exclusion and not a vacuous one.
+        expect(tagsColumn.mapFromDriverValue).not.toBe(tagsMapperBefore);
     });
 
     it("should handle tables with no array columns", () => {

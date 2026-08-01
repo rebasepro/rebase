@@ -67,6 +67,24 @@ const IRREGULAR_SINGULARS: Record<string, string> = {
     phenomena: "phenomenon"
 };
 
+/**
+ * Plurals in "-ves" whose singular really ends in f/fe, and which of the two.
+ *
+ * A blanket "-ves" -> "-f" rule gets `knives` -> `knif`, and mangles every
+ * ordinary "-ive" noun that happens to be plural along with it: `archives` ->
+ * `archif`, `objectives` -> `objectif`. The set of English words that genuinely
+ * swap f/fe for ves is small and closed, so it is listed rather than guessed —
+ * anything else ending in "ves" drops the trailing 's' like any other plural.
+ *
+ * Matched on the whole word, not on the suffix: `olives` ends in `lives`.
+ */
+const VES_SINGULAR_ENDINGS: Record<string, "f" | "fe"> = {
+    calves: "f", dwarves: "f", elves: "f", halves: "f", hooves: "f",
+    leaves: "f", loaves: "f", scarves: "f", selves: "f", sheaves: "f",
+    shelves: "f", thieves: "f", wharves: "f", wolves: "f",
+    knives: "fe", lives: "fe", wives: "fe"
+};
+
 /** Words ending in 's' that are already singular. */
 const UNCOUNTABLE = new Set([
     "status", "campus", "virus", "bus", "plus", "census",
@@ -100,9 +118,9 @@ export function singularize(word: string): string {
     if (lower.endsWith("ies") && lower.length > 3) {
         return word.slice(0, -3) + "y";
     }
-    if (lower.endsWith("ves")) {
-        // e.g. "wolves" -> "wolf", "leaves" -> "leaf"
-        return word.slice(0, -3) + "f";
+    if (VES_SINGULAR_ENDINGS[lower]) {
+        // e.g. "wolves" -> "wolf", "knives" -> "knife"
+        return word.slice(0, -3) + VES_SINGULAR_ENDINGS[lower];
     }
     if (lower.endsWith("ches") || lower.endsWith("shes") || lower.endsWith("sses") || lower.endsWith("xes") || lower.endsWith("zes")) {
         return word.slice(0, -2);

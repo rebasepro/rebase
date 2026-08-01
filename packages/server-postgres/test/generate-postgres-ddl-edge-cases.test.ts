@@ -32,7 +32,7 @@ describe("generatePostgresDdl edge cases", () => {
 
     // ── 2. Enum values with single quotes ─────────────────────────────
     describe("enum values with single quotes", () => {
-        it("should embed single quotes in enum values without escaping (documents current behavior)", async () => {
+        it("should double single quotes inside enum values so the DDL stays parseable", async () => {
             const collections: CollectionConfig[] = [
                 {
                     slug: "phrases",
@@ -48,13 +48,34 @@ describe("generatePostgresDdl edge cases", () => {
             ];
 
             const result = await generatePostgresDdl(collections);
-            // Current behavior: single quotes inside values are NOT escaped,
-            // producing invalid SQL. Document this as a known limitation.
-            expect(result).toContain("CREATE TYPE");
-            expect(result).toContain("phrases_mood");
-            // The raw output will contain the unescaped quotes
-            expect(result).toContain("it's");
-            expect(result).toContain("won't");
+            // Enum labels are user-authored config. Emitted verbatim, the
+            // apostrophe closes the literal early and psql/atlas rejects the
+            // whole file — so the escaped form is asserted exactly, rather than
+            // just that the words appear somewhere in the output.
+            expect(result).toContain(
+                "CREATE TYPE \"public\".\"phrases_mood\" AS ENUM ('it''s', 'won''t');"
+            );
+            expect(result).not.toContain("'it's'");
+        });
+
+        it("should leave enum values without quotes untouched", async () => {
+            const collections: CollectionConfig[] = [
+                {
+                    slug: "phrases",
+                    table: "phrases",
+                    name: "Phrases",
+                    properties: {
+                        mood: { type: "string", enum: ["happy", "sad"] }
+                    }
+                }
+            ];
+
+            const result = await generatePostgresDdl(collections);
+            // The other direction: an escaper that doubled every quote
+            // character, or wrapped the label twice, shows up here.
+            expect(result).toContain(
+                "CREATE TYPE \"public\".\"phrases_mood\" AS ENUM ('happy', 'sad');"
+            );
         });
     });
 
@@ -593,6 +614,50 @@ describe("generatePostgresDdl edge cases", () => {
             const sizeCount = (result.match(/CREATE TYPE.*products_size/g) ?? []).length;
             expect(categoryCount).toBe(1);
             expect(sizeCount).toBe(1);
+        });
+
+        // The two tests above use *differently* named enums, so neither can see
+        // a duplicate. The enum type name is table + column, and these are the
+        // two ways config makes that name collide.
+        it("should emit one CREATE TYPE when two properties resolve to the same column", async () => {
+            const collections: CollectionConfig[] = [
+                {
+                    slug: "products",
+                    table: "products",
+                    name: "Products",
+                    properties: {
+                        status: { type: "string", enum: ["a", "b"] },
+                        state: { type: "string", enum: ["a", "b"], columnName: "status" }
+                    }
+                }
+            ];
+
+            const result = await generatePostgresDdl(collections);
+
+            // CREATE TYPE has no IF NOT EXISTS: a second one for the same name
+            // is a hard error that aborts the rest of the generated file.
+            expect(result.match(/CREATE TYPE[^;]*products_status/g) ?? []).toHaveLength(1);
+        });
+
+        it("should emit one CREATE TYPE when two collections map onto the same table", async () => {
+            const collections: CollectionConfig[] = [
+                {
+                    slug: "products",
+                    table: "products",
+                    name: "Products",
+                    properties: { status: { type: "string", enum: ["a", "b"] } }
+                },
+                {
+                    slug: "featured-products",
+                    table: "products",
+                    name: "Featured Products",
+                    properties: { status: { type: "string", enum: ["a", "b"] } }
+                }
+            ];
+
+            const result = await generatePostgresDdl(collections);
+
+            expect(result.match(/CREATE TYPE[^;]*products_status/g) ?? []).toHaveLength(1);
         });
     });
 

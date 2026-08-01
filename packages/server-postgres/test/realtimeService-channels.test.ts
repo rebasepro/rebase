@@ -116,12 +116,29 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             expect(ws1.send).not.toHaveBeenCalled(); // sender excluded
         });
 
-        it("joinChannel() with undefined channel name does not crash and does not pollute state", () => {
-            createClient(service, "c1");
-            // Should not throw
+        it("joinChannel() with undefined channel name does not crash, but does create the channel", () => {
+            const ws1 = createClient(service, "c1");
+            createClient(service, "c2");
+
             expect(() => {
                 service.joinChannel("c1", undefined as unknown as string);
             }).not.toThrow();
+
+            // Nothing validates the name, so `undefined` becomes a map key like
+            // any other and c1 is a real member of it — surviving the call is
+            // not the same as ignoring it. Pinned as the behaviour rather than
+            // the wish, so that adding a guard shows up here as a failure to
+            // decide about, not a silent change.
+            service.broadcastToChannel("c2", undefined as unknown as string, "ping", { n: 1 });
+            expect(ws1.send).toHaveBeenCalledTimes(1);
+            expect(JSON.parse(ws1.send.mock.calls[0][0] as string).payload).toEqual({ n: 1 });
+
+            // And it is its own key: the string "undefined" is a different
+            // channel, so nothing joined under it hears the frame above.
+            const ws3 = createClient(service, "c3");
+            service.joinChannel("c3", "undefined");
+            service.broadcastToChannel("c2", undefined as unknown as string, "ping", { n: 2 });
+            expect(ws3.send).not.toHaveBeenCalled();
         });
 
         it("joinChannel() with empty string channel name does not crash", () => {
@@ -607,7 +624,7 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
         });
 
         it("destroy() cancels pending refetch timers without errors", async () => {
-            createClient(service, "c1");
+            const ws = createClient(service, "c1");
 
             await service.handleClientMessage("c1", {
                 type: "subscribe_collection",
@@ -618,13 +635,28 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             const dummyEntity = { id: "1", _rebase_invalidated: true } as unknown as Record<string, unknown>;
             await service.notifyUpdate("posts", "1", dummyEntity, undefined, false);
 
-            // Destroy before the timer fires
+            const refetchTimers = (service as unknown as {
+                refetchTimers: Map<string, ReturnType<typeof setTimeout>>
+            }).refetchTimers;
+            // Without a pending timer there is nothing to cancel and the rest of
+            // this test would pass against a destroy() that cancels nothing.
+            expect(refetchTimers.size).toBe(1);
+
+            const sendsBeforeDestroy = ws.send.mock.calls.length;
             await service.destroy();
 
-            // Advance time — should not throw
+            // The handles are dropped, not merely orphaned: a timer left armed
+            // keeps the process (and, in a pooled deployment, the connection it
+            // refetches on) alive past shutdown.
+            expect(refetchTimers.size).toBe(0);
+            expect(jest.getTimerCount()).toBe(0);
+
             jest.advanceTimersByTime(500);
             await Promise.resolve();
             await Promise.resolve();
+
+            // The refetch it would have run never reaches the client.
+            expect(ws.send.mock.calls.length).toBe(sendsBeforeDestroy);
         });
 
         it("destroy() can be called multiple times safely", async () => {
@@ -638,10 +670,20 @@ describe("RealtimeService — Channels, Presence & Lifecycle", () => {
             service.joinChannel("c1", "room:test");
             service.trackPresence("c1", "room:test", { active: true });
 
+            const internals = service as unknown as { presenceInterval?: ReturnType<typeof setInterval> };
+            // Tracking presence arms a repeating sweep. It only clears itself
+            // once every presence is gone, so after destroy() wipes the map
+            // nothing is left to run the check that would stop it — destroy()
+            // has to do it, or the interval outlives the service forever.
+            expect(internals.presenceInterval).toBeDefined();
+
             await service.destroy();
 
-            // Advancing time should not cause errors from the interval
+            expect(internals.presenceInterval).toBeUndefined();
+            expect(jest.getTimerCount()).toBe(0);
+
             jest.advanceTimersByTime(60000);
+            expect(jest.getTimerCount()).toBe(0);
         });
     });
 
