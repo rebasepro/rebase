@@ -30,6 +30,22 @@
     --tracking-title: -0.018em;   /* 20-24px — section titles */
     --tracking-heading: -0.01em;  /* <= 18px — labels; still a heading, not a headline */
 
+    /* Control heights — the one scale every inline control resolves to, so a
+       Button, TextField and Select at the same size share a baseline. Mirrors
+       CONTROL_HEIGHT in styles.ts; that is the source for React components,
+       these are for everyone else.
+
+       Marketing pages and docs are plain markup and cannot import a JS mixin,
+       so without these they hand-roll their own paddings and drift: the site's
+       two hero CTAs sat at 52px and 54px, on no scale and not even matching
+       each other. Reach for `min-h-(--control-xl)` instead of a magic number. */
+    --control-smallest: 28px;
+    --control-small: 32px;
+    --control-medium: 40px;
+    --control-large: 48px;
+    --control-xl: 56px;   /* buttons only */
+    --control-2xl: 64px;  /* buttons only */
+
     /* Colors */
     --color-primary: #0070F4;
     --color-primary-light: oklch(from var(--color-primary) calc(l + 0.15) c h);

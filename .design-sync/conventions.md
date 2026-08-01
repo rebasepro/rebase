@@ -68,8 +68,11 @@ A **labelled** TextField sits exactly 16px taller (44/48/56/64), because the
 label takes its own row. Don't mix labelled and unlabelled fields on one line and
 expect alignment — give the unlabelled one the next size up, or label both.
 
-The scale is exported: `CONTROL_HEIGHT` (numbers) and `controlHeightMixin`
-(Tailwind classes) from the library, so custom controls can sit on it too.
+The scale is exported three ways, so custom controls can sit on it too:
+`CONTROL_HEIGHT` (numbers) and `controlHeightMixin` (Tailwind classes) from the
+library, and CSS variables `--control-smallest|small|medium|large|xl|2xl` for
+markup that can't import JS — e.g. `min-h-(--control-xl)` on a hero CTA. Reach
+for those rather than a hand-picked pixel value.
 
 ## Colour
 
