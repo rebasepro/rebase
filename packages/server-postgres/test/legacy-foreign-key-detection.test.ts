@@ -1,5 +1,5 @@
 /**
- * Detecting a database provisioned before `generateForeignKeyName` singularized.
+ * Migrating a database provisioned before `generateForeignKeyName` singularized.
  *
  * The old rule snake-cased a collection name and chopped one trailing "s", so
  * `categories` produced `categorie_id`. The current rule produces
@@ -16,8 +16,10 @@
  * The only symptom is relations resolving to nothing, which looks identical to
  * having no data.
  *
- * So the plan carries the collision out to the caller, and `ensureCollectionTables`
- * says so before it applies anything.
+ * So when the old name is present and the new one is not, the plan emits a
+ * RENAME instead of an ADD. In Postgres that is a metadata-only operation: the
+ * values stay, and the column's indexes and constraints travel with it. The
+ * collision is still reported, so the log explains why a column changed name.
  */
 import { CollectionConfig } from "@rebasepro/types";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
@@ -76,17 +78,33 @@ describe("legacy foreign-key column detection", () => {
         expect(generateForeignKeyName("products")).toBe(legacyForeignKeyName("products"));
     });
 
-    it("reports a junction that has the old spelling and not the new one", () => {
+    it("renames a junction column that still has the old spelling", () => {
         const plan = planCollectionSchemaEnsure(collections, dbWithJunction(["categorie_id", "product_id"]));
 
         expect(plan.legacyForeignKeys).toEqual([
             { table: "public.categories_products", expected: "category_id", legacy: "categorie_id" }
         ]);
 
-        // It still plans the column: the report is a warning, not a veto.
-        // Refusing to add it would leave the relation with no column at all,
-        // which is worse than one the operator has been told about.
-        expect(plan.statements.some(s => s.includes('ADD COLUMN IF NOT EXISTS "category_id"'))).toBe(true);
+        expect(plan.actions).toContainEqual({
+            kind: "rename-column",
+            target: "public.categories_products.category_id",
+            sql: 'ALTER TABLE "public"."categories_products" RENAME COLUMN "categorie_id" TO "category_id";'
+        });
+
+        // And emphatically does NOT also add it. Adding is the bug: it creates
+        // the new column empty beside the populated old one, every statement
+        // succeeds, and the relation reads the empty one.
+        expect(plan.statements.some(s => s.includes('ADD COLUMN IF NOT EXISTS "category_id"'))).toBe(false);
+    });
+
+    it("renames before it adds any foreign key that polices the column", () => {
+        // A constraint naming a column that has not been renamed yet would fail.
+        const plan = planCollectionSchemaEnsure(collections, dbWithJunction(["categorie_id", "product_id"]));
+        const rename = plan.actions.findIndex(a => a.kind === "rename-column");
+        const firstConstraint = plan.actions.findIndex(a => a.kind === "add-constraint");
+
+        expect(rename).toBeGreaterThanOrEqual(0);
+        if (firstConstraint >= 0) expect(rename).toBeLessThan(firstConstraint);
     });
 
     it("says nothing when the junction already has the current spelling", () => {
@@ -123,6 +141,8 @@ describe("legacy foreign-key column detection", () => {
         // project would warn.
         const plan = planCollectionSchemaEnsure(collections, dbWithJunction(["categorie_id"]));
         expect(plan.legacyForeignKeys.map(l => l.expected)).toEqual(["category_id"]);
+        // `product_id` is simply missing, so it is created the ordinary way.
+        expect(plan.statements.some(s => s.includes('ADD COLUMN IF NOT EXISTS "product_id"'))).toBe(true);
     });
 
     it("says nothing when the author named the junction columns themselves", () => {
@@ -187,7 +207,9 @@ describe("legacy foreign-key column detection", () => {
         const plan = planCollectionSchemaEnsure([renamed, categories], dbWithJunction(["categorie_id", "product_id"]));
 
         expect(plan.legacyForeignKeys).toEqual([]);
-        // The author's column is genuinely missing, so it is still created.
+        // The author's column is genuinely missing, so it is created — not
+        // renamed from a column they never referred to.
         expect(plan.statements.some(s => s.includes('ADD COLUMN IF NOT EXISTS "cat_ref"'))).toBe(true);
+        expect(plan.actions.some(a => a.kind === "rename-column")).toBe(false);
     });
 });

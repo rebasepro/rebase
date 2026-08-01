@@ -77,7 +77,7 @@ export interface ExistingSchema {
 }
 
 export interface EnsureAction {
-    kind: "create-enum" | "create-table" | "add-column" | "add-constraint";
+    kind: "create-enum" | "create-table" | "add-column" | "add-constraint" | "rename-column";
     /** Qualified target, for logging: `public.posts` or `public.posts.title`. */
     target: string;
     sql: string;
@@ -235,9 +235,42 @@ export function planCollectionSchemaEnsure(
         actions.push({ kind: "create-table", target: key, sql: junction.createTable });
     }
 
+    // 3. Missing columns, on both brand-new and pre-existing tables.
     const legacyForeignKeys: LegacyForeignKey[] = [];
 
-    // 3. Missing columns, on both brand-new and pre-existing tables.
+    /**
+     * Move a relation column that is only missing because it was renamed.
+     *
+     * Returns true when it handled the column, so the caller skips the ordinary
+     * ADD. Adding here would be the wrong move and a quiet one: the data is in
+     * the old column, `ADD COLUMN` creates the new one empty beside it, every
+     * statement succeeds, and the relation reads the empty one. A rename is
+     * metadata-only in Postgres, keeps the values, and carries the column's
+     * indexes and constraints with it.
+     *
+     * Only ever reached when the new name is absent and the old name is
+     * present, so there is nothing to overwrite and nothing to choose between.
+     */
+    const renameLegacyColumn = (
+        key: string,
+        schema: string,
+        table: string,
+        column: string,
+        legacyName: string | undefined
+    ): boolean => {
+        const present = existing.tables.get(key);
+        if (!legacyName || !present) return false;
+        if (present.has(column) || !present.has(legacyName)) return false;
+
+        legacyForeignKeys.push({ table: key, expected: column, legacy: legacyName });
+        actions.push({
+            kind: "rename-column",
+            target: `${key}.${column}`,
+            sql: `ALTER TABLE "${schema}"."${table}" RENAME COLUMN "${legacyName}" TO "${column}";`
+        });
+        return true;
+    };
+
     const addColumn = (
         key: string,
         schema: string,
@@ -280,16 +313,8 @@ export function planCollectionSchemaEnsure(
     for (const junction of junctions) {
         const key = `${junction.schema}.${junction.table}`;
         if (created.has(key)) continue;
-        const present = existing.tables.get(key);
         for (const column of junction.columns) {
-            if (
-                column.legacyName &&
-                present &&
-                !present.has(column.name) &&
-                present.has(column.legacyName)
-            ) {
-                legacyForeignKeys.push({ table: key, expected: column.name, legacy: column.legacyName });
-            }
+            if (renameLegacyColumn(key, junction.schema, junction.table, column.name, column.legacyName)) continue;
             addColumn(key, junction.schema, junction.table, column.name, column.type);
         }
     }
@@ -297,23 +322,7 @@ export function planCollectionSchemaEnsure(
     // 3c. The columns relation and reference properties own.
     for (const relational of planRelationalColumns(collections)) {
         const relKey = `${relational.schema}.${relational.table}`;
-        // Flag before adding: the signal is precisely "we are about to create
-        // this column, and the old spelling of it is already here with data".
-        // If the expected column exists there is nothing to warn about, and if
-        // the legacy one does not, this database never used the old rule.
-        const columns = existing.tables.get(relKey);
-        if (
-            relational.legacyColumn &&
-            columns &&
-            !columns.has(relational.column) &&
-            columns.has(relational.legacyColumn)
-        ) {
-            legacyForeignKeys.push({
-                table: relKey,
-                expected: relational.column,
-                legacy: relational.legacyColumn
-            });
-        }
+        if (renameLegacyColumn(relKey, relational.schema, relational.table, relational.column, relational.legacyColumn)) continue;
         addColumn(
             relKey,
             relational.schema,
@@ -433,19 +442,18 @@ export async function ensureCollectionTables(
     const plan = planCollectionSchemaEnsure(collections, existing);
     const failures: { target: string; error: string }[] = [];
 
-    // Said before anything is applied, and through both sinks, because this is
-    // the one thing here that goes wrong without producing an error. Every
-    // statement below will succeed; the relation will simply read a column that
-    // was created empty a moment ago, next to the one holding the data.
+    // Reported, not warned: this is a rename the ensure is about to perform, and
+    // the operator should be able to see in the log why a column changed name.
+    // The interesting case is the one that no longer happens — before this,
+    // ensure added the new column empty beside the populated old one, every
+    // statement succeeded, and the relation read the empty one.
     for (const legacy of plan.legacyForeignKeys) {
         const message =
-            `Relation column "${legacy.table}"."${legacy.expected}" is about to be created, but ` +
-            `this table already has "${legacy.legacy}" — the name Rebase derived for the same ` +
-            "relation before it singularized properly. Adding a column does not move the data in " +
-            `it: unless you rename "${legacy.legacy}" to "${legacy.expected}", or pin the old name ` +
-            `with \`localKey: "${legacy.legacy}"\` on the relation, this relation will resolve to an ` +
-            "empty column and read as though it has no data.";
-        logger.warn(`⚠️  [schema] ${message}`);
+            `Renaming "${legacy.table}"."${legacy.legacy}" to "${legacy.expected}". The old name is ` +
+            "the one Rebase derived for this relation before it singularized properly; the column " +
+            "keeps its data, indexes and constraints. To keep the old name instead, set " +
+            `\`localKey: "${legacy.legacy}"\` on the relation and this will stop.`;
+        logger.info(`[schema] ${message}`);
         log?.(message);
     }
 
