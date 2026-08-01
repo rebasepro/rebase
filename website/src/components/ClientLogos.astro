@@ -1,4 +1,45 @@
 ---
+// Intrinsic pixel dimensions of each asset (viewBox for the SVGs), so the browser
+// can reserve the right box before a lazy logo arrives instead of reflowing the
+// row. Keyed by src rather than inlined per entry to keep the list below readable
+// — regenerate these if a logo file is replaced.
+// These are the browser's `naturalWidth`/`naturalHeight`, not the SVG viewBox —
+// several of these files carry width/height attributes that disagree with their
+// viewBox, and it is the attributes the browser lays out from. Read them back with
+// `new Image()` rather than by parsing the markup if a logo is ever replaced.
+const INTRINSIC: Record<string, [number, number]> = {
+    "/img/logos/deardoc.webp": [290, 66],
+    "/img/logos/mm_logo.webp": [441, 108],
+    "/img/logos/proton_logo.svg": [710, 710],
+    "/img/logos/withu.png": [300, 163],
+    "/img/logos/social_income_logo.svg": [1493, 157],
+    "/img/logos/clario.svg": [139, 38],
+    "/img/logos/gearfocus_logo.svg": [300, 64],
+    "/img/logos/mindswitch_logo.svg": [300, 69],
+    "/img/logos/bitforge.svg": [300, 76],
+    "/img/logos/logo_somnio.webp": [346, 126],
+    "/img/logos/riverstone.webp": [220, 35],
+    "/img/logos/icodelabs.png": [230, 48],
+    "/img/logos/nfq.svg": [117, 34],
+    "/img/logos/fyc.svg": [204, 30],
+    "/img/logos/kodecreators.svg": [141, 44],
+    "/img/logos/viscap.svg": [300, 52],
+    "/img/logos/abacus.svg": [102, 30]
+};
+
+// Shared by the server-rendered markup below AND the carousel script that swaps
+// logos in on a timer. They drifted apart once already — the script kept building
+// bare <img>s while the markup gained sizing — so both now read this one string.
+//
+// `w-auto` is load-bearing: width/height are presentational hints, so without it
+// the attribute width fights the inline `height` and stretches the logo. With it,
+// width follows the attributes' aspect ratio, which is the point of setting them —
+// the box is reserved correctly before the file arrives. `object-contain` covers
+// the wide logos, where `max-w-full` clamps width against a fixed inline height
+// and would otherwise squash the artwork (viscap wants 242px at h-42, cell is 144).
+const LOGO_IMG_CLASSES =
+    "max-w-full w-auto h-auto object-contain grayscale opacity-60 hover:opacity-100 transition-all duration-500";
+
 const allLogos = [
     {
         key: "deardoc",
@@ -187,9 +228,12 @@ const initialLogos = filteredLogos.slice(0, 5);
                         src={logo.src}
                         alt={logo.alt}
                         loading="lazy"
+                        decoding="async"
+                        width={INTRINSIC[logo.src]?.[0]}
+                        height={INTRINSIC[logo.src]?.[1]}
                         style={logo.height ? `height: ${logo.height}px` : ""}
                         class:list={[
-                            "max-w-full h-auto grayscale opacity-60 hover:opacity-100 transition-all duration-500",
+                            LOGO_IMG_CLASSES,
                             { "dark:invert hover:brightness-110": logo.invert },
                             { "hover:grayscale-0": !logo.invert }
                         ]}
@@ -200,7 +244,7 @@ const initialLogos = filteredLogos.slice(0, 5);
     ))}
 </div>
 
-<script define:vars={{ allLogos: filteredLogos }}>
+<script define:vars={{ allLogos: filteredLogos, INTRINSIC, LOGO_IMG_CLASSES }}>
     document.addEventListener('astro:page-load', () => {
         const container = document.getElementById('logo-container');
         if (!container) return;
@@ -256,14 +300,22 @@ const initialLogos = filteredLogos.slice(0, 5);
                     img.src = newLogo.src;
                     img.alt = newLogo.alt;
                     img.loading = 'lazy';
+                    img.decoding = 'async';
+
+                    // Same sizing the server-rendered markup gets, so a swapped-in
+                    // logo reserves its box instead of reflowing the row.
+                    const size = INTRINSIC[newLogo.src];
+                    if (size) {
+                        img.width = size[0];
+                        img.height = size[1];
+                    }
 
                     if (newLogo.height) {
                         img.style.height = `${newLogo.height}px`;
                     }
 
-                    const baseClasses = "max-w-full h-auto grayscale opacity-60 hover:opacity-100 transition-all duration-500";
                     const hoverClasses = newLogo.invert ? "dark:invert hover:brightness-110" : "hover:grayscale-0";
-                    img.className = `${baseClasses} ${hoverClasses}`;
+                    img.className = `${LOGO_IMG_CLASSES} ${hoverClasses}`;
 
                     newElement.appendChild(img);
                 } else if (newLogo.text) {
