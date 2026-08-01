@@ -33,6 +33,18 @@
 
   **If you test with Jest**, budget for this: react-router 8 is ESM-only, and it breaks ts-jest's CommonJS output in two unrelated ways. react-router guards a Vite HMR hook with `import.meta.hot`, which is a *syntax* error in CJS — and ts-jest cannot fix it, because TypeScript emits `import.meta` verbatim under `module: commonjs`. Separately, react-router depends on `cookie-es` 3, which ships `.mjs` only, and TypeScript keys module format off the file extension, so it will not emit CJS for a `.mjs` input whatever `module` says. Every affected suite dies at module load with zero tests run, which reads as a broken config rather than a dependency-format problem. `scripts/jest/react-router-esm-transform.cjs` in this repo handles both and is a reasonable thing to copy. Vitest is unaffected.
 
+- **`rebase cloud deploy --source` on a managed project now needs `--force`.** It ejects the project to a custom container image, and until now it did that on the strength of `--source` alone — read as self-evidently a deliberate eject. It is not. `--source` answers *which source gets built* — this directory, rather than the months-old archive the control plane is holding — and the eject is a side effect of that answer, not something the caller named. Someone reaching for `--source .` because they want their working tree deployed has the right instinct and no reason to expect a runtime change.
+
+  That is how a live project got flipped from `runtime.mode: managed` to `custom`, discovered afterwards from `rebase cloud status` showing `frameworkVersion: null`. The bare form had been refused for the identical reason since the release below; `--source` was the hole left in it. Both forms are now the same rule: a container-image build of a project the platform runs as managed happens only when `--force` says to.
+
+  ```diff
+  - rebase cloud deploy --source .        # ejected, with a warning
+  + rebase cloud deploy --bundle          # stay on managed — almost always what was meant
+  + rebase cloud deploy --source . --force  # eject on purpose
+  ```
+
+  The refusal carries `code: "managed_project"`, which is what it already used, so a caller already branching on that code needs no change.
+
 ### Security
 
 - **`policy.authenticated()` admitted anonymous visitors.** There were two sentinels for "nobody is signed in". The types, the policy compiler, the JavaScript evaluator and the anonymous-grant linter were all built on `ANONYMOUS_USER_ID` (`'anonymous'`); the request path scoped unauthenticated callers as `'anon'`. So `policy.authenticated()` — the sanctioned, documented way to write "signed in", the thing the linter *tells you to use* — compiled to `auth.uid() <> 'anonymous'` and was true for every signed-out caller.
@@ -74,6 +86,18 @@
 - **`@hono/node-server` in the scaffolded backend goes from `^1.19.12` to `^2.0.12`**, closing GHSA-frvp-7c67-39w9 (a `serve-static` path traversal on Windows via an encoded backslash). The 1.x line has no patch, and `@rebasepro/server` already peered `^2.0.12` — a new project was being handed an adapter two majors behind the server consuming it.
 
 ### Fixed
+
+- **The eject warning was suppressed exactly where it mattered.** The warning above the refusal — the one that exists because ejecting "is not something to discover from a runtime version going blank" — was printed behind `!isJsonMode()`. JSON mode latches on whenever stdout is not a TTY, so piping the command, or running it from CI or a coding agent, deleted the warning outright, and the deploy's JSON payload carried no equivalent field. The one case with nobody watching the terminal was the one case that said nothing.
+
+  Warnings now go to stderr in every output mode — stderr is not the JSON stream, so it cannot corrupt a parser — and only their *formatting* depends on the mode. Whether a warning is emitted at all no longer does. The deploy payload gains `warnings: [{code, message, hint}]` and a denormalised `ejectsManagedRuntime` boolean for CI to test directly; both fields are always present, so `false` never has to be told from absent.
+
+- **`deploy` printed human progress to stdout in JSON mode**, ahead of the result object, breaking any parser reading it — the `🚀 Triggering deployment…` banner on both the source and managed-bundle paths, the source upload's size line, and on the bundle path the entire build transcript (`Building bundle…`, the compiler's own log lines, frontend folding, `Uploading bundle…`). Progress goes through one `progress()` helper now, which drops it in JSON mode. The rule it settles: progress is not a result and disappears when stdout belongs to the JSON; a *warning* is not a result either, but goes to stderr and never disappears.
+
+- **A project that had never deployed reported `custom · your own image`.** `projects.runtime_mode` is a record of what the last deploy made a project, and it carried `DEFAULT 'custom'` from the migration that added it — which was a true statement about the projects that existed *then*, and applied to every row created ever after. So a project created seconds ago, which had never built anything, named a container image nobody had built. Most visibly right after the console's create wizard, whose runtime step defaults to Managed and says outright that the choice is intent and writes no mode.
+
+  It also blunted the one signal that catches an accidental eject: `custom` was equally the resting value of a project nothing had happened to, so it could not distinguish "a source build moved you off managed" from "nothing has happened here yet."
+
+  The column stops defaulting (control plane migration `0040_runtime_mode_undecided`), making NULL the honest third state, and `rebase cloud status` and the console's overview, infrastructure and apps headers all read it as "not deployed yet" rather than inventing an image. Every non-display reader already coerced absent to `custom` before use, so nothing else changes. Existing rows are deliberately **not** backfilled — a row saying `custom` today may be a project that really did ship source, and there is no way to tell those apart from the ones the default flattened.
 
 - **Several concurrent realtime subscriptions hung on a cold page load.** A view that opens more than one at once — a Kanban board opens one per column — reported `Subscription timed out` for all but one of them, thirty seconds in. The socket was healthy: probed directly, six concurrent `subscribe_collection` frames all answered inside 15ms. The frames were never sent.
 

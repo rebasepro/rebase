@@ -107,6 +107,13 @@ export function describeRuntime(project: {
     runtimeFrameworkVersion?: string | null;
     runtimeVersionPin?: string | null;
 }): string {
+    // Absent is a third state, not a synonym for custom. `runtime_mode` stopped
+    // defaulting to `custom` in migration 0040, so a project that has never
+    // deployed has no mode at all — and "your own image" about one of those
+    // asserts a container that was never built. The first deploy decides.
+    if (project.runtimeMode == null || project.runtimeMode.trim() === "") {
+        return `not deployed yet ${chalk.gray("· the first deploy decides (`--bundle` keeps it managed)")}`;
+    }
     if (project.runtimeMode !== "managed") {
         return `custom ${chalk.gray("· your own image")}`;
     }

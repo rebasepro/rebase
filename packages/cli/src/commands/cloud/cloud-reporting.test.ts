@@ -193,4 +193,17 @@ describe("describeRuntime", () => {
         expect(line).toContain("custom");
         expect(line).not.toContain("managed");
     });
+
+    it("does not claim an image for a project that has never deployed", () => {
+        // `runtime_mode` stopped defaulting to `custom` in migration 0040, so
+        // absent is a third state. Reporting it as "custom · your own image"
+        // described a container that was never built — and made `custom`
+        // useless as the tell for an accidental eject, since it was equally the
+        // resting value of every project nothing had happened to.
+        for (const mode of [null, undefined, "  "]) {
+            const line = stripAnsi(describeRuntime({ runtimeMode: mode, runtimeVersion: null }));
+            expect(line).toContain("not deployed yet");
+            expect(line).not.toContain("your own image");
+        }
+    });
 });

@@ -555,6 +555,36 @@ export function emit(human: () => void, json: unknown): void {
    Output helpers
    ═══════════════════════════════════════════════════════════════ */
 
+/**
+ * Print a warning (+ optional hint) — in every output mode, always to stderr.
+ *
+ * `emit` is for a command's *result*, and JSON mode legitimately replaces the
+ * human rendering of one. A warning is not a result: it says the command is
+ * about to do something the caller may not have meant, and that is exactly as
+ * true when the output is piped. Gating one on `!isJsonMode()` deleted it
+ * precisely where nobody was watching the terminal — a `--source` deploy ejected
+ * a live project off the managed runtime and said so only to a TTY that wasn't
+ * there.
+ *
+ * stdout carries the JSON value and nothing else, so warnings go to stderr:
+ * a machine parser reading stdout cannot be corrupted by one. Only the
+ * *formatting* may depend on the mode — colour and indentation for a terminal,
+ * plain ASCII otherwise. Whether a warning is emitted at all may not.
+ *
+ * Anything a caller might branch on belongs in the JSON payload as well; stderr
+ * is for whoever reads the transcript afterwards.
+ */
+export function warn(message: string, hint?: string): void {
+    if (JSON_MODE) {
+        process.stderr.write(`warning: ${stripAnsi(message)}\n`);
+        if (hint) process.stderr.write(`  ${stripAnsi(hint)}\n`);
+        return;
+    }
+    console.error("");
+    console.error(chalk.yellow(`  ⚠ ${message}`));
+    if (hint) console.error(chalk.gray(`    ${hint}`));
+}
+
 /** Print an error (+ optional hint) and exit non-zero. Never returns. */
 export function fail(message: string, hint?: string, code?: string): never {
     if (JSON_MODE) {

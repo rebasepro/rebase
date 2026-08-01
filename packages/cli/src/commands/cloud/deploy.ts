@@ -25,6 +25,7 @@ import {
     isJsonMode,
     printJson,
     fail,
+    warn,
     reportError,
     type CloudClient
 } from "./context";
@@ -142,6 +143,19 @@ function resolveFrameworkVersion(sourceDir: string): string | undefined {
     }
 }
 
+/**
+ * A progress line for a human — dropped entirely in JSON mode.
+ *
+ * Progress is not a result. In JSON mode stdout carries the one result value
+ * and nothing else, so every unguarded `console.log` on a deploy path was a
+ * line printed in front of the JSON, breaking the parser meant to read it.
+ * Warnings are the other half of this rule and go the other way: they are
+ * `warn`, which prints in every mode, to stderr. See `warn` in `context.ts`.
+ */
+function progress(line: string): void {
+    if (!isJsonMode()) console.log(line);
+}
+
 /** Upload a build-context tarball; returns the opaque `source` ref for deploy. */
 async function uploadSource(url: string, token: string, projectId: string, tarPath: string): Promise<string> {
     const bytes = fs.readFileSync(tarPath);
@@ -152,7 +166,7 @@ async function uploadSource(url: string, token: string, projectId: string, tarPa
             "Trim the build context: exclude sourcemaps (*.map), build output and large assets via .rebaseignore or .gitignore."
         );
     }
-    console.log(chalk.gray(`  Uploading source (${sizeMb} MB)...`));
+    progress(chalk.gray(`  Uploading source (${sizeMb} MB)...`));
     const res = await fetch(`${url}/api/functions/deploy/upload?projectId=${encodeURIComponent(projectId)}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`,
@@ -202,7 +216,7 @@ async function deployBundle(opts: {
                 "A managed deploy runs the backend; declare one in rebase.json, or deploy from the backend's repository."
             );
         }
-        console.log(chalk.gray("  Building bundle..."));
+        progress(chalk.gray("  Building bundle..."));
         const result = await buildBundle({
             projectRoot,
             appName: backend!.name,
@@ -210,7 +224,7 @@ async function deployBundle(opts: {
             runtimeRange: loaded.manifest.rebase,
             storage: loaded.manifest.storage,
             skipTypeCheck: opts.skipTypeCheck,
-            log: (m: string) => console.log(chalk.gray(m))
+            log: (m: string) => progress(chalk.gray(m))
         });
         bundleDir = result.outDir;
 
@@ -225,10 +239,10 @@ async function deployBundle(opts: {
                 projectRoot,
                 manifest: loaded.manifest as never,
                 bundleDir,
-                log: (m: string) => console.log(m)
+                log: (m: string) => progress(m)
             });
             for (const outcome of folded) {
-                console.log(chalk.gray(
+                progress(chalk.gray(
                     `  folded ${outcome.appName} in (${outcome.fileCount} file(s), served at ${outcome.path})`
                 ));
             }
@@ -263,7 +277,7 @@ async function deployBundle(opts: {
     try {
         await packBundle(bundleDir, tarPath);
         const sizeMb = (fs.statSync(tarPath).size / 1024 / 1024).toFixed(1);
-        console.log(chalk.gray(`  Uploading bundle (${sizeMb} MB)...`));
+        progress(chalk.gray(`  Uploading bundle (${sizeMb} MB)...`));
         bundleId = await uploadBundle(url, token!, projectId, tarPath);
     } catch (e) {
         fail(e instanceof Error ? e.message : String(e));
@@ -272,8 +286,12 @@ async function deployBundle(opts: {
         fs.rmSync(tarPath, { force: true });
     }
 
-    console.log("");
-    console.log(`  🚀 Triggering managed deployment for ${chalk.bold(projectRef)} (schema ${manifest.schemaVersion})...`);
+    // Guarded for the same reason as the source-deploy banner below: the JSON
+    // result on this path is printed to stdout too.
+    if (!isJsonMode()) {
+        console.log("");
+        console.log(`  🚀 Triggering managed deployment for ${chalk.bold(projectRef)} (schema ${manifest.schemaVersion})...`);
+    }
 
     // Tell the platform about every app this repo declares, not only the one
     // whose bundle is being uploaded. A deploy ships one app; the Apps page is
@@ -440,9 +458,117 @@ export function planBareDeploy(
     };
 }
 
+/**
+ * A warning attached to a deploy: printed for the human, carried in the JSON.
+ *
+ * `code` is the stable half — the message is prose and will be reworded, so it
+ * is the code that CI or an agent branches on.
+ */
+export interface DeployWarning {
+    code: string;
+    message: string;
+    hint?: string;
+}
+
+/** `code` of the warning below, and the field name it sets in the payload. */
+export const EJECTS_MANAGED_RUNTIME = "ejects_managed_runtime";
+
 /** The one sentence that says a source build undoes `runtimeMode: managed`. */
-function ejectWarning(projectRef: string): string {
-    return `⚠ ${projectRef} runs on the managed runtime — a source build ejects it to a custom container.`;
+export function ejectWarning(projectRef: string): DeployWarning {
+    return {
+        code: EJECTS_MANAGED_RUNTIME,
+        message: `${projectRef} runs on the managed runtime — this build ejects it to a custom container.`,
+        hint: "Use `rebase cloud deploy --bundle` to stay on managed."
+    };
+}
+
+/** How a container-image deploy was asked for — the input to both rules below. */
+export interface EjectContext {
+    /** The project currently runs on the managed runtime. */
+    managed: boolean;
+    /** `--source` was passed: build this directory. */
+    source: boolean;
+    /** `--force` was passed: eject on purpose. */
+    force: boolean;
+}
+
+/**
+ * Why a container-image deploy of a managed project is refused — or `undefined`
+ * to let it through.
+ *
+ * Every path below this point builds a container image, and a successful one
+ * sets `runtimeMode: "custom"` server-side. So the question is never "which flag
+ * was used" but "did the caller ask to leave the managed runtime", and only
+ * `--force` answers it.
+ *
+ * `--source` used to be read as answering it too, on the theory that uploading a
+ * build context is self-evidently a deliberate eject. It is not: `--source`
+ * picks *which source* gets built — this directory, rather than the stale
+ * archive the control plane is holding — and the eject is a side effect of the
+ * answer. That is exactly how a live project got flipped to `custom` by someone
+ * whose actual intent was "deploy what I have here", and it is the same
+ * ignorance the bare form is refused for. Same ignorance, same refusal.
+ */
+export function ejectRefusal(
+    opts: EjectContext,
+    projectRef: string
+): { message: string; hint: string; code: string } | undefined {
+    if (!opts.managed || opts.force) return undefined;
+    const eject = "To eject on purpose, add `--force`.";
+    if (opts.source) {
+        return {
+            message:
+                `${projectRef} runs on the managed runtime, and \`--source\` builds a container image from ` +
+                "this directory — which ejects it from managed. Picking a build method is not the same as " +
+                "asking to leave the runtime.",
+            hint: `Deploy this directory to the managed runtime with \`rebase cloud deploy --bundle\`. ${eject}`,
+            code: "managed_project"
+        };
+    }
+    return {
+        message:
+            `${projectRef} runs on the managed runtime, and a plain \`rebase cloud deploy\` builds a ` +
+            "container image instead — ejecting it from managed, from source the control plane " +
+            "already holds rather than this directory.",
+        hint:
+            `Redeploy it with \`rebase cloud deploy --bundle\`. ${eject} ` +
+            "`--source . --force` builds this directory; `--force` alone builds what the control plane holds.",
+        code: "managed_project"
+    };
+}
+
+/**
+ * Which warnings a container-image deploy has earned.
+ *
+ * Pure, and separate from the printing, because the printing is what went
+ * wrong: the eject warning used to be written inline behind `!isJsonMode()`, so
+ * the fact that a deploy ejects a managed project existed only as a side effect
+ * of a TTY being attached. Deciding here, emitting once at the call site, means
+ * the decision cannot be output-mode-dependent again.
+ *
+ * The condition is just `managed`: anything reaching this point is a container
+ * image build that `ejectRefusal` has already let through, and on a managed
+ * project that is an eject however it was spelled. A caller who passed `--force`
+ * knows — the warning is for the transcript and the payload, which is what
+ * anyone reviewing the deploy afterwards actually reads.
+ */
+export function deployWarnings(opts: EjectContext, projectRef: string): DeployWarning[] {
+    return opts.managed ? [ejectWarning(projectRef)] : [];
+}
+
+/** The warning half of a deploy's JSON payload — merged into whatever it emits. */
+export function warningPayload(warnings: DeployWarning[]): Record<string, unknown> {
+    return {
+        warnings: warnings.map((w) => ({
+            code: w.code,
+            message: w.message,
+            hint: w.hint ?? null
+        })),
+        // Denormalised from `warnings` on purpose: a boolean is what a CI step
+        // can test without walking an array, and this is the one consequence
+        // worth failing a pipeline over.
+        ejectsManagedRuntime: warnings.some((w) => w.code === EJECTS_MANAGED_RUNTIME)
+    };
 }
 
 /**
@@ -501,8 +627,10 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
    only way to deploy a bundle without type checking was to run the build
    by hand and then point `--bundle-dir` at the result. */
 "--skip-type-check": Boolean,
-/* Deploy a source build even for a project that runs on the managed
-   runtime — an eject, done deliberately. See the refusal below. */
+/* Leave the managed runtime on purpose. The ONLY way to build a container
+   image for a project the platform runs as managed — for the bare form and
+   for `--source` alike, because neither of those says so by itself. See
+   `ejectRefusal`. */
 "--force": Boolean,
 "-m": "--message" },
         { argv: rawArgs.slice(2),
@@ -521,7 +649,9 @@ permissive: true }
     // mean a plain `deploy` tried to build a container image and eject the
     // project — which is why the refusal further down exists.
     //
-    // `--source` and `--bundle-dir` are explicit acts and still win.
+    // `--source` and `--bundle-dir` are explicit acts and still route away from
+    // here — though on a project the platform *runs* as managed, routing away
+    // is now where `ejectRefusal` stops them without `--force`.
     const declaredManaged = !args["--source"] && !args["--bundle"] && declaresManagedRuntime();
     if (args["--bundle"] || declaredManaged) {
         if (args["--bundle"] && args["--source"]) {
@@ -548,29 +678,23 @@ permissive: true }
     const { project, latest } = await readDeployContext(client, projectId);
     const plan = planBareDeploy(project, latest, new Date());
 
-    if (!args["--source"]) {
-        if (plan.managed && args["--force"] !== true) {
-            fail(
-                `${projectRef} runs on the managed runtime, and a plain \`rebase cloud deploy\` builds a ` +
-                    "container image instead — ejecting it from managed, from source the control plane " +
-                    "already holds rather than this directory.",
-                "Redeploy it with `rebase cloud deploy --bundle`. To eject on purpose, pass `--source .` " +
-                    "to build this directory, or `--force` to build what the control plane holds.",
-                "managed_project"
-            );
-        }
-        if (!isJsonMode()) {
-            console.log("");
-            if (plan.managed) console.log(chalk.yellow(`  ${ejectWarning(projectRef)}`));
-            for (const line of plan.lines) console.log(chalk.gray(`  ${line}`));
-        }
-    } else if (plan.managed && !isJsonMode()) {
-        // Explicit `--source` is a deliberate build, so it proceeds — but a
-        // successful one rewrites `runtimeMode` to `custom` server-side, and
-        // that is not something to discover from a runtime version going blank.
+    const eject: EjectContext = {
+        managed: plan.managed,
+        source: Boolean(args["--source"]),
+        force: args["--force"] === true
+    };
+    const refusal = ejectRefusal(eject, projectRef);
+    if (refusal) fail(refusal.message, refusal.hint, refusal.code);
+
+    // What survived that refusal is a deliberate eject, and still worth saying.
+    // Warn in every output mode — `warn` writes to stderr, which is not the JSON
+    // stream — and carry the same fact into the payload, the half CI reads.
+    const warnings = deployWarnings(eject, projectRef);
+    for (const w of warnings) warn(w.message, w.hint);
+
+    if (!args["--source"] && !isJsonMode()) {
         console.log("");
-        console.log(chalk.yellow(`  ${ejectWarning(projectRef)}`));
-        console.log(chalk.gray("    Use `rebase cloud deploy --bundle` to stay on managed."));
+        for (const line of plan.lines) console.log(chalk.gray(`  ${line}`));
     }
 
     // Optional fly-style local source upload: `deploy --source .`
@@ -586,8 +710,13 @@ permissive: true }
         }
     }
 
-    console.log("");
-    console.log(`  🚀 Triggering deployment for project ${chalk.bold(projectRef)}${source ? " from uploaded source" : ""}...`);
+    // Guarded: this is stdout, and in JSON mode stdout carries the one JSON
+    // value and nothing else — an unguarded banner here put a 🚀 line in front
+    // of it and broke every parser reading the result.
+    if (!isJsonMode()) {
+        console.log("");
+        console.log(`  🚀 Triggering deployment for project ${chalk.bold(projectRef)}${source ? " from uploaded source" : ""}...`);
+    }
 
     const body: Record<string, unknown> = { projectId };
     if (source) body.source = source;
@@ -633,7 +762,8 @@ deduplicated: res.deduplicated === true };
             { deploymentId,
 deduplicated,
 frameworkVersion: frameworkVersion ?? null,
-following: false }
+following: false,
+...warningPayload(warnings) }
         );
         return;
     }
@@ -654,7 +784,8 @@ following: false }
 deduplicated,
 frameworkVersion: frameworkVersion ?? null,
 following: true,
-status }
+status,
+...warningPayload(warnings) }
     );
 }
 
