@@ -190,6 +190,88 @@ working, and it will make the positive one look like the bug.
 
 ---
 
+## 7. A test and the code agreeing on a fiction
+
+`MongoConditionBuilder` picked searchable columns with
+`prop?.dataType === "string"`. No property in `@rebasepro/types` has ever had a
+`dataType` field — a real collection carries `type` — so the loop matched
+nothing for every collection a user could declare, and every search fell
+through to `$text`, which needs a text index and throws without one.
+
+The suite was green because its fixtures were written with the same wrong key.
+The test data agreed with the bug, and neither ever met a real collection.
+
+This is the failure mode `tsconfig.tests.json` was created to stop, and its own
+docblock records an earlier instance. But it covers only two packages: measured
+2026-08-01, including every test directory yields **1,668** type errors
+(server-postgres 974, client 266, server 122, common 106, admin 80, app 52,
+then a tail of nine packages with 21 or fewer). Everything outside those two is
+invisible to tsc, and the runners strip types without checking them.
+
+A second instance sits in `common/test/collection_registry_property_gates.test.ts`,
+which declares collections with `driver:` instead of `engine:` — so the engine
+gates it exists to test are never exercised at all.
+
+**Sweep:** for any fixture key, `grep` it in `packages/types/src`. Zero hits on
+a field the production code branches on is this bug. Then check whether that
+test directory is in `tsconfig.tests.json`; if not, it cannot warn you.
+
+**Fix shape:** fix the source, switch the fixtures to the real shape, and earn
+the package a line in `include` so it cannot drift again. The tail packages are
+cheap — 68 errors across nine of them.
+
+---
+
+## 8. A security-labelled test watching the wrong mechanism
+
+Four tests named "CVE-FIX: registration NEVER assigns admin role, even for
+first user" each asserted that `assignDefaultRole` was not called with
+`"admin"`. The first user is promoted through a different call —
+`setUserRoles(id, ["admin"])`, on both the password and OAuth paths — and in
+that branch `assignDefaultRole` is never reached at all.
+
+So they watched a function the escalation path does not use, and passed by
+construction. Measured: changing `if (isFirstUser)` to `if (true)`, so that
+*every* registrant becomes an admin, left three of the four green; the fourth
+failed only incidentally, because that mutation also skips the `defaultRole`
+branch.
+
+Their names were also simply wrong about the system. Registration *does* make
+the first user an admin — the documented bootstrap, asserted 1,100 lines
+earlier in the same file. A reader of that block was told the opposite, under a
+CVE label.
+
+**Sweep:** for any test whose name contains NEVER, CVE, or a vulnerability id,
+find the line of source that would have to change for the claim to break, and
+check the test observes *that* line. A spy on a neighbouring function is the
+signature.
+
+**Fix shape:** assert the property, not a proxy for it — here, "no non-first
+registration reaches admin **by any mechanism**", which reads every route to
+the role rather than one of them. Pair it with a positive test that the
+bootstrap still works, or the negatives can go green on a build where the
+feature quietly died.
+
+---
+
+## 9. `toBeDefined()` on an API that returns `null`
+
+`Headers.get` and `FormData.get` return `null` for a missing key, and `null`
+*is* defined. So `expect(res.headers.get("Retry-After")).toBeDefined()` cannot
+fail: the header could be dropped entirely and the rate-limiter test would stay
+green. The same shape appeared on `formData.get("file")`, and on
+`auth.getSession()`, which is typed `RebaseSession | null`.
+
+**Sweep:** `grep -rn "toBeDefined()" ` over the test suites and, for each,
+answer what the expression returns when the thing is absent. `null`, `[]`, `""`
+and `0` all pass `toBeDefined()`.
+
+**Fix shape:** `toBeTruthy()`, or better, assert the value. The nearby
+`rate-limit-data.test.ts` already got this right, which is the tell that the
+weaker one was a slip rather than a decision.
+
+---
+
 ## The discipline
 
 When you find a bug:
