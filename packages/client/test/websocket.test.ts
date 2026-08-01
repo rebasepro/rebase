@@ -300,8 +300,19 @@ code: "AUTH_FAILED" } }
                 WebSocket: undefined as any
             });
             createdClients.push(client);
-            // Should not throw
-            client.disconnect();
+
+            // "Should not throw" was a comment, so the runner was never told
+            // what this test was for: it reported a pass whether `disconnect()`
+            // guarded the missing socket or silently stopped doing anything.
+            // Both halves are stated now — it must not throw, and it must still
+            // leave the client disconnected, which is the reason to call it.
+            expect(() => client.disconnect()).not.toThrow();
+            // And it is still teardown: nothing armed survives it, and calling
+            // it again on an already-torn-down client is safe. Asserting the
+            // pending-timer count rather than spying on a call keeps this true
+            // of whatever internal path removes the handle.
+            expect(jest.getTimerCount()).toBe(0);
+            expect(() => client.disconnect()).not.toThrow();
         });
     });
 

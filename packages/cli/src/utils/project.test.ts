@@ -56,6 +56,45 @@ describe("findProjectRoot", () => {
         expect(findProjectRoot(emptyDir)).toBeNull();
     });
 
+    /*
+     * `rebase.json` is the primary marker — the only one `rebase init` writes,
+     * and the one that makes a **frontend-only** repository discoverable at all:
+     * such a repo has no `backend/`, no `config/`, and no "backend" workspace,
+     * so it matches none of the heuristics below it.
+     *
+     * Nothing covered it. Found by mutation: making the manifest branch
+     * unreachable left the whole CLI suite green, while every command in a repo
+     * that has only a manifest would have failed with "Could not find a Rebase
+     * project root".
+     */
+    it("finds root by a rebase.json alone, with no package.json beside it", () => {
+        const projectDir = createDir("frontend-only");
+        writeJSON(path.join(projectDir, "rebase.json"), { app: "shop" });
+
+        expect(findProjectRoot(projectDir)).toBe(projectDir);
+    });
+
+    it("finds a rebase.json root from a nested subdirectory", () => {
+        const projectDir = createDir("frontend-only-nested");
+        writeJSON(path.join(projectDir, "rebase.json"), { app: "shop" });
+        const deep = createDir("frontend-only-nested", "src", "views");
+
+        expect(findProjectRoot(deep)).toBe(projectDir);
+    });
+
+    it("prefers the nearest rebase.json over an outer workspace root", () => {
+        // An app nested inside a monorepo owns itself: the manifest beside it
+        // is the project, not the workspace root several levels up.
+        const outer = createDir("monorepo");
+        writeJSON(path.join(outer, "package.json"), { name: "mono", workspaces: ["backend"] });
+        createDir("monorepo", "backend");
+
+        const inner = createDir("monorepo", "apps", "shop");
+        writeJSON(path.join(inner, "rebase.json"), { app: "shop" });
+
+        expect(findProjectRoot(inner)).toBe(inner);
+    });
+
     it("finds root by backend/ + config/ sibling directories", () => {
         const projectDir = createDir("my-app");
         createDir("my-app", "backend");

@@ -83,6 +83,66 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         expect(resolve("users")?.name).toBe("user_id");
     });
 
+    /*
+     * Which direction the sort actually compiles to.
+     *
+     * Found by mutation: swapping `asc` and `desc` in `buildDrizzleQueryOptions`
+     * left the entire unit suite green. Every list in every admin panel would
+     * have come back reversed — the most visible regression this file's subject
+     * can produce, and the one nothing was watching. The tests above pin *which
+     * column* is sorted on; nothing pinned which way.
+     */
+    describe("sort direction", () => {
+        // `buildDrizzleQueryOptions` resolves the collection from the registry,
+        // so this one needs a registry that knows `posts` — unlike the direct
+        // `resolveOrderByField` calls above, which are handed the collection.
+        const registry = new PostgresCollectionRegistry();
+        registry.registerMultiple([postsCollection]);
+        const sortService = new FetchService({} as never, registry);
+
+        const buildOrder = (order: "asc" | "desc") => {
+            const opts = (sortService as unknown as {
+                buildDrizzleQueryOptions(
+                    table: typeof postsTable,
+                    idField: AnyPgColumn,
+                    idInfo: { fieldName: string; type: "string" | "number" },
+                    options: Record<string, unknown>,
+                    collectionPath: string
+                ): { orderBy?: unknown[] }
+            }).buildDrizzleQueryOptions(
+                postsTable,
+                postsTable.id as unknown as AnyPgColumn,
+                { fieldName: "id", type: "number" },
+                { orderBy: "title", order },
+                "posts"
+            );
+            // Drizzle renders the direction as a string chunk on the SQL
+            // object; the id tiebreaker is appended after, so the first
+            // expression is ours. Reading the chunks rather than serialising
+            // the object, which is circular (a column refers to its table).
+            const first = opts.orderBy?.[0] as { queryChunks?: { value?: string[] }[] } | undefined;
+            return (first?.queryChunks ?? [])
+                .flatMap(chunk => chunk?.value ?? [])
+                .join(" ")
+                .trim();
+        };
+
+        it("compiles `asc` ascending", () => {
+            expect(buildOrder("asc")).toMatch(/asc/i);
+            expect(buildOrder("asc")).not.toMatch(/desc/i);
+        });
+
+        it("compiles `desc` descending", () => {
+            expect(buildOrder("desc")).toMatch(/desc/i);
+        });
+
+        it("gives the two directions different SQL", () => {
+            // The assertion that survives a change of Drizzle's internals: the
+            // only thing that must hold is that the directions differ.
+            expect(buildOrder("asc")).not.toEqual(buildOrder("desc"));
+        });
+    });
+
     it("refuses a field that names neither a column nor a relation", () => {
         /*
          * This used to resolve to `undefined`, and the caller then dropped the
