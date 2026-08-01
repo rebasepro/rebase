@@ -7,6 +7,12 @@ import { safeCompare } from "./crypto-utils";
 import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { logger } from "../utils/logger";
+import { extractBearerToken } from "./bearer-token";
+
+// Re-exported from here because this is where callers look for it; the separate
+// module exists only so `api-key-middleware` can use it without closing an
+// import cycle with this file.
+export { extractBearerToken };
 
 /**
  * Result from a custom auth validator.
@@ -80,10 +86,9 @@ export const requireAuth: MiddlewareHandler<HonoEnv> = async (
     // resolved the user — respect it instead of re-parsing the token as a JWT.
     if (c.get("user")) return next();
 
-    const authHeader = c.req.header("authorization");
-    const hasBearer = authHeader && authHeader.startsWith("Bearer ");
+    const token = extractBearerToken(c.req.header("authorization"));
 
-    if (!hasBearer) {
+    if (token === undefined) {
         return c.json({
             error: {
                 message: "Authorization header missing or invalid",
@@ -92,7 +97,6 @@ export const requireAuth: MiddlewareHandler<HonoEnv> = async (
         }, 401);
     }
 
-    const token = authHeader!.substring(7);
     const payload = verifyAccessToken(token);
 
     if (!payload) {
@@ -126,10 +130,9 @@ export function createRequireAuth(options?: { serviceKey?: string }): Middleware
         // Respect a user already resolved upstream (e.g. API-key pre-auth).
         if (c.get("user")) return next();
 
-        const authHeader = c.req.header("authorization");
-        const hasBearer = authHeader && authHeader.startsWith("Bearer ");
+        const token = extractBearerToken(c.req.header("authorization"));
 
-        if (!hasBearer) {
+        if (token === undefined) {
             return c.json({
                 error: {
                     message: "Authorization header missing or invalid",
@@ -137,8 +140,6 @@ export function createRequireAuth(options?: { serviceKey?: string }): Middleware
                 }
             }, 401);
         }
-
-        const token = authHeader!.substring(7);
 
         // Check service key first (constant-time comparison)
         if (safeCompare(token, key)) {
@@ -214,11 +215,9 @@ export const optionalAuth: MiddlewareHandler<HonoEnv> = async (
     // Skip if a prior middleware (e.g. queryTokenAuth) already set the user.
     if (c.get("user")) return next();
 
-    const authHeader = c.req.header("authorization");
-    const hasBearer = authHeader && authHeader.startsWith("Bearer ");
+    const token = extractBearerToken(c.req.header("authorization"));
 
-    if (hasBearer) {
-        const token = authHeader!.substring(7);
+    if (token !== undefined) {
         const payload = verifyAccessToken(token);
         if (payload) {
             c.set("user", payload);
@@ -302,12 +301,9 @@ code: "UNAUTHORIZED" } }, 401);
             }
         } else {
             // Default JWT path (with optional service key support)
-            const authHeader = c.req.header("authorization");
-            const hasBearer = authHeader && authHeader.startsWith("Bearer ");
+            const token = extractBearerToken(c.req.header("authorization"));
 
-            if (hasBearer) {
-                const token = authHeader!.substring(7);
-
+            if (token !== undefined) {
                 // ── Service Key check ──────────────────────────────────
                 // Check BEFORE JWT verification. Service keys are static
                 // secrets (like Service Account keys) that grant admin access
@@ -406,8 +402,7 @@ code: "UNAUTHORIZED" } }, 401);
  */
 export const queryTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     // Only activate when no Authorization header is present and a query token exists.
-    const authHeader = c.req.header("authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
+    if (extractBearerToken(c.req.header("authorization")) !== undefined) {
         // Authorization header takes precedence — let downstream middleware handle it.
         return next();
     }
@@ -518,8 +513,9 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     };
 
     // 1. Authorization: Bearer <token>
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-        const token = authHeader.substring(7);
+    const bearerToken = extractBearerToken(authHeader);
+    if (bearerToken !== undefined) {
+        const token = bearerToken;
         const payload = verifyDownloadToken(token);
 
         if (payload) {

@@ -37,6 +37,7 @@ import { resolveAuthHooks } from "./auth-hooks";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
 import { safeCompare } from "./crypto-utils";
+import { extractBearerToken } from "./bearer-token";
 import { logger } from "../utils/logger";
 
 /**
@@ -122,14 +123,11 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             // that reason. Routes that legitimately need query-string tokens
             // (storage file serving for `<img src>`) use scoped download
             // tokens via `fileTokenAuth`, which never reach this adapter.
-            const authHeader = request.headers.get("authorization");
-            const hasBearer = authHeader?.startsWith("Bearer ");
+            const token = extractBearerToken(request.headers.get("authorization"));
 
-            if (!hasBearer) {
+            if (token === undefined) {
                 return null;
             }
-
-            const token = authHeader!.substring(7);
 
             // Check service key first (constant-time)
             if (serviceKey && safeCompare(token, serviceKey)) {

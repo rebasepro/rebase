@@ -46,15 +46,40 @@ describe("Rate Limiter", () => {
     });
 
     it("includes Retry-After header when rate limited", async () => {
-        const app = createTestApp({ limit: 1 });
+        // `Headers.get` returns null for a header that was never set, and
+        // `expect(null).toBeDefined()` passes — so the old assertion here was
+        // green whether or not the header existed. Retry-After is the only thing
+        // that tells a client when to come back, so the value is what matters:
+        // the window is 60s and the blocked request follows the first one inside
+        // the same second, leaving a full 60 to wait.
+        const app = createTestApp({ limit: 1,
+windowMs: 60 * 1000 });
 
         await app.request("/api/test", { headers: { "x-forwarded-for": "10.0.0.2" } });
+        const before = Date.now();
         const res = await app.request("/api/test", {
             headers: { "x-forwarded-for": "10.0.0.2" }
         });
 
-        expect(res.headers.get("Retry-After")).toBeDefined();
+        expect(res.status).toBe(429);
+        expect(res.headers.get("Retry-After")).toBe("60");
         expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
+
+        // The reset stamp is a unix time in seconds, not a duration.
+        const reset = Number(res.headers.get("X-RateLimit-Reset"));
+        expect(reset).toBeGreaterThanOrEqual(Math.floor((before + 59 * 1000) / 1000));
+        expect(reset).toBeLessThanOrEqual(Math.ceil((Date.now() + 60 * 1000) / 1000));
+    });
+
+    it("does not send Retry-After on an allowed request", async () => {
+        // The counterpart: a header emitted unconditionally would satisfy the
+        // test above while telling every successful caller to back off.
+        const app = createTestApp({ limit: 5 });
+
+        const res = await app.request("/api/test", { headers: { "x-forwarded-for": "10.0.0.3" } });
+
+        expect(res.status).toBe(200);
+        expect(res.headers.get("Retry-After")).toBeNull();
     });
 
     it("tracks different IPs separately", async () => {

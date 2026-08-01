@@ -570,7 +570,15 @@ values: entity as Record<string, unknown> },
         // or "authors/111094/posts" into
         // { collectionPath: "authors/111094/posts", id: undefined }
         const parseSubPath = (rawPath: string): { collectionPath: string; id?: string } | null => {
-            const segments = rawPath.split("/").filter(s => s && s !== "undefined");
+            const segments = rawPath.split("/").filter(Boolean);
+            // A literal "undefined" segment is a client that interpolated a
+            // variable it did not have. The whole-`rest` case is already refused
+            // by the route guards above; this used to *drop* the segment, so
+            // `/authors/123/undefined/posts` was quietly answered with the
+            // contents of `/authors/123/posts`. Serving a path nobody asked for
+            // is worse than refusing the one they did: the caller gets rows,
+            // concludes the address it built was right, and the bug ships.
+            if (segments.some(s => s === "undefined")) return null;
             // Need at least 3 segments for a subcollection path (parent/id/child)
             if (segments.length < 3) return null;
 

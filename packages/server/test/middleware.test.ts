@@ -126,12 +126,52 @@ describe("Auth Middleware", () => {
         });
 
         it("should handle lowercase bearer prefix", async () => {
+            // RFC 7235 §2.1: the auth-scheme is case-insensitive. This test used
+            // to pin the opposite — a 401 for `bearer` — which turned a spec
+            // deviation into a documented guarantee. Behaviour change: `bearer`,
+            // `BEARER` and any other casing are now accepted, and the token is
+            // taken verbatim after the first space.
             const token = generateAccessToken("user-123", ["admin"]);
-            const { c, getStatus } = createMockContext({ authHeader: `bearer ${token}` });
+            const { c, getStatus, getUser } = createMockContext({ authHeader: `bearer ${token}` });
 
             await requireAuth(c, nextFn);
 
-            // The implementation requires "Bearer " with capital B
+            expect(getStatus()).toBeUndefined();
+            expect(nextFn).toHaveBeenCalled();
+            expect(getUser()).toEqual({ uid: "user-123",
+roles: ["admin"],
+aal: "aal1" });
+        });
+
+        it("should handle an uppercase BEARER prefix", async () => {
+            const token = generateAccessToken("user-123", ["admin"]);
+            const { c, getUser } = createMockContext({ authHeader: `BEARER ${token}` });
+
+            await requireAuth(c, nextFn);
+
+            expect(nextFn).toHaveBeenCalled();
+            expect(getUser()).toEqual({ uid: "user-123",
+roles: ["admin"],
+aal: "aal1" });
+        });
+
+        it("should still reject a non-Bearer scheme", async () => {
+            // Folding the scheme's case must not turn into accepting any scheme:
+            // a Basic credential is not a token, and must not be verified as one.
+            const { c, getStatus } = createMockContext({ authHeader: "Basic dXNlcjpwYXNz" });
+
+            await requireAuth(c, nextFn);
+
+            expect(getStatus()).toBe(401);
+            expect(nextFn).not.toHaveBeenCalled();
+        });
+
+        it("should not treat a scheme merely starting with 'bearer' as Bearer", async () => {
+            const token = generateAccessToken("user-123", ["admin"]);
+            const { c, getStatus } = createMockContext({ authHeader: `Bearerish ${token}` });
+
+            await requireAuth(c, nextFn);
+
             expect(getStatus()).toBe(401);
             expect(nextFn).not.toHaveBeenCalled();
         });

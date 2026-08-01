@@ -104,11 +104,69 @@ describe("Error Handler (Hono)", () => {
         expect(body.error.message).toBe("Internal Server Error");
     });
 
-    it("maps known error codes to HTTP status codes", async () => {
+    it("defaults to 500 for a code that is not in the map", async () => {
         const app = createApp();
         const res = await app.request("/error-with-code");
         // RATE_LIMITED is not in the code-to-status map, so it should default to 500
         expect(res.status).toBe(500);
+    });
+
+    describe("maps known error codes to HTTP status codes", () => {
+        // A plain Error carrying only a `code` is what a thrower outside this
+        // module produces — an adapter, a driver, a user callback — and the map
+        // is the only thing that turns it into anything other than a 500. The
+        // single case this used to have threw RATE_LIMITED, which is *absent*
+        // from the map, so it asserted the default and left all sixteen entries
+        // unmeasured: every one of them could have been deleted, or given the
+        // wrong status, in silence.
+        const cases: [string, number][] = [
+            ["BAD_REQUEST", 400],
+            ["INVALID_INPUT", 400],
+            ["WEAK_PASSWORD", 400],
+            ["UNAUTHORIZED", 401],
+            ["INVALID_CREDENTIALS", 401],
+            ["INVALID_TOKEN", 401],
+            ["FORBIDDEN", 403],
+            ["NOT_FOUND", 404],
+            ["CONFLICT", 409],
+            ["EMAIL_EXISTS", 409],
+            ["ROLE_EXISTS", 409],
+            ["SCHEMA_DRIFT", 500],
+            ["DB_PERMISSION_DENIED", 500],
+            ["INTERNAL_ERROR", 500],
+            ["NOT_CONFIGURED", 503],
+            ["SERVICE_UNAVAILABLE", 503]
+        ];
+
+        it.each(cases)("%s → %i", async (code, status) => {
+            const app = new Hono<HonoEnv>();
+            app.onError(errorHandler);
+            app.get("/boom", () => {
+                const err = new Error("thrown from outside this module") as Error & { code: string };
+                err.code = code;
+                throw err;
+            });
+
+            const res = await app.request("/boom");
+            expect(res.status).toBe(status);
+            const body = await res.json() as any;
+            expect(body.error.code).toBe(code);
+        });
+
+        it("lets an explicit statusCode win over the code lookup", async () => {
+            // `statusCode` is checked first, so a thrower that knows better is
+            // not overruled by a coincidentally-named code.
+            const app = new Hono<HonoEnv>();
+            app.onError(errorHandler);
+            app.get("/boom", () => {
+                const err = new Error("gone") as Error & { code: string; statusCode: number };
+                err.code = "NOT_FOUND";
+                err.statusCode = 410;
+                throw err;
+            });
+
+            expect((await app.request("/boom")).status).toBe(410);
+        });
     });
 
     it("omits details when not provided", async () => {

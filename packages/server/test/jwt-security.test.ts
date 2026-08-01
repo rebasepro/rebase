@@ -32,9 +32,28 @@ refreshExpiresIn: "30d" });
             expect(() => configureJwt({ secret: "your-super-secret-jwt-key-change-in-production" })).toThrow("weak");
         });
 
-        it("rejects 'changeme' and variations", () => {
-            expect(() => configureJwt({ secret: "changeme-padding-for-32-chars!!!" })).not.toThrow();
+        /*
+         * Named "rejects 'changeme' and variations", and its body asserted that
+         * a variation is *accepted*. The guard is a Set of exact strings, so the
+         * name was describing a substring scan that has never existed.
+         *
+         * Renaming rather than widening the guard: a secret is only weak because
+         * it is a published default someone forgot to replace, and a variation
+         * is by definition not that string. Matching on substrings would start
+         * refusing perfectly good secrets that happen to contain "test" or
+         * "password". So the exact-match behaviour is the intended one, and this
+         * pins it honestly in both directions.
+         */
+        it("matches the weak-secret list exactly, after lowercasing", () => {
+            // In the list, but caught by the length check first.
             expect(() => configureJwt({ secret: "changeme" })).toThrow("too short");
+            // Long enough to reach the list, and in it — this is the case the
+            // list exists for, and the one nothing else in this file covered.
+            expect(() => configureJwt({ secret: "rebase_saas_jwt_secret_must_be_long_long_long_long" })).toThrow("weak");
+            // Same value, shouted: casing is normalised before the lookup.
+            expect(() => configureJwt({ secret: "REBASE_SAAS_JWT_SECRET_MUST_BE_LONG_LONG_LONG_LONG" })).toThrow("weak");
+            // Merely *containing* a weak word is a different secret, and allowed.
+            expect(() => configureJwt({ secret: "changeme-padding-for-32-chars!!!" })).not.toThrow();
         });
 
         it("accepts strong, random secrets", () => {

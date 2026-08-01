@@ -197,8 +197,22 @@ force: true });
         it("should list files in a directory", async () => {
             const result = await controller.listObjects("listtest", { bucket: "default" });
 
-            // Items should be the actual files (not metadata files)
-            expect(result.items.length).toBeGreaterThanOrEqual(5);
+            // Every stored object gets a `.metadata.json` sidecar written beside
+            // it, and the listing must not show them — they are this controller's
+            // bookkeeping, not objects the caller put there. `length >= 5` was
+            // satisfied by ten entries just as happily as by five, so the filter
+            // the comment claims to cover went unmeasured.
+            expect(result.items.map(i => i.name).sort()).toEqual([
+                "file1.txt", "file2.txt", "file3.txt", "file4.txt", "file5.txt"
+            ]);
+            expect(result.items.map(i => i.fullPath).sort()).toEqual([
+                "listtest/file1.txt",
+                "listtest/file2.txt",
+                "listtest/file3.txt",
+                "listtest/file4.txt",
+                "listtest/file5.txt"
+            ]);
+            expect(result.prefixes).toHaveLength(0);
         });
 
         it("should return empty list for non-existent directory", async () => {

@@ -68,10 +68,18 @@ describe("generateTotp", () => {
     });
 
     it("pads short codes with leading zeros", () => {
-        // Generate many codes to increase chance of seeing leading zeros behavior
-        const secret = Buffer.from("12345678901234567890");
-        const code = generateTotp(secret);
-        expect(code.length).toBe(6);
+        // A TOTP is the HOTP value modulo 10^6, so about one step in a hundred
+        // lands below 100000 — and the authenticator app still shows six digits.
+        // `length === 6` could not tell padding apart from any other code, so this
+        // pins a step whose value is genuinely short: counter 36 (t = 1_080_000ms)
+        // hashes to 3784 for the RFC 4226 test secret, and must render as 003784.
+        jest.useFakeTimers().setSystemTime(1_080_000);
+        try {
+            const secret = Buffer.from("12345678901234567890");
+            expect(generateTotp(secret)).toBe("003784");
+        } finally {
+            jest.useRealTimers();
+        }
     });
 });
 
@@ -95,12 +103,44 @@ describe("verifyTotp", () => {
     });
 
     it("uses window parameter to check adjacent time steps", () => {
+        // The window exists for the user whose phone clock drifts, or who types
+        // the code as the step rolls over. Verifying only the *current* step
+        // proves nothing about it: an implementation that ignored `window`
+        // entirely would pass. So the token under test comes from a neighbouring
+        // step, and the same token must be accepted with a window and refused
+        // without one.
         const secret = Buffer.from("12345678901234567890");
-        const token = generateTotp(secret);
-        // Window of 0 should still pass for current step
-        expect(verifyTotp(secret, token, 0)).toBe(true);
-        // Window of 2 should also pass for current step
-        expect(verifyTotp(secret, token, 2)).toBe(true);
+        const now = 1_700_000_000_000; // floor(t/30) differs from t + 30s
+        jest.useFakeTimers().setSystemTime(now);
+        try {
+            const current = generateTotp(secret);
+
+            jest.setSystemTime(now + 30_000);
+            const nextStep = generateTotp(secret);
+            jest.setSystemTime(now - 30_000);
+            const previousStep = generateTotp(secret);
+
+            jest.setSystemTime(now);
+            // If these collided the assertions below would be vacuous.
+            expect(new Set([current, nextStep, previousStep]).size).toBe(3);
+
+            expect(verifyTotp(secret, current, 0)).toBe(true);
+            expect(verifyTotp(secret, nextStep, 0)).toBe(false);
+            expect(verifyTotp(secret, previousStep, 0)).toBe(false);
+
+            expect(verifyTotp(secret, nextStep, 1)).toBe(true);
+            expect(verifyTotp(secret, previousStep, 1)).toBe(true);
+
+            // …and the window is a bound, not a suggestion: two steps out is
+            // outside a window of 1.
+            jest.setSystemTime(now + 60_000);
+            const twoStepsOut = generateTotp(secret);
+            jest.setSystemTime(now);
+            expect(verifyTotp(secret, twoStepsOut, 1)).toBe(false);
+            expect(verifyTotp(secret, twoStepsOut, 2)).toBe(true);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 });
 

@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { ApiError, errorHandler } from "../src/api/errors";
 import { HonoEnv } from "../src/api/types";
+import { createResetPasswordRoute } from "../src/auth/reset-password-admin";
+import type { AuthRepository } from "../src/auth/interfaces";
+import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 
 /**
  * End-to-end tests that verify ApiError thrown inside Hono sub-routers
@@ -13,35 +16,54 @@ import { HonoEnv } from "../src/api/types";
  */
 describe("Error Propagation through Sub-Routers", () => {
 
-    // ── Without onError on sub-router (broken behavior) ─────────────
+    // ── Real routers carry their own onError ────────────────────────
 
-    describe("Sub-router WITHOUT onError (demonstrates the bug)", () => {
-        function createBrokenApp() {
-            // This simulates the REAL production scenario: the consumer's Hono app
-            // (e.g. SustenTalent's index.ts) does NOT set onError on the parent app.
-            // Without onError on the sub-router either, Hono's DEFAULT error handler
-            // catches ApiErrors and returns a generic 500 with a plain text body.
+    describe("Routers this package ships, mounted on a bare parent", () => {
+        /*
+         * This describe used to build a bare Hono app with no `onError` anywhere
+         * and assert that Hono answers 500 with plain text. That is a fact about
+         * Hono, upheld by Hono's own test suite; nothing in this package could
+         * break it and nothing in this package was exercised by it.
+         *
+         * The invariant that IS ours is the one the comment above was reaching
+         * for: because `onError` does not inherit downwards, every router we hand
+         * to a consumer has to install `errorHandler` itself — the consumer's app
+         * is not guaranteed to have one. So the parent here deliberately has no
+         * handler, and a real router is asked to produce a real ApiError.
+         */
+        beforeAll(() => {
+            configureJwt({ secret: "error-propagation-test-secret-at-least-32-chars",
+accessExpiresIn: "1h" });
+        });
+
+        function mountOnBareParent(): Hono<HonoEnv> {
             const parentApp = new Hono<HonoEnv>();
-            // NOTE: no parentApp.onError(errorHandler) — this is the real scenario
-
-            const subRouter = new Hono<HonoEnv>();
-            // NOTE: no subRouter.onError(errorHandler) — this is the bug
-            subRouter.get("/login", () => {
-                throw ApiError.unauthorized("Invalid credentials", "INVALID_CREDENTIALS");
-            });
-
-            parentApp.route("/api/auth", subRouter);
+            // NOTE: no parentApp.onError — this is the consumer's app, and it is
+            // under no obligation to install ours.
+            parentApp.route("/api/admin", createResetPasswordRoute({
+                authRepo: {
+                    // The uid in the test below is never found, so the route
+                    // throws ApiError.notFound from inside the handler.
+                    getUserById: async () => null,
+                    getUserRoleIds: async () => ["admin"]
+                } as unknown as AuthRepository
+            }));
             return parentApp;
         }
 
-        it("ApiError.unauthorized returns 500 plain text without ANY onError handler", async () => {
-            const app = createBrokenApp();
-            const res = await app.request("/api/auth/login");
-            // Without any onError handler, Hono's default handler returns 500
-            expect(res.status).toBe(500);
-            // And the body is NOT our structured JSON — it's plain text
-            const text = await res.text();
-            expect(text).toBe("Internal Server Error");
+        it("surfaces an ApiError as structured JSON with its own status", async () => {
+            const app = mountOnBareParent();
+            const adminToken = generateAccessToken("admin-user", ["admin"]);
+
+            const res = await app.request("/api/admin/users/missing-user/reset-password", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${adminToken}` }
+            });
+
+            expect(res.status).toBe(404);
+            const body = await res.json() as { error: { message: string; code: string } };
+            expect(body.error.code).toBe("NOT_FOUND");
+            expect(body.error.message).toBe("User not found");
         });
     });
 

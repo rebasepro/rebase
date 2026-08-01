@@ -134,6 +134,11 @@ describe("S3StorageController", () => {
 
     describe("getSignedUrl", () => {
         it("should generate presigned URL", async () => {
+            // `result.url` is the constant the presigner mock was told to return,
+            // so asserting it only proves the mock works. What the controller
+            // decides is *what it signs* — which object, in which bucket, for how
+            // long — and none of that was checked: a presigner call naming the
+            // wrong key, or omitting the expiry so the URL never dies, passed.
             mockSend.mockResolvedValueOnce({
                 ContentType: "text/plain",
                 ContentLength: 100,
@@ -143,8 +148,42 @@ describe("S3StorageController", () => {
 
             const result = await controller.getSignedUrl("uploads/test.txt");
 
-            expect(getSignedUrl).toHaveBeenCalled();
+            expect(GetObjectCommand).toHaveBeenCalledWith({
+                Bucket: "test-bucket",
+                Key: "uploads/test.txt"
+            });
+            expect(getSignedUrl).toHaveBeenCalledTimes(1);
+            expect(getSignedUrl).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.any(GetObjectCommand),
+                { expiresIn: 3600 }
+            );
             expect(result.url).toBe("https://presigned-url.example.com");
+            expect(result.metadata?.bucket).toBe("test-bucket");
+            expect(result.metadata?.fullPath).toBe("uploads/test.txt");
+        });
+
+        it("honours a configured signed-URL expiry and an s3:// bucket override", async () => {
+            const scoped = new S3StorageController({ ...defaultConfig,
+signedUrlExpiration: 60 });
+            mockSend.mockResolvedValueOnce({
+                ContentType: "text/plain",
+                ContentLength: 1,
+                LastModified: new Date(),
+                Metadata: {}
+            });
+
+            await scoped.getSignedUrl("s3://other-bucket/deep/key.txt");
+
+            expect(GetObjectCommand).toHaveBeenCalledWith({
+                Bucket: "other-bucket",
+                Key: "deep/key.txt"
+            });
+            expect(getSignedUrl).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.any(GetObjectCommand),
+                { expiresIn: 60 }
+            );
         });
 
         it("should include metadata in download config", async () => {
@@ -188,9 +227,27 @@ describe("S3StorageController", () => {
         });
 
         it("should not throw for non-existent file", async () => {
-            mockSend.mockResolvedValueOnce({});
+            // The mock used to resolve, so nothing could throw and the test said
+            // nothing about the controller. A backend that raises NoSuchKey is
+            // the case worth pinning: `deleteObject` had no catch at all, so a
+            // stale reference surfaced as a 500 on MinIO/Ceph and as a 200 on
+            // AWS. It is a 200 either way now, matching LocalStorageController.
+            const error = new Error("NoSuchKey");
+            (error as any).name = "NoSuchKey";
+            mockSend.mockRejectedValueOnce(error);
 
-            await expect(controller.deleteObject("nonexistent.txt")).resolves.not.toThrow();
+            await expect(controller.deleteObject("nonexistent.txt")).resolves.toBeUndefined();
+        });
+
+        it("should propagate errors that are not a missing key", async () => {
+            // Swallowing everything would turn a denied delete into a silent
+            // success, which is worse than the 500 this replaced.
+            const error = new Error("AccessDenied");
+            (error as any).name = "AccessDenied";
+            (error as any).$metadata = { httpStatusCode: 403 };
+            mockSend.mockRejectedValueOnce(error);
+
+            await expect(controller.deleteObject("uploads/test.txt")).rejects.toThrow("AccessDenied");
         });
     });
 

@@ -1402,6 +1402,131 @@ ipAddress: "1.2.3.4" }
             const res2 = await app.request("/auth/sessions", { method: "DELETE" });
             expect(res2.status).toBe(401);
         });
+
+        it("DELETE /auth/sessions/:id revokes the family of the token that was named", async () => {
+            // The id in the URL names one token row, and the route resolves it
+            // to the session family behind it — a device holds several rotated
+            // siblings, and killing one leaves the device signed in. Nothing
+            // checked *which* row it resolved: with more than one session on
+            // file, matching the wrong row signs the user out of the laptop they
+            // are sitting at and leaves the phone they were revoking alive.
+            const app = createApp();
+            mockAuthRepo.listRefreshTokensForUser.mockResolvedValueOnce([
+                { id: "tok-laptop",
+uid: "user-1",
+tokenHash: "h1",
+sessionId: "sess-laptop",
+expiresAt: new Date(),
+createdAt: new Date() },
+                { id: "tok-phone",
+uid: "user-1",
+tokenHash: "h2",
+sessionId: "sess-phone",
+expiresAt: new Date(),
+createdAt: new Date() }
+            ] as never);
+
+            const res = await app.request("/auth/sessions/tok-phone", {
+                method: "DELETE",
+                headers: { ...authHeader() }
+            });
+
+            expect(res.status).toBe(200);
+            expect(mockAuthRepo.revokeRefreshTokenSession).toHaveBeenCalledTimes(1);
+            expect(mockAuthRepo.revokeRefreshTokenSession).toHaveBeenCalledWith("sess-phone");
+            // …and the row-level fallback is not also fired.
+            expect(mockAuthRepo.deleteRefreshTokenById).not.toHaveBeenCalled();
+        });
+
+        it("DELETE /auth/sessions/:id falls back to the single row when the id is not the caller's", async () => {
+            // `owned` is already scoped to the caller, so an id that is not in it
+            // is either stale or someone else's. The fallback deletes by id *and*
+            // uid, which is the layer that keeps it from touching another user.
+            const app = createApp();
+            mockAuthRepo.listRefreshTokensForUser.mockResolvedValueOnce([
+                { id: "tok-laptop",
+uid: "user-1",
+tokenHash: "h1",
+sessionId: "sess-laptop",
+expiresAt: new Date(),
+createdAt: new Date() }
+            ] as never);
+
+            const res = await app.request("/auth/sessions/tok-someone-else", {
+                method: "DELETE",
+                headers: { ...authHeader() }
+            });
+
+            expect(res.status).toBe(200);
+            expect(mockAuthRepo.revokeRefreshTokenSession).not.toHaveBeenCalled();
+            expect(mockAuthRepo.deleteRefreshTokenById).toHaveBeenCalledWith("tok-someone-else", "user-1");
+        });
+    });
+
+    // ── MFA challenge ownership ─────────────────────────────────────────
+    describe("POST /auth/mfa/challenge", () => {
+        /**
+         * A challenge is the step between "password accepted" and "session
+         * upgraded to aal2". Opening one against a factor belonging to somebody
+         * else would let a caller drive another account's second factor — so the
+         * route checks that the factor's uid is the caller's. Nothing tested
+         * that check: inverting it (`!==` → `===`) left the whole suite green.
+         */
+        function withFactor(app: ReturnType<typeof createApp>, factor: unknown) {
+            (mockAuthRepo as unknown as Record<string, unknown>).getMfaFactorById =
+                jest.fn().mockResolvedValue(factor);
+            (mockAuthRepo as unknown as Record<string, unknown>).createMfaChallenge =
+                jest.fn().mockResolvedValue({ id: "challenge-1",
+factorId: "factor-1" });
+            return app;
+        }
+
+        function challenge(app: ReturnType<typeof createApp>, uid = "user-1") {
+            return app.request("/auth/mfa/challenge", {
+                ...json({ factorId: "factor-1" }),
+                headers: { "Content-Type": "application/json",
+...authHeader(uid) }
+            });
+        }
+
+        it("opens a challenge against the caller's own factor", async () => {
+            const app = withFactor(createApp(), { id: "factor-1",
+uid: "user-1",
+verified: true });
+
+            const res = await challenge(app);
+
+            expect(res.status).toBe(200);
+            const body = await res.json() as { challengeId: string; factorId: string };
+            expect(body.challengeId).toBe("challenge-1");
+            expect(body.factorId).toBe("factor-1");
+        });
+
+        it("refuses a factor that belongs to another user", async () => {
+            const app = withFactor(createApp(), { id: "factor-1",
+uid: "someone-else",
+verified: true });
+
+            const res = await challenge(app);
+
+            expect(res.status).toBe(404);
+            expect((await res.json() as { error: { message: string } }).error.message)
+                .toBe("MFA factor not found");
+            // No challenge is minted for a factor the caller does not own — a
+            // 404 that still created one would be a leak with a polite status.
+            expect((mockAuthRepo as unknown as { createMfaChallenge: jest.Mock }).createMfaChallenge)
+                .not.toHaveBeenCalled();
+        });
+
+        it("refuses a factor id that does not exist", async () => {
+            const app = withFactor(createApp(), null);
+
+            const res = await challenge(app);
+
+            expect(res.status).toBe(404);
+            expect((mockAuthRepo as unknown as { createMfaChallenge: jest.Mock }).createMfaChallenge)
+                .not.toHaveBeenCalled();
+        });
     });
 
     // ── Auth Config ─────────────────────────────────────────────────────
