@@ -1,6 +1,6 @@
 import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo } from "@rebasepro/types";
 import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, getInjectedSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength } from "@rebasepro/common";
-import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
+import { toSnakeCase, getPolicyNamesForRule, generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 
 // --- Helper Functions ---
 
@@ -548,6 +548,15 @@ export interface RelationalColumnPlan {
     type: string;
     /** Absent when the target collection is not part of this bundle. */
     foreignKey?: ForeignKeyPlan;
+    /**
+     * What this column would have been called before `generateForeignKeyName`
+     * learned to singularize — set only when the two differ and the column name
+     * is the derived default rather than one the author wrote.
+     *
+     * Carried so the boot-time ensure can notice a database provisioned under
+     * the old rule. It is never used to name anything.
+     */
+    legacyColumn?: string;
 }
 
 /** The table behind a many-to-many `through` relation. */
@@ -555,7 +564,7 @@ export interface JunctionTablePlan {
     schema: string;
     /** Bare table name, no schema prefix. */
     table: string;
-    columns: { name: string; type: string }[];
+    columns: { name: string; type: string; legacyName?: string }[];
     /** Both endpoint columns plus the composite primary key. */
     createTable: string;
     foreignKeys: ForeignKeyPlan[];
@@ -631,10 +640,16 @@ export const planRelationalColumns = (collections: CollectionConfig[]): Relation
                 if (!targetCollection) continue;
 
                 const required = prop.validation?.required;
+                // Only a *derived* column name can be affected by the change to
+                // `generateForeignKeyName`; one the author wrote is theirs.
+                const relationName = refProp.relation?.relationName ?? propName;
+                const legacyKey = legacyForeignKeyName(relationName);
+                const derived = relInfo.localKey === generateForeignKeyName(relationName);
                 plans.push({
                     schema,
                     table,
                     column: relInfo.localKey,
+                    legacyColumn: derived && legacyKey !== relInfo.localKey ? legacyKey : undefined,
                     type: getSqlColumnType(propName, prop, collection, collections),
                     foreignKey: foreignKeyPlan({
                         schema,
@@ -693,9 +708,20 @@ export const planJunctionTables = (collections: CollectionConfig[]): JunctionTab
 
     for (const spec of resolveJunctionSpecs(collections).values()) {
         const [source, target] = spec.endpoints;
+        // A junction column's default name is derived from the endpoint
+        // collection's slug — which is normally plural, so this is where the
+        // singularization change actually lands: a `categories` endpoint used
+        // to give `categorie_id` and now gives `category_id`. Recorded, not
+        // used, so boot-ensure can recognise a table built under the old rule.
+        const legacyFor = (endpoint: typeof source): string | undefined => {
+            const slug = toSnakeCase(endpoint.collection.slug ?? endpoint.collection.name ?? "");
+            const legacy = legacyForeignKeyName(slug);
+            const derived = endpoint.junctionColumn === generateForeignKeyName(slug);
+            return derived && legacy !== endpoint.junctionColumn ? legacy : undefined;
+        };
         const columns = [
-            { name: source.junctionColumn, type: junctionKeyType(source.collection) },
-            { name: target.junctionColumn, type: junctionKeyType(target.collection) }
+            { name: source.junctionColumn, type: junctionKeyType(source.collection), legacyName: legacyFor(source) },
+            { name: target.junctionColumn, type: junctionKeyType(target.collection), legacyName: legacyFor(target) }
         ];
         // Every declaring side agrees on the edge's lifetime; the first one wins,
         // as it does in the generator's walk.

@@ -42,3 +42,24 @@ function singularizeForKey(name: string): string {
     const result = singular(name);
     return result.length > 0 ? result : name;
 }
+
+/**
+ * What `generateForeignKeyName` returned before it learned to singularize:
+ * snake-case the name, then chop one trailing "s".
+ *
+ * This is here to be *detected*, never to be generated. A database provisioned
+ * under the old rule carries `categorie_id`, `addresse_id`, `children_id` or
+ * `ur_l_id` where the current rule expects `category_id`, `address_id`,
+ * `child_id` and `url_id` — and the boot-time schema ensure is additive, so it
+ * would create the new column empty beside the populated old one and leave the
+ * relation reading nothing. No error, no missing table: the failure is silent,
+ * which is the only reason this function still exists.
+ *
+ * `ensureCollectionSchema` calls it to recognise that shape and say so.
+ * Returns the same string as `generateForeignKeyName` for every regular plural,
+ * so a caller can compare the two and act only when they differ.
+ */
+export function legacyForeignKeyName(name: string): string {
+    const snake = toSnakeCase(name);
+    return `${snake.endsWith("s") ? snake.slice(0, -1) : snake}_id`;
+}

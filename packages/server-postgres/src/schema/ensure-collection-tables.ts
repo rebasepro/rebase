@@ -27,6 +27,7 @@
  */
 import { type CollectionConfig, type Property, isPostgresCollectionConfig } from "@rebasepro/types";
 import { getTableName } from "@rebasepro/common";
+import { logger } from "@rebasepro/server";
 import {
     getSqlColumnType,
     resolveColumnName,
@@ -86,6 +87,27 @@ export interface EnsurePlan {
     actions: EnsureAction[];
     /** Every statement, in dependency order. Empty when the schema is current. */
     statements: string[];
+    /**
+     * Relation columns this plan is about to create where the table already
+     * carries the same column under its pre-singularization name.
+     *
+     * The reason this is reported rather than silently handled: the ensure is
+     * additive, so it would add `category_id` beside a populated
+     * `categorie_id` and the relation would then read the new, empty one. No
+     * statement fails, no table is missing, and the only symptom is relations
+     * resolving to nothing — which is indistinguishable from having no data.
+     */
+    legacyForeignKeys: LegacyForeignKey[];
+}
+
+/** A relation column whose old and new spellings both plausibly apply. */
+export interface LegacyForeignKey {
+    /** `schema.table`. */
+    table: string;
+    /** The name the current rule derives, and what this plan would create. */
+    expected: string;
+    /** The name the old rule derived, which the table already has. */
+    legacy: string;
 }
 
 export interface EnsureOutcome extends EnsurePlan {
@@ -213,6 +235,8 @@ export function planCollectionSchemaEnsure(
         actions.push({ kind: "create-table", target: key, sql: junction.createTable });
     }
 
+    const legacyForeignKeys: LegacyForeignKey[] = [];
+
     // 3. Missing columns, on both brand-new and pre-existing tables.
     const addColumn = (
         key: string,
@@ -256,15 +280,42 @@ export function planCollectionSchemaEnsure(
     for (const junction of junctions) {
         const key = `${junction.schema}.${junction.table}`;
         if (created.has(key)) continue;
+        const present = existing.tables.get(key);
         for (const column of junction.columns) {
+            if (
+                column.legacyName &&
+                present &&
+                !present.has(column.name) &&
+                present.has(column.legacyName)
+            ) {
+                legacyForeignKeys.push({ table: key, expected: column.name, legacy: column.legacyName });
+            }
             addColumn(key, junction.schema, junction.table, column.name, column.type);
         }
     }
 
     // 3c. The columns relation and reference properties own.
     for (const relational of planRelationalColumns(collections)) {
+        const relKey = `${relational.schema}.${relational.table}`;
+        // Flag before adding: the signal is precisely "we are about to create
+        // this column, and the old spelling of it is already here with data".
+        // If the expected column exists there is nothing to warn about, and if
+        // the legacy one does not, this database never used the old rule.
+        const columns = existing.tables.get(relKey);
+        if (
+            relational.legacyColumn &&
+            columns &&
+            !columns.has(relational.column) &&
+            columns.has(relational.legacyColumn)
+        ) {
+            legacyForeignKeys.push({
+                table: relKey,
+                expected: relational.column,
+                legacy: relational.legacyColumn
+            });
+        }
         addColumn(
-            `${relational.schema}.${relational.table}`,
+            relKey,
             relational.schema,
             relational.table,
             relational.column,
@@ -293,7 +344,7 @@ export function planCollectionSchemaEnsure(
         });
     }
 
-    return { actions, statements: actions.map(a => a.sql) };
+    return { actions, statements: actions.map(a => a.sql), legacyForeignKeys };
 }
 
 /** Read what the database has, for the schemas the collections live in. */
@@ -381,6 +432,22 @@ export async function ensureCollectionTables(
     const existing = await readExistingSchema(client, schemas);
     const plan = planCollectionSchemaEnsure(collections, existing);
     const failures: { target: string; error: string }[] = [];
+
+    // Said before anything is applied, and through both sinks, because this is
+    // the one thing here that goes wrong without producing an error. Every
+    // statement below will succeed; the relation will simply read a column that
+    // was created empty a moment ago, next to the one holding the data.
+    for (const legacy of plan.legacyForeignKeys) {
+        const message =
+            `Relation column "${legacy.table}"."${legacy.expected}" is about to be created, but ` +
+            `this table already has "${legacy.legacy}" — the name Rebase derived for the same ` +
+            "relation before it singularized properly. Adding a column does not move the data in " +
+            `it: unless you rename "${legacy.legacy}" to "${legacy.expected}", or pin the old name ` +
+            `with \`localKey: "${legacy.legacy}"\` on the relation, this relation will resolve to an ` +
+            "empty column and read as though it has no data.";
+        logger.warn(`⚠️  [schema] ${message}`);
+        log?.(message);
+    }
 
     if (plan.actions.length === 0) {
         log?.("Schema is up to date; nothing to create.");
