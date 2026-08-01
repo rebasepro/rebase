@@ -9,6 +9,20 @@ import { MongoClient, Db, ObjectId } from "mongodb";
 import { MongoDriver } from "../src/services/MongoDriver";
 import { CollectionConfig } from "@rebasepro/types";
 
+/**
+ * The driver returns flat rows typed `Record<string, unknown>` — the primary
+ * key is a column like any other, so `row.id` is `unknown` and cannot be fed
+ * straight back into an `id: string | number` parameter. Narrow it once,
+ * loudly, rather than casting at every call site.
+ */
+function rowId(row: Record<string, unknown>): string | number {
+    const id = row.id;
+    if (typeof id !== "string" && typeof id !== "number") {
+        throw new Error(`expected the row to carry a string or number id, got ${JSON.stringify(id)}`);
+    }
+    return id;
+}
+
 describe("MongoDriver", () => {
     let mongoServer: MongoMemoryServer;
     let client: MongoClient;
@@ -16,11 +30,16 @@ describe("MongoDriver", () => {
     let delegate: MongoDriver;
 
     const mockCollection: CollectionConfig = {
+        slug: "users",
         name: "users",
+        engine: "mongodb",
         properties: {
-            name: { type: "string" },
-            email: { type: "string" },
-            age: { type: "number" }
+            name: { name: "Name",
+type: "string" },
+            email: { name: "Email",
+type: "string" },
+            age: { name: "Age",
+type: "number" }
         }
     };
 
@@ -167,7 +186,7 @@ email: "new@example.com" },
             // Verify it was saved
             const fetched = await delegate.fetchOne({
                 path: "users",
-                id: entity.id,
+                id: rowId(entity),
                 collection: mockCollection
             });
             expect(fetched?.name).toBe("New User");
@@ -186,7 +205,7 @@ email: "test@example.com" },
             // Update
             const updated = await delegate.save({
                 path: "users",
-                id: created.id,
+                id: rowId(created),
                 values: { name: "Updated",
 email: "test@example.com" },
                 collection: mockCollection,
@@ -210,14 +229,14 @@ email: "test@example.com" },
 
             // Delete — rows are flat, so the caller provides the collection path
             await delegate.delete({
-                row: { id: entity.id as string, path: "users" },
+                row: { id: rowId(entity), path: "users" },
                 collection: mockCollection
             });
 
             // Verify deleted
             const fetched = await delegate.fetchOne({
                 path: "users",
-                id: entity.id,
+                id: rowId(entity),
                 collection: mockCollection
             });
             expect(fetched).toBeUndefined();
@@ -363,9 +382,12 @@ email: "test@example.com" },
             const afterDeleteSpy = jest.fn();
 
             const collectionWithHooks: CollectionConfig = {
+                slug: "hooked_users",
                 name: "hooked_users",
+                engine: "mongodb",
                 properties: {
-                    name: { type: "string" }
+                    name: { name: "Name",
+type: "string" }
                 },
                 callbacks: {
                     afterRead: afterReadSpy,
@@ -374,7 +396,7 @@ email: "test@example.com" },
                     beforeDelete: beforeDeleteSpy,
                     afterDelete: afterDeleteSpy
                 }
-            } as any;
+            };
 
             // 1. Test save
             const saved = await delegate.save({
@@ -399,7 +421,7 @@ email: "test@example.com" },
             // 2. Test fetchOne
             const fetched = await delegate.fetchOne({
                 path: "hooked_users",
-                id: saved.id,
+                id: rowId(saved),
                 collection: collectionWithHooks
             });
 

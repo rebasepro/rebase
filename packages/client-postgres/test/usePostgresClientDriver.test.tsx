@@ -1,5 +1,6 @@
 import React from "react";
 import { renderHook } from "@testing-library/react";
+import { isBranchAdmin } from "@rebasepro/types";
 import { usePostgresClientDriver } from "../src/usePostgresClientDriver";
 
 describe("usePostgresClientDriver hook", () => {
@@ -62,42 +63,53 @@ id: "1" });
         expect(item).toEqual({ id: "1",
 name: "Entity 1" });
 
-        // save
+        // save — `status` is a required part of `SaveProps`, so a caller always has one
         const saved = await driver.save({ path: "posts",
-values: { name: "Test" } });
+values: { name: "Test" },
+status: "new" });
         expect(mockWsClient.save).toHaveBeenCalledWith({
             path: "posts",
             values: { name: "Test" },
             id: undefined,
             previousValues: undefined,
-            status: undefined
+            status: "new"
         });
         expect(saved).toEqual({ id: "1",
 name: "Saved Entity" });
 
-        // delete
+        // delete — a `DeleteProps` row addresses the entity with `id`/`path` and
+        // carries its column data under `values`
         await driver.delete({ row: { id: "1",
 path: "test",
-name: "Test" } });
+values: { name: "Test" } } });
         expect(mockWsClient.delete).toHaveBeenCalledWith({ row: { id: "1",
 path: "test",
-name: "Test" } });
+values: { name: "Test" } } });
     });
 
     it("correctly routes admin database branching operations", async () => {
         const { result } = renderHook(() => usePostgresClientDriver({ wsClient: mockWsClient }));
         const driver = result.current;
 
+        // `DataDriver.admin` is optional and every capability on `DatabaseAdmin`
+        // is partial, so consumers narrow with the exported guards before
+        // calling. Doing the same here also asserts the driver really does
+        // advertise the branching capability.
+        const admin = driver.admin;
+        if (!isBranchAdmin(admin)) {
+            throw new Error("the postgres driver should expose branch admin capabilities");
+        }
+
         // createBranch
-        await driver.admin.createBranch("branch_test");
+        await admin.createBranch("branch_test");
         expect(mockWsClient.createBranch).toHaveBeenCalledWith("branch_test", undefined);
 
         // deleteBranch
-        await driver.admin.deleteBranch("branch_test");
+        await admin.deleteBranch("branch_test");
         expect(mockWsClient.deleteBranch).toHaveBeenCalledWith("branch_test");
 
         // listBranches
-        await driver.admin.listBranches();
+        await admin.listBranches();
         expect(mockWsClient.listBranches).toHaveBeenCalled();
     });
 });

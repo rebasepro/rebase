@@ -4,7 +4,7 @@
  * Translates Rebase filter conditions to MongoDB query operators.
  */
 
-import { FilterValues, WhereFilterOp } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, WhereFilterOp } from "@rebasepro/types";
 import { Filter, Document } from "mongodb";
 import { logger } from "@rebasepro/server";
 
@@ -115,12 +115,16 @@ export class MongoConditionBuilder {
      * Build search conditions for text search
      *
      * @param searchString - Text to search for
-     * @param properties - Properties to search in
+     * @param properties - The collection's properties, searched for string fields
      * @returns Array of MongoDB filter objects for text search
      */
     static buildSearchConditions(
         searchString: string,
-        properties: Record<string, any>
+        // Typed as the real property map, not `Record<string, any>`. The loose
+        // type is what let the `dataType` bug below survive: a caller — and,
+        // more to the point, a test fixture — could invent any key it liked and
+        // nothing checked it against a property a user can actually declare.
+        properties: CollectionConfig["properties"]
     ): Filter<Document>[] {
         if (!searchString) return [];
 
@@ -188,7 +192,7 @@ export class MongoConditionBuilder {
     static buildQuery<M extends Record<string, any>>(options: {
         filter?: FilterValues<Extract<keyof M, string>>;
         searchString?: string;
-        properties?: Record<string, any>;
+        properties?: CollectionConfig["properties"];
     }): Filter<Document> {
         const conditions: Filter<Document>[] = [];
 

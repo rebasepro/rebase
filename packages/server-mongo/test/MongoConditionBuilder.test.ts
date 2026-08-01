@@ -5,7 +5,7 @@
  */
 
 import { MongoConditionBuilder } from "../src/db/MongoConditionBuilder";
-import { FilterValues } from "@rebasepro/types";
+import { CollectionConfig, FilterValues } from "@rebasepro/types";
 
 describe("MongoConditionBuilder", () => {
     describe("buildFilterConditions", () => {
@@ -108,7 +108,7 @@ describe("MongoConditionBuilder", () => {
         it("should skip null filter params", () => {
             const filter: FilterValues<string> = {
                 status: ["==", "active"],
-                empty: undefined as unknown as [string, unknown]
+                empty: undefined
             };
             const result = MongoConditionBuilder.buildFilterConditions(filter);
             expect(result).toHaveLength(1);
@@ -250,7 +250,8 @@ describe("MongoConditionBuilder", () => {
             const result = MongoConditionBuilder.buildQuery({
                 filter: { status: ["==", "active"] },
                 searchString: "test",
-                properties: { name: { type: "string" } }
+                properties: { name: { name: "Name",
+type: "string" } }
             });
             expect(result).toHaveProperty("$and");
         });
@@ -271,10 +272,13 @@ describe("MongoConditionBuilder", () => {
      * These assert on the shape a collection actually has.
      */
     describe("search picks its fields off the property shape collections really use", () => {
-        const props = {
-            name: { type: "string" },
-            bio: { type: "string" },
-            age: { type: "number" }
+        const props: CollectionConfig["properties"] = {
+            name: { name: "Name",
+type: "string" },
+            bio: { name: "Bio",
+type: "string" },
+            age: { name: "Age",
+type: "number" }
         };
 
         it("builds a regex condition per string property", () => {
@@ -291,7 +295,8 @@ describe("MongoConditionBuilder", () => {
         });
 
         it("matches case-insensitively on the search string", () => {
-            const [first] = MongoConditionBuilder.buildSearchConditions("ada", { name: { type: "string" } });
+            const [first] = MongoConditionBuilder.buildSearchConditions("ada", { name: { name: "Name",
+type: "string" } });
 
             const regex = (first as Record<string, { $regex: RegExp }>).name.$regex;
             expect(regex.test("Ada Lovelace")).toBe(true);
@@ -299,7 +304,8 @@ describe("MongoConditionBuilder", () => {
         });
 
         it("escapes regex metacharacters so a search term stays a literal", () => {
-            const [first] = MongoConditionBuilder.buildSearchConditions("a.b", { name: { type: "string" } });
+            const [first] = MongoConditionBuilder.buildSearchConditions("a.b", { name: { name: "Name",
+type: "string" } });
 
             const regex = (first as Record<string, { $regex: RegExp }>).name.$regex;
             expect(regex.test("a.b")).toBe(true);
@@ -309,7 +315,8 @@ describe("MongoConditionBuilder", () => {
         it("falls back to $text only when the collection really has no string field", () => {
             // The fallback is correct in itself — it was simply the only path
             // ever taken, on collections that had string fields all along.
-            const conditions = MongoConditionBuilder.buildSearchConditions("ada", { age: { type: "number" } });
+            const conditions = MongoConditionBuilder.buildSearchConditions("ada", { age: { name: "Age",
+type: "number" } });
 
             expect(conditions).toEqual([{ $text: { $search: "ada" } }]);
         });
