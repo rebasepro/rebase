@@ -149,6 +149,20 @@ export default [
                 avoidEscape: true
             }],
 
+            // `rules-of-hooks` is an error and source is clean of it: a hook
+            // called conditionally or in a callback is wrong with no judgement
+            // call to make, so there is nothing to weigh.
+            //
+            // `exhaustive-deps` stays a warning because it is the opposite —
+            // adding the missing dependency is as often the bug as the fix
+            // (`VirtualTableInput` re-runs on every keystroke and breaks its own
+            // debounce if you "fix" it), so an error would be a rule that has to
+            // be disabled to ship, and a rule everyone disables teaches nothing.
+            //
+            // What makes it useful anyway is `pnpm check:hooks`, which pins the
+            // current 183 in `scripts/hooks-baseline.json` and fails on the
+            // 184th. The count was never the problem; a list too long to read
+            // hiding a genuinely new stale closure was.
             "react-hooks/rules-of-hooks": "error",
             "react-hooks/exhaustive-deps": "warn",
             "@typescript-eslint/no-unused-vars": ["warn", {
