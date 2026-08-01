@@ -39,6 +39,8 @@ export interface ColumnLoadingState {
         hasMore: boolean;
         itemCount: number;
         totalCount?: number;
+        /** Set when the column could not be read at all. */
+        error?: Error;
     };
 }
 
@@ -54,6 +56,14 @@ export interface BoardProps<T, COLUMN extends string> {
     assignColumn: (item: BoardItem<T>) => COLUMN;
     allowColumnReorder?: boolean;
     onColumnReorder?: (columns: COLUMN[]) => void;
+    /**
+     * A card was dropped.
+     *
+     * `items` is the target column's contents in their new order — the moved
+     * card included — so the neighbours of the moved card are the cards it
+     * actually landed between. `sourceColumn` is where the card was picked up,
+     * which is not where it now sits whenever the two differ.
+     */
     onItemsReorder?: (
         items: BoardItem<T>[],
         moveInfo?: {

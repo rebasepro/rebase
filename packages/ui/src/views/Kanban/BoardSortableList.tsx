@@ -14,6 +14,7 @@ interface BoardSortableListProps<T> {
     isDragOverColumn: boolean;
     loading?: boolean;
     hasMore?: boolean;
+    error?: Error;
     onLoadMore?: () => void;
 }
 
@@ -25,6 +26,7 @@ export function BoardSortableList<T>({
     isDragOverColumn,
     loading = false,
     hasMore = false,
+    error,
     onLoadMore
 }: BoardSortableListProps<T>) {
     const {
@@ -76,7 +78,10 @@ export function BoardSortableList<T>({
     }, [hasMore, onLoadMore]);
 
     const containerClassName = useMemo(() => cls(
-        "flex flex-col p-2 transition-opacity duration-100 transition-bg ease-linear w-full overflow-y-auto no-scrollbar flex-1 rounded-md",
+        // The scrollbar stays: this is the only thing on the page that scrolls
+        // vertically, and hiding it left a column of cards with no sign that
+        // there were more below the fold.
+        "flex flex-col p-2 transition-opacity duration-100 transition-bg ease-linear w-full overflow-y-auto flex-1 min-h-0 rounded-md",
         isDragging && isDragOverColumn
             ? "bg-surface-accent-200 dark:bg-surface-900"
             : isDragging
@@ -95,9 +100,16 @@ export function BoardSortableList<T>({
                 strategy={verticalListSortingStrategy}
             >
                 {items.length === 0 && !loading ? (
-                    <div className="flex-1 flex items-center justify-center">
-                        <span className="text-xs text-surface-400 dark:text-surface-500">
-                            No items
+                    <div className="flex-1 flex items-center justify-center px-3 text-center">
+                        {/* "No items" over a header counting eleven of them is
+                            the wrong thing to say when the read failed. */}
+                        <span className={cls(
+                            "text-xs",
+                            error
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-surface-400 dark:text-surface-500"
+                        )}>
+                            {error ? "Could not load this column" : "No items"}
                         </span>
                     </div>
                 ) : (

@@ -1166,8 +1166,14 @@ parentEntityIds,
                 ) : (
                     <div className="flex flex-col w-full h-full">
                         {toolbarNode}
+                        {/* `min-h-0` is what lets the board scroll its columns.
+                            A flex item defaults to `min-height: auto`, so this
+                            one grew to the board's full content height — 1230px
+                            in a 883px area — and the ancestor's `overflow-hidden`
+                            simply cut the rest off, with each column's own
+                            scroller never reaching its limit. */}
                         <div className={cls(
-                            "flex-1 flex flex-col",
+                            "flex-1 min-h-0 flex flex-col",
                             (viewMode === "list" || viewMode === "cards") && "overflow-y-auto"
                         )}>
                             {collectionSurface}

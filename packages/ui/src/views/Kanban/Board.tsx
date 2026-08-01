@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+    closestCorners,
     DndContext,
     DragEndEvent,
     DragOverEvent,
@@ -12,7 +13,7 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, SortableContext } from "@dnd-kit/sortable";
 import { BoardColumn } from "./BoardColumn";
-import { BoardItem, BoardItemMap, BoardItemViewProps, BoardProps } from "./board_types";
+import { BoardItem, BoardItemMap, BoardProps } from "./board_types";
 import { cls } from "../../util";
 
 export function Board<T, COLUMN extends string>({
@@ -33,26 +34,21 @@ export function Board<T, COLUMN extends string>({
 }: BoardProps<T, COLUMN>) {
 
     const [activeItem, setActiveItem] = useState<BoardItem<T> | null>(null);
-    const [activeColumn, setActiveColumn] = useState<COLUMN | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
-    const grabOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-    const [overlayPos, setOverlayPos] = useState<{ x: number; y: number } | null>(null);
-
-    const handleMouseMove = useCallback((e: MouseEvent) => {
-        setOverlayPos({
-            x: e.clientX - grabOffsetRef.current.x,
-            y: e.clientY - grabOffsetRef.current.y
-        });
-    }, []);
-
-    useEffect(() => {
-        return () => {
-            window.removeEventListener("mousemove", handleMouseMove);
-            window.removeEventListener("pointermove", handleMouseMove);
-        };
-    }, [handleMouseMove]);
+    /**
+     * Which column the card was picked up from.
+     *
+     * `handleDragOver` moves the card between columns in `itemMapState` while
+     * the pointer is still down — that is what makes the gap open up under the
+     * cursor. So by the time the drop is handled, looking the card up by id
+     * finds it in its *destination*, and the board was reporting the move as
+     * source === target: a cross-column drop looked like a plain reorder and
+     * the column property was never written. The card snapped back on the next
+     * fetch.
+     */
+    const dragSourceColumnRef = useRef<COLUMN | null>(null);
 
     const [itemMapState, setItemMapState] = useState<BoardItemMap<T>>(() => {
         const dataColumnMap: Record<string, COLUMN> = data.reduce((prev, item: BoardItem<T>) => ({
@@ -146,31 +142,9 @@ export function Board<T, COLUMN extends string>({
         setDragOverColumnId(null);
         const { active } = event;
 
-        const activatorEvt = event.activatorEvent as PointerEvent | MouseEvent;
-        if (activatorEvt) {
-            const target = activatorEvt.target as HTMLElement;
-            const draggableEl = target.closest<HTMLElement>("[role='button']") ?? target;
-            const rect = draggableEl.getBoundingClientRect();
-            grabOffsetRef.current = {
-                x: activatorEvt.clientX - rect.left,
-                y: activatorEvt.clientY - rect.top
-            };
-            setOverlayPos({
-                x: rect.left,
-                y: rect.top
-            });
-        }
-        window.addEventListener("mousemove", handleMouseMove);
-        window.addEventListener("pointermove", handleMouseMove);
-
-        if (active.data.current?.type === "COLUMN") {
-            const columnId = active.id as string;
-            const column = columnsProp.find(col => String(col) === columnId);
-            if (column) {
-                setActiveColumn(column);
-            }
-        } else if (active.data.current?.type === "ITEM") {
+        if (active.data.current?.type === "ITEM") {
             const columnId = findColumnByItemId(active.id as string);
+            dragSourceColumnRef.current = (columnId as COLUMN | undefined) ?? null;
             if (columnId) {
                 const item = itemMapState[columnId]?.find(i => i.id === active.id);
                 setActiveItem(item || null);
@@ -208,7 +182,7 @@ export function Board<T, COLUMN extends string>({
         }
 
         const activeId = active.id as string;
-        const activeColumn = findColumnByItemId(activeId);
+        const activeItemColumn = findColumnByItemId(activeId);
         let overColumnForMove = findColumnByItemId(overId);
 
         if (!overColumnForMove && overDataType === "ITEM-LIST") {
@@ -218,15 +192,15 @@ export function Board<T, COLUMN extends string>({
             overColumnForMove = overId;
         }
 
-        if (!activeColumn || !overColumnForMove) return;
-        if (activeColumn === overColumnForMove) return;
+        if (!activeItemColumn || !overColumnForMove) return;
+        if (activeItemColumn === overColumnForMove) return;
 
         if (itemMapState[overColumnForMove]?.some(i => i.id === activeId)) {
             return;
         }
 
         setItemMapState(currentMap => {
-            const activeItems = [...(currentMap[activeColumn] || [])];
+            const activeItems = [...(currentMap[activeItemColumn] || [])];
             const overItems = [...(currentMap[overColumnForMove!] || [])];
             const activeIndex = activeItems.findIndex(i => i.id === activeId);
 
@@ -258,10 +232,20 @@ export function Board<T, COLUMN extends string>({
             const newItemMap = { ...currentMap };
             const [moved] = activeItems.splice(activeIndex, 1);
             overItems.splice(overIndex, 0, moved);
-            newItemMap[activeColumn] = activeItems;
+            newItemMap[activeItemColumn] = activeItems;
             newItemMap[overColumnForMove!] = overItems;
             return newItemMap;
         });
+    };
+
+    // Escape, or a drop outside the board. `handleDragOver` may already have
+    // moved the card between columns, so the next `data` effect has to be
+    // allowed to put it back.
+    const handleDragCancel = () => {
+        setIsDragging(false);
+        setActiveItem(null);
+        setDragOverColumnId(null);
+        dragSourceColumnRef.current = null;
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
@@ -270,14 +254,12 @@ export function Board<T, COLUMN extends string>({
             over
         } = event;
 
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("pointermove", handleMouseMove);
-        setOverlayPos(null);
+        const sourceColumn = dragSourceColumnRef.current;
 
         setIsDragging(false);
         setActiveItem(null);
-        setActiveColumn(null);
         setDragOverColumnId(null);
+        dragSourceColumnRef.current = null;
 
         if (!over) return;
 
@@ -296,76 +278,76 @@ export function Board<T, COLUMN extends string>({
             return;
         }
 
-        const activeCol = findColumnByItemId(activeId) as COLUMN | undefined;
-        let overCol = findColumnByItemId(overId) as COLUMN | undefined;
+        // Where the card sits right now — `handleDragOver` has already put it in
+        // the column being hovered, so this is the destination, not the origin.
+        const currentCol = findColumnByItemId(activeId) as COLUMN | undefined;
+        let targetCol = findColumnByItemId(overId) as COLUMN | undefined;
 
-        if (!overCol) {
+        if (!targetCol) {
             const overDataType = over.data.current?.type;
             if (overDataType === "ITEM-LIST" || columnsProp.includes(overId as COLUMN)) {
-                overCol = overId as COLUMN;
+                targetCol = overId as COLUMN;
             }
         }
+        targetCol = targetCol ?? currentCol;
 
-        if (!activeCol || !overCol) return;
+        if (!currentCol || !targetCol) return;
 
-        const isSameColumn = activeCol === overCol;
-        const activeItems = itemMapState[activeCol] || [];
-        const overItems = itemMapState[overCol] || [];
+        const targetItems = itemMapState[targetCol] || [];
+        const activeIndex = (itemMapState[currentCol] || []).findIndex(i => i.id === activeId);
+        if (activeIndex === -1) return;
 
-        const activeIndex = activeItems.findIndex(i => i.id === activeId);
+        // Which card the pointer was over. `-1` means it was over the column
+        // itself: an empty column, or the space under the last card. That used
+        // to abort the drop outright, so a card dragged to an empty column
+        // moved on screen and was never saved.
+        const overIndexInTarget = targetItems.findIndex(i => i.id === overId);
+        const indexInTarget = targetItems.findIndex(i => i.id === activeId);
+        const changedColumn = (sourceColumn ?? currentCol) !== targetCol;
 
-        let overIndex;
-        if (over.id === overCol) {
-            overIndex = overItems.length;
+        let finalTargetItems: BoardItem<T>[];
+        if (indexInTarget === -1) {
+            // Not placed by `handleDragOver` — drop straight into the slot.
+            const moved = (itemMapState[currentCol] || [])[activeIndex];
+            finalTargetItems = [...targetItems];
+            finalTargetItems.splice(overIndexInTarget === -1 ? targetItems.length : overIndexInTarget, 0, moved);
+        } else if (overIndexInTarget !== -1) {
+            finalTargetItems = arrayMove(targetItems, indexInTarget, overIndexInTarget);
+        } else if (changedColumn) {
+            // Over the column, not a card, and `handleDragOver` already opened
+            // the gap the card is sitting in. Appending here is what sent a
+            // card dropped into the middle of another column to the bottom of
+            // it — the position it was dropped at is the one on screen.
+            finalTargetItems = targetItems;
         } else {
-            overIndex = overItems.findIndex(i => i.id === overId);
+            // Same column, released below the last card.
+            finalTargetItems = arrayMove(targetItems, indexInTarget, targetItems.length - 1);
         }
 
-        if (activeIndex === -1 || overIndex === -1) return;
-
-        let finalItems: BoardItem<T>[] = [];
-
-        if (isSameColumn) {
-            finalItems = arrayMove(activeItems, activeIndex, overIndex);
-        } else {
-            const newActiveItems = [...activeItems];
-            const newOverItems = [...overItems];
-            const [moved] = newActiveItems.splice(activeIndex, 1);
-            newOverItems.splice(overIndex, 0, moved);
-            finalItems = [...newActiveItems, ...newOverItems];
-        }
-
-        const fullFlattenedList: BoardItem<T>[] = [];
-        columnsProp.forEach(col => {
-            if (col === activeCol) {
-                if (isSameColumn) {
-                    fullFlattenedList.push(...finalItems);
-                } else {
-                    fullFlattenedList.push(...activeItems.filter(i => i.id !== activeId));
-                }
-            } else if (col === overCol) {
-                const newOverItems = [...overItems];
-                const [moved] = [...activeItems].splice(activeIndex, 1);
-                newOverItems.splice(overIndex, 0, moved);
-                fullFlattenedList.push(...newOverItems);
-            } else {
-                fullFlattenedList.push(...(itemMapState[col] || []));
-            }
-        });
-
-        onItemsReorder?.(fullFlattenedList, {
+        onItemsReorder?.(finalTargetItems, {
             itemId: activeId,
-            sourceColumn: activeCol,
-            targetColumn: overCol
+            // The column the pointer went down in. `currentCol` would report a
+            // cross-column move as a same-column reorder.
+            sourceColumn: (sourceColumn ?? currentCol),
+            targetColumn: targetCol
         });
     };
 
     return (
         <DndContext
             sensors={sensors}
+            // `rectIntersection`, the default, only reports a target while the
+            // dragged rect physically overlaps it, and prefers whichever
+            // overlap is largest — on a board of tall columns that means a card
+            // held over a gap reports nothing, and one held near a column edge
+            // reports the neighbour. `closestCorners` is the sortable-list
+            // recommendation and is what makes the drop land where it looks
+            // like it will.
+            collisionDetection={closestCorners}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
         >
             <div className={cls("flex flex-row h-full w-full overflow-x-auto p-4 select-none items-start", className)}>
                 <SortableContext items={columnsProp}>
@@ -385,6 +367,7 @@ export function Board<T, COLUMN extends string>({
                                 allowReorder={allowColumnReorder}
                                 loading={loadingState?.loading}
                                 hasMore={loadingState?.hasMore}
+                                error={loadingState?.error}
                                 totalCount={loadingState?.totalCount}
                                 color={columnColors?.[col]}
                                 onLoadMore={onLoadMoreColumn ? () => onLoadMoreColumn(col) : undefined}
@@ -396,22 +379,21 @@ export function Board<T, COLUMN extends string>({
                 {AddColumnComponent}
             </div>
 
+            {/* The overlay used to be positioned by hand, from `mousemove`
+                listeners on `window` and a grab offset measured off whatever
+                `[role='button']` the pointer went down on. dnd-kit already
+                tracks the pointer and already knows the grab offset — the
+                hand-rolled copy drifted from the position collision detection
+                was actually using, so the card you saw and the slot you got
+                were two different things. */}
             {typeof document !== "undefined" && createPortal(
-                <DragOverlay dropAnimation={null}>
-                    {isDragging && activeItem && (
-                        <div style={{
-                            position: "fixed",
-                            left: overlayPos?.x ?? 0,
-                            top: overlayPos?.y ?? 0,
-                            pointerEvents: "none",
-                            zIndex: 9999
-                        }}>
-                            <ItemComponent
-                                item={activeItem}
-                                isDragging={true}
-                                isClone={true}
-                            />
-                        </div>
+                <DragOverlay dropAnimation={null} zIndex={9999}>
+                    {activeItem && (
+                        <ItemComponent
+                            item={activeItem}
+                            isDragging={true}
+                            isClone={true}
+                        />
                     )}
                 </DragOverlay>,
                 document.body

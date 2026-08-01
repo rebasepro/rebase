@@ -21,6 +21,7 @@ export interface BoardColumnProps<T> {
     allowReorder?: boolean;
     loading?: boolean;
     hasMore?: boolean;
+    error?: Error;
     onLoadMore?: () => void;
     onAddItem?: () => void;
     totalCount?: number;
@@ -38,6 +39,7 @@ export const BoardColumn = memo(function BoardColumn<T>({
     allowReorder = false,
     loading = false,
     hasMore = false,
+    error,
     onLoadMore,
     onAddItem,
     totalCount,
@@ -127,6 +129,7 @@ export const BoardColumn = memo(function BoardColumn<T>({
                     isDragOverColumn={isDragOverColumn}
                     loading={loading}
                     hasMore={hasMore}
+                    error={error}
                     onLoadMore={onLoadMore}
                 />
             </SortableContext>
