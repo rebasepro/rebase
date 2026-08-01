@@ -189,7 +189,13 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             const countParams: FindParams<M> = {
                 ...params,
                 limit: undefined,
-                offset: undefined
+                offset: undefined,
+                // A count reads no relation data, so `include` can only add
+                // joins — and a join that does not match drops rows, which
+                // would make the total disagree with the `find()` it describes.
+                // Same reasoning as limit/offset: parameters that cannot affect
+                // the answer are not forwarded.
+                include: undefined
             };
             const qs = buildQueryString(countParams);
             const raw = await transport.request<{ count: number }>(basePath + "/count" + qs, { method: "GET" });

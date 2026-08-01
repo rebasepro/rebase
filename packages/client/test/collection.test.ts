@@ -343,8 +343,14 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
             } as unknown as RebaseWebSocketClient;
 
             const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
-            // count returns 2 (matching heuristic) — still only fires once
-            client.count = jest.fn().mockResolvedValue(2);
+            // Hold the count open so the *waiting* is observable. With a count
+            // that resolves immediately this body is indistinguishable from
+            // "listen fires once even when count matches heuristic" below, and
+            // neither would notice a client that emitted heuristic meta first
+            // and corrected it afterwards — the flicker this behaviour exists
+            // to prevent.
+            let resolveCount!: (n: number) => void;
+            client.count = jest.fn().mockReturnValue(new Promise<number>(r => { resolveCount = r; }));
             const onUpdate = jest.fn();
             client.listen!(undefined, onUpdate);
 
@@ -358,18 +364,21 @@ values: { title: "B" } }
             ];
             capturedCallback!(entities);
 
-            // Wait for count promise to resolve
+            // Rows in hand, total still outstanding: nothing may be emitted.
+            await new Promise(resolve => setTimeout(resolve, 0));
+            expect(onUpdate).not.toHaveBeenCalled();
+
+            resolveCount(37);
             await new Promise(resolve => setTimeout(resolve, 0));
 
-            // Single emission — no estimated flag
             expect(onUpdate).toHaveBeenCalledTimes(1);
             expect(onUpdate).toHaveBeenCalledWith({
                 data: entities,
                 meta: {
-                    total: 2,
+                    total: 37,
                     limit: 20,
                     offset: 0,
-                    hasMore: false
+                    hasMore: true
                 }
             });
         });

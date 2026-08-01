@@ -416,6 +416,10 @@ details: { field: "email" } } })
 
             try {
                 await transport.request("/fail");
+                // Without this, a request that resolved would skip the catch
+                // block entirely and the test would pass having asserted
+                // nothing (see the sibling case below for the same guard).
+                throw new Error("expected request to reject");
             } catch (e) {
                 expect(e).toBeInstanceOf(RebaseApiError);
                 const err = e as RebaseApiError;

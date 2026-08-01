@@ -97,22 +97,35 @@ describe("createAuth", () => {
             expect(transport.setToken).toHaveBeenCalledWith("fake-jwt");
         });
 
-        it("attempts refresh when stored session is expired", () => {
+        it("attempts refresh when stored session is expired", async () => {
             const storage = createMemoryStorage();
             const expiredSession = mockSessionObj(Date.now() - 1000);
             storage.setItem("rebase_auth", JSON.stringify(expiredSession));
 
+            const newExpiry = Date.now() + 3600000;
             // Mock the refresh fetch call
             mockFetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
-                    tokens: mockTokens(Date.now() + 3600000)
+                    tokens: { ...mockTokens(newExpiry),
+accessToken: "refreshed-jwt" }
                 })
             });
 
             const auth = createAuth(transport, { storage });
-            // Session should exist (refresh is attempted in background)
-            expect(auth.getSession()).toBeDefined();
+            await auth.isInitialized();
+
+            // Boot restores the expired session optimistically and fires
+            // /refresh underneath it. `getSession()` is nullable, so asserting
+            // it "toBeDefined" would also pass on the null the failure path
+            // leaves behind — i.e. with no refresh attempted at all. Assert the
+            // network call the test is named for.
+            expect(mockFetch).toHaveBeenCalledWith(
+                "http://localhost/api/v1/auth/refresh",
+                expect.objectContaining({ method: "POST" })
+            );
+            expect(auth.getSession()?.accessToken).toBe("refreshed-jwt");
+            expect(auth.getSession()?.expiresAt).toBe(newExpiry);
         });
 
         it("skips session restore when persistSession is false", () => {
@@ -148,7 +161,11 @@ expiresAt: Date.now() + 100000 }));
 
             const auth = createAuth(transport, { storage });
             await expect(auth.isInitialized()).resolves.toBeUndefined();
-            expect(auth.getSession()).toBeDefined();
+            // `toBeDefined()` on a `RebaseSession | null` getter is satisfied by
+            // null, so it would not notice a restore that silently dropped the
+            // session — pin the token that was actually restored.
+            expect(auth.getSession()?.accessToken).toBe("fake-jwt");
+            expect(auth.getSession()?.expiresAt).toBe(session.expiresAt);
         });
 
         it("resolves isInitialized after failed restore", async () => {
@@ -1020,14 +1037,26 @@ autoRefresh: true });
             mockFetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
-                    tokens: mockTokens(Date.now() + 3600000)
+                    tokens: { ...mockTokens(Date.now() + 3600000),
+accessToken: "refreshed-jwt" }
                 })
             });
 
-            // Advance time to trigger the refresh
-            jest.advanceTimersByTime(300000);
-            // Allow promises to settle
-            await Promise.resolve();
+            // The refresh is armed for REFRESH_BUFFER_MS (2 min) *before*
+            // expiry, not at expiry — a timer that only fires once the token is
+            // already dead is the bug this pins. One tick short of the buffer
+            // boundary nothing may have gone out yet.
+            expect(jest.getTimerCount()).toBe(1);
+            await jest.advanceTimersByTimeAsync(300000 - 120000 - 1);
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+
+            await jest.advanceTimersByTimeAsync(1);
+            expect(mockFetch).toHaveBeenCalledTimes(2);
+            expect(mockFetch).toHaveBeenLastCalledWith(
+                "http://localhost/api/v1/auth/refresh",
+                expect.objectContaining({ method: "POST" })
+            );
+            expect(auth.getSession()?.accessToken).toBe("refreshed-jwt");
         });
 
         it("disables auto-refresh when autoRefresh option is false", async () => {

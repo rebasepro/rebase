@@ -213,17 +213,51 @@ describe("realtime opt-out", () => {
         expect(opened).toHaveLength(0);
     });
 
-    it("signing in does not by itself open a socket", () => {
+    it("signing in does not by itself open a socket", async () => {
         // Authenticating is not a request for realtime. If it dialled, every
         // app with a login would lose lazy connect at the moment of login.
+        // Merely registering a listener does not show that: the SIGNED_IN
+        // branch that could dial is only reached by an actual sign-in.
         const { FakeWebSocket, opened } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
-        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
-        // Drive the auth-state path the way a sign-in would.
-        client.auth.onAuthStateChange(() => { /* noop */ });
+        const loginBody = {
+            tokens: {
+                accessToken: "jwt",
+                refreshToken: "refresh",
+                accessTokenExpiresAt: Date.now() + 3600_000
+            },
+            user: { uid: "usr_1",
+email: "u@example.com",
+displayName: "U",
+photoURL: null,
+roles: ["user"],
+providerId: "local",
+isAnonymous: false }
+        };
+        const fetchMock = jest.fn(async () => ({
+            ok: true,
+            status: 200,
+            text: async () => JSON.stringify(loginBody),
+            json: async () => loginBody,
+            headers: new Headers()
+        })) as unknown as typeof globalThis.fetch;
 
+        const client = createRebaseClient({
+            baseUrl: "http://localhost:3000/api",
+            fetch: fetchMock
+        });
+
+        const events: string[] = [];
+        client.auth.onAuthStateChange((event) => { events.push(event); });
+
+        const result = await client.auth.signInWithEmail("u@example.com", "pw");
+
+        expect(result.user.uid).toBe("usr_1");
+        expect(events).toEqual(["SIGNED_IN"]);
         expect(opened).toHaveLength(0);
+
+        client.close();
     });
 
     it("leaves listen() absent so callers can feature-detect, and says why via the query builder", () => {
