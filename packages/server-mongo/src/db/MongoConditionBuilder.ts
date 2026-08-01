@@ -130,8 +130,17 @@ export class MongoConditionBuilder {
         const searchRegex = new RegExp(escapedSearch, "i");
 
         for (const [key, prop] of Object.entries(properties)) {
-            // Only search in string-type properties
-            if (prop?.dataType === "string" || typeof prop === "string") {
+            // `type`, not `dataType`. No property in `@rebasepro/types` has ever
+            // had a `dataType` field — a real collection carries `type:
+            // "string"` — so this matched nothing for every collection a user
+            // could actually declare. With no field matching, the fallback
+            // below took over and every search became a `$text` query, which
+            // needs a text index and throws `IndexNotFound` without one.
+            //
+            // The suite passed because its fixtures were written with the same
+            // wrong key, so the test data agreed with the bug and the two
+            // never met a real collection between them.
+            if (prop?.type === "string" || typeof prop === "string") {
                 orConditions.push({
                     [key]: { $regex: searchRegex }
                 });

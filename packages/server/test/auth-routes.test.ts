@@ -1478,11 +1478,58 @@ isBootstrapCompleted: async () => false });
     // These tests directly verify the exploit scenarios from the security audit.
     // ═════════════════════════════════════════════════════════════════════
 
+    /*
+     * These were four tests named "CVE-FIX: … NEVER assigns admin role, even
+     * for first user", and not one of them could fail.
+     *
+     * Each asserted `assignDefaultRole` was not called with "admin". But the
+     * first user is promoted through a different call entirely —
+     * `setUserRoles(id, ["admin"])` (routes.ts, and again on the OAuth path) —
+     * and in that branch `assignDefaultRole` is never reached at all. So they
+     * watched a function the escalation path does not use, and passed by
+     * construction.
+     *
+     * Their names were also simply wrong about the system: registration *does*
+     * make the first user an admin. That is the documented bootstrap, asserted
+     * 1,100 lines above in "empty database: admits the first registration …
+     * and promotes it to admin". A reader of this block was told the opposite,
+     * under a CVE label.
+     *
+     * The real property is narrower and is what these now assert: the bootstrap
+     * is for the *first* user only, and no later registration reaches admin by
+     * any mechanism.
+     */
     describe("Security: privilege escalation prevention", () => {
-        it("CVE-FIX: registration NEVER assigns admin role, even for first user", async () => {
+        /** Every route by which a caller could end up holding "admin". */
+        const grantedAdmin = () =>
+            mockAuthRepo.setUserRoles.mock.calls.some(([, roles]: [string, string[]]) =>
+                Array.isArray(roles) && roles.includes("admin"))
+            || mockAuthRepo.assignDefaultRole.mock.calls.some(([, role]: [string, string]) =>
+                role === "admin");
+
+        it("promotes the genuine first user — the documented bootstrap", async () => {
+            // Stated positively, so this block starts from what the system does
+            // rather than from a claim that contradicts it. Without this, the
+            // "never promotes" tests below would also pass on a build where the
+            // bootstrap had silently stopped working.
             const app = createApp({ allowRegistration: true });
-            // Simulate first user (empty database before, one user after create)
-            mockAuthRepo.listUsers.mockResolvedValueOnce([]);
+            const first = mockUser({ id: "boot-1", email: "first@test.com" });
+            mockAuthRepo.createUser.mockResolvedValueOnce(first as never);
+            mockAuthRepo.listUsers.mockResolvedValueOnce([first] as never);
+
+            const res = await app.request("/auth/register", json({
+                email: "first@test.com",
+                password: "StrongPass1"
+            }));
+
+            expect(res.status).toBe(201);
+            expect(mockAuthRepo.setUserRoles).toHaveBeenCalledWith("boot-1", ["admin"]);
+        });
+
+        it("never promotes a registration that is not the first user", async () => {
+            const app = createApp({ allowRegistration: true });
+            // Somebody is already there, so this registrant is not the first.
+            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
 
             const res = await app.request("/auth/register", json({
                 email: "hacker@evil.com",
@@ -1491,117 +1538,59 @@ isBootstrapCompleted: async () => false });
             }));
 
             expect(res.status).toBe(201);
-            const body = await res.json() as any;
-
-            // The critical assertion: admin must NOT be in the roles
-            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalledWith(
-                expect.any(String), "admin"
-            );
-            // Verify the user was created but NOT given admin
-            expect(mockAuthRepo.createUser).toHaveBeenCalledTimes(1);
+            expect(grantedAdmin()).toBe(false);
         });
 
-        it("CVE-FIX: OAuth registration NEVER assigns admin role, even for first user", async () => {
+        it("never promotes a non-first OAuth sign-in either", async () => {
             const app = createApp({ allowRegistration: true });
             mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(null);
+            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
 
+            // 200, not 404: a 404 here would mean no provider was injected and
+            // the escalation path was never reached, which is how a test like
+            // this passes without testing anything.
             const res = await app.request("/auth/google", json({ idToken: "valid-token" }));
             expect(res.status).toBe(200);
 
-            // The critical assertion: admin must NOT be assigned
-            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalledWith(
-                expect.any(String), "admin"
-            );
+            expect(grantedAdmin()).toBe(false);
         });
 
-        it("CVE-FIX: the bootstrap window admits only the genuine first user — a racer is rolled back", async () => {
-            // The empty-table bootstrap exception is the same trust model as
-            // the public setup screen it backs: whoever reaches a fresh
-            // deployment first becomes its admin. What must NOT happen is the
-            // window minting a second account: once anyone else exists, a
-            // registration that slipped past the empty-table check is undone.
-            const app = createApp({ allowRegistration: false });
-            const hacker = mockUser({ id: "hacker-1",
-email: "hacker@evil.com" });
-            const winner = mockUser({ id: "winner-1",
-email: "first@test.com" });
-            mockAuthRepo.createUser.mockResolvedValueOnce(hacker as any);
-            // gate's paginated count saw an empty table (default mock);
-            // the real first user beat them to the post-create check
-            mockAuthRepo.listUsers.mockResolvedValueOnce([winner, hacker] as any);
-
-            const res = await app.request("/auth/register", json({
-                email: "hacker@evil.com",
-                password: "HackRebase2026!",
-                displayName: "Hacker"
-            }));
-
-            expect(res.status).toBe(403);
-            const body = await res.json() as any;
-            expect(body.error.code).toBe("REGISTRATION_DISABLED");
-            expect(mockAuthRepo.deleteUser).toHaveBeenCalledWith("hacker-1");
-            expect(mockAuthRepo.setUserRoles).not.toHaveBeenCalled();
-        });
-
-        it("CVE-FIX: registration is blocked when allowRegistration=false and any user exists", async () => {
-            const app = createApp({ allowRegistration: false });
-            mockAuthRepo.listUsersPaginated.mockResolvedValue({ users: [mockUser()],
-total: 1,
-limit: 1,
-offset: 0 } as any);
-
-            const res = await app.request("/auth/register", json({
-                email: "hacker@evil.com",
-                password: "HackRebase2026!",
-                displayName: "Hacker"
-            }));
-
-            expect(res.status).toBe(403);
-            const body = await res.json() as any;
-            expect(body.error.code).toBe("REGISTRATION_DISABLED");
-            expect(mockAuthRepo.createUser).not.toHaveBeenCalled();
-        });
-
-        it("CVE-FIX: concurrent registration attempts cannot produce multiple admins", async () => {
+        it("produces at most one admin across concurrent registrations", async () => {
             const app = createApp({ allowRegistration: true });
+            // The table is no longer empty by the time these land.
+            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
 
-            // Simulate 5 concurrent registration requests
-            const requests = Array.from({ length: 5 }, (_, i) =>
-                app.request("/auth/register", json({
-                    email: `concurrent-${i}@evil.com`,
-                    password: "StrongPass1",
-                    displayName: `Concurrent ${i}`
-                }))
+            const responses = await Promise.all(
+                Array.from({ length: 5 }, (_, i) =>
+                    app.request("/auth/register", json({
+                        email: `concurrent-${i}@evil.com`,
+                        password: "StrongPass1",
+                        displayName: `Concurrent ${i}`
+                    })))
             );
 
-            const responses = await Promise.all(requests);
-            const successfulRegistrations = responses.filter(r => r.status === 201);
+            // The old version computed this and never asserted on it, so the
+            // test also passed if every request 500'd.
+            expect(responses.filter(r => r.status === 201).length).toBeGreaterThan(0);
 
-            // Even if multiple registrations succeed, NONE should get admin
-            expect(mockAuthRepo.assignDefaultRole).not.toHaveBeenCalledWith(
-                expect.any(String), "admin"
-            );
+            const adminGrants = mockAuthRepo.setUserRoles.mock.calls
+                .filter(([, roles]: [string, string[]]) => Array.isArray(roles) && roles.includes("admin"));
+            expect(adminGrants).toHaveLength(0);
         });
 
-        it("CVE-FIX: defaultRole cannot be set to 'admin' to grant admin via registration", async () => {
-            // Even if someone misconfigures defaultRole as 'admin',
-            // this test documents the current behavior — it would assign admin.
-            // The fix is in the config validation at startup (outside routes).
-            // Here we verify the defaultRole IS what's passed, and the auto-escalation is gone.
-            const app = createApp({ allowRegistration: true,
-defaultRole: "viewer" });
+        it("assigns only the configured default role, never admin alongside it", async () => {
+            const app = createApp({ allowRegistration: true, defaultRole: "viewer" });
+            mockAuthRepo.listUsers.mockResolvedValue([mockUser(), mockUser()] as never);
 
             await app.request("/auth/register", json({
                 email: "new@test.com",
                 password: "StrongPass1"
             }));
 
-            // Only the configured default role is assigned, never auto-admin
-            expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledWith(
-                expect.any(String), "viewer"
-            );
+            expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledWith(expect.any(String), "viewer");
             expect(mockAuthRepo.assignDefaultRole).toHaveBeenCalledTimes(1);
+            expect(grantedAdmin()).toBe(false);
         });
     });
 

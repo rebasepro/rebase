@@ -18,9 +18,9 @@ describe("MongoDriver", () => {
     const mockCollection: CollectionConfig = {
         name: "users",
         properties: {
-            name: { dataType: "string" },
-            email: { dataType: "string" },
-            age: { dataType: "number" }
+            name: { type: "string" },
+            email: { type: "string" },
+            age: { type: "number" }
         }
     };
 
@@ -365,7 +365,7 @@ email: "test@example.com" },
             const collectionWithHooks: CollectionConfig = {
                 name: "hooked_users",
                 properties: {
-                    name: { dataType: "string" }
+                    name: { type: "string" }
                 },
                 callbacks: {
                     afterRead: afterReadSpy,

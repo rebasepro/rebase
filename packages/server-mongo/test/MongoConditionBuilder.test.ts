@@ -250,9 +250,68 @@ describe("MongoConditionBuilder", () => {
             const result = MongoConditionBuilder.buildQuery({
                 filter: { status: ["==", "active"] },
                 searchString: "test",
-                properties: { name: { dataType: "string" } }
+                properties: { name: { type: "string" } }
             });
             expect(result).toHaveProperty("$and");
+        });
+    });
+
+    /*
+     * Search built a regex over the collection's string properties, or fell
+     * back to `$text` when it found none.
+     *
+     * It found none — ever. The check read `prop.dataType === "string"`, and no
+     * property in `@rebasepro/types` has ever had a `dataType` field; a real
+     * collection carries `type`. So every search on this driver became a
+     * `$text` query, which requires a text index and throws `IndexNotFound`
+     * without one.
+     *
+     * The fixtures in this file were written with the same wrong key, so the
+     * test data agreed with the bug and neither ever met a real collection.
+     * These assert on the shape a collection actually has.
+     */
+    describe("search picks its fields off the property shape collections really use", () => {
+        const props = {
+            name: { type: "string" },
+            bio: { type: "string" },
+            age: { type: "number" }
+        };
+
+        it("builds a regex condition per string property", () => {
+            const conditions = MongoConditionBuilder.buildSearchConditions("ada", props);
+
+            expect(conditions).toHaveLength(2);
+            expect(conditions.map(c => Object.keys(c)[0]).sort()).toEqual(["bio", "name"]);
+        });
+
+        it("does not search non-string properties", () => {
+            const conditions = MongoConditionBuilder.buildSearchConditions("ada", props);
+
+            expect(conditions.some(c => "age" in c)).toBe(false);
+        });
+
+        it("matches case-insensitively on the search string", () => {
+            const [first] = MongoConditionBuilder.buildSearchConditions("ada", { name: { type: "string" } });
+
+            const regex = (first as Record<string, { $regex: RegExp }>).name.$regex;
+            expect(regex.test("Ada Lovelace")).toBe(true);
+            expect(regex.flags).toContain("i");
+        });
+
+        it("escapes regex metacharacters so a search term stays a literal", () => {
+            const [first] = MongoConditionBuilder.buildSearchConditions("a.b", { name: { type: "string" } });
+
+            const regex = (first as Record<string, { $regex: RegExp }>).name.$regex;
+            expect(regex.test("a.b")).toBe(true);
+            expect(regex.test("axb")).toBe(false);
+        });
+
+        it("falls back to $text only when the collection really has no string field", () => {
+            // The fallback is correct in itself — it was simply the only path
+            // ever taken, on collections that had string fields all along.
+            const conditions = MongoConditionBuilder.buildSearchConditions("ada", { age: { type: "number" } });
+
+            expect(conditions).toEqual([{ $text: { $search: "ada" } }]);
         });
     });
 });
