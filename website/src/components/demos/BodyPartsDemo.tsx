@@ -80,10 +80,15 @@ export function BodyPartsDemo() {
 
     const renderBodyView = (view: "front" | "back", imgSrc: string) => (
         <div className="relative w-full max-w-[130px]">
+            {/* `client:visible` defers hydration but not rendering, so this markup
+                is in the initial HTML and was fetching two thirds of the way down
+                the landing page while the render-blocking CSS was still in flight. */}
             <img
                 src={imgSrc}
                 alt={`Body ${view} view`}
                 draggable={false}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-auto block select-none opacity-50 dark:invert dark:brightness-125"
             />
 

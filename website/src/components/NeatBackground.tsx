@@ -174,16 +174,41 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
 
         let neat: NeatGradientInstance | undefined;
         let scrollHandler: (() => void) | null = null;
-
-        if (NeatGradient) {
-            neat = new NeatGradient({
-                ref: canvasRef.current,
-                ...config,
-            });
-        }
+        let cancelled = false;
 
         const baseOffset = config.yOffset ?? 0;
         const canvas = canvasRef.current;
+
+        // Compiling the shaders costs 600-1000ms of main thread on a throttled
+        // phone. Astro's `client:idle` schedules this for the first idle moment,
+        // which is precisely the gap where the hero headline is trying to paint —
+        // it pushed LCP from ~2.3s to ~3.8s whenever the two collided. Nothing
+        // here is content, so let the page finish loading first, then take an
+        // idle slot.
+        const startGradient = () => {
+            if (cancelled || !NeatGradient) return;
+
+            neat = new NeatGradient({
+                ref: canvas,
+                ...config,
+            });
+            scrollHandler?.();
+        };
+
+        const scheduleGradient = () => {
+            if (cancelled) return;
+            if ("requestIdleCallback" in window) {
+                requestIdleCallback(startGradient, { timeout: 2000 });
+            } else {
+                setTimeout(startGradient, 200);
+            }
+        };
+
+        if (document.readyState === "complete") {
+            scheduleGradient();
+        } else {
+            addEventListener("load", scheduleGradient, { once: true });
+        }
 
         scrollHandler = () => {
             if (!neat) return;
@@ -198,9 +223,10 @@ export function NeatBackground({ variant = "hero", randomize = true }: { variant
         };
 
         window.addEventListener("scroll", scrollHandler, { passive: true });
-        scrollHandler();
 
         return () => {
+            cancelled = true;
+            removeEventListener("load", scheduleGradient);
             if (scrollHandler) window.removeEventListener("scroll", scrollHandler);
             if (neat) neat.destroy();
         };

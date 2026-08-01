@@ -182,6 +182,14 @@ export default defineConfig({
             },
         })
     ],
+    build: {
+        // The only render-blocking resource left on the landing page was the
+        // 28.5KB stylesheet, costing a full round trip before anything could
+        // paint. Inlining trades the cross-page stylesheet cache for one fewer
+        // hop on first paint, which is the right trade for a marketing site
+        // where most visits are a cold single page view.
+        inlineStylesheets: "always"
+    },
     vite: {
         build: {
             rollupOptions: {

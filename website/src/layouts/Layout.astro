@@ -234,10 +234,7 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
         <script type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />
     )}
 
-<!-- Google tag (gtag.js) - Load the library -->
-    <script async is:inline src="https://www.googletagmanager.com/gtag/js?id=G-715WKXSHF3"/>
-
-    <script is:inline>
+<script is:inline>
 
         // Initialize dataLayer and gtag function
         window.dataLayer = window.dataLayer || [];
@@ -272,6 +269,37 @@ const breadcrumbSchema = breadcrumbs && breadcrumbs.length > 0 ? {
 
         // Initialize GA4
         window.gtag("config", "G-715WKXSHF3");
+
+        // gtag.js is 167KB and used to load `async` from the head, where it ate
+        // bandwidth and main thread the hero needed first. Every call above is
+        // just a dataLayer.push, so the queue survives an arbitrarily late
+        // library — it replays the whole thing on arrival and the pageview is
+        // still recorded. Load it once the page is idle, or sooner if the user
+        // interacts, whichever comes first.
+        (function () {
+            var loaded = false;
+
+            function loadGtag() {
+                if (loaded) return;
+                loaded = true;
+                var s = document.createElement("script");
+                s.async = true;
+                s.src = "https://www.googletagmanager.com/gtag/js?id=G-715WKXSHF3";
+                document.head.appendChild(s);
+            }
+
+            ["pointerdown", "keydown", "scroll"].forEach(function (evt) {
+                addEventListener(evt, loadGtag, { once: true, passive: true });
+            });
+
+            // requestIdleCallback can be starved indefinitely on a busy page, so
+            // the timeout is what actually bounds this on slow devices.
+            if ("requestIdleCallback" in window) {
+                requestIdleCallback(loadGtag, { timeout: 3500 });
+            } else {
+                setTimeout(loadGtag, 3500);
+            }
+        })();
 
     </script>
 

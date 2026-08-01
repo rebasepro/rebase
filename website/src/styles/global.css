@@ -202,6 +202,16 @@ h6 {
     animation-play-state: running;
 }
 
+/* Above-the-fold elements are in the viewport by definition, so gating them on
+   the IntersectionObserver buys nothing and costs everything: `opacity: 0` holds
+   the hero blank until page-effects.ts has been fetched, parsed and run, which
+   pushed LCP out to ~8s on a throttled phone. These start playing on the first
+   frame, with no JS in the path. Pair it with `animate-on-scroll` so the
+   observer can still no-op over them harmlessly. */
+.animate-on-scroll.animate-immediate {
+    animation-play-state: running;
+}
+
 /* Reduce motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
     .animate-on-scroll {

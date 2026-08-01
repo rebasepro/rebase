@@ -44,7 +44,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
 
         <div class="px-4 mx-auto max-w-7xl text-center lg:px-8 relative z-10 mt-8">
             <!-- Badge -->
-            <div class="mb-8 flex items-center justify-center gap-3 animate-on-scroll fade-in">
+            <div class="mb-8 flex items-center justify-center gap-3 animate-on-scroll animate-immediate fade-in">
                     <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-surface-700 bg-surface-900/60 text-xs font-medium text-surface-400">
                         <img src="/img/postgresql-logo.svg" alt="PostgreSQL" class="h-4 w-auto"/>
                         {t("hero.badge")}
@@ -64,7 +64,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                      72px was picked over 80px because 80 leaves only 4% of slack
                      and any copy edit overflows it. Base stays 36px and wraps,
                      which is correct on phones. -->
-                <h1 class="relative mb-6 text-4xl md:text-5xl lg:text-6xl font-semibold leading-[1.08] text-white animate-on-scroll fade-in-up">
+                <h1 class="relative mb-6 text-4xl md:text-5xl lg:text-6xl font-semibold leading-[1.08] text-white animate-on-scroll animate-immediate fade-in-up">
                     {t("hero.title.part1")}<br/><span class="text-primary">{t("hero.title.part2")}</span>
                 </h1>
             </div>
@@ -74,14 +74,14 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
             <!-- Steps up with the headline so the pair keeps its ratio (~3.6:1
                  at xl). Measure is set with max-w, not side padding — `xl:px-40`
                  only bit above 1280px, so the line used to run ~90 characters. -->
-            <p class="mx-auto mb-4 max-w-2xl text-lg lg:text-xl leading-relaxed text-surface-300 animate-on-scroll fade-in-up"
+            <p class="mx-auto mb-4 max-w-2xl text-lg lg:text-xl leading-relaxed text-surface-300 animate-on-scroll animate-immediate fade-in-up"
                set:html={t("hero.subtitle")}/>
 
             <!-- Two actions side by side, then one command with a one-line lead-in.
                  The old stack narrated its own CTAs — a note under the button, a
                  two-line paragraph introducing the command, an npx alternative
                  inside the box. Six text moments where a hero carries three. -->
-            <div class="mt-10 flex items-center justify-center gap-3 flex-wrap animate-on-scroll fade-in-up">
+            <div class="mt-10 flex items-center justify-center gap-3 flex-wrap animate-on-scroll animate-immediate fade-in-up">
                 <a href="https://demo.rebase.pro"
                    target="_blank" rel="noopener noreferrer"
                    id="hero-try-demo"
@@ -114,7 +114,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
             </div>
 
             <!-- The command, with a single line of copy doing the work three used to -->
-            <div class="mt-8 mb-6 max-w-md mx-auto animate-on-scroll fade-in-up">
+            <div class="mt-8 mb-6 max-w-md mx-auto animate-on-scroll animate-immediate fade-in-up">
                 <p class="mb-2.5 text-sm text-surface-500">{t("hero.cli.label")}</p>
                 <div class="rounded-xl bg-surface-900/80 border border-surface-700/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden hover:border-primary/40 transition-colors duration-300">
                     <div class="px-5 py-4 flex items-center justify-between">
@@ -330,7 +330,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                             <div class="ml-2 text-[10px] font-mono text-surface-400">app.ts</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
-                            <SdkMiniDemo client:load/>
+                            <SdkMiniDemo client:visible/>
                         </div>
                     </div>
                     <div class="relative z-10 p-5 flex flex-col justify-between h-full min-h-[160px]">
@@ -369,7 +369,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                             <div class="ml-2 text-[10px] font-mono text-surface-400">api.demo.rebase.pro</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
-                            <ApiMiniDemo client:load/>
+                            <ApiMiniDemo client:visible/>
                         </div>
                     </div>
                     <div class="relative z-10 p-5 flex flex-col justify-between h-full min-h-[160px]">
@@ -424,7 +424,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                             <div class="ml-2 text-[10px] font-mono text-surface-400">websocket: sync</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
-                            <RealtimeMiniDemo client:load/>
+                            <RealtimeMiniDemo client:visible/>
                         </div>
                     </div>
                     <div class="relative z-10 p-5">
@@ -632,7 +632,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
             </div>
 
             <div style="min-height: 700px;">
-                <AdminDemoCarousel client:load/>
+                <AdminDemoCarousel client:visible/>
             </div>
             <p class="mt-2 text-center text-xs sm:text-sm text-surface-400">
                 {t("see.caption")}
@@ -708,6 +708,11 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden">
+                            <!-- 4.3MB, and it sits two thirds of the way down the
+                                 page — eagerly fetching it starved the hero of
+                                 bandwidth on a throttled connection. The poster
+                                 is frame 0, so the handoff is seamless once
+                                 data-src is promoted by page-effects.ts. -->
                             <video
                                     class="w-full h-full object-cover object-top"
                                     style="pointer-events: none;"
@@ -716,9 +721,12 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                                     loop
                                     autoplay
                                     muted
-                                    playsinline>
-                                <source src="/img/import.webm" type="video/webm"/>
-                            </video>
+                                    playsinline
+                                    preload="none"
+                                    poster="/img/import-poster.webp"
+                                    data-lazy-video
+                                    data-src="/img/import.webm"
+                                    data-type="video/webm"></video>
                         </div>
                     </div>
                     <div class="relative z-10 p-5">
@@ -766,7 +774,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden" inert aria-hidden="true">
-                            <BodyPartsDemo client:load/>
+                            <BodyPartsDemo client:visible/>
                         </div>
                     </div>
                     <div class="relative z-10 p-5">
