@@ -20,7 +20,7 @@ import { RelationService } from "./RelationService";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { toCmsRow, toRestRow, isJunctionRelation } from "./row-pipeline";
+import { toFlatRow, toRestRow, isJunctionRelation } from "./row-pipeline";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 import { ApiError, logger } from "@rebasepro/server";
 
@@ -607,7 +607,7 @@ idColumn };
 
                 if (!row) return undefined;
 
-                const flatRow = toCmsRow(row, collection, this.registry);
+                const flatRow = toFlatRow(row, collection, this.registry);
 
                 // Post-fetch joinPath relations that Drizzle's `with` can't express
                 await this.resolveJoinPathRelations<M>(flatRow, collection, collectionPath, parsedId, databaseId);
@@ -734,7 +734,7 @@ idColumn };
                 const results = await qb.findMany(queryOpts as Parameters<NonNullable<typeof qb>["findMany"]>[0]);
 
                 const rows = (results as Record<string, unknown>[]).map(row =>
-                    toCmsRow(row, collection, this.registry)
+                    toFlatRow(row, collection, this.registry)
                 );
 
                 return rows;
@@ -837,7 +837,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
     /**
      * Fallback path used when db.query is unavailable.
      *
-     * The primary path runs the results through `toCmsRow`, which maps
+     * The primary path runs the results through `toFlatRow`, which maps
      * relations from what drizzle already nested — no query per row. This one
      * has no nesting to read, so it resolves relations itself, in batches.
      *

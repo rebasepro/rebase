@@ -12,7 +12,7 @@
  * relation targets, since a secret only has to leak through one overlooked path.
  */
 import { CollectionConfig } from "@rebasepro/types";
-import { toCmsRow, toRestRow } from "../src/services/row-pipeline";
+import { toFlatRow, toRestRow } from "../src/services/row-pipeline";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 const usersCollection = {
@@ -68,7 +68,7 @@ describe("excludeFromApi", () => {
             emailVerificationToken: "tok_123"
         };
 
-        const served = toCmsRow(row, usersCollection, registry);
+        const served = toFlatRow(row, usersCollection, registry);
 
         expect(served.email).toBe("a@b.c");
         expect(served).not.toHaveProperty("passwordHash");

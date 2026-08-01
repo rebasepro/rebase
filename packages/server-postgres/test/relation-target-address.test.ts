@@ -1,5 +1,5 @@
 import { CollectionConfig } from "@rebasepro/types";
-import { toCmsRow } from "../src/services/row-pipeline";
+import { toFlatRow } from "../src/services/row-pipeline";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 
 /**
@@ -66,13 +66,15 @@ relationName: "seat" }
         });
     });
 
-    // The CMS row builder is a plain function now, rather than a private
-    // reached into through a cast.
-    const toFlatRow = (row: Record<string, unknown>, collection: CollectionConfig) =>
-        toCmsRow(row, collection, registry);
+    // The row builder is a plain function now, rather than a private reached
+    // into through a cast. Named differently from the import it wraps: this
+    // local only exists to bind `registry`, and sharing the name makes it call
+    // itself — which is a stack overflow, not a test failure anyone can read.
+    const flatten = (row: Record<string, unknown>, collection: CollectionConfig) =>
+        toFlatRow(row, collection, registry);
 
     it("joins a composite target key into the ref address", () => {
-        const result = toFlatRow({
+        const result = flatten({
             id: 1,
             seat: { seat_row: "A",
 seat_number: 12,
@@ -109,7 +111,7 @@ occupant: "Ada" }
             if (name === "notes") return table("notes", ["body"]) as any;
             return undefined;
         });
-        const result = toFlatRow({
+        const result = flatten({
             id: 1,
             seat: { body: "aisle, please" }
         }, keylessBooking);

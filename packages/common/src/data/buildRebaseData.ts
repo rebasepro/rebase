@@ -99,7 +99,7 @@ function rowToEntity<M extends Record<string, unknown>>(
 }
 
 /**
- * The relation envelope `toCmsRow` writes where a relation was:
+ * The relation envelope `toFlatRow` writes where a relation was:
  * `{ id, path, __type: "relation", data: { id, path, values } }`. It is the
  * admin's view-model, and the only pipeline that produces one is postgres'.
  */
