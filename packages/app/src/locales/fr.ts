@@ -910,5 +910,16 @@ no_filter: "No filter",
     record_history: "Historique",
     inspect_record: "Inspecter l'enregistrement",
     inspect: "Inspecter",
-    close_inspector: "Fermer l'inspecteur"
+    close_inspector: "Fermer l'inspecteur",
+
+    // ─── Revision history ───────────────────────────────────────
+    history_revert: "Revenir à cette version",
+    history_revert_title: "Revenir à cette version des données ?",
+    history_reverted: "Retour à la version sélectionnée",
+    history_revert_error: "Erreur lors du retour en arrière",
+    history_revert_dirty: "Enregistrez ou annulez vos modifications avant de revenir en arrière",
+    history_empty: "Aucun historique disponible",
+    history_empty_description: "À chaque enregistrement, une nouvelle version est créée et conservée dans l'historique.",
+    history_new_entity: "L'historique n'est disponible que pour les enregistrements existants",
+    history_no_more: "Plus d'historique"
 };

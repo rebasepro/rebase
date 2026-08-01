@@ -989,5 +989,16 @@ export const en: RebaseTranslations = {
     record_history: "History",
     inspect_record: "Inspect record",
     inspect: "Inspect",
-    close_inspector: "Close inspector"
+    close_inspector: "Close inspector",
+
+    // ─── Revision history ───────────────────────────────────────
+    history_revert: "Revert to this version",
+    history_revert_title: "Revert data to this version?",
+    history_reverted: "Reverted to selected version",
+    history_revert_error: "Error reverting entity",
+    history_revert_dirty: "Please save or discard your changes before reverting",
+    history_empty: "No history available",
+    history_empty_description: "When you save a record, a new version is created and stored in the history.",
+    history_new_entity: "History is only available for existing records",
+    history_no_more: "No more history"
 };

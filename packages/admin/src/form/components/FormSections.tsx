@@ -39,6 +39,7 @@ export function FormSections({
                                 title={section.title}
                                 collapsible={section.collapsible}
                                 collapsed={isCollapsed}
+                                controls={`form_section_${section.key}`}
                                 onToggle={() => onToggle(section.key)}/>
                         )}
 
@@ -48,10 +49,11 @@ export function FormSections({
                             // screen, side panel, split pane, dialog) inside the
                             // same viewport, so spans have to answer to the
                             // column they are in, not to the window.
-                            <div className={cls(
-                                "grid gap-x-4 gap-y-5 min-w-0",
-                                "grid-cols-1 @2xl:grid-cols-4"
-                            )}>
+                            <div id={`form_section_${section.key}`}
+                                className={cls(
+                                    "grid gap-x-4 gap-y-5 min-w-0",
+                                    "grid-cols-1 @2xl:grid-cols-4"
+                                )}>
                                 {section.fields.map(renderField)}
                             </div>
                         )}
@@ -66,11 +68,18 @@ function Header({
     title,
     collapsible,
     collapsed,
+    controls,
     onToggle
 }: {
     title: string;
     collapsible: boolean;
     collapsed: boolean;
+    /**
+     * Id of the region this header shows and hides. Only referenced while that
+     * region exists — a collapsed section unmounts its fields, and pointing
+     * `aria-controls` at an id that is not in the document is its own defect.
+     */
+    controls: string;
     onToggle: () => void;
 }) {
 
@@ -101,6 +110,7 @@ function Header({
         <button type={"button"}
             onClick={onToggle}
             aria-expanded={!collapsed}
+            aria-controls={collapsed ? undefined : controls}
             className={cls(className, "text-left hover:opacity-80 transition-opacity")}>
             {content}
         </button>

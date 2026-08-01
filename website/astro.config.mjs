@@ -96,6 +96,7 @@ export default defineConfig({
                         { label: "Storage & File Uploads", slug: "docs/frontend/storage" },
                         { label: "View Modes", slug: "docs/frontend/view-modes" },
                         { label: "Custom Fields", slug: "docs/frontend/custom-fields" },
+                        { label: "Form Layout", slug: "docs/frontend/form-layout" },
                         { label: "Entity Views", slug: "docs/frontend/entity-views" },
                         { label: "Entity Actions", slug: "docs/frontend/entity-actions" },
                         { label: "Additional Columns", slug: "docs/frontend/additional-columns" },

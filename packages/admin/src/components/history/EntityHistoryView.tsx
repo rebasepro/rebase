@@ -4,7 +4,7 @@ import { useRef, useEffect } from "react";
 import { cls, IconButton, Label, Tooltip, Typography } from "@rebasepro/ui";
 import { ErrorBoundary, HistoryIcon } from "@rebasepro/ui";
 import { EntityHistoryEntry } from "./EntityHistoryEntry";
-import { useSnackbarController, useAuthController } from "@rebasepro/app";
+import { useSnackbarController, useAuthController, useTranslation } from "@rebasepro/app";
 import { ConfirmationDialog } from "@rebasepro/app";
 import { useState } from "react";
 import { useHistory } from "../../hooks/useHistory";
@@ -19,6 +19,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
     formContext
 }: EntityCustomViewParams<M>) {
 
+    const { t } = useTranslation();
     const snackbarController = useSnackbarController();
     const authController = useAuthController();
     const dirty = formContext?.formex.dirty;
@@ -72,7 +73,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
 
     if (!entity) {
         return <div className="flex items-center justify-center h-full">
-            <Label>History is only available for existing entities</Label>
+            <Label>{t("history_new_entity") ?? "History is only available for existing records"}</Label>
         </div>;
     }
 
@@ -93,13 +94,13 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
             }
 
             snackbarController.open({
-                message: "Reverted to selected version",
+                message: t("history_reverted") ?? "Reverted to selected version",
                 type: "info"
             });
         } catch (error) {
             console.error("Error reverting entity:", error);
             snackbarController.open({
-                message: "Error reverting entity",
+                message: t("history_revert_error") ?? "Error reverting entity",
                 type: "error"
             });
         } finally {
@@ -132,10 +133,10 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
 
             {!isLoading && entries.length === 0 && <>
                 <Label>
-                    No history available
+                    {t("history_empty") ?? "No history available"}
                 </Label>
                 <Typography variant={"caption"}>
-                    When you save a entity, a new version is created and stored in the history.
+                    {t("history_empty_description") ?? "When you save a record, a new version is created and stored in the history."}
                 </Typography>
             </>}
 
@@ -146,13 +147,13 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
                         collection={collection}
                         size={"medium"}
                         actions={
-                            <Tooltip title={"Revert to this version"}
+                            <Tooltip title={t("history_revert") ?? "Revert to this version"}
                                 className={"m-2 grow-0 self-start"}>
                                 <IconButton
                                     onClick={() => {
                                         if (dirty) {
                                             snackbarController.open({
-                                                message: "Please save or discard your changes before reverting",
+                                                message: t("history_revert_dirty") ?? "Please save or discard your changes before reverting",
                                                 type: "warning"
                                             });
                                         } else {
@@ -170,8 +171,8 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
             {/* Load more sentinel */}
             {entries.length > 0 && (
                 <div ref={loadMoreRef} className="py-4 text-center">
-                    {isLoading && <Label>Loading more...</Label>}
-                    {!hasMore && entries.length > 10 && <Label>No more history available</Label>}
+                    {isLoading && <Label>{t("loading")}</Label>}
+                    {!hasMore && entries.length > 10 && <Label>{t("history_no_more") ?? "No more history"}</Label>}
                 </div>
             )}
         </div>
@@ -183,7 +184,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
                     if (revertHistoryId) doRevert(revertHistoryId);
                 }}
                 onCancel={() => setRevertHistoryId(undefined)}
-                title={<Typography variant={"subtitle2"}>Revert data to this version?</Typography>}
+                title={<Typography variant={"subtitle2"}>{t("history_revert_title") ?? "Revert data to this version?"}</Typography>}
                 body={revertEntry
                     ? <div className="p-4">
                         <Typography variant={"caption"} color={"secondary"}>

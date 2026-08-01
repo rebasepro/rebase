@@ -1,10 +1,9 @@
 
-import type { EntityCustomViewParams, AdditionalFieldDelegateProps, AdminCollection } from "@rebasepro/admin-types";
+import type { AdditionalFieldDelegateProps } from "@rebasepro/admin-types";
 import type { FormContext, PropertyFieldBindingProps } from "../types/fields";
-import type { PropertyConfig } from "@rebasepro/admin-types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
-import type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";
+import type { EntityFormProps } from "../types/components/EntityFormProps";
 import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary } from "@rebasepro/ui";
@@ -12,7 +11,6 @@ import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
 import { getDefaultValuesFor } from "@rebasepro/common";
 import { isReadOnly } from "@rebasepro/app";
 
-import { useCustomizationController } from "@rebasepro/app";
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
 import type { ResolvedFormField } from "@rebasepro/app";
 import { Alert, Button, cls, Dialog, DialogActions, DialogContent, DialogTitle, iconSize, paperMixin, Typography } from "@rebasepro/ui";
@@ -86,8 +84,6 @@ export function EntityForm<M extends Record<string, unknown>>({
     onClearLocalChanges
 }: EntityFormProps<M>) {
 
-    const customizationController = useCustomizationController();
-
     const navigateBack = useCallback(() => {
         if (navigateBackProp) {
             navigateBackProp();
@@ -121,7 +117,6 @@ export function EntityForm<M extends Record<string, unknown>>({
     }, [entityIdProp, status]);
 
     const [entityId, setEntityId] = useState<string | number | undefined>(initialEntityId);
-    const [entityIdError, setEntityIdError] = useState<boolean>(false);
     const [savingError, setSavingError] = useState<Error | undefined>();
     const [isSavingAutoSave, setIsSavingAutoSave] = useState<boolean>(false);
     const [discardDialogOpen, setDiscardDialogOpen] = useState<boolean>(false);
@@ -150,7 +145,6 @@ export function EntityForm<M extends Record<string, unknown>>({
     const onSubmit = (values: EntityValues<M>, formexController: FormexController<EntityValues<M>>) => {
 
         setSavingError(undefined);
-        setEntityIdError(false);
 
         if (status === "existing") {
             if (!entity?.id) throw Error("Form misconfiguration when saving, no id for existing entity");

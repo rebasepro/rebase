@@ -1,7 +1,7 @@
 # Entity form + tabs — diagnosis and redesign
 
-Date: 2026-07-31. Status: **implemented** on `worktree-entity-form-redesign`,
-except where [§5](#5-what-is-not-done) says otherwise.
+Date: 2026-07-31. Status: **merged to `main`** on 2026-08-01, except where
+[§5](#5-what-is-not-done) says otherwise.
 
 Measured on the same form after the change: **2932px → 1587px** of scroll, and
 **219px → 24px** of dead space above the first field.
@@ -331,9 +331,41 @@ read-only view; worth revisiting if it reads as noise.
 
 ### 5.4 Not verified
 
-- Kanban open mode (`side_panel` via `resolveOpenEntityMode`) was not exercised.
 - The Playwright e2e suites were not run — they need built `dist/`, which a
   worktree with symlinked `node_modules` cannot produce safely
   (see the worktree recipe in memory).
 - The collection editor's own UI has no control for `admin.form`; the block
   round-trips through `serializable_types.ts` but must be written by hand.
+
+## 6. Fixed while shipping
+
+Found by using the result rather than by reading it. None of it was specific to
+the rewrite; each had been present for a while.
+
+- **The board reported every cross-column drop as a same-column reorder.**
+  `handleDragOver` moves the card between columns mid-drag, so looking it up by
+  id at drop time finds it in its *destination*. The column property was never
+  written and the card snapped back on the next fetch. The placement rules are
+  a pure function now — `placeDroppedCard`, with tests.
+- **Board order keys were unusable.** The demo seeded `String(i)`, which
+  `fractional-indexing` rejects, so every drag fell into the fallback that
+  hands out the same key to everything. Keys are base36 and single case now:
+  the library's base62 output only sorts correctly under byte ordering, and the
+  sort is done by Postgres, whose default collation is not byte ordering.
+- **Nothing on the board scrolled.** A `flex-1` item defaults to
+  `min-height: auto`, so the view grew to the board's full content height and
+  the ancestor's `overflow-hidden` clipped the rest.
+- **Concurrent realtime subscriptions hung.** `ensureAuthenticated` published
+  its in-flight guard only after an `await`, so every caller arriving in that
+  gap started an attempt of its own, and those attempts collided in
+  `pendingRequests` under ``auth_${Date.now()}``. One settled; the frames
+  behind the others were never sent. A board opening one subscription per
+  column hit this on every cold load.
+- **Date previews demanded a `Date` instance**, so every audit column in every
+  history entry rendered as a red "Unexpected value" — history is raw API
+  payload, where a timestamp is still the string Postgres sent.
+- **The chip palette had been flattened** from four tones per hue to one,
+  leaving `colorScheme="blueDark"` resolving to `undefined` at every call site
+  that used it, and making seeded chips repeat colours within a single enum.
+- **A shared module inside `app/config/collections/`** stopped the backend
+  booting outright: the loader requires a default export from every file there.

@@ -918,5 +918,16 @@ no_filter: "No filter",
     record_history: "Histórico",
     inspect_record: "Inspecionar registo",
     inspect: "Inspecionar",
-    close_inspector: "Fechar o inspetor"
+    close_inspector: "Fechar o inspetor",
+
+    // ─── Revision history ───────────────────────────────────────
+    history_revert: "Voltar a esta versão",
+    history_revert_title: "Reverter os dados para esta versão?",
+    history_reverted: "Revertido para a versão selecionada",
+    history_revert_error: "Erro ao reverter o registo",
+    history_revert_dirty: "Guarde ou descarte as suas alterações antes de reverter",
+    history_empty: "Nenhum histórico disponível",
+    history_empty_description: "Ao guardar um registo é criada uma nova versão, guardada no histórico.",
+    history_new_entity: "O histórico só está disponível para registos existentes",
+    history_no_more: "Sem mais histórico"
 };

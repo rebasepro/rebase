@@ -13,6 +13,7 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, SortableContext } from "@dnd-kit/sortable";
 import { BoardColumn } from "./BoardColumn";
+import { placeDroppedCard } from "./placement";
 import { BoardItem, BoardItemMap, BoardProps } from "./board_types";
 import { cls } from "../../util";
 
@@ -294,35 +295,15 @@ export function Board<T, COLUMN extends string>({
         if (!currentCol || !targetCol) return;
 
         const targetItems = itemMapState[targetCol] || [];
-        const activeIndex = (itemMapState[currentCol] || []).findIndex(i => i.id === activeId);
-        if (activeIndex === -1) return;
+        const movedItem = (itemMapState[currentCol] || []).find(i => i.id === activeId);
+        if (!movedItem) return;
 
-        // Which card the pointer was over. `-1` means it was over the column
-        // itself: an empty column, or the space under the last card. That used
-        // to abort the drop outright, so a card dragged to an empty column
-        // moved on screen and was never saved.
-        const overIndexInTarget = targetItems.findIndex(i => i.id === overId);
-        const indexInTarget = targetItems.findIndex(i => i.id === activeId);
-        const changedColumn = (sourceColumn ?? currentCol) !== targetCol;
-
-        let finalTargetItems: BoardItem<T>[];
-        if (indexInTarget === -1) {
-            // Not placed by `handleDragOver` — drop straight into the slot.
-            const moved = (itemMapState[currentCol] || [])[activeIndex];
-            finalTargetItems = [...targetItems];
-            finalTargetItems.splice(overIndexInTarget === -1 ? targetItems.length : overIndexInTarget, 0, moved);
-        } else if (overIndexInTarget !== -1) {
-            finalTargetItems = arrayMove(targetItems, indexInTarget, overIndexInTarget);
-        } else if (changedColumn) {
-            // Over the column, not a card, and `handleDragOver` already opened
-            // the gap the card is sitting in. Appending here is what sent a
-            // card dropped into the middle of another column to the bottom of
-            // it — the position it was dropped at is the one on screen.
-            finalTargetItems = targetItems;
-        } else {
-            // Same column, released below the last card.
-            finalTargetItems = arrayMove(targetItems, indexInTarget, targetItems.length - 1);
-        }
+        const finalTargetItems = placeDroppedCard({
+            targetItems,
+            movedItem,
+            overId,
+            changedColumn: (sourceColumn ?? currentCol) !== targetCol
+        });
 
         onItemsReorder?.(finalTargetItems, {
             itemId: activeId,

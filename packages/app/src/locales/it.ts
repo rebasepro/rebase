@@ -910,5 +910,16 @@ no_filter: "No filter",
     record_history: "Cronologia",
     inspect_record: "Ispeziona record",
     inspect: "Ispeziona",
-    close_inspector: "Chiudi l'ispettore"
+    close_inspector: "Chiudi l'ispettore",
+
+    // ─── Revision history ───────────────────────────────────────
+    history_revert: "Torna a questa versione",
+    history_revert_title: "Ripristinare i dati a questa versione?",
+    history_reverted: "Ripristinata la versione selezionata",
+    history_revert_error: "Errore durante il ripristino del record",
+    history_revert_dirty: "Salva o annulla le modifiche prima di ripristinare",
+    history_empty: "Nessuna cronologia disponibile",
+    history_empty_description: "Quando salvi un record viene creata una nuova versione e conservata nella cronologia.",
+    history_new_entity: "La cronologia è disponibile solo per i record esistenti",
+    history_no_more: "Nessun'altra cronologia"
 };

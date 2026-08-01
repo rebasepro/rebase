@@ -1048,4 +1048,24 @@ export interface RebaseTranslations {
     inspect?: string;
     /** Close button of that panel */
     close_inspector?: string;
+
+    // ─── Revision history ───────────────────────────────────────
+    /** Tooltip on the revert button of a revision */
+    history_revert?: string;
+    /** Confirmation title before reverting */
+    history_revert_title?: string;
+    /** Snackbar after a successful revert */
+    history_reverted?: string;
+    /** Snackbar when the revert fails */
+    history_revert_error?: string;
+    /** Refused because the form has unsaved edits */
+    history_revert_dirty?: string;
+    /** Empty state of the history panel */
+    history_empty?: string;
+    /** Explains what fills the history panel */
+    history_empty_description?: string;
+    /** History is meaningless for a record that does not exist yet */
+    history_new_entity?: string;
+    /** End of the paginated revision list */
+    history_no_more?: string;
 }

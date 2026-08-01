@@ -910,5 +910,16 @@ no_filter: "No filter",
     record_history: "Verlauf",
     inspect_record: "Datensatz inspizieren",
     inspect: "Inspizieren",
-    close_inspector: "Inspektor schließen"
+    close_inspector: "Inspektor schließen",
+
+    // ─── Revision history ───────────────────────────────────────
+    history_revert: "Auf diese Version zurücksetzen",
+    history_revert_title: "Daten auf diese Version zurücksetzen?",
+    history_reverted: "Auf die gewählte Version zurückgesetzt",
+    history_revert_error: "Fehler beim Zurücksetzen des Datensatzes",
+    history_revert_dirty: "Bitte speichere oder verwirf deine Änderungen vor dem Zurücksetzen",
+    history_empty: "Kein Verlauf vorhanden",
+    history_empty_description: "Beim Speichern eines Datensatzes wird eine neue Version erstellt und im Verlauf abgelegt.",
+    history_new_entity: "Der Verlauf ist nur für vorhandene Datensätze verfügbar",
+    history_no_more: "Kein weiterer Verlauf"
 };

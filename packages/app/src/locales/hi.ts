@@ -910,5 +910,16 @@ no_filter: "No filter",
     record_history: "इतिहास",
     inspect_record: "रिकॉर्ड जाँचें",
     inspect: "जाँचें",
-    close_inspector: "इंस्पेक्टर बंद करें"
+    close_inspector: "इंस्पेक्टर बंद करें",
+
+    // ─── Revision history ───────────────────────────────────────
+    history_revert: "इस संस्करण पर लौटें",
+    history_revert_title: "डेटा को इस संस्करण पर लौटाएँ?",
+    history_reverted: "चयनित संस्करण पर लौटा दिया गया",
+    history_revert_error: "रिकॉर्ड लौटाने में त्रुटि",
+    history_revert_dirty: "लौटाने से पहले अपने बदलाव सहेजें या रद्द करें",
+    history_empty: "कोई इतिहास उपलब्ध नहीं",
+    history_empty_description: "रिकॉर्ड सहेजने पर एक नया संस्करण बनता है और इतिहास में रखा जाता है।",
+    history_new_entity: "इतिहास केवल मौजूदा रिकॉर्ड के लिए उपलब्ध है",
+    history_no_more: "और इतिहास नहीं"
 };

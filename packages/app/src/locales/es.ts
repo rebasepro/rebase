@@ -931,5 +931,16 @@ no_filter: "No filter",
     record_history: "Historial",
     inspect_record: "Inspeccionar registro",
     inspect: "Inspeccionar",
-    close_inspector: "Cerrar el inspector"
+    close_inspector: "Cerrar el inspector",
+
+    // ─── Revision history ───────────────────────────────────────
+    history_revert: "Volver a esta versión",
+    history_revert_title: "¿Volver a esta versión de los datos?",
+    history_reverted: "Se volvió a la versión seleccionada",
+    history_revert_error: "Error al revertir el registro",
+    history_revert_dirty: "Guarda o descarta tus cambios antes de revertir",
+    history_empty: "No hay historial disponible",
+    history_empty_description: "Al guardar un registro se crea una nueva versión y se almacena en el historial.",
+    history_new_entity: "El historial solo está disponible para registros existentes",
+    history_no_more: "No hay más historial"
 };
