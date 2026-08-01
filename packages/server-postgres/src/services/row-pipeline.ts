@@ -164,7 +164,7 @@ export function relationTargetAddress(
  * expects real types. The row's own address is *not* among the columns — it is
  * derived by the consumer from the collection's primary keys.
  */
-export function toCmsRow(
+export function toFlatRow(
     row: Record<string, unknown>,
     collection: CollectionConfig,
     registry: PostgresCollectionRegistry

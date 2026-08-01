@@ -157,7 +157,7 @@ describe("SDK data symmetry (flat backend context.data == flat frontend client)"
 const COMPANY = { id: "c1", name: "Acme" };
 const JOB = { id: "j1", title: "Engineer", company_id: "c1" };
 
-/** A relation envelope, exactly as `toCmsRow` builds one. */
+/** A relation envelope, exactly as `toFlatRow` builds one. */
 function envelope(values: Record<string, unknown>, path: string) {
     return {
         id: values.id,

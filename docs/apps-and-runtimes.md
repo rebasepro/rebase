@@ -1,8 +1,25 @@
 # Apps, runtimes, and the admin
 
-Status: **proposal — implementation-ready**
+Status: **implemented** — verified against the source 2026-08-01.
 Scope: `packages/types`, `packages/admin`, `packages/admin-types`, `packages/app`,
 `packages/cli`, `packages/server`, `saas`, templates
+
+§5's execution plan is history; read §1–§4 for the decisions and §6 for the
+traps, which is what the code cannot carry on its own. Checked, not assumed:
+
+| Decision | Where it landed |
+| --- | --- |
+| D1 `runtime: "managed" \| "custom"` | `RebaseBackendAppConfig.runtime` |
+| D2–D4 `admin` / `custom` / `mobile` deleted | `RebaseAppType = "backend" \| "static"` |
+| D5 `backend.mode` (`cms`/`baas`) deleted | no live field left — only comments recording what replaced it |
+| D6 manifest `kind` | `kind: "backend" \| "static"` |
+| D8 `runtime` → `rebase` | `rebase: string` on the project manifest |
+| D9 "CMS" out of the exported API | the last three — `firestoreToCMSModel`, `cmsToFirestoreModel`, `toCmsRow` — are now `firestoreToRebaseModel`, `rebaseToFirestoreModel`, `toFlatRow` |
+| D11 `rebase eject` | `packages/cli/src/commands/eject.ts`, plus its template |
+
+A plan that still says "proposal" after it has shipped is worse than no status
+line at all: it is what a reader trusts when deciding whether the work is still
+outstanding, and it says the opposite of the truth.
 
 ---
 

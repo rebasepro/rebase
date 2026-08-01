@@ -141,7 +141,7 @@ export function useFirestoreDriver({
                         );
                     }
 
-                    queryParams.push(whereClause(key, op, cmsToFirestoreModel(value, firestore)));
+                    queryParams.push(whereClause(key, op, rebaseToFirestoreModel(value, firestore)));
                 });
         }
 
@@ -456,7 +456,7 @@ export function useFirestoreDriver({
             values: valuesProp,
             collection
         })
-        const values = cmsToFirestoreModel(valuesProp, getFirestore(firebaseApp));
+        const values = rebaseToFirestoreModel(valuesProp, getFirestore(firebaseApp));
 
         console.debug("2", {
             path,
@@ -485,7 +485,7 @@ export function useFirestoreDriver({
         return setDoc(documentReference, values as Record<string, unknown>, { merge: true })
             .then(() => {
                 return {
-                    ...(firestoreToCMSModel(values) as Record<string, unknown>),
+                    ...(firestoreToRebaseModel(values) as Record<string, unknown>),
                     id: documentReference.id
                 };
             })
@@ -542,7 +542,7 @@ export function useFirestoreDriver({
         if (value === undefined || value === null) {
             return Promise.resolve(true);
         }
-        const q = query(collectionClause(firestore, path), whereClause(name, "==", cmsToFirestoreModel(value, firestore)));
+        const q = query(collectionClause(firestore, path), whereClause(name, "==", rebaseToFirestoreModel(value, firestore)));
         const entity = await getDocs(q);
         return entity.docs.filter(doc => doc.id !== id).length === 0;
 
@@ -648,7 +648,7 @@ export function useFirestoreDriver({
 const createRowFromDocument = (
     docSnap: DocumentSnapshot
 ): Record<string, unknown> => {
-    const values = firestoreToCMSModel(docSnap.data()) as Record<string, unknown>;
+    const values = firestoreToRebaseModel(docSnap.data()) as Record<string, unknown>;
     return {
         ...values,
         // Spread the canonical document id last so it wins over a literal `id` field
@@ -666,7 +666,7 @@ const createRowFromDocument = (
  * @param data
  * @group Firestore
  */
-export function firestoreToCMSModel(data: unknown): unknown {
+export function firestoreToRebaseModel(data: unknown): unknown {
     if (data === null || data === undefined) return null;
     if (typeof data === "object" && data !== null && "isEqual" in data && typeof (data as FieldValue).isEqual === "function" && deleteField().isEqual(data as FieldValue)) {
         return undefined;
@@ -698,12 +698,12 @@ value: (data as { toArray: () => number[] }).toArray() };
             databaseId });
     }
     if (Array.isArray(data)) {
-        return data.map(firestoreToCMSModel).filter(v => v !== undefined);
+        return data.map(firestoreToRebaseModel).filter(v => v !== undefined);
     }
     if (typeof data === "object") {
         const result: Record<string, unknown> = {};
         for (const key of Object.keys(data)) {
-            const childValue = firestoreToCMSModel((data as Record<string, unknown>)[key]);
+            const childValue = firestoreToRebaseModel((data as Record<string, unknown>)[key]);
             if (childValue !== undefined)
                 result[key] = childValue;
         }
@@ -723,13 +723,13 @@ function getCMSPathFromFirestorePath(fsPath: string): string {
 }
 
 
-export function cmsToFirestoreModel(data: unknown, firestore: Firestore, inArray = false): unknown {
+export function rebaseToFirestoreModel(data: unknown, firestore: Firestore, inArray = false): unknown {
     if (data === undefined) {
         return deleteField();
     } else if (data === null) {
         return null;
     } else if (Array.isArray(data)) {
-        return (data as unknown[]).filter(v => v !== undefined).map(v => cmsToFirestoreModel(v, firestore, true));
+        return (data as unknown[]).filter(v => v !== undefined).map(v => rebaseToFirestoreModel(v, firestore, true));
     } else if (typeof data === "object" && data !== null && "isEntityReference" in data && typeof (data as Record<string, unknown>).isEntityReference === "function" && (data as { isEntityReference: () => boolean }).isEntityReference()) {
         const entityRef = data as EntityReference;
         const targetFirestore = entityRef.databaseId ? getFirestore(firestore.app, entityRef.databaseId) : firestore;
@@ -746,7 +746,7 @@ export function cmsToFirestoreModel(data: unknown, firestore: Firestore, inArray
     } else if (data && typeof data === "object") {
         return Object.entries(data)
             .map(([key, v]) => {
-                const firestoreModel = cmsToFirestoreModel(v, firestore);
+                const firestoreModel = rebaseToFirestoreModel(v, firestore);
                 if (firestoreModel !== undefined)
                     return ({ [key]: firestoreModel });
                 else

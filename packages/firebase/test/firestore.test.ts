@@ -1,9 +1,9 @@
 import { expect, it } from "@jest/globals";
 import { Timestamp } from "@firebase/firestore";
 import type { Firestore } from "@firebase/firestore";
-import { cmsToFirestoreModel, firestoreToCMSModel } from "../src/hooks/useFirestoreDriver";
+import { rebaseToFirestoreModel, firestoreToRebaseModel } from "../src/hooks/useFirestoreDriver";
 
-it("cmsToFirestoreModel", () => {
+it("rebaseToFirestoreModel", () => {
     const inputValues = {
         content:
             [{
@@ -15,14 +15,14 @@ it("cmsToFirestoreModel", () => {
         order: 2,
         title: { en: "Test pill in english" }
     };
-    const result = cmsToFirestoreModel(inputValues, {} as unknown as Firestore);
+    const result = rebaseToFirestoreModel(inputValues, {} as unknown as Firestore);
     expect(result).toEqual(inputValues);
 });
 
 it("timestamp conversion", () => {
     const timestamp = Timestamp.now();
     const date = timestamp.toDate();
-    expect(firestoreToCMSModel({ created_on: timestamp })
+    expect(firestoreToRebaseModel({ created_on: timestamp })
     ).toEqual({ created_on: date });
 });
 
@@ -32,7 +32,7 @@ it("timestamp array conversion", () => {
     const date = timestamp.toDate();
 
     expect(
-        firestoreToCMSModel({ my_array: [timestamp] })
+        firestoreToRebaseModel({ my_array: [timestamp] })
     ).toEqual({ my_array: [date] });
 
 });
@@ -49,7 +49,7 @@ it("vector conversion", () => {
         }
     };
 
-    const result = cmsToFirestoreModel(inputValues, {} as unknown as Firestore) as {
+    const result = rebaseToFirestoreModel(inputValues, {} as unknown as Firestore) as {
         embedding: { toArray: () => number[] }
     };
 
@@ -65,9 +65,9 @@ it("vector round trip", () => {
         }
     };
 
-    const stored = cmsToFirestoreModel(inputValues, {} as unknown as Firestore);
+    const stored = rebaseToFirestoreModel(inputValues, {} as unknown as Firestore);
 
     // On the way back a Firestore VectorValue has to become the tagged shape
     // again, or what the panel reads is not what it wrote.
-    expect(firestoreToCMSModel(stored)).toEqual(inputValues);
+    expect(firestoreToRebaseModel(stored)).toEqual(inputValues);
 });
