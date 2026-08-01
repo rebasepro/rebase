@@ -1,3 +1,5 @@
+import type { ChipColorKey } from "@rebasepro/ui";
+
 export type ProjectStatus = "backlog" | "in_progress" | "in_review" | "done";
 export type ProjectPriority = "low" | "medium" | "high" | "critical";
 
@@ -14,14 +16,14 @@ export interface SampleProject {
     createdAt: string;
 }
 
-export const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string }> = {
+export const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: ChipColorKey }> = {
     backlog: { label: "Backlog", color: "gray" },
     in_progress: { label: "In Progress", color: "blue" },
     in_review: { label: "In Review", color: "purple" },
     done: { label: "Done", color: "green" }
 };
 
-export const PRIORITY_CONFIG: Record<ProjectPriority, { label: string; color: string }> = {
+export const PRIORITY_CONFIG: Record<ProjectPriority, { label: string; color: ChipColorKey }> = {
     low: { label: "Low", color: "gray" },
     medium: { label: "Medium", color: "yellow" },
     high: { label: "High", color: "orange" },

@@ -8,7 +8,7 @@ import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 import type { AuthController } from "@rebasepro/admin-types";
-import { ChipColorScheme, CHIP_COLORS } from "@rebasepro/ui";
+import { ChipColorScheme, CHIP_COLORS, CHIP_SEED_KEYS } from "@rebasepro/ui";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
 function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
@@ -417,8 +417,10 @@ id: relation.id });
 
         if (items.length > 0) {
             const relIndex = relationKeys.indexOf(relKey);
-            const chipColors = Object.values(CHIP_COLORS);
-            const colorScheme = chipColors[relIndex % chipColors.length];
+            // Walking the seed keys rather than `Object.values`: the table also
+            // holds a bare-hue alias per hue, so raw values would hand the first
+            // two relations the same scheme.
+            const colorScheme = CHIP_COLORS[CHIP_SEED_KEYS[relIndex % CHIP_SEED_KEYS.length]];
             relations.push({
                 property: prop,
                 propertyKey: relKey,

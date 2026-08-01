@@ -1,5 +1,5 @@
 import { EnumValueConfig } from "@rebasepro/types";
-import { CHIP_COLORS, ChipColorScheme, getColorSchemeForSeed } from "@rebasepro/ui";
+import { ChipColorScheme, getColorSchemeForKey, getColorSchemeForSeed } from "@rebasepro/ui";
 import { getLabelOrConfigFrom } from "@rebasepro/common";
 
 export function getColorScheme(enumValues: EnumValueConfig[], key: string | number): ChipColorScheme | undefined {
@@ -8,7 +8,9 @@ export function getColorScheme(enumValues: EnumValueConfig[], key: string | numb
         return getColorSchemeForSeed(key.toString());
     if (typeof labelOrConfig === "object" && "color" in labelOrConfig) {
         if (typeof labelOrConfig.color === "string")
-            return CHIP_COLORS[labelOrConfig.color];
+            // Not a raw table lookup: a config naming a colour this build does
+            // not have still deserves a colour rather than `undefined`.
+            return getColorSchemeForKey(labelOrConfig.color);
         if (typeof labelOrConfig.color === "object")
             return labelOrConfig.color;
     }

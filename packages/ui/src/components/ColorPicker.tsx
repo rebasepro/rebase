@@ -2,6 +2,7 @@
 import React from "react";
 import { CHIP_COLORS, cls } from "../util";
 import { ChipColorKey, ChipColorScheme } from "./Chip";
+import type { ChipTone } from "../util/chip_colors";
 import { CheckIcon } from "lucide-react";
 import { Tooltip } from "./Tooltip";
 
@@ -28,12 +29,16 @@ export interface ColorPickerProps {
     disabled?: boolean;
 }
 
-// Base colors in display order
+// Hues across, tones down — the arrangement the palette is built in.
 const BASE_COLORS = ["blue", "indigo", "violet", "purple", "fuchsia", "pink", "rose", "red", "orange", "yellow", "green", "emerald", "teal", "cyan", "gray"] as const;
 
+// Lightest first, matching how the bare hue name reads.
+const TONES: ChipTone[] = ["Lighter", "Light", "Dark", "Darker"];
+
 // Helper to get readable name from color key
-function getColorDisplayName(colorKey: ChipColorKey): string {
-    return `${colorKey.charAt(0).toUpperCase()}${colorKey.slice(1)}`;
+function getColorDisplayName(hue: string, tone: ChipTone): string {
+    const hueName = `${hue.charAt(0).toUpperCase()}${hue.slice(1)}`;
+    return tone === "Lighter" ? hueName : `${hueName} ${tone.toLowerCase()}`;
 }
 
 /**
@@ -80,48 +85,56 @@ export function ColorPicker({
                 </button>
             )}
 
-            <div className="flex flex-wrap gap-1.5">
-                {BASE_COLORS.map((base) => {
-                    const colorKey = base as ChipColorKey;
-                    const colorScheme = CHIP_COLORS[colorKey] as ChipColorScheme;
-                    const isSelected = value === colorKey;
-                    const displayName = getColorDisplayName(colorKey);
+            {/* One row per tone. Wrapping rather than a fixed 15-column grid:
+                the picker also opens inside narrow property panels, where
+                fifteen tracks would shrink each swatch to a few pixels. */}
+            {TONES.map((tone) => (
+                <div key={tone} className="flex flex-wrap gap-1.5">
+                    {BASE_COLORS.map((base) => {
+                        // The bare hue and its `Lighter` tone are the same
+                        // scheme; the picker offers the short name so configs
+                        // stay readable.
+                        const colorKey = (tone === "Lighter" ? base : `${base}${tone}`) as ChipColorKey;
+                        const colorScheme = CHIP_COLORS[colorKey] as ChipColorScheme;
+                        const isSelected = value === colorKey;
+                        const displayName = getColorDisplayName(base, tone);
 
-                    return (
-                        <Tooltip
-                            key={colorKey}
-                            title={displayName}
-                            delayDuration={300}
-                        >
-                            <button
-                                type="button"
-                                disabled={disabled}
-                                onClick={() => onChange(colorKey)}
-                                className={cls(
-                                    swatchSize,
-                                    "rounded-full transition-all flex items-center justify-center",
-                                    "hover:scale-110 hover:shadow-md",
-                                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
-                                    disabled && "opacity-50 cursor-not-allowed hover:scale-100",
-                                    isSelected && "ring-2 ring-primary ring-offset-1"
-                                )}
-                                style={{
-                                    backgroundColor: colorScheme.color
-                                }}
-                                aria-label={displayName}
-                                aria-pressed={isSelected}
+                        return (
+                            <Tooltip
+                                key={colorKey}
+                                title={displayName}
+                                delayDuration={300}
                             >
-                                {isSelected && (
-                                    <CheckIcon
-                                        size={checkSize}
-                                        style={{ color: colorScheme.text }}
-                                    />
-                                )}
-                            </button>
-                        </Tooltip>
-                    );
-                })}
-            </div>
+                                <button
+                                    type="button"
+                                    disabled={disabled}
+                                    onClick={() => onChange(colorKey)}
+                                    className={cls(
+                                        swatchSize,
+                                        "rounded-full transition-all flex items-center justify-center",
+                                        "hover:scale-110 hover:shadow-md",
+                                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1",
+                                        disabled && "opacity-50 cursor-not-allowed hover:scale-100",
+                                        isSelected && "ring-2 ring-primary ring-offset-1"
+                                    )}
+                                    style={{
+                                        backgroundColor: colorScheme.color
+                                    }}
+                                    aria-label={displayName}
+                                    aria-pressed={isSelected}
+                                >
+                                    {isSelected && (
+                                        <CheckIcon
+                                            size={checkSize}
+                                            style={{ color: colorScheme.text }}
+                                        />
+                                    )}
+                                </button>
+                            </Tooltip>
+                        );
+                    })}
+                </div>
+            ))}
         </div>
     );
 }

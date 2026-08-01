@@ -18,7 +18,8 @@ export * from "./icons";
 // =============================================================================
 export * from "./styles";
 export { cls } from "./util/cls";
-export { CHIP_COLORS, getColorSchemeForKey, getColorSchemeForSeed } from "./util/chip_colors";
+export { CHIP_COLORS, CHIP_HUES, CHIP_SEED_KEYS, getColorSchemeForKey, getColorSchemeForSeed } from "./util/chip_colors";
+export type { ChipHue, ChipTone } from "./util/chip_colors";
 
 // =============================================================================
 // Public Hooks
