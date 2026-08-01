@@ -272,6 +272,84 @@ weaker one was a slip rather than a decision.
 
 ---
 
+## 10. A flag whose `false` grants instead of skipping
+
+`requireAuth` on both realtime sockets was resolved as
+
+```ts
+const requireAuth = authConfig?.requireAuth !== false && !!authConfig?.jwtSecret;
+```
+
+and the connection handler then seeded each session with
+`authenticated: !requireAuth`. So the flag does not gate a check — it *is* the
+check, inverted. Computing `false` did not skip authentication, it granted it to
+everyone who connected, at connect time, silently. `requireAuth: true` on a
+server whose auth came from an adapter rather than a local `jwtSecret`
+evaluated to `false`: asking for authentication was what turned it off.
+
+**Sweep:** grep for a boolean derived from config that is later consumed
+*negated* — `!flag`, `flag ? x : y` where `y` is the permissive branch, or a
+default assignment like `authenticated: !requireAuth`, `allowed: !restricted`,
+`isPublic: !requireX`. For each, ask what the value is when the feature is
+requested but its prerequisite is absent. If that state grants rather than
+refuses, it is this class.
+
+**Fix shape:** fail closed, and say so. An explicit request for a restriction is
+honoured on its own; when there is no credential to enforce it with, refuse
+everyone and log at boot. Refusing is visible and gets reported; admitting is
+not, and does not.
+
+---
+
+## 11. Two interfaces for one call, disagreeing
+
+`init.ts` passes the AuthAdapter as the fifth argument to
+`initializeWebsockets`. `BackendBootstrapper` declares five parameters.
+`DatabaseAdapter` — the other type describing the same hop — declared four. The
+wrapper in `PostgresAdapter` was written against the shorter one and dropped the
+argument. JavaScript discards a surplus argument without complaint, and
+TypeScript had nothing to object to, because each side was individually
+consistent.
+
+What went missing was the argument that makes the socket secure by default. The
+same file already carried a comment explaining that `ensureCollectionSchema` and
+`ensureCollectionPolicies` had been dropped at this exact boundary before, with
+the same silence — which is the tell that the boundary, not the method, is the
+defect.
+
+**Sweep:** for every hop where an object is re-wrapped or forwarded, diff the
+two type declarations parameter by parameter, and diff both against the call
+site. `grep -n "<method>" packages/types/src` will usually turn up more than one
+declaration; if their arities differ, something is being dropped right now.
+
+**Fix shape:** one declaration, or make the narrower one reference the wider.
+Then pin it with a test that asserts the forwarded call receives *every*
+argument, not that the method exists — a wrapper that drops an argument is still
+a function of the right name.
+
+---
+
+## 12. A prop the component does not have
+
+`render(<Alert severity="error">…</Alert>)` in a test named "renders alert with
+correct message". `AlertProps` has no `severity`; the prop is `color`. React
+drops an unknown prop silently, so the alert rendered in its default blue while
+the test — which read only the text — passed. It is class 7 with a JSX face, and
+it survived because `packages/ui/test` was not in `tsconfig.tests.json`.
+
+Its neighbour in the same file was the inverse: `<VirtualTable<any> …>` did not
+compile, and the reason was a product bug. `React.memo` takes the props type as
+its *own* type argument, so `React.memo<VirtualTableProps<Record<string, unknown>>>(…)`
+pinned `T` at the boundary and discarded the `<T>` the inner function declares.
+The exported component was not generic at all.
+
+**Sweep:** put the test directory in `tsconfig.tests.json` — that is the whole
+sweep, and it is why the include list is the unit of progress rather than the
+individual fix. Then read what tsc rejects rather than suppressing it: half of
+these are the test's mistake and half are the product's.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -342,3 +420,40 @@ that exists, is correct, and never runs. `saas` CI could not see this repo's
 commits, and the Playwright suite could not survive CI's database. In both cases
 the work had been done and the wiring had not, which is cheaper to find by
 asking "when does this actually execute?" than by reading the assertions.
+
+### Last sweep — 2026-08-01
+
+Triggered by a mutation-testing campaign over every package, and a read of all
+402 test files. Mutation scores at the start (comment-masked, sampled):
+`common` 72%, `client` 59%, `server-postgres` 48%, `inference` 40%,
+`server-mongo` 37%, `cli` 31%, `server` 33%, `admin` 12%.
+
+| checked | result |
+|---|---|
+| `requireAuth` on the Postgres and Mongo sockets | **BUG** (class 10) — an explicit `requireAuth: true` resolved to `false` without a local `jwtSecret`, marking every connecting client authenticated. Both fixed, fail closed, warn at boot. |
+| `DatabaseAdapter.initializeWebsockets` arity vs `BackendBootstrapper` | **BUG** (class 11) — four parameters against five, so the AuthAdapter was dropped and secure-by-default was lost through `createPostgresAdapter`. Fixed and pinned. |
+| Mongo `clientSessions` map | **BUG** — module-level, shared by every socket in the process; two servers read each other's sessions. Scoped to the factory, as Postgres already was. |
+| `parseSubPath` and a literal `undefined` segment | **BUG** — `/authors/123/undefined/posts` was answered with `/authors/123/posts`. Now 404. |
+| `S3StorageController.deleteObject` on a missing key | **BUG** — 200 on AWS, 500 on MinIO/Ceph. Idempotent now, matching the local controller. |
+| `Bearer` scheme case-sensitivity | **BUG** — against RFC 7235 §2.1; `bearer` was a 401 indistinguishable from a bad token. Fixed. |
+| client `where: { f: ["==", undefined] }` | **BUG** — serialized to `f=eq.undefined`, a search for the literal string. Now refused, because silently dropping the condition returns the query *unfiltered*. |
+| `count()` forwarding `include` | **BUG** — a non-matching join drops rows, so the total disagreed with the `find()` it describes. |
+| enum labels in generated DDL | **BUG** — interpolated unescaped, and emitted twice for two collections on one table. Both fixed. |
+| `singularize("knives")` | **BUG** — `"knif"`, and `archives → archif` with it. Closed f/fe map. |
+| `getInferenceType(null)` | **BUG** — `"map"`, disagreeing with `inferTypeFromValue` on the same value (class 2). |
+| `buildPropertiesOrder` | **BUG** — overwrote the caller's order and sorted it in place. No internal callers. |
+| `fromSerializableCollectionConfig` relations | **BUG** — rebuilt property thunks but not the collection-level array; imported tables threw "target is not a function". |
+| `<Alert severity="error">` | **BUG** (class 12) — a prop that does not exist, silently dropped by React. |
+| `VirtualTable`'s generic | **BUG** (class 12) — discarded by `React.memo`; the exported component was not generic. |
+| `packages/app/test/components/useBoardDataController.test.ts` | **BUG** (class 3) — never imported the hook, and could not: it lives in `admin`, which depends on `app`. Rewritten in `admin`. |
+| `VirtualTable.performance.test.tsx` | **BUG** (class 3) — ~300 lines that never ran; it triggered a `ResizeObserver` the mocked `react-use-measure` never constructs. |
+| `reset-password-admin`, `admin-users-ids-lookup` | **BUG** (class 8) — no 401 or 403 at all, so dropping `requireAdmin` passed. |
+| `websocket.test.ts` admin gate | **BUG** (class 8) — stubbed the token verifier to return an admin unconditionally, so only the happy path could ever run. |
+| `mfa-service.test.ts` | **BUG** — counted calls without reading the statements; dropping `AND uid = …` from a factor delete passed. |
+| test directories invisible to tsc | **BUG** (class 7/12, systemic) — six more packages added to `tsconfig.tests.json`; 47 errors fixed, no `as any`, no `@ts-ignore`. |
+
+The two socket findings are worth keeping together, because they are the same
+bug reached two different ways: once by a boolean expression that inverted its
+own meaning, once by a type signature that silently ate the argument which would
+have made the expression irrelevant. Neither had a test, and the test that
+existed for the gate stubbed the verifier so that it could not have failed.
