@@ -1,8 +1,9 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
 import { AnyPgColumn, integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 import { FetchService } from "../src/services/FetchService";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { configureUnknownFilterFields } from "../src/utils/drizzle-conditions";
 
 /**
  * Sorting by an owning relation sorts by the foreign key it compiles to, and
@@ -82,7 +83,48 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         expect(resolve("users")?.name).toBe("user_id");
     });
 
-    it("resolves nothing for a field that names neither a column nor a relation", () => {
-        expect(resolve("nonexistent", postsCollection)).toBeUndefined();
+    it("refuses a field that names neither a column nor a relation", () => {
+        /*
+         * This used to resolve to `undefined`, and the caller then dropped the
+         * ORDER BY: `?orderBy=titel` answered 200 with rows in whatever order
+         * Postgres pleased, while the requester believed they were sorted.
+         * A filter naming a field that does not exist is already refused for
+         * exactly that reason, so a sort field answers the same way.
+         */
+        expect(() => resolve("nonexistent", postsCollection))
+            .toThrow(/Unknown orderBy field 'nonexistent' on collection 'posts'/);
+    });
+
+    it("names the fields that would have worked", () => {
+        // Same courtesy the filter path extends — without the list, the caller
+        // is told their guess was wrong and nothing else.
+        expect(() => resolve("nonexistent", postsCollection))
+            .toThrow(/Valid fields: created_by, id, title, user_id, user_profile_id/);
+    });
+
+    it("carries a machine-readable code, like the filter path", () => {
+        try {
+            resolve("nonexistent", postsCollection);
+            throw new Error("expected resolveOrderByField to throw");
+        } catch (err) {
+            expect((err as { code?: string }).code).toBe("UNKNOWN_ORDER_BY_FIELD");
+            expect((err as { statusCode?: number }).statusCode).toBe(400);
+        }
+    });
+
+    describe("under the lenient switch", () => {
+        // One knob for both: a deployment that wants unknown *filter* fields
+        // warned rather than refused wants the same for sort fields.
+        beforeEach(() => configureUnknownFilterFields("warn"));
+        afterEach(() => configureUnknownFilterFields("error"));
+
+        it("drops the sort and warns instead of throwing", () => {
+            const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+            expect(resolve("nonexistent", postsCollection)).toBeUndefined();
+            expect(warn.mock.calls.flat().join(" ")).toMatch(/does not exist in the table/);
+
+            warn.mockRestore();
+        });
     });
 });
