@@ -3,7 +3,7 @@ import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError, isRebaseApiError } from "../errors";
 import { parseQueryOptions, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
-import { assertKnownWriteFields } from "./write-validation";
+import { assertKnownWriteFields, projectResponseFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
@@ -226,7 +226,12 @@ export class RestApiGenerator {
             const total = await this.countRawEntities(driver, resolvedCollection, queryOptions, searchString);
 
             return c.json({
-                data: entities,
+                data: projectResponseFields(
+                    entities as Record<string, unknown>[],
+                    queryOptions.fields,
+                    resolvedCollection,
+                    { include: queryOptions.include }
+                ),
                 meta: {
                     total,
                     limit: queryOptions.limit,
@@ -254,7 +259,12 @@ export class RestApiGenerator {
                 throw ApiError.notFound("Entity not found");
             }
 
-            return c.json(entity);
+            return c.json(projectResponseFields(
+                [entity as Record<string, unknown>],
+                queryOptions.fields,
+                resolvedCollection,
+                { include: queryOptions.include }
+            )[0]);
         });
 
         // POST /collection/bulk - Write many rows as one transaction.
