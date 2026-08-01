@@ -1,4 +1,5 @@
 import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
+import type { LogicalCondition } from "../controllers/data";
 import type { AuthAdapter } from "./auth_adapter";
 import type { HistoryConfig } from "../controllers/client";
 import type { ChannelBusSetting } from "./channel_bus";
@@ -73,6 +74,13 @@ export interface SearchOptions<M extends Record<string, unknown> = Record<string
  */
 export interface CountOptions<M extends Record<string, unknown> = Record<string, unknown>> {
     filter?: FilterValues<Extract<keyof M, string>>;
+    /**
+     * An `or(...)`/`and(...)` group, alongside `filter`.
+     *
+     * Counted as well as fetched, or `total` describes a different set of rows
+     * from the one that was served — the same reason `filter` is here.
+     */
+    logical?: LogicalCondition;
     searchString?: string;
     databaseId?: string;
 }

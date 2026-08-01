@@ -2,6 +2,7 @@ import type { CollectionRegistryController } from "./collection_registry";
 import type { EntityStatus, EntityValues } from "../types/entities";
 import type { CollectionConfig, FilterValues } from "../types/collections";
 import type { RebaseCallContext } from "../call_context";
+import type { LogicalCondition } from "./data";
 
 
 /**
@@ -103,6 +104,14 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
     path: string;
     collection?: CollectionConfig<M>;
     filter?: FilterValues<Extract<keyof M, string>>,
+    /**
+     * An `or(...)`/`and(...)` group, applied alongside `filter`.
+     *
+     * The REST layer parsed `?or=` into this and then had nowhere to put it, so
+     * the group was dropped and the read ran unfiltered — returning every row
+     * the caller's policies allowed rather than the ones they asked for.
+     */
+    logical?: LogicalCondition;
     limit?: number;
     offset?: number;
     startAfter?: unknown;
@@ -366,6 +375,8 @@ export interface RestFetchService {
         collectionPath: string,
         options?: {
             filter?: FilterValues<string>;
+            /** An `or(...)`/`and(...)` group, applied alongside `filter`. */
+            logical?: LogicalCondition;
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;

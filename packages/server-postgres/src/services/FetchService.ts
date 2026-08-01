@@ -994,6 +994,7 @@ relatedTo: hop });
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            logical?: LogicalCondition;
             searchString?: string;
             databaseId?: string;
         } = {}
@@ -1023,6 +1024,13 @@ relatedTo: hop });
         if (options.filter) {
             const filterConditions = this.buildFilterConditions(options.filter, table, effectivePath);
             if (filterConditions.length > 0) allConditions.push(...filterConditions);
+        }
+
+        if (options.logical) {
+            const logicalCondition = DrizzleConditionBuilder.buildLogicalConditions(
+                options.logical, table, effectivePath, this.filterContext(effectivePath, table)
+            );
+            if (logicalCondition) allConditions.push(logicalCondition);
         }
 
         if (allConditions.length > 0) {
@@ -1095,6 +1103,8 @@ relatedTo: hop });
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            /** An `or(...)`/`and(...)` group, applied alongside `filter`. */
+            logical?: LogicalCondition;
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;

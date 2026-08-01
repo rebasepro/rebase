@@ -212,6 +212,9 @@ export class RestApiGenerator {
                     collection.slug,
                     {
                         filter: queryOptions.where,
+                        // `?or=`/`?and=` were parsed and then dropped right here,
+                        // so a filtered read returned every row RLS allowed.
+                        logical: queryOptions.logical,
                         limit: queryOptions.limit,
                         offset: queryOptions.offset,
                         orderBy: queryOptions.orderBy?.[0]?.field,
@@ -640,6 +643,9 @@ id: parsed.id });
                 const fetchService = driver.restFetchService;
                 const listOptions = {
                     filter: queryOptions.where,
+                    // Same omission the comment above describes, one parameter
+                    // later: parsed, then dropped, so `?or=` widened the read.
+                    logical: queryOptions.logical,
                     limit: queryOptions.limit,
                     offset: queryOptions.offset,
                     orderBy: queryOptions.orderBy?.[0]?.field,
@@ -654,6 +660,7 @@ id: parsed.id });
                 const total = driver.count ? await driver.count({
                     path: parsed.collectionPath,
                     filter: queryOptions.where,
+                    logical: queryOptions.logical,
                     searchString
                 }) : entities.length;
 
@@ -790,6 +797,10 @@ id: parsed.id });
             path: getCollectionDataPath(collection),
             collection,
             filter: queryOptions.where,
+            // The fallback every driver without a `restFetchService` uses —
+            // mongo, firebase, anything a developer registers. It dropped the
+            // group exactly as the Postgres path did.
+            logical: queryOptions.logical,
             limit: queryOptions.limit,
             orderBy: queryOptions.orderBy?.[0]?.field,
             order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
@@ -809,6 +820,9 @@ id: parsed.id });
             path: getCollectionDataPath(collection),
             collection,
             filter: queryOptions.where,
+            // Counted as well as fetched, or `total` describes a different set
+            // of rows from the one that was served.
+            logical: queryOptions.logical,
             searchString
         }) : 0;
     }
