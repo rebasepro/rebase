@@ -54,8 +54,21 @@ export async function entry(args: string[]) {
         return;
     }
 
-    const command = parsedArgs._[0];
-    const subcommand = parsedArgs._[1];
+    // `permissive: true` is load-bearing here — each command parses its own
+    // flags, so this parser must pass anything it does not recognise through
+    // rather than reject it. The cost is that `arg` puts those flags into `_`,
+    // mixed in with the positionals: for `rebase cloud --json storage create`,
+    // `_` is ["cloud", "--json", "storage", "create"] and the subcommand read as
+    // "--json". Skip the flags when naming the command and its subcommand.
+    //
+    // This cannot be complete at this level: a flag that takes a value leaves
+    // the value behind as a bare token, and which flags take values is a fact
+    // only the individual command knows. So a command whose dispatch has to be
+    // exact resolves its own positionals against its own spec — see
+    // `positionals()` in commands/cloud/index.ts — and this is the coarse pass.
+    const words = parsedArgs._.filter(a => !a.startsWith("-"));
+    const command = words[0];
+    const subcommand = words[1];
 
     // Show global help only when no command given, or --help with no recognized command
     const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk"];

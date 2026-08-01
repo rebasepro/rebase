@@ -119,6 +119,46 @@ describe("CLI routing", () => {
         expect(cloudCommand).toHaveBeenCalledWith("--help", args);
     });
 
+    /**
+     * `permissive: true` is required here — every command parses its own flags,
+     * so this parser has to pass through what it does not recognise. But `arg`
+     * does not skip an undeclared flag, it appends it to `_` beside the
+     * positionals. `rebase cloud --json storage create` therefore gave
+     * `_ = ["cloud", "--json", "storage", "create"]` and the subcommand read as
+     * "--json", which `cloudCommand` then took for the resource group.
+     *
+     * The subcommand is now the second *word*, ignoring flags.
+     */
+    it("names the subcommand past a flag written before it", async () => {
+        const args = ["node", "rebase", "cloud", "--json", "storage", "create"];
+        await entry(args);
+        expect(cloudCommand).toHaveBeenCalledWith("storage", args);
+    });
+
+    it("names the command past a flag written before it", async () => {
+        const args = ["node", "rebase", "--json", "db", "push"];
+        await entry(args);
+        expect(dbCommand).toHaveBeenCalledWith("push", args);
+    });
+
+    /**
+     * What this level cannot fix, recorded so the limit is deliberate rather
+     * than discovered: a flag that takes a value leaves the value in `_` as a
+     * bare token, and which flags take values is known only to the command
+     * itself. So `--project acme` still yields "acme" as the subcommand here.
+     *
+     * That is why `cloudCommand` resolves the group from its own positionals
+     * against its own flag spec instead of trusting this argument — see the
+     * dispatch tests in cloud/cloud-commands.test.ts. This asserts the handoff
+     * still happens with the full argv, which is what makes that recovery
+     * possible.
+     */
+    it("hands cloud the whole argv, since only cloud can parse cloud's flags", async () => {
+        const args = ["node", "rebase", "cloud", "--project", "acme", "storage", "create"];
+        await entry(args);
+        expect(cloudCommand).toHaveBeenCalledWith("acme", args);
+    });
+
     it("routes 'build' to buildCommand", async () => {
         await entry(["node", "rebase", "build"]);
         expect(buildCommand).toHaveBeenCalled();

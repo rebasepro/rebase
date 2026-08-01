@@ -374,6 +374,40 @@ export function removeLink(cwd: string = process.cwd()): boolean {
     return false;
 }
 
+/**
+ * Flags that may appear anywhere on a `rebase cloud` line, including *before*
+ * the resource group.
+ *
+ * They have to be declared wherever positionals are resolved, because `arg`'s
+ * `permissive: true` does not merely tolerate an undeclared flag — it pushes it
+ * into `_` alongside the positionals, and for a flag that takes a value it
+ * pushes the value in too. So `cloud --project acme storage create` parsed
+ * without this spec yields `_` of `["--project", "acme", "storage", "create"]`,
+ * and the group reads as `"acme"`: a real project name, in the group position,
+ * dispatching to nothing. Skipping tokens that start with `-` does not save you
+ * there — the damage is the orphaned value, which looks exactly like a
+ * positional.
+ *
+ * Only genuinely global flags belong here. Group-specific ones (`--bucket`,
+ * `--region`, …) are declared by the handler that owns them and always follow
+ * the group, so they cannot shift the group or action.
+ *
+ * `-p` is `--project` in eighteen places and `--password` in `login`. That
+ * ambiguity does not matter to the one caller that reads this spec: it resolves
+ * positionals and never looks at a flag's value, so all it needs to know is
+ * that `-p` takes one. Anything that wants the value must keep declaring it
+ * itself, with the meaning its own command gives it.
+ */
+export const GLOBAL_CLOUD_FLAGS = {
+    "--json": Boolean,
+    "--yes": Boolean,
+    "--help": Boolean,
+    "--project": String,
+    "-p": "--project",
+    "-y": "--yes",
+    "-h": "--help"
+} as const;
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**

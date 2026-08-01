@@ -13,10 +13,27 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { setJsonModeForTest } from "./context";
+import { cloudCommand, positionals } from "./index";
+import { storageCommand } from "./resources";
 import { isRollbackable, deploymentDurationMs, deploymentView, triggerInfo, type DeploymentRow } from "./deployments";
 import { parseEnvAssignment } from "./env";
 import { resolveExtensionAlias } from "./extensions";
 import { buildSettingsPatch } from "./settings";
+
+/**
+ * The resource handlers are stubbed so the dispatch tests can assert routing
+ * without reaching the network. Everything else in this file imports its
+ * subject directly and is unaffected.
+ */
+vi.mock("./resources", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("./resources")>()),
+    storageCommand: vi.fn(async () => {}),
+    statusCommand: vi.fn(async () => {}),
+    metricsCommand: vi.fn(async () => {}),
+    webhooksCommand: vi.fn(async () => {}),
+    clustersCommand: vi.fn(async () => {}),
+    billingCommand: vi.fn(async () => {})
+}));
 
 /* ── stdout capture ─────────────────────────────────────────────── */
 
@@ -357,8 +374,8 @@ describe("cloud subcommand dispatch", () => {
      * exactly what `storage create` and `storage attach` did when they shipped:
      * both advertised in the help, neither reachable.
      *
-     * The dispatcher already resolves the action positionally. This pins that
-     * contract so the next resource group cannot repeat it.
+     * The dispatcher resolves the action positionally. This pins that contract
+     * so the next resource group cannot repeat it.
      */
     it("puts the group at argv[3], not argv[2]", () => {
         const rawArgs = ["/usr/bin/node", "/path/rebase.js", "cloud", "storage", "create"];
@@ -368,14 +385,93 @@ describe("cloud subcommand dispatch", () => {
         expect(rawArgs[4]).toBe("create");
     });
 
-    it("resolves the action the way the dispatcher does", () => {
-        // Mirrors `positionals()` in index.ts: arg({}, { argv: rawArgs.slice(3) })._
-        const positionals = (rawArgs: string[]) => rawArgs.slice(3).filter((a) => !a.startsWith("-"));
-
-        expect(positionals(["node", "cli", "cloud", "storage", "create"])[1]).toBe("create");
-        expect(positionals(["node", "cli", "cloud", "storage", "attach", "--bucket", "b"])[1]).toBe("attach");
+    /**
+     * These call the real `positionals`. They used to call a copy declared in
+     * this file as `rawArgs.slice(3).filter(a => !a.startsWith("-"))` — which
+     * dropped flags, while the real function did not. So the copy had the
+     * behaviour the tests assert, the dispatcher did not, and every case below
+     * passed for as long as `rebase cloud --json storage create` was broken.
+     * A local re-implementation of the thing under test can only ever confirm
+     * itself.
+     */
+    it("resolves the group and action positionally", () => {
+        expect(positionals(["node", "cli", "cloud", "storage", "create"]).slice(0, 2))
+            .toEqual(["storage", "create"]);
+        expect(positionals(["node", "cli", "cloud", "storage", "attach", "--bucket", "b"])[1])
+            .toBe("attach");
         // Bare `rebase cloud storage` has no action, which is the list path.
         expect(positionals(["node", "cli", "cloud", "storage"])[1]).toBeUndefined();
+        expect(positionals(["node", "cli", "cloud"])[0]).toBeUndefined();
+    });
+
+    /**
+     * The reported bug. `arg`'s `permissive: true` does not skip an undeclared
+     * flag, it pushes it into `_` beside the positionals — so a flag written
+     * before the group took the group's place and `rebase cloud --json storage
+     * create` dispatched to a group named "--json".
+     *
+     * `--project` is the sharp case, and the reason filtering `-`-prefixed
+     * tokens is not on its own a fix: `arg` leaves the flag's *value* in `_`
+     * too, so the group came out as the project name — a real-looking word, in
+     * the right position, that no `startsWith("-")` test can catch.
+     */
+    it.each([
+        ["flag before the group", ["node", "cli", "cloud", "--json", "storage", "create"]],
+        ["flag between group and action", ["node", "cli", "cloud", "storage", "--json", "create"]],
+        ["value-taking flag before the group", ["node", "cli", "cloud", "--project", "acme", "storage", "create"]],
+        ["its short alias", ["node", "cli", "cloud", "-p", "acme", "storage", "create"]],
+        ["several, on both sides", ["node", "cli", "cloud", "--json", "-p", "acme", "storage", "--yes", "create"]],
+        ["an undeclared boolean flag", ["node", "cli", "cloud", "--verbose", "storage", "create"]]
+    ])("resolves storage/create with a %s", (_label, argv) => {
+        expect(positionals(argv).slice(0, 2)).toEqual(["storage", "create"]);
+    });
+
+    /**
+     * A flag *after* the action belongs to the handler, and must be left alone —
+     * otherwise fixing the leading case would eat the group's own options.
+     */
+    it("leaves flags after the action for the handler to parse", () => {
+        const pos = positionals(["node", "cli", "cloud", "storage", "create", "--bucket", "b"]);
+        expect(pos.slice(0, 2)).toEqual(["storage", "create"]);
+    });
+
+    /**
+     * End to end through the dispatcher, because `positionals` being right is
+     * necessary and not sufficient: `cloudCommand` also had to stop preferring
+     * the `subcommand` the top-level parser passes it. That parser is generic
+     * over every command and cannot know which flags `cloud` takes, so for
+     * `cloud --json storage create` it reported the subcommand as "--json" —
+     * and the dispatcher trusted it over its own positionals.
+     */
+    it("routes a flag-prefixed line to the storage handler with the right action", async () => {
+        const storage = vi.mocked(storageCommand);
+        storage.mockClear();
+
+        // "--json" is what `cli.ts` derives as the subcommand for this line.
+        await cloudCommand("--json", ["node", "cli", "cloud", "--json", "storage", "create"]);
+
+        expect(storage).toHaveBeenCalledTimes(1);
+        expect(storage.mock.calls[0][0]).toBe("create");
+    });
+
+    it("still routes a clean line, and still prints help for a bare `cloud`", async () => {
+        const storage = vi.mocked(storageCommand);
+        storage.mockClear();
+
+        await cloudCommand("storage", ["node", "cli", "cloud", "storage", "create"]);
+        expect(storage.mock.calls[0][0]).toBe("create");
+
+        // No group at all: help, and nothing dispatched. The help printer uses
+        // `console.log`, which vitest intercepts above `process.stdout.write`,
+        // so the stdout shim the rest of this file uses would see nothing.
+        storage.mockClear();
+        const log = vi.spyOn(console, "log").mockImplementation(() => {});
+        await cloudCommand(undefined, ["node", "cli", "cloud"]);
+        const printed = log.mock.calls.map(c => String(c[0])).join("\n");
+        log.mockRestore();
+
+        expect(storage).not.toHaveBeenCalled();
+        expect(printed).toContain("storage");
     });
 });
 

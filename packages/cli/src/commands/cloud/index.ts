@@ -29,12 +29,35 @@ import {
     clustersCommand,
     billingCommand
 } from "./resources";
-import { requireProjectRef, initOutputMode } from "./context";
+import { requireProjectRef, initOutputMode, GLOBAL_CLOUD_FLAGS } from "./context";
 
-/** Positional tokens after `rebase cloud` (group, action, …). */
-function positionals(rawArgs: string[]): string[] {
-    return arg({}, { argv: rawArgs.slice(3),
-permissive: true })._;
+/**
+ * Positional tokens after `rebase cloud` (group, action, …).
+ *
+ * Two things stop a flag being mistaken for the group. `GLOBAL_CLOUD_FLAGS` is
+ * declared so `arg` *consumes* the flags that may precede it — critically
+ * together with their values, which is the half that filtering cannot do. The
+ * leading-`-` skip then covers a flag nobody declared, so an unrecognised
+ * boolean shifts nothing.
+ *
+ * Only leading tokens are skipped: past the group and action, an undeclared
+ * flag and its value are somebody else's positionals and none of our business.
+ * A flag this file has never heard of, that takes a value, placed before the
+ * group, is the one shape still unresolvable here — there is no way to know
+ * whether the token after it is its value or the group, and guessing either way
+ * is worse than the handler reporting an unknown group.
+ *
+ * Exported so its tests can drive the real thing. The dispatch test used to
+ * re-implement it locally as `slice(3).filter(a => !a.startsWith("-"))` — which
+ * filtered flags, while this function did not — so the test asserted the
+ * behaviour we wanted against a copy that had it, and stayed green for as long
+ * as the real dispatcher was broken.
+ */
+export function positionals(rawArgs: string[]): string[] {
+    const rest = arg(GLOBAL_CLOUD_FLAGS, { argv: rawArgs.slice(3), permissive: true })._;
+    let i = 0;
+    while (i < rest.length && rest[i].startsWith("-")) i++;
+    return rest.slice(i);
 }
 
 export async function cloudCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
@@ -43,7 +66,13 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
     initOutputMode(rawArgs);
 
     const pos = positionals(rawArgs);
-    const group = subcommand && subcommand !== "--help" ? subcommand : pos[0];
+    // The positionals win over the `subcommand` the top-level parser handed us.
+    // Both describe the same token, but only this one is resolved against a
+    // flag spec: `cli.ts` is generic across every command and cannot know which
+    // flags `cloud` takes, so with `cloud --json storage create` it reported the
+    // subcommand as `"--json"`. Falling back to it keeps the parameter useful
+    // when a caller passes a group that is not in `rawArgs` at all.
+    const group = pos[0] ?? (subcommand !== "--help" ? subcommand : undefined);
     const action = pos[1];
 
     if (!group || subcommand === "--help") {
