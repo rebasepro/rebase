@@ -111,17 +111,16 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
         ? entries.find(e => e.id === revertHistoryId)
         : undefined;
 
+    // `p-8` plus a `mt-24` heading were sized for a full-width tab that no
+    // longer exists. In the inspector panel that was 96px of nothing above the
+    // first revision, and 32px of gutter on each side of a 448px column.
     return <div
         ref={containerRef}
-        className={cls("relative flex-1 h-full overflow-auto w-full flex flex-col gap-4 p-8")}>
+        className={cls("relative flex-1 h-full overflow-auto w-full flex flex-col gap-4 p-4 sm:p-5")}>
         <div className="flex flex-col gap-2 max-w-6xl mx-auto w-full">
 
-            <Typography variant={"h5"} className={"mt-24 ml-4"}>
-                History
-            </Typography>
-
             {isLoading && entries.length === 0 && (
-                <div className="flex flex-col gap-4 mt-8 ml-4">
+                <div className="flex flex-col gap-4">
                     {[1, 2, 3].map(i => (
                         <div key={i} className="flex flex-col gap-2 animate-pulse">
                             <div className="h-4 w-48 bg-surface-200 dark:bg-surface-700 rounded"/>
@@ -132,16 +131,16 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
             )}
 
             {!isLoading && entries.length === 0 && <>
-                <Label className={"ml-4 mt-8"}>
+                <Label>
                     No history available
                 </Label>
-                <Typography variant={"caption"} className={"ml-4"}>
+                <Typography variant={"caption"}>
                     When you save a entity, a new version is created and stored in the history.
                 </Typography>
             </>}
 
             {entries.map((entry) => (
-                <div key={entry.id} className="flex flex-cols gap-2 w-full">
+                <div key={entry.id} className="flex flex-col gap-2 w-full">
                     <EntityHistoryEntry
                         entry={entry}
                         collection={collection}

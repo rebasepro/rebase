@@ -1,6 +1,7 @@
 import type { AdminCollection } from "@rebasepro/admin-types";
 import type { EntityStatus } from "@rebasepro/types";
 import React, { useState } from "react";
+import { useTranslation } from "@rebasepro/app";
 import {
     Button,
     CheckIcon,
@@ -8,6 +9,7 @@ import {
     CodeIcon,
     CopyIcon,
     defaultBorderMixin,
+    HistoryIcon,
     IconButton,
     iconSize,
     LoadingButton,
@@ -44,6 +46,8 @@ export interface EntityIdentityBarProps {
 
     onBack?: () => void;
     onInspect?: () => void;
+    /** Opens the inspector straight on its history tab. */
+    onViewHistory?: () => void;
 
     /**
      * Actions performed *on* the record — copy, delete, whatever the collection
@@ -83,14 +87,21 @@ export function EntityIdentityBar({
     onSaveAndClose,
     onBack,
     onInspect,
+    onViewHistory,
     recordActions,
     pluginActions,
     trailing
 }: EntityIdentityBarProps) {
 
-    const saveLabel = status === "existing" ? "Save" : status === "copy" ? "Create copy" : "Create";
-    const closeLabel = status === "existing" ? "Save and close" : "Create and close";
-    const hasMenu = Boolean(recordActions) || Boolean(onInspect);
+    const { t } = useTranslation();
+
+    const saveLabel = status === "existing"
+        ? t("save")
+        : status === "copy" ? t("create_copy") : t("create");
+    const closeLabel = status === "existing"
+        ? t("save_and_close")
+        : status === "copy" ? t("create_copy_and_close") : t("create_and_close");
+    const hasMenu = Boolean(recordActions) || Boolean(onInspect) || Boolean(onViewHistory);
 
     return (
         <div className={cls(
@@ -99,8 +110,8 @@ export function EntityIdentityBar({
             defaultBorderMixin
         )}>
             {onBack && (
-                <Tooltip title={"Back"}>
-                    <IconButton size={"small"} onClick={onBack} aria-label={"Back"}>
+                <Tooltip title={t("back")}>
+                    <IconButton size={"small"} onClick={onBack} aria-label={t("back")}>
                         <ArrowLeftIcon size={iconSize.smallest}/>
                     </IconButton>
                 </Tooltip>
@@ -123,18 +134,20 @@ export function EntityIdentityBar({
             {/* Only where there is something to save. The read-only detail
                 view has no Save button, and reporting "Saved" there implies an
                 editing session the user never started. */}
-            {onSave && <SaveState dirty={dirty} saving={saving} status={status}/>}
+            {onSave && <SaveState dirty={dirty} saving={saving} status={status} t={t}/>}
 
             {pluginActions}
 
             {onDiscard && dirty && !saving && (
                 <Button variant={"text"} size={"small"} onClick={onDiscard}>
-                    {status === "existing" ? "Discard" : "Clear"}
+                    {status === "existing" ? t("discard") : t("clear")}
                 </Button>
             )}
 
             {onSave && (
-                <Tooltip title={hasErrors ? "Fix highlighted errors before saving" : undefined}>
+                <Tooltip title={hasErrors
+                    ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving")
+                    : undefined}>
                     <LoadingButton
                         // Where there is something to close, closing is the
                         // dominant intent and takes the filled treatment.
@@ -163,16 +176,22 @@ export function EntityIdentityBar({
             {hasMenu && (
                 <Menu align={"end"}
                     trigger={
-                        <IconButton size={"small"} aria-label={"More actions"}>
+                        <IconButton size={"small"} aria-label={t("more_actions") ?? "More actions"}>
                             <MoreVerticalIcon size={iconSize.smallest}/>
                         </IconButton>
                     }>
                     {recordActions}
-                    {recordActions && onInspect && <Separator orientation={"horizontal"}/>}
+                    {recordActions && (onInspect || onViewHistory) && <Separator orientation={"horizontal"}/>}
+                    {onViewHistory && (
+                        <MenuItem onClick={onViewHistory}>
+                            <HistoryIcon size={iconSize.smallest}/>
+                            {t("record_history") ?? "History"}
+                        </MenuItem>
+                    )}
                     {onInspect && (
                         <MenuItem onClick={onInspect}>
                             <CodeIcon size={iconSize.smallest}/>
-                            Inspect record
+                            {t("inspect_record") ?? "Inspect record"}
                         </MenuItem>
                     )}
                 </Menu>
@@ -194,20 +213,22 @@ export function EntityIdentityBar({
 function SaveState({
     dirty,
     saving,
-    status
+    status,
+    t
 }: {
     dirty: boolean;
     saving: boolean;
     status: EntityStatus;
+    t: (key: string) => string;
 }) {
     if (saving) {
-        return <StateText>Saving…</StateText>;
+        return <StateText>{t("saving")}</StateText>;
     }
     if (dirty) {
-        return <StateText>Unsaved changes</StateText>;
+        return <StateText>{t("unsaved_changes_title")}</StateText>;
     }
     if (status === "existing") {
-        return <StateText>Saved</StateText>;
+        return <StateText>{t("entity_saved") ?? "Saved"}</StateText>;
     }
     return null;
 }
@@ -225,6 +246,7 @@ function StateText({ children }: { children: React.ReactNode }) {
  */
 function IdChip({ value }: { value: string }) {
 
+    const { t } = useTranslation();
     const [copied, setCopied] = useState(false);
 
     const truncated = value.length > 14
@@ -239,10 +261,10 @@ function IdChip({ value }: { value: string }) {
     };
 
     return (
-        <Tooltip title={copied ? "Copied" : value}>
+        <Tooltip title={copied ? t("copied") : value}>
             <button type={"button"}
                 onClick={copy}
-                aria-label={`Copy id ${value}`}
+                aria-label={`${t("copy_id")} ${value}`}
                 className={cls(
                     "hidden md:inline-flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-md",
                     "font-mono text-[11px] text-text-secondary dark:text-text-secondary-dark",

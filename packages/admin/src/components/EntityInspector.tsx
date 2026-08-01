@@ -1,7 +1,7 @@
 import type { AdminCollection } from "@rebasepro/admin-types";
 import type { Entity } from "@rebasepro/types";
 import type { FormContext } from "../types/fields";
-import React, { lazy, Suspense, useEffect, useState } from "react";
+import React, { lazy, Suspense, useEffect } from "react";
 import {
     CircularProgressCenter,
     cls,
@@ -13,6 +13,7 @@ import {
     Tabs,
     XIcon
 } from "@rebasepro/ui";
+import { useTranslation } from "@rebasepro/app";
 import { JsonPreviewBinding } from "./JsonPreviewBinding";
 
 const EntityHistoryView = lazy(() => import("./history").then(m => ({ default: m.EntityHistoryView })));
@@ -20,7 +21,9 @@ const EntityHistoryView = lazy(() => import("./history").then(m => ({ default: m
 export type InspectorTab = "json" | "history";
 
 export interface EntityInspectorProps {
-    open: boolean;
+    /** The open tab, or null when the panel is closed. */
+    tab: InspectorTab | null;
+    onTabChange: (tab: InspectorTab) => void;
     onClose: () => void;
     collection: AdminCollection;
     entity?: Entity<Record<string, unknown>>;
@@ -42,7 +45,8 @@ export interface EntityInspectorProps {
  * record you are inspecting while you inspect it.
  */
 export function EntityInspector({
-    open,
+    tab,
+    onTabChange,
     onClose,
     collection,
     entity,
@@ -51,7 +55,8 @@ export function EntityInspector({
     includeHistory
 }: EntityInspectorProps) {
 
-    const [tab, setTab] = useState<InspectorTab>("json");
+    const { t } = useTranslation();
+    const open = tab !== null;
 
     useEffect(() => {
         if (!open) return;
@@ -72,7 +77,7 @@ export function EntityInspector({
         // stays named and its actions stay reachable while the panel is open.
         <div className={"absolute inset-x-0 bottom-0 top-[52px] z-30 flex justify-end"}
             role={"dialog"}
-            aria-label={"Inspect record"}>
+            aria-label={t("inspect_record") ?? "Inspect record"}>
 
             <div className={"absolute inset-0 bg-black/25"}
                 onClick={onClose}
@@ -84,20 +89,23 @@ export function EntityInspector({
                 defaultBorderMixin
             )}>
                 <div className={cls("h-11 shrink-0 flex items-center gap-2 pl-4 pr-1.5 border-b", defaultBorderMixin)}>
-                    <span className={"text-sm font-semibold"}>Inspect</span>
+                    <span className={"text-sm font-semibold"}>{t("inspect") ?? "Inspect"}</span>
 
                     <div className={"flex-1"}/>
 
                     {includeHistory
-                        ? <Tabs value={tab}
+                        ? <Tabs value={tab ?? "json"}
                             className={"!w-fit"}
-                            onValueChange={(v) => setTab(v as InspectorTab)}>
-                            <Tab value={"json"} className={"text-xs"}>JSON</Tab>
-                            <Tab value={"history"} className={"text-xs"}>History</Tab>
+                            onValueChange={(v) => onTabChange(v as InspectorTab)}>
+                            <Tab value={"json"} className={"text-xs"}>{t("json")}</Tab>
+                            <Tab value={"history"} className={"text-xs"}>
+                                {t("record_history") ?? "History"}
+                            </Tab>
                         </Tabs>
                         : null}
 
-                    <IconButton size={"small"} onClick={onClose} aria-label={"Close inspector"}>
+                    <IconButton size={"small"} onClick={onClose}
+                        aria-label={t("close_inspector") ?? "Close inspector"}>
                         <XIcon size={iconSize.smallest}/>
                     </IconButton>
                 </div>

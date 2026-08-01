@@ -95,7 +95,22 @@ export function EntityHistoryEntry({
 
     const authController = useAuthController();
 
-    const changedFields = entry.changed_fields;
+    // The backend reports the whole row as changed, which includes the columns
+    // that cannot meaningfully change: a timestamp it stamps itself on every
+    // write, and the primary key, which is what identifies the row being
+    // revised. Every revision was listing `updated_at: <now>` and `id: <the id
+    // in the title bar>` around the one field the user actually edited.
+    const changedFields = React.useMemo(() => {
+        const all = entry.changed_fields;
+        if (!all || !collection) return all;
+        return all.filter(key => {
+            const property = getPropertyInPath(collection.properties, key);
+            if (!property) return true;
+            if ("isId" in property && property.isId) return false;
+            return !(property.type === "date" && "autoValue" in property && property.autoValue);
+        });
+    }, [entry.changed_fields, collection]);
+
     const previousValues = entry.previous_values;
     const updatedOn = new Date(entry.updated_at);
     const updatedBy = entry.updated_by;
@@ -106,8 +121,8 @@ export function EntityHistoryEntry({
         ? currentUser
         : undefined;
 
-    return <div className={"w-full flex flex-col gap-2 mt-4"}>
-        <div className={"ml-4 flex items-center gap-4"}>
+    return <div className={"@container/histentry w-full flex flex-col gap-2"}>
+        <div className={"flex items-center flex-wrap gap-2"}>
             <Typography variant={"body2"} color={"secondary"}>
                 {updatedOn.toLocaleString()}
             </Typography>
@@ -148,15 +163,21 @@ export function EntityHistoryEntry({
                             {typeof valueInPath === "string" ? valueInPath : JSON.stringify(valueInPath)}
                         </Typography>;
 
+                    // The key column used to be `min-w-[200px] w-1/5` beside a
+                    // `w-4/5` value — 200px of label and 80% of the row, which
+                    // adds up to more than the row in anything narrower than a
+                    // full page. In the inspector that pushed every value off
+                    // the right edge and wrapped ids one character per line.
+                    // It stacks until the entry itself is wide enough.
                     return (
                         <div key={"ref_prev_" + key}
-                            className="flex w-full my-1 items-center">
+                            className="flex flex-col @sm/histentry:flex-row @sm/histentry:items-baseline gap-x-4 gap-y-0.5 w-full my-1.5">
                             <Typography variant={"caption"}
                                 color={"secondary"}
-                                className="min-w-[140px] md:min-w-[200px] w-1/5 pr-8 overflow-hidden text-ellipsis text-right">
+                                className="shrink-0 break-all @sm/histentry:w-40 @sm/histentry:text-right @sm/histentry:break-normal @sm/histentry:truncate">
                                 {key}
                             </Typography>
-                            <div className="w-4/5">
+                            <div className="min-w-0 flex-1 flex flex-col items-start gap-0.5">
                                 {previousValueInPath !== undefined && !deepEqual(previousValueInPath, valueInPath) &&
                                     <PreviousValueView previousValueInPath={previousValueInPath}
                                         childProperty={childProperty as Property}
@@ -169,7 +190,7 @@ export function EntityHistoryEntry({
                 })}
 
                 {(!changedFields || changedFields.length === 0) && (
-                    <Typography variant={"caption"} color={"secondary"} className="ml-4">
+                    <Typography variant={"caption"} color={"secondary"}>
                         {entry.action === "create" ? "Entity created" :
                             entry.action === "delete" ? "Entity deleted" : "No field changes recorded"}
                     </Typography>

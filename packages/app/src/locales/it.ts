@@ -902,5 +902,13 @@ no_filter: "No filter",
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Comportamento incolla",
     markdown_strip_html: "Rimuovi HTML all'incolla",
-    markdown_convert_pasted: "Converti testo incollato in markdown"
+    markdown_convert_pasted: "Converti testo incollato in markdown",
+
+    // ─── Entity identity bar and inspector ──────────────────────
+    entity_saved: "Salvato",
+    more_actions: "Altre azioni",
+    record_history: "Cronologia",
+    inspect_record: "Ispeziona record",
+    inspect: "Ispeziona",
+    close_inspector: "Chiudi l'ispettore"
 };

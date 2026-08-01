@@ -9,7 +9,7 @@ import { PluginProviderStack, resolveComponentRef, useComponentOverride, Collect
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { EntityViewBinding } from "./EntityViewBinding";
 import { EntityIdentityBar } from "./EntityIdentityBar";
-import { EntityInspector } from "./EntityInspector";
+import { EntityInspector, InspectorTab } from "./EntityInspector";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
     Alert,
@@ -191,14 +191,15 @@ entityId }
     const includeHistoryView = Boolean(collection.history);
     // Same split as the edit view: the strip is for destinations, the inspector
     // for the developer tools that used to sit in front of them.
-    const hasInspector = includeJsonView || includeHistoryView;
     const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0;
 
-    const [inspectorOpen, setInspectorOpen] = useState(false);
+    const [inspectorTab, setInspectorTab] = useState<InspectorTab | null>(null);
 
-    const legacyInspectorTab = selectedTab === JSON_TAB_VALUE || selectedTab === HISTORY_TAB_VALUE;
+    const legacyInspectorTab: InspectorTab | undefined = selectedTab === JSON_TAB_VALUE
+        ? "json"
+        : selectedTab === HISTORY_TAB_VALUE ? "history" : undefined;
     useEffect(() => {
-        if (legacyInspectorTab) setInspectorOpen(true);
+        if (legacyInspectorTab) setInspectorTab(legacyInspectorTab);
     }, [legacyInspectorTab]);
 
     const {
@@ -524,7 +525,8 @@ entityId }
             status={"existing"}
             dirty={false}
             saving={false}
-            onInspect={hasInspector ? () => setInspectorOpen(true) : undefined}
+            onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
+            onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
             trailing={<>
                 {editButton}
                 {pluginActionsTop}
@@ -573,8 +575,9 @@ entityId }
         {subCollectionsViews}
 
         <EntityInspector
-            open={inspectorOpen}
-            onClose={() => setInspectorOpen(false)}
+            tab={inspectorTab}
+            onTabChange={setInspectorTab}
+            onClose={() => setInspectorTab(null)}
             collection={collection as AdminCollection}
             entity={usedEntity as Entity<Record<string, unknown>> | undefined}
             formContext={readOnlyFormContext as FormContext<Record<string, unknown>> | undefined}

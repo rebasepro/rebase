@@ -47,7 +47,7 @@ import { EntityIdentityBar } from "./EntityIdentityBar";
 import { useRecordActions } from "../hooks/useRecordActions";
 import { useSideDialogContext } from "./SideDialogs";
 import { useAdminContext } from "../hooks/useAdminContext";
-import { EntityInspector } from "./EntityInspector";
+import { EntityInspector, InspectorTab } from "./EntityInspector";
 import { useEntityDisplayTitle } from "../hooks/useEntityDisplayTitle";
 import { createFormexStub, getEntityFromCache } from "@rebasepro/app";
 import { usePermissions } from "@rebasepro/app";
@@ -273,7 +273,6 @@ parentEntityIds,
     // The inspector holds the developer tools; the tab strip holds destinations.
     // A strip with only the record in it has nothing to choose between, so it
     // does not render at all.
-    const hasInspector = includeJsonView || includeHistoryView;
     const hasAdditionalViews = customViewsCount > 0 || subcollectionsCount > 0;
 
     const {
@@ -413,7 +412,7 @@ parentEntityIds,
         || (status === "existing" && !formex?.dirty)
     );
 
-    const [inspectorOpen, setInspectorOpen] = useState(false);
+    const [inspectorTab, setInspectorTab] = useState<InspectorTab | null>(null);
 
     /* ---- record actions, in the bar's overflow menu ---------------------- */
 
@@ -458,7 +457,7 @@ parentEntityIds,
     // A URL still naming the old `json`/`history` tab opens the inspector on
     // that pane instead of 404-ing into the record with nothing shown.
     useEffect(() => {
-        if (legacyInspectorTab) setInspectorOpen(true);
+        if (legacyInspectorTab) setInspectorTab(legacyInspectorTab);
     }, [legacyInspectorTab]);
 
     const subCollectionsViews = childViews && childViews.map(({ collection: subcollection }) => {
@@ -691,7 +690,8 @@ parentEntityIds,
                 formContext.submit();
             } : undefined}
             onDiscard={canEdit && formContext ? () => formContext.formex.resetForm() : undefined}
-            onInspect={hasInspector ? () => setInspectorOpen(true) : undefined}
+            onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
+            onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
             recordActions={recordActionItems}
             pluginActions={formPluginActions}
             trailing={<>
@@ -749,8 +749,9 @@ parentEntityIds,
         {subCollectionsViews}
 
         <EntityInspector
-            open={inspectorOpen}
-            onClose={() => setInspectorOpen(false)}
+            tab={inspectorTab}
+            onTabChange={setInspectorTab}
+            onClose={() => setInspectorTab(null)}
             collection={collection as AdminCollection}
             entity={usedEntity as Entity<Record<string, unknown>> | undefined}
             formContext={formContext as FormContext<Record<string, unknown>> | undefined}

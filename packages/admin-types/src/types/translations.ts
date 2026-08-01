@@ -1034,4 +1034,18 @@ export interface RebaseTranslations {
     markdown_paste_behavior?: string;
     markdown_strip_html?: string;
     markdown_convert_pasted?: string;
+
+    // ─── Entity identity bar and inspector ──────────────────────
+    /** Save state shown in the entity header once a record has no pending edits */
+    entity_saved?: string;
+    /** Overflow menu button in the entity header */
+    more_actions?: string;
+    /** Overflow menu entry opening the revision history */
+    record_history?: string;
+    /** Overflow menu entry opening the raw values panel */
+    inspect_record?: string;
+    /** Title of the panel holding the raw values and the revision history */
+    inspect?: string;
+    /** Close button of that panel */
+    close_inspector?: string;
 }

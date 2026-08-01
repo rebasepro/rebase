@@ -923,5 +923,13 @@ no_filter: "No filter",
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Comportamiento al pegar",
     markdown_strip_html: "Eliminar HTML al pegar",
-    markdown_convert_pasted: "Convertir texto pegado a markdown"
+    markdown_convert_pasted: "Convertir texto pegado a markdown",
+
+    // ─── Entity identity bar and inspector ──────────────────────
+    entity_saved: "Guardado",
+    more_actions: "Más acciones",
+    record_history: "Historial",
+    inspect_record: "Inspeccionar registro",
+    inspect: "Inspeccionar",
+    close_inspector: "Cerrar el inspector"
 };

@@ -902,5 +902,13 @@ no_filter: "No filter",
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "पेस्ट व्यवहार",
     markdown_strip_html: "पेस्ट करते समय HTML हटाएं",
-    markdown_convert_pasted: "पेस्ट किए गए टेक्स्ट को मार्कडाउन में बदलें"
+    markdown_convert_pasted: "पेस्ट किए गए टेक्स्ट को मार्कडाउन में बदलें",
+
+    // ─── Entity identity bar and inspector ──────────────────────
+    entity_saved: "सहेजा गया",
+    more_actions: "अधिक क्रियाएँ",
+    record_history: "इतिहास",
+    inspect_record: "रिकॉर्ड जाँचें",
+    inspect: "जाँचें",
+    close_inspector: "इंस्पेक्टर बंद करें"
 };

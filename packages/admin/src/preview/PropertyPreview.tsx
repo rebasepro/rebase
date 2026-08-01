@@ -181,9 +181,15 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
             content = buildWrongValueType(propertyKey, property.type, value);
         }
     } else if (property.type === "date") {
-        if (value instanceof Date) {
+        // Not every caller comes through the data layer's Date coercion: the
+        // revision history renders raw API payloads, where a timestamp is still
+        // the string Postgres sent (`2026-06-19 17:20:33.032+02`). Requiring a
+        // `Date` instance turned every audit column in every history entry into
+        // a red "Unexpected value" box.
+        const date = asDate(value);
+        if (date) {
             content = <DatePreview
-                date={value}
+                date={date}
                 mode={property.mode}
             />;
         } else {
@@ -275,6 +281,17 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
         ? <EmptyValue/>
         : content;
 }, equal);
+
+/**
+ * A `Date`, or a string/number that unambiguously names one. Returns null for
+ * anything else, so an actual type mismatch still reports as one.
+ */
+function asDate(value: unknown): Date | null {
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+    if (typeof value !== "string" && typeof value !== "number") return null;
+    const parsed = new Date(value);
+    return isNaN(parsed.getTime()) ? null : parsed;
+}
 
 function buildWrongValueType(name: string | undefined, type: string, value: any) {
     console.warn(`Unexpected value for property ${name}, of type ${type}`, value);

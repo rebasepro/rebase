@@ -910,5 +910,13 @@ no_filter: "No filter",
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Comportamento ao colar",
     markdown_strip_html: "Remover HTML ao colar",
-    markdown_convert_pasted: "Converter texto colado para markdown"
+    markdown_convert_pasted: "Converter texto colado para markdown",
+
+    // ─── Entity identity bar and inspector ──────────────────────
+    entity_saved: "Guardado",
+    more_actions: "Mais ações",
+    record_history: "Histórico",
+    inspect_record: "Inspecionar registo",
+    inspect: "Inspecionar",
+    close_inspector: "Fechar o inspetor"
 };

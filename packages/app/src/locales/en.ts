@@ -981,5 +981,13 @@ export const en: RebaseTranslations = {
     // ─── Markdown property ──────────────────────────────────────
     markdown_paste_behavior: "Paste behavior",
     markdown_strip_html: "Strip HTML on paste",
-    markdown_convert_pasted: "Convert pasted text to markdown"
+    markdown_convert_pasted: "Convert pasted text to markdown",
+
+    // ─── Entity identity bar and inspector ──────────────────────
+    entity_saved: "Saved",
+    more_actions: "More actions",
+    record_history: "History",
+    inspect_record: "Inspect record",
+    inspect: "Inspect",
+    close_inspector: "Close inspector"
 };
