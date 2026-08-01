@@ -2,7 +2,7 @@
 // `target: () =>` thunk below, so module init order never matters.
 // fallow-ignore-next-line circular-dependency
 import productsCollection from "./products";
-import { LOCALE_ENUM } from "./locales";
+import { LOCALE_ENUM } from "../locales";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 const productLocalesCollection: PostgresCollectionConfig = {
