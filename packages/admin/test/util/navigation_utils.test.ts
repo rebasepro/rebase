@@ -165,15 +165,22 @@ describe("resolveCollectionPathIds", () => {
         expect(resolveCollectionPathIds("", collections)).toBe("");
     });
 
-    it("resolves top-level collection slug to its table name", () => {
+    // The fixture gives every collection a `table` that differs from its `slug`
+    // precisely so these assertions can tell the two apart: the resolver deals in
+    // slugs, and a segment must never come back as the underlying table name.
+    it("resolves a top-level collection segment to its slug, never its table name", () => {
         expect(resolveCollectionPathIds("products", collections)).toBe("products");
+        expect(resolveCollectionPathIds("products", collections)).not.toContain("products_table");
     });
 
-    it("resolves collection/entityId path", () => {
-        // Warn is expected but we get: "users_table/abc123"
+    it("resolves collection/entityId path and warns that the path ends on an id", () => {
         const warnSpy = jest.spyOn(console, "warn").mockImplementation();
         const result = resolveCollectionPathIds("users/abc123", collections);
         expect(result).toBe("users/abc123");
+        // An odd-segment path is the valid shape; ending on an entity id is
+        // handled defensively and is meant to be reported.
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(String(warnSpy.mock.calls[0][0])).toContain("abc123");
         warnSpy.mockRestore();
     });
 
@@ -185,8 +192,9 @@ describe("resolveCollectionPathIds", () => {
     it("appends remaining path when no subcollection matches", () => {
         const warnSpy = jest.spyOn(console, "warn").mockImplementation();
         const result = resolveCollectionPathIds("users/abc123/orders/xyz/nested", collections);
-        // orders has no subcollections, so "nested" gets appended
-        expect(result).toContain("orders");
+        // `orders` declares no subcollections, so everything past its entity id
+        // is carried over verbatim rather than dropped.
+        expect(result).toBe("users/abc123/orders/xyz/nested");
         warnSpy.mockRestore();
     });
 

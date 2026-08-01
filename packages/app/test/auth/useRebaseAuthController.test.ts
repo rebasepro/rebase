@@ -455,8 +455,15 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
     // ─── skipLogin ───────────────────────────────────────────────────
 
     describe("skipLogin", () => {
-        it("should set loginSkipped and clear user", () => {
+        it("should set loginSkipped and clear user", async () => {
+            // Start from a signed-in session: `user` is already null on a fresh
+            // mount, so "clears the user" is unfalsifiable without one to clear.
+            mockAuth.getSession.mockReturnValue(mockSession);
+
             const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+
+            await act(async () => { await Promise.resolve(); });
+            expect(result.current.user?.uid).toBe("123");
 
             act(() => {
                 result.current.skipLogin();

@@ -36,8 +36,11 @@ describe("getAppendableSuggestion", () => {
         expect(result).toBe("Hello World");
     });
 
-    it("handles whitespace trimming", () => {
-        const result = getAppendableSuggestion("Hello World", "Hello");
+    it("ignores whitespace around the value", () => {
+        // What the user has typed arrives with the field's own padding, so the
+        // comparison and the offset both trim it. Byte-identical to the first
+        // test until the value actually carries whitespace.
+        const result = getAppendableSuggestion("Hello World", "  Hello  ");
         expect(result).toBe(" World");
     });
 

@@ -1,7 +1,7 @@
 import { expect, it } from "@jest/globals";
 import { Timestamp } from "@firebase/firestore";
 import type { Firestore } from "@firebase/firestore";
-import { cmsToFirestoreModel, firestoreToCMSModel } from "../src";
+import { cmsToFirestoreModel, firestoreToCMSModel } from "../src/hooks/useFirestoreDriver";
 
 it("cmsToFirestoreModel", () => {
     const inputValues = {
@@ -38,25 +38,36 @@ it("timestamp array conversion", () => {
 });
 
 it("vector conversion", () => {
-    // Simulated Firestore VectorValue since it might not be fully exported or instantiable easily without firebase context in tests.
-    // We can test at least the CMS to Firestore mapping uses the vector() helper (or the mock of it).
-    // Let's just verify the cmsToFirestoreModel maps `type: "__vector__"` correctly.
+    // The tag is `__type__`, not `type`. Spelled the wrong way it falls through
+    // to the generic object branch — which is exactly what the old
+    // `if (result.embedding?.toArray) … else expect(result).toBeDefined()`
+    // shape hid: a broken mapping took the else branch and passed.
     const inputValues = {
         embedding: {
-            type: "__vector__",
+            __type__: "__vector__",
             value: [0.1, 0.2, 0.3]
         }
     };
 
-    // As mock firestore doesn't do much here, we expect cmsToFirestoreModel to transform it
-    // to a Firestore VectorValue instance if available, but for our simple test we can just check
-    // if the object looks structurally like what it should, or just verify no crash.
-    const result: any = cmsToFirestoreModel(inputValues, {} as unknown as Firestore);
-    // @firebase/firestore VectorValue produces an object with toArray() method, but in our unit test mock
-    // we just check it processes our "__vector__" type.
-    if (result.embedding && typeof result.embedding.toArray === "function") {
-        expect(result.embedding.toArray()).toEqual([0.1, 0.2, 0.3]);
-    } else {
-        expect(result).toBeDefined();
-    }
+    const result = cmsToFirestoreModel(inputValues, {} as unknown as Firestore) as {
+        embedding: { toArray: () => number[] }
+    };
+
+    expect(typeof result.embedding.toArray).toBe("function");
+    expect(result.embedding.toArray()).toEqual([0.1, 0.2, 0.3]);
+});
+
+it("vector round trip", () => {
+    const inputValues = {
+        embedding: {
+            __type__: "__vector__",
+            value: [0.1, 0.2, 0.3]
+        }
+    };
+
+    const stored = cmsToFirestoreModel(inputValues, {} as unknown as Firestore);
+
+    // On the way back a Firestore VectorValue has to become the tagged shape
+    // again, or what the panel reads is not what it wrote.
+    expect(firestoreToCMSModel(stored)).toEqual(inputValues);
 });

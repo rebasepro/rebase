@@ -80,12 +80,25 @@ export function buildPropertiesOrder(
         return 0;
     }
 
-    const keys = propertiesOrder ?? Object.keys(properties);
-    keys.sort(); // alphabetically
-    keys.sort((a, b) => {
-        return propOrder(b) - propOrder(a);
-    });
-    return keys;
+    function deriveOrder(keys: string[]): string[] {
+        return [...keys]
+            .sort() // alphabetically
+            .sort((a, b) => propOrder(b) - propOrder(a));
+    }
+
+    // A caller-supplied order is an answer, not an input. It used to be handed
+    // to the same alphabetical + priority sort as a derived order, which threw
+    // it away entirely — and because `Array.prototype.sort` sorts in place, the
+    // caller's own array was silently reordered as a side effect.
+    if (propertiesOrder) {
+        const placed = new Set(propertiesOrder);
+        // Properties the caller did not place — a newly inferred column, say —
+        // still have to appear, so they follow in derived order.
+        const rest = Object.keys(properties).filter(key => !placed.has(key));
+        return [...propertiesOrder, ...deriveOrder(rest)];
+    }
+
+    return deriveOrder(Object.keys(properties));
 }
 
 /**
@@ -375,6 +388,12 @@ function getMostProbableTypeInArray(
 ): DataType {
     const typesCount: TypesCount = {};
     array.forEach((value) => {
+        // A hole in the array says nothing about what the array holds, so it
+        // gets no vote. This used to fall out of `getType` answering "map" for
+        // null and `increaseTypeCount` then skipping falsy map values; now that
+        // null infers as "string" the skip has to be explicit, or every array
+        // with a gap in it would drift towards "string".
+        if (value === null || value === undefined) return;
         increaseTypeCount(getType(value), typesCount, value, getType);
     });
     return getMostProbableType(typesCount);

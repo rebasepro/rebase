@@ -210,7 +210,11 @@ required: true }
         } as StringProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync("UPPER");
-        expect(result.success).toBe(true);
+        // The transform is the whole feature. Deleting the `z.preprocess` still
+        // parses "UPPER" successfully — it just hands back the untransformed
+        // value, and that is what gets written to the row.
+        expect(result).toMatchObject({ success: true,
+data: "upper" });
     });
 
     it("applies uppercase pre-processing", async () => {
@@ -221,7 +225,8 @@ required: true }
         } as StringProperty;
         const schema = mapPropertyToZod({ property });
         const result = await schema.safeParseAsync("lower");
-        expect(result.success).toBe(true);
+        expect(result).toMatchObject({ success: true,
+data: "LOWER" });
     });
 
     it("validates enum constraints", async () => {
@@ -825,6 +830,13 @@ name: "Title" } as StringProperty
         const schema = getEntitySchema("e1", properties);
         const result = await schema.safeParseAsync({ title: "Hello",
 extra: "world" });
-        expect(result.success).toBe(true);
+        // Without `passthrough()` Zod strips unknown keys and still reports
+        // success — the key surviving in `data` is the only observable
+        // difference, and the one the save path depends on.
+        expect(result).toMatchObject({
+            success: true,
+            data: { title: "Hello",
+extra: "world" }
+        });
     });
 });

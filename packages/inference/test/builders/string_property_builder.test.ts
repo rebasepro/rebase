@@ -59,7 +59,10 @@ describe("buildStringProperty", () => {
             totalDocsCount: 10,
             valuesResult: makeValuesResult(mixed)
         });
-        expect((result as StringProperty).admin?.url).toBeFalsy();
+        // On the property itself, not under `admin`: the builder never writes an
+        // `admin` block, so an assertion on `admin?.url` held whatever the
+        // threshold decided.
+        expect((result as StringProperty).url).toBeUndefined();
     });
 
     it("detects email values", () => {
@@ -182,7 +185,7 @@ describe("buildStringProperty", () => {
         });
         expect(result.type).toBe("string");
         expect((result as StringProperty).email).toBeUndefined();
-        expect((result as StringProperty).admin?.url).toBeFalsy();
+        expect((result as StringProperty).url).toBeUndefined();
         expect((result as StringProperty).storage).toBeUndefined();
     });
 });

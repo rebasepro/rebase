@@ -136,8 +136,18 @@ describe("resolveAdminCollection", () => {
 
     it("is idempotent — the panel resolves at more than one entry point", () => {
         const once = resolveAdminCollection(nested());
-        const twice = resolveAdminCollection(once);
+        const twice = resolveAdminCollection(once) as Record<string, unknown>;
         expect(twice).toEqual(once);
+        // Comparing the two passes to each other holds just as well for a
+        // resolver that flattened nothing on either — both sides come out of the
+        // same function. Name the fields that have to survive the second round.
+        expect(twice.icon).toBe("FileText");
+        expect(twice.listProperties).toEqual(["title"]);
+        expect(twice.admin).toEqual({
+            icon: "FileText",
+            listProperties: ["title"],
+            defaultViewMode: "table"
+        });
     });
 
     it("passes a collection with no block straight through", () => {

@@ -70,10 +70,17 @@ describe("useBuildNavigationStateController", () => {
             user: { uid: "test" }
         } as unknown as AuthController;
 
+        // Builders, not arrays: re-invoking them is the observable proof that
+        // both halves of the navigation state were refreshed. "Combined" is the
+        // whole point of the method — refreshing only collections would leave
+        // plugin/app views stale and nothing else here would notice.
+        const collectionsBuilder = jest.fn(async () => [] as CollectionConfig[]);
+        const viewsBuilder = jest.fn(async () => []);
+
         const { result } = renderHook(() => useBuildNavigationStateController({
             authController: mockAuthController,
-            collections: [],
-            views: undefined,
+            collections: collectionsBuilder,
+            views: viewsBuilder,
             data: mockData,
             collectionRegistryController: mockCollectionRegistryController,
             urlController: mockCmsUrlController
@@ -83,8 +90,8 @@ describe("useBuildNavigationStateController", () => {
             expect(result.current.loading).toBe(false);
         });
 
-        // Calling refreshNavigation shouldn't throw, and it should trigger the sub-hooks
-        expect(typeof result.current.refreshNavigation).toBe("function");
+        expect(collectionsBuilder).toHaveBeenCalledTimes(1);
+        expect(viewsBuilder).toHaveBeenCalledTimes(1);
 
         // refreshNavigation uses queueMicrotask internally, so we need an async
         // act boundary to let the microtask (and resulting state updates) flush.
@@ -92,6 +99,11 @@ describe("useBuildNavigationStateController", () => {
             result.current.refreshNavigation();
             // Flush the queueMicrotask scheduled by refreshNavigation
             await Promise.resolve();
+        });
+
+        await waitFor(() => {
+            expect(collectionsBuilder).toHaveBeenCalledTimes(2);
+            expect(viewsBuilder).toHaveBeenCalledTimes(2);
         });
     });
 

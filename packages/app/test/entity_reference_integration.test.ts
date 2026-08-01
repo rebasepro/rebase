@@ -108,8 +108,10 @@ describe("EntityReference Preservation - Integration Tests", () => {
 
             const result = mergeDeep(baseValues, updates);
 
-            // mergeDeep element-wise merges arrays, so we merge first elements
-            // Since arrays have element-wise merge, first element should be source's ref
+            // Length is what separates the two behaviours. An element-wise merge
+            // keeps `author2` in slot 1 and the reference list silently grows
+            // back rows the user just removed; only a whole replacement drops it.
+            expect(result.authors).toHaveLength(1);
             expect(result.authors[0]).toBe(sourceRef);
             expect(result.authors[0].isEntityReference()).toBe(true);
             expect(result.authors[0].id).toBe("author3");

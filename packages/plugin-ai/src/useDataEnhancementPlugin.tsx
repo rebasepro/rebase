@@ -5,7 +5,13 @@ import { RebasePlugin } from "@rebasepro/admin-types";
 import { DataEnhancementControllerProvider } from "./components/DataEnhancementControllerProvider";
 import { FormEnhanceAction } from "./components/FormEnhanceAction";
 
-const DEFAULT_API_KEY = "fcms-U9jdDii0xXWSDC34asfrf54lbkFJBfKfRWcEDEwdc4V5wDWEDF";
+/**
+ * Key used when the host app supplies none. Exported so a test can assert that
+ * this is the value threaded through to the provider without transcribing the
+ * literal — a copy in a test pins the key rather than the wiring, and makes
+ * rotating it a test failure.
+ */
+export const DEFAULT_API_KEY = "fcms-U9jdDii0xXWSDC34asfrf54lbkFJBfKfRWcEDEwdc4V5wDWEDF";
 
 export interface DataEnhancementPluginProps {
 

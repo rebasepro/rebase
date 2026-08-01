@@ -11,8 +11,7 @@ import { describe, expect, it } from "@jest/globals";
 import { updateDateAutoValues, traverseValuesProperties } from "@rebasepro/common";
 import { Properties, DateProperty, EntityReference, GeoPoint } from "@rebasepro/types";
 import { mergeDeep, removeFunctions, removeUndefined } from "@rebasepro/utils";
-
-// Entity cache functions have internal JSON serialization that we need to test
+import { getEntityFromCache, saveEntityToCache } from "../src/util/entity_cache";
 
 // Helper to create a date property with autoValue
 function createAutoDateProperty(autoValue: "on_create" | "on_update"): DateProperty {
@@ -50,15 +49,13 @@ describe("Date-to-String Conversion Bug", () => {
                 timestampNowValue: timestampNow
             });
 
-            // Dates should be Date objects, not strings
+            // Dates should be Date objects, not strings. `toBeInstanceOf(Date)`
+            // already rules out a string, so the value itself is what is worth
+            // pinning: both auto-values are stamped with the supplied "now".
             expect(result.created_on).toBeInstanceOf(Date);
             expect(result.updated_on).toBeInstanceOf(Date);
-            expect(typeof result.created_on).toBe("object");
-            expect(typeof result.updated_on).toBe("object");
-
-            // Verify they're not strings
-            expect(typeof result.created_on).not.toBe("string");
-            expect(typeof result.updated_on).not.toBe("string");
+            expect(result.created_on).toEqual(timestampNow);
+            expect(result.updated_on).toEqual(timestampNow);
         });
 
         it("should preserve Date objects when updating existing entities", () => {
@@ -248,42 +245,43 @@ name: "Title" },
         });
     });
 
-    describe("Potential conversion points", () => {
-        it("JSON.stringify converts Date to ISO string (demonstration)", () => {
-            const values = {
-                updated_on: new Date("2025-01-01T10:00:00Z")
-            };
+    // The entity cache is the one place in this package that puts values
+    // through JSON, which is where a Date would silently degrade to an ISO
+    // string. It defends itself with a replacer/reviver pair — that pair is
+    // what this block exercises.
+    describe("entity cache round-trip preserves Date objects", () => {
 
-            // This demonstrates the issue - JSON.stringify converts Date to ISO string
-            const jsonString = JSON.stringify(values);
-            const parsed = JSON.parse(jsonString);
+        it("revives a Date saved to the cache as a Date, not an ISO string", () => {
+            const updatedOn = new Date("2025-01-01T10:00:00Z");
+            saveEntityToCache("products/date-round-trip", { updated_on: updatedOn });
 
-            // After JSON round-trip, the date becomes a string
-            expect(typeof parsed.updated_on).toBe("string");
-            expect(parsed.updated_on).toBe("2025-01-01T10:00:00.000Z");
-            expect(parsed.updated_on).not.toBeInstanceOf(Date);
+            const cached = getEntityFromCache("products/date-round-trip") as { updated_on: Date };
+
+            expect(cached.updated_on).toBeInstanceOf(Date);
+            expect(cached.updated_on.toISOString()).toBe("2025-01-01T10:00:00.000Z");
         });
 
-        it("Object spread should preserve Date objects", () => {
-            const original = {
-                updated_on: new Date("2025-01-01T10:00:00Z")
+        it("revives nested Date objects, not just top-level ones", () => {
+            saveEntityToCache("products/nested-date", {
+                metadata: {
+                    history: [{ at: new Date("2024-06-30T23:59:59Z") }]
+                }
+            });
+
+            const cached = getEntityFromCache("products/nested-date") as {
+                metadata: { history: { at: Date }[] }
             };
 
-            const spread = { ...original };
-
-            expect(spread.updated_on).toBeInstanceOf(Date);
-            expect(spread.updated_on).toBe(original.updated_on);
+            expect(cached.metadata.history[0].at).toBeInstanceOf(Date);
+            expect(cached.metadata.history[0].at.toISOString()).toBe("2024-06-30T23:59:59.000Z");
         });
 
-        it("Object.assign should preserve Date objects", () => {
-            const original = {
-                updated_on: new Date("2025-01-01T10:00:00Z")
-            };
+        it("keeps a plain ISO string a string, so the reviver cannot over-reach", () => {
+            saveEntityToCache("products/string-date", { note: "2025-01-01T10:00:00.000Z" });
 
-            const assigned = Object.assign({}, original);
+            const cached = getEntityFromCache("products/string-date") as { note: unknown };
 
-            expect(assigned.updated_on).toBeInstanceOf(Date);
-            expect(assigned.updated_on).toBe(original.updated_on);
+            expect(typeof cached.note).toBe("string");
         });
     });
 });

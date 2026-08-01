@@ -44,6 +44,41 @@ import type {
  */
 export type CollectionLookup = (slug: string) => AdminCollection | undefined;
 
+/**
+ * Rebuild a serialized relation's `target` slug into the thunk consumers call.
+ *
+ * Shared by the relation *property* and the collection-level `relations` array.
+ * They are the same shape on the wire and they need the same treatment coming
+ * back, but only the property path had it — so a collection imported from an
+ * existing table came off disk with `relations[n].target` still a string, which
+ * typechecks (the serializable shape erases the difference) and throws "target
+ * is not a function" at the first consumer.
+ *
+ * The lookup is consulted lazily, inside the thunk, so collections may
+ * reference each other in any order, including circularly.
+ */
+function fromSerializableRelation<R extends { target?: string; relationName?: string }>(
+    relation: R,
+    label: string,
+    lookup?: CollectionLookup
+): R & { target: () => AdminCollection } {
+    const slug = relation.target;
+    return {
+        ...relation,
+        target: () => {
+            const found = slug ? lookup?.(slug) : undefined;
+            if (!found) {
+                throw new Error(
+                    `Relation "${relation.relationName ?? label}" targets collection "${slug ?? "(none)"}", ` +
+                    "which is not among the collections it was deserialized with. Pass the whole set to " +
+                    "`fromSerializableCollectionConfigs` so slugs can be resolved against each other."
+                );
+            }
+            return found;
+        }
+    };
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // PROPERTY CONVERSION: Original → Serializable
 // ═══════════════════════════════════════════════════════════════════════
@@ -600,21 +635,11 @@ type: "date" };
             const result = { ...rest,
 type: "relation" } as unknown as RelationProperty;
             if (relation) {
-                const slug = relation.target;
-                result.relation = {
-                    ...relation,
-                    target: () => {
-                        const found = slug ? lookup?.(slug) : undefined;
-                        if (!found) {
-                            throw new Error(
-                                `Relation "${relation.relationName ?? sp.name}" targets collection "${slug ?? "(none)"}", ` +
-                                "which is not among the collections it was deserialized with. Pass the whole set to " +
-                                "`fromSerializableCollectionConfigs` so slugs can be resolved against each other."
-                            );
-                        }
-                        return found;
-                    }
-                } as unknown as RelationProperty["relation"];
+                result.relation = fromSerializableRelation(
+                    relation,
+                    sp.name ?? "",
+                    lookup
+                ) as unknown as RelationProperty["relation"];
             }
             return result as Property;
         }
@@ -654,10 +679,18 @@ export function fromSerializableCollectionConfig(
     serialized: SerializableCollectionConfig,
     lookup?: CollectionLookup
 ): AdminCollection {
-    const { properties, ...rest } = serialized;
+    const { properties, relations, ...rest } = serialized as SerializableCollectionConfig & {
+        relations?: SerializableRelation[]
+    };
 
     return {
         ...rest,
+        ...(relations
+            ? {
+                relations: relations.map((relation, index) =>
+                    fromSerializableRelation(relation, `relations[${index}]`, lookup))
+            }
+            : {}),
         properties: fromSerializableProperties(properties, lookup)
     } as AdminCollection;
 }

@@ -3,7 +3,7 @@ import { unflattenObject } from "../../src/data_import/utils/transforms";
 
 describe("UnflattenObject function", () => {
 
-    test("Flattens object keys correctly", () => {
+    test("Unflattens dotted and indexed keys into nested objects and arrays", () => {
         const input = {
             key1: "value1",
             "key2.key3": "value3",
@@ -47,7 +47,7 @@ describe("UnflattenObject function", () => {
         });
     });
 
-    test("Flattens complex object keys correctly", () => {
+    test("Unflattens deeply nested and mixed object/array keys", () => {
         const input = {
             keyA: "value1",
             "keyB.keyC.keyD": "value2",

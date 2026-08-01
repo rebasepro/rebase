@@ -111,9 +111,15 @@ summary: "Get one" }
         const result = parseOpenApiSpec(spec);
         const users = result.groups.find(g => g.tag === "Users");
         expect(users).toBeDefined();
-        // /api/data/users first (get, post, delete), then /api/data/users/{id} (get)
-        const methods = users!.endpoints.map(e => `${e.path}:${e.method}`);
-        expect(methods[0]).toContain("/api/data/users:get");
+        // Path first, then the CRUD method order — not the order the spec
+        // happened to declare them in (delete, get, post above). Asserting only
+        // `[0]` left both halves of that free to be wrong.
+        expect(users!.endpoints.map(e => `${e.path}:${e.method}`)).toEqual([
+            "/api/data/users:get",
+            "/api/data/users:post",
+            "/api/data/users:delete",
+            "/api/data/users/{id}:get"
+        ]);
     });
 
     it("respects tag order from spec.tags", () => {

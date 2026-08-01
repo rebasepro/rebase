@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { useResolvedViews } from "../../src/hooks/navigation/useResolvedViews";
 import { RebaseData } from "@rebasepro/types";
 import { AuthController, AppView } from "@rebasepro/admin-types";
@@ -45,12 +45,28 @@ describe("useResolvedViews", () => {
             user: null
         };
 
+        // A builder, not an array: `loading` starts true either way, so the only
+        // thing that distinguishes "gated on auth" from "not gated" is whether
+        // the builder ran before the user was known. A builder that resolves
+        // views per role would otherwise be invoked with a null user.
+        const builder = jest.fn(async () => ([
+            { name: "My View",
+              slug: "my-view",
+              view: null! }
+        ] as AppView[]));
+
         const { result, rerender } = renderHook(() => useResolvedViews({
             authController: mockAuthController,
-            views: [],
+            views: builder,
             data: mockData
         }));
 
+        expect(result.current.loading).toBe(true);
+        // Give the resolver every chance to fire while the gate should hold it.
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(builder).not.toHaveBeenCalled();
         expect(result.current.loading).toBe(true);
 
         authLoading = false;
@@ -62,6 +78,8 @@ describe("useResolvedViews", () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(result.current.views).toEqual([]);
+        expect(builder).toHaveBeenCalledTimes(1);
+        expect(builder.mock.calls[0][0].user).toEqual({ uid: "test-user" });
+        expect(result.current.views?.map(v => v.slug)).toEqual(["my-view"]);
     });
 });
