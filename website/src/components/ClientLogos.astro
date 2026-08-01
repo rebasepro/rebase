@@ -1,15 +1,15 @@
 ---
-// Intrinsic pixel dimensions of each asset (viewBox for the SVGs), so the browser
-// can reserve the right box before a lazy logo arrives instead of reflowing the
-// row. Keyed by src rather than inlined per entry to keep the list below readable
-// — regenerate these if a logo file is replaced.
-// These are the browser's `naturalWidth`/`naturalHeight`, not the SVG viewBox —
-// several of these files carry width/height attributes that disagree with their
-// viewBox, and it is the attributes the browser lays out from. Read them back with
-// `new Image()` rather than by parsing the markup if a logo is ever replaced.
+// Intrinsic pixel dimensions of each asset, so the browser reserves the right box
+// before a lazy logo arrives instead of reflowing the row. Keyed by src rather than
+// inlined per entry to keep the list below readable.
+//
+// These are the browser's `naturalWidth`/`naturalHeight`, NOT the SVG viewBox —
+// five of these files carry width/height attributes that disagree with their
+// viewBox, and layout follows the attributes. If a logo file is replaced, read the
+// numbers back with `new Image()` rather than by parsing the markup.
 const INTRINSIC: Record<string, [number, number]> = {
     "/img/logos/deardoc.webp": [290, 66],
-    "/img/logos/mm_logo.webp": [441, 108],
+    "/img/logos/mm_logo.webp": [288, 71],
     "/img/logos/proton_logo.svg": [710, 710],
     "/img/logos/withu.png": [300, 163],
     "/img/logos/social_income_logo.svg": [1493, 157],
