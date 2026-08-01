@@ -24,7 +24,10 @@ import { renderHook, waitFor } from "@testing-library/react";
  * collapsing into "nothing is protected".
  */
 
-const executeSql = jest.fn();
+// Typed so `mockResolvedValue`/`mockRejectedValue` are checked against what the
+// hook actually consumes. A bare `jest.fn()` infers a non-promise return, which
+// collapses those arguments to `never` and lets any shape through untyped.
+const executeSql = jest.fn<(sql: string) => Promise<unknown>>();
 let hasAdmin = true;
 
 jest.mock("@rebasepro/app", () => ({

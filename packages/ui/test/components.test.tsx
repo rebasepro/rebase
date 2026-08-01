@@ -42,8 +42,25 @@ describe("UI Components", () => {
 
     describe("Alert Component", () => {
         it("renders alert with correct message", () => {
-            render(<Alert severity="error">Something went wrong!</Alert>);
+            render(<Alert color="error">Something went wrong!</Alert>);
             expect(screen.getByText("Something went wrong!")).toBeInTheDocument();
+        });
+
+        /**
+         * This block used to pass `severity="error"`, a prop `AlertProps` does
+         * not declare. React drops an unknown prop silently, so the alert
+         * rendered in its default `info` blue while the test — which only read
+         * the text — reported that an error alert renders correctly. The colour
+         * is asserted now, so the prop has to be both spelled right and wired.
+         */
+        it("applies the colour it was given, not the default", () => {
+            const { container: errorAlert } = render(<Alert color="error">Boom</Alert>);
+            const { container: infoAlert } = render(<Alert>Note</Alert>);
+
+            expect(errorAlert.querySelector(".text-red-800")).toBeInTheDocument();
+            expect(errorAlert.querySelector(".text-blue-800")).not.toBeInTheDocument();
+            // The default, for contrast — otherwise "always red" would pass.
+            expect(infoAlert.querySelector(".text-blue-800")).toBeInTheDocument();
         });
     });
 

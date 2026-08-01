@@ -258,7 +258,7 @@ describe("Decoupled UI Views", () => {
 
         it("renders the table with headers and cell data", () => {
             render(
-                <VirtualTable<any>
+                <VirtualTable<Record<string, unknown>>
                     data={mockData as any}
                     columns={columns}
                     cellRenderer={cellRendererMock}
@@ -268,6 +268,23 @@ describe("Decoupled UI Views", () => {
             // Verify header title exists in the DOM
             expect(screen.getByText("ID")).toBeInTheDocument();
             expect(screen.getByText("Name")).toBeInTheDocument();
+
+            // The headers render from `columns` alone and say nothing about
+            // whether a row ever reached a cell. `cellRenderer` is the seam the
+            // component exists to drive: once per column per row, each call
+            // carrying that row's value for its own column.
+            expect(cellRendererMock).toHaveBeenCalledTimes(mockData.length * columns.length);
+            expect(cellRendererMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    column: columns[1],
+                    columnIndex: 1,
+                    cellData: "Task 1",
+                    rowData: mockData[0],
+                    rowIndex: 0
+                })
+            );
+            expect(screen.getAllByTestId("table-cell").map(c => c.textContent))
+                .toEqual(expect.arrayContaining(["1", "Task 1", "2", "Task 2", "3", "Task 3"]));
         });
     });
 
