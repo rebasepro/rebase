@@ -219,8 +219,36 @@ done: 0 });
         expect(result.current.columnData.done.totalCount).toBe(5);
     });
 
-    it("surfaces a column error and stops reporting the board as loading", async () => {
+    /**
+     * A subscription that dies is not the same thing as a column with nothing
+     * in it, and the hook is careful about the difference: it reads the column
+     * once over HTTP and paints that, losing the live updates but not the
+     * contents. The error only reaches the caller if the fallback read fails
+     * too. Both halves are asserted, because a hook that surfaced the error
+     * immediately — as an earlier version did — renders "No items" above a
+     * header still counting eleven of them.
+     */
+    it("falls back to a one-shot read when a column's subscription fails", async () => {
         const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+        find.mockResolvedValue({ data: [entity("1", { status: "todo" }), entity("2", { status: "todo" })] });
+        const { result } = renderBoard();
+        await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
+
+        await act(async () => {
+            (listen.mock.calls[0][2] as (e: Error) => void)(new Error("stream failed"));
+            updateFor("done")([]);
+        });
+
+        await waitFor(() => expect(result.current.columnData.todo.entities).toHaveLength(2));
+        expect(result.current.error).toBeUndefined();
+        expect(result.current.columnData.todo.loading).toBe(false);
+        expect(result.current.loading).toBe(false);
+        consoleError.mockRestore();
+    });
+
+    it("surfaces the error only when the fallback read fails too", async () => {
+        const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
+        find.mockRejectedValue(new Error("http failed"));
         const { result } = renderBoard();
         await waitFor(() => expect(listen).toHaveBeenCalledTimes(2));
 
@@ -230,7 +258,7 @@ done: 0 });
             updateFor("done")([]);
         });
 
-        expect(result.current.error).toBe(boom);
+        await waitFor(() => expect(result.current.columnData.todo.error).toBe(boom));
         expect(result.current.columnData.todo.loading).toBe(false);
         expect(result.current.loading).toBe(false);
         consoleError.mockRestore();
