@@ -14,7 +14,8 @@ function createMockDriver(key: string): DataDriver {
             values
         })),
         delete: jest.fn().mockResolvedValue(undefined),
-        count: jest.fn().mockResolvedValue(0)
+        count: jest.fn().mockResolvedValue(0),
+        checkUniqueField: jest.fn().mockResolvedValue(true)
     };
 }
 

@@ -290,9 +290,14 @@ export function removeFunctions(o: unknown): unknown {
     if (o === undefined) return undefined;
     if (o === null) return null;
     if (typeof o === "object") {
-        // Handle arrays first - map over them recursively
+        // Handle arrays first - drop function elements, then recurse.
+        // Only object *properties* used to be filtered, so a function sitting
+        // directly in an array survived — and the callers strip functions
+        // precisely because a function survives no deep comparison.
         if (Array.isArray(o)) {
-            return o.map(v => removeFunctions(v));
+            return o
+                .filter(v => typeof v !== "function")
+                .map(v => removeFunctions(v));
         }
         // Preserve class instances (EntityReference, GeoPoint, etc.) - don't recurse into them
         if (!isPlainObject(o)) {
@@ -300,15 +305,10 @@ export function removeFunctions(o: unknown): unknown {
         }
         return Object.entries(o)
             .filter(([_, value]) => typeof value !== "function")
-            .map(([key, value]) => {
-                if (Array.isArray(value)) {
-                    return { [key]: value.map(v => removeFunctions(v)) };
-                } else if (typeof value === "object") {
-                    return { [key]: removeFunctions(value) };
-                } else return { [key]: value };
-            })
-            .reduce((a, b) => ({ ...a,
-...b }), {});
+            .reduce<Record<string, unknown>>((acc, [key, value]) => {
+                acc[key] = removeFunctions(value);
+                return acc;
+            }, {});
     }
     return o;
 }

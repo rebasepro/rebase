@@ -68,7 +68,16 @@
     // info alert. And `views.test.tsx` wrote `VirtualTable<any>`, which tsc
     // rejects: `React.memo` had pinned the component's type parameter, so the
     // exported component was not generic at all.
-    "packages/ui/test"
+    "packages/ui/test",
+    // The collection registry, permissions and policy tests.
+    // `collection_registry_property_gates.test.ts` declared its fixtures with
+    // `driver: "firestore"` / `driver: "mongodb"`. The field is `engine`; there
+    // is no `driver`. So every "Firestore" and "MongoDB" case in it was a
+    // default-Postgres collection and no engine gate was ever crossed — for as
+    // long as this line was missing, nothing could say so.
+    // `src` joins `test` because some of these tests sit beside the code.
+    "packages/common/test",
+    "packages/common/src"
   ],
   "exclude": [
     "**/node_modules",

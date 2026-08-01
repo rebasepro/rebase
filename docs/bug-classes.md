@@ -450,6 +450,9 @@ Triggered by a mutation-testing campaign over every package, and a read of all
 | `reset-password-admin`, `admin-users-ids-lookup` | **BUG** (class 8) — no 401 or 403 at all, so dropping `requireAdmin` passed. |
 | `websocket.test.ts` admin gate | **BUG** (class 8) — stubbed the token verifier to return an admin unconditionally, so only the happy path could ever run. |
 | `mfa-service.test.ts` | **BUG** — counted calls without reading the statements; dropping `AND uid = …` from a factor delete passed. |
+| every method on `DatabaseAdapter` vs `BackendBootstrapper` (class 11 sweep) | clean apart from the fix above — `initializeRealtime` takes a `config` on one side and not the other, but every implementation names it `_config` and ignores it, so nothing is lost. The other seven agree parameter for parameter. |
+| every security flag consumed negated (class 10 sweep) | clean — the only `authenticated: !flag` sites are the two sockets fixed here. `resolveRequireAuth`, `openapi-generator`'s `requireAuth ?? true` and the API-key guard all default closed. |
+| the HTTP and socket answers to "is auth required?" | **BUG** (class 2 + 10) — two implementations of one predicate, disagreeing in the open direction: with no auth configured, `/api/data` answered 401 while the socket served the same rows. Extracted to `resolveRequireAuth`; both call it, and the tests pin agreement rather than restating answers. |
 | test directories invisible to tsc | **BUG** (class 7/12, systemic) — six more packages added to `tsconfig.tests.json`; 47 errors fixed, no `as any`, no `@ts-ignore`. |
 
 The two socket findings are worth keeping together, because they are the same

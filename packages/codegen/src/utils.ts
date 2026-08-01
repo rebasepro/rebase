@@ -5,11 +5,20 @@
 /**
  * Convert a slug/snake_case string to PascalCase
  * e.g. "private_notes" → "PrivateNotes"
+ *
+ * Capitals already inside a word are meaningful and are kept: lowercasing the
+ * tail of every chunk turned "TestEntities" into "Testentities", which is what
+ * ended up in the generated type names. SHOUTING_CASE is the one shape where
+ * the tail is not meaningful, so it is folded down.
  */
 export function toPascalCase(str: string): string {
     return str
         .split(/[_\-\s]+/)
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .filter(Boolean)
+        .map(word => {
+            const rest = /^[A-Z0-9]+$/.test(word) ? word.slice(1).toLowerCase() : word.slice(1);
+            return word.charAt(0).toUpperCase() + rest;
+        })
         .join("");
 }
 

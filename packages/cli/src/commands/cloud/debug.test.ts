@@ -382,6 +382,7 @@ vi.mock("./context", async (importOriginal) => {
 
 import * as context from "./context";
 import { debugCommand } from "./debug";
+import { cloudCommand, positionals } from "./index";
 
 function fakeClient(spec: {
     invoke?: (name: string, body: unknown, opts?: { method?: string; path?: string }) => Promise<unknown>;
@@ -661,15 +662,31 @@ describe("debug subcommand dispatch", () => {
      * rawArgs is what left `storage create` unreachable.
      */
     it("reads the action from positional 1, with the group at argv[3]", () => {
-        const rawArgs = ["/usr/bin/node", "/path/rebase.js", "cloud", "debug", "health"];
-        expect(rawArgs[2]).toBe("cloud");
-        expect(rawArgs[3]).toBe("debug");
-
-        const positionals = (a: string[]) => a.slice(3).filter((x) => !x.startsWith("-"));
-        expect(positionals(rawArgs)[1]).toBe("health");
+        // This used to declare a local `positionals` and assert against that, so
+        // the dispatcher's own parser was never called — the exact shape of
+        // mistake the docblock above is about.
+        expect(positionals(["/usr/bin/node", "/path/rebase.js", "cloud", "debug", "health"]))
+            .toEqual(["debug", "health"]);
         expect(positionals(["node", "cli", "cloud", "debug", "logs", "--since", "1h"])[1]).toBe("logs");
         // Bare `rebase cloud debug` has no action — that is the health path.
         expect(positionals(["node", "cli", "cloud", "debug"])[1]).toBeUndefined();
+    });
+
+    it("dispatches `cloud debug health` through the real cloud router", async () => {
+        // `debugCommand` receives the action the router resolved, so route the
+        // whole argv through the router rather than hand-feeding the string.
+        vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
+        useClient(fakeClient({}));
+        const cap = captureStdout();
+        const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+
+        await cloudCommand("debug", ["node", "rebase", "cloud", "debug", "health", "--json"]);
+
+        cap.restore();
+        exit.mockRestore();
+        const parsed = JSON.parse(cap.output().trim());
+        // The health path is the one that reports the probe list.
+        expect(parsed.probes).toHaveLength(PROBES.length);
     });
 
     it("runs the probes when no subcommand is given", async () => {

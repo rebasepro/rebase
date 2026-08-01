@@ -179,22 +179,39 @@ describe("getJunctionSecurityRules — write inheritance", () => {
         expect(names).toContain("posts_tags_default_edge_write");
     });
 
-    it("refuses to inherit raw-SQL rules: the failure mode is locked, never open", () => {
+    it("refuses to inherit raw SQL that does not round-trip: the failure mode is locked, never open", () => {
+        // `is_shared` is a bare boolean column reference that the SQL parser does
+        // not turn into the structured model, so the rule stays `raw` and cannot
+        // be re-scoped into the junction's EXISTS. Nothing may be granted.
+        //
+        // The assertion used to sit inside `if (write)` — the branch that does
+        // not run — so a regression that started granting an *unconstrained*
+        // edge write here would have passed too.
         const { posts, tags } = makeCollections({
             postsRules: [{ operation: "update", using: "author_id = auth.uid() OR is_shared" }]
         });
         const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
 
-        // `using` raw SQL is parsed into the structured model when possible, so
-        // this may or may not embed — the invariant under test is weaker and
-        // more important: no write grant may exist unless it round-trips into
-        // structured, embeddable form.
+        const names = getJunctionSecurityRules(spec).map(r => r.name);
+        expect(names).not.toContain("posts_tags_default_edge_write");
+    });
+
+    it("inherits raw SQL that does round-trip, embedded in the parent EXISTS", () => {
+        // The other half of the invariant: a grant exists only when the parent's
+        // own condition travels with it.
+        const { posts, tags } = makeCollections({
+            postsRules: [{ operation: "update", using: "author_id = auth.uid()" }]
+        });
+        const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
+        const junction = getJunctionCollectionConfig(spec);
+
         const write = getJunctionSecurityRules(spec).find(r => r.name === "posts_tags_default_edge_write");
-        if (write) {
-            const junction = getJunctionCollectionConfig(spec);
-            const sql = compileUsing(write, junction, [posts, tags]);
-            expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."posts"`);
-        }
+        expect(write).toBeDefined();
+        const sql = compileUsing(write!, junction, [posts, tags]);
+        expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."posts"`);
+        expect(sql).toContain(`"public"."posts_tags".post_id`);
+        expect(sql).toContain("author_id");
+        expect(sql).toContain("auth.uid()");
     });
 
     it("suppresses a side's whole grant when a restrictive update rule cannot be embedded", () => {

@@ -1,6 +1,6 @@
 import { buildSdkData } from "../src/data/buildRebaseData";
 import { RebasePaginationError } from "../src/data/paginate";
-import { DataDriver, FetchCollectionProps } from "@rebasepro/types";
+import { DataDriver, FetchCollectionProps, RebaseSdkData, SDKCollectionClient } from "@rebasepro/types";
 
 /**
  * `iterate()` / `findAll()` on the **in-process** accessor — `rebase.data.*`
@@ -14,6 +14,16 @@ import { DataDriver, FetchCollectionProps } from "@rebasepro/types";
 
 interface Row extends Record<string, unknown> {
     id: number;
+}
+
+/**
+ * `RebaseSdkData`'s dynamic index signature is a union of a collection accessor
+ * and the `collection()` method that shares the namespace with it, so tsc
+ * cannot narrow a bare `data.jobs` on its own. A project generates a `Database`
+ * type and gets the narrowing for free; a test does it here.
+ */
+function jobsOf(data: RebaseSdkData): SDKCollectionClient<Row> {
+    return data.jobs as SDKCollectionClient<Row>;
 }
 
 function rows(from: number, count: number): Row[] {
@@ -42,15 +52,15 @@ function createPagedDriver(total: number, calls: FetchCollectionProps[] = []): D
 describe("in-process accessor pagination", () => {
     it("exposes iterate() and findAll() on the flat SDK data layer", () => {
         const data = buildSdkData(createPagedDriver(0));
-        expect(typeof data.jobs.iterate).toBe("function");
-        expect(typeof data.jobs.findAll).toBe("function");
+        expect(typeof jobsOf(data).iterate).toBe("function");
+        expect(typeof jobsOf(data).findAll).toBe("function");
     });
 
     it("yields every row across pages exactly once", async () => {
         const data = buildSdkData(createPagedDriver(7));
 
         const seen: number[] = [];
-        for await (const row of data.jobs.iterate({ pageSize: 3 })) {
+        for await (const row of jobsOf(data).iterate({ pageSize: 3 })) {
             seen.push(row.id as number);
         }
 
@@ -63,7 +73,7 @@ describe("in-process accessor pagination", () => {
         const data = buildSdkData(createPagedDriver(6));
 
         const seen: number[] = [];
-        for await (const row of data.jobs.iterate({ pageSize: 3 })) {
+        for await (const row of jobsOf(data).iterate({ pageSize: 3 })) {
             seen.push(row.id as number);
         }
 
@@ -74,7 +84,7 @@ describe("in-process accessor pagination", () => {
         const calls: FetchCollectionProps[] = [];
         const data = buildSdkData(createPagedDriver(5, calls));
 
-        for await (const _row of data.jobs.iterate({ pageSize: 2 })) { /* drain */ }
+        for await (const _row of jobsOf(data).iterate({ pageSize: 2 })) { /* drain */ }
 
         expect(calls.map((c) => [c.limit, c.offset])).toEqual([[2, 0], [2, 2], [2, 4]]);
     });
@@ -94,7 +104,7 @@ describe("in-process accessor pagination", () => {
         } as unknown as DataDriver;
 
         const seen: number[] = [];
-        for await (const row of buildSdkData(driver).jobs.iterate({ pageSize: 2 })) {
+        for await (const row of jobsOf(buildSdkData(driver)).iterate({ pageSize: 2 })) {
             seen.push(row.id as number);
         }
 
@@ -111,7 +121,7 @@ describe("in-process accessor pagination", () => {
         } as unknown as DataDriver;
 
         await expect((async () => {
-            for await (const _row of buildSdkData(driver).jobs.iterate({ pageSize: 2, maxPages: 3 })) {
+            for await (const _row of jobsOf(buildSdkData(driver)).iterate({ pageSize: 2, maxPages: 3 })) {
                 // drain
             }
         })()).rejects.toThrow(RebasePaginationError);
@@ -120,19 +130,19 @@ describe("in-process accessor pagination", () => {
 
     it("findAll collects every page", async () => {
         const data = buildSdkData(createPagedDriver(5));
-        const all = await data.jobs.findAll({ pageSize: 2 });
+        const all = await jobsOf(data).findAll({ pageSize: 2 });
         expect(all.map((r) => r.id)).toEqual([1, 2, 3, 4, 5]);
     });
 
     it("findAll throws rather than truncating when the cap is hit", async () => {
         const data = buildSdkData(createPagedDriver(50));
-        await expect(data.jobs.findAll({ pageSize: 10, maxRows: 20 }))
+        await expect(jobsOf(data).findAll({ pageSize: 10, maxRows: 20 }))
             .rejects.toMatchObject({ code: "max-rows" });
     });
 
     it("findAll returns flat rows, not Entity wrappers", async () => {
         const data = buildSdkData(createPagedDriver(2));
-        const all = await data.jobs.findAll({ pageSize: 2 });
+        const all = await jobsOf(data).findAll({ pageSize: 2 });
         expect(all[0].id).toBe(1);
         expect((all[0] as Record<string, unknown>).values).toBeUndefined();
     });
@@ -161,7 +171,7 @@ describe("in-process accessor pagination", () => {
         } as unknown as DataDriver;
 
         const seen: number[] = [];
-        for await (const row of buildSdkData(driver).jobs.iterate({ pageSize: 2, cursor: "id" })) {
+        for await (const row of jobsOf(buildSdkData(driver)).iterate({ pageSize: 2, cursor: "id" })) {
             seen.push(row.id as number);
         }
 
@@ -178,7 +188,7 @@ describe("in-process accessor pagination", () => {
     it("cursor mode refuses a cursor that disagrees with orderBy", async () => {
         const data = buildSdkData(createPagedDriver(5));
         await expect((async () => {
-            for await (const _row of data.jobs.iterate({ cursor: "id", orderBy: ["name", "asc"] })) { /* drain */ }
+            for await (const _row of jobsOf(data).iterate({ cursor: "id", orderBy: ["name", "asc"] })) { /* drain */ }
         })()).rejects.toMatchObject({ code: "cursor-order-mismatch" });
     });
 });

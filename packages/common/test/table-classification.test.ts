@@ -1,4 +1,9 @@
-import { classifyTable, isRebaseInternalTable, detectJunctionTables } from "../src/table-classification";
+import {
+    classifyTable,
+    isRebaseInternalTable,
+    detectJunctionTables,
+    JUNCTION_TABLES_SQL
+} from "../src/table-classification";
 
 describe("table-classification", () => {
     describe("classifyTable", () => {
@@ -43,13 +48,45 @@ describe("table-classification", () => {
             expect(result.has("posts_tags")).toBe(true);
             expect(result.has("users_roles")).toBe(true);
             expect(result.size).toBe(2);
-            expect(mockExecuteSql).toHaveBeenCalled();
+            // The rows are a fixture, so `toHaveBeenCalled()` only proved the
+            // mock was reached. The query is the part that decides what a
+            // junction table is, so assert it is the one that was sent.
+            expect(mockExecuteSql).toHaveBeenCalledTimes(1);
+            expect(mockExecuteSql).toHaveBeenCalledWith(JUNCTION_TABLES_SQL);
+        });
+
+        it("should ignore rows without a string table_name", async () => {
+            const mockExecuteSql = jest.fn().mockResolvedValue([
+                { table_name: "posts_tags" },
+                { table_name: null },
+                { table_name: 42 },
+                {}
+            ]);
+            const result = await detectJunctionTables(mockExecuteSql);
+            expect([...result]).toEqual(["posts_tags"]);
         });
 
         it("should handle empty results", async () => {
             const mockExecuteSql = jest.fn().mockResolvedValue([]);
             const result = await detectJunctionTables(mockExecuteSql);
             expect(result.size).toBe(0);
+        });
+    });
+
+    describe("JUNCTION_TABLES_SQL", () => {
+        it("asks for base tables in the public schema whose every column is a foreign key", () => {
+            // The definition of a junction table lives in this string and nowhere
+            // else, so a silent edit to it is a silent change of meaning.
+            const sql = JUNCTION_TABLES_SQL.replace(/\s+/g, " ").trim();
+            expect(sql).toContain("FROM information_schema.tables t");
+            expect(sql).toContain("t.table_schema = 'public'");
+            expect(sql).toContain("t.table_type = 'BASE TABLE'");
+            // "no column that is not a foreign-key column" — the double negative
+            // is the whole test: dropping the NOT would return every table.
+            expect(sql).toContain("AND NOT EXISTS");
+            expect(sql).toContain("c.column_name NOT IN");
+            expect(sql).toContain("tc.constraint_type = 'FOREIGN KEY'");
+            expect(sql).toContain("SELECT t.table_name");
         });
     });
 });

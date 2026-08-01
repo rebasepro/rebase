@@ -148,13 +148,27 @@ roles: ["admin", "editor"] }
         expect(canReadCollection(collection, adminAuthController)).toBe(true); // admin
     });
 
-    test("10. Roles on user are objects {id, name} — correctly mapped to strings", () => {
+    // The test that used to sit here claimed roles arrive as `{ id, name }`
+    // objects and are mapped to strings. `User.roles` is `string[]` and no such
+    // mapping exists anywhere, so the fixture was plain strings and the
+    // assertion was test 9 again with a different rule. What is worth pinning
+    // instead is that the match is an exact string membership test.
+    test("10. Role IDs match exactly — not by prefix, substring or case", () => {
         const collection = createMockCollection([
             { operation: "select",
 roles: ["author"] }
         ]);
-        // mockUser.roles = [{ id: "author" }, { id: "user" }]
-        expect(canReadCollection(collection, mockAuthController)).toBe(true);
+        const withRoles = (roles: string[] | undefined): AuthState<User> => ({
+            user: { ...mockUser,
+roles }
+        });
+
+        expect(canReadCollection(collection, withRoles(["author", "user"]))).toBe(true);
+        expect(canReadCollection(collection, withRoles(["authors"]))).toBe(false);
+        expect(canReadCollection(collection, withRoles(["auth"]))).toBe(false);
+        expect(canReadCollection(collection, withRoles(["Author"]))).toBe(false);
+        expect(canReadCollection(collection, withRoles([]))).toBe(false);
+        expect(canReadCollection(collection, withRoles(undefined))).toBe(false);
     });
 
     test("11. Empty roles array [] adds no role restriction (public rule stays public)", () => {

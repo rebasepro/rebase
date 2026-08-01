@@ -13,27 +13,10 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { setJsonModeForTest } from "./context";
-import { cloudCommand, positionals } from "./index";
-import { storageCommand } from "./resources";
 import { isRollbackable, deploymentDurationMs, deploymentView, triggerInfo, type DeploymentRow } from "./deployments";
 import { parseEnvAssignment } from "./env";
 import { resolveExtensionAlias } from "./extensions";
 import { buildSettingsPatch } from "./settings";
-
-/**
- * The resource handlers are stubbed so the dispatch tests can assert routing
- * without reaching the network. Everything else in this file imports its
- * subject directly and is unaffected.
- */
-vi.mock("./resources", async (importOriginal) => ({
-    ...(await importOriginal<typeof import("./resources")>()),
-    storageCommand: vi.fn(async () => {}),
-    statusCommand: vi.fn(async () => {}),
-    metricsCommand: vi.fn(async () => {}),
-    webhooksCommand: vi.fn(async () => {}),
-    clustersCommand: vi.fn(async () => {}),
-    billingCommand: vi.fn(async () => {})
-}));
 
 /* ── stdout capture ─────────────────────────────────────────────── */
 
@@ -85,10 +68,23 @@ vi.mock("./context", async (importOriginal) => {
     };
 });
 
+// The dispatch tests below assert *routing*, so the resource group handlers are
+// replaced by spies — running them would need a control-plane client.
+vi.mock("./resources", () => ({
+    statusCommand: vi.fn(async () => undefined),
+    metricsCommand: vi.fn(async () => undefined),
+    webhooksCommand: vi.fn(async () => undefined),
+    storageCommand: vi.fn(async () => undefined),
+    clustersCommand: vi.fn(async () => undefined),
+    billingCommand: vi.fn(async () => undefined)
+}));
+
 import * as context from "./context";
 import { envCommand } from "./env";
 import { deploymentsListCommand, rollbackCommand } from "./deployments";
 import { dbCommand } from "./databases";
+import { cloudCommand, positionals } from "./index";
+import { statusCommand, storageCommand } from "./resources";
 
 function useClient(client: unknown): void {
     (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ client, url: "https://cp.example" });
@@ -377,12 +373,9 @@ describe("cloud subcommand dispatch", () => {
      * The dispatcher resolves the action positionally. This pins that contract
      * so the next resource group cannot repeat it.
      */
-    it("puts the group at argv[3], not argv[2]", () => {
-        const rawArgs = ["/usr/bin/node", "/path/rebase.js", "cloud", "storage", "create"];
-
-        expect(rawArgs[2]).toBe("cloud");
-        expect(rawArgs[3]).toBe("storage");
-        expect(rawArgs[4]).toBe("create");
+    beforeEach(() => {
+        vi.mocked(storageCommand).mockClear();
+        vi.mocked(statusCommand).mockClear();
     });
 
     /**
@@ -472,6 +465,38 @@ describe("cloud subcommand dispatch", () => {
 
         expect(storage).not.toHaveBeenCalled();
         expect(printed).toContain("storage");
+    });
+
+    /**
+     * Kept from the parallel sweep of this file: the argv shape itself. The
+     * first three entries are the runtime, the script and the literal "cloud",
+     * whatever the first two happen to be called.
+     */
+    it("reads past the runtime and script names, whatever they are", () => {
+        expect(positionals(["/usr/bin/node", "/x/y/rebase.js", "cloud", "db", "list"]))
+            .toEqual(["db", "list"]);
+    });
+
+    it("routes `cloud storage create` to the storage group, passing the whole argv", async () => {
+        vi.mocked(storageCommand).mockClear();
+        const rawArgs = ["node", "cli", "cloud", "storage", "create", "--region", "eu"];
+        await cloudCommand("storage", rawArgs);
+        expect(storageCommand).toHaveBeenCalledWith("create", rawArgs);
+    });
+
+    it("routes a bare `cloud storage` with no action — the list path", async () => {
+        vi.mocked(storageCommand).mockClear();
+        const rawArgs = ["node", "cli", "cloud", "storage"];
+        await cloudCommand("storage", rawArgs);
+        expect(storageCommand).toHaveBeenCalledWith(undefined, rawArgs);
+    });
+
+    it("takes the group from the positionals when no subcommand is passed in", async () => {
+        vi.mocked(storageCommand).mockClear();
+        vi.mocked(statusCommand).mockClear();
+        await cloudCommand(undefined, ["node", "cli", "cloud", "status"]);
+        expect(statusCommand).toHaveBeenCalled();
+        expect(storageCommand).not.toHaveBeenCalled();
     });
 });
 

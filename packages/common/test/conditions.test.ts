@@ -1,10 +1,9 @@
 import {
-    applyPropertyConditions,
     buildConditionContext,
     evaluateCondition,
     registerConditionOperations
 } from "../src/util/conditions";
-import { AuthController, ConditionContext, EnumValueConfig, Property, StringProperty } from "../../types";
+import { AuthState, ConditionContext, EnumValueConfig, Property, StringProperty } from "@rebasepro/types";
 
 describe("Property Conditions", () => {
 
@@ -251,7 +250,7 @@ roles: [] },
             const context = buildConditionContext({
                 path: "products",
                 values: { createdAt: fakeTimestamp },
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as AuthState
             });
 
             expect(context.values.createdAt).toBe(1700000000000);
@@ -265,7 +264,7 @@ roles: [] },
             const context = buildConditionContext({
                 path: "products",
                 values: { updatedAt: fakeTimestamp },
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as AuthState
             });
 
             expect(context.values.updatedAt).toBe(date.getTime());
@@ -279,7 +278,7 @@ roles: [] },
                 path: "products",
                 values: { meta: { created: now,
 updated: now } },
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as AuthState
             });
 
             expect((context.values.meta as any).created).toBe(now.getTime());
@@ -294,7 +293,7 @@ updated: now } },
             const context = buildConditionContext({
                 path: "products",
                 values: { dates: [d1, d2] },
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as AuthState
             });
 
             expect(context.values.dates).toEqual([d1.getTime(), d2.getTime()]);
@@ -307,7 +306,7 @@ updated: now } },
                 path: "products",
                 propertyKey: "title",
                 values: { title: "Hello World" },
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as AuthState
             });
 
             expect(context.propertyValue).toBe("Hello World");
@@ -319,7 +318,7 @@ updated: now } },
             const context = buildConditionContext({
                 path: "products",
                 values: { title: "Current" },
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as AuthState
             });
 
             expect(context.previousValues).toEqual({ title: "Current" });
@@ -331,7 +330,7 @@ updated: now } },
             const context = buildConditionContext({
                 path: "products",
                 index: 3,
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as AuthState
             });
 
             expect(context.index).toBe(3);
@@ -350,7 +349,7 @@ updated: now } },
 
             const context = buildConditionContext({
                 path: "products",
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as AuthState
             });
 
             expect(context.user.roles).toEqual(["admin", "editor"]);
@@ -368,6 +367,9 @@ updated: now } },
                     photoURL: null,
                     providerId: "google.com",
                     isAnonymous: false,
+                    // `User.roles` is `string[]`; object roles are the legacy
+                    // shape `buildConditionContext` still normalises, so the cast
+                    // through `unknown` is the point of the fixture.
                     roles: [{ id: "admin",
 name: "Admin" }, { id: "editor",
 name: "Editor" }]
@@ -381,7 +383,7 @@ name: "Editor" }]
 createdAt: now },
                 path: "products",
                 entityId: "123",
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as unknown as AuthState
             });
 
             expect(context.values.createdAt).toBe(now.getTime());
@@ -398,7 +400,7 @@ createdAt: now },
 
             const context = buildConditionContext({
                 path: "products",
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as AuthState
             });
 
             expect(context.isNew).toBe(true);
@@ -412,6 +414,9 @@ createdAt: now },
                     email: "test@example.com",
                     displayName: "Test User",
                     photoURL: null,
+                    // `User.roles` is `string[]`; object roles are the legacy
+                    // shape `buildConditionContext` still normalises, so the cast
+                    // through `unknown` is the point of the fixture.
                     roles: [{ id: "admin",
 name: "Admin" }, { id: "editor",
 name: "Editor" }]
@@ -421,7 +426,7 @@ name: "Editor" }]
             const context = buildConditionContext({
                 path: "products",
                 entityId: "123",
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as unknown as AuthState
             });
 
             // Roles are mapped from Role.id
@@ -435,7 +440,7 @@ name: "Editor" }]
 
             const context = buildConditionContext({
                 path: "products",
-                authController: mockAuthController as AuthController
+                authController: mockAuthController as AuthState
             });
 
             expect(context.user).toBeDefined();

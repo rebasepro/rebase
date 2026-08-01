@@ -49,13 +49,35 @@ label: "B" }
             name: "Test",
             enum: {
                 valid: "Valid",
-                "": "" // empty id and label
+                "": "", // empty id and label
+                blank: "" // present id, empty label
             } as any
         };
         const result = resolvePropertyEnum(prop) as StringProperty;
-        const enumArr = result.enum as EnumValueConfig[];
-        // The empty string id should be filtered out (since "" is falsy)
-        expect(enumArr.find(e => e.id === "valid")).toBeDefined();
+        // Asserting only that the valid entry survived left the filter deletable.
+        // Pin the whole resulting list instead.
+        expect(result.enum as EnumValueConfig[]).toEqual([{ id: "valid",
+label: "Valid" }]);
+    });
+
+    it("keeps a zero id, which is falsy but legitimate", () => {
+        const prop: NumberProperty = {
+            type: "number",
+            name: "Level",
+            enum: [
+                { id: 0,
+label: "None" },
+                { id: 1,
+label: "Some" }
+            ] as any
+        };
+        const result = resolvePropertyEnum(prop) as NumberProperty;
+        expect(result.enum).toEqual([
+            { id: 0,
+label: "None" },
+            { id: 1,
+label: "Some" }
+        ]);
     });
 
     it("handles number property enums", () => {
@@ -69,7 +91,15 @@ label: "B" }
             } as any
         };
         const result = resolvePropertyEnum(prop) as NumberProperty;
-        expect(Array.isArray(result.enum)).toBe(true);
+        // `Array.isArray` alone held even if every entry was dropped or garbled.
+        expect(result.enum).toEqual([
+            { id: "1",
+label: "Low" },
+            { id: "2",
+label: "Medium" },
+            { id: "3",
+label: "High" }
+        ]);
     });
 });
 

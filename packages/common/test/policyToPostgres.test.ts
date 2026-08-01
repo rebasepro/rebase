@@ -66,7 +66,9 @@ describe("policyToPostgres — existsIn (membership)", () => {
             collection: "team_members",
             where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
         });
-        expect(evaluatePolicy(expr, { uid: "u1", roles: [] })).toBe("unknown");
+        expect(evaluatePolicy(expr, { uid: "u1",
+roles: [],
+entity: null })).toBe("unknown");
     });
 });
 

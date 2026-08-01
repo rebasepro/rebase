@@ -1,4 +1,3 @@
-import { fileURLToPath } from "url";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -409,31 +408,13 @@ spa: true }]);
     });
 });
 
-/**
- * A custom runtime's artifact is an image, not a bundle.
- *
- * `rebase build` had no `runtime` check, so an ejected project still got a
- * `dist-bundle/` built for it — one it never deploys. That is worse than doing
- * nothing, because it looks like the thing that ships.
+/*
+ * "What `rebase build` does with each runtime" used to live here, asserted by
+ * reading `commands/build.ts` as text and matching regexes against it —
+ * including an `indexOf` ordering check that a variable rename would break and
+ * a genuine behavioural regression would not. It now runs the command:
+ * see `commands/build.test.ts`.
  */
-describe("what `rebase build` does with each runtime", () => {
-    function read(relative: string): string {
-        const here = path.dirname(fileURLToPath(import.meta.url));
-        return fs.readFileSync(path.join(here, relative), "utf8");
-    }
-
-    it("skips the bundle for a custom backend", () => {
-        const source = read("commands/build.ts");
-        expect(source).toMatch(/app\.type === "backend" && app\.runtime === "custom"/);
-        // …and the skip must come BEFORE the branch that bundles, or it never runs.
-        expect(source.indexOf('app.runtime === "custom"'))
-            .toBeLessThan(source.indexOf("const result = await buildBundle("));
-    });
-
-    it("still bundles a managed backend", () => {
-        expect(read("commands/build.ts")).toContain("const result = await buildBundle(");
-    });
-});
 
 /**
  * The declared `@rebasepro/*` versions are the one thing a project can get badly

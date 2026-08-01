@@ -86,14 +86,24 @@ describe("strings utils", () => {
     });
 
     describe("randomString", () => {
-        it("should generate random string of given length", () => {
-            const str1 = randomString(5);
-            expect(str1.length).toBe(5);
+        it("should generate a string of the given length from the base-36 alphabet", () => {
+            expect(randomString(5)).toMatch(/^[0-9a-z]{5}$/);
+            expect(randomString(10)).toMatch(/^[0-9a-z]{10}$/);
+        });
 
-            const str2 = randomString(10);
-            expect(str2.length).toBe(10);
+        it("should produce different values on successive calls", () => {
+            // Comparing a 5-char string to a 10-char one can never be equal, so it
+            // said nothing about randomness. Draw same-length samples instead: a
+            // constant generator would collapse this set to one entry.
+            const samples = new Set(Array.from({ length: 200 }, () => randomString(10)));
+            expect(samples.size).toBe(200);
+        });
 
-            expect(str1).not.toBe(str2);
+        it("should not concentrate on a single character", () => {
+            // One long draw covers the alphabet: a generator stuck on one symbol
+            // (or on a short cycle) fails here deterministically.
+            const distinctChars = new Set(randomString(2000));
+            expect(distinctChars.size).toBeGreaterThan(30);
         });
 
         it("should return the requested length every time", () => {

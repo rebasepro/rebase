@@ -509,7 +509,9 @@ describe("template package.json contracts", () => {
     it("frontend package.json has required dependencies", () => {
         const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "package.json"), "utf-8"));
         expect(pkg.dependencies).toHaveProperty("@rebasepro/app");
-        expect(pkg.dependencies).toHaveProperty("@rebasepro/app");
+        // `@rebasepro/admin` used to be a second copy of the `app` assertion, so
+        // the panel package the template actually ships went unchecked.
+        expect(pkg.dependencies).toHaveProperty("@rebasepro/admin");
         expect(pkg.dependencies).toHaveProperty("@rebasepro/client");
         expect(pkg.dependencies).toHaveProperty("react");
         expect(pkg.dependencies).toHaveProperty("react-dom");
@@ -666,8 +668,19 @@ describe(".env.example", () => {
     });
 
     it("contains setup instructions for required values", () => {
+        // "contains the word 'required' somewhere" was satisfied by any comment
+        // in the file. What a developer copying this needs is: which variables
+        // must be filled in, that they ship empty, and how to produce a value.
         const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
-        expect(envContent).toContain("required");
+
+        expect(envContent).toMatch(/Database connection string \(required\)/);
+        expect(envContent).toMatch(/JWT Authentication \(required\)/);
+
+        // JWT_SECRET must ship empty — a default here is a shared signing key.
+        expect(envContent).toMatch(/^JWT_SECRET=$/m);
+        // ...with the command that generates one right above it.
+        expect(envContent).toContain("randomBytes");
+        expect(envContent).toContain("at least 32 characters");
     });
     it("has optional SMTP section commented out", () => {
         const envContent = fs.readFileSync(path.join(TEMPLATE_DIR, ".env.example"), "utf-8");
@@ -823,11 +836,17 @@ describe("docker-compose.yml", () => {
     it("mounts a durable volume wherever it acknowledges local storage", () => {
         // FORCE_LOCAL_STORAGE without a durable mount is how uploads get
         // silently destroyed on the next restart.
+        //
+        // The whole body used to sit inside `if (compose.includes(...))`, so
+        // deleting the FORCE_LOCAL_STORAGE line — the very thing that makes the
+        // mount necessary — turned this into an empty test rather than a failure.
         const compose = fs.readFileSync(path.join(TEMPLATE_DIR, "docker-compose.yml"), "utf-8");
-        if (compose.includes("FORCE_LOCAL_STORAGE")) {
-            expect(compose).toContain("STORAGE_PATH: /uploads");
-            expect(compose).toContain("uploads:/uploads");
-        }
+        expect(compose).toContain("FORCE_LOCAL_STORAGE");
+        expect(compose).toContain("STORAGE_PATH: /uploads");
+        expect(compose).toContain("uploads:/uploads");
+        // ...and the volume has to be declared, not just referenced.
+        expect(compose).toMatch(/^volumes:/m);
+        expect(compose).toMatch(/^\s{2}uploads:/m);
     });
 
     it("backend depends on healthy db", () => {

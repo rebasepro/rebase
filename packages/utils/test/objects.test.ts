@@ -148,8 +148,25 @@ c: 3 });
         it("should defend against prototype pollution", () => {
             const target = {};
             const source = JSON.parse('{"__proto__": {"polluted": "yes"}}');
-            mergeDeep(target, source);
+            const result = mergeDeep(target, source) as any;
+            // Asserting on a fresh `{}` proves nothing: assigning `output["__proto__"]`
+            // re-points *that object's* prototype, it does not touch Object.prototype.
+            // The victim is the merge result, so assert there.
+            expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+            expect("polluted" in result).toBe(false);
+            expect(Object.prototype.hasOwnProperty.call(result, "__proto__")).toBe(false);
             expect(({} as any).polluted).toBeUndefined();
+        });
+
+        it("should not let `constructor` or `prototype` through either", () => {
+            const result = mergeDeep({ keep: 1 }, JSON.parse(
+                '{"constructor": {"prototype": {"polluted": "yes"}}, "prototype": {"polluted": "yes"}}'
+            )) as any;
+            expect(result.constructor).toBe(Object);
+            expect(Object.prototype.hasOwnProperty.call(result, "prototype")).toBe(false);
+            expect("polluted" in result).toBe(false);
+            expect(({} as any).polluted).toBeUndefined();
+            expect(result.keep).toBe(1);
         });
     });
 
@@ -176,11 +193,29 @@ c: 2 } };
             const obj = {
                 a: 1,
                 b: () => console.log("func"),
-                c: [2, () => {}]
+                c: [2, () => {}],
+                d: { e: () => {},
+f: 3 },
+                g: [{ h: () => {},
+i: 4 }]
             };
-            const result = removeFunctions(obj);
+            const result = removeFunctions(obj) as any;
             expect(result).toEqual({ a: 1,
-c: [2, expect.any(Function)] });
+c: [2],
+d: { f: 3 },
+g: [{ i: 4 }] });
+            // toEqual ignores nothing here, but be explicit: the array must have
+            // lost the element, not kept a hole or an undefined in its place.
+            expect(result.c).toHaveLength(1);
+            expect(JSON.stringify(result)).not.toContain("function");
+        });
+
+        it("should preserve class instances rather than flattening them", () => {
+            const date = new Date("2020-01-01T00:00:00.000Z");
+            const result = removeFunctions({ when: date,
+list: [date] }) as any;
+            expect(result.when).toBe(date);
+            expect(result.list[0]).toBe(date);
         });
     });
 
