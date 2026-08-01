@@ -116,11 +116,29 @@ export function createPostgresWebSocket(
         logger.error("❌ [WebSocket Server] Error", { error: err });
     });
 
-    // Auth is required when either: an adapter is present (secure by default),
-    // OR the config has a jwtSecret and requireAuth !== false.
-    const requireAuth = authAdapter
-        ? true
-        : (authConfig?.requireAuth !== false && !!authConfig?.jwtSecret);
+    // Auth is required when an adapter is present (secure by default), when
+    // `requireAuth: true` is set explicitly, or when a jwtSecret is configured
+    // and `requireAuth` is not switched off.
+    //
+    // The explicit-`true` arm is not redundant. It used to be ANDed with
+    // `!!jwtSecret`, so `requireAuth: true` on a server whose auth comes from an
+    // adapter rather than a local secret evaluated to *false* — and a `false`
+    // here does not merely skip a check, it opens every session with
+    // `authenticated: true` at connect time. A setting whose whole purpose is to
+    // demand authentication silently granted it instead. It now fails closed:
+    // asking for auth you have no credential to verify makes the socket refuse
+    // everyone, which is visible, rather than admit everyone, which is not.
+    const requireAuth = !!authAdapter
+        || authConfig?.requireAuth === true
+        || (authConfig?.requireAuth !== false && !!authConfig?.jwtSecret);
+
+    if (requireAuth && !authAdapter && !authConfig?.jwtSecret && !authConfig?.serviceKey) {
+        logger.warn(
+            "🔐 [WebSocket Server] Authentication is required but no adapter, jwtSecret or " +
+            "serviceKey is configured — no client can complete AUTH, so every realtime " +
+            "message will be refused with UNAUTHORIZED."
+        );
+    }
 
     wss.on("connection", (ws) => {
         const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;

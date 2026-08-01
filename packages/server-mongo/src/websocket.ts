@@ -25,7 +25,6 @@ interface ClientSession {
     messageWindowStart: number;
 }
 
-const clientSessions = new Map<string, ClientSession>();
 const WS_RATE_LIMIT = 2000;
 const WS_RATE_WINDOW_MS = 60_000;
 
@@ -53,6 +52,11 @@ export function createMongoWebSocket(
     authConfig?: RebaseAuthConfig,
     admin?: DatabaseAdmin
 ) {
+    // Scoped to this factory invocation rather than the module, so sessions do
+    // not leak across hot reloads or a second server on the same process — the
+    // Postgres socket keeps it here for the same reason.
+    const clientSessions = new Map<string, ClientSession>();
+
     const isProduction = process.env.NODE_ENV === "production";
     const wsDebug = (...args: unknown[]) => { if (!isProduction) console.debug(...args); };
     const wss = new WebSocketServer({ server });
@@ -62,7 +66,22 @@ export function createMongoWebSocket(
         logger.error("❌ [WebSocket Server] Error", { error: err });
     });
 
-    const requireAuth = authConfig?.requireAuth !== false && authConfig?.jwtSecret;
+    // An explicit `requireAuth: true` is honoured on its own. ANDing it with the
+    // presence of a jwtSecret (as this did) means the one setting that exists to
+    // demand authentication evaluates to false when no local secret is
+    // configured — and `false` here does not skip a check, it marks every
+    // session `authenticated` at connect time. Asking for auth must never be
+    // what grants it; with no credential to verify against the socket now
+    // refuses everyone, which is a visible failure rather than a silent one.
+    const requireAuth = authConfig?.requireAuth === true
+        || (authConfig?.requireAuth !== false && !!authConfig?.jwtSecret);
+
+    if (requireAuth && !authConfig?.jwtSecret) {
+        logger.warn(
+            "🔐 [WebSocket Server] Authentication is required but no jwtSecret is configured — " +
+            "no client can complete AUTH, so every realtime message will be refused."
+        );
+    }
 
     wss.on("connection", (ws) => {
         const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
