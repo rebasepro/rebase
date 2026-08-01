@@ -7,6 +7,13 @@ import type { AdminCollection } from "@rebasepro/admin-types";
 const DEFAULT_PAGE_SIZE = 20;
 
 /**
+ * How long a column waits for its subscription's first payload before reading
+ * once over HTTP instead. Long enough that a healthy socket always wins the
+ * race, short enough that a dead one does not hold a blank board.
+ */
+const LIVE_FIRST_PAINT_TIMEOUT_MS = 2500;
+
+/**
  * Shallow equality for entity value records.
  * Handles primitives and reference equality for nested values.
  * Avoids JSON.stringify allocation on every comparison.
@@ -392,46 +399,94 @@ values: { ...e.values,
             });
         };
 
-        const onError = (error: Error) => {
-            // Skip error handling if we're cleaning up
-            if (isCleaningUpRef.current) return;
-
-            console.error(`Error loading column ${column}:`, error);
-            setColumnData(prev => ({
-                ...prev,
-                [column]: {
-                    ...prev[column],
-                    entities: [],
-                    loading: false,
-                    hasMore: false,
-                    error
-                }
-            }));
-        };
-
-        // Set up listener or fetch
         const accessor = currentDataClient.collection(currentResolvedPath);
 
         // Eagerly include relations to avoid N+1 fetches.
         const includeParams = getRelationIncludeParams(currentCollection);
 
+        const fetchOnce = () => accessor.find({
+            where: whereFilter,
+            limit: itemCount,
+            orderBy: orderByParam,
+            include: includeParams
+        });
+
+        const onError = (error: Error) => {
+            // Skip error handling if we're cleaning up
+            if (isCleaningUpRef.current) return;
+
+            console.error(`Error loading column ${column}:`, error);
+
+            // A live subscription that fails is not the same thing as a column
+            // with nothing in it, but that is exactly what this used to render:
+            // entities cleared, no error surfaced, and a column reading "No
+            // items" above a header still counting eleven of them. Read once
+            // over HTTP instead — the board loses its live updates, not its
+            // contents — and only report the failure if that fails too.
+            fetchOnce()
+                .then(res => onUpdate(res.data as Entity<M>[]))
+                .catch(() => {
+                    if (isCleaningUpRef.current) return;
+                    setColumnData(prev => ({
+                        ...prev,
+                        [column]: {
+                            ...prev[column],
+                            entities: prev[column]?.entities ?? [],
+                            loading: false,
+                            hasMore: false,
+                            error
+                        }
+                    }));
+                });
+        };
+
         if (accessor.listen) {
+            let liveDataReceived = false;
             const unsubscribe = accessor.listen({
                 where: whereFilter,
                 limit: itemCount,
                 orderBy: orderByParam,
                 include: includeParams
-            }, res => onUpdate(res.data as Entity<M>[]), onError);
-            unsubscribersRef.current[column] = unsubscribe;
+            }, res => {
+                liveDataReceived = true;
+                onUpdate(res.data as Entity<M>[]);
+            }, onError);
+
+            // A subscription that is never going to answer takes the client's
+            // full 30s watchdog to say so, and the board spins the whole time.
+            // If the socket has not delivered shortly after mount, read once
+            // over HTTP and paint that; the live data still wins whenever it
+            // arrives. Costs nothing when realtime is healthy.
+            const firstPaintFallback = setTimeout(() => {
+                if (liveDataReceived || isCleaningUpRef.current) return;
+                fetchOnce()
+                    .then(res => {
+                        if (liveDataReceived || isCleaningUpRef.current) return;
+                        onUpdate(res.data as Entity<M>[]);
+                    })
+                    .catch(() => undefined);
+            }, LIVE_FIRST_PAINT_TIMEOUT_MS);
+
+            unsubscribersRef.current[column] = () => {
+                clearTimeout(firstPaintFallback);
+                unsubscribe?.();
+            };
         } else {
-            accessor.find({
-                where: whereFilter,
-                limit: itemCount,
-                orderBy: orderByParam,
-                include: includeParams
-            })
+            fetchOnce()
                 .then(res => onUpdate(res.data as Entity<M>[]))
-                .catch(onError);
+                .catch((error: Error) => {
+                    if (isCleaningUpRef.current) return;
+                    setColumnData(prev => ({
+                        ...prev,
+                        [column]: {
+                            ...prev[column],
+                            entities: prev[column]?.entities ?? [],
+                            loading: false,
+                            hasMore: false,
+                            error
+                        }
+                    }));
+                });
         }
     }, []); // No dependencies - uses refs for all values
 

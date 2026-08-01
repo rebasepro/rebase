@@ -7,6 +7,42 @@ import { BoardItem } from "@rebasepro/ui";
 import { BoardDataController } from "../useBoardDataController";
 import { generateKeyBetween } from "fractional-indexing";
 
+/**
+ * The digits a board order key is built from: base36, lower case only.
+ *
+ * The library's default alphabet is base62, and its keys only sort correctly
+ * under byte ordering. The column is sorted by the *database*, and Postgres'
+ * default collation is not byte ordering — under `en_US.UTF-8`, `"aa"` sorts
+ * before `"aC"`, so as soon as a board had been dragged around enough to reach
+ * the upper-case digits its order stopped matching the keys. One case has no
+ * such ambiguity: digits before letters is true of every collation in use.
+ *
+ * A key written with the old alphabet no longer validates, which is what makes
+ * the board offer to initialise the column — one click, and the order is
+ * rewritten in a form the database can sort.
+ */
+export const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+/**
+ * Whether a stored order value is a key `fractional-indexing` can interpolate
+ * against.
+ *
+ * Anything else — a plain `"12"` from a seed or a migration, an empty string —
+ * makes `generateKeyBetween` throw, and the fallback below then hands out the
+ * same first key to every card, so each drag lands at the bottom of the column
+ * on top of the last one that did. Asking the library itself is the only
+ * definition of "valid" worth trusting.
+ */
+export function isValidOrderKey(value: unknown): value is string {
+    if (typeof value !== "string" || value.length === 0) return false;
+    try {
+        generateKeyBetween(value, null, ORDER_KEY_DIGITS);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 export interface UseKanbanDragAndDropParams<M extends Record<string, unknown>> {
     collection: AdminCollection<M>;
     fullPath: string;
@@ -63,13 +99,16 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
 
             const movedIndex = targetColumnItems.findIndex(item => item.id === moveInfo.itemId);
 
-            // Get the order keys of the neighbours
-            const prevKey = movedIndex > 0
-                ? (targetColumnItems[movedIndex - 1].data.values?.[orderProperty] as string | null) ?? null
-                : null;
-            const nextKey = movedIndex < targetColumnItems.length - 1
-                ? (targetColumnItems[movedIndex + 1].data.values?.[orderProperty] as string | null) ?? null
-                : null;
+            // The order keys of the neighbours. A neighbour whose key is not a
+            // valid one counts as no neighbour at all: interpolating against it
+            // throws, and the whole move then falls back to a key that ignores
+            // where the card was actually dropped.
+            const keyAt = (index: number): string | null => {
+                const value = targetColumnItems[index]?.data.values?.[orderProperty];
+                return isValidOrderKey(value) ? value : null;
+            };
+            const prevKey = movedIndex > 0 ? keyAt(movedIndex - 1) : null;
+            const nextKey = movedIndex < targetColumnItems.length - 1 ? keyAt(movedIndex + 1) : null;
 
             try {
                 const a = prevKey;
@@ -78,12 +117,12 @@ export function useKanbanDragAndDrop<M extends Record<string, unknown>>({
                     // Handle duplicate or out-of-order keys to prevent fractional-indexing crash
                     b = null;
                 }
-                const newKey = generateKeyBetween(a, b);
+                const newKey = generateKeyBetween(a, b, ORDER_KEY_DIGITS);
                 updatedValues = setIn(updatedValues, orderProperty, newKey) as Record<string, unknown>;
             } catch (e) {
                 // Fallback: if keys are somehow invalid, generate from scratch
                 console.warn("fractional-indexing error, falling back:", e);
-                const newKey = generateKeyBetween(null, null);
+                const newKey = generateKeyBetween(null, null, ORDER_KEY_DIGITS);
                 updatedValues = setIn(updatedValues, orderProperty, newKey) as Record<string, unknown>;
             }
         }

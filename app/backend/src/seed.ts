@@ -142,6 +142,43 @@ function generateUUID(prefix: string, index: number): string {
     return `${hash.substring(0, 8)}-${hash.substring(8, 12)}-4${hash.substring(13, 16)}-a${hash.substring(17, 20)}-${hash.substring(20, 32)}`;
 }
 
+const ORDER_KEY_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+/**
+ * The nth key in the fractional-indexing order the admin panel writes.
+ *
+ * Board ordering is a `fractional-indexing` key, not a number: dropping a card
+ * asks that library for a key *between* its two new neighbours. Seeding
+ * `String(i)` produced values it rejects outright ("invalid order key head:
+ * 1"), so every drag fell through to the library's fallback and every card
+ * landed at the bottom with the same key — and `"6"` sorted after `"55"`
+ * anyway, since the column is ordered as text.
+ *
+ * The format is a length marker followed by base36 digits — exactly what
+ * `generateNKeysBetween(null, null, n, ORDER_KEY_DIGITS)` emits in the admin
+ * package. Lower case only, because the column is sorted by Postgres and its
+ * default collation does not order upper case the way byte comparison does.
+ */
+function orderKey(index: number): string {
+    const digits: string[] = [];
+    let remaining = index;
+    let width = 1;
+    let capacity = ORDER_KEY_ALPHABET.length;
+    while (remaining >= capacity) {
+        remaining -= capacity;
+        width += 1;
+        capacity *= ORDER_KEY_ALPHABET.length;
+    }
+    let value = remaining;
+    for (let i = 0; i < width; i++) {
+        digits.unshift(ORDER_KEY_ALPHABET[value % ORDER_KEY_ALPHABET.length]);
+        value = Math.floor(value / ORDER_KEY_ALPHABET.length);
+    }
+    // The marker sits at the middle of the alphabet, so keys can also be
+    // generated before the first one later on.
+    return ORDER_KEY_ALPHABET[ORDER_KEY_ALPHABET.indexOf("i") + width - 1] + digits.join("");
+}
+
 // ── Static seed-asset helpers ─────────────────────────────────────────
 /**
  * Copy all files from a seed-assets subdirectory into the uploads directory (local storage).
@@ -853,7 +890,7 @@ tag_id: tagIds[t - 1] });
                 category: template.category,
                 customer_id: hasCustomer ? customerIds[Math.floor(Math.random() * 40)] : null,
                 assigned_to: status === "open" && Math.random() > 0.5 ? null : pick(agentNames),
-                __order: String(i),
+                __order: orderKey(i),
                 created_at: createdAt,
                 updated_at: status === "open" ? createdAt : randomDate(7, 0)
             });

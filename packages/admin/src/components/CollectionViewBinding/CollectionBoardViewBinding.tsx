@@ -38,7 +38,7 @@ import {
 import { useAnalyticsController } from "@rebasepro/app";
 import { setIn } from "@rebasepro/forms";
 import { useBoardDataController } from "./useBoardDataController";
-import { useKanbanDragAndDrop } from "./hooks/useKanbanDragAndDrop";
+import { isValidOrderKey, ORDER_KEY_DIGITS, useKanbanDragAndDrop } from "./hooks/useKanbanDragAndDrop";
 import { useSidePanel } from "../../hooks/useSidePanel";
 import { generateNKeysBetween } from "fractional-indexing";
 
@@ -298,11 +298,11 @@ parentEntityIds,
         if (!orderProperty || dataLoading) return false;
         // Use collection-level count detection
         if (missingOrderCount > 0) return true;
-        // Fallback to checking loaded entities
-        return allEntities.some((entity: Entity<M>) => {
-            const orderValue = entity.values?.[orderProperty];
-            return orderValue === undefined || orderValue === null;
-        });
+        // A value that is present but is not a fractional-indexing key is no
+        // more usable than a missing one — dropping a card next to it cannot
+        // produce a key between the two — so it earns the same offer to
+        // initialise the column.
+        return allEntities.some((entity: Entity<M>) => !isValidOrderKey(entity.values?.[orderProperty]));
     }, [allEntities, orderProperty, dataLoading, missingOrderCount]);
 
     // Create a lookup map of entity ID → column from boardDataController data
@@ -337,7 +337,8 @@ parentEntityIds,
                 loading: colData?.loading ?? true,
                 hasMore: colData?.hasMore ?? false,
                 itemCount: colData?.entities?.length ?? 0,
-                totalCount: colData?.totalCount
+                totalCount: colData?.totalCount,
+                error: colData?.error
             };
         });
         return state;
@@ -375,20 +376,24 @@ parentEntityIds,
         setBackfillLoading(true);
 
         try {
-            // Fetch ALL documents from collection (not relying on loaded entities)
+            // Fetch ALL documents from collection (not relying on loaded
+            // entities). No `orderBy`: with no usable order key there is
+            // nothing to order by, and this is the same query the columns
+            // themselves run, so the keys are handed out in the order the
+            // board is showing — which is what the dialog promises.
             const allDocsRes = await dataClient.collection(fullPath).find({
                 limit: 10000 // Fetch all
             });
             const allDocs = allDocsRes.data as Entity<M>[];
 
-            // Find entities missing order property
-            const entitiesToUpdate = allDocs.filter((entity: Entity<M>) => {
-                const orderValue = entity.values?.[orderProperty];
-                return orderValue === undefined || orderValue === null;
-            });
+            // Entities without a usable order key. Testing only for null here
+            // meant a column full of unusable values — `"12"`, `"6"` — offered
+            // an Initialize button that updated nothing and never went away.
+            const entitiesToUpdate = allDocs.filter((entity: Entity<M>) =>
+                !isValidOrderKey(entity.values?.[orderProperty]));
 
             // Generate string fractional keys for all entities that need them
-            const keys = generateNKeysBetween(null, null, entitiesToUpdate.length);
+            const keys = generateNKeysBetween(null, null, entitiesToUpdate.length, ORDER_KEY_DIGITS);
             const updates: Promise<void>[] = [];
             entitiesToUpdate.forEach((entity: Entity<M>, index: number) => {
                 const updatedValues = setIn({ ...entity.values }, orderProperty, keys[index]);
@@ -591,8 +596,10 @@ parentEntityIds,
                 </div>
             )}
 
-            {/* Main board */}
-            <div className="flex-1 overflow-auto no-scrollbar">
+            {/* Main board. It scrolls its own columns vertically and its own
+                row horizontally, so an `overflow-auto` here only added a second
+                scroll container around both. */}
+            <div className="flex-1 min-h-0 overflow-hidden">
                 <KanbanView
                     data={boardItems}
                     columns={columns}
