@@ -223,7 +223,12 @@ function SortableStorageItem({
             style={style}
             {...attributes}
             {...listeners}
-            className={cls("rounded-md m-1")}
+            // No vertical margin: the strip already pads itself, and `m-1` made
+            // each item 8px taller than the row's content box — enough to make a
+            // field holding one image scroll vertically behind a hidden
+            // scrollbar. `shrink-0` keeps thumbnails square once there are more
+            // of them than fit across.
+            className={cls("rounded-md shrink-0")}
             tabIndex={-1}
         >
             {child}
@@ -320,7 +325,10 @@ function FileDropComponent({
         >
             <div
                 className={cls("flex items-center gap-2 p-1 px-3 no-scrollbar",
-                    multipleFilesSupported && internalValue.length ? "overflow-auto" : "",
+                    // Horizontal only. `overflow-auto` scrolls both axes, so any
+                    // pixel of vertical overflow turned the field into a
+                    // scrollable box with nothing visible to scroll to.
+                    multipleFilesSupported && internalValue.length ? "overflow-x-auto overflow-y-hidden" : "",
                     // A fixed height, not a minimum: the 118px preview overflowed
                     // a `min-h`, so a field with a file stood taller than the same
                     // field empty. 126px is the preview plus its padding.

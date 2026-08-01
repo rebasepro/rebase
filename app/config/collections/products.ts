@@ -1,5 +1,6 @@
 import ordersCollection from "./orders";
 import productLocalesCollection from "./product_locales";
+import { LOCALE_ENUM } from "./locales";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 const productsCollection: PostgresCollectionConfig = {
@@ -52,7 +53,8 @@ const productsCollection: PostgresCollectionConfig = {
             type: "array",
             of: {
                 name: "Locale",
-                type: "string"
+                type: "string",
+                enum: LOCALE_ENUM
             }
         },
         brand: {
