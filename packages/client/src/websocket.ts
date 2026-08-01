@@ -295,11 +295,18 @@ export class RebaseWebSocketClient {
      */
     async authenticate(token: string): Promise<void> {
         return new Promise((resolve, reject) => {
-            const requestId = `auth_${Date.now()}`;
+            // Random suffix, like every other request id here. Two auth
+            // attempts started in the same millisecond produced the same id,
+            // and `pendingRequests` is a Map: the second registration replaced
+            // the first, so one caller's promise was never settled either way.
+            const requestId = `auth_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
             const timeout = setTimeout(() => {
                 this.pendingRequests.delete(requestId);
-                this.authPromise = null; // Clear promise so we can retry later
+                // `authPromise` belongs to `ensureAuthenticated`, which clears
+                // it when the whole attempt — retries included — settles.
+                // Clearing it here let a second attempt start while this one
+                // was still retrying.
                 reject(new Error("Authentication timeout"));
             }, 30000);
 
@@ -895,26 +902,39 @@ export class RebaseWebSocketClient {
         // If already authenticated or no token getter, skip
         if (this.isAuthenticated || !this.getAuthToken) return;
 
-        // If auth is in progress, wait for it
-        if (this.authPromise) {
-            await this.authPromise;
-            return;
+        // If auth is in progress, wait for it.
+        //
+        // The share has to be published *before* the first await, which is why
+        // the work lives in its own method. The guard used to be read here and
+        // the promise only assigned after `await this.getAuthToken()` — so
+        // every caller that arrived during that gap saw `null` and started an
+        // attempt of its own. A queue flushing six subscriptions on connect
+        // does exactly that, and each extra attempt raced the others through a
+        // single `pendingRequests` slot: one settled, the rest hung until their
+        // own 30s timeout, and the frames waiting behind them were never sent.
+        // Their subscriptions then reported "Subscription timed out" — the
+        // board's columns loading one at a time, or not at all.
+        if (!this.authPromise) {
+            this.authPromise = this.runAuthentication(retryCount);
+            this.authPromise.finally(() => {
+                this.authPromise = null;
+            }).catch(() => undefined);
         }
+        await this.authPromise;
+    }
 
+    private async runAuthentication(retryCount: number): Promise<void> {
         // Try to authenticate with retries
         let lastError: unknown = null;
 
         for (let attempt = 0; attempt < retryCount; attempt++) {
             try {
-                const token = await this.getAuthToken();
+                const token = await this.getAuthToken!();
                 if (!token) throw new Error("user not logged in");
-                this.authPromise = this.authenticate(token);
-                await this.authPromise;
-                this.authPromise = null;
+                await this.authenticate(token);
                 console.debug("WebSocket authenticated on demand");
                 return; // Success
             } catch (error: unknown) {
-                this.authPromise = null;
                 lastError = error;
 
                 const errMsg = error instanceof Error ? error.message : String(error);
