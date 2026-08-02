@@ -92,7 +92,7 @@ but an annotation only *validates the shape* — it cannot see your property nam
 need to name the type.
 
 :::note
-`buildCollection` and `buildProperty` were removed in 0.11. `buildCollection` is
+`buildCollection` and `buildProperty` no longer exist. `buildCollection` is
 `defineCollection` without the inference; `buildProperty` wrapped a property in a type it
 already had. See the [changelog](/docs/changelog) for the one-line migration.
 :::

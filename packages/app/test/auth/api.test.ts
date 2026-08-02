@@ -83,8 +83,15 @@ describe("auth API client", () => {
             });
         });
 
-        it("AuthApiError is a deprecated alias of RebaseApiError", () => {
-            expect(authApi.AuthApiError).toBe(RebaseApiError);
+        // The `AuthApiError` alias this used to assert on is gone. What the alias
+        // existed to promise — that a caller can `catch (e) { if (e instanceof
+        // RebaseApiError) … }` — is the thing worth pinning, so assert the
+        // instance rather than the name that pointed at its constructor.
+        it("throws a RebaseApiError instance, not a bare Error", async () => {
+            (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+            await expect(authApi.fetchAuthConfig(API_URL, authApi.createAuthConfigCache()))
+                .rejects.toBeInstanceOf(RebaseApiError);
         });
     });
 

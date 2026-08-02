@@ -20,8 +20,8 @@ export interface RebaseFunctionContext {
      * `rebase.dataAsAdmin` runs with **admin privileges and bypasses RLS** — use
      * it only for trusted admin work. For user-scoped queries inside a handler,
      * use the request `driver` (`c.var.driver`), which carries the caller's
-     * identity so RLS applies. (`rebase.data` is a deprecated alias for
-     * `rebase.dataAsAdmin`.)
+     * identity so RLS applies. (`rebase.data` no longer exists on this type —
+     * `dataAsAdmin` is the only name for the admin-scoped accessor.)
      */
     rebase: RebaseServerClient;
 }

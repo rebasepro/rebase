@@ -235,29 +235,3 @@ export function createDataRateLimiter(config: DataRateLimitConfig = {}): Middlew
     });
 }
 
-/**
- * Create a rate limiter specifically for API key requests.
- *
- * @deprecated Use {@link createDataRateLimiter}, which limits signed-in users
- * and anonymous callers too. This one skips every request that is not
- * API-key-authenticated, which was most of them.
- *
- * @param defaultLimit - Fallback limit when the key has no `rate_limit` set.
- * @param windowMs     - Time window in milliseconds (default: 15 minutes).
- */
-export function createApiKeyRateLimiter(
-    defaultLimit = 1000,
-    windowMs = 15 * 60 * 1000
-): MiddlewareHandler<HonoEnv> {
-    return createRateLimiter({
-        windowMs,
-        message: "API key rate limit exceeded, please try again later.",
-        keyGenerator: apiKeyKeyGenerator,
-        resolveLimit: (c) => {
-            const apiKey = c.get("apiKey") as { id: string; rate_limit: number | null } | undefined;
-            // Not an API key request — skip this limiter.
-            if (!apiKey) return null;
-            return apiKey.rate_limit ?? defaultLimit;
-        }
-    });
-}

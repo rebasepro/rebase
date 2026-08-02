@@ -12,13 +12,6 @@
 import { RebaseApiError } from "@rebasepro/types";
 import { DEFAULT_API_PATH } from "../hooks/ApiConfigContext";
 
-/**
- * @deprecated Use {@link RebaseApiError} (from `@rebasepro/types`, re-exported by
- * `@rebasepro/client`). Kept as an alias so `instanceof` / imports keep working;
- * errors thrown here now carry `.code` and `.status` on the unified type.
- */
-export const AuthApiError = RebaseApiError;
-
 async function handleResponse<T>(response: Response): Promise<T> {
     let data: Record<string, unknown>;
     try {

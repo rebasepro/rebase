@@ -2,12 +2,11 @@ import { User, AuthTokens, DeviceSession, RebaseSession, AuthChangeEvent } from 
 import { AuthController } from "@rebasepro/admin-types";
 import type { AuthConfigResponse } from "./api";
 
-/** @deprecated Use `User` from `@rebasepro/types` instead. */
-export type UserInfo = User;
-/** @deprecated Use `DeviceSession` from `@rebasepro/types` instead. */
-export type Session = DeviceSession;
-// Re-export canonical types for backward compatibility
-export type { AuthTokens, DeviceSession };
+// Re-export canonical types so the auth entry point stays self-contained. `User`
+// joins them because the controller hands one back and a consumer installs
+// `@rebasepro/app` alone — `@rebasepro/types` is this package's dependency, not
+// theirs, so it is not a specifier they can import from.
+export type { User, AuthTokens, DeviceSession };
 
 /**
  * Auth controller that extends the base AuthController

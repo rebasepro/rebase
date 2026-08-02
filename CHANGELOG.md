@@ -4,6 +4,42 @@
 
 ### Breaking
 
+- **`rebase.data` is gone — use `rebase.dataAsAdmin`.** The server singleton had two names for one accessor, and the shorter one gave no hint of what it does: `rebase.data` and `rebase.dataAsAdmin` were the same admin-scoped, **RLS-bypassing** driver. `data` is the name a browser client uses for its *user-scoped* accessor, so the same expression meant "whatever this user may read" on the client and "everything, no policies" on the server. That is a bad thing to have to remember at a call site that reads fine either way.
+
+  ```diff
+  - const { data: rows } = await rebase.data.projects.find();
+  + const { data: rows } = await rebase.dataAsAdmin.projects.find();
+  ```
+
+  `RebaseServerClient` now extends `Omit<RebaseClient, "data">`, so this is a compile error rather than a silent privilege. **The property still exists at runtime**, aliasing `dataAsAdmin`, so an untyped JavaScript caller keeps working instead of failing on `undefined` mid-upgrade — the type is the contract, and it is the type that changed.
+
+  Unaffected, because their accessor is genuinely user-scoped and was never deprecated: `context.client.data` in entity callbacks, and `client.data` in a cron handler — both are `RebaseClient`. Also unaffected: `rebase.data` in a **generated SDK** or browser app, which is a different object entirely.
+
+  For user-scoped queries inside a request handler, neither name is right: use the request-scoped driver (`c.var.driver`), which carries the caller's identity so RLS applies.
+
+- **Every other deprecated export is gone too.** Ten more symbols carrying `@deprecated`, removed rather than carried across the 1.0 line. After 1.0 a deprecated export costs a major to remove, so the choice was to drop them now or keep them until 2.0 — and each one was an alias for something already exported under a better name, so keeping them only bought a second way to write the same line.
+
+  | Removed | From | Use instead |
+  | --- | --- | --- |
+  | `buildCollection` | `@rebasepro/common` | `defineCollection` |
+  | `buildProperty` | `@rebasepro/common` | a plain property object |
+  | `RebaseUser` | `@rebasepro/client` | `User` from `@rebasepro/types` |
+  | `RebaseTokens` | `@rebasepro/client` | `AuthTokens` from `@rebasepro/types` |
+  | `UserInfo` | `@rebasepro/app` | `User` from `@rebasepro/types` |
+  | `Session` | `@rebasepro/app` | `DeviceSession` from `@rebasepro/types` |
+  | `AuthApiError` | `@rebasepro/app` | `RebaseApiError` from `@rebasepro/types` |
+  | `DatabaseConnection` | `@rebasepro/server` | `DriverConnection` |
+  | `createApiKeyRateLimiter` | `@rebasepro/server` | `createDataRateLimiter` |
+  | `resolveChannelBusConfig` | `@rebasepro/server-postgres` | `resolveChannelBusSetting` |
+
+  Every one is a rename at the import site. The three that are not purely cosmetic:
+
+  `createApiKeyRateLimiter` **skipped every request that was not API-key-authenticated**, which on a normal deployment is nearly all of them — a limiter that reads as protection and passed the traffic you would want limited. `createDataRateLimiter` covers signed-in users and anonymous callers too, and has been the wired default since it landed.
+
+  `buildCollection` / `buildProperty` were **announced as removed in 0.11 and were not** — the note went into the changelog and into the collections docs, and both functions kept shipping from `@rebasepro/common` for two more minors. Anyone who read the note migrated; anyone who did not kept a working build. Now the code matches what was published, and the collections docs no longer name a version the removal did not happen in.
+
+  `DatabaseConnection` is still a name you can import from `@rebasepro/server` — that is the point of removing it. Two different shapes answered to it: a local alias for `DriverConnection`, and the canonical `DatabaseConnection` from `@rebasepro/types` that the package re-exports. Deleting the alias leaves one. If your import resolved to the alias, it was the driver connection and wants `DriverConnection`; if it type-checks unchanged, it was already the canonical one.
+
 - **`admin.widthPercentage` is gone — use `admin.span`.** Field width is a span over a shared four-column grid now, so two fields line up whatever order they were declared in. A raw percentage could not line up with anything: `33` and `35` produced different widths that looked like a mistake, and nothing snapped to a common edge.
 
   ```diff
@@ -87,6 +123,8 @@
 
 ### Fixed
 
+- **`customProps` in the collection editor was marked deprecated by accident.** It carried a `@deprecated Superseded by span` tag that belonged to `widthPercentage` and slid onto the next field along when that one was deleted. `customProps` is live — it is how a custom `Field` or `Preview` receives its props, and `PropertyFieldBinding` reads it on every render. Nothing about the behaviour changed; the tag is gone, so editors stop striking through a supported field and suggesting a replacement that does something else entirely.
+
 - **The eject warning was suppressed exactly where it mattered.** The warning above the refusal — the one that exists because ejecting "is not something to discover from a runtime version going blank" — was printed behind `!isJsonMode()`. JSON mode latches on whenever stdout is not a TTY, so piping the command, or running it from CI or a coding agent, deleted the warning outright, and the deploy's JSON payload carried no equivalent field. The one case with nobody watching the terminal was the one case that said nothing.
 
   Warnings now go to stderr in every output mode — stderr is not the JSON stream, so it cannot corrupt a parser — and only their *formatting* depends on the mode. Whether a warning is emitted at all no longer does. The deploy payload gains `warnings: [{code, message, hint}]` and a denormalised `ejectsManagedRuntime` boolean for CI to test directly; both fields are always present, so `false` never has to be told from absent.
@@ -120,6 +158,8 @@
 - **The Firebase example compiles again.** It had not built since the property-options split, which made `url` a statement about the data — it feeds `format: "uri"` into the OpenAPI contract — and moved presentation to `admin.urlPreview`. The example's `admin: { url: "image" }` had both halves in the wrong place, and `expanded` likewise belongs in the `admin` block.
 
 ### Added
+
+- **`User` is exported from `@rebasepro/client` and `@rebasepro/app`.** The removals above tell a caller to import `User` from `@rebasepro/types`, which was not an instruction a browser app could follow: it installs the client (or app) package alone, and `@rebasepro/types` is *that package's* dependency, not a specifier resolvable from its own project. So the deprecated aliases were removable in a monorepo and stranding anywhere else. `User` now sits beside `RebaseSession`, `AuthTokens` and `DeviceSession`, which were already re-exported for exactly this reason.
 
 - **The entity form has a layout.** It had exactly one — a single centred column of full-width cards in declaration order — and one escape hatch, `formView.Builder`, which replaces the whole form. Nothing in between.
 

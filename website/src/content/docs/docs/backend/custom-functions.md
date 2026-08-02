@@ -251,7 +251,7 @@ app.post("/:id/approve", async (c) => {
     const id = c.req.param("id");
 
     // Use the admin-level data API (bypasses RLS completely)
-    await rebase.data.collection<Record<string, unknown>>("jobs").update(id, {
+    await rebase.dataAsAdmin.collection<Record<string, unknown>>("jobs").update(id, {
         status: "published",
         approved_at: new Date().toISOString(),
     });
@@ -265,9 +265,9 @@ export default app;
 ### RLS-Scoped Driver vs. Rebase Singleton
 
 | **RLS Enforcement** | ✅ Yes (evaluated against user/roles) | ❌ No (bypasses all security rules) |
-| **Performance** | Native (direct driver call) | Native (direct driver call for `rebase.data`) |
+| **Performance** | Native (direct driver call) | Native (direct driver call for `rebase.dataAsAdmin`) |
 | **Ideal for...** | General user CRUD, search, and queries | Background jobs, system triggers, webhooks |
-| **API style** | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.data.jobs.find`) |
+| **API style** | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.dataAsAdmin.jobs.find`) |
 
 ### 3. Via Direct Drizzle Access
 

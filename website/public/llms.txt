@@ -879,7 +879,86 @@ unchanged — it describes where collections come from, not the UI.
 
 ---
 
-### 7. `defaultSecurityRules` moved off the server config
+### 7. Every deprecated export is removed
+
+Eleven symbols that carried `@deprecated` are gone rather than carried across
+the 1.0 line, where removing one would cost a major.
+
+#### `rebase.data` → `rebase.dataAsAdmin`
+
+The one to grep for first, because it is the one with a security shape. The
+server singleton had two names for a single **RLS-bypassing** accessor, and the
+shorter one gave no hint of that — while on a browser client, `data` is the
+*user-scoped* accessor. The same expression meant two very different things
+depending on which side of the wire it ran.
+
+```diff
+- const { data: rows } = await rebase.data.projects.find();
++ const { data: rows } = await rebase.dataAsAdmin.projects.find();
+```
+
+```bash
+grep -rn "rebase\.data\b" src config backend
+```
+
+`RebaseServerClient` extends `Omit<RebaseClient, "data">` now, so this is a
+compile error rather than a silent privilege. The property is still there at
+runtime, aliasing `dataAsAdmin`, so a plain-JavaScript backend keeps running
+while you migrate — but do not rely on that.
+
+**Leave these alone.** They are user-scoped and were never deprecated:
+
+- `context.client.data` in an entity callback — runs under the caller's RLS
+- `client.data` in a cron handler — a `RebaseClient`
+- `rebase.data` in a generated SDK or browser app — a different object
+
+And for user-scoped queries inside a request handler, neither name is what you
+want: use `c.var.driver`, which carries the caller's identity.
+
+#### The other ten
+
+Each is a rename at the import site:
+
+| Removed | From | Use instead |
+|---|---|---|
+| `buildCollection` | `@rebasepro/common` | `defineCollection` |
+| `buildProperty` | `@rebasepro/common` | a plain property object |
+| `RebaseUser` | `@rebasepro/client` | `User` |
+| `RebaseTokens` | `@rebasepro/client` | `AuthTokens` |
+| `UserInfo` | `@rebasepro/app` | `User` |
+| `Session` | `@rebasepro/app` | `DeviceSession` |
+| `AuthApiError` | `@rebasepro/app` | `RebaseApiError` |
+| `DatabaseConnection` | `@rebasepro/server` | `DriverConnection` |
+| `createApiKeyRateLimiter` | `@rebasepro/server` | `createDataRateLimiter` |
+| `resolveChannelBusConfig` | `@rebasepro/server-postgres` | `resolveChannelBusSetting` |
+
+`User`, `AuthTokens`, `DeviceSession` and `RebaseApiError` are all exported from
+`@rebasepro/client` and `@rebasepro/app` directly — you do not need to add
+`@rebasepro/types` to your `package.json` to name them.
+
+Three of these are worth reading past the table:
+
+**`createApiKeyRateLimiter` skipped every request that was not
+API-key-authenticated** — on a normal deployment, nearly all of them. If you
+wired it expecting protection, you had none for browser traffic.
+`createDataRateLimiter` covers signed-in users and anonymous callers too.
+
+**`buildCollection` and `buildProperty` were announced as removed in 0.11 and
+were not.** If you migrated then, nothing changes now. If you did not, your
+build kept working and breaks here.
+
+**`DatabaseConnection` is still importable from `@rebasepro/server`** — that is
+the point. Two shapes answered to the name; the local alias for
+`DriverConnection` is gone and the canonical type from `@rebasepro/types`
+remains. If your code still type-checks, you were already using the right one.
+
+```bash
+grep -rnE "buildCollection|buildProperty|RebaseUser|RebaseTokens|UserInfo|AuthApiError|createApiKeyRateLimiter|resolveChannelBusConfig" src config backend
+```
+
+---
+
+### 8. `defaultSecurityRules` moved off the server config
 
 It used to live on `RebaseBackendConfig`, where it enforced nothing: `db push`
 generates the Postgres policies — the only thing that actually enforces
@@ -904,7 +983,7 @@ database's own RLS is the whole model and there is nothing to default.
 
 ---
 
-### 8. Smaller behaviour changes
+### 9. Smaller behaviour changes
 
 **A write naming a field the collection lacks is now a 400.** Unknown keys used
 to travel into the INSERT, so a typo came back as `column "titel" does not
@@ -939,6 +1018,8 @@ restores the old behaviour.
 [ ] replace not(authenticated()) with serverContext()
 [ ] SELECT ... FROM pg_policies — record the qual of every policy BEFORE
 [ ] update package names and imports
+[ ] grep for rebase.data — it is now rebase.dataAsAdmin (section 7)
+[ ] grep for the other ten removed deprecated exports (section 7)
 [ ] drop react-router-dom; import RouterProvider from "react-router/dom"
 [ ] check node >= 22.22.0 and react >= 19.2.7 (react-router 8 requires both)
 [ ] move defaultSecurityRules into config/collections/index.ts
@@ -1045,7 +1126,7 @@ but an annotation only *validates the shape* — it cannot see your property nam
 need to name the type.
 
 :::note
-`buildCollection` and `buildProperty` were removed in 0.11. `buildCollection` is
+`buildCollection` and `buildProperty` no longer exist. `buildCollection` is
 `defineCollection` without the inference; `buildProperty` wrapped a property in a type it
 already had. See the [changelog](/docs/changelog) for the one-line migration.
 :::
@@ -5760,7 +5841,7 @@ app.post("/:id/approve", async (c) => {
     const id = c.req.param("id");
 
     // Use the admin-level data API (bypasses RLS completely)
-    await rebase.data.collection<Record<string, unknown>>("jobs").update(id, {
+    await rebase.dataAsAdmin.collection<Record<string, unknown>>("jobs").update(id, {
         status: "published",
         approved_at: new Date().toISOString(),
     });
@@ -5774,9 +5855,9 @@ export default app;
 #### RLS-Scoped Driver vs. Rebase Singleton
 
 | **RLS Enforcement** | ✅ Yes (evaluated against user/roles) | ❌ No (bypasses all security rules) |
-| **Performance** | Native (direct driver call) | Native (direct driver call for `rebase.data`) |
+| **Performance** | Native (direct driver call) | Native (direct driver call for `rebase.dataAsAdmin`) |
 | **Ideal for...** | General user CRUD, search, and queries | Background jobs, system triggers, webhooks |
-| **API style** | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.data.jobs.find`) |
+| **API style** | Driver-level methods (`fetchCollection`, `saveEntity`) | Fluent collection accessors (`rebase.dataAsAdmin.jobs.find`) |
 
 #### 3. Via Direct Drizzle Access
 

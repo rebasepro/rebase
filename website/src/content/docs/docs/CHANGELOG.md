@@ -8,6 +8,42 @@ title: Changelog
 
 ### Breaking
 
+- **`rebase.data` is gone — use `rebase.dataAsAdmin`.** The server singleton had two names for one accessor, and the shorter one gave no hint of what it does: `rebase.data` and `rebase.dataAsAdmin` were the same admin-scoped, **RLS-bypassing** driver. `data` is the name a browser client uses for its *user-scoped* accessor, so the same expression meant "whatever this user may read" on the client and "everything, no policies" on the server. That is a bad thing to have to remember at a call site that reads fine either way.
+
+  ```diff
+  - const { data: rows } = await rebase.data.projects.find();
+  + const { data: rows } = await rebase.dataAsAdmin.projects.find();
+  ```
+
+  `RebaseServerClient` now extends `Omit<RebaseClient, "data">`, so this is a compile error rather than a silent privilege. **The property still exists at runtime**, aliasing `dataAsAdmin`, so an untyped JavaScript caller keeps working instead of failing on `undefined` mid-upgrade — the type is the contract, and it is the type that changed.
+
+  Unaffected, because their accessor is genuinely user-scoped and was never deprecated: `context.client.data` in entity callbacks, and `client.data` in a cron handler — both are `RebaseClient`. Also unaffected: `rebase.data` in a **generated SDK** or browser app, which is a different object entirely.
+
+  For user-scoped queries inside a request handler, neither name is right: use the request-scoped driver (`c.var.driver`), which carries the caller's identity so RLS applies.
+
+- **Every other deprecated export is gone too.** Ten more symbols carrying `@deprecated`, removed rather than carried across the 1.0 line. After 1.0 a deprecated export costs a major to remove, so the choice was to drop them now or keep them until 2.0 — and each one was an alias for something already exported under a better name, so keeping them only bought a second way to write the same line.
+
+  | Removed | From | Use instead |
+  | --- | --- | --- |
+  | `buildCollection` | `@rebasepro/common` | `defineCollection` |
+  | `buildProperty` | `@rebasepro/common` | a plain property object |
+  | `RebaseUser` | `@rebasepro/client` | `User` from `@rebasepro/types` |
+  | `RebaseTokens` | `@rebasepro/client` | `AuthTokens` from `@rebasepro/types` |
+  | `UserInfo` | `@rebasepro/app` | `User` from `@rebasepro/types` |
+  | `Session` | `@rebasepro/app` | `DeviceSession` from `@rebasepro/types` |
+  | `AuthApiError` | `@rebasepro/app` | `RebaseApiError` from `@rebasepro/types` |
+  | `DatabaseConnection` | `@rebasepro/server` | `DriverConnection` |
+  | `createApiKeyRateLimiter` | `@rebasepro/server` | `createDataRateLimiter` |
+  | `resolveChannelBusConfig` | `@rebasepro/server-postgres` | `resolveChannelBusSetting` |
+
+  Every one is a rename at the import site. The three that are not purely cosmetic:
+
+  `createApiKeyRateLimiter` **skipped every request that was not API-key-authenticated**, which on a normal deployment is nearly all of them — a limiter that reads as protection and passed the traffic you would want limited. `createDataRateLimiter` covers signed-in users and anonymous callers too, and has been the wired default since it landed.
+
+  `buildCollection` / `buildProperty` were **announced as removed in 0.11 and were not** — the note went into the changelog and into the collections docs, and both functions kept shipping from `@rebasepro/common` for two more minors. Anyone who read the note migrated; anyone who did not kept a working build. Now the code matches what was published, and the collections docs no longer name a version the removal did not happen in.
+
+  `DatabaseConnection` is still a name you can import from `@rebasepro/server` — that is the point of removing it. Two different shapes answered to it: a local alias for `DriverConnection`, and the canonical `DatabaseConnection` from `@rebasepro/types` that the package re-exports. Deleting the alias leaves one. If your import resolved to the alias, it was the driver connection and wants `DriverConnection`; if it type-checks unchanged, it was already the canonical one.
+
 - **`admin.widthPercentage` is gone — use `admin.span`.** Field width is a span over a shared four-column grid now, so two fields line up whatever order they were declared in. A raw percentage could not line up with anything: `33` and `35` produced different widths that looked like a mistake, and nothing snapped to a common edge.
 
   ```diff
@@ -36,6 +72,18 @@ title: Changelog
   This closes GHSA-qwww-vcr4-c8h2, which has no fix on the 7.x line. That advisory is an RSC-mode CSRF bypass and nothing here uses RSC mode, so the vulnerable path was unreachable — but 8.3.0 is the only patched release, and the alternative was staying on a package that no longer exists.
 
   **If you test with Jest**, budget for this: react-router 8 is ESM-only, and it breaks ts-jest's CommonJS output in two unrelated ways. react-router guards a Vite HMR hook with `import.meta.hot`, which is a *syntax* error in CJS — and ts-jest cannot fix it, because TypeScript emits `import.meta` verbatim under `module: commonjs`. Separately, react-router depends on `cookie-es` 3, which ships `.mjs` only, and TypeScript keys module format off the file extension, so it will not emit CJS for a `.mjs` input whatever `module` says. Every affected suite dies at module load with zero tests run, which reads as a broken config rather than a dependency-format problem. `scripts/jest/react-router-esm-transform.cjs` in this repo handles both and is a reasonable thing to copy. Vitest is unaffected.
+
+- **`rebase cloud deploy --source` on a managed project now needs `--force`.** It ejects the project to a custom container image, and until now it did that on the strength of `--source` alone — read as self-evidently a deliberate eject. It is not. `--source` answers *which source gets built* — this directory, rather than the months-old archive the control plane is holding — and the eject is a side effect of that answer, not something the caller named. Someone reaching for `--source .` because they want their working tree deployed has the right instinct and no reason to expect a runtime change.
+
+  That is how a live project got flipped from `runtime.mode: managed` to `custom`, discovered afterwards from `rebase cloud status` showing `frameworkVersion: null`. The bare form had been refused for the identical reason since the release below; `--source` was the hole left in it. Both forms are now the same rule: a container-image build of a project the platform runs as managed happens only when `--force` says to.
+
+  ```diff
+  - rebase cloud deploy --source .        # ejected, with a warning
+  + rebase cloud deploy --bundle          # stay on managed — almost always what was meant
+  + rebase cloud deploy --source . --force  # eject on purpose
+  ```
+
+  The refusal carries `code: "managed_project"`, which is what it already used, so a caller already branching on that code needs no change.
 
 ### Security
 
@@ -79,6 +127,20 @@ title: Changelog
 
 ### Fixed
 
+- **`customProps` in the collection editor was marked deprecated by accident.** It carried a `@deprecated Superseded by span` tag that belonged to `widthPercentage` and slid onto the next field along when that one was deleted. `customProps` is live — it is how a custom `Field` or `Preview` receives its props, and `PropertyFieldBinding` reads it on every render. Nothing about the behaviour changed; the tag is gone, so editors stop striking through a supported field and suggesting a replacement that does something else entirely.
+
+- **The eject warning was suppressed exactly where it mattered.** The warning above the refusal — the one that exists because ejecting "is not something to discover from a runtime version going blank" — was printed behind `!isJsonMode()`. JSON mode latches on whenever stdout is not a TTY, so piping the command, or running it from CI or a coding agent, deleted the warning outright, and the deploy's JSON payload carried no equivalent field. The one case with nobody watching the terminal was the one case that said nothing.
+
+  Warnings now go to stderr in every output mode — stderr is not the JSON stream, so it cannot corrupt a parser — and only their *formatting* depends on the mode. Whether a warning is emitted at all no longer does. The deploy payload gains `warnings: [{code, message, hint}]` and a denormalised `ejectsManagedRuntime` boolean for CI to test directly; both fields are always present, so `false` never has to be told from absent.
+
+- **`deploy` printed human progress to stdout in JSON mode**, ahead of the result object, breaking any parser reading it — the `🚀 Triggering deployment…` banner on both the source and managed-bundle paths, the source upload's size line, and on the bundle path the entire build transcript (`Building bundle…`, the compiler's own log lines, frontend folding, `Uploading bundle…`). Progress goes through one `progress()` helper now, which drops it in JSON mode. The rule it settles: progress is not a result and disappears when stdout belongs to the JSON; a *warning* is not a result either, but goes to stderr and never disappears.
+
+- **A project that had never deployed reported `custom · your own image`.** `projects.runtime_mode` is a record of what the last deploy made a project, and it carried `DEFAULT 'custom'` from the migration that added it — which was a true statement about the projects that existed *then*, and applied to every row created ever after. So a project created seconds ago, which had never built anything, named a container image nobody had built. Most visibly right after the console's create wizard, whose runtime step defaults to Managed and says outright that the choice is intent and writes no mode.
+
+  It also blunted the one signal that catches an accidental eject: `custom` was equally the resting value of a project nothing had happened to, so it could not distinguish "a source build moved you off managed" from "nothing has happened here yet."
+
+  The column stops defaulting (control plane migration `0040_runtime_mode_undecided`), making NULL the honest third state, and `rebase cloud status` and the console's overview, infrastructure and apps headers all read it as "not deployed yet" rather than inventing an image. Every non-display reader already coerced absent to `custom` before use, so nothing else changes. Existing rows are deliberately **not** backfilled — a row saying `custom` today may be a project that really did ship source, and there is no way to tell those apart from the ones the default flattened.
+
 - **Several concurrent realtime subscriptions hung on a cold page load.** A view that opens more than one at once — a Kanban board opens one per column — reported `Subscription timed out` for all but one of them, thirty seconds in. The socket was healthy: probed directly, six concurrent `subscribe_collection` frames all answered inside 15ms. The frames were never sent.
 
   `ensureAuthenticated` published its in-flight guard only *after* awaiting the token getter, so every caller arriving in that gap started an attempt of its own — and the message queue flushing on connect delivers exactly that. Each attempt then registered under ``auth_${Date.now()}``, the one request id with no random suffix, so attempts in the same millisecond collided in a `Map` and only the last survived. One promise settled; the frames waiting behind the others never reached the socket. Client-side navigation skips the path (`isAuthenticated` is already true), which is why the same view worked on every visit after the first.
@@ -100,6 +162,8 @@ title: Changelog
 - **The Firebase example compiles again.** It had not built since the property-options split, which made `url` a statement about the data — it feeds `format: "uri"` into the OpenAPI contract — and moved presentation to `admin.urlPreview`. The example's `admin: { url: "image" }` had both halves in the wrong place, and `expanded` likewise belongs in the `admin` block.
 
 ### Added
+
+- **`User` is exported from `@rebasepro/client` and `@rebasepro/app`.** The removals above tell a caller to import `User` from `@rebasepro/types`, which was not an instruction a browser app could follow: it installs the client (or app) package alone, and `@rebasepro/types` is *that package's* dependency, not a specifier resolvable from its own project. So the deprecated aliases were removable in a monorepo and stranding anywhere else. `User` now sits beside `RebaseSession`, `AuthTokens` and `DeviceSession`, which were already re-exported for exactly this reason.
 
 - **The entity form has a layout.** It had exactly one — a single centred column of full-width cards in declaration order — and one escape hatch, `formView.Builder`, which replaces the whole form. Nothing in between.
 

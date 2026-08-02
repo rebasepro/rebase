@@ -1512,9 +1512,16 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
     // The rest of the client (auth, admin, cron, functions, storage) keeps using
     // the HTTP transport, which is fine — they are low-frequency control-plane ops.
     //
-    // `dataAsAdmin` is the loud, explicitly-named admin accessor; `data` is kept
-    // as a (deprecated) alias pointing at the same admin-scoped, RLS-bypassing
-    // object — same trust level, clearer name at the call site.
+    // `dataAsAdmin` is the admin accessor, and the only one `RebaseServerClient`
+    // declares — `data` is `Omit`ted from the type so the privilege has to be
+    // named at the call site.
+    //
+    // It is still assigned here on purpose. `createRebaseClient` above already
+    // put an HTTP-transport `data` on this object, so *not* overwriting it would
+    // leave `rebase.data` working in plain JS while quietly routing through the
+    // loop this native plane exists to skip — a silent performance and identity
+    // change instead of the compile error TypeScript now gives. Both names point
+    // at the same admin-scoped, RLS-bypassing object.
     Object.assign(serverClient, { data: serverData, dataAsAdmin: serverData });
     logger.info("Native data plane attached to singleton (bypasses HTTP loop)");
 

@@ -60,9 +60,10 @@ export { QueryBuilder, or, and, cond } from "@rebasepro/common";
 // Auth: session/token types, config, and the pluggable storage strategies.
 export { createCookieStorage, createMemoryStorage } from "./auth";
 export type { AuthConfig, AuthStorage, CookieStorageOptions, CreateAuthOptions } from "./auth";
-export type { RebaseSession, AuthTokens, AuthChangeEvent, DeviceSession } from "@rebasepro/types";
-/** @deprecated Import `User` / `AuthTokens` from `@rebasepro/types` instead. */
-export type { RebaseUser, RebaseTokens } from "./auth";
+// `User` is re-exported alongside the session types because `client.auth` hands
+// one back and a browser app installs `@rebasepro/client` only — `@rebasepro/types`
+// is a transitive dependency there, not something a consumer can import from.
+export type { User, RebaseSession, AuthTokens, AuthChangeEvent, DeviceSession } from "@rebasepro/types";
 
 // Control-plane client option/DTO types (the client instance exposes the impls).
 export type { CreateAdminOptions } from "./admin";

@@ -109,7 +109,7 @@ const products: PostgresCollectionConfig = {
 Eine Annotation *validiert* das Objekt jedoch nur — sie kann Ihre Eigenschaftsnamen nicht sehen, Sie erhalten also keine Vervollständigung. Bevorzugen Sie `defineCollection`, sofern Sie den Typ nicht benennen müssen.
 
 :::note
-`buildCollection` und `buildProperty` wurden in 0.11 entfernt. `buildCollection` ist `defineCollection` ohne die Inferenz; `buildProperty` umhüllte eine Eigenschaft mit einem Typ, den sie bereits hatte. Siehe das [Changelog](/docs/changelog) für die einzeilige Migration.
+`buildCollection` und `buildProperty` existieren nicht mehr. `buildCollection` ist `defineCollection` ohne die Inferenz; `buildProperty` umhüllte eine Eigenschaft mit einem Typ, den sie bereits hatte. Siehe das [Changelog](/docs/changelog) für die einzeilige Migration.
 :::
 
 ## Haupteigenschaften

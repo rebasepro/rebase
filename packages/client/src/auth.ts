@@ -4,11 +4,6 @@ import type { AuthChangeEvent, RebaseSession, AuthTokens, DeviceSession, User } 
 // Re-export canonical types so `import { RebaseSession } from "@rebasepro/client"` keeps working
 export type { RebaseSession, AuthTokens, AuthChangeEvent, DeviceSession } from "@rebasepro/types";
 
-/** @deprecated Use `User` from `@rebasepro/types` instead. */
-export type RebaseUser = User;
-/** @deprecated Use `AuthTokens` from `@rebasepro/types` instead. */
-export type RebaseTokens = AuthTokens;
-
 /** Minimal, non-sensitive user profile returned by {@link findUserByEmail}. */
 export interface PublicUserProfile {
     uid: string;

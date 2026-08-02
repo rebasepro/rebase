@@ -382,20 +382,14 @@ export interface RebaseClient<DB = unknown> {
  * the admin-scoped {@link dataAsAdmin} accessor, raw {@link sql}, and the
  * {@link email} service are all present (non-optional).
  *
- * **Trust levels.** Both {@link dataAsAdmin} and the deprecated {@link data}
- * alias point at the same admin-scoped, **RLS-bypassing** driver. Prefer
- * `dataAsAdmin` so the privilege is explicit at every call site. For user-scoped
- * queries inside a request handler use the request-scoped driver
- * (`c.var.driver`) instead — never `dataAsAdmin`/`data`.
+ * **Trust levels.** {@link dataAsAdmin} is the admin-scoped, **RLS-bypassing**
+ * driver, and it is the only name for it here — the `data` alias that used to
+ * sit beside it is deliberately `Omit`ted from {@link RebaseClient} so the
+ * privilege has to be spelled out at every call site. For user-scoped queries
+ * inside a request handler use the request-scoped driver (`c.var.driver`)
+ * instead — never `dataAsAdmin`.
  */
-export interface RebaseServerClient<DB = unknown> extends RebaseClient<DB> {
-    /**
-     * @deprecated On the server, prefer {@link dataAsAdmin} for admin scope or
-     * the request-scoped driver (`c.var.driver`) for user scope. This alias
-     * points at the same admin-scoped, RLS-bypassing accessor as `dataAsAdmin`.
-     */
-    data: RebaseSdkData<DB>;
-
+export interface RebaseServerClient<DB = unknown> extends Omit<RebaseClient<DB>, "data"> {
     /**
      * Admin-scoped, **RLS-bypassing** data accessor. Always present server-side.
      * See {@link RebaseClient.dataAsAdmin} for the full safety contract.

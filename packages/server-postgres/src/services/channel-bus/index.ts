@@ -81,15 +81,6 @@ export function resolveChannelBusSetting(configured?: ChannelBusSetting): Channe
 }
 
 /**
- * @deprecated Use {@link resolveChannelBusSetting}, which also accepts a
- * supplied {@link ChannelBus} instance. Kept as a narrow alias so existing
- * config-only callers keep their exact types.
- */
-export function resolveChannelBusConfig(configured?: ChannelBusConfig): ChannelBusConfig {
-    return resolveChannelBusSetting(configured) as ChannelBusConfig;
-}
-
-/**
  * Produce the bus a setting asks for.
  *
  * An instance is handed straight back — constructing it was the application's

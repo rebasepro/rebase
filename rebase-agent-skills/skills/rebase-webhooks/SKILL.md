@@ -301,7 +301,7 @@ export default defineFunction((app, { rebase }) => {
         }
 
         const payload = JSON.parse(rawBody);
-        void payload; // Process it — `rebase.data` is available here.
+        void payload; // Process it — `rebase.dataAsAdmin` is available here.
 
         return c.json({ received: true });
     });
@@ -437,7 +437,7 @@ export default defineFunction((app, { rebase }) => {
         const { orderId, amount } = await c.req.json();
 
         // Create the payment record
-        const payment = await rebase.data
+        const payment = await rebase.dataAsAdmin
             .collection<{ id: string; orderId: string; amount: number; status: string }>("payments")
             .create({
             orderId,

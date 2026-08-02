@@ -80,8 +80,10 @@ export function _resetRebaseMock(): void {
  * request-scoped driver (`c.var.driver`), which carries the caller's identity
  * so RLS applies.
  *
- * `rebase.data` is a **deprecated alias** for `rebase.dataAsAdmin` — identical
- * admin scope at runtime. Prefer `dataAsAdmin` so the privilege is explicit.
+ * `rebase.data` is **gone from the type**: `RebaseServerClient` omits it, so the
+ * admin-scoped accessor has exactly one name and the privilege is visible at the
+ * call site. The property still exists at runtime, aliasing `dataAsAdmin`, so an
+ * untyped JavaScript caller keeps working rather than failing on `undefined`.
  *
  * **Control plane** (`rebase.auth`, `rebase.admin`, `rebase.storage`, etc.):
  * Routes through the Hono app's internal request handler. An internal per-boot

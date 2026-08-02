@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { client } from "./client";
-import type { RebaseUser, RebaseSession } from "@rebasepro/client";
+import type { User, RebaseSession } from "@rebasepro/client";
 
 // ===== Auth Hook =====
 export function useAuth() {
-  const [user, setUser] = useState<RebaseUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

@@ -13,14 +13,14 @@
 export type {
     RebaseAuthController,
     RebaseAuthControllerProps,
+    User,
     AuthTokens,
     DeviceSession,
-    UserInfo,
     AuthResponse,
     RefreshResponse
 } from "./types";
 
 export { useRebaseAuthController } from "./useRebaseAuthController";
 // API utilities
-export { fetchAuthConfig, clearAuthConfigCache, createAuthConfigCache, AuthApiError } from "./api";
+export { fetchAuthConfig, clearAuthConfigCache, createAuthConfigCache } from "./api";
 export type { AuthConfigResponse, AuthConfigCache } from "./api";

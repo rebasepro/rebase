@@ -467,7 +467,7 @@ import { initializeRebaseBackend, RebaseBackendConfig } from "@rebasepro/server"
 | `cronPersistence` | `boolean` | `true` | Persist cron job execution logs to the database |
 | `maxBodySize` | `number` | `10485760` (10 MB) | Max request body size in bytes. Set `0` to disable |
 | `csrf` | `{ origin: string \| string[] \| ((origin: string) => boolean) }` | — | CSRF protection (opt-in, disabled by default) |
-| `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks applied to every collection. Same type as per-collection `callbacks`, and fires on **every** data path (REST, realtime/WebSocket, server-side `rebase.data`). Order: global → collection → property |
+| `callbacks` | `CollectionCallbacks` | — | Global lifecycle callbacks applied to every collection. Same type as per-collection `callbacks`, and fires on **every** data path (REST, realtime/WebSocket, server-side `rebase.dataAsAdmin`). Order: global → collection → property |
 | `baas` | `BaasOptions` | — | `baas` mode only: `{ unprotectedTables?: "exclude" \| "serve" }`. Default `"exclude"` — a table with RLS disabled carries no authorization model, and every authenticated request runs as `rebase_user`, so serving one hands every row to every logged-in user. Excluded tables are logged with the SQL to protect them. `"serve"` serves them anyway; only sensible when every caller is already trusted |
 | `schemaEditor` | `boolean` | — | Force the schema-editor routes on or off. Defaults to enabled when `collectionsDir` is set, outside production, in `cms` mode |
 | `storageSources` | `StorageSourceDefinition[]` | — | Named storage backends for multi-source setups. Each has a `key` that collection properties point at via `StorageConfig.storageSource` |
@@ -644,7 +644,7 @@ The `rebase` singleton implements the `RebaseClient` interface:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `rebase.data` | `RebaseData` | Admin-level data access (bypasses RLS). Use `rebase.data.<slug>.find()`, `.findOne()`, `.create()`, `.update()`, `.delete()` |
+| `rebase.dataAsAdmin` | `RebaseData` | Admin-level data access (bypasses RLS). Use `rebase.dataAsAdmin.<slug>.find()`, `.findOne()`, `.create()`, `.update()`, `.delete()` |
 | `rebase.auth` | `AuthClient` | Authentication operations |
 | `rebase.storage` | `StorageSource \| undefined` | File storage operations |
 | `rebase.email` | `EmailService \| undefined` | Send emails via SMTP (only when email is configured) |
@@ -660,8 +660,8 @@ import { rebase } from "@rebasepro/server";
 // In a cron job, custom function, or hook:
 
 // Data operations (admin-level, no RLS)
-const { data: posts } = await rebase.data.collection<Record<string, unknown>>("posts").find({ limit: 10 });
-await rebase.data.collection<Record<string, unknown>>("orders").create({ status: "pending", total: 99.99 });
+const { data: posts } = await rebase.dataAsAdmin.collection<Record<string, unknown>>("posts").find({ limit: 10 });
+await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").create({ status: "pending", total: 99.99 });
 
 // Send an email
 await rebase.email?.send({

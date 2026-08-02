@@ -132,7 +132,7 @@ export default app;
 ```typescript
 import { rebase } from "@rebasepro/server";
 
-await rebase.data.collection<Record<string, unknown>>("orders").find({ where: { status: ["==", "paid"] } });
+await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").find({ where: { status: ["==", "paid"] } });
 await rebase.storage.putObject({ key, file });   // → storageUrl (gs://|s3://|local://)
 await rebase.email.send({ to, subject, html });
 ```
@@ -140,7 +140,7 @@ await rebase.email.send({ to, subject, html });
 | Need | ✅ Use | ❌ Never import directly |
 |------|--------|--------------------------|
 | Object storage | `rebase.storage` (see **rebase-storage** skill) | `@aws-sdk/client-s3`, `@google-cloud/storage` |
-| Database / collections | `rebase.data` (or `c.get("driver")`) | `pg`, `drizzle` clients by hand |
+| Database / collections | `rebase.dataAsAdmin` (or `c.get("driver")`) | `pg`, `drizzle` clients by hand |
 | Email | `rebase.email` | `nodemailer`, provider SDKs |
 | Auth / users | `rebase.auth` / `c.get("user")` | custom JWT parsing |
 

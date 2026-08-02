@@ -47,7 +47,7 @@ export interface SerializableAdminBaseOptions {
     readOnly?: boolean;
     disabled?: boolean | SerializablePropertyDisabledConfig;
     span?: 1 | 2 | 3 | 4;
-    /** @deprecated Superseded by `span`; still round-tripped so it survives a save. */
+    /** Opaque props handed to a custom `Field` / `Preview`. Round-tripped as-is. */
     customProps?: unknown;
     /** Narrows the filter operators offered for this property. Plain data. */
     filterOperators?: readonly WhereFilterOp[];

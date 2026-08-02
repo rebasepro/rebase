@@ -338,9 +338,3 @@ export async function initializeDataSources(
     }
     return initialized;
 }
-
-/**
- * @deprecated Use {@link DriverConnection}. This name collides with
- * `DatabaseConnection` from `@rebasepro/types`, which is a different shape.
- */
-export type DatabaseConnection = DriverConnection;

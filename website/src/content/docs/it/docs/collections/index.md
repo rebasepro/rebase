@@ -109,7 +109,7 @@ const products: PostgresCollectionConfig = {
 Ma un'annotazione si limita a *validare* l'oggetto — non vede i nomi delle tue proprietà, quindi non ottieni completamento. Preferisci `defineCollection`, a meno che tu non debba nominare il tipo.
 
 :::note
-`buildCollection` e `buildProperty` sono stati rimossi in 0.11. `buildCollection` è `defineCollection` senza l'inferenza; `buildProperty` avvolgeva una proprietà in un tipo che aveva già. Vedi il [changelog](/docs/changelog) per la migrazione in una riga.
+`buildCollection` e `buildProperty` non esistono più. `buildCollection` è `defineCollection` senza l'inferenza; `buildProperty` avvolgeva una proprietà in un tipo che aveva già. Vedi il [changelog](/docs/changelog) per la migrazione in una riga.
 :::
 
 ## Proprietà Chiave
