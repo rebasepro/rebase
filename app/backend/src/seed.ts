@@ -8,7 +8,7 @@ import { env } from "./env.js";
 import {
     authors, posts, tags, products, orders,
     postsTags, customers, orderItems, tickets, productLocales, exercises,
-    postsStatus, productsCategory, productsStatus,
+    postsStatus, productsCategory, productsStatus, productLocalesLocale,
     ordersStatus, ordersPayment_status, ordersCurrency,
     ticketsStatus, ticketsPriority, ticketsCategory,
     exercisesDifficulty, exercisesCategory, exercisesStatus
@@ -435,6 +435,25 @@ export async function runSeed() {
             return validCategories[Math.floor(Math.random() * validCategories.length)];
         }
 
+        // `available_locales` comes from an external product dump, so it is
+        // whatever that file happens to say. The column is an enum precisely so
+        // `EN`, `en-US` and `english` cannot all land in it, which means the
+        // narrowing has to happen here rather than at the insert — Postgres
+        // would otherwise reject the batch at run time, after the seed has
+        // already truncated the tables.
+        type ProductLocale = (typeof productLocalesLocale.enumValues)[number];
+        const validLocales = productLocalesLocale.enumValues as readonly ProductLocale[];
+        function mapLocales(raw: string[] | undefined | null): ProductLocale[] {
+            const seen = new Set<ProductLocale>();
+            for (const value of raw ?? []) {
+                // `en-US` and `EN` both mean `en`; anything else is dropped
+                // rather than guessed at.
+                const base = value.toLowerCase().split(/[-_]/)[0] as ProductLocale;
+                if (validLocales.includes(base)) seen.add(base);
+            }
+            return seen.size ? [...seen] : ["en"];
+        }
+
         interface DemoProductRaw {
             name?: string;
             asin?: string;
@@ -456,7 +475,7 @@ export async function runSeed() {
             weight: number;
             desc: string;
             brand: string;
-            locales: string[];
+            locales: ProductLocale[];
             imageUrls: string[];
             localImages?: string[] | null;
         }
@@ -470,7 +489,7 @@ export async function runSeed() {
             weight: 100 + Math.floor(Math.random() * 900),
             desc: p.description || "No description available.",
             brand: p.brand || "Generic",
-            locales: p.available_locales || ["en"],
+            locales: mapLocales(p.available_locales),
             imageUrls: p.images || (p.main_image ? [p.main_image] : [])
         }));
 
@@ -679,7 +698,7 @@ tag_id: tagIds[t - 1] });
         await db.insert(products).values(productValues);
 
         console.log("📦 Generating product locales subcollections...");
-        const productLocalesValues: { id: string; product_id: string; locale: string; name: string; description: string }[] = [];
+        const productLocalesValues: { id: string; product_id: string; locale: ProductLocale; name: string; description: string }[] = [];
         allProducts.forEach((p, i) => {
             const pid = productIds[i];
             const locales = p.locales || ["en"];
