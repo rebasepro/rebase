@@ -47,6 +47,9 @@ the check meaningful rather than to silence it:
 1. **Unresolvable imports are stubbed.** Relative paths, `virtual:` ids, and
    deps the monorepo does not carry become ambient `any` modules.
    `@rebasepro/*` is *never* stubbed — that is the surface under test.
+   Third-party packages have to be named in `EXTERNAL_PACKAGES`; an
+   unresolvable specifier that is not on that list is reported. See
+   "Degradation is reported, not absorbed" below.
 2. **Free identifiers are discovered by compiling twice.** Pass 1 collects the
    compiler's own "Cannot find name" diagnostics; pass 2 re-runs with a
    synthesized prelude. Using real scope resolution beats reimplementing it. A
@@ -61,6 +64,34 @@ buried the diagnostics that can under several hundred that could not.
 
 What survives is the part worth checking — member access and call signatures on
 real SDK types.
+
+## Degradation is reported, not absorbed
+
+Every accommodation above trades coverage for the ability to check fragments at
+all, and each one fails *quietly*: a stubbed module is `any`, and `any` accepts
+everything. So a module that silently drops out of the program does not produce
+errors — it produces a clean run over unchecked code.
+
+That is not hypothetical. `react` left the program twice. The second time it
+took fifteen generated `@rebasepro/ui` pages with it: their examples called
+`React.useState` with no import, which is a `ReferenceError` for anyone who
+copies them, and the verifier passed them because `React` was merely an
+undeclared name it helpfully stubbed. Three guards now make that loud:
+
+- **Unresolvable bare specifiers** are findings unless listed in
+  `EXTERNAL_PACKAGES` (`typecheck-snippets.mjs`). Add a package there when the
+  monorepo genuinely should not carry it; the list is the record of what is
+  knowingly unchecked. Relative and `virtual:` specifiers stay exempt — they
+  are unresolvable by design.
+- **Hand-written `paths` targets are checked for existence.** They are absolute
+  directories pointing into `node_modules`, and tsc does not complain about a
+  mapping that resolves to nothing — it just types the import `any`. A store
+  layout change would otherwise silently un-check every snippet using that
+  module.
+- **A snippet the program never compiled is a finding**, not a skip.
+
+The summary line reports how many third-party modules were stubbed, so the
+allowlist's cost stays visible.
 
 ## Opting out
 
@@ -81,8 +112,12 @@ or an HTML comment on the line immediately above the fence:
 Use it when the block is *not meant to compile*. Do not use it to silence a
 block that is wrong — that is the bug this exists to find.
 
-## Making it blocking
+## Where it blocks
 
-The stage is warn-first because the baseline is not clean. To enforce: add
-`--strict` to the `verify-docs.mjs` call in `scripts/verify-quality.sh` and move
-it from `warn` to `err`.
+CI runs `pnpm run verify:docs:strict` (`.github/workflows/verify.yml`), so a
+finding fails the build. The baseline is clean — keep it there.
+
+`scripts/verify-quality.sh` still calls it without `--strict`, deliberately: it
+is the local sweep, and a warning there is a nudge rather than a stop. To make
+the local run blocking too, add `--strict` to that call and move it from `warn`
+to `err`.

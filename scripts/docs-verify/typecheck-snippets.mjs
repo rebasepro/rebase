@@ -25,7 +25,7 @@
  * signatures on real SDK types. `channel.on("message", …)` fails because
  * `RebaseRealtimeChannel` has no `on`.
  */
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { extractSnippets } from "./extract.mjs";
@@ -115,6 +115,40 @@ const IGNORED_CODES = new Set([
  */
 const resolvedPackageDirs = new Map();
 
+/**
+ * Third-party packages the docs legitimately name but the monorepo does not
+ * carry, so they cannot be typechecked and are stubbed to `any`.
+ *
+ * The list exists to make that degradation *bounded*. Stubbing is silent by
+ * construction — a stubbed module un-checks every use of it in the snippet —
+ * so a specifier that drops off the resolvable set is indistinguishable from
+ * one that was never resolvable. That is precisely how `react` went missing:
+ * the whole module became `any` and the snippets importing it reported clean.
+ * Anything unresolvable and *not* listed here is reported as a finding.
+ */
+const EXTERNAL_PACKAGES = new Set([
+    "@aws-sdk/client-ses",
+    "bcrypt",
+    "dotenv",
+    "drizzle-kit",
+    "express",
+    "firebase",
+    "firebase-admin",
+    "pg",
+    "postmark",
+    "recharts",
+    "resend",
+    "stripe",
+    "tus-js-client"
+]);
+
+/**
+ * Where each unresolvable bare specifier was imported from, so the report can
+ * name the fence rather than just the package. Keyed by specifier as written.
+ * @type {Map<string, Set<string>>}
+ */
+const stubbedSpecifiers = new Map();
+
 /** The bare package name of a specifier: `drizzle-orm/pg-core` → `drizzle-orm`. */
 function packageNameOf(specifier) {
     return specifier.split("/").slice(0, specifier.startsWith("@") ? 2 : 1).join("/");
@@ -131,7 +165,7 @@ function packageDirOf(entry, packageName) {
     return null;
 }
 
-function isStubbable(specifier, root) {
+function isStubbable(specifier, root, where) {
     if (specifier.startsWith("@rebasepro/")) return false; // the surface under test
     if (specifier.startsWith(".") || specifier.startsWith("/")) return true;
     if (specifier.includes(":")) return true; // virtual:, node:… (node: resolves anyway)
@@ -160,6 +194,8 @@ function isStubbable(specifier, root) {
         if (dir && !resolvedPackageDirs.has(pkg)) resolvedPackageDirs.set(pkg, dir);
         return false;
     } catch {
+        if (!stubbedSpecifiers.has(specifier)) stubbedSpecifiers.set(specifier, new Set());
+        if (where) stubbedSpecifiers.get(specifier).add(where);
         return true;
     }
 }
@@ -182,12 +218,32 @@ function derivedPaths() {
 }
 
 /** Rewrites unresolvable import/export specifiers in place, preserving line count. */
-function rewriteImports(code, root) {
+function rewriteImports(code, root, where) {
     return code.replace(
         /(\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|^\s*import\s+)(["'])([^"'\n]+)\2/gm,
         (match, lead, quote, spec) =>
-            isStubbable(spec, root) ? `${lead}${quote}docsverify-stub:${spec}${quote}` : match
+            isStubbable(spec, root, where) ? `${lead}${quote}docsverify-stub:${spec}${quote}` : match
     );
+}
+
+/**
+ * The `paths` entries below are hand-written absolute directories, and a
+ * mapping whose target does not exist does not error — tsc just resolves
+ * nothing, the import falls back to `any`, and every snippet using that module
+ * reports clean. Both times `react` silently left the program it left behind a
+ * stale entry exactly like this. Check the targets so the next store-layout or
+ * dependency change is a finding instead of a quiet loss of coverage.
+ */
+function checkPathTargets(explicitPaths) {
+    const missing = [];
+    for (const [spec, targets] of Object.entries(explicitPaths)) {
+        for (const target of targets) {
+            // Wildcard targets are checked via their parent directory.
+            const dir = target.endsWith("/*") ? target.slice(0, -2) : target;
+            if (!existsSync(dir)) missing.push({ spec, target: dir });
+        }
+    }
+    return missing;
 }
 
 /**
@@ -264,14 +320,27 @@ export async function typecheckSnippets(root, opts = {}) {
     const { ts, ownerOf } = loadSdkExports(root);
     const { snippets, skipped, files } = extractSnippets(root, opts.globs);
 
-    const scratch = path.join(root, "node_modules/.cache/docs-verify");
+    // Per-process, because `node_modules` is commonly a symlink shared with a
+    // worktree (or the primary checkout): two runs on one fixed path overwrite
+    // each other's scratch files mid-compile, and the damage shows up as
+    // spurious "Cannot find name" findings rather than as an error.
+    const scratchRoot = path.join(root, "node_modules/.cache/docs-verify");
+    const scratch = path.join(scratchRoot, String(process.pid));
+    // Scratch files used to live directly here, one flat directory shared by
+    // every run. Sweep those; sibling run directories are left alone.
+    if (existsSync(scratchRoot)) {
+        for (const entry of readdirSync(scratchRoot, { withFileTypes: true })) {
+            if (entry.isFile()) rmSync(path.join(scratchRoot, entry.name), { force: true });
+        }
+    }
     rmSync(scratch, { recursive: true, force: true });
     mkdirSync(scratch, { recursive: true });
 
+    stubbedSpecifiers.clear();
     const prepared = snippets.map((s) => ({
         snippet: s,
         name: scratchName(s),
-        code: rewriteImports(s.code, root)
+        code: rewriteImports(s.code, root, `${s.file}:${s.line}`)
     }));
 
     // Stub modules for specifiers we cannot resolve. A shorthand ambient
@@ -328,6 +397,38 @@ export async function typecheckSnippets(root, opts = {}) {
         `declare module "docsverify-stub:*";\n${importMetaEnv}\n${stubBody}\n`
     );
 
+    // Hand-written mappings, split out from the merge below so their targets can
+    // be checked for existence — see {@link checkPathTargets}.
+    const explicitPaths = {
+        // Backend snippets legitimately import `hono` and `zod`. Neither is a
+        // dependency of the workspace root, and `tsconfig.typecheck.json` maps hono to
+        // `node_modules/hono`, which does not exist — that mapping only ever worked for
+        // files sitting inside `packages/server`, whose own node_modules has both.
+        // Snippets compile from a scratch directory, so they need the real location or
+        // every backend example reports a missing module.
+        hono: [path.join(root, "packages/server/node_modules/hono")],
+        "hono/*": [path.join(root, "packages/server/node_modules/hono/*")],
+        zod: [path.join(root, "packages/server/node_modules/zod")],
+        // React is not a root dependency either, so `useRef<HTMLDivElement>(null)` in a
+        // frontend snippet hit "untyped function calls may not accept type arguments" —
+        // the stub had swallowed the whole module.
+        // Point at the *types*, not the runtime package: React ships no declarations
+        // of its own, so mapping the JS package leaves every call untyped.
+        react: [path.join(root, "node_modules/.pnpm/node_modules/@types/react")],
+        "react-dom": [path.join(root, "node_modules/.pnpm/node_modules/@types/react-dom")],
+        // Same story for the backend's own dependencies: resolvable from
+        // packages/server, invisible from the scratch directory snippets compile in.
+        "drizzle-orm": [path.join(root, "packages/server/node_modules/drizzle-orm")],
+        "drizzle-orm/*": [path.join(root, "packages/server/node_modules/drizzle-orm/*")],
+        "@hono/node-server": [path.join(root, "packages/server/node_modules/@hono/node-server")]
+    };
+    const setupErrors = checkPathTargets(explicitPaths).map(
+        ({ spec, target }) =>
+            `\`${spec}\` maps to ${path.relative(root, target)}, which does not exist — ` +
+            `every snippet importing it is silently unchecked. Run \`pnpm install\` (and ` +
+            `\`pnpm build\`), or update the mapping in scripts/docs-verify/typecheck-snippets.mjs.`
+    );
+
     const configPath = path.join(root, "tsconfig.typecheck.json");
     const parsed = ts.parseJsonConfigFileContent(
         ts.readConfigFile(configPath, ts.sys.readFile).config,
@@ -365,21 +466,9 @@ export async function typecheckSnippets(root, opts = {}) {
             // entries below override it where the resolved package is the wrong
             // target.
             ...derivedPaths(),
-            hono: [path.join(root, "packages/server/node_modules/hono")],
-            "hono/*": [path.join(root, "packages/server/node_modules/hono/*")],
-            zod: [path.join(root, "packages/server/node_modules/zod")],
-            // React is not a root dependency either, so `useRef<HTMLDivElement>(null)` in a
-            // frontend snippet hit "untyped function calls may not accept type arguments" —
-            // the stub had swallowed the whole module.
-            // Point at the *types*, not the runtime package: React ships no declarations
-            // of its own, so mapping the JS package leaves every call untyped.
-            react: [path.join(root, "node_modules/.pnpm/node_modules/@types/react")],
-            "react-dom": [path.join(root, "node_modules/.pnpm/node_modules/@types/react-dom")],
-            // Same story for the backend's own dependencies: resolvable from
-            // packages/server, invisible from the scratch directory snippets compile in.
-            "drizzle-orm": [path.join(root, "packages/server/node_modules/drizzle-orm")],
-            "drizzle-orm/*": [path.join(root, "packages/server/node_modules/drizzle-orm/*")],
-            "@hono/node-server": [path.join(root, "packages/server/node_modules/@hono/node-server")]
+            // The explicit entries override it where the resolved package is the
+            // wrong target.
+            ...explicitPaths
         }
     };
 
@@ -408,7 +497,9 @@ export async function typecheckSnippets(root, opts = {}) {
         const byFile = new Map();
         for (const p of prepared) {
             const sf = program.getSourceFile(p.file);
-            if (!sf) continue;
+            // A scratch file the program did not pick up was never checked at
+            // all. Silently skipping it reads as a pass; record it instead.
+            if (!sf) { byFile.set(p.name, null); continue; }
             const diags = [
                 ...program.getSemanticDiagnostics(sf),
                 ...program.getSyntacticDiagnostics(sf)
@@ -441,8 +532,19 @@ export async function typecheckSnippets(root, opts = {}) {
     const stubbed = new Map();
     for (const p of prepared) {
         for (const n of p.stubbedNames) stubbed.set(n, (stubbed.get(n) || 0) + 1);
-        const diags = pass2.get(p.name) || [];
-        if (!diags.length) continue;
+        const diags = pass2.get(p.name);
+        if (diags === null) {
+            failures.push({
+                snippet: p.snippet,
+                messages: [{
+                    code: 0,
+                    docLine: p.snippet.line,
+                    text: "Snippet was never compiled — the TypeScript program did not include its scratch file, so this fence is unverified."
+                }]
+            });
+            continue;
+        }
+        if (!diags?.length) continue;
         const messages = diags.map((d) => {
             const { line } = d.file
                 ? d.file.getLineAndCharacterOfPosition(d.start ?? 0)
@@ -458,5 +560,19 @@ export async function typecheckSnippets(root, opts = {}) {
         failures.push({ snippet: p.snippet, messages });
     }
 
-    return { failures, snippetCount: snippets.length, skipped, files, stubbed, MODULE_NOT_FOUND };
+    // Unresolvable imports the allowlist does not cover. Each one silently types
+    // its module as `any`, so it is reported rather than absorbed.
+    const unresolved = [...stubbedSpecifiers]
+        .filter(([spec]) => !EXTERNAL_PACKAGES.has(packageNameOf(spec)))
+        .map(([spec, where]) => ({ specifier: spec, locations: [...where].sort() }))
+        .sort((a, b) => a.specifier.localeCompare(b.specifier));
+    const externalCount = [...stubbedSpecifiers].filter(([spec]) =>
+        EXTERNAL_PACKAGES.has(packageNameOf(spec))).length;
+
+    rmSync(scratch, { recursive: true, force: true });
+
+    return {
+        failures, snippetCount: snippets.length, skipped, files, stubbed,
+        setupErrors, unresolved, externalCount, MODULE_NOT_FOUND
+    };
 }

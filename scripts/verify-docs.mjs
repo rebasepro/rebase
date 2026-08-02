@@ -21,6 +21,7 @@
  * clean to make it blocking.
  */
 import path from "node:path";
+import { writeSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { typecheckSnippets } from "./docs-verify/typecheck-snippets.mjs";
 import { checkApiNames } from "./docs-verify/check-api-names.mjs";
@@ -52,6 +53,8 @@ if (asJson) {
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
+        out.setupErrors = r.setupErrors;
+        out.unresolvedImports = r.unresolved;
         out.snippets = r.failures.map((f) => ({
             file: f.snippet.file,
             fenceLine: f.snippet.line,
@@ -60,7 +63,11 @@ if (asJson) {
             messages: f.messages
         }));
     }
-    console.log(JSON.stringify(out, null, 2));
+    // `console.log` to a pipe is asynchronous, and `process.exit` does not wait
+    // for it: piping a findings-sized payload anywhere truncated it at the 64K
+    // pipe buffer, so a consumer saw a subset — or unparseable JSON — and no
+    // error. Write synchronously instead.
+    writeSync(1, JSON.stringify(out, null, 2) + "\n");
     process.exit(0);
 }
 
@@ -105,11 +112,36 @@ if (only === "both" || only === "names") {
 
 if (only === "both" || only === "snippets") {
     console.log(`\n${YELLOW}━━━ Docs snippet typecheck (en + skills) ━━━${NC}`);
-    const { failures, snippetCount, skipped, files, stubbed } = await typecheckSnippets(ROOT);
+    const { failures, snippetCount, skipped, files, stubbed, setupErrors, unresolved, externalCount } =
+        await typecheckSnippets(ROOT);
     console.log(
         `${DIM}Compiled ${snippetCount} snippets from ${files} files ` +
-            `(${skipped} opted out via no-verify).${NC}`
+            `(${skipped} opted out via no-verify, ${externalCount} third-party module(s) stubbed).${NC}`
     );
+
+    // A misconfigured verifier reports "clean" for the snippets it can no longer
+    // check, so surface it before the results it produced.
+    if (setupErrors.length) {
+        findings += setupErrors.length;
+        console.log(`${RED}✗ ${setupErrors.length} broken module mapping(s) — coverage is silently reduced:${NC}`);
+        for (const e of setupErrors) console.log(`    ${e}`);
+    }
+
+    if (unresolved.length) {
+        findings += unresolved.length;
+        console.log(`${RED}✗ ${unresolved.length} unresolvable import(s) — stubbed as \`any\`, so these fences are unchecked:${NC}`);
+        for (const u of unresolved) {
+            console.log(`  ${RED}${u.specifier}${NC}`);
+            for (const loc of u.locations.slice(0, 6)) console.log(`      ${DIM}${loc}${NC}`);
+            if (u.locations.length > 6) {
+                console.log(`      ${DIM}… and ${u.locations.length - 6} more${NC}`);
+            }
+            console.log(
+                `      ${DIM}→ install it, or add it to EXTERNAL_PACKAGES in ` +
+                    `scripts/docs-verify/typecheck-snippets.mjs if the monorepo should not carry it.${NC}`
+            );
+        }
+    }
 
     if (verbose) {
         const top = [...stubbed].sort((a, b) => b[1] - a[1]).slice(0, 30);
