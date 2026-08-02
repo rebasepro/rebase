@@ -1,0 +1,35 @@
+---
+title: CollectionView
+sidebar_label: CollectionView
+description: CollectionView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { CollectionView } from "@rebasepro/ui";
+```
+
+> This component takes no documented props, or its type could not be flattened. See the source.
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { CollectionView } from "@rebasepro/ui";
+import type { CollectionPropertyConfig, CollectionDataController } from "@rebasepro/ui";
+
+export function TableMode() {
+    return (
+        <div style={{ height: 460 }} className="w-full">
+            <CollectionView<SampleProject>
+                dataController={dataController}
+                properties={properties}
+                idProperty="id"
+                titleProperty="name"
+                defaultViewMode="table"
+                enabledViews={["list", "table", "cards", "kanban"]}
+            />
+        </div>
+    );
+}
+```

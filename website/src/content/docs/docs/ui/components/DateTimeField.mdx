@@ -1,0 +1,43 @@
+---
+title: DateTimeField
+sidebar_label: DateTimeField
+description: DateTimeField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { DateTimeField } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `Date` | — |  |
+| `onChange` | `(date: Date \| null) => void` | — |  |
+| `mode` | `"date" \| "date_time"` | — |  |
+| `disabled` | `boolean` | — |  |
+| `clearable` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `inputClassName` | `string` | — |  |
+| `invisible` | `boolean` | — |  |
+| `locale` | `string` | — |  |
+| `timezone` | `string` | — | IANA timezone string (e.g., "America/New_York", "Europe/London"). Used to display and input dates in the specified timez |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { DateTimeField } from "@rebasepro/ui";
+
+export const Modes = () => (
+    <div className="flex flex-col gap-3 w-[320px] p-4">
+        <DateTimeField mode="date" label="Published on" value={new Date("2026-07-31")} onChange={() => {}}/>
+        <DateTimeField mode="date_time" label="Scheduled for" value={new Date("2026-07-31T14:30:00")} onChange={() => {}}/>
+    </div>
+);
+```

@@ -1,0 +1,40 @@
+---
+title: Tab
+sidebar_label: Tab
+description: Tab — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Tab } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `string` | yes |  |
+| `className` | `string` | — |  |
+| `innerClassName` | `string` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `disabled` | `boolean` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Tabs, Tab, cls, defaultBorderMixin, Button } from "@rebasepro/ui";
+
+export const StandardWithDisabled = () => (
+    <div className="p-4">
+        <Tabs value="overview" onValueChange={() => {}}>
+            <Tab value="overview">Overview</Tab>
+            <Tab value="policies">Policies</Tab>
+            <Tab value="danger" disabled>Danger zone</Tab>
+        </Tabs>
+    </div>
+);
+
+// Boxy toolbar tabs with leading icons, ported from UIReferenceView's
+// "Toolbar Tabs" SQL-editor pattern.
+```

@@ -173,6 +173,14 @@ export const en = {
   "features.realtime.desc":
     "Live data subscriptions, broadcast channels, and presence tracking — all over WebSocket. Build chat, dashboards, and collaborative UIs without any extra infrastructure.",
   "faq.title": "Frequently asked questions",
+  "faq.subtitle": "Every answer links to the page that proves it.",
+  "faq.proof1": "Property types and Postgres mapping",
+  "faq.proof2": "Side-by-side comparisons",
+  "faq.proof3": "How the schema pipeline works",
+  "faq.proof4": "Read the MIT licence on GitHub",
+  "faq.proof5": "Architecture overview",
+  "faq.proof6": "Authentication docs",
+  "faq.proof7": "Extension mechanisms",
   "faq.q1": "What database does Rebase support?",
   "faq.a1":
     '<strong class="text-white font-medium">PostgreSQL</strong> is the primary focus — Rebase goes deep on Postgres so every feature (RLS, enums, constraints, relations) works natively. That said, the architecture is database-agnostic and can be adapted to other databases. You bring your own database instance; self-hosted Rebase never sees or copies your data.',
@@ -197,6 +205,22 @@ export const en = {
   "cta.title": "Stop writing glue code.",
   "cta.subtitle":
     'Define your schema. Get your platform.<br class="hidden sm:block"/>Open-source, self-hosted, no per-seat pricing.',
+  // The close is a fork, not a fourth copy of the hero's install command. Cloud
+  // has not launched — its lane offers the waitlist and says so, rather than a
+  // deploy button that would go nowhere.
+  "cta.lane.local.title": "Run it locally",
+  "cta.lane.local.desc":
+    "One command against the Postgres you already have. No account, no container to pull, nothing to sign up for.",
+  "cta.lane.local.link": "Quickstart",
+  "cta.lane.selfhost.title": "Self-host it",
+  "cta.lane.selfhost.desc":
+    "Docker, Fly, Railway, Hetzner or bare metal. Your data stays in your infrastructure and never reaches us.",
+  "cta.lane.selfhost.link": "Deployment guides",
+  "cta.lane.cloud.title": "Rebase Cloud",
+  "cta.lane.cloud.desc":
+    "Managed hosting. We run our own products on it first — early access goes out from the waitlist, oldest first.",
+  "cta.lane.cloud.badge": "Not launched yet",
+  "cta.lane.cloud.link": "Join the waitlist",
   "cta.button.demo": "Try the Demo",
   "cta.button.docs": "Read the Docs",
   "cta.button.github": "GitHub",
@@ -258,6 +282,8 @@ export const en = {
   "nav.backend.desc": "REST, typed SDK, realtime, auth, storage.",
   "nav.admin": "Admin panel",
   "nav.admin.desc": "The optional back office, from the same definition.",
+  "nav.ui": "Component library",
+  "nav.ui.desc": "The React components the panel is built from.",
   "nav.ai": "AI & agents",
   "nav.ai.desc": "MCP server, scoped keys, agent skills.",
   "nav.developers": "Developers",

@@ -1,0 +1,54 @@
+---
+title: DialogTitle
+sidebar_label: DialogTitle
+description: DialogTitle — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { DialogTitle } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `align` | `"center" \| "inherit" \| "left" \| "right" \| "justify"` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+| `component` | `"span"` | — |  |
+| `gutterBottom` | `boolean` | — |  |
+| `noWrap` | `boolean` | — |  |
+| `paragraph` | `boolean` | — |  |
+| `variant` | `"button" \| "caption" \| "h1" \| "h2" \| "h3" \| "h4" \| "h5" \| "h6" \| "label" \| "inherit" \| "subtitle1" \| "subtitle2" \| "body1" \| "body2"` | — |  |
+| `variantMapping` | `{ [key: string]: string; }` | — |  |
+| `color` | `"inherit" \| "disabled" \| "error" \| "primary" \| "secondary" \| "initial"` | — |  |
+| `onClick` | `React.ReactEventHandler<HTMLElement> & React.MouseEventHandler<HTMLSpanElement>` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `id` | `string` | — |  |
+| `includeMargin` | `boolean` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@rebasepro/ui";
+
+export const Default = () => (
+    <div className="p-4 h-[280px]">
+        <Dialog open onOpenChange={() => {}} maxWidth="sm">
+            <DialogTitle>Regenerate API key</DialogTitle>
+            <DialogContent>
+                A new secret will be issued. The old one keeps working for 24h.
+            </DialogContent>
+            <DialogActions>
+                <Button variant="text">Cancel</Button>
+                <Button variant="filled">Regenerate</Button>
+            </DialogActions>
+        </Dialog>
+    </div>
+);
+
+// Larger heading variant — sweeps the `variant` prop for dialogs that need
+// more visual weight (e.g. a primary settings screen).
+```

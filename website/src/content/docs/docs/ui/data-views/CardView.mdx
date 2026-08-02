@@ -1,0 +1,54 @@
+---
+title: CardView
+sidebar_label: CardView
+description: CardView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { CardView } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `data` | `T[]` | yes | Virtualized card grid. Generic over the row type T. |
+| `renderCard` | `(item: T, extra: { selected: boolean; highlighted: boolean; onSelectionChange: (selected: boolean) => void; onClick: (e: React.MouseEvent) => void }) => React.ReactNode` | yes |  |
+| `dataLoading` | `boolean` | — |  |
+| `noMoreToLoad` | `boolean` | — |  |
+| `dataLoadingError` | `Error` | — |  |
+| `itemCount` | `number` | — |  |
+| `setItemCount` | `(itemCount: number) => void` | — |  |
+| `pageSize` | `number` | — |  |
+| `paginationEnabled` | `boolean` | — |  |
+| `onItemClick` | `(item: T) => void` | — |  |
+| `selectedIds` | `Set<string \| number>` | — |  |
+| `highlightedIds` | `Set<string \| number>` | — |  |
+| `selectionEnabled` | `boolean` | — |  |
+| `onSelectionChange` | `(item: T, selected: boolean) => void` | — |  |
+| `initialScroll` | `number` | — |  |
+| `size` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — |  |
+| `emptyComponent` | `React.ReactNode` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export function ProjectGrid() {
+    return (
+        <div style={{ height: 480 }} className="w-full overflow-auto rounded-lg border border-surface-200 dark:border-surface-800">
+            <CardView<SampleProject>
+                data={SAMPLE_PROJECTS}
+                dataLoading={false}
+                noMoreToLoad={true}
+                paginationEnabled={false}
+                size="m"
+                selectionEnabled
+                renderCard={renderCard}
+            />
+        </div>
+    );
+}
+```

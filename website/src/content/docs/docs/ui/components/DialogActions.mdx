@@ -1,0 +1,45 @@
+---
+title: DialogActions
+sidebar_label: DialogActions
+description: DialogActions — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { DialogActions } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `position` | `"sticky" \| "absolute"` | — |  |
+| `translucent` | `boolean` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, LoadingButton } from "@rebasepro/ui";
+
+export const Default = () => (
+    <div className="p-4 h-[280px]">
+        <Dialog open onOpenChange={() => {}} maxWidth="sm">
+            <DialogTitle>Create API key</DialogTitle>
+            <DialogContent>Choose a name and scope for the new key.</DialogContent>
+            <DialogActions>
+                <Button variant="text">Cancel</Button>
+                <LoadingButton variant="filled" loading={false}>Create key</LoadingButton>
+            </DialogActions>
+        </Dialog>
+    </div>
+);
+
+// Non-translucent variant with a destructive action — sweeps `translucent`.
+// (position="absolute" takes the bar out of flow and overlaps the content
+// above it — that's the real component's own layout, not something a
+// static preview with short body text can show cleanly, so this sticks
+// with the default "sticky" position.)
+```

@@ -1,0 +1,41 @@
+---
+title: Tabs
+sidebar_label: Tabs
+description: Tabs — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Tabs } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `string` | yes |  |
+| `children` | `React.ReactNode` | yes |  |
+| `innerClassName` | `string` | — |  |
+| `className` | `string` | — |  |
+| `variant` | `"standard" \| "boxy" \| "pill"` | — |  |
+| `onValueChange` | `(value: string) => void` | yes |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Tabs, Tab, Typography, IconButton, SettingsIcon, cls, defaultBorderMixin } from "@rebasepro/ui";
+
+export const Standard = () => (
+    <div className="p-4">
+        <Tabs value="schema" onValueChange={() => {}}>
+            <Tab value="schema">Schema</Tab>
+            <Tab value="snippets">Snippets</Tab>
+            <Tab value="history">History</Tab>
+        </Tabs>
+    </div>
+);
+
+// Editor-sidebar pattern (SQLEditorSidebar / RLSEditor): boxy tab bar +
+// section header, ported from UIReferenceView's "Tabs" section.
+```

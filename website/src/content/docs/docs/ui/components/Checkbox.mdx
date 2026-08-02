@@ -1,0 +1,40 @@
+---
+title: Checkbox
+sidebar_label: Checkbox
+description: Checkbox — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Checkbox } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `checked` | `boolean` | yes |  |
+| `id` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+| `indeterminate` | `boolean` | — |  |
+| `onCheckedChange` | `(checked: boolean) => void` | — |  |
+| `padding` | `boolean` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `color` | `"primary" \| "secondary"` | — |  |
+| `aria-label` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Checkbox } from "@rebasepro/ui";
+
+export const States = () => (
+    <div className="flex flex-col gap-3 p-4">
+        <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked onCheckedChange={() => {}}/><span>Checked</span></label>
+        <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={false} onCheckedChange={() => {}}/><span>Unchecked</span></label>
+        <label className="flex items-center gap-2 cursor-pointer"><Checkbox checked={false} indeterminate onCheckedChange={() => {}}/><span>Indeterminate</span></label>
+        <label className="flex items-center gap-2"><Checkbox checked disabled/><span>Disabled</span></label>
+    </div>
+);
+```

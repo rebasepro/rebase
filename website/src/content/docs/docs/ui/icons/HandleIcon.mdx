@@ -1,0 +1,44 @@
+---
+title: HandleIcon
+sidebar_label: HandleIcon
+description: HandleIcon — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { HandleIcon } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `size` | `number \| "small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `color` | `"inherit" \| "disabled" \| "error" \| "warning" \| "success" \| "primary" \| "secondary"` | — |  |
+| `className` | `string` | — |  |
+| `onClick` | `(e: React.SyntheticEvent) => void` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { HandleIcon, Typography } from "@rebasepro/ui";
+
+export function Sizes() {
+    return (
+        <div className="flex items-end gap-4 p-4">
+            {SIZES.map(size => (
+                <div key={size} className="flex flex-col items-center gap-1">
+                    <HandleIcon size={size}/>
+                    <Typography variant="caption" color="secondary" className="font-mono">{size}</Typography>
+                </div>
+            ))}
+            <div className="flex flex-col items-center gap-1">
+                <HandleIcon size={40}/>
+                <Typography variant="caption" color="secondary" className="font-mono">40</Typography>
+            </div>
+        </div>
+    );
+}
+```

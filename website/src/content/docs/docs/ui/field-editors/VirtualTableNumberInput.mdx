@@ -1,0 +1,42 @@
+---
+title: VirtualTableNumberInput
+sidebar_label: VirtualTableNumberInput
+description: VirtualTableNumberInput — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { VirtualTableNumberInput } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `error` | `Error` | — |  |
+| `value` | `number` | yes |  |
+| `align` | `"center" \| "left" \| "right"` | — |  |
+| `updateValue` | `(newValue: (number \| null)) => void` | yes |  |
+| `focused` | `boolean` | yes |  |
+| `disabled` | `boolean` | yes |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { VirtualTableNumberInput, cls } from "@rebasepro/ui";
+
+export function RightAlignedCountCell() {
+  return (
+    <CellShell selected width={160}>
+      <VirtualTableNumberInput
+        value={128442}
+        align="right"
+        focused
+        disabled={false}
+        updateValue={() => {}}
+      />
+    </CellShell>
+  );
+}
+```

@@ -1,0 +1,35 @@
+---
+title: InfoLabel
+sidebar_label: InfoLabel
+description: InfoLabel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { InfoLabel } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `mode` | `"info" \| "warn"` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { InfoLabel } from "@rebasepro/ui";
+
+export const Modes = () => (
+    <div className="flex flex-col gap-3 p-4 w-[420px]">
+        <InfoLabel mode="info">
+            Policies are evaluated per row, for every read and write.
+        </InfoLabel>
+        <InfoLabel mode="warn">
+            This action cannot be undone once the migration has run.
+        </InfoLabel>
+    </div>
+);
+```

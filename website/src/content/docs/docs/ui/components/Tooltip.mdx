@@ -1,0 +1,47 @@
+---
+title: Tooltip
+sidebar_label: Tooltip
+description: Tooltip — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Tooltip } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `open` | `boolean` | — |  |
+| `defaultOpen` | `boolean` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `side` | `"left" \| "right" \| "top" \| "bottom"` | — |  |
+| `align` | `"center" \| "end" \| "start"` | — |  |
+| `sideOffset` | `number` | — |  |
+| `title` | `React.ReactNode` | — |  |
+| `delayDuration` | `number` | — |  |
+| `asChild` | `boolean` | — |  |
+| `tooltipClassName` | `string` | — |  |
+| `tooltipStyle` | `React.CSSProperties` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+| `container` | `HTMLElement` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Tooltip, IconButton, Button, KeyIcon, Trash2Icon } from "@rebasepro/ui";
+
+export const Default = () => (
+    <div className="p-4 h-[280px] flex items-center justify-center">
+        <Tooltip open onOpenChange={() => {}} title="Copy connection string" side="top">
+            <IconButton size="small" aria-label="Copy"><KeyIcon size={16}/></IconButton>
+        </Tooltip>
+    </div>
+);
+
+// Destructive-action tooltip on a text button, sweeping `side="right"`.
+```

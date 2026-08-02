@@ -1,0 +1,68 @@
+---
+title: TableHeader
+sidebar_label: TableHeader
+description: TableHeader — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { TableHeader } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export function UsersTableHeader() {
+  return (
+    <div className="overflow-x-auto w-full">
+      <Table className="w-full">
+        <TableHeader>
+          <TableCell header className="w-16"></TableCell>
+          <TableCell header>Email</TableCell>
+          <TableCell header>Name</TableCell>
+          <TableCell header>Roles</TableCell>
+        </TableHeader>
+        <TableBody>
+          {USERS.map(user => (
+            <TableRow key={user.uid}>
+              <TableCell style={{ width: "64px" }}>
+                <Tooltip asChild title="Delete this user">
+                  <IconButton size="small"><Trash2Icon/></IconButton>
+                </Tooltip>
+              </TableCell>
+              <TableCell>{user.email}</TableCell>
+              <TableCell className="font-medium">{user.displayName}</TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-2">
+                  {user.roles.map(role => (
+                    <Chip key={role.id} colorScheme={role.isAdmin ? "purple" : "blue"} size="small">
+                      {role.name}
+                    </Chip>
+                  ))}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+const COLLECTIONS = [
+  { id: "c1", name: "users", type: "table", rows: "128,442", rls: true },
+  { id: "c2", name: "orders", type: "table", rows: "54,910", rls: true },
+  { id: "c3", name: "audit_logs", type: "view", rows: "2,004,331", rls: false }
+];
+```

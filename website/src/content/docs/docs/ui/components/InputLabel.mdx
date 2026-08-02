@@ -1,0 +1,42 @@
+---
+title: InputLabel
+sidebar_label: InputLabel
+description: InputLabel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { InputLabel } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `shrink` | `boolean` | — |  |
+| `id` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { InputLabel } from "@rebasepro/ui";
+
+export const FloatingStates = () => (
+    <div className="flex gap-6 p-4">
+        <div className="relative rounded-lg bg-surface-accent-200/50 dark:bg-white/[0.055] min-h-[44px] w-[180px]">
+            <InputLabel shrink className="absolute top-1 text-text-secondary dark:text-text-secondary-dark">
+                Shrink (focused)
+            </InputLabel>
+        </div>
+        <div className="relative rounded-lg bg-surface-accent-200/50 dark:bg-white/[0.055] min-h-[44px] w-[180px]">
+            <InputLabel className="absolute text-text-secondary dark:text-text-secondary-dark">
+                Expanded (empty)
+            </InputLabel>
+        </div>
+    </div>
+);
+```

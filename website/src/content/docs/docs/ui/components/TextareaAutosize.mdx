@@ -1,0 +1,43 @@
+---
+title: TextareaAutosize
+sidebar_label: TextareaAutosize
+description: TextareaAutosize — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { TextareaAutosize } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `style` | `React.CSSProperties & object` | — |  |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `shadowClassName` | `string` | — |  |
+| `maxRows` | `string \| number` | — | Maximum number of rows to display. |
+| `minRows` | `string \| number` | — | Minimum number of rows to display. |
+| `sizeRef` | `React.RefObject<HTMLDivElement>` | — |  |
+| `onResize` | `(state: State) => void` | — |  |
+| `ignoreBoxSizing` | `boolean` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { TextareaAutosize } from "@rebasepro/ui";
+
+export const Basic = () => (
+    <div className="rounded-lg bg-surface-accent-200/50 dark:bg-white/[0.055] p-3 w-[320px] m-4">
+        <TextareaAutosize
+            className="w-full bg-transparent outline-none text-base resize-none"
+            minRows={2}
+            value={"Policies are evaluated per row, for every read and write."}
+            onChange={() => {}}
+        />
+    </div>
+);
+```

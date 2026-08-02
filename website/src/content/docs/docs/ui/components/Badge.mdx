@@ -1,0 +1,34 @@
+---
+title: Badge
+sidebar_label: Badge
+description: Badge — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Badge } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `color` | `"error" \| "warning" \| "primary" \| "secondary"` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `invisible` | `boolean` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Badge, IconButton, Avatar, MailIcon } from "@rebasepro/ui";
+
+export const Colors = () => (
+    <div className="flex items-center gap-6 p-4">
+        <Badge color="primary"><Avatar>A</Avatar></Badge>
+        <Badge color="secondary"><Avatar>B</Avatar></Badge>
+        <Badge color="warning"><Avatar>C</Avatar></Badge>
+        <Badge color="error"><Avatar>D</Avatar></Badge>
+    </div>
+);
+```

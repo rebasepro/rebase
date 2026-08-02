@@ -1,0 +1,57 @@
+---
+title: Select
+sidebar_label: Select
+description: Select — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Select } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `open` | `boolean` | — |  |
+| `name` | `string` | — |  |
+| `fullWidth` | `boolean` | — |  |
+| `id` | `string` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `value` | `T` | — |  |
+| `className` | `string` | — |  |
+| `inputClassName` | `string` | — |  |
+| `viewportClassName` | `string` | — |  |
+| `onChange` | `(event: React.ChangeEvent<HTMLSelectElement, Element>) => void` | — |  |
+| `onValueChange` | `(updatedValue: T) => void` | — |  |
+| `placeholder` | `React.ReactNode` | — |  |
+| `renderValue` | `(value: T) => React.ReactNode` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `disabled` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `position` | `"item-aligned" \| "popper"` | — |  |
+| `endAdornment` | `React.ReactNode` | — |  |
+| `inputRef` | `React.Ref` | — |  |
+| `padding` | `boolean` | — |  |
+| `invisible` | `boolean` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `dataType` | `"string" \| "number" \| "boolean"` | — |  |
+| `portalContainer` | `HTMLElement` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Select, SelectItem } from "@rebasepro/ui";
+
+export const Basic = () => (
+    <div className="w-[280px] p-4">
+        <Select label="Status" value="published" onValueChange={() => {}}>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+        </Select>
+    </div>
+);
+```

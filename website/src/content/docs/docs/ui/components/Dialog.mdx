@@ -1,0 +1,70 @@
+---
+title: Dialog
+sidebar_label: Dialog
+description: Dialog — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Dialog } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `open` | `boolean` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+| `containerClassName` | `string` | — |  |
+| `fullWidth` | `boolean` | — |  |
+| `fullHeight` | `boolean` | — |  |
+| `fullScreen` | `boolean` | — |  |
+| `scrollable` | `boolean` | — |  |
+| `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl" \| "full"` | — |  |
+| `modal` | `boolean` | — |  |
+| `onOpenAutoFocus` | `(e: Event) => void` | — |  |
+| `onEscapeKeyDown` | `(e: KeyboardEvent) => void` | — |  |
+| `onPointerDownOutside` | `(e: Event) => void` | — |  |
+| `onInteractOutside` | `(e: Event) => void` | — |  |
+| `disableInitialFocus` | `boolean` | — | If `true`, the dialog will not focus the first focusable element when opened. |
+| `portalContainer` | `HTMLElement` | — |  |
+| `aria-describedby` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const FormDialog = () => (
+    <div className="p-4 h-[320px]">
+        <Dialog open onOpenChange={() => {}} maxWidth="lg">
+            <DialogTitle>Edit collection</DialogTitle>
+            <DialogContent>
+                <div className="grid grid-cols-12 gap-4">
+                    <div className="col-span-12">
+                        <TextField name="name" required value="products" onChange={() => {}} label="Collection name"/>
+                    </div>
+                    <div className="col-span-12">
+                        <TextField name="path" value="products" onChange={() => {}} label="Database table"/>
+                    </div>
+                    <div className="col-span-12">
+                        <MultiSelect className="w-full" label="RLS policies" value={["read_authenticated"]} onValueChange={() => {}}>
+                            <MultiSelectItem value="read_authenticated">read_authenticated</MultiSelectItem>
+                            <MultiSelectItem value="write_owner">write_owner</MultiSelectItem>
+                            <MultiSelectItem value="admin_all">admin_all</MultiSelectItem>
+                        </MultiSelect>
+                    </div>
+                </div>
+            </DialogContent>
+            <DialogActions>
+                <Button variant="text">Cancel</Button>
+                <LoadingButton variant="filled" loading={false}>Save changes</LoadingButton>
+            </DialogActions>
+        </Dialog>
+    </div>
+);
+
+// Smaller destructive confirmation — sweeps maxWidth + a plain-text body.
+```

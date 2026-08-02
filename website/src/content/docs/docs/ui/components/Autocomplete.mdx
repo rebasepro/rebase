@@ -1,0 +1,48 @@
+---
+title: Autocomplete
+sidebar_label: Autocomplete
+description: Autocomplete — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Autocomplete } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `open` | `boolean` | yes |  |
+| `setOpen` | `(open: boolean) => void` | yes |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Autocomplete, AutocompleteItem, TextField } from "@rebasepro/ui";
+
+export const TableSearch = () => (
+    <div className="p-4 h-[320px]">
+        <div className="relative w-[320px]">
+            <TextField label="Search tables" value="use" onChange={() => {}}/>
+            <Autocomplete open setOpen={() => {}}>
+                <AutocompleteItem>
+                    <div className="px-4">users</div>
+                </AutocompleteItem>
+                <AutocompleteItem>
+                    <div className="px-4">user_roles</div>
+                </AutocompleteItem>
+                <AutocompleteItem>
+                    <div className="px-4">user_sessions</div>
+                </AutocompleteItem>
+            </Autocomplete>
+        </div>
+    </div>
+);
+
+// Empty state — the surface is still authored open, just with a single
+// non-interactive row instead of matches.
+```

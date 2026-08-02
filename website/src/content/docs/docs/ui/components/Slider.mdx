@@ -1,0 +1,44 @@
+---
+title: Slider
+sidebar_label: Slider
+description: Slider — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Slider } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `className` | `string` | — |  |
+| `name` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+| `orientation` | `"horizontal" \| "vertical"` | — |  |
+| `dir` | `"ltr" \| "rtl"` | — |  |
+| `min` | `number` | — |  |
+| `max` | `number` | — |  |
+| `step` | `number` | — |  |
+| `minStepsBetweenThumbs` | `number` | — |  |
+| `value` | `number[]` | — |  |
+| `defaultValue` | `number[]` | — |  |
+| `onValueChange` | `(value: number[]) => void` | — |  |
+| `onValueCommit` | `(value: number[]) => void` | — |  |
+| `inverted` | `boolean` | — |  |
+| `form` | `string` | — |  |
+| `size` | `"small" \| "regular"` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Slider } from "@rebasepro/ui";
+
+export const Basic = () => (
+    <div className="w-[320px] p-6">
+        <Slider defaultValue={[60]} min={0} max={100} step={1}/>
+    </div>
+);
+```

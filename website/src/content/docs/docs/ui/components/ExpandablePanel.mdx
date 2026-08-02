@@ -1,0 +1,49 @@
+---
+title: ExpandablePanel
+sidebar_label: ExpandablePanel
+description: ExpandablePanel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { ExpandablePanel } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `title` | `React.ReactNode` | yes |  |
+| `invisible` | `boolean` | — |  |
+| `initiallyExpanded` | `boolean` | — |  |
+| `expanded` | `boolean` | — |  |
+| `onExpandedChange` | `(expanded: boolean) => void` | — |  |
+| `titleClassName` | `string` | — |  |
+| `asField` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `innerClassName` | `string` | — |  |
+| `children` | `React.ReactNode` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { ExpandablePanel, Typography, CheckSquareIcon, FilterIcon } from "@rebasepro/ui";
+
+export const Expanded = () => (
+    <div className="p-4 w-80">
+        <ExpandablePanel
+            asField
+            initiallyExpanded
+            innerClassName="p-4"
+            title={
+                <div className="flex flex-row items-center text-text-secondary dark:text-text-secondary-dark">
+                    <CheckSquareIcon size={18}/>
+                    <Typography variant="subtitle2" className="ml-4">Validation</Typography>
+                </div>
+            }>
+            <Typography variant="body2" color="secondary">Required, must be a valid email address, max 254 characters.</Typography>
+        </ExpandablePanel>
+    </div>
+);
+```

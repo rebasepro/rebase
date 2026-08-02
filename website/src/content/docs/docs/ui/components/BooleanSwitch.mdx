@@ -1,0 +1,36 @@
+---
+title: BooleanSwitch
+sidebar_label: BooleanSwitch
+description: BooleanSwitch — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { BooleanSwitch } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `boolean` | yes |  |
+| `className` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `allowIndeterminate` | `boolean` | — |  |
+| `onValueChange` | `((newValue: boolean \| null) => void) \| ((newValue: boolean) => void)` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { BooleanSwitch } from "@rebasepro/ui";
+
+export const States = () => (
+    <div className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-2"><BooleanSwitch value onValueChange={() => {}}/><span>On</span></div>
+        <div className="flex items-center gap-2"><BooleanSwitch value={false} onValueChange={() => {}}/><span>Off</span></div>
+        <div className="flex items-center gap-2"><BooleanSwitch value disabled/><span>Disabled</span></div>
+    </div>
+);
+```

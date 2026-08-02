@@ -1,0 +1,38 @@
+---
+title: FilterChip
+sidebar_label: FilterChip
+description: FilterChip — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { FilterChip } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes | The text label displayed on the chip. |
+| `active` | `boolean` | — | Whether the chip is currently in an active/selected state. |
+| `icon` | `React.ReactNode` | — | Optional icon rendered before the label. |
+| `size` | `"small" \| "medium"` | — | Size variant. |
+| `disabled` | `boolean` | — | Whether the chip is disabled. |
+| `style` | `React.CSSProperties` | — |  |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { FilterChip, FilterIcon } from "@rebasepro/ui";
+
+export const ActiveInactive = () => (
+    <div className="flex flex-wrap gap-2 items-center p-4">
+        <FilterChip active>Active</FilterChip>
+        <FilterChip>Inactive</FilterChip>
+        <FilterChip icon={<FilterIcon size={12}/>} active>With icon</FilterChip>
+    </div>
+);
+```

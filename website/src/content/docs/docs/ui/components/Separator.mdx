@@ -1,0 +1,33 @@
+---
+title: Separator
+sidebar_label: Separator
+description: Separator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Separator } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `orientation` | `"horizontal" \| "vertical"` | yes |  |
+| `decorative` | `boolean` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Separator, Typography } from "@rebasepro/ui";
+
+export const Horizontal = () => (
+    <div className="p-4 w-64">
+        <Typography variant="body2">Account</Typography>
+        <Separator orientation="horizontal"/>
+        <Typography variant="body2">Billing</Typography>
+    </div>
+);
+```

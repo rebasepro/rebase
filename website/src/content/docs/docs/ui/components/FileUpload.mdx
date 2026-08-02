@@ -1,0 +1,47 @@
+---
+title: FileUpload
+sidebar_label: FileUpload
+description: FileUpload — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { FileUpload } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `accept` | `Record<string, string[]>` | — |  |
+| `onFilesAdded` | `OnFilesUploadAdded` | yes |  |
+| `onFilesRejected` | `OnFileUploadRejected` | — |  |
+| `maxSize` | `number` | — |  |
+| `disabled` | `boolean` | — |  |
+| `maxFiles` | `number` | — |  |
+| `title` | `React.ReactNode` | — |  |
+| `uploadDescription` | `React.ReactNode` | — |  |
+| `preventDropOnDocument` | `boolean` | — |  |
+| `size` | `"small" \| "medium" \| "large"` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { FileUpload, Typography, Chip, UploadCloudIcon, FileTextIcon, XIcon, IconButton, cls, defaultBorderMixin } from "@rebasepro/ui";
+
+export const Idle = () => (
+    <div className="p-4 w-full max-w-md">
+        <FileUpload
+            size="large"
+            accept={{ "text/csv": [".csv"], "application/json": [".json"] }}
+            maxFiles={1}
+            title="Import data"
+            uploadDescription={<><UploadCloudIcon size={18}/> Drag and drop a CSV or JSON file, or click to browse</>}
+            onFilesAdded={() => {}}
+        />
+    </div>
+);
+
+// Compact size for tight forms (e.g. an inline logo/avatar uploader).
+```

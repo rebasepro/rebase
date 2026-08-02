@@ -1,0 +1,61 @@
+---
+title: Popover
+sidebar_label: Popover
+description: Popover — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Popover } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `trigger` | `React.ReactNode` | yes |  |
+| `children` | `React.ReactNode` | yes |  |
+| `open` | `boolean` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `side` | `"left" \| "right" \| "top" \| "bottom"` | — |  |
+| `sideOffset` | `number` | — |  |
+| `align` | `"center" \| "end" \| "start"` | — |  |
+| `alignOffset` | `number` | — |  |
+| `arrowPadding` | `number` | — |  |
+| `sticky` | `"partial" \| "always"` | — |  |
+| `hideWhenDetached` | `boolean` | — |  |
+| `avoidCollisions` | `boolean` | — |  |
+| `enabled` | `boolean` | — |  |
+| `modal` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `portalContainer` | `HTMLElement` | — |  |
+| `onMouseEnter` | `React.MouseEventHandler<HTMLDivElement>` | — |  |
+| `onMouseLeave` | `React.MouseEventHandler<HTMLDivElement>` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Popover, Button, IconButton, TextField, Typography, Chip, SearchIcon, KeyRoundIcon } from "@rebasepro/ui";
+
+export const FilterPopover = () => (
+    <div className="p-4 h-[320px] flex items-center justify-center">
+        <Popover
+            open
+            onOpenChange={() => {}}
+            side="bottom"
+            align="start"
+            trigger={<Button variant="outlined" startIcon={<SearchIcon size={16}/>}>Filter rows</Button>}
+        >
+            <div className="w-64 p-3 flex flex-col gap-3">
+                <TextField label="Column" value="status" onChange={() => {}} size="small"/>
+                <div className="flex flex-wrap gap-1.5">
+                    <Chip colorScheme="green">published</Chip>
+                    <Chip colorScheme="gray" outlined>draft</Chip>
+                    <Chip colorScheme="gray" outlined>archived</Chip>
+                </div>
+            </div>
+        </Popover>
+    </div>
+);
+```

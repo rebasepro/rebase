@@ -1,0 +1,82 @@
+---
+title: KanbanView
+sidebar_label: KanbanView
+description: KanbanView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { KanbanView } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `data` | `{ id: string; data: T }[]` | yes | Drag-and-drop board. T = card payload, COLUMN = the column key union. |
+| `columns` | `COLUMN[]` | yes |  |
+| `assignColumn` | `(item: { id: string; data: T }) => COLUMN` | yes |  |
+| `ItemComponent` | `React.ComponentType<{ item: { id: string; data: T }; isDragging: boolean; isClone?: boolean; isGroupedOver?: boolean; style?: React.CSSProperties; index?: number }>` | yes |  |
+| `columnLabels` | `Record<COLUMN, string>` | — |  |
+| `columnColors` | `Record<COLUMN, unknown>` | — |  |
+| `allowColumnReorder` | `boolean` | — |  |
+| `onColumnReorder` | `(columns: COLUMN[]) => void` | — |  |
+| `onItemsReorder` | `(items: { id: string; data: T }[], moveInfo?: { itemId: string; sourceColumn: COLUMN; targetColumn: COLUMN }) => void` | — |  |
+| `columnLoadingState` | `{ [columnKey: string]: { loading: boolean; hasMore: boolean; itemCount: number; totalCount?: number } }` | — |  |
+| `onLoadMoreColumn` | `(column: COLUMN) => void` | — |  |
+| `onAddItemToColumn` | `(column: COLUMN) => void` | — |  |
+| `AddColumnComponent` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Typography, Chip, cls, KanbanView, FolderKanbanIcon } from "@rebasepro/ui";
+import type { BoardItem, BoardItemViewProps } from "@rebasepro/ui";
+
+export function ProjectBoard() {
+    const [boardData, setBoardData] = useState<BoardItem<SampleProject>[]>(() => SAMPLE_PROJECTS.map(p => ({ id: p.id, data: p })));
+    const [columns, setColumns] = useState<ProjectStatus[]>(STATUS_COLUMNS);
+
+    const assignColumn = useCallback((item: BoardItem<SampleProject>): ProjectStatus => item.data.status, []);
+
+    const handleItemsReorder = useCallback((items: BoardItem<SampleProject>[], moveInfo?: { itemId: string; sourceColumn: ProjectStatus; targetColumn: ProjectStatus }) => {
+        const updatedItems = items.map(item => {
+            if (moveInfo && item.id === moveInfo.itemId && moveInfo.sourceColumn !== moveInfo.targetColumn) {
+                return { ...item, data: { ...item.data, status: moveInfo.targetColumn } };
+            }
+            return item;
+        });
+        setBoardData(updatedItems);
+    }, []);
+
+    const handleColumnReorder = useCallback((reordered: ProjectStatus[]) => setColumns(reordered), []);
+
+    const columnLoadingState = useMemo(() => {
+        const state: Record<string, { loading: boolean; hasMore: boolean; itemCount: number; totalCount: number }> = {};
+        for (const col of columns) {
+            const count = boardData.filter(item => item.data.status === col).length;
+            state[col] = { loading: false, hasMore: false, itemCount: count, totalCount: count };
+        }
+        return state;
+    }, [boardData, columns]);
+
+    return (
+        <div style={{ height: 480 }} className="w-full rounded-lg border border-surface-200 dark:border-surface-800 overflow-hidden">
+            <KanbanView<SampleProject, ProjectStatus>
+                data={boardData}
+                columns={columns}
+                columnLabels={COLUMN_LABELS}
+                columnColors={COLUMN_COLORS}
+                assignColumn={assignColumn}
+                allowColumnReorder={true}
+                onColumnReorder={handleColumnReorder}
+                onItemsReorder={handleItemsReorder}
+                ItemComponent={KanbanProjectCard}
+                columnLoadingState={columnLoadingState}
+            />
+        </div>
+    );
+}
+```

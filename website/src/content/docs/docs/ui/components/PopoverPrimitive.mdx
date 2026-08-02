@@ -1,0 +1,52 @@
+---
+title: PopoverPrimitive
+sidebar_label: PopoverPrimitive
+description: PopoverPrimitive — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { PopoverPrimitive } from "@rebasepro/ui";
+```
+
+> This component takes no documented props, or its type could not be flattened. See the source.
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { PopoverPrimitive, cls, defaultBorderMixin, TextField, Typography, SearchIcon } from "@rebasepro/ui";
+
+export const Default = () => (
+    <div className="p-4 h-[320px] flex items-center justify-center">
+        <PopoverPrimitive.Root open onOpenChange={() => {}} modal={false}>
+            <PopoverPrimitive.Trigger asChild>
+                <button
+                    type="button"
+                    className={cls("px-3 py-1.5 text-sm rounded-md border bg-white dark:bg-surface-900", defaultBorderMixin)}
+                >
+                    Select table…
+                </button>
+            </PopoverPrimitive.Trigger>
+            <PopoverPrimitive.Content
+                align="start"
+                sideOffset={8}
+                className={cls("z-50 overflow-hidden border bg-white dark:bg-surface-900 rounded-lg w-64", defaultBorderMixin)}
+            >
+                <div className="p-2 border-b border-surface-200 dark:border-surface-700 flex items-center gap-2">
+                    <SearchIcon size={14} className="text-text-disabled dark:text-text-disabled-dark"/>
+                    <TextField invisible value="" onChange={() => {}} placeholder="Search tables…" size="small"/>
+                </div>
+                <div className="py-1">
+                    {["users", "orders", "products"].map(t => (
+                        <div key={t} className="px-3 py-1.5 text-sm cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-900">
+                            {t}
+                        </div>
+                    ))}
+                </div>
+                <PopoverPrimitive.Arrow className="fill-white dark:fill-surface-900"/>
+            </PopoverPrimitive.Content>
+        </PopoverPrimitive.Root>
+    </div>
+);
+```

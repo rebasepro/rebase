@@ -1,0 +1,36 @@
+---
+title: Container
+sidebar_label: Container
+description: Container — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Container } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `style` | `React.CSSProperties` | — |  |
+| `className` | `string` | — |  |
+| `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl"` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Container, Typography } from "@rebasepro/ui";
+
+export const MaxWidths = () => (
+    <div className="flex flex-col gap-3 p-4 bg-surface-50 dark:bg-surface-900">
+        {(["sm", "md", "xl"] as const).map(w => (
+            <Container key={w} maxWidth={w} className="bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg py-2">
+                <Typography variant="caption" color="secondary" className="font-mono">maxWidth=&quot;{w}&quot;</Typography>
+            </Container>
+        ))}
+    </div>
+);
+```

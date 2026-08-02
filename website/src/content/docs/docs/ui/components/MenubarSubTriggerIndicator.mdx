@@ -1,0 +1,47 @@
+---
+title: MenubarSubTriggerIndicator
+sidebar_label: MenubarSubTriggerIndicator
+description: MenubarSubTriggerIndicator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { MenubarSubTriggerIndicator } from "@rebasepro/ui";
+```
+
+> This component takes no documented props, or its type could not be flattened. See the source.
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[280px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarSub>
+                                <MenubarSubTrigger>
+                                    Export
+                                    <MenubarSubTriggerIndicator/>
+                                </MenubarSubTrigger>
+                            </MenubarSub>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```

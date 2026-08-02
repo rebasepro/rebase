@@ -1,0 +1,36 @@
+---
+title: Label
+sidebar_label: Label
+description: Label — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Label } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `style` | `React.CSSProperties` | — |  |
+| `className` | `string` | — |  |
+| `id` | `string` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `asChild` | `boolean` | — |  |
+| `border` | `boolean` | — |  |
+| `ref` | `React.Ref` | — | Allows getting a ref to the component instance. Once the component unmounts, React will set `ref.current` to `null` (or |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Label } from "@rebasepro/ui";
+
+export const Basic = () => (
+    <div className="flex flex-col gap-2 p-4">
+        <Label htmlFor="email-field">Email address</Label>
+        <Label htmlFor="role-field">Role</Label>
+    </div>
+);
+```

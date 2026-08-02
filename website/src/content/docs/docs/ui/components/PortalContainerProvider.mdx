@@ -1,0 +1,43 @@
+---
+title: PortalContainerProvider
+sidebar_label: PortalContainerProvider
+description: PortalContainerProvider — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { PortalContainerProvider } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `container` | `HTMLElement` | yes |  |
+| `children` | `React.ReactNode` | yes |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { PortalContainerProvider, usePortalContainer, Portal, Typography } from "@rebasepro/ui";
+
+export const ScopedContainer = () => {
+    const [container, setContainer] = React.useState<HTMLDivElement | null>(null);
+    return (
+        <div className="p-4 w-80">
+            <Typography variant="caption" color="secondary" className="block mb-2">Modal content area</Typography>
+            <div
+                ref={setContainer}
+                className="relative min-h-[72px] border border-dashed border-surface-300 dark:border-surface-700 rounded-lg p-3"
+            >
+                {container && (
+                    <PortalContainerProvider container={container}>
+                        <ScopedBadge/>
+                    </PortalContainerProvider>
+                )}
+            </div>
+        </div>
+    );
+};
+```

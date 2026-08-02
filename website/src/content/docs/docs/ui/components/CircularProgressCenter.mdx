@@ -1,0 +1,29 @@
+---
+title: CircularProgressCenter
+sidebar_label: CircularProgressCenter
+description: CircularProgressCenter — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { CircularProgressCenter } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `className` | `string` | — |  |
+| `text` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { CircularProgressCenter } from "@rebasepro/ui";
+
+export const WithText = () => (
+    <CircularProgressCenter size="medium" text="Loading workspace…"/>
+);
+```

@@ -1,0 +1,28 @@
+---
+title: VirtualTableSelectionProvider
+sidebar_label: VirtualTableSelectionProvider
+description: VirtualTableSelectionProvider — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { VirtualTableSelectionProvider } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `store` | `VirtualTableSelectionStore<T>` | yes |  |
+| `children` | `React.ReactNode` | yes |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import type { VirtualTableSelectionStore, SelectedCell } from "@rebasepro/ui";
+
+export function CellSelected() {
+  return <SelectionGrid initialSelection={{ columnKey: "status", id: "2" }}/>;
+}
+```

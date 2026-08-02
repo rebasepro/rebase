@@ -1,0 +1,35 @@
+---
+title: Skeleton
+sidebar_label: Skeleton
+description: Skeleton — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Skeleton } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `width` | `number` | — |  |
+| `height` | `number` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Skeleton } from "@rebasepro/ui";
+
+export const RowLoading = () => (
+    <div className="flex items-center gap-4 p-4">
+        <Skeleton className="w-10 h-10 rounded-full"/>
+        <div className="flex flex-col gap-2">
+            <Skeleton className="w-48 h-4 rounded"/>
+            <Skeleton className="w-32 h-3 rounded"/>
+        </div>
+    </div>
+);
+```

@@ -1,0 +1,40 @@
+---
+title: ToggleButtonGroup
+sidebar_label: ToggleButtonGroup
+description: ToggleButtonGroup — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { ToggleButtonGroup } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `string` | yes | Currently selected value |
+| `onValueChange` | `(value: string) => void` | yes | Callback when value changes |
+| `options` | `{ value: string; label: string; icon?: React.ReactNode; disabled?: boolean }[]` | yes | Options to display |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { ToggleButtonGroup, ListIcon, LayoutGridIcon, KanbanIcon } from "@rebasepro/ui";
+
+export const Basic = () => (
+    <div className="p-4">
+        <ToggleButtonGroup
+            value="list"
+            onValueChange={() => {}}
+            options={[
+                { value: "list", label: "List" },
+                { value: "grid", label: "Grid" },
+                { value: "kanban", label: "Kanban" }
+            ]}
+        />
+    </div>
+);
+```

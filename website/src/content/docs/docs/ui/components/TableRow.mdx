@@ -1,0 +1,61 @@
+---
+title: TableRow
+sidebar_label: TableRow
+description: TableRow — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { TableRow } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `onClick` | `React.MouseEventHandler<any> & React.MouseEventHandler<HTMLTableRowElement>` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `id` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export function ClickableRows() {
+  return (
+    <div className="overflow-x-auto w-full">
+      <Table className="w-full">
+        <TableHeader>
+          <TableCell header>Name</TableCell>
+          <TableCell header>Type</TableCell>
+          <TableCell header align="right">Rows</TableCell>
+          <TableCell header align="center">RLS</TableCell>
+        </TableHeader>
+        <TableBody>
+          {COLLECTIONS.map(col => (
+            <TableRow key={col.id} onClick={() => {}}>
+              <TableCell className="font-mono text-xs font-medium">{col.name}</TableCell>
+              <TableCell className="text-text-secondary dark:text-text-secondary-dark">{col.type}</TableCell>
+              <TableCell align="right">{col.rows}</TableCell>
+              <TableCell align="center">
+                <Chip size="small" colorScheme={col.rls ? "green" : "red"}>
+                  {col.rls ? "Enabled" : "Disabled"}
+                </Chip>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+const USERS = [
+  { uid: "1", email: "maria.chen@rebase.pro", displayName: "Maria Chen", role: "Admin" },
+  { uid: "2", email: "diego.alvarez@rebase.pro", displayName: "Diego Alvarez", role: "Editor" },
+  { uid: "3", email: "priya.natarajan@rebase.pro", displayName: "Priya Natarajan", role: "Viewer" }
+];
+```

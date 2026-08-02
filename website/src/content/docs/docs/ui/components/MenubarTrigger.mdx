@@ -1,0 +1,46 @@
+---
+title: MenubarTrigger
+sidebar_label: MenubarTrigger
+description: MenubarTrigger — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { MenubarTrigger } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `onSelect` | `(event: React.SyntheticEvent) => void` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Idle = () => (
+    <div className="p-4">
+        <Menubar>
+            <MenubarMenu>
+                <MenubarTrigger>File</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>Edit</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>View</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>Help</MenubarTrigger>
+            </MenubarMenu>
+        </Menubar>
+    </div>
+);
+
+// data-[state=open] styling — the trigger takes the same highlighted
+// background as a `data-highlighted` item while its menu is open.
+```

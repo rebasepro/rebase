@@ -1,0 +1,44 @@
+---
+title: Menu
+sidebar_label: Menu
+description: Menu — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Menu } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `trigger` | `React.ReactNode` | yes |  |
+| `open` | `boolean` | — |  |
+| `defaultOpen` | `boolean` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `portalContainer` | `HTMLElement` | — |  |
+| `side` | `"left" \| "right" \| "top" \| "bottom"` | — |  |
+| `align` | `"center" \| "end" \| "start"` | — |  |
+| `sideOffset` | `number` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const AccountMenu = () => (
+    <div className="p-4 h-[320px]">
+        <Menu defaultOpen align="start" trigger={<Avatar>A</Avatar>}>
+            <div className="px-4 py-2 mb-2">
+                <Typography variant="body1" color="secondary">Alice Johnson</Typography>
+                <Typography variant="body2" color="secondary">alice@example.com</Typography>
+            </div>
+            <MenuItem><SettingsIcon size={16}/> Account settings</MenuItem>
+            <MenuItem><LogOutIcon size={16}/> Log out</MenuItem>
+        </Menu>
+    </div>
+);
+```

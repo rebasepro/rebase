@@ -1,0 +1,38 @@
+---
+title: CenteredView
+sidebar_label: CenteredView
+description: CenteredView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { CenteredView } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl"` | — |  |
+| `outerClassName` | `string` | — |  |
+| `className` | `string` | — |  |
+| `fullScreen` | `boolean` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { CenteredView, Typography, CircularProgress } from "@rebasepro/ui";
+
+export const CenteredMessage = () => (
+    <div className="h-64 border border-surface-200 dark:border-surface-700 rounded-lg overflow-hidden">
+        <CenteredView maxWidth="sm">
+            <div className="flex flex-col items-center gap-2 text-center">
+                <Typography variant="h6">No results found</Typography>
+                <Typography variant="body2" color="secondary">Try adjusting your filters or search terms.</Typography>
+            </div>
+        </CenteredView>
+    </div>
+);
+```

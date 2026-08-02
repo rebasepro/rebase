@@ -1,0 +1,50 @@
+---
+title: MenubarItem
+sidebar_label: MenubarItem
+description: MenubarItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { MenubarItem } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `onSelect` | `(event: Event) => void` | — |  |
+| `leftPadding` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[280px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>New table<MenubarShortcut>⌘N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>New SQL query<MenubarShortcut>⌘⇧N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```

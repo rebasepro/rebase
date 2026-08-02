@@ -1,0 +1,61 @@
+---
+title: TableCell
+sidebar_label: TableCell
+description: TableCell — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { TableCell } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `header` | `boolean` | — |  |
+| `scope` | `string` | — |  |
+| `className` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `align` | `"center" \| "left" \| "right"` | — |  |
+| `colspan` | `number` | — |  |
+| `id` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export function AlignedCells() {
+  return (
+    <div className="overflow-x-auto w-full">
+      <Table className="w-full">
+        <TableHeader>
+          <TableCell header align="left">Name</TableCell>
+          <TableCell header align="center">RLS</TableCell>
+          <TableCell header align="right">Rows</TableCell>
+        </TableHeader>
+        <TableBody>
+          {COLLECTIONS.map(col => (
+            <TableRow key={col.id}>
+              <TableCell align="left" className="font-mono text-xs font-medium">{col.name}</TableCell>
+              <TableCell align="center">
+                <Chip size="small" colorScheme={col.rls ? "green" : "red"}>
+                  {col.rls ? "Enabled" : "Disabled"}
+                </Chip>
+              </TableCell>
+              <TableCell align="right">{col.rows}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+const USERS = [
+  { uid: "1", email: "maria.chen@rebase.pro", displayName: "Maria Chen", roles: [{ id: "admin", name: "Admin", isAdmin: true }] },
+  { uid: "2", email: "diego.alvarez@rebase.pro", displayName: "Diego Alvarez", roles: [{ id: "editor", name: "Editor", isAdmin: false }] }
+];
+```

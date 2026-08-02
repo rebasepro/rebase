@@ -1,0 +1,37 @@
+---
+title: Avatar
+sidebar_label: Avatar
+description: Avatar — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Avatar } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `src` | `string` | — |  |
+| `alt` | `string` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `outerClassName` | `string` | — |  |
+| `hover` | `boolean` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Avatar, Typography } from "@rebasepro/ui";
+
+export const Initials = () => (
+    <div className="flex items-center gap-4 p-4">
+        <Avatar>A</Avatar>
+        <Avatar>MJ</Avatar>
+        <Avatar>RK</Avatar>
+    </div>
+);
+```

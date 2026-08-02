@@ -1,0 +1,49 @@
+---
+title: Button
+sidebar_label: Button
+description: Button — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Button } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `variant` | `"text" \| "filled" \| "outlined"` | — |  |
+| `disabled` | `boolean` | — |  |
+| `color` | `"text" \| "error" \| "primary" \| "secondary" \| "neutral"` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large" \| "xl" \| "2xl"` | — |  |
+| `startIcon` | `React.ReactNode` | — |  |
+| `fullWidth` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `component` | `C` | — |  |
+| `onClick` | `React.MouseEventHandler<HTMLElement>` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Button, PlusIcon, Trash2Icon, DownloadIcon } from "@rebasepro/ui";
+
+export const Variants = () => (
+    <div className="flex flex-col gap-5 p-4">
+        {(["filled", "outlined", "text"] as const).map(variant => (
+            <div key={variant}>
+                <div className="text-xs font-mono text-surface-500 mb-2">variant=&quot;{variant}&quot;</div>
+                <div className="flex flex-wrap gap-3 items-center">
+                    {(["primary", "secondary", "error", "neutral", "text"] as const).map(color => (
+                        <Button key={color} variant={variant} color={color}>
+                            {color.charAt(0).toUpperCase() + color.slice(1)}
+                        </Button>
+                    ))}
+                </div>
+            </div>
+        ))}
+    </div>
+);
+```

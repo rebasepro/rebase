@@ -1,0 +1,43 @@
+---
+title: RadioGroupItem
+sidebar_label: RadioGroupItem
+description: RadioGroupItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { RadioGroupItem } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | — |  |
+| `value` | `string` | yes |  |
+| `checked` | `boolean` | — |  |
+| `required` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { RadioGroup, RadioGroupItem, Label } from "@rebasepro/ui";
+
+export const CheckedAndUnchecked = () => (
+    <RadioGroup value="email" onValueChange={() => {}} className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-2">
+            <RadioGroupItem value="email" id="notify-email"/>
+            <Label htmlFor="notify-email">Email</Label>
+        </div>
+        <div className="flex items-center gap-2">
+            <RadioGroupItem value="sms" id="notify-sms"/>
+            <Label htmlFor="notify-sms">SMS</Label>
+        </div>
+    </RadioGroup>
+);
+
+// Item-level disabled — one item disabled inside an otherwise enabled group.
+```

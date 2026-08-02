@@ -1,0 +1,62 @@
+---
+title: VirtualTable
+sidebar_label: VirtualTable
+description: VirtualTable — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { VirtualTable } from "@rebasepro/ui";
+```
+
+> This component takes no documented props, or its type could not be flattened. See the source.
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { VirtualTable, Chip } from "@rebasepro/ui";
+import type { VirtualTableColumn, CellRendererParams } from "@rebasepro/ui";
+
+export function UsersVirtualTable() {
+  return (
+    <div style={{ width: 380, height: 296, border: "1px solid #e5e7eb", borderRadius: 8 }}>
+      <VirtualTable
+        data={USER_ROWS}
+        columns={USER_COLUMNS}
+        cellRenderer={userCellRenderer}
+        rowHeight={48}
+        headerHeight={40}
+      />
+    </div>
+  );
+}
+
+type ApiKeyRow = { id: string; name: string; scope: string; created: string };
+
+const API_KEY_COLUMNS: VirtualTableColumn[] = [
+  { key: "name", title: "Name", width: 170 },
+  { key: "scope", title: "Scope", width: 110 },
+  { key: "created", title: "Created", width: 110, align: "right" }
+];
+
+const API_KEY_ROWS: ApiKeyRow[] = [
+  { id: "k1", name: "CI/CD deploy key", scope: "deploy", created: "Jul 12, 2026" },
+  { id: "k2", name: "Analytics read-only", scope: "read", created: "Jun 30, 2026" },
+  { id: "k3", name: "Mobile app (iOS)", scope: "write", created: "Jan 4, 2026" }
+];
+
+function apiKeyCellRenderer({ column, rowData }: CellRendererParams<ApiKeyRow>) {
+  if (!rowData) return null;
+  if (column.key === "name") {
+    return <div className="flex items-center h-full px-3 font-medium truncate">{rowData.name}</div>;
+  }
+  if (column.key === "scope") {
+    return <div className="flex items-center h-full px-3"><Chip size="small" colorScheme={rowData.scope === "write" ? "green" : "gray"}>{rowData.scope}</Chip></div>;
+  }
+  if (column.key === "created") {
+    return <div className="flex items-center justify-end h-full px-3 text-text-secondary dark:text-text-secondary-dark">{rowData.created}</div>;
+  }
+  return null;
+}
+```

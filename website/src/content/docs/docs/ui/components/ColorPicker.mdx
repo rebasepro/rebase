@@ -1,0 +1,40 @@
+---
+title: ColorPicker
+sidebar_label: ColorPicker
+description: ColorPicker — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { ColorPicker } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `"blue" \| "cyan" \| "teal" \| "green" \| "yellow" \| "orange" \| "red" \| "pink" \| "purple" \| "gray" \| "indigo" \| "violet" \| "fuchsia" \| "rose" \| "emerald" \| "blueLighter" \| (string & {}) /* +59 more */` | — | Currently selected color key |
+| `onChange` | `(colorKey: ChipColorKey \| undefined) => void` | yes | Callback when color selection changes. Passes undefined when "Auto" is selected. |
+| `size` | `"small" \| "medium"` | — | Size of the color swatches |
+| `allowClear` | `boolean` | — | Whether to show the "Auto" option that clears the selection |
+| `disabled` | `boolean` | — | Whether the picker is disabled |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { ColorPicker } from "@rebasepro/ui";
+
+export const SelectedAndAuto = () => (
+    <div className="flex gap-8 p-4">
+        <div>
+            <div className="text-xs font-mono text-surface-500 mb-2">selected = &quot;violet&quot;</div>
+            <ColorPicker value="violet" onChange={() => {}}/>
+        </div>
+        <div>
+            <div className="text-xs font-mono text-surface-500 mb-2">auto (no selection)</div>
+            <ColorPicker value={undefined} onChange={() => {}}/>
+        </div>
+    </div>
+);
+```

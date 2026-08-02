@@ -1,0 +1,46 @@
+---
+title: Menubar
+sidebar_label: Menubar
+description: Menubar — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Menubar } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `onSelect` | `(event: React.SyntheticEvent) => void` | — |  |
+| `value` | `string` | — | Value of the open menu, controlled. Pair with `onValueChange`. |
+| `defaultValue` | `string` | — | Value of the menu open on mount, uncontrolled. |
+| `onValueChange` | `(value: string) => void` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Closed = () => (
+    <div className="p-4">
+        <Menubar>
+            <MenubarMenu>
+                <MenubarTrigger>File</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>Edit</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>View</MenubarTrigger>
+            </MenubarMenu>
+            <MenubarMenu>
+                <MenubarTrigger>Help</MenubarTrigger>
+            </MenubarMenu>
+        </Menubar>
+    </div>
+);
+```

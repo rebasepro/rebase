@@ -1,0 +1,55 @@
+---
+title: TextField
+sidebar_label: TextField
+description: TextField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { TextField } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `type` | `"number" \| "search" \| "time" \| "text" \| "color" \| "url" \| "email" \| "date" \| "phone" \| "password" \| "datetime-local" \| "month" \| "week"` | — |  |
+| `value` | `T` | — |  |
+| `onChange` | `((event: React.ChangeEvent<HTMLInputElement \| HTMLTextAreaElement>) => void) & React.ChangeEventHandler<HTMLInputElement, HTMLInputElement>` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `multiline` | `boolean` | — |  |
+| `disabled` | `boolean` | — |  |
+| `invisible` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `endAdornment` | `React.ReactNode` | — |  |
+| `autoFocus` | `boolean` | — |  |
+| `placeholder` | `string` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `className` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `inputClassName` | `string` | — |  |
+| `inputStyle` | `React.CSSProperties` | — |  |
+| `inputRef` | `((instance: any) => void) \| React.RefObject<any>` | — |  |
+| `maxRows` | `string \| number` | — | Maximum number of rows to display. |
+| `minRows` | `string \| number` | — | Minimum number of rows to display. |
+| `id` | `string` | — |  |
+| `children` | `React.ReactNode` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { TextField } from "@rebasepro/ui";
+
+export const States = () => (
+    <div className="flex flex-col gap-3 w-[320px] p-4">
+        <TextField label="Default" placeholder="Type something…"/>
+        <TextField label="With value" value="Filled value" onChange={() => {}}/>
+        <TextField label="Error state" error value="Bad value" onChange={() => {}}/>
+        <TextField label="Disabled" disabled value="Read only" onChange={() => {}}/>
+    </div>
+);
+
+// All four sizes. The reference view keeps these together deliberately: a
+// labelled `small` field once shipped with its label on top of its placeholder.
+```

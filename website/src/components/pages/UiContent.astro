@@ -6,7 +6,6 @@ import { languages, defaultLang, useTranslations } from '../../i18n/ui';
 
 
 import { NeatBackground } from '../../components/NeatBackground';
-import ClientUIComponentsShowcase from '../../components/ClientUIComponentsShowcase.tsx';
 import { ReactExtMiniDemo } from '../../components/demos/ReactExtMiniDemo.tsx';
 import { UIReferenceView } from '@rebasepro/app';
 
@@ -39,67 +38,51 @@ import { UIReferenceView } from '@rebasepro/app';
       </div>
     </section>
 
-    <!-- UI Components Showcase Section -->
- <section class="py-16 sm:py-24">
-      <div class="mx-auto max-w-7xl px-6 lg:px-8">
-        <div id="showcase-container" class="relative min-h-[600px]">
-          <!-- Loading indicator -->
-          <div id="showcase-loading" class="absolute inset-0 flex flex-col items-center justify-center gap-4">
-            <div class="relative w-16 h-16">
-              <div class="absolute inset-0 border-4 border-surface-800 rounded-full"></div>
-              <div class="absolute inset-0 border-4 border-orange-500 rounded-full border-t-transparent animate-spin"></div>
-            </div>
-            <p class="text-surface-400 text-lg">Loading UI Components...</p>
+    <!-- Install + pointer to the generated reference.
+         The exhaustive per-component gallery that used to sit here is now the
+         docs reference under /docs/ui — generated from the library's own types
+         and render-verified examples, so it cannot drift from the package the
+         way a hand-written gallery does. This page keeps the pitch and the
+         real screens below; the reference lives where people look things up
+         while building. -->
+    <section class="py-16 sm:py-24 border-t border-surface-800">
+      <div class="mx-auto max-w-4xl px-6 lg:px-8">
+        <div class="grid gap-8 md:grid-cols-2 md:items-center">
+          <div>
+            <h2 class="text-2xl font-semibold tracking-tight text-white mb-3">Install it</h2>
+            <p class="text-surface-400 mb-5">
+              Already a dependency of every Rebase admin panel. Add it directly when you are
+              building extensions in a separate package.
+            </p>
+            <pre class="rounded-lg border border-surface-800 bg-surface-950 px-4 py-3 font-mono text-sm text-surface-200 overflow-x-auto"><code>npm install @rebasepro/ui</code></pre>
           </div>
-
-          <ClientUIComponentsShowcase client:only="react" docsUrl="https://rebase.pro" linksInNewTab={true} />
+          <div>
+            <h2 class="text-2xl font-semibold tracking-tight text-white mb-3">Component reference</h2>
+            <p class="text-surface-400 mb-5">
+              Every component, with its real prop types and a working example — searchable,
+              and generated from the library itself.
+            </p>
+            <a href="/docs/ui/components/"
+               class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary border border-transparent px-6 py-0 min-h-(--control-large) text-base font-medium text-white hover:bg-primary-dark transition-colors">
+              Browse the components
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
     </section>
 
-    <script>
-      // Hide loading indicator once the component is visible
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const container = entry.target;
-            // Check if component has rendered by looking for its content
-            const checkLoaded = setInterval(() => {
-              const hasContent = container.querySelector('.max-w-6xl');
-              if (hasContent) {
-                const loader = document.getElementById('showcase-loading');
-                if (loader) {
-                  loader.style.opacity = '0';
-                  loader.style.transition = 'opacity 0.3s ease-out';
-                  setTimeout(() => loader.remove(), 300);
-                }
-                clearInterval(checkLoaded);
-                observer.disconnect();
-              }
-            }, 100);
-
-            // Fallback: remove loader after 3 seconds anyway
-            setTimeout(() => {
-              clearInterval(checkLoaded);
-              const loader = document.getElementById('showcase-loading');
-              if (loader) loader.remove();
-            }, 3000);
-          }
-        });
-      });
-
-      const container = document.getElementById('showcase-container');
-      if (container) observer.observe(container);
-    </script>
 
     <!-- UI Reference View Section -->
  <section class="py-16 sm:py-24 border-t border-surface-800">
       <div class="mx-auto max-w-7xl px-6 lg:px-8 mb-8">
         <h2 class="text-2xl font-semibold tracking-tight text-white mb-2">
-          Design System Reference
+          How the panel is composed
         </h2>
         <p class="text-surface-400 text-sm">
-          Full component reference with real UI patterns used across the app.
+          The same components assembled into the screens the admin panel actually ships — drawer, app bar, tabs, management views. Per-component props and examples live in the <a href="/docs/ui/components/" class="text-primary hover:underline">docs reference</a>.
         </p>
       </div>
       <div class="mx-auto max-w-7xl px-6 lg:px-8">

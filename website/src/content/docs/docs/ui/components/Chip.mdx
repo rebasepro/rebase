@@ -1,0 +1,36 @@
+---
+title: Chip
+sidebar_label: Chip
+description: Chip — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Chip } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `colorScheme` | `"blue" \| "teal" \| "yellow" \| "pink" \| "purple" \| "cyan" \| "orange" \| "green" \| "red" \| "gray" \| "indigo" \| "violet" \| "fuchsia" \| "rose" \| "emerald"` | — | One of the 15 CHIP_COLORS keys, or a full scheme object. |
+| `size` | `"smallest" \| "small" \| "medium" \| "large"` | — |  |
+| `outlined` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `icon` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `onClick` | `React.MouseEventHandler<HTMLDivElement>` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Chip, TagIcon } from "@rebasepro/ui";
+
+export const ColorSchemes = () => (
+    <div className="flex flex-wrap gap-2 p-4 max-w-[520px]">
+        {SCHEMES.map(s => <Chip key={s} colorScheme={s}>{s}</Chip>)}
+    </div>
+);
+```

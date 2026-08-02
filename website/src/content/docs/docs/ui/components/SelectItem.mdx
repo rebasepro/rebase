@@ -1,0 +1,37 @@
+---
+title: SelectItem
+sidebar_label: SelectItem
+description: SelectItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { SelectItem } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `T` | yes |  |
+| `children` | `React.ReactNode` | — |  |
+| `disabled` | `boolean` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Select, SelectItem } from "@rebasepro/ui";
+
+export const InOpenSelect = () => (
+    <div className="w-[280px] p-4 h-[300px]">
+        <Select open label="Status" value="published" onValueChange={() => {}} onOpenChange={() => {}}>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+            <SelectItem value="deleted" disabled>Deleted</SelectItem>
+        </Select>
+    </div>
+);
+```

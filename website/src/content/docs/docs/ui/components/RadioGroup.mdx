@@ -1,0 +1,49 @@
+---
+title: RadioGroup
+sidebar_label: RadioGroup
+description: RadioGroup — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { RadioGroup } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `name` | `string` | — |  |
+| `required` | `boolean` | — |  |
+| `disabled` | `boolean` | — |  |
+| `loop` | `boolean` | — | Whether keyboard navigation should loop around |
+| `defaultValue` | `string` | — |  |
+| `value` | `string` | — |  |
+| `onValueChange` | `(value: string) => void` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { RadioGroup, RadioGroupItem, Label } from "@rebasepro/ui";
+
+export const Basic = () => (
+    <RadioGroup value="pro" onValueChange={() => {}} className="flex flex-col gap-3 p-4">
+        <div className="flex items-center gap-2">
+            <RadioGroupItem value="free" id="plan-free"/>
+            <Label htmlFor="plan-free">Free — 1 project</Label>
+        </div>
+        <div className="flex items-center gap-2">
+            <RadioGroupItem value="pro" id="plan-pro"/>
+            <Label htmlFor="plan-pro">Pro — unlimited projects</Label>
+        </div>
+        <div className="flex items-center gap-2">
+            <RadioGroupItem value="team" id="plan-team"/>
+            <Label htmlFor="plan-team">Team — shared workspaces</Label>
+        </div>
+    </RadioGroup>
+);
+```

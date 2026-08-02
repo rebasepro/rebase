@@ -1,0 +1,35 @@
+---
+title: CircularProgress
+sidebar_label: CircularProgress
+description: CircularProgress — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { CircularProgress } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { CircularProgress, Typography } from "@rebasepro/ui";
+
+export const Sizes = () => (
+    <div className="flex gap-6 items-end p-4">
+        {(["smallest", "small", "medium", "large"] as const).map(s => (
+            <div key={s} className="flex flex-col items-center gap-1">
+                <CircularProgress size={s}/>
+                <Typography variant="caption" color="secondary">{s}</Typography>
+            </div>
+        ))}
+    </div>
+);
+```

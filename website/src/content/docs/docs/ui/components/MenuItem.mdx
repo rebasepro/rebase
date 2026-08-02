@@ -1,0 +1,39 @@
+---
+title: MenuItem
+sidebar_label: MenuItem
+description: MenuItem — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { MenuItem } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `dense` | `boolean` | — |  |
+| `disabled` | `boolean` | — |  |
+| `onClick` | `(event: React.MouseEvent) => void` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Menu, MenuItem, IconButton, MoreVerticalIcon, CopyIcon, Trash2Icon, KeyRoundIcon, SettingsIcon } from "@rebasepro/ui";
+
+export const Default = () => (
+    <div className="p-4 h-[280px]">
+        <Menu defaultOpen align="start" trigger={<IconButton size="small" aria-label="Row actions"><MoreVerticalIcon size={16}/></IconButton>}>
+            <MenuItem><KeyRoundIcon size={16}/> Rotate key</MenuItem>
+            <MenuItem><CopyIcon size={16}/> Copy ID</MenuItem>
+            <MenuItem disabled><Trash2Icon size={16}/> Revoke (owner only)</MenuItem>
+        </Menu>
+    </div>
+);
+
+// Dense variant — compact rows for tight contexts like a table row menu.
+```

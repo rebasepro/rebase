@@ -1,0 +1,59 @@
+---
+title: MultiSelect
+sidebar_label: MultiSelect
+description: MultiSelect — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { MultiSelect } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `modalPopover` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `open` | `boolean` | — |  |
+| `name` | `string` | — |  |
+| `id` | `string` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `value` | `T[]` | — |  |
+| `inputClassName` | `string` | — |  |
+| `onChange` | `(event: React.ChangeEvent<HTMLSelectElement, Element>) => void` | — |  |
+| `onValueChange` | `(updatedValue: T[]) => void` | — |  |
+| `placeholder` | `React.ReactNode` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `useChips` | `boolean` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `disabled` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `position` | `"item-aligned" \| "popper"` | — |  |
+| `endAdornment` | `React.ReactNode` | — |  |
+| `multiple` | `boolean` | — |  |
+| `includeSelectAll` | `boolean` | — |  |
+| `includeClear` | `boolean` | — |  |
+| `inputRef` | `React.Ref` | — |  |
+| `padding` | `boolean` | — |  |
+| `invisible` | `boolean` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `renderValues` | `(values: T[]) => React.ReactNode` | — |  |
+| `portalContainer` | `HTMLElement` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { MultiSelect, MultiSelectItem } from "@rebasepro/ui";
+
+export const Basic = () => (
+    <div className="w-[300px] p-4">
+        <MultiSelect label="Roles" value={["admin", "editor"]} onValueChange={() => {}}>
+            <MultiSelectItem value="admin">Admin</MultiSelectItem>
+            <MultiSelectItem value="editor">Editor</MultiSelectItem>
+            <MultiSelectItem value="viewer">Viewer</MultiSelectItem>
+        </MultiSelect>
+    </div>
+);
+```

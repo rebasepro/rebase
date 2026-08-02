@@ -1,0 +1,57 @@
+---
+title: DialogContent
+sidebar_label: DialogContent
+description: DialogContent — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { DialogContent } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `align` | `"center" \| "inherit" \| "left" \| "right" \| "justify"` | — |  |
+| `children` | `React.ReactNode` | yes |  |
+| `className` | `string` | — |  |
+| `component` | `"span"` | — |  |
+| `gutterBottom` | `boolean` | — |  |
+| `noWrap` | `boolean` | — |  |
+| `paragraph` | `boolean` | — |  |
+| `variant` | `"button" \| "caption" \| "h1" \| "h2" \| "h3" \| "h4" \| "h5" \| "h6" \| "label" \| "inherit" \| "subtitle1" \| "subtitle2" \| "body1" \| "body2"` | — |  |
+| `variantMapping` | `{ [key: string]: string; }` | — |  |
+| `color` | `"inherit" \| "disabled" \| "error" \| "primary" \| "secondary" \| "initial"` | — |  |
+| `onClick` | `React.ReactEventHandler<HTMLElement> & React.MouseEventHandler<HTMLSpanElement>` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `id` | `string` | — |  |
+| `includeMargin` | `boolean` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Button } from "@rebasepro/ui";
+
+export const Default = () => (
+    <div className="p-4 h-[320px]">
+        <Dialog open onOpenChange={() => {}} maxWidth="md">
+            <DialogTitle>Rotate encryption key</DialogTitle>
+            <DialogContent>
+                <Typography variant="body2" color="secondary">
+                    Rotating the cluster encryption key re-wraps every secret in the
+                    project. Existing deploys keep running; new ones use the new key.
+                </Typography>
+            </DialogContent>
+            <DialogActions>
+                <Button variant="text">Cancel</Button>
+                <Button variant="filled">Rotate key</Button>
+            </DialogActions>
+        </Dialog>
+    </div>
+);
+
+// Longer body content, scrollable dialog — shows DialogContent's default
+// `my-8 mx-8` margin against a list of policy rows.
+```

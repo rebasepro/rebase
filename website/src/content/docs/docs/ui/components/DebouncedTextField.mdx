@@ -1,0 +1,48 @@
+---
+title: DebouncedTextField
+sidebar_label: DebouncedTextField
+description: DebouncedTextField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { DebouncedTextField } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `string \| number` | — | Same contract as TextField; commits its value on a debounce. |
+| `onChange` | `React.ChangeEventHandler<HTMLInputElement>` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `type` | `"text" \| "number" \| "search" \| "email" \| "url" \| "password" \| "date" \| "time" \| "datetime-local" \| "month" \| "week" \| "color" \| "phone"` | — |  |
+| `placeholder` | `string` | — |  |
+| `size` | `"smallest" \| "small" \| "medium" \| "large"` | — |  |
+| `multiline` | `boolean` | — |  |
+| `minRows` | `string \| number` | — |  |
+| `maxRows` | `string \| number` | — |  |
+| `disabled` | `boolean` | — |  |
+| `error` | `boolean` | — |  |
+| `invisible` | `boolean` | — |  |
+| `endAdornment` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `inputClassName` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { DebouncedTextField } from "@rebasepro/ui";
+
+export const LiveSearch = () => (
+    <div className="w-[320px] p-4">
+        <DebouncedTextField
+            label="Search records"
+            value="analytics"
+            onChange={() => {}}
+            placeholder="Type to filter…"
+        />
+    </div>
+);
+```

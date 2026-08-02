@@ -1,0 +1,66 @@
+---
+title: Sheet
+sidebar_label: Sheet
+description: Sheet — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Sheet } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | yes |  |
+| `open` | `boolean` | yes |  |
+| `title` | `string` | — |  |
+| `modal` | `boolean` | — |  |
+| `includeBackgroundOverlay` | `boolean` | — |  |
+| `side` | `"left" \| "right" \| "top" \| "bottom"` | — |  |
+| `darkBackground` | `boolean` | — |  |
+| `transparent` | `boolean` | — |  |
+| `onOpenChange` | `(open: boolean) => void` | — |  |
+| `onPointerDownOutside` | `(e: Event) => void` | — |  |
+| `onInteractOutside` | `(e: Event) => void` | — |  |
+| `className` | `string` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+| `overlayClassName` | `string` | — |  |
+| `overlayZIndex` | `string` | — |  |
+| `overlayStyle` | `React.CSSProperties` | — |  |
+| `portalContainer` | `HTMLElement` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Sheet, Typography, TextField, MultiSelect, MultiSelectItem, Button, LoadingButton, IconButton, XIcon, Checkbox } from "@rebasepro/ui";
+
+export const RightPanel = () => (
+    <div className="p-4 h-[320px]">
+        <Sheet open onOpenChange={() => {}} side="right" title="Edit user">
+            <div className="w-96 h-full flex flex-col">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-surface-200 dark:border-surface-800">
+                    <Typography variant="h5">Edit user</Typography>
+                    <IconButton size="small" aria-label="Close"><XIcon size={16}/></IconButton>
+                </div>
+                <div className="flex-grow p-6 flex flex-col gap-4 overflow-y-auto">
+                    <TextField label="Name" value="Alice Johnson" onChange={() => {}}/>
+                    <TextField label="Email" value="alice@example.com" onChange={() => {}}/>
+                    <MultiSelect label="Roles" value={["admin"]} onValueChange={() => {}}>
+                        <MultiSelectItem value="admin">Admin</MultiSelectItem>
+                        <MultiSelectItem value="editor">Editor</MultiSelectItem>
+                    </MultiSelect>
+                </div>
+                <div className="px-6 py-4 border-t border-surface-200 dark:border-surface-800 flex justify-end gap-2">
+                    <Button variant="text">Cancel</Button>
+                    <LoadingButton variant="filled" loading={false}>Save</LoadingButton>
+                </div>
+            </div>
+        </Sheet>
+    </div>
+);
+
+// Left-side navigation panel — sweeps the `side` prop.
+```

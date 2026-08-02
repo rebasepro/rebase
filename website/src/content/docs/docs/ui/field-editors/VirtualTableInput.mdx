@@ -1,0 +1,42 @@
+---
+title: VirtualTableInput
+sidebar_label: VirtualTableInput
+description: VirtualTableInput — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { VirtualTableInput } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `error` | `Error` | — |  |
+| `value` | `string` | yes |  |
+| `multiline` | `boolean` | — |  |
+| `focused` | `boolean` | yes |  |
+| `disabled` | `boolean` | yes |  |
+| `updateValue` | `(newValue: (string \| null)) => void` | yes |  |
+| `onBlur` | `() => void` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { VirtualTableInput, cls } from "@rebasepro/ui";
+
+export function FocusedTextCell() {
+  return (
+    <CellShell selected width={260}>
+      <VirtualTableInput
+        value="Add authentication middleware to /api routes"
+        focused
+        disabled={false}
+        updateValue={() => {}}
+      />
+    </CellShell>
+  );
+}
+```

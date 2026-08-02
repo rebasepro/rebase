@@ -1,0 +1,47 @@
+---
+title: VirtualTableDateField
+sidebar_label: VirtualTableDateField
+description: VirtualTableDateField — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { VirtualTableDateField } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | `string` | — |  |
+| `error` | `Error` | — |  |
+| `mode` | `"date" \| "date_time"` | — |  |
+| `timezone` | `string` | — |  |
+| `internalValue` | `Date` | yes |  |
+| `updateValue` | `(newValue: (Date \| null)) => void` | yes |  |
+| `focused` | `boolean` | yes |  |
+| `disabled` | `boolean` | yes |  |
+| `small` | `boolean` | — |  |
+| `locale` | `string` | — |  |
+| `onBlur` | `React.FocusEventHandler<HTMLInputElement \| HTMLTextAreaElement>` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { VirtualTableDateField, cls } from "@rebasepro/ui";
+
+export function DueDateCell() {
+  return (
+    <CellShell selected width={180} height={64}>
+      <VirtualTableDateField
+        mode="date"
+        internalValue={new Date(2026, 7, 15)}
+        focused
+        disabled={false}
+        updateValue={() => {}}
+      />
+    </CellShell>
+  );
+}
+```

@@ -1,0 +1,44 @@
+---
+title: BooleanSwitchWithLabel
+sidebar_label: BooleanSwitchWithLabel
+description: BooleanSwitchWithLabel — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { BooleanSwitchWithLabel } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `value` | `boolean` | yes |  |
+| `className` | `string` | — |  |
+| `disabled` | `boolean` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `allowIndeterminate` | `boolean` | — |  |
+| `onValueChange` | `((newValue: boolean \| null) => void) \| ((newValue: boolean) => void)` | — |  |
+| `position` | `"end" \| "start"` | — |  |
+| `invisible` | `boolean` | — |  |
+| `label` | `React.ReactNode` | — |  |
+| `error` | `boolean` | — |  |
+| `autoFocus` | `boolean` | — |  |
+| `fullWidth` | `boolean` | — |  |
+| `inputClassName` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { BooleanSwitchWithLabel } from "@rebasepro/ui";
+
+export const States = () => (
+    <div className="flex flex-col gap-3 w-[340px] p-4">
+        <BooleanSwitchWithLabel value label="Enable row level security" onValueChange={() => {}}/>
+        <BooleanSwitchWithLabel value={false} label="Allow public sign-up" onValueChange={() => {}}/>
+        <BooleanSwitchWithLabel value disabled label="Managed by the platform" onValueChange={() => {}}/>
+        <BooleanSwitchWithLabel value={false} error label="Requires a valid encryption key" onValueChange={() => {}}/>
+    </div>
+);
+```

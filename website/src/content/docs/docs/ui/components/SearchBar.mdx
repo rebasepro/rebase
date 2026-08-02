@@ -1,0 +1,40 @@
+---
+title: SearchBar
+sidebar_label: SearchBar
+description: SearchBar — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { SearchBar } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `onClick` | `() => void` | — |  |
+| `onTextSearch` | `(searchString?: string) => void` | — |  |
+| `placeholder` | `string` | — |  |
+| `expandable` | `boolean` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — | Size of the search bar. - "small": 32px height (matches TextField small) - "medium": 44px height (matches TextField medi |
+| `innerClassName` | `string` | — |  |
+| `className` | `string` | — |  |
+| `autoFocus` | `boolean` | — |  |
+| `disabled` | `boolean` | — |  |
+| `loading` | `boolean` | — |  |
+| `inputRef` | `React.Ref` | — |  |
+| `initialValue` | `string` | — | Optional initial value for the search input, e.g. from URL params. |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { SearchBar } from "@rebasepro/ui";
+
+export const Basic = () => (
+    <div className="w-[380px] p-4">
+        <SearchBar placeholder="Search entities…"/>
+    </div>
+);
+```

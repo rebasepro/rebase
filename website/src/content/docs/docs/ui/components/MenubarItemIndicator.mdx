@@ -1,0 +1,51 @@
+---
+title: MenubarItemIndicator
+sidebar_label: MenubarItemIndicator
+description: MenubarItemIndicator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { MenubarItemIndicator } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const OnCheckboxItem = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[220px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>View</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarCheckboxItem checked onCheckedChange={() => {}}>
+                                <MenubarItemIndicator/>
+                                Table editor
+                            </MenubarCheckboxItem>
+                            <MenubarCheckboxItem checked={false} onCheckedChange={() => {}}>
+                                <MenubarItemIndicator/>
+                                Query logs
+                            </MenubarCheckboxItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+
+// The same indicator on a selected radio item.
+```

@@ -1,0 +1,45 @@
+---
+title: IconButton
+sidebar_label: IconButton
+description: IconButton — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { IconButton } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `size` | `"small" \| "smallest" \| "medium" \| "large"` | — |  |
+| `variant` | `"filled" \| "ghost"` | — |  |
+| `shape` | `"circular" \| "square"` | — |  |
+| `disabled` | `boolean` | — |  |
+| `toggled` | `boolean` | — |  |
+| `component` | `C` | — |  |
+| `onClick` | `React.MouseEventHandler<any>` | — |  |
+| `aria-label` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Sizes = () => (
+    <div className="flex flex-wrap gap-3 items-center p-4">
+        {([
+            { s: "smallest" as const, size: 14 },
+            { s: "small" as const, size: 16 },
+            { s: "medium" as const, size: 20 },
+            { s: "large" as const, size: 24 }
+        ]).map(({ s, size }) => (
+            <div key={s} className="flex flex-col items-center gap-1">
+                <IconButton size={s} aria-label={`${s} edit`}><PencilIcon size={size}/></IconButton>
+                <span className="text-xs text-surface-500">{s}</span>
+            </div>
+        ))}
+    </div>
+);
+```

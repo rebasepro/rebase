@@ -1,0 +1,53 @@
+---
+title: ListView
+sidebar_label: ListView
+description: ListView — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { ListView } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `data` | `T[]` | yes | Virtualized list. Generic over the row type T. |
+| `renderRow` | `(params: { item: T; index: number; style: React.CSSProperties; className: string; selected: boolean; highlighted: boolean; isLast: boolean; onClick: (e: React.MouseEvent) => void; onSelectionChange: (selected: boolean) => void }) => React.ReactNode` | yes |  |
+| `dataLoading` | `boolean` | — |  |
+| `noMoreToLoad` | `boolean` | — |  |
+| `dataLoadingError` | `Error` | — |  |
+| `itemCount` | `number` | — |  |
+| `setItemCount` | `(itemCount: number) => void` | — |  |
+| `pageSize` | `number` | — |  |
+| `paginationEnabled` | `boolean` | — |  |
+| `onItemClick` | `(item: T) => void` | — |  |
+| `selectedIds` | `Set<string \| number>` | — |  |
+| `highlightedIds` | `Set<string \| number>` | — |  |
+| `selectedEntityId` | `string \| number` | — |  |
+| `selectionEnabled` | `boolean` | — |  |
+| `onSelectionChange` | `(item: T, selected: boolean) => void` | — |  |
+| `size` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — |  |
+| `emptyComponent` | `React.ReactNode` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export function ProjectList() {
+    return (
+        <div style={{ height: 420 }} className="w-full overflow-auto">
+            <ListView<SampleProject>
+                data={SAMPLE_PROJECTS}
+                dataLoading={false}
+                noMoreToLoad={true}
+                paginationEnabled={false}
+                size="l"
+                renderRow={renderRow}
+            />
+        </div>
+    );
+}
+```

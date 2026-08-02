@@ -1,0 +1,31 @@
+---
+title: Markdown
+sidebar_label: Markdown
+description: Markdown — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Markdown } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `source` | `string` | yes |  |
+| `size` | `"small" \| "medium" \| "large" \| "xl" \| "2xl"` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Markdown } from "@rebasepro/ui";
+
+export const Basic = () => (
+    <div className="p-4 w-96">
+        <Markdown source={readme}/>
+    </div>
+);
+```

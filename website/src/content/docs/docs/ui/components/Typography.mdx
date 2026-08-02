@@ -1,0 +1,45 @@
+---
+title: Typography
+sidebar_label: Typography
+description: Typography — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Typography } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `align` | `"center" \| "inherit" \| "left" \| "right" \| "justify"` | — |  |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+| `component` | `C` | — |  |
+| `gutterBottom` | `boolean` | — |  |
+| `noWrap` | `boolean` | — |  |
+| `paragraph` | `boolean` | — |  |
+| `variant` | `"button" \| "caption" \| "h1" \| "h2" \| "h3" \| "h4" \| "h5" \| "h6" \| "label" \| "inherit" \| "subtitle1" \| "subtitle2" \| "body1" \| "body2"` | — |  |
+| `variantMapping` | `{ [key: string]: string; }` | — |  |
+| `color` | `"inherit" \| "disabled" \| "error" \| "primary" \| "secondary" \| "initial"` | — |  |
+| `onClick` | `React.ReactEventHandler<HTMLElement>` | — |  |
+| `style` | `React.CSSProperties` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Typography } from "@rebasepro/ui";
+
+export const Scale = () => (
+    <div className="flex flex-col gap-3 p-4">
+        {(["h1", "h2", "h3", "h4", "h5", "h6", "subtitle1", "subtitle2", "body1", "body2", "caption", "label", "button"] as const).map(v => (
+            <div key={v} className="flex items-baseline gap-4 border-b border-surface-200 dark:border-surface-700 pb-3 last:border-0">
+                <span className="w-20 shrink-0 text-xs text-surface-400 font-mono">{v}</span>
+                <Typography variant={v}>The quick brown fox jumps over the lazy dog</Typography>
+            </div>
+        ))}
+    </div>
+);
+```

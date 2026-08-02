@@ -1,0 +1,40 @@
+---
+title: Portal
+sidebar_label: Portal
+description: Portal — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { Portal } from "@rebasepro/ui";
+```
+
+> This component takes no documented props, or its type could not be flattened. See the source.
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { Portal, Typography } from "@rebasepro/ui";
+
+export const TeleportedContent = () => {
+    const [container, setContainer] = React.useState<HTMLDivElement | null>(null);
+    return (
+        <div className="p-4 w-72">
+            <Typography variant="caption" color="secondary" className="block mb-2">Panel (rendered elsewhere in the tree)</Typography>
+            <div
+                ref={setContainer}
+                className="relative min-h-[64px] border border-dashed border-surface-300 dark:border-surface-700 rounded-lg p-3"
+            >
+                {container && (
+                    <Portal.Root container={container}>
+                        <div className="rounded-md bg-primary/10 text-primary dark:bg-primary/20 px-3 py-2 text-sm font-medium">
+                            Portaled node — mounted here via `container`
+                        </div>
+                    </Portal.Root>
+                )}
+            </div>
+        </div>
+    );
+};
+```

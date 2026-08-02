@@ -1,0 +1,47 @@
+---
+title: ResizablePanels
+sidebar_label: ResizablePanels
+description: ResizablePanels — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { ResizablePanels } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `firstPanel` | `React.ReactNode` | yes |  |
+| `secondPanel` | `React.ReactNode` | yes |  |
+| `showFirstPanel` | `boolean` | — | Whether the first panel is visible (e.g. Sidebar) |
+| `showSecondPanel` | `boolean` | — | Whether the second panel is visible (e.g. Results) |
+| `panelSizePercent` | `number` | yes | 0-100 representing the width/height of the first panel |
+| `onPanelSizeChange` | `(sizePercent: number) => void` | yes |  |
+| `minPanelSizePx` | `number` | — |  |
+| `orientation` | `"horizontal" \| "vertical"` | — |  |
+| `animateLayout` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `stacked` | `boolean` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { ResizablePanels, Typography, cls, defaultBorderMixin } from "@rebasepro/ui";
+
+export const Horizontal = () => (
+    <div className={cls("h-[280px] w-full border rounded-lg overflow-hidden", defaultBorderMixin)}>
+        <ResizablePanels
+            orientation="horizontal"
+            firstPanel={<SidebarPanel/>}
+            secondPanel={<ContentPanel/>}
+            panelSizePercent={28}
+            onPanelSizeChange={() => {}}
+        />
+    </div>
+);
+
+// Query editor over results, the stacked SQLEditor layout.
+```

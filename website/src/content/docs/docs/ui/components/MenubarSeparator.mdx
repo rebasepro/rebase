@@ -1,0 +1,55 @@
+---
+title: MenubarSeparator
+sidebar_label: MenubarSeparator
+description: MenubarSeparator — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { MenubarSeparator } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `className` | `string` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+
+export const Basic = () => {
+    const ref = React.useRef<HTMLDivElement>(null);
+    useOpenMenu(ref, 0);
+    return (
+        <div ref={ref} className="p-4 h-[320px]">
+            <Menubar>
+                <MenubarMenu>
+                    <MenubarTrigger>File</MenubarTrigger>
+                    <MenubarPortal>
+                        <MenubarContent>
+                            <MenubarItem>New table<MenubarShortcut>⌘N</MenubarShortcut></MenubarItem>
+                            <MenubarItem>Save<MenubarShortcut>⌘S</MenubarShortcut></MenubarItem>
+                            <MenubarSeparator/>
+                            <MenubarSub>
+                                <MenubarSubTrigger>
+                                    Export
+                                    <MenubarSubTriggerIndicator/>
+                                </MenubarSubTrigger>
+                            </MenubarSub>
+                            <MenubarSeparator/>
+                            <MenubarItem disabled>Close project</MenubarItem>
+                        </MenubarContent>
+                    </MenubarPortal>
+                </MenubarMenu>
+                <MenubarMenu>
+                    <MenubarTrigger>Edit</MenubarTrigger>
+                </MenubarMenu>
+            </Menubar>
+        </div>
+    );
+};
+```

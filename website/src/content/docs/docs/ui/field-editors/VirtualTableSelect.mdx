@@ -1,0 +1,52 @@
+---
+title: VirtualTableSelect
+sidebar_label: VirtualTableSelect
+description: VirtualTableSelect — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { VirtualTableSelect } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `options` | `VirtualTableSelectOption[]` | yes |  |
+| `error` | `Error` | — |  |
+| `multiple` | `boolean` | — |  |
+| `disabled` | `boolean` | yes |  |
+| `small` | `boolean` | — |  |
+| `value` | `string \| number \| string[] \| number[]` | yes |  |
+| `updateValue` | `(newValue: (string \| number \| string[] \| number[] \| null)) => void` | yes |  |
+| `focused` | `boolean` | yes |  |
+| `onBlur` | `React.FocusEventHandler<HTMLInputElement \| HTMLTextAreaElement>` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { VirtualTableSelect, cls } from "@rebasepro/ui";
+
+export function SingleSelectCell() {
+  return (
+    <CellShell selected width={200}>
+      <VirtualTableSelect
+        options={STATUS_OPTIONS}
+        value="active"
+        multiple={false}
+        focused
+        disabled={false}
+        updateValue={() => {}}
+      />
+    </CellShell>
+  );
+}
+
+const SCOPE_OPTIONS = [
+  { value: "read", label: "read" },
+  { value: "write", label: "write" },
+  { value: "admin", label: "admin" }
+];
+```

@@ -1,0 +1,41 @@
+---
+title: LoadingButton
+sidebar_label: LoadingButton
+description: LoadingButton — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { LoadingButton } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `children` | `React.ReactNode` | — |  |
+| `variant` | `"text" \| "filled" \| "outlined"` | — |  |
+| `disabled` | `boolean` | — |  |
+| `color` | `"text" \| "error" \| "primary" \| "secondary" \| "neutral"` | — |  |
+| `size` | `"small" \| "smallest" \| "medium" \| "large" \| "xl" \| "2xl"` | — |  |
+| `startIcon` | `React.ReactNode` | — |  |
+| `fullWidth` | `boolean` | — |  |
+| `className` | `string` | — |  |
+| `component` | `P` | — |  |
+| `onClick` | `React.MouseEventHandler<HTMLElement>` | — |  |
+| `loading` | `boolean` | — |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { LoadingButton, SaveIcon } from "@rebasepro/ui";
+
+export const States = () => (
+    <div className="flex flex-wrap gap-3 p-4">
+        <LoadingButton loading={true}>Saving…</LoadingButton>
+        <LoadingButton loading={false}>Idle</LoadingButton>
+        <LoadingButton disabled>Disabled</LoadingButton>
+    </div>
+);
+```

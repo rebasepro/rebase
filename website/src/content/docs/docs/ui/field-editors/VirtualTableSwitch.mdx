@@ -1,0 +1,40 @@
+---
+title: VirtualTableSwitch
+sidebar_label: VirtualTableSwitch
+description: VirtualTableSwitch — a component from @rebasepro/ui, the library the Rebase admin panel is built from.
+---
+
+```ts
+import { VirtualTableSwitch } from "@rebasepro/ui";
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `error` | `Error` | — |  |
+| `internalValue` | `boolean` | — |  |
+| `focused` | `boolean` | yes |  |
+| `disabled` | `boolean` | yes |  |
+| `updateValue` | `(newValue: (boolean \| null)) => void` | yes |  |
+
+## Example
+
+This is the example the design-system sync renders and verifies for this component.
+
+```tsx
+import { VirtualTableSwitch, cls } from "@rebasepro/ui";
+
+export function EnabledToggleCell() {
+  return (
+    <CellShell selected>
+      <VirtualTableSwitch
+        internalValue
+        focused
+        disabled={false}
+        updateValue={() => {}}
+      />
+    </CellShell>
+  );
+}
+```
