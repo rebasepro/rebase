@@ -15,8 +15,13 @@ import { Portal } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import React from "react";
 import { Portal, Typography } from "@rebasepro/ui";
 
+// Portal.Root teleports its children into another DOM node. To keep the
+// teleported content visible inside the preview card (instead of jumping to
+// document.body) we point it at a local container element, which mirrors how
+// consumers scope portals with an explicit `container`.
 export const TeleportedContent = () => {
     const [container, setContainer] = React.useState<HTMLDivElement | null>(null);
     return (

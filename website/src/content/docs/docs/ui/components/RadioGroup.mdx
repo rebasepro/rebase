@@ -30,6 +30,8 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { RadioGroup, RadioGroupItem, Label } from "@rebasepro/ui";
 
+// RadioGroupItem only renders inside a RadioGroup, and needs a paired Label
+// to be a plausible field — the canonical Radix composition.
 export const Basic = () => (
     <RadioGroup value="pro" onValueChange={() => {}} className="flex flex-col gap-3 p-4">
         <div className="flex items-center gap-2">

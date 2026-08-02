@@ -28,8 +28,10 @@ import { Button } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { Button, PlusIcon, Trash2Icon, DownloadIcon } from "@rebasepro/ui";
+import { Button } from "@rebasepro/ui";
 
+// Variant × color grid — ported from UIReferenceView's "Buttons" section,
+// extended with `outlined` (in ButtonProps but absent from the reference view).
 export const Variants = () => (
     <div className="flex flex-col gap-5 p-4">
         {(["filled", "outlined", "text"] as const).map(variant => (

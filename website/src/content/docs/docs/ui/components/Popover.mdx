@@ -36,7 +36,12 @@ import { Popover } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { Popover, Button, IconButton, TextField, Typography, Chip, SearchIcon, KeyRoundIcon } from "@rebasepro/ui";
+import { Popover, Button, TextField, Chip, SearchIcon } from "@rebasepro/ui";
+
+// Popover has no `defaultOpen` in the .d.ts, only controlled `open` — force
+// it with `open` + a no-op `onOpenChange`, same pattern as Select.
+// Content renders through a Radix portal and escapes the card, so this
+// needs cfg.overrides.Popover = { cardMode: "single", primaryStory: "FilterPopover" }.
 
 export const FilterPopover = () => (
     <div className="p-4 h-[320px] flex items-center justify-center">

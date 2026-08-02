@@ -20,7 +20,24 @@ import { PortalContainerProvider } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import React from "react";
 import { PortalContainerProvider, usePortalContainer, Portal, Typography } from "@rebasepro/ui";
+
+// A descendant that reads the container from context (exactly what Sheet and
+// Dialog do internally) and portals into it, instead of the default
+// document.body — this is the whole reason the provider exists: scoping
+// overlays to a specific DOM region (e.g. a modal's own content element).
+function ScopedBadge() {
+    const container = usePortalContainer();
+    if (!container) return null;
+    return (
+        <Portal.Root container={container}>
+            <div className="rounded-md bg-primary/10 text-primary dark:bg-primary/20 px-3 py-2 text-sm font-medium">
+                Rendered inside the provided container
+            </div>
+        </Portal.Root>
+    );
+}
 
 export const ScopedContainer = () => {
     const [container, setContainer] = React.useState<HTMLDivElement | null>(null);

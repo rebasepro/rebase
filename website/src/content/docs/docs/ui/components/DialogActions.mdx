@@ -22,7 +22,18 @@ import { DialogActions } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, LoadingButton } from "@rebasepro/ui";
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    LoadingButton
+} from "@rebasepro/ui";
+
+// DialogActions is the sticky/absolute footer bar of a Dialog — only
+// renders meaningfully inside one. Same portal-escape issue as Dialog.
+// Needs cfg.overrides.DialogActions = { cardMode: "single", primaryStory: "Default" }.
 
 export const Default = () => (
     <div className="p-4 h-[280px]">
@@ -36,10 +47,4 @@ export const Default = () => (
         </Dialog>
     </div>
 );
-
-// Non-translucent variant with a destructive action — sweeps `translucent`.
-// (position="absolute" takes the bar out of flow and overlaps the content
-// above it — that's the real component's own layout, not something a
-// static preview with short body text can show cleanly, so this sticks
-// with the default "sticky" position.)
 ```

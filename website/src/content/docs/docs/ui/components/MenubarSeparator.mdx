@@ -20,7 +20,31 @@ import { MenubarSeparator } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import React from "react";
+import {
+    Menubar,
+    MenubarMenu,
+    MenubarTrigger,
+    MenubarPortal,
+    MenubarContent,
+    MenubarItem,
+    MenubarSeparator,
+    MenubarShortcut,
+    MenubarSub,
+    MenubarSubTrigger,
+    MenubarSubTriggerIndicator
+} from "@rebasepro/ui";
 
+function useOpenMenu(ref: React.RefObject<HTMLDivElement>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+// The File menu groups its items into three visually distinct clusters —
+// creation, export, and the destructive action — with a separator between
+// each, the clearest showcase of the divider's job.
 export const Basic = () => {
     const ref = React.useRef<HTMLDivElement>(null);
     useOpenMenu(ref, 0);

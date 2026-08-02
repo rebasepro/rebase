@@ -28,8 +28,10 @@ import { ExpandablePanel } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { ExpandablePanel, Typography, CheckSquareIcon, FilterIcon } from "@rebasepro/ui";
+import { ExpandablePanel, Typography, CheckSquareIcon } from "@rebasepro/ui";
 
+// Ported from ValidationPanel: asField title with a leading icon, initially
+// expanded so the card shows the panel content rather than a bare header.
 export const Expanded = () => (
     <div className="p-4 w-80">
         <ExpandablePanel

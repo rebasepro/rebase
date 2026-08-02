@@ -41,6 +41,7 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { TextField } from "@rebasepro/ui";
 
+// Ported from UIReferenceView's "Form Inputs" section.
 export const States = () => (
     <div className="flex flex-col gap-3 w-[320px] p-4">
         <TextField label="Default" placeholder="Type something…"/>
@@ -49,7 +50,4 @@ export const States = () => (
         <TextField label="Disabled" disabled value="Read only" onChange={() => {}}/>
     </div>
 );
-
-// All four sizes. The reference view keeps these together deliberately: a
-// labelled `small` field once shipped with its label on top of its placeholder.
 ```

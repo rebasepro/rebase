@@ -29,8 +29,9 @@ import { LoadingButton } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { LoadingButton, SaveIcon } from "@rebasepro/ui";
+import { LoadingButton } from "@rebasepro/ui";
 
+// Ported from UIReferenceView's "LoadingButton" section.
 export const States = () => (
     <div className="flex flex-wrap gap-3 p-4">
         <LoadingButton loading={true}>Saving…</LoadingButton>

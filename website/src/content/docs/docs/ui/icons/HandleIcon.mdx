@@ -25,6 +25,10 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { HandleIcon, Typography } from "@rebasepro/ui";
 
+// The DS's own drag-handle icon. Takes IconProps like GitHubIcon does:
+// `size` is a number or an iconSize keyword, plus color/className/style/onClick.
+const SIZES = ["smallest", "small", "medium", "large"] as const;
+
 export function Sizes() {
     return (
         <div className="flex items-end gap-4 p-4">

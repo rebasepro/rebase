@@ -22,8 +22,11 @@ import { ToggleButtonGroup } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { ToggleButtonGroup, ListIcon, LayoutGridIcon, KanbanIcon } from "@rebasepro/ui";
+import { ToggleButtonGroup } from "@rebasepro/ui";
 
+// Contract fixed by the orchestrator (generics dropped by the .d.ts
+// extractor): { value, onValueChange, options: { value, label, icon?,
+// disabled? }[], className? }.
 export const Basic = () => (
     <div className="p-4">
         <ToggleButtonGroup

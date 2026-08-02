@@ -23,8 +23,13 @@ import { Tab } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { Tabs, Tab, cls, defaultBorderMixin, Button } from "@rebasepro/ui";
+import { Tabs, Tab } from "@rebasepro/ui";
 
+// Tab only renders as a child of Tabs (reads its `variant` from Tabs'
+// internal context) — full parent composition below. Tabs is not
+// portaled, so this renders inline and doesn't need cardMode overrides.
+
+// Standard variant with a disabled tab, sweeping the `disabled` prop.
 export const StandardWithDisabled = () => (
     <div className="p-4">
         <Tabs value="overview" onValueChange={() => {}}>
@@ -34,7 +39,4 @@ export const StandardWithDisabled = () => (
         </Tabs>
     </div>
 );
-
-// Boxy toolbar tabs with leading icons, ported from UIReferenceView's
-// "Toolbar Tabs" SQL-editor pattern.
 ```

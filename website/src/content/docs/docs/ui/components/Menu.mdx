@@ -28,7 +28,10 @@ import { Menu } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import { Avatar, Menu, MenuItem, Typography, SettingsIcon, LogOutIcon } from "@rebasepro/ui";
 
+// Open by default so the card shows the menu surface rather than a bare
+// trigger. Ported from UIReferenceView's App Bar section (DefaultAppBar).
 export const AccountMenu = () => (
     <div className="p-4 h-[320px]">
         <Menu defaultOpen align="start" trigger={<Avatar>A</Avatar>}>

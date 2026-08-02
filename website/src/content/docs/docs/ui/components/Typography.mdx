@@ -32,6 +32,8 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { Typography } from "@rebasepro/ui";
 
+// The full type scale. Ported from UIReferenceView's "Typography" section —
+// the pangram is what makes the Instrument Sans / Inter split legible.
 export const Scale = () => (
     <div className="flex flex-col gap-3 p-4">
         {(["h1", "h2", "h3", "h4", "h5", "h6", "subtitle1", "subtitle2", "body1", "body2", "caption", "label", "button"] as const).map(v => (

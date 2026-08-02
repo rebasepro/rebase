@@ -25,6 +25,10 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { ColorPicker } from "@rebasepro/ui";
 
+// Real props read from packages/ui/src/components/ColorPicker.tsx (the
+// emitted .d.ts leaves ChipColorKey unresolved):
+//   value?: string; onChange: (colorKey: string | undefined) => void;
+//   size?: "small" | "medium"; allowClear?: boolean; disabled?: boolean;
 export const SelectedAndAuto = () => (
     <div className="flex gap-8 p-4">
         <div>

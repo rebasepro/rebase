@@ -25,6 +25,15 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { GitHubIcon, Typography } from "@rebasepro/ui";
 
+const SIZES = [16, 24, 32, 48];
+
+const COLORS: { label: string; className: string }[] = [
+    { label: "default", className: "text-surface-900 dark:text-surface-50" },
+    { label: "primary", className: "text-primary" },
+    { label: "secondary", className: "text-surface-500" },
+    { label: "error", className: "text-red-500" }
+];
+
 export function SizesAndColors() {
     return (
         <div className="flex flex-col gap-4 w-full">

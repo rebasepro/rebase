@@ -24,6 +24,24 @@ import { MenubarContent } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import React from "react";
+import {
+    Menubar,
+    MenubarMenu,
+    MenubarTrigger,
+    MenubarPortal,
+    MenubarContent,
+    MenubarItem,
+    MenubarSeparator,
+    MenubarShortcut
+} from "@rebasepro/ui";
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
 
 export const Basic = () => {
     const ref = React.useRef<HTMLDivElement>(null);
@@ -50,7 +68,4 @@ export const Basic = () => {
         </div>
     );
 };
-
-// align="end" — content hangs from the right edge of its trigger instead
-// of the left, useful for a trigger near the bar's right edge.
 ```

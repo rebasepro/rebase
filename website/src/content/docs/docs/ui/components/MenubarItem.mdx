@@ -23,6 +23,23 @@ import { MenubarItem } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import React from "react";
+import {
+    Menubar,
+    MenubarMenu,
+    MenubarTrigger,
+    MenubarPortal,
+    MenubarContent,
+    MenubarItem,
+    MenubarShortcut
+} from "@rebasepro/ui";
+
+function useOpenMenu(ref: React.RefObject<HTMLDivElement>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
 
 export const Basic = () => {
     const ref = React.useRef<HTMLDivElement>(null);

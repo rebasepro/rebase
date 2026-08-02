@@ -26,6 +26,8 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { RadioGroup, RadioGroupItem, Label } from "@rebasepro/ui";
 
+// RadioGroupItem only renders inside a RadioGroup — full parent composition,
+// focused on item-level render states rather than group-level layout.
 export const CheckedAndUnchecked = () => (
     <RadioGroup value="email" onValueChange={() => {}} className="flex flex-col gap-3 p-4">
         <div className="flex items-center gap-2">
@@ -38,6 +40,4 @@ export const CheckedAndUnchecked = () => (
         </div>
     </RadioGroup>
 );
-
-// Item-level disabled — one item disabled inside an otherwise enabled group.
 ```

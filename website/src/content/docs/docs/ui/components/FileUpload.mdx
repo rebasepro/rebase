@@ -28,7 +28,13 @@ import { FileUpload } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { FileUpload, Typography, Chip, UploadCloudIcon, FileTextIcon, XIcon, IconButton, cls, defaultBorderMixin } from "@rebasepro/ui";
+import { FileUpload, UploadCloudIcon } from "@rebasepro/ui";
+
+// FileUpload's .d.ts has no `children` prop (the source's PropsWithChildren
+// wrapper didn't survive extraction) — stick to `title`/`uploadDescription`,
+// the documented content slots, rather than porting a `children` usage.
+// It previously rendered blank on the floor card; the fix is giving it
+// real `uploadDescription`/`title` content and a non-zero footprint.
 
 export const Idle = () => (
     <div className="p-4 w-full max-w-md">
@@ -42,6 +48,4 @@ export const Idle = () => (
         />
     </div>
 );
-
-// Compact size for tight forms (e.g. an inline logo/avatar uploader).
 ```

@@ -24,7 +24,12 @@ import { Tabs } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { Tabs, Tab, Typography, IconButton, SettingsIcon, cls, defaultBorderMixin } from "@rebasepro/ui";
+import { Tabs, Tab } from "@rebasepro/ui";
+
+// The .d.ts only lists `variant?: "standard" | "boxy" | "pill"` — no
+// "default". UIReferenceView labels its first example "variant=\"default\""
+// but never actually passes that string; it just omits `variant`, which
+// defaults to "standard". Sweeping standard/boxy/pill below.
 
 export const Standard = () => (
     <div className="p-4">
@@ -35,7 +40,4 @@ export const Standard = () => (
         </Tabs>
     </div>
 );
-
-// Editor-sidebar pattern (SQLEditorSidebar / RLSEditor): boxy tab bar +
-// section header, ported from UIReferenceView's "Tabs" section.
 ```

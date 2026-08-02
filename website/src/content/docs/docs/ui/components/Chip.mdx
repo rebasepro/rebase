@@ -26,7 +26,13 @@ import { Chip } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { Chip, TagIcon } from "@rebasepro/ui";
+import { Chip } from "@rebasepro/ui";
+
+// The 15 real CHIP_COLORS keys. NOTE: UIReferenceView passes "purpleDark" /
+// "blueDark", which are NOT keys of CHIP_COLORS — those chips fall through to
+// the default scheme. Use the keys below.
+const SCHEMES = ["blue", "teal", "red", "green", "yellow", "orange", "purple",
+    "pink", "cyan", "indigo", "violet", "fuchsia", "rose", "emerald", "gray"] as const;
 
 export const ColorSchemes = () => (
     <div className="flex flex-wrap gap-2 p-4 max-w-[520px]">

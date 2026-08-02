@@ -20,7 +20,25 @@ import { MenubarItemIndicator } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import React from "react";
+import {
+    Menubar,
+    MenubarMenu,
+    MenubarTrigger,
+    MenubarPortal,
+    MenubarContent,
+    MenubarCheckboxItem,
+    MenubarItemIndicator
+} from "@rebasepro/ui";
 
+function useOpenMenu(ref: React.RefObject<HTMLDivElement>, triggerIndex: number) {
+    React.useEffect(() => {
+        const trigger = ref.current?.querySelectorAll('button[aria-haspopup="menu"]')[triggerIndex] as HTMLElement | undefined;
+        trigger?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
+    }, [ref, triggerIndex]);
+}
+
+// The check mark rendered by a checked checkbox item.
 export const OnCheckboxItem = () => {
     const ref = React.useRef<HTMLDivElement>(null);
     useOpenMenu(ref, 0);
@@ -46,6 +64,4 @@ export const OnCheckboxItem = () => {
         </div>
     );
 };
-
-// The same indicator on a selected radio item.
 ```

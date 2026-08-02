@@ -21,7 +21,9 @@ import { MenubarTrigger } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import { Menubar, MenubarMenu, MenubarTrigger } from "@rebasepro/ui";
 
+// Idle row — the trigger's resting style within a bar of menus.
 export const Idle = () => (
     <div className="p-4">
         <Menubar>
@@ -40,7 +42,4 @@ export const Idle = () => (
         </Menubar>
     </div>
 );
-
-// data-[state=open] styling — the trigger takes the same highlighted
-// background as a `data-highlighted` item while its menu is open.
 ```

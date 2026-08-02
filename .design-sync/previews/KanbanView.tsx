@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { Typography, Chip, cls, KanbanView, FolderKanbanIcon } from "@rebasepro/ui";
-import type { BoardItem, BoardItemViewProps } from "@rebasepro/ui";
+import type { BoardItem, BoardItemViewProps, ChipHue } from "@rebasepro/ui";
 
 type ProjectStatus = "backlog" | "in_progress" | "in_review" | "done";
 type ProjectPriority = "low" | "medium" | "high" | "critical";
@@ -16,7 +16,7 @@ interface SampleProject {
     dueDate: string;
 }
 
-const PRIORITY_CONFIG: Record<ProjectPriority, { label: string; color: string }> = {
+const PRIORITY_CONFIG: Record<ProjectPriority, { label: string; color: ChipHue }> = {
     low: { label: "Low", color: "gray" },
     medium: { label: "Medium", color: "yellow" },
     high: { label: "High", color: "orange" },

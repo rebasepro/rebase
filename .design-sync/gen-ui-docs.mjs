@@ -14,8 +14,13 @@
  */
 import fs from "fs";
 import path from "path";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
-const ROOT = "/Users/francesco/rebase";
+const require = createRequire(import.meta.url);
+const ts = require("typescript");
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "ds-bundle/components");
 const PREVIEWS = path.join(ROOT, ".design-sync/previews");
 const OUT = path.join(ROOT, "website/src/content/docs/docs/ui");
@@ -59,22 +64,155 @@ function readProps(dts, name) {
     return rows;
 }
 
-/** First named export of an authored preview — real, render-verified usage. */
+/** Names a top-level statement introduces into module scope. */
+function declaredNames(stmt) {
+    const out = [];
+    if (ts.isVariableStatement(stmt)) {
+        for (const d of stmt.declarationList.declarations) collectBindingNames(d.name, out);
+    } else if (stmt.name && ts.isIdentifier(stmt.name)) {
+        out.push(stmt.name.text);
+    }
+    return out;
+}
+
+function collectBindingNames(binding, out) {
+    if (ts.isIdentifier(binding)) { out.push(binding.text); return; }
+    for (const el of binding.elements ?? []) {
+        if (ts.isBindingElement(el)) collectBindingNames(el.name, out);
+    }
+}
+
+/** Local names an import statement binds: default, namespace and named alike. */
+function importBindings(stmt) {
+    const clause = stmt.importClause;
+    if (!clause) return [];
+    const out = [];
+    if (clause.name) out.push(clause.name.text);
+    const b = clause.namedBindings;
+    if (b && ts.isNamespaceImport(b)) out.push(b.name.text);
+    if (b && ts.isNamedImports(b)) for (const el of b.elements) out.push(el.name.text);
+    return out;
+}
+
+/**
+ * Identifiers a statement *reads*. Declaration and member positions are skipped
+ * so `project.name` does not look like a reference to a module-level `name`,
+ * and a shorthand `{ container }` still does.
+ */
+function referencedNames(stmt) {
+    const out = new Set();
+    const visit = (node) => {
+        if (ts.isIdentifier(node)) {
+            const p = node.parent;
+            const isMember =
+                (ts.isPropertyAccessExpression(p) && p.name === node) ||
+                (ts.isQualifiedName(p) && p.right === node) ||
+                (ts.isJsxAttribute(p) && p.name === node) ||
+                (ts.isBindingElement(p) && p.propertyName === node) ||
+                // A declaration's own name is not a reference — but a shorthand
+                // property assignment's "name" is the value it reads.
+                (!ts.isShorthandPropertyAssignment(p) && p.name === node);
+            if (!isMember) out.add(node.text);
+        }
+        ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(stmt, visit);
+    return out;
+}
+
+/** Re-print an import keeping only the bindings the example actually uses. */
+function printImport(stmt, used) {
+    const clause = stmt.importClause;
+    const spec = stmt.moduleSpecifier.text;
+    const typeOnly = clause.isTypeOnly ? "type " : "";
+    const head = [];
+    if (clause.name && used.has(clause.name.text)) head.push(clause.name.text);
+    const b = clause.namedBindings;
+    if (b && ts.isNamespaceImport(b) && used.has(b.name.text)) head.push(`* as ${b.name.text}`);
+    const named = b && ts.isNamedImports(b)
+        ? b.elements.filter(el => used.has(el.name.text)).map(el =>
+            `${el.isTypeOnly ? "type " : ""}${el.propertyName ? `${el.propertyName.text} as ` : ""}${el.name.text}`)
+        : [];
+    if (!head.length && !named.length) return null;
+
+    const oneLine = `import ${typeOnly}${[...head, named.length ? `{ ${named.join(", ")} }` : ""].filter(Boolean).join(", ")} from "${spec}";`;
+    if (oneLine.length <= 96 || !named.length) return oneLine;
+    // Long member lists read better stacked, which is how the previews write them.
+    const lead = [...head, "{"].join(", ");
+    return `import ${typeOnly}${lead}\n${named.map(n => `    ${n}`).join(",\n")}\n} from "${spec}";`;
+}
+
+/** Source text of a statement, including the comment block written above it. */
+function statementText(stmt, src) {
+    const ranges = ts.getLeadingCommentRanges(src, stmt.getFullStart()) || [];
+    return src.slice(ranges.length ? ranges[0].pos : stmt.getStart(), stmt.end);
+}
+
+/**
+ * First named export of an authored preview — real, render-verified usage.
+ *
+ * Everything that export transitively references comes with it: the helper
+ * hooks, sample data and card components a preview declares above it, plus the
+ * imports that back them, narrowed to the names this example actually uses.
+ * Slicing the file textually instead (the first cut of this) shipped examples
+ * that called undefined helpers and, because the single-line import regex never
+ * matched a multi-line `import {` block, examples with no imports at all — a
+ * reader copying one got a ReferenceError.
+ */
 function readExample(name) {
     const f = path.join(PREVIEWS, `${name}.tsx`);
     if (!fs.existsSync(f)) return null;
     const src = fs.readFileSync(f, "utf8");
-    const imports = [...src.matchAll(/^import .*?;$/gm)].map(m => m[0])
-        .filter(l => l.includes("@rebasepro/ui"));
-    // grab the first `export const X = ...` / `export function X`
-    const start = src.search(/^export (const|function) [A-Z]/m);
-    if (start < 0) return null;
-    let body = src.slice(start);
-    // cut at the next top-level export
-    const next = body.slice(1).search(/^export (const|function) [A-Z]/m);
-    if (next > 0) body = body.slice(0, next + 1);
-    body = body.replace(/\n{3,}/g, "\n\n").trimEnd();
-    return [...imports, "", body].join("\n");
+    const sf = ts.createSourceFile(f, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+
+    /** @type {Map<string, ts.Statement>} */
+    const declaredBy = new Map();
+    /** @type {Map<string, ts.ImportDeclaration>} */
+    const importedBy = new Map();
+    for (const stmt of sf.statements) {
+        if (ts.isImportDeclaration(stmt)) {
+            for (const local of importBindings(stmt)) importedBy.set(local, stmt);
+        } else {
+            for (const n of declaredNames(stmt)) declaredBy.set(n, stmt);
+        }
+    }
+
+    const isExported = s => s.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword);
+    const entry = sf.statements.find(s =>
+        !ts.isImportDeclaration(s) && isExported(s) && declaredNames(s).some(n => /^[A-Z]/.test(n)));
+    if (!entry) return null;
+
+    const keep = new Set([entry]);
+    /** @type {Map<ts.ImportDeclaration, Set<string>>} */
+    const usedImports = new Map();
+    const queue = [entry];
+    while (queue.length) {
+        for (const ref of referencedNames(queue.pop())) {
+            const imp = importedBy.get(ref);
+            if (imp) {
+                if (!usedImports.has(imp)) usedImports.set(imp, new Set());
+                usedImports.get(imp).add(ref);
+                continue;
+            }
+            const decl = declaredBy.get(ref);
+            if (decl && !keep.has(decl)) { keep.add(decl); queue.push(decl); }
+        }
+    }
+
+    const importLines = sf.statements
+        .filter(s => ts.isImportDeclaration(s) && usedImports.has(s))
+        // A preview-local path would not resolve for a reader; nothing but bare
+        // package specifiers belongs in a copy-pasteable example.
+        .filter(s => !s.moduleSpecifier.text.startsWith("."))
+        .map(s => printImport(s, usedImports.get(s)))
+        .filter(Boolean);
+
+    const body = sf.statements
+        .filter(s => keep.has(s))
+        .map(s => statementText(s, src).trim())
+        .join("\n\n");
+
+    return [...importLines, "", body].join("\n").replace(/\n{3,}/g, "\n\n").trimEnd();
 }
 
 // Only `|` needs escaping: these land inside inline code spans, which MDX does

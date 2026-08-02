@@ -32,7 +32,18 @@ import { DialogContent } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Button } from "@rebasepro/ui";
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Typography,
+    Button
+} from "@rebasepro/ui";
+
+// DialogContent only makes sense inside an open Dialog — full parent
+// composition, same portal-escape issue. Needs cfg.overrides.DialogContent
+// = { cardMode: "single", primaryStory: "Default" }.
 
 export const Default = () => (
     <div className="p-4 h-[320px]">
@@ -51,7 +62,4 @@ export const Default = () => (
         </Dialog>
     </div>
 );
-
-// Longer body content, scrollable dialog — shows DialogContent's default
-// `my-8 mx-8` margin against a list of policy rows.
 ```

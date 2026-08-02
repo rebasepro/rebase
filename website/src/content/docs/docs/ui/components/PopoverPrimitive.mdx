@@ -15,7 +15,22 @@ import { PopoverPrimitive } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { PopoverPrimitive, cls, defaultBorderMixin, TextField, Typography, SearchIcon } from "@rebasepro/ui";
+import {
+    PopoverPrimitive,
+    cls,
+    defaultBorderMixin,
+    TextField,
+    SearchIcon
+} from "@rebasepro/ui";
+
+// PopoverPrimitive is the raw @radix-ui/react-popover namespace re-exported
+// (Root/Trigger/Portal/Content/Arrow/...), unstyled by itself — the `Popover`
+// component wraps it with DS chrome. This is how internal DS consumers
+// (e.g. RelationSelector) build custom popover surfaces on top of it.
+// Root passes straight through to Radix, so `open` is a real controlled
+// prop even though PopoverPrimitiveProps is `{[key: string]: unknown}`.
+// Content still portals to <body> and escapes the card — needs
+// cfg.overrides.PopoverPrimitive = { cardMode: "single", primaryStory: "Default" }.
 
 export const Default = () => (
     <div className="p-4 h-[320px] flex items-center justify-center">

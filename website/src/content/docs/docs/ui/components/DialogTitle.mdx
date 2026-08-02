@@ -34,6 +34,13 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from "@rebasepro/ui";
 
+// DialogTitle only renders inside Dialog's Radix context (it wraps
+// DialogPrimitive.Title asChild) — these previews are the full parent
+// composition. Same portal-escape problem as Dialog: needs
+// cfg.overrides.DialogTitle = { cardMode: "single", primaryStory: "Default" }.
+
+// Default variant is "subtitle2" (component default) — smaller, dense title
+// used for compact dialogs (e.g. row-action confirmations).
 export const Default = () => (
     <div className="p-4 h-[280px]">
         <Dialog open onOpenChange={() => {}} maxWidth="sm">
@@ -48,7 +55,4 @@ export const Default = () => (
         </Dialog>
     </div>
 );
-
-// Larger heading variant — sweeps the `variant` prop for dialogs that need
-// more visual weight (e.g. a primary settings screen).
 ```

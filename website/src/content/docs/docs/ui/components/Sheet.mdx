@@ -35,7 +35,23 @@ import { Sheet } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { Sheet, Typography, TextField, MultiSelect, MultiSelectItem, Button, LoadingButton, IconButton, XIcon, Checkbox } from "@rebasepro/ui";
+import {
+    Sheet,
+    Typography,
+    TextField,
+    MultiSelect,
+    MultiSelectItem,
+    Button,
+    LoadingButton,
+    IconButton,
+    XIcon
+} from "@rebasepro/ui";
+
+// Sheet's `open` prop is required (not optional) — always pass it. It has
+// no visible header of its own (only a sr-only DialogPrimitive.Title), so
+// any header chrome is composed by the caller, as below. Content is a fixed
+// Radix Dialog portal (`fixed … right-0/left-0`), so it escapes the grid
+// card — needs cfg.overrides.Sheet = { cardMode: "single", primaryStory: "RightPanel" }.
 
 export const RightPanel = () => (
     <div className="p-4 h-[320px]">
@@ -61,6 +77,4 @@ export const RightPanel = () => (
         </Sheet>
     </div>
 );
-
-// Left-side navigation panel — sweeps the `side` prop.
 ```

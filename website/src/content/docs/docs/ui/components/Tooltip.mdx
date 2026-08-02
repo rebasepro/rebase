@@ -33,7 +33,12 @@ import { Tooltip } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { Tooltip, IconButton, Button, KeyIcon, Trash2Icon } from "@rebasepro/ui";
+import { Tooltip, IconButton, KeyIcon } from "@rebasepro/ui";
+
+// Tooltip supports both `open` and `defaultOpen` per the .d.ts — use the
+// controlled `open` (+ no-op onOpenChange) to force the visible state, same
+// as Popover/Select. Content renders through a Radix portal, so it escapes
+// the grid card — needs cfg.overrides.Tooltip = { cardMode: "single", primaryStory: "Default" }.
 
 export const Default = () => (
     <div className="p-4 h-[280px] flex items-center justify-center">
@@ -42,6 +47,4 @@ export const Default = () => (
         </Tooltip>
     </div>
 );
-
-// Destructive-action tooltip on a text button, sweeping `side="right"`.
 ```

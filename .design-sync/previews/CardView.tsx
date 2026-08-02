@@ -5,7 +5,8 @@ import {
     Typography,
     Chip,
     cls,
-    FolderKanbanIcon
+    FolderKanbanIcon,
+    type ChipHue
 } from "@rebasepro/ui";
 
 type ProjectStatus = "backlog" | "in_progress" | "in_review" | "done";
@@ -23,14 +24,14 @@ interface SampleProject {
     progress: number;
 }
 
-const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string }> = {
+const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: ChipHue }> = {
     backlog: { label: "Backlog", color: "gray" },
     in_progress: { label: "In Progress", color: "blue" },
     in_review: { label: "In Review", color: "purple" },
     done: { label: "Done", color: "green" }
 };
 
-const PRIORITY_CONFIG: Record<ProjectPriority, { label: string; color: string }> = {
+const PRIORITY_CONFIG: Record<ProjectPriority, { label: string; color: ChipHue }> = {
     low: { label: "Low", color: "gray" },
     medium: { label: "Medium", color: "yellow" },
     high: { label: "High", color: "orange" },

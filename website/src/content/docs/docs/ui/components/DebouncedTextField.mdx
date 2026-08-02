@@ -35,6 +35,9 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { DebouncedTextField } from "@rebasepro/ui";
 
+// Same contract as TextField (fixed shape from the orchestrator config —
+// generics dropped by the .d.ts extractor); commits its value on a debounce,
+// so it's typically used for live-filter/search inputs.
 export const LiveSearch = () => (
     <div className="w-[320px] p-4">
         <DebouncedTextField

@@ -30,6 +30,11 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { TextareaAutosize } from "@rebasepro/ui";
 
+// A headless autosizing primitive with no built-in field chrome (see
+// packages/ui/src/components/VirtualTable/fields/VirtualTableInput.tsx — the
+// real consumer supplies all styling via className/style). Wrap it in the
+// same field-box treatment TextField/DateTimeField use so the preview isn't
+// browser-default text.
 export const Basic = () => (
     <div className="rounded-lg bg-surface-accent-200/50 dark:bg-white/[0.055] p-3 w-[320px] m-4">
         <TextareaAutosize

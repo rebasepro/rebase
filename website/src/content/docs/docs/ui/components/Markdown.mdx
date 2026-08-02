@@ -23,6 +23,19 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { Markdown } from "@rebasepro/ui";
 
+const readme = `## Getting started
+
+Install the client and connect to your project:
+
+\`\`\`bash
+npm install @rebasepro/client
+\`\`\`
+
+- Works with **Postgres** and *SQLite*
+- Realtime subscriptions out of the box
+- [Read the docs](https://rebase.pro/docs)
+`;
+
 export const Basic = () => (
     <div className="p-4 w-96">
         <Markdown source={readme}/>

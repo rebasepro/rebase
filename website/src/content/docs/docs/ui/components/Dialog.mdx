@@ -36,7 +36,25 @@ import { Dialog } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    MultiSelect,
+    MultiSelectItem,
+    Button,
+    LoadingButton
+} from "@rebasepro/ui";
 
+// Dialog is a Radix portal — it renders `fixed inset-0`, so it always
+// escapes a grid card regardless of the wrapper below. Needs
+// cfg.overrides.Dialog = { cardMode: "single", primaryStory: "FormDialog" }.
+// `open` is the only prop the .d.ts exposes (no defaultOpen) — force it true.
+
+// Canonical layout ported from UIReferenceView's "Form Dialog" section:
+// title -> grid grid-cols-12 gap-4 body -> right-aligned actions.
 export const FormDialog = () => (
     <div className="p-4 h-[320px]">
         <Dialog open onOpenChange={() => {}} maxWidth="lg">
@@ -65,6 +83,4 @@ export const FormDialog = () => (
         </Dialog>
     </div>
 );
-
-// Smaller destructive confirmation — sweeps maxWidth + a plain-text body.
 ```

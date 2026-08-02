@@ -22,6 +22,24 @@ import { TableBody } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import {
+    Table,
+    TableHeader,
+    TableBody,
+    TableRow,
+    TableCell,
+    Chip,
+    IconButton,
+    Tooltip,
+    Trash2Icon
+} from "@rebasepro/ui";
+
+const USERS = [
+  { uid: "1", email: "maria.chen@rebase.pro", displayName: "Maria Chen", roles: [{ id: "admin", name: "Admin", isAdmin: true }] },
+  { uid: "2", email: "diego.alvarez@rebase.pro", displayName: "Diego Alvarez", roles: [{ id: "editor", name: "Editor", isAdmin: false }] },
+  { uid: "3", email: "priya.natarajan@rebase.pro", displayName: "Priya Natarajan", roles: [] },
+  { uid: "4", email: "sam.okafor@rebase.pro", displayName: "Sam Okafor", roles: [{ id: "editor", name: "Editor", isAdmin: false }] }
+];
 
 export function PopulatedBody() {
   return (

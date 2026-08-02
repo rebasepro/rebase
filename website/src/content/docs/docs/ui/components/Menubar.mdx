@@ -24,7 +24,10 @@ import { Menubar } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
+import { Menubar, MenubarMenu, MenubarTrigger } from "@rebasepro/ui";
 
+// A believable admin-console menu bar: File / Edit / View / Help over
+// tables, SQL queries and RLS policies.
 export const Closed = () => (
     <div className="p-4">
         <Menubar>

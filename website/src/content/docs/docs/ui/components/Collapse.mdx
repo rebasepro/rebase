@@ -24,6 +24,8 @@ This is the example the design-system sync renders and verifies for this compone
 ```tsx
 import { Collapse, Typography, Chip } from "@rebasepro/ui";
 
+// Ported from FavouritesView: a row of pinned-collection chips that collapses
+// away entirely when the list is empty.
 export const Expanded = () => (
     <div className="p-4 w-72">
         <Typography variant="caption" color="secondary" className="block mb-1">Favourites</Typography>

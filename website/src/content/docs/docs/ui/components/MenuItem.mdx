@@ -23,7 +23,21 @@ import { MenuItem } from "@rebasepro/ui";
 This is the example the design-system sync renders and verifies for this component.
 
 ```tsx
-import { Menu, MenuItem, IconButton, MoreVerticalIcon, CopyIcon, Trash2Icon, KeyRoundIcon, SettingsIcon } from "@rebasepro/ui";
+import {
+    Menu,
+    MenuItem,
+    IconButton,
+    MoreVerticalIcon,
+    CopyIcon,
+    Trash2Icon,
+    KeyRoundIcon
+} from "@rebasepro/ui";
+
+// MenuItem only renders inside Menu's dropdown-menu portal — full parent
+// composition below, forced open via Menu's `defaultOpen` (Menu, unlike
+// Select/Popover, does expose it). Content escapes the grid card the same
+// way Menu's own preview does — needs cfg.overrides.MenuItem =
+// { cardMode: "single", primaryStory: "Default" }.
 
 export const Default = () => (
     <div className="p-4 h-[280px]">
@@ -34,6 +48,4 @@ export const Default = () => (
         </Menu>
     </div>
 );
-
-// Dense variant — compact rows for tight contexts like a table row menu.
 ```
