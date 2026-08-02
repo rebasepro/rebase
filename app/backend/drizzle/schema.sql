@@ -10,6 +10,7 @@ CREATE TYPE "public"."orders_status" AS ENUM ('pending', 'confirmed', 'processin
 CREATE TYPE "public"."orders_payment_status" AS ENUM ('unpaid', 'paid', 'partially_refunded', 'refunded');
 CREATE TYPE "public"."orders_currency" AS ENUM ('USD', 'EUR', 'GBP', 'CAD', 'AUD');
 CREATE TYPE "public"."posts_status" AS ENUM ('draft', 'needs_review', 'published', 'archived');
+CREATE TYPE "public"."product_locales_locale" AS ENUM ('en', 'es', 'fr', 'de', 'it');
 CREATE TYPE "public"."products_category" AS ENUM ('electronics', 'clothing', 'home_garden', 'sports', 'books', 'food_beverage', 'health_beauty', 'toys');
 CREATE TYPE "public"."products_status" AS ENUM ('draft', 'active', 'archived');
 CREATE TYPE "public"."tickets_status" AS ENUM ('open', 'in_progress', 'waiting', 'resolved', 'closed');
@@ -124,7 +125,7 @@ CREATE TABLE "public"."posts_tags" (
 CREATE TABLE "public"."product_locales" (
   "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   "product_id" UUID,
-  "locale" TEXT NOT NULL,
+  "locale" "public"."product_locales_locale" NOT NULL,
   "name" TEXT,
   "description" TEXT
 );

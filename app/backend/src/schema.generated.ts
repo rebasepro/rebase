@@ -12,6 +12,7 @@ export const ordersStatus = pgEnum("orders_status", ['pending', 'confirmed', 'pr
 export const ordersPayment_status = pgEnum("orders_payment_status", ['unpaid', 'paid', 'partially_refunded', 'refunded']);
 export const ordersCurrency = pgEnum("orders_currency", ['USD', 'EUR', 'GBP', 'CAD', 'AUD']);
 export const postsStatus = pgEnum("posts_status", ['draft', 'needs_review', 'published', 'archived']);
+export const productLocalesLocale = pgEnum("product_locales_locale", ['en', 'es', 'fr', 'de', 'it']);
 export const productsCategory = pgEnum("products_category", ['electronics', 'clothing', 'home_garden', 'sports', 'books', 'food_beverage', 'health_beauty', 'toys']);
 export const productsStatus = pgEnum("products_status", ['draft', 'active', 'archived']);
 export const ticketsStatus = pgEnum("tickets_status", ['open', 'in_progress', 'waiting', 'resolved', 'closed']);
@@ -189,7 +190,7 @@ export const postsTags = pgTable("posts_tags", {
 export const productLocales = pgTable("product_locales", {
     id: uuid("id").primaryKey().defaultRandom().notNull(),
     product_id: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
-    locale: text("locale").notNull(),
+    locale: productLocalesLocale("locale").notNull(),
     name: text("name"),
     description: text("description")
 }, (table) => ([
@@ -379,6 +380,6 @@ export const ticketsRelations = drizzleRelations(tickets, ({ one, many }) => ({
 }));
 
 export const tables = { authors, customers, exercises, orderItems, orders, posts, postsTags, productLocales, products, tags, tickets, users };
-export const enums = { exercisesDifficulty, exercisesCategory, exercisesStatus, ordersStatus, ordersPayment_status, ordersCurrency, postsStatus, productsCategory, productsStatus, ticketsStatus, ticketsPriority, ticketsCategory };
+export const enums = { exercisesDifficulty, exercisesCategory, exercisesStatus, ordersStatus, ordersPayment_status, ordersCurrency, postsStatus, productLocalesLocale, productsCategory, productsStatus, ticketsStatus, ticketsPriority, ticketsCategory };
 export const relations = { authorsRelations, customersRelations, orderItemsRelations, ordersRelations, postsRelations, postsTagsRelations, productLocalesRelations, productsRelations, tagsRelations, ticketsRelations };
 
