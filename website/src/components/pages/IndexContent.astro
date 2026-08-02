@@ -28,7 +28,29 @@ const translatePath = useTranslatedPath(lang);
 // The FAQ is seven identically-shaped q/a pairs; the numbers index into i18n.
 // `as const` matters: t() takes a literal key union, so the numbers have to stay
 // literal for `faq.q${n}` to widen to "faq.q1" | ... rather than to string.
-const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
+//
+// Every answer now closes on the page that proves it. An FAQ that only asserts is
+// the cheapest block on a landing page — "yes, it's open source" is worth nothing
+// next to a link to the licence. `href` goes through translatePath so the localized
+// docs routes stay correct; `external` entries leave the site and skip it.
+const faqs = [
+    { n: 1, href: "/docs/collections/properties" },
+    { n: 2, href: "/compare" },
+    { n: 3, href: "/docs/cli/schema" },
+    { n: 4, href: "https://github.com/rebasepro/rebase", external: true },
+    { n: 5, href: "/docs/architecture" },
+    { n: 6, href: "/docs/backend/authentication" },
+    { n: 7, href: "/docs/frontend/extending" }
+] as const;
+
+// Two independent columns rather than a two-column grid. In a grid the items pair
+// up into rows, so opening a long answer on the left leaves a matching hole under
+// the short one on its right. Two flex columns let each side grow on its own, and
+// unlike CSS `columns` nothing reflows from one column into the other on open.
+const faqColumns = [
+    faqs.filter((_, i) => i % 2 === 0),
+    faqs.filter((_, i) => i % 2 === 1)
+];
 
 ---
 
@@ -415,14 +437,10 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                          (lg:col-span-6), so aspect-[4/3] made the media ~900px tall
                          with the 4-row demo stranded at the top. The demo is h-full,
                          so a bounded height is what keeps it a sensible size. -->
+                    <!-- No outer window chrome here: this demo draws TWO separate
+                         client windows, so a shared title bar would read as one
+                         browser with two panes — the opposite of the point. -->
                     <div class="relative z-10 flex flex-col h-[240px] overflow-hidden bg-surface-950 pointer-events-none border-b border-surface-800/80">
-                        <!-- Window controls -->
-                        <div class="px-3 py-2 flex items-center gap-1.5 bg-surface-900/50 border-b border-surface-800/50 backdrop-blur-sm">
-                            <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <div class="ml-2 text-[10px] font-mono text-surface-400">websocket: sync</div>
-                        </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
                             <RealtimeMiniDemo client:visible/>
                         </div>
@@ -640,8 +658,11 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
 
             <!-- The panel-side capabilities that used to sit in the backend beat above.
                  History, import/export and custom React are things the admin layer gives
-                 you — they belong here, not in the list of what the API serves. -->
-            <div class="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5 max-w-5xl mx-auto">
+                 you — they belong here, not in the list of what the API serves.
+
+                 No max-w of its own: the carousel above fills the section's max-w-7xl,
+                 and a narrower card row under it read as a different, unrelated block. -->
+            <div class="mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-5">
                 <!-- Data history & audit -->
                 <div class="lg:col-span-2 group relative overflow-hidden rounded-2xl border border-white/5 bg-surface-950 shadow-[0_10px_30px_rgba(0,0,0,0.45)] hover:border-primary/40 hover:shadow-[0_18px_44px_rgba(0,112,244,0.12)] transition-all duration-300 animate-on-scroll fade-in delay-100">
                     <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-300"
@@ -713,9 +734,20 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                                  bandwidth on a throttled connection. The poster
                                  is frame 0, so the handoff is seamless once
                                  data-src is promoted by page-effects.ts. -->
+                            <!-- The height is inline on purpose. global.css carries an
+                                 unlayered `video { height: auto }` reset, and unlayered
+                                 CSS beats anything in Tailwind's `@layer utilities`, so
+                                 `h-full` never applied however specific it looked. The
+                                 video then fell back to its intrinsic 2544x1074 — 165px
+                                 tall in a 265px box, with 100px of black under it.
+                                 (`bottom-0` can't rescue it either: for an absolutely
+                                 positioned replaced element with height:auto, `bottom`
+                                 is ignored and the intrinsic height wins.) Inline styles
+                                 outrank the reset, so object-cover finally gets a full
+                                 box and crops the sides instead of letterboxing. -->
                             <video
-                                    class="w-full h-full object-cover object-top"
-                                    style="pointer-events: none;"
+                                    class="absolute inset-0 w-full object-cover object-top"
+                                    style="pointer-events: none; height: 100%;"
                                     width="800"
                                     height="600"
                                     loop
@@ -1089,21 +1121,40 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
             <div class="mx-auto max-w-3xl text-center animate-on-scroll fade-in-up">
                 <h2 class="text-3xl sm:text-4xl font-semibold text-white">{t("faq.title")}</h2>
             </div>
-            <div class="mt-10 max-w-3xl mx-auto space-y-4 animate-on-scroll fade-in-up delay-100">
-                {faqs.map((n) => (
-                    <details
-                            class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300 [&::-webkit-details-marker]:hidden">
-                        <summary class="flex cursor-pointer items-center justify-between gap-4 text-white font-semibold marker:content-[''] [&::-webkit-details-marker]:hidden">
-                            {t(`faq.q${n}`)}
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                 stroke-linejoin="round" aria-hidden="true"
-                                 class="flex-none text-surface-500 transition-transform duration-300 group-open:rotate-180 group-hover:text-surface-300">
-                                <path d="m6 9 6 6 6-6"/>
-                            </svg>
-                        </summary>
-                        <p class="mt-3 text-surface-400 leading-relaxed" set:html={t(`faq.a${n}`)}></p>
-                    </details>
+            <p class="mx-auto mt-4 max-w-2xl text-center text-surface-400 animate-on-scroll fade-in-up">
+                {t("faq.subtitle")}
+            </p>
+
+            <div class="mt-10 max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 items-start animate-on-scroll fade-in-up delay-100">
+                {faqColumns.map((column) => (
+                    <div class="flex flex-col gap-4">
+                        {column.map(({ n, href, external }) => (
+                            <details
+                                    class="group rounded-xl border border-white/5 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-5 shadow-[0_4px_20px_rgba(0,0,0,0.3)] hover:border-primary/30 transition-all duration-300 [&::-webkit-details-marker]:hidden">
+                                <summary class="flex cursor-pointer items-center justify-between gap-4 text-white font-semibold marker:content-[''] [&::-webkit-details-marker]:hidden">
+                                    {t(`faq.q${n}`)}
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round" aria-hidden="true"
+                                         class="flex-none text-surface-500 transition-transform duration-300 group-open:rotate-180 group-hover:text-surface-300">
+                                        <path d="m6 9 6 6 6-6"/>
+                                    </svg>
+                                </summary>
+                                <p class="mt-3 text-surface-400 leading-relaxed" set:html={t(`faq.a${n}`)}></p>
+                                <!-- The proof chip: the answer asserts, this links to what settles it. -->
+                                <a href={external ? href : translatePath(href)}
+                                   {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                                   class="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-white/[0.03] px-2.5 py-1.5 text-xs font-medium text-surface-400 ring-1 ring-inset ring-white/5 hover:text-primary hover:ring-primary/30 transition-colors duration-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                         stroke-linejoin="round" aria-hidden="true" class="flex-none">
+                                        <path d="M20 6 9 17l-5-5"/>
+                                    </svg>
+                                    {t(`faq.proof${n}`)}
+                                </a>
+                            </details>
+                        ))}
+                    </div>
                 ))}
             </div>
         </div>
@@ -1131,66 +1182,153 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
             <p class="text-surface-400 mb-6 text-lg max-w-xl mx-auto animate-on-scroll fade-in-up"
                set:html={t("cta.subtitle")}>
             </p>
-            <div class="mb-10 animate-on-scroll fade-in-up">
-                <div class="inline-block w-full max-w-[380px] text-left relative group">
-                    <div class="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500"
-                         aria-hidden="true"
-                         style="background: radial-gradient(200px 100px at 50% 100%, rgba(0,112,244,0.15), transparent 100%); z-index: 0;"></div>
-                    <div class="rounded-xl bg-surface-900/80 border border-surface-800/80 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_24px_80px_rgba(0,0,0,0.65)] overflow-hidden relative z-10 group-hover:border-primary/40 transition-colors duration-300">
-                        <div class="flex items-center justify-between px-4 py-2.5 border-b border-surface-800/80 bg-surface-950/50">
-                            <div class="flex items-center gap-1.5">
-                                <span class="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
-                                <span class="h-2.5 w-2.5 rounded-full bg-amber-400/80"></span>
-                                <span class="h-2.5 w-2.5 rounded-full bg-emerald-400/80"></span>
+            <!-- This used to be the page's FOURTH fake terminal, repeating the same
+                 `cli init` box the hero already shows. The question left at the bottom
+                 of the page isn't "what do I type" — it's "where does this run", so the
+                 close is a fork with three real answers.
+
+                 The cloud lane deliberately does not offer a deploy button: Rebase Cloud
+                 has not launched (see showcase.case0.feat3), so its action is the footer
+                 waitlist and its chip says so. -->
+            <div class="mt-12 mb-10 max-w-5xl mx-auto text-left animate-on-scroll fade-in-up">
+                <div class="relative rounded-2xl p-px overflow-hidden"
+                     style="background: linear-gradient(100deg, rgba(0,112,244,0.55), rgba(160,120,255,0.35) 55%, rgba(255,255,255,0.06) 85%);">
+                    <div class="grid grid-cols-1 md:grid-cols-3 rounded-2xl bg-surface-950/85 backdrop-blur-xl overflow-hidden">
+
+                        <!-- Local -->
+                        <div class="group relative px-6 py-7 flex flex-col border-b md:border-b-0 md:border-r border-white/10">
+                            <div class="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                 aria-hidden="true"
+                                 style="background: radial-gradient(70% 90% at 25% 0%, rgba(0,112,244,0.20), transparent 70%);"></div>
+                            <div class="relative flex flex-col h-full">
+                                <div class="flex items-center gap-2.5 mb-3">
+                                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-inset ring-primary/30 text-primary">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                             stroke-linejoin="round">
+                                            <path d="M12 19h8"/>
+                                            <path d="m4 17 6-6-6-6"/>
+                                        </svg>
+                                    </span>
+                                    <span class="text-base font-semibold text-white">{t("cta.lane.local.title")}</span>
+                                </div>
+                                <p class="text-sm text-surface-400 leading-relaxed">{t("cta.lane.local.desc")}</p>
+
+                                <div class="mt-5 rounded-lg border border-surface-800 bg-surface-900/60 px-3 py-2.5 flex items-center justify-between gap-3 group-hover:border-primary/40 transition-colors duration-300">
+                                    <span class="font-mono text-sm text-white whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                        pnpm dlx @rebasepro/cli init
+                                    </span>
+                                    <button data-track-copy="cta-lane-local" data-command="pnpm dlx @rebasepro/cli init"
+                                            class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                             stroke-linejoin="round">
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <a href={translatePath("/docs/getting-started/quickstart")}
+                                   class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-light hover:text-white transition-colors">
+                                    {t("cta.lane.local.link")}
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                         stroke-linejoin="round" class="group-hover:translate-x-0.5 transition-transform duration-300">
+                                        <path d="M5 12h14"/>
+                                        <path d="m12 5 7 7-7 7"/>
+                                    </svg>
+                                </a>
                             </div>
-                            <span class="text-[11px] font-medium text-surface-500 font-mono flex items-center gap-1.5">
-
-<svg
-        class="lucide lucide-terminal"
-        xmlns="http://www.w3.org/2000/svg"
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
->
-  <path d="M12 19h8"/>
-  <path d="m4 17 6-6-6-6"/>
-</svg>
-
-                                    terminal
-                                </span>
-                            <div class="w-10"></div> <!-- spacer -->
                         </div>
-                        <div class="px-5 py-4 flex items-center justify-between bg-gradient-to-b from-surface-900/50 to-transparent">
-                            <div class="font-mono text-sm flex items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
-                                <span class="text-primary font-semibold mr-3">~</span>
-                                <span class="text-white">pnpm dlx @rebasepro/cli init</span>
+
+                        <!-- Self-host -->
+                        <div class="group relative px-6 py-7 flex flex-col border-b md:border-b-0 md:border-r border-white/10">
+                            <div class="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                 aria-hidden="true"
+                                 style="background: radial-gradient(70% 90% at 50% 0%, rgba(0,112,244,0.16), transparent 70%);"></div>
+                            <div class="relative flex flex-col h-full">
+                                <div class="flex items-center gap-2.5 mb-3">
+                                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06] ring-1 ring-inset ring-white/15 text-surface-200">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                             stroke-linejoin="round">
+                                            <rect width="20" height="8" x="2" y="2" rx="2"/>
+                                            <rect width="20" height="8" x="2" y="14" rx="2"/>
+                                            <line x1="6" x2="6.01" y1="6" y2="6"/>
+                                            <line x1="6" x2="6.01" y1="18" y2="18"/>
+                                        </svg>
+                                    </span>
+                                    <span class="text-base font-semibold text-white">{t("cta.lane.selfhost.title")}</span>
+                                </div>
+                                <p class="text-sm text-surface-400 leading-relaxed">{t("cta.lane.selfhost.desc")}</p>
+
+                                <div class="mt-5 rounded-lg border border-surface-800 bg-surface-900/60 px-3 py-2.5 flex items-center justify-between gap-3 group-hover:border-primary/40 transition-colors duration-300">
+                                    <span class="font-mono text-sm text-white whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                        docker compose up -d
+                                    </span>
+                                    <button data-track-copy="cta-lane-selfhost" data-command="docker compose up -d"
+                                            class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
+                                            aria-label="Copy command" title="Copy to clipboard">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                             stroke-linejoin="round">
+                                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <a href={translatePath("/docs/deployment/self-hosting")}
+                                   class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-light hover:text-white transition-colors">
+                                    {t("cta.lane.selfhost.link")}
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                         stroke-linejoin="round" class="group-hover:translate-x-0.5 transition-transform duration-300">
+                                        <path d="M5 12h14"/>
+                                        <path d="m12 5 7 7-7 7"/>
+                                    </svg>
+                                </a>
                             </div>
-                            <button data-track-copy="bottom-cta" data-command="pnpm dlx @rebasepro/cli init"
-                                    class="copy-btn shrink-0 text-surface-500 hover:text-white transition-colors"
-                                    aria-label="Copy command" title="Copy to clipboard">
+                        </div>
 
-                                <svg
-                                        class="lucide lucide-copy"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                >
-                                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
-                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
-                                </svg>
+                        <!-- Cloud: no command, because there is nothing to run yet -->
+                        <div class="group relative px-6 py-7 flex flex-col">
+                            <div class="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                                 aria-hidden="true"
+                                 style="background: radial-gradient(70% 90% at 75% 0%, rgba(160,120,255,0.20), transparent 70%);"></div>
+                            <div class="relative flex flex-col h-full">
+                                <div class="flex items-center gap-2.5 mb-3">
+                                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06] ring-1 ring-inset ring-white/15 text-surface-200">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                             stroke-linejoin="round">
+                                            <path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 1 0 6.3 19Z"/>
+                                        </svg>
+                                    </span>
+                                    <span class="text-base font-semibold text-white">{t("cta.lane.cloud.title")}</span>
+                                </div>
+                                <p class="text-sm text-surface-400 leading-relaxed">{t("cta.lane.cloud.desc")}</p>
 
-                            </button>
+                                <div class="mt-5 rounded-lg border border-dashed border-surface-800 px-3 py-2.5 flex items-center gap-2">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-amber-400/80"></span>
+                                    <span class="text-sm text-surface-500">{t("cta.lane.cloud.badge")}</span>
+                                </div>
+
+                                <a href="#footer-waitlist"
+                                   data-track
+                                   id="cta-lane-cloud"
+                                   class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-light hover:text-white transition-colors">
+                                    {t("cta.lane.cloud.link")}
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                         fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                         stroke-linejoin="round" class="group-hover:translate-x-0.5 transition-transform duration-300">
+                                        <path d="M5 12h14"/>
+                                        <path d="m12 5 7 7-7 7"/>
+                                    </svg>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1223,7 +1361,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                 <a href={translatePath("/docs")}
                    data-track
                    id="cta-view-docs"
-                   class="inline-flex items-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/20 transition-all duration-200 ease-in-out">
+                   class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-0 min-h-(--control-large) text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/20 transition-all duration-200 ease-in-out">
                     {t("cta.button.docs")}
 
                     <svg
