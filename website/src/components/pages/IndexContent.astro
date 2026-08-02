@@ -171,7 +171,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                                 <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                                 <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                             </div>
-                            <div class="text-[11px] font-mono font-medium text-surface-400 flex items-center gap-2">
+                            <div class="text-2xs font-mono font-medium text-surface-400 flex items-center gap-2">
 
                                 <svg
                                         class="lucide lucide-terminal"
@@ -194,7 +194,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                             <div class="w-12"></div> <!-- spacer -->
                         </div>
 
-                        <div class="relative z-10 font-mono text-[13px] sm:text-sm text-surface-200 space-y-4 px-5 py-5 bg-gradient-to-b from-surface-900/50 to-transparent">
+                        <div class="relative z-10 font-mono text-sm sm:text-sm text-surface-200 space-y-4 px-5 py-5 bg-gradient-to-b from-surface-900/50 to-transparent">
                             <div>
                                 <div class="flex gap-3 items-center justify-between">
                                     <div class="flex gap-3 items-center whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mr-4">
@@ -327,7 +327,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <div class="ml-2 text-[10px] font-mono text-surface-400">app.ts</div>
+                            <div class="ml-2 text-3xs font-mono text-surface-400">app.ts</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
                             <SdkMiniDemo client:visible/>
@@ -345,7 +345,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                                     </svg>
                                 </div>
                                 <h3 class="text-base font-semibold text-white">{t("features.sdk.title")}</h3>
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-3xs font-medium ring-1 ring-primary/20 ml-auto">
                                         {t("features.sdk.badge")}
                                     </span>
                             </div>
@@ -366,7 +366,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                             <div class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-amber-400/80"></div>
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
-                            <div class="ml-2 text-[10px] font-mono text-surface-400">api.demo.rebase.pro</div>
+                            <div class="ml-2 text-3xs font-mono text-surface-400">api.demo.rebase.pro</div>
                         </div>
                         <div class="relative flex-1 w-full overflow-hidden flex items-center justify-center" inert aria-hidden="true">
                             <ApiMiniDemo client:visible/>
@@ -396,7 +396,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
 
                                 </div>
                                 <h3 class="text-base font-semibold text-white">{t("features.api.title")}</h3>
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-3xs font-medium ring-1 ring-primary/20 ml-auto">
                                         {t("features.api.badge")}
                                     </span>
                             </div>
@@ -451,7 +451,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
 
                             </div>
                             <h3 class="text-base font-semibold text-white">{t("features.realtime.title")}</h3>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-3xs font-medium ring-1 ring-primary/20 ml-auto">
                                     {t("features.realtime.badge")}
                                 </span>
                         </div>
@@ -536,9 +536,9 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
 
                 <!-- Two ways in: one lit ribbon, not another pair of grey cards -->
                 <div class="mt-12 animate-on-scroll fade-in-up">
-                    <div class="relative rounded-3xl p-px overflow-hidden"
+                    <div class="relative rounded-2xl p-px overflow-hidden"
                          style="background: linear-gradient(100deg, rgba(0,112,244,0.55), rgba(160,120,255,0.35) 45%, rgba(255,255,255,0.06) 80%);">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 rounded-3xl bg-surface-950/85 backdrop-blur-xl overflow-hidden">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 rounded-2xl bg-surface-950/85 backdrop-blur-xl overflow-hidden">
                             <a href={translatePath("/backend")}
                                class="group relative px-8 py-8 transition-colors duration-300 hover:bg-white/[0.04]">
                                 <div class="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
@@ -687,7 +687,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
 
                             </div>
                             <h3 class="text-base font-semibold text-white">{t("features.history.title")}</h3>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-3xs font-medium ring-1 ring-primary/20 ml-auto">
                                     {t("features.history.badge")}
                                 </span>
                         </div>
@@ -752,7 +752,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
 
                             </div>
                             <h3 class="text-base font-semibold text-white">{t("features.import.title")}</h3>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-3xs font-medium ring-1 ring-primary/20 ml-auto">
                                     {t("features.import.badge")}
                                 </span>
                         </div>
@@ -791,7 +791,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                                 </svg>
                             </div>
                             <h3 class="text-base font-semibold text-white">{t("features.customization.title")}</h3>
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium ring-1 ring-primary/20 ml-auto">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-3xs font-medium ring-1 ring-primary/20 ml-auto">
                                     {t("features.customization.badge")}
                                 </span>
                         </div>
@@ -888,10 +888,10 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                                     <span class="h-2.5 w-2.5 rounded-full bg-amber-400/80"></span>
                                     <span class="h-2.5 w-2.5 rounded-full bg-emerald-400/80"></span>
                                 </div>
-                                <span class="text-[11px] font-mono font-medium text-surface-500">self-host</span>
+                                <span class="text-2xs font-mono font-medium text-surface-500">self-host</span>
                                 <div class="w-12"></div>
                             </div>
-                            <div class="px-5 py-5 font-mono text-[13px] sm:text-sm space-y-3 bg-gradient-to-b from-surface-900/50 to-transparent">
+                            <div class="px-5 py-5 font-mono text-sm sm:text-sm space-y-3 bg-gradient-to-b from-surface-900/50 to-transparent">
                                 <div class="flex items-center gap-3 whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                                     <span class="text-primary font-semibold">~</span>
                                     <span class="text-white">git clone github.com/rebasepro/rebase</span>
@@ -903,7 +903,7 @@ const faqs = [1, 2, 3, 4, 5, 6, 7] as const;
                                 <div class="text-surface-400 text-xs ml-6">✔ Postgres ready on :5432</div>
                                 <div class="text-emerald-400/90 text-xs ml-6 flex items-center gap-2">
                                     ✔ Backend live on :3000
-                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20 text-emerald-400 text-[10px]">
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20 text-emerald-400 text-3xs">
                                         <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                                         running
                                     </span>
