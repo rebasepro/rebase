@@ -63,7 +63,7 @@ const entFeatures = [
                     </ul>
 
                     <a href={translatePath("/cli")}
-                       class="inline-flex items-center justify-center gap-x-2 rounded-lg border border-white/10 bg-white/5 px-6 py-3 text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 transition-all duration-200">
+                       class="inline-flex items-center justify-center gap-x-2 inline-flex items-center justify-center rounded-lg border border-white/10 bg-white/5 px-6 py-0 min-h-(--control-large) text-base font-semibold text-white hover:bg-white/10 hover:border-white/20 transition-all duration-200">
                         {t("pricing.oss.cta")}
                         <svg class="lucide lucide-arrow-right" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
                              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -78,7 +78,7 @@ const entFeatures = [
                 <div class="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-surface-900/80 to-surface-950/70 p-8 shadow-[0_18px_44px_rgba(0,112,244,0.12)] flex flex-col">
                     <div class="flex items-center justify-between mb-2">
                         <h2 class="text-xl font-semibold text-white">{t("pricing.ent.name")}</h2>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold ring-1 ring-primary/20">{t("pricing.ent.popular")}</span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-2xs font-semibold ring-1 ring-primary/20">{t("pricing.ent.popular")}</span>
                     </div>
                     <div class="flex items-baseline gap-2 mb-1">
                         <span class="text-4xl font-semibold text-white">{t("pricing.ent.price")}</span>

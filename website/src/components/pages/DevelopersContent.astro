@@ -216,7 +216,7 @@ const deployTargets = [
                             <div class="w-2.5 h-2.5 rounded-full bg-emerald-400/80"></div>
                             <span class="ml-2 font-mono text-xs text-surface-400">after rebase init</span>
                         </div>
-                        <pre class="p-6 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-400"><code set:html={projectTree}></code></pre>
+                        <pre class="p-6 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-400"><code set:html={projectTree}></code></pre>
                     </div>
                 </div>
             </div>
@@ -249,9 +249,9 @@ const deployTargets = [
                 <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
                         <span class="font-mono text-xs text-surface-400">config/collections/orders.ts</span>
-                        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">callbacks</span>
+                        <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">callbacks</span>
                     </div>
-                    <pre class="p-5 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={callbackCode}></code></pre>
+                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={callbackCode}></code></pre>
                     <p class="px-5 pb-5 text-sm text-surface-400">
                         Business logic runs on the server, on every write path — including writes made from the
                         admin panel.
@@ -261,9 +261,9 @@ const deployTargets = [
                 <div class="rounded-2xl border border-white/5 bg-surface-950/80 overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.45)] flex flex-col">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50 flex items-center justify-between">
                         <span class="font-mono text-xs text-surface-400">backend/functions/checkout.ts</span>
-                        <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">custom routes</span>
+                        <span class="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface-800 text-surface-400">custom routes</span>
                     </div>
-                    <pre class="p-5 overflow-x-auto text-[11px] sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={functionCode}></code></pre>
+                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300 flex-1"><code set:html={functionCode}></code></pre>
                     <p class="px-5 pb-5 text-sm text-surface-400">
                         Drop a file in <code class="font-mono text-surface-300">functions/</code> and it is mounted,
                         authenticated and RLS-scoped with no registration step.

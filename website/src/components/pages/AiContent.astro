@@ -146,9 +146,9 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                             <span class="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
                             <span class="h-2.5 w-2.5 rounded-full bg-amber-400/80"></span>
                             <span class="h-2.5 w-2.5 rounded-full bg-emerald-400/80"></span>
-                            <span class="ml-2 font-mono text-[11px] text-surface-400">.cursor/mcp.json</span>
+                            <span class="ml-2 font-mono text-2xs text-surface-400">.cursor/mcp.json</span>
                         </div>
-                        <pre class="overflow-x-auto p-5 font-mono text-[11px] leading-relaxed text-surface-300 sm:text-xs"><code set:html={mcpConfigCode}></code></pre>
+                        <pre class="overflow-x-auto p-5 font-mono text-2xs leading-relaxed text-surface-300 sm:text-xs"><code set:html={mcpConfigCode}></code></pre>
                     </div>
                 </div>
             </div>
@@ -182,7 +182,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                                     </svg>
                                 </span>
                                 <span class="text-sm font-medium text-surface-200">{group.name}</span>
-                                <span class="ml-auto font-mono text-[11px] text-surface-600">{group.tools.length}</span>
+                                <span class="ml-auto font-mono text-2xs text-surface-600">{group.tools.length}</span>
                             </div>
                             <ul class="space-y-1">
                                 {group.tools.map((tool) => (
@@ -254,7 +254,7 @@ const toolCount = toolGroups.reduce((n, g) => n + g.tools.length, 0);
                         <div class="border-b border-surface-800/80 bg-surface-900/50 px-4 py-3">
                             <span class="font-mono text-xs text-surface-400">POST /api/admin/api-keys</span>
                         </div>
-                        <pre class="overflow-x-auto p-5 font-mono text-[11px] leading-relaxed text-surface-300 sm:text-xs"><code set:html={keyCode}></code></pre>
+                        <pre class="overflow-x-auto p-5 font-mono text-2xs leading-relaxed text-surface-300 sm:text-xs"><code set:html={keyCode}></code></pre>
                     </div>
                 </div>
             </div>

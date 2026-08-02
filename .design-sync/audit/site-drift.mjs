@@ -22,7 +22,7 @@ const rawColors = [...src.matchAll(/(--color-[\w-]+):\s*([^;]+);/g)].map(m => m[
 const siteExtra = ["#359aff", "#0061c2"];
 // the control scale and Tailwind's default type scale (the DS does not restate it)
 const CONTROL = [28, 32, 40, 48, 56, 64];
-const TEXT = [12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128];
+const TEXT = [10, 11, 12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128];
 
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1280, height: 900 } });

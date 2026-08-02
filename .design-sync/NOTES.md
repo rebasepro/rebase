@@ -207,6 +207,49 @@ Two measurement caveats for whoever re-runs this:
   harness artifact, not a bug — the button renders red with white text, verified
   by screenshot. Its true ratio is 4.83:1. Don't chase it.
 
+## Marketing site alignment (2026-08-02)
+
+`.design-sync/audit/site-drift.mjs` measures the site against the DS tokens.
+Run it against a dev server: `cd .ds-sync && node ../.design-sync/audit/site-drift.mjs`.
+
+**Read tokens from `theme.css` on disk, never from the page.** Tailwind v4
+tree-shakes `@theme` variables nothing references, so a page-based read finds
+only the handful in use and reports `primary` itself as drift. The first version
+of the script did that and produced a garbage report.
+
+The site was already tokenised for colour, fonts and the large type sizes — it
+imports `theme.css` and defers to it. What had drifted was scale:
+
+- **Type.** ~450 hand-written `text-[10px]`/`text-[11px]` classes. That tier was
+  real but unnamed, so every page improvised it. The DS now defines `--text-2xs`
+  (11px) and `--text-3xs` (10px), **marketing-only** — product UI must not go
+  below `text-xs`. 117 non-mockup occurrences were swept onto the tokens.
+- **Controls.** Header CTA 36→40, hero CTAs 52/54→56, "Read the Docs" 50→48,
+  footer "Join" 38→40. The 2px gap between the two hero CTAs was the DS Button
+  bug in miniature: identical padding, but only the outlined one had a border.
+  Filled variants now carry `border-transparent`, as Button does.
+- **Radii.** `rounded-3xl` collapsed to `2xl` except a phone bezel and a demo.
+
+**Expected remaining "drift" — do not chase these:**
+
+- Everything under `website/src/components/demos/**` and the mockup blocks in
+  `StudioContent.astro` is a *scaled illustration of a UI*, not typography. It
+  legitimately uses 6-9px text and 22-34px tab heights. Raising those breaks the
+  illusion of a shrunken interface.
+- Nav dropdown cards report as 62px/163px "controls" — they are link cards, not
+  buttons; the script's control heuristic cannot tell them apart.
+- Baseline at time of writing: 18 off-scale controls (15 mockup, 2 nav cards,
+  1 demo tab) and 8/9/15px text (all mockup). A number materially above that is
+  new drift.
+
+**Not done: semantic colour.** The audit flags site accents (emerald/sky/amber/
+rose) as matching no token — but the DS defines **zero** semantic colour tokens,
+and `Alert` itself hardcodes `red-500`/`amber-500`/`blue-500`/`emerald-500`. The
+site is doing exactly what the DS does, so there is nothing to move onto. The
+real fix is to add `--color-success|warning|info|danger` to the DS and refactor
+`Alert` onto them first; pointing the site at raw palette colours in the
+meantime would just move the hardcoding around.
+
 ## The authoring trap: silently-dropped Tailwind classes
 
 **The single biggest time sink of this sync.** The stylesheet is compiled ONCE
