@@ -10,7 +10,6 @@ import { useCollectionRegistryController } from "../../hooks/navigation/contexts
 import { getEntityTitlePropertyKeyForEntity } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/admin-types";
-import { RelationPreviewDepthProvider, useRelationPreviewDepth } from "./RelationPreviewDepth";
 
 export type RelationPreviewProps = {
     disabled?: boolean;
@@ -65,15 +64,9 @@ function extractDisplayFromPlainObject(obj: unknown): string {
  */
 export const RelationPreview = function RelationPreview(props: RelationPreviewProps) {
     const relation = props.relation;
-    // Already inside a relation card: render as text. The target row's own
-    // relations are context for the row above, not a second thing to pick.
-    // See `RelationPreviewDepthContext`.
-    const nested = useRelationPreviewDepth() > 0;
-    const textOnly = props.textOnly || nested;
-
     if (!(typeof relation === "object" && "isEntityRelation" in relation && relation.isEntityRelation())) {
         console.warn("Relation preview received value of type", typeof relation);
-        if (textOnly) {
+        if (props.textOnly) {
             const display = extractDisplayFromPlainObject(relation);
             return <span className="truncate">{display}</span>;
         }
@@ -84,7 +77,7 @@ export const RelationPreview = function RelationPreview(props: RelationPreviewPr
                 tooltip={JSON.stringify(relation)}/>
         </EntityPreviewContainer>;
     }
-    return <RelationPreviewInternal {...props} textOnly={textOnly}/>;
+    return <RelationPreviewInternal {...props}/>;
 };
 
 const DefaultMissingReference: React.FC<{ path: string }> = () => null;
@@ -242,19 +235,15 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
         return <span className="truncate">{displayValue}</span>;
     }
 
-    // Everything the card renders is one level deeper, which is what stops the
-    // target's own relations coming out as cards inside this one.
-    return <RelationPreviewDepthProvider>
-        <ResolvedEntityPreview size={size}
-            previewKeys={previewProperties}
-            disabled={disabled}
-            entity={usedEntity}
-            collection={collection}
-            onClick={onClick}
-            includeEntityLink={includeEntityLink}
-            includeId={false}
-            hover={hover}/>
-    </RelationPreviewDepthProvider>;
+    return <ResolvedEntityPreview size={size}
+        previewKeys={previewProperties}
+        disabled={disabled}
+        entity={usedEntity}
+        collection={collection}
+        onClick={onClick}
+        includeEntityLink={includeEntityLink}
+        includeId={false}
+        hover={hover}/>;
 
 }
 
