@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import { randomBytes, randomUUID } from "crypto";
 import { generateSecureToken, hashToken } from "./admin-user-ops";
@@ -358,7 +359,7 @@ refreshToken };
         // Create user
         const passwordHash = await ops.hashPassword(password);
         let createData: import("./interfaces").CreateUserData = {
-            email: email.toLowerCase(),
+            email: normalizeEmail(email),
             passwordHash,
             displayName: displayName || undefined
         };
@@ -533,7 +534,7 @@ displayName: user.displayName });
                     } else {
                         // Create new user
                         user = await authRepo.createUser({
-                            email: externalUser.email.toLowerCase(),
+                            email: normalizeEmail(externalUser.email),
                             displayName: externalUser.displayName || undefined,
                             photoUrl: externalUser.photoUrl || undefined
                         });

@@ -11,6 +11,7 @@
  */
 
 import { randomBytes, createHash, randomInt } from "node:crypto";
+import { normalizeEmail } from "@rebasepro/common";
 import type { AuthRepository } from "./interfaces";
 import type { EmailService, EmailConfig } from "../email";
 import type { ResolvedAuthHooks } from "./auth-hooks";
@@ -161,7 +162,7 @@ export async function prepareAdminUserValues(
     const values = { ...body };
     values.passwordHash = passwordHash;
     if (values.email) {
-        values.email = (values.email as string).toLowerCase();
+        values.email = normalizeEmail(values.email as string);
     }
     values.emailVerified = true;
     delete values.password;

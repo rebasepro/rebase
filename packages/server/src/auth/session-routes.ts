@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { normalizeEmail } from "@rebasepro/common";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { ApiError } from "../api/errors";
@@ -252,7 +253,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
                 throw ApiError.unauthorized("Not authenticated");
             }
             const { email } = parseBody(findUserSchema, await c.req.json());
-            const user = await authRepo.getUserByEmail(email.toLowerCase());
+            const user = await authRepo.getUserByEmail(normalizeEmail(email));
             return c.json({
                 user: user
                     ? { uid: user.id, displayName: user.displayName ?? null, photoURL: user.photoUrl ?? null }
@@ -435,7 +436,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
         }
 
         // Check if email is already taken
-        const existingUser = await authRepo.getUserByEmail(email.toLowerCase());
+        const existingUser = await authRepo.getUserByEmail(normalizeEmail(email));
         if (existingUser) {
             throw ApiError.conflict("Email already registered", "EMAIL_EXISTS");
         }
@@ -445,7 +446,7 @@ export function mountSessionRoutes(opts: SessionRoutesConfig): void {
 
         // Update user: set email, password, remove anonymous flag
         const updatedUser = await authRepo.updateUser(user.id, {
-            email: email.toLowerCase(),
+            email: normalizeEmail(email),
             passwordHash,
             isAnonymous: false
         });

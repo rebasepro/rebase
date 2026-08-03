@@ -1,4 +1,5 @@
 import { Db, ObjectId } from "mongodb";
+import { normalizeEmail } from "@rebasepro/common";
 
 /** Loose document type that allows string _id values (Rebase convention). */
 export interface MongoDoc { _id?: string; [key: string]: any; }
@@ -68,7 +69,7 @@ export class MongoUserService implements UserRepository {
         const doc = {
             _id: id,
             id,
-            email: data.email.toLowerCase(),
+            email: normalizeEmail(data.email),
             passwordHash: data.passwordHash ?? null,
             displayName: data.displayName ?? null,
             photoUrl: data.photoUrl ?? null,
@@ -86,7 +87,7 @@ export class MongoUserService implements UserRepository {
     }
 
     async getUserByEmail(email: string): Promise<UserData | null> {
-        const doc = await this.collection.findOne({ email: email.toLowerCase() });
+        const doc = await this.collection.findOne({ email: normalizeEmail(email) });
         return doc ? toUser(doc) : null;
     }
 
@@ -136,7 +137,7 @@ providerId },
     async updateUser(id: string, data: Partial<Omit<CreateUserData, "id">>): Promise<UserData | null> {
         const updateData: Record<string, unknown> = { ...data,
 updatedAt: new Date() };
-        if (typeof updateData.email === "string") updateData.email = updateData.email.toLowerCase();
+        if (typeof updateData.email === "string") updateData.email = normalizeEmail(updateData.email);
 
         await this.collection.updateOne({ id }, { $set: updateData });
         return this.getUserById(id);

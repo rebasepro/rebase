@@ -11,6 +11,7 @@
  */
 
 import { Hono } from "hono";
+import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
 import { createRequireAuth, requireAdmin } from "./middleware";
@@ -228,7 +229,7 @@ offset: 0 });
             throw ApiError.badRequest("Email is required");
         }
 
-        const existing = await authRepo.getUserByEmail(email.toLowerCase());
+        const existing = await authRepo.getUserByEmail(normalizeEmail(email));
         if (existing) {
             throw ApiError.conflict("A user with this email already exists");
         }
@@ -291,7 +292,7 @@ values: prepResult.values },
         }
 
         const updates: Record<string, unknown> = {};
-        if (email !== undefined) updates.email = email.toLowerCase();
+        if (email !== undefined) updates.email = normalizeEmail(email);
         if (displayName !== undefined) updates.displayName = displayName;
 
         if (password) {

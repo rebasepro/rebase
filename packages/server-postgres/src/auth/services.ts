@@ -68,10 +68,13 @@ function getColumn(table: RebasePgTable | undefined, ...keys: string[]): RebaseP
  *
  * Whitespace goes too: a trailing space survives the fold and reproduces the
  * problem exactly.
+ *
+ * Re-exported rather than defined here: `@rebasepro/server` and
+ * `@rebasepro/server-mongo` write this column too, and a second copy of this
+ * rule is the defect it exists to prevent.
  */
-export function normalizeEmail<T>(email: T): T | string {
-    return typeof email === "string" ? email.trim().toLowerCase() : email;
-}
+import { normalizeEmail } from "@rebasepro/common";
+export { normalizeEmail };
 
 /**
  * PostgreSQL implementation of UserRepository.
