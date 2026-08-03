@@ -619,10 +619,11 @@ function Widget() {
 ## Upgrading an existing app
 
 This release renames packages, changes what `id` means, drops CJS, moves the
-admin panel to react-router 8, and — most importantly — **fixes a security rule
-that was silently permissive**. Read the first section before anything else: it
-is the only change that can alter who can read your data, and it is the only one
-that will not announce itself.
+admin panel to react-router 8, and — most importantly — **fixes three ways
+access could be granted that you did not ask for**: a security rule that was
+silently permissive, and two on the realtime socket. Read the first two sections
+before anything else. They are the changes that alter who can read your data,
+and none of them announces itself.
 
 Work through the sections in order. Each one names the symptom you would
 otherwise debug from the wrong end.
@@ -750,7 +751,58 @@ quietly depended on the old behaviour.
 
 ---
 
-### 2. The authenticated principal is `uid`, not `userId`
+### 2. The realtime socket was open — check who could subscribe
+
+Two separate defects, both of which granted socket access rather than
+withholding it, and neither of which logged anything.
+
+**`realtime.requireAuth: true` opened the socket.** The connection handler seeds
+each session with `authenticated: !requireAuth`, so the flag does not gate a
+later check — it decides whether a connecting client is treated as *already*
+authenticated. It was computed as:
+
+```ts
+authConfig.requireAuth !== false && !!authConfig.jwtSecret
+```
+
+On a server that authenticates through an `AuthAdapter`, or through anything
+other than a local `auth.jwtSecret`, that is `false` — so every client that
+connected was marked authenticated. Setting `requireAuth: true` was what granted
+access.
+
+**The socket and `/api/data` disagreed.** Each computed "does this server
+require an authenticated caller?" separately. With no auth configured at all,
+the HTTP routes answered 401 to every read while the socket admitted everyone
+and served the same rows.
+
+#### Are you affected?
+
+You were exposed if **either** holds:
+
+- you set `realtime.requireAuth: true` while authenticating through an
+  `AuthAdapter` (or any path other than `auth.jwtSecret`), or
+- you run with no auth configuration at all and assumed the socket matched the
+  401 you get from `/api/data`.
+
+RLS still applied to what a subscription returned, so a collection whose
+policies are correct leaked nothing. The exposure is the collections whose
+protection was "the socket requires auth" rather than a policy.
+
+#### What to do
+
+```bash
+# Every collection reachable over the socket relies on RLS, not on the gate.
+pnpm rebase doctor --policies
+```
+
+Then exercise your app **signed out, in a private window**, with the network
+panel open on the websocket — the same check section 1 asks for, for the same
+reason. Nothing needs to change in your code: both enforcement points call
+`resolveRequireAuth` now and the tests pin that they agree.
+
+---
+
+### 3. The authenticated principal is `uid`, not `userId`
 
 Tokens now carry a `uid` claim and `c.get("user")` returns `{ uid, roles }`.
 
@@ -769,7 +821,7 @@ grep -rn "uid ?? \|?? .*userId" src/ config/
 
 ---
 
-### 3. `id` is an address, not a column
+### 4. `id` is an address, not a column
 
 Rows now carry their own columns under their own names and types. Previously a
 synthesized `id` was written into rows on the way out, which collided with your
@@ -787,7 +839,7 @@ a string will silently stop matching.
 
 ---
 
-### 4. ESM only
+### 5. ESM only
 
 `main`, `module` and the `import` condition all point at `index.es.js`; the
 `require` condition is gone. The CJS/UMD half was never loadable anyway — the
@@ -799,7 +851,7 @@ A CommonJS consumer must use dynamic `import()` or move to ESM.
 
 ---
 
-### 5. `react-router` 8, and `react-router-dom` is gone
+### 6. `react-router` 8, and `react-router-dom` is gone
 
 Only relevant if you use the admin panel — `@rebasepro/admin`, `app`, `studio`
 or `plugin-ai`. A headless install has no router.
@@ -857,7 +909,7 @@ Vitest needs none of this.
 
 ---
 
-### 6. Package renames
+### 7. Package renames
 
 Import paths only — no behaviour moved with them.
 
@@ -891,7 +943,7 @@ unchanged — it describes where collections come from, not the UI.
 
 ---
 
-### 7. Every deprecated export is removed
+### 8. Every deprecated export is removed
 
 Eleven symbols that carried `@deprecated` are gone rather than carried across
 the 1.0 line, where removing one would cost a major.
@@ -970,7 +1022,7 @@ grep -rnE "buildCollection|buildProperty|RebaseUser|RebaseTokens|UserInfo|AuthAp
 
 ---
 
-### 8. `defaultSecurityRules` moved off the server config
+### 9. `defaultSecurityRules` moved off the server config
 
 It used to live on `RebaseBackendConfig`, where it enforced nothing: `db push`
 generates the Postgres policies — the only thing that actually enforces
@@ -995,7 +1047,7 @@ database's own RLS is the whole model and there is nothing to default.
 
 ---
 
-### 9. Smaller behaviour changes
+### 10. Smaller behaviour changes
 
 **A write naming a field the collection lacks is now a 400.** Unknown keys used
 to travel into the INSERT, so a typo came back as `column "titel" does not
@@ -1028,10 +1080,12 @@ restores the old behaviour.
 [ ] grep for authenticated() and auth.uid() IS NOT NULL in config/collections/
 [ ] decide the intent of each rule; rewrite the ones that meant "public"
 [ ] replace not(authenticated()) with serverContext()
+[ ] if realtime.requireAuth was true with an AuthAdapter, treat the socket as
+    having been open — verify RLS on every subscribable collection (section 2)
 [ ] SELECT ... FROM pg_policies — record the qual of every policy BEFORE
 [ ] update package names and imports
-[ ] grep for rebase.data — it is now rebase.dataAsAdmin (section 7)
-[ ] grep for the other ten removed deprecated exports (section 7)
+[ ] grep for rebase.data — it is now rebase.dataAsAdmin (section 8)
+[ ] grep for the other ten removed deprecated exports (section 8)
 [ ] drop react-router-dom; import RouterProvider from "react-router/dom"
 [ ] check node >= 22.22.0 and react >= 19.2.7 (react-router 8 requires both)
 [ ] move defaultSecurityRules into config/collections/index.ts
@@ -1040,7 +1094,7 @@ restores the old behaviour.
 [ ] run db push
 [ ] run rebase doctor --policies — expect no Insecure or Orphaned entries
 [ ] SELECT ... FROM pg_policies again — confirm every intended change landed
-[ ] exercise the app signed OUT, in a private window
+[ ] exercise the app signed OUT, in a private window — watch the websocket too
 ```
 
 `rebase doctor --policies` is the one to wire into CI: it exits non-zero on a
