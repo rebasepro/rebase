@@ -46,6 +46,8 @@ export const pt: RebaseTranslations = {
     clear_filter: "Limpar filtro",
     clear_filter_sort: "Limpar filtro/ordenação",
     clear_sort: "Limpar ordenação",
+    sort: "Ordenar",
+    sort_by: "Ordenar por",
     clear_all: "Limpar tudo",
     no_items: "Sem itens",
     no_entries_found: "Nenhum registo encontrado",

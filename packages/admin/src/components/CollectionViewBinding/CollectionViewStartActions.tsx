@@ -2,12 +2,13 @@ import type { Properties } from "@rebasepro/types";
 
 import React, { useState, useCallback } from "react";
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/app";
-import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
+import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection, ViewMode } from "@rebasepro/admin-types";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import { Badge, Button, cls, FilterIcon, IconButton, Tooltip, XIcon } from "@rebasepro/ui";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
 import { FiltersDialog } from "./FiltersDialog";
 import { FilterPresetsButton } from "./FilterPresetsButton";
+import { SortButton } from "./SortButton";
 import { toArray } from "@rebasepro/utils";
 import { useNavigate } from "react-router";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
@@ -27,6 +28,11 @@ export type CollectionViewStartActionsProps<M extends Record<string, unknown>> =
      * Resolved properties from the collection for the filters dialog
      */
     resolvedProperties?: Properties;
+    /**
+     * Which view is being displayed. Decides whether the sort control is
+     * offered — see `sortButton`.
+     */
+    viewMode?: ViewMode;
     compact?: boolean;
     openNewDocument: (defaultValues?: Record<string, unknown>) => void;
 }
@@ -40,6 +46,7 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
     tableController,
     collectionEntitiesCount,
     resolvedProperties,
+    viewMode,
     compact,
     openNewDocument
 }: CollectionViewStartActionsProps<M>) {
@@ -127,6 +134,22 @@ parentEntityIds,
         </Tooltip>
     );
 
+    // Ordering the collection is a click on a column header — which only the
+    // table has. The list and card views showed rows in whatever order the
+    // query returned with no way to change it, so they get the control in the
+    // toolbar instead.
+    //
+    // Not the table, where the headers already do this and say which column is
+    // sorted; and not the board, which orders its columns by its own order key
+    // and ignores `sortBy` entirely, so the control would appear to do nothing.
+    const sortButton = resolvedProperties && (viewMode === "list" || viewMode === "cards") && (
+        <SortButton
+            key={"sort_button"}
+            tableController={tableController}
+            properties={resolvedProperties}
+        />
+    );
+
     // Not in the split view. The toolbar there is a strip a few hundred pixels
     // wide above the list, and a row of preset chips crowded out the controls
     // that act on what you are looking at. The presets are still one click away
@@ -143,6 +166,7 @@ parentEntityIds,
     const actions: React.ReactNode[] = [
         backButton,
         filtersButton,
+        sortButton,
         <ClearFilterSortButton
             key={"clear_filter"}
             tableController={tableController}

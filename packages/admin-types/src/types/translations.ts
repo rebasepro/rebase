@@ -62,6 +62,9 @@ export interface RebaseTranslations {
     clear_filter: string;
     clear_filter_sort: string;
     clear_sort: string;
+    /** Toolbar control that orders the collection, outside the table view */
+    sort: string;
+    sort_by: string;
     /** Reset all active filters */
     clear_all: string;
     no_items: string;

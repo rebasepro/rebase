@@ -41,6 +41,8 @@ export const it: RebaseTranslations = {
     clear_filter: "Cancella filtro",
     clear_filter_sort: "Cancella filtro/ordinamento",
     clear_sort: "Cancella ordinamento",
+    sort: "Ordina",
+    sort_by: "Ordina per",
     clear_all: "Cancella tutto",
     no_items: "Nessun elemento",
     no_entries_found: "Nessuna voce trovata",

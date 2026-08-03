@@ -67,6 +67,39 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
         });
 }
 
+export type SortablePropertyOption = {
+    key: string;
+    title: string;
+    property: Property;
+};
+
+/**
+ * The properties a sort can be applied to, as keys and titles.
+ *
+ * Only the table renders headers, so the list, card and split views had no way
+ * to order anything — the controller has carried `sortBy` all along, with no
+ * control bound to it outside the table. This is the same walk
+ * `propertiesToColumns` makes, under the same keys and the same
+ * `sortableProperty` authority, so a sort picked from the toolbar means exactly
+ * what clicking the header would have meant, and the two cannot drift into
+ * offering different columns.
+ */
+export function getSortablePropertyOptions(properties: Properties): SortablePropertyOption[] {
+    return Object.entries<Property>(properties)
+        .flatMap(([key, property]) => getColumnKeysForProperty(property, key))
+        .flatMap(({ key }) => {
+            // Unlike the table, a missing property here is not worth throwing
+            // over: the sort control simply has one fewer option to offer.
+            const property = getResolvedPropertyInPath(properties, key) as Property | undefined;
+            if (!property || !sortableProperty(property)) return [];
+            return [{
+                key: key as string,
+                title: property.name ?? key as string,
+                property
+            }];
+        });
+}
+
 /**
  * Whether this column can be ordered by.
  *

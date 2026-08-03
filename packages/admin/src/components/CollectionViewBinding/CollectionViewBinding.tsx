@@ -970,6 +970,7 @@ parentEntityIds,
                     selectionController={usedSelectionController}
                     collectionEntitiesCount={docsCount ?? undefined}
                     resolvedProperties={resolvedCollection.properties}
+                    viewMode={viewMode}
                     openNewDocument={openNewDocument}
                     compact={isCompact}/>}
                 actions={

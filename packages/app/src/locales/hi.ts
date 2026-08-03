@@ -41,6 +41,8 @@ export const hi: RebaseTranslations = {
     clear_filter: "फ़िल्टर साफ़ करें",
     clear_filter_sort: "फ़िल्टर/सॉर्ट साफ़ करें",
     clear_sort: "सॉर्ट साफ़ करें",
+    sort: "क्रमबद्ध करें",
+    sort_by: "इसके अनुसार क्रमबद्ध करें",
     clear_all: "सभी साफ़ करें",
     no_items: "कोई आइटम नहीं",
     no_entries_found: "कोई प्रविष्टि नहीं मिली",

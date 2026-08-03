@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { Properties } from "@rebasepro/types";
 
-import { propertiesToColumns } from "../../src/components/CollectionTableBinding/column_utils";
+import { getSortablePropertyOptions, propertiesToColumns } from "../../src/components/CollectionTableBinding/column_utils";
 
 /**
  * Which columns offer a sort.
@@ -78,5 +78,53 @@ describe("column sortability follows the property, not the table", () => {
         } as unknown as Properties;
 
         expect(propertiesToColumns({ properties, sortable: false }).every(c => !c.sortable)).toBe(true);
+    });
+});
+
+/**
+ * The toolbar's sort control (list and card views, which have no headers to
+ * click) offers the same columns the table does. Two walks over the same
+ * properties are two chances to disagree — one offering a sort the other
+ * refuses — so they are pinned to each other here.
+ */
+describe("the toolbar sort options match the table's sortable columns", () => {
+
+    it("offers exactly the keys the table marks sortable", () => {
+        const properties = {
+            title: { name: "Title", type: "string" },
+            views: { name: "Views", type: "number" },
+            author: { name: "Author", type: "relation", relation: { kind: "belongsTo" } },
+            tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany" } }
+        } as unknown as Properties;
+
+        expect(getSortablePropertyOptions(properties).map(o => o.key).sort())
+            .toEqual(sortableKeys(properties));
+    });
+
+    it("spreads a map's children under the same dotted keys the table uses", () => {
+        const properties = {
+            address: {
+                name: "Address",
+                type: "map",
+                admin: { spreadChildren: true },
+                properties: {
+                    city: { name: "City", type: "string" },
+                    zip: { name: "Zip", type: "string" }
+                }
+            }
+        } as unknown as Properties;
+
+        expect(getSortablePropertyOptions(properties).map(o => o.key).sort())
+            .toEqual(["address.city", "address.zip"]);
+    });
+
+    it("labels an option with the property name, falling back to its key", () => {
+        const properties = {
+            title: { name: "Title", type: "string" },
+            slug: { type: "string" }
+        } as unknown as Properties;
+
+        expect(getSortablePropertyOptions(properties).map(o => o.title))
+            .toEqual(["Title", "slug"]);
     });
 });
