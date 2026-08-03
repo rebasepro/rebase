@@ -6,9 +6,13 @@ import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { useCustomizationController, useFetch, ErrorView, useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { Skeleton } from "@rebasepro/ui";
 import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
+import {
+    InlineEntityPreview,
+    InlineEntityPreviewMissing,
+    InlineEntityPreviewSkeleton
+} from "../../components/InlineEntityPreview";
+import { useIsNestedEntityPreview } from "../../components/EntityPreviewNesting";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
-import { getEntityTitlePropertyKeyForEntity } from "../../util/previews";
-import { getValueInPath } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type RelationPreviewProps = {
@@ -64,9 +68,10 @@ function extractDisplayFromPlainObject(obj: unknown): string {
  */
 export const RelationPreview = function RelationPreview(props: RelationPreviewProps) {
     const relation = props.relation;
+    const nested = useIsNestedEntityPreview();
     if (!(typeof relation === "object" && "isEntityRelation" in relation && relation.isEntityRelation())) {
         console.warn("Relation preview received value of type", typeof relation);
-        if (props.textOnly) {
+        if (props.textOnly || nested) {
             const display = extractDisplayFromPlainObject(relation);
             return <span className="truncate">{display}</span>;
         }
@@ -95,6 +100,7 @@ function RelationPreviewInternalInner({
     collection
 }: RelationPreviewProps & { collection?: AdminCollection }) {
     const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
+    const nested = useIsNestedEntityPreview();
 
     if (!collection) {
         if (ResolvedMissingReference !== DefaultMissingReference) {
@@ -102,6 +108,10 @@ function RelationPreviewInternalInner({
         } else {
             if (textOnly) {
                 return <span>{relation.path}</span>;
+            }
+            if (nested) {
+                return <InlineEntityPreviewMissing label={String(relation.id)}
+                    tooltip={`Collection not found: ${relation.path}`}/>;
             }
             return <EntityPreviewContainer size={size}>
                 <ErrorView error={`Collection not found: ${relation.path}`}/>
@@ -162,6 +172,11 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     const passedEntity = relation.data as Entity<M> | undefined;
     const ResolvedEntityPreview = useComponentOverride("EntityPreview", EntityPreviewBinding);
     const customizationController = useCustomizationController();
+    const nested = useIsNestedEntityPreview();
+
+    // Nested inside another preview, or filling a title slot: one line of text,
+    // not a second card. See {@link InlineEntityPreview}.
+    const inline = nested || Boolean(textOnly);
 
     const {
         entity,
@@ -190,8 +205,9 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     }
 
     if (body) {
-        if (textOnly) {
-            return <span>{relation.id}</span>;
+        if (inline) {
+            return <InlineEntityPreviewMissing label={String(relation.id)}
+                tooltip={relation.pathWithId}/>;
         }
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
@@ -203,8 +219,8 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     }
 
     if (dataLoading && !usedEntity) {
-        if (textOnly) {
-            return <Skeleton className="inline-block w-20 h-4" />;
+        if (inline) {
+            return <InlineEntityPreviewSkeleton/>;
         }
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
@@ -216,8 +232,9 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
     }
 
     if (!usedEntity) {
-        if (textOnly) {
-            return <span>{relation.id}</span>;
+        if (inline) {
+            return <InlineEntityPreviewMissing label={String(relation.id)}
+                tooltip={"Entity not found"}/>;
         }
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
@@ -228,11 +245,14 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
         );
     }
 
-    if (textOnly) {
-        const titleProperty = getEntityTitlePropertyKeyForEntity(collection, usedEntity.values, usedEntity.id);
-        const titleValue = titleProperty ? getValueInPath(usedEntity.values, titleProperty) : undefined;
-        const displayValue = titleValue !== undefined && titleValue !== null ? String(titleValue) : String(relation.id);
-        return <span className="truncate">{displayValue}</span>;
+    if (inline) {
+        return <InlineEntityPreview entity={usedEntity}
+            collection={collection}
+            disabled={disabled}
+            onClick={onClick}
+            // In a title slot the row itself is the click target; only a
+            // preview nested inside a card opens its own side panel.
+            includeEntityLink={!textOnly && includeEntityLink !== false}/>;
     }
 
     return <ResolvedEntityPreview size={size}

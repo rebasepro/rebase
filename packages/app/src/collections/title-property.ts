@@ -213,6 +213,47 @@ index });
 }
 
 /**
+ * The relation a collection *leads* with, if it leads with one.
+ *
+ * A junction-shaped collection — a pipeline entry, a membership, a booking —
+ * holds no label of its own: it is "this candidate, for that vacancy". The
+ * general ranking puts relations last (they only read once the target
+ * resolves), so the title slot would otherwise fall to whatever free text
+ * happens to follow: a note, a comment. Preview surfaces that render one row
+ * per entity (list, cards, board) prefer the leading relation instead.
+ *
+ * The decision is structural — the first property that could be a title, in the
+ * order the developer declared (or ordered) them. Declaration order is a
+ * statement about what the collection is about; property *names* are not
+ * consulted here.
+ *
+ * Returns `undefined` when that first property is anything but a
+ * single-cardinality relation, or when the collection states its own
+ * `titleProperty`.
+ *
+ * @group Collections
+ */
+export function getLeadingRelationTitleKey<M extends Record<string, unknown>>(
+    collection: AdminCollection<M>
+): string | undefined {
+    if (!collection.properties) return undefined;
+    if (collection.titleProperty) return undefined;
+
+    const idKeys = new Set<string>(getPrimaryKeys(collection) as string[]);
+    const foreignKeys = getForeignKeyColumns(collection);
+    const order = (collection.propertiesOrder as string[] | undefined) ?? Object.keys(collection.properties);
+
+    for (const key of order) {
+        const property = collection.properties[key];
+        if (!property || isPropertyBuilder(property)) continue;
+        if (scoreTitleCandidate(property as Property, key, idKeys, foreignKeys) === SCORE.DISQUALIFIED) continue;
+        return (property as Property).type === "relation" ? key : undefined;
+    }
+
+    return undefined;
+}
+
+/**
  * The property that should fill the title slot for a collection, ignoring any
  * concrete values. Prefer {@link getTitlePropertyKeyForValues} when an entity
  * is at hand — it can skip candidates that happen to be empty or to hold an id.

@@ -1,20 +1,15 @@
 import React, { PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
+    AutofillResult,
     DataEnhancementController,
-    EnhancedDataResult,
     EnhanceParams,
     InputProperty
 } from "../types/data_enhancement_controller";
-import {
-    useAuthController,
-    useCustomizationController,
-    useSnackbarController
-} from "@rebasepro/app";
-import { useUrlController } from "@rebasepro/admin";
-import { DataDriver, Entity, CollectionConfig } from "@rebasepro/types";
+import { useAuthController, useSnackbarController } from "@rebasepro/app";
+import { CollectionConfig } from "@rebasepro/types";
 import { PluginFormActionProps } from "@rebasepro/admin-types";
-import { enhanceDataAPIStream, fetchEntityPromptSuggestion } from "../api";
+import { autofillStream, fetchAiStatus, fetchPromptSuggestions } from "../api";
 import { getAppendableSuggestion } from "../utils/suggestions";
 import { getSimplifiedProperties } from "../utils/properties";
 import { useEditorAIController } from "../editor/useEditorAIController";
@@ -24,19 +19,17 @@ const DataEnhancementControllerContext = React.createContext<DataEnhancementCont
 
 type DataEnhancementControllerProviderProps = {
 
-    apiKey: string;
-
     getConfigForPath?: (props: {
         path: string,
         collection: CollectionConfig
     }) => boolean;
 
-    host?: string;
+    endpoint?: string;
 }
 
 export const useDataEnhancementController = (): DataEnhancementController => useContext(DataEnhancementControllerContext);
 
-function getPropertyFromKey(properties: Record<string, InputProperty>, propertyKey: string) {
+function getPropertyFromKey(properties: Record<string, InputProperty>, propertyKey: string): InputProperty | undefined {
     if (propertyKey in properties) {
         return properties[propertyKey];
     } else {
@@ -51,17 +44,34 @@ function getPropertyFromKey(properties: Record<string, InputProperty>, propertyK
     }
 }
 
+/**
+ * Convert a value off the wire into what the form field expects.
+ *
+ * Only dates need converting: the service answers ISO-8601 strings because JSON
+ * has no date type, and handing a date field a string stores the wrong type
+ * without complaining. Everything else — strings, numbers, booleans, arrays of
+ * scalars — is already the shape the field wants, which is the point of having
+ * the service constrain its answer to a schema derived from these properties.
+ */
+function coerceToProperty(value: unknown, property: InputProperty | undefined): unknown {
+    if (property?.type === "date" && typeof value === "string") {
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? undefined : date;
+    }
+    return value;
+}
+
 export function DataEnhancementControllerProvider({
-    apiKey,
     getConfigForPath,
     children,
-    host,
+    endpoint,
     path,
     collection,
     formContext
 }: PropsWithChildren<DataEnhancementControllerProviderProps & PluginFormActionProps>) {
 
-    const [enabled, setEnabled] = useState(false);
+    const [allowedHere, setAllowedHere] = useState(false);
+    const [serviceAvailable, setServiceAvailable] = useState(false);
     const [suggestions, setSuggestions] = useState<Record<string, string | number>>({});
     const [loadingSuggestions, setLoadingSuggestions] = useState<string[]>([]);
 
@@ -70,9 +80,7 @@ export function DataEnhancementControllerProvider({
     const authController = useAuthController();
     const snackbarController = useSnackbarController();
 
-
     const properties = useMemo(() => getSimplifiedProperties(collection.properties, formContext?.values ?? {}), [formContext?.values]);
-    // const preEnhanceValuesRef = React.useRef(formContext?.values ?? {});
     const valuesRef = React.useRef(formContext?.values ?? {});
     useEffect(() => {
         if (!enhancingInProgress.current)
@@ -81,28 +89,39 @@ export function DataEnhancementControllerProvider({
 
     const allowReferenceDataSelection = false;
 
-    const updateConfig = useCallback(async () => {
-        if (!getConfigForPath) return;
-        const config = getConfigForPath({
-            path,
-            collection
-        });
-        if (config) {
-            setEnabled(true);
-        }
-    }, [collection, getConfigForPath, path]);
-
+    /**
+     * The host app's own opt-out.
+     *
+     * The previous version of this only ever called `setEnabled(true)` — there
+     * was no `else` — so a `getConfigForPath` that returned `false` after
+     * having returned `true` for another collection left the plugin switched on.
+     */
     useEffect(() => {
         if (!getConfigForPath) {
-            setEnabled(true);
-        } else {
-            updateConfig();
+            setAllowedHere(true);
+            return;
         }
+        setAllowedHere(Boolean(getConfigForPath({ path, collection })));
+    }, [getConfigForPath, path, collection]);
 
-    }, [getConfigForPath, updateConfig]);
+    /**
+     * The service's own availability.
+     *
+     * Nothing renders until this comes back true. An unreachable host, an
+     * unconfigured provider key or an exhausted daily quota all land here, and
+     * all of them mean the same thing to the operator: no Autofill button,
+     * rather than a button that fails when clicked.
+     */
+    useEffect(() => {
+        if (!allowedHere) return;
+        const abort = new AbortController();
+        fetchAiStatus({ endpoint, signal: abort.signal })
+            .then((status) => setServiceAvailable(status.available))
+            .catch(() => setServiceAvailable(false));
+        return () => abort.abort();
+    }, [allowedHere, endpoint]);
 
-
-    const urlController = useUrlController();
+    const enabled = allowedHere && serviceAvailable;
 
     const clearSuggestion = useCallback((propertyKey: string) => {
         setSuggestions((prev) => {
@@ -122,12 +141,10 @@ export function DataEnhancementControllerProvider({
             return;
         }
 
-        // clearSuggestion(propertyKey);
         const value = getValueInPath(valuesRef.current, propertyKey);
 
         const currentValue = value ? (value as string) + "" : "";
         const updatedValue = currentValue + delta;
-        // if (currentValue.length === 0) updatedValue = updatedValue.trimStart();
         valuesRef.current = {
             ...valuesRef.current,
             [propertyKey]: updatedValue
@@ -139,90 +156,75 @@ export function DataEnhancementControllerProvider({
         }));
     }, [properties, formContext]);
 
-    const updateSuggestedValues = useCallback((currentValues: object, updatedValues: Record<string, string | number>, replaceValues: boolean) => {
+    /**
+     * Apply one completed field.
+     *
+     * The append-vs-replace dance below is what makes autofill feel additive
+     * rather than destructive: when the generated text starts with what the
+     * operator already typed, their words are kept and the rest is appended.
+     */
+    const applyValue = useCallback((propertyKey: string, rawValue: unknown, replaceValues: boolean) => {
 
-        setLoadingSuggestions((prev) => {
-            return prev.filter(p => !Object.keys(updatedValues).includes(p));
-        });
+        setLoadingSuggestions((prev) => prev.filter(p => p !== propertyKey));
 
-        Object.entries(updatedValues).forEach(([propertyKey, suggestion]) => {
+        const property = getPropertyFromKey(properties, propertyKey);
+        if (!property || property.disabled) return;
 
-            const value = getValueInPath(currentValues, propertyKey);
-            const property = getPropertyFromKey(properties, propertyKey);
+        const suggestion = coerceToProperty(rawValue, property);
+        if (suggestion === null || suggestion === undefined) return;
 
-            if (!property || suggestion === null || property?.disabled) {
-                return;
+        const value = getValueInPath(valuesRef.current, propertyKey);
+
+        // Only text can be appended to. A number, a boolean, a date or an array
+        // of tags is a whole value or nothing — the old code ran all of them
+        // through the string-append path, which stringified them into the field.
+        if (typeof suggestion !== "string" || replaceValues) {
+            formContext?.setFieldValue(propertyKey, suggestion);
+            if (typeof suggestion === "string" || typeof suggestion === "number") {
+                setSuggestions(prev => ({ ...prev, [propertyKey]: suggestion }));
             }
+            return;
+        }
 
-            if (typeof suggestion === "number") {
-                formContext?.setFieldValue(propertyKey, suggestion);
-                return;
-            }
+        const appendableValue = getAppendableSuggestion(suggestion, value);
+        const currentValue = value ? (value as string) + "" : "";
 
-            if (replaceValues) {
-                formContext?.setFieldValue(propertyKey, suggestion);
-                return;
-            }
-
-            const appendableValue = getAppendableSuggestion(suggestion, value);
-
-            const currentValue = value ? (value as string) + "" : "";
-            if (appendableValue) {
-                formContext?.setFieldValue(propertyKey, suggestion);
+        if (appendableValue) {
+            formContext?.setFieldValue(propertyKey, suggestion);
+        } else {
+            const multiline = property.fieldConfigId === "multiline" || property.fieldConfigId === "markdown";
+            const trimmedValue = currentValue.trimEnd();
+            if (multiline && (trimmedValue.endsWith(".") || trimmedValue.endsWith("?") || trimmedValue.endsWith("!") || trimmedValue.endsWith(":"))) {
+                formContext?.setFieldValue(propertyKey, trimmedValue + "\n\n" + suggestion.trimStart());
             } else {
-                const multiline = property?.fieldConfigId === "multiline" || property?.fieldConfigId === "markdown";
-                const trimmedValue = currentValue.trimEnd();
-                if (multiline && (trimmedValue.endsWith(".") || trimmedValue.endsWith("?") || trimmedValue.endsWith("!") || trimmedValue.endsWith(":"))) {
-                    formContext?.setFieldValue(propertyKey, trimmedValue + "\n\n" + (suggestion as string).trimStart());
-                } else {
-                    formContext?.setFieldValue(propertyKey, trimmedValue + (trimmedValue.length > 0 ? " " : "") + (suggestion as string));
-                }
+                formContext?.setFieldValue(propertyKey, trimmedValue + (trimmedValue.length > 0 ? " " : "") + suggestion);
             }
-        });
+        }
 
         setSuggestions(prev => ({
             ...prev,
-            ...Object.keys(updatedValues)
-                .reduce((acc, key) => {
-                    const value = getValueInPath(formContext?.values, key);
-                    const suggestion = updatedValues[key];
-                    return {
-                        ...acc,
-                        [key]: getAppendableSuggestion(suggestion, value) ?? suggestion
-                    };
-                }, {})
+            [propertyKey]: appendableValue ?? suggestion
         }));
     }, [properties, formContext]);
 
-    const displayNeededSubscriptionSnackbar = useCallback((projectId: unknown) => {
-        snackbarController.open({
-            type: "warning",
-            message: "A valid subscription is needed in order to use this function.",
-            autoHideDuration: 4000
-        });
-    }, [snackbarController]);
-
-    const editorAIController = useEditorAIController({ getAuthToken: authController.getAuthToken });
+    const editorAIController = useEditorAIController({ endpoint });
 
     const clearAllSuggestions = useCallback(() => {
         setSuggestions({});
     }, []);
 
-    const enhance = useCallback(async (props: EnhanceParams<Record<string, unknown>>): Promise<EnhancedDataResult | null> => {
+    const enhance = useCallback(async (props: EnhanceParams<Record<string, unknown>>): Promise<AutofillResult | null> => {
 
         if (!authController.user) {
             snackbarController.open({
                 type: "warning",
-                message: "You need to be logged in to enhance data"
+                message: "You need to be logged in to use autofill"
             });
             return Promise.reject(new Error("Not logged in"));
         }
 
-        const resolvedPath = urlController.resolveDatabasePathsFrom(path);
-        const firebaseToken = await authController.getAuthToken();
-
         if (props.propertyKey) {
-            clearSuggestion(props.propertyKey)
+            clearSuggestion(props.propertyKey);
         } else {
             clearAllSuggestions();
         }
@@ -230,85 +232,53 @@ export function DataEnhancementControllerProvider({
         setLoadingSuggestions((prev) => [...prev, ...(props.propertyKey ? [props.propertyKey] : Object.keys(properties))]);
         enhancingInProgress.current = true;
 
-        const currentValues = valuesRef.current ?? {};
-
-        return new Promise((resolve, reject) => {
-            function onError(e: unknown) {
-                setLoadingSuggestions([]);
-                const err = e instanceof Error ? e : typeof e === "object" && e !== null ? e : new Error(String(e));
-                const errorObj = err as Record<string, unknown>;
-                if (errorObj.code === "payment-required") {
-                    const data = errorObj.data as Record<string, unknown> | undefined;
-                    const projectId = data?.projectId;
-                    displayNeededSubscriptionSnackbar(projectId);
-                } else {
-                    console.error("Enhance error", e);
-                }
-                reject(e);
-                enhancingInProgress.current = false;
-            }
-
-            try {
-                enhanceDataAPIStream({
-                    ...props,
-                    host,
-                    apiKey,
-                    properties,
-                    path: resolvedPath,
+        try {
+            const result = await autofillStream({
+                endpoint,
+                request: {
                     entityName: collection.singularName ?? collection.name,
                     entityDescription: collection.description,
+                    values: (props.values ?? {}) as Record<string, unknown>,
+                    properties,
+                    propertyKey: props.propertyKey,
+                    propertyInstructions: props.propertyInstructions,
+                    instructions: props.instructions
+                },
+                onDelta: appendValueDelta,
+                onValue: (key, value) => applyValue(key, value, props.replaceValues ?? false)
+            });
 
-                    firebaseToken,
-                    onUpdate: (suggestions) => {
-                        console.debug("de onUpdate", suggestions);
-                        updateSuggestedValues(currentValues, suggestions, props.replaceValues ?? false);
-                    },
-                    onUpdateDelta: (propertyKey: string, partialValue: string) => {
-                        // console.debug("de delta", propertyKey, partialValue);
-                        appendValueDelta(propertyKey, partialValue);
-                    },
-                    onError,
-                    onEnd: (result) => {
-                        console.debug("de onEnd", result);
-                        if (result.errors) {
-                            result.errors.forEach((error) => {
-                                snackbarController.open({
-                                    type: "warning",
-                                    message: error
-                                })
-                            });
-                        }
-                        if (Object.keys(result.suggestions).length === 0) {
-                            snackbarController.open({
-                                type: "info",
-                                autoHideDuration: 1800,
-                                message: "No fields were updated"
-                            })
-                        }
-                        setLoadingSuggestions([]);
-                        resolve(result);
-                        enhancingInProgress.current = false;
-                    }
-                }).catch(onError);
-            } catch (e: unknown) {
-                onError(e);
+            if (Object.keys(result.suggestions).length === 0) {
+                snackbarController.open({
+                    type: "info",
+                    autoHideDuration: 1800,
+                    message: "No fields were updated"
+                });
             }
-        });
+            return result;
+        } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : "Autofill could not be completed";
+            snackbarController.open({
+                type: "error",
+                message
+            });
+            throw e;
+        } finally {
+            setLoadingSuggestions([]);
+            enhancingInProgress.current = false;
+        }
     }, [
-        authController, urlController, path, clearSuggestion, clearAllSuggestions,
-        properties, host, apiKey, collection, updateSuggestedValues, appendValueDelta, displayNeededSubscriptionSnackbar, snackbarController
+        authController.user, clearSuggestion, clearAllSuggestions, properties, endpoint,
+        collection, appendValueDelta, applyValue, snackbarController
     ]);
 
     const getSamplePrompts = useCallback(async (entityName: string, input?: string) => {
-        const firebaseToken = await authController.getAuthToken()
-        return fetchEntityPromptSuggestion({
-            host,
+        return fetchPromptSuggestions({
+            endpoint,
             entityName,
-            firebaseToken,
-            apiKey,
             input
         });
-    }, [apiKey, authController.getAuthToken, host]);
+    }, [endpoint]);
 
     const dataEnhancementController: DataEnhancementController = useMemo(() => ({
         enabled,
@@ -339,5 +309,3 @@ export function DataEnhancementControllerProvider({
         </DataEnhancementControllerContext.Provider>
     );
 }
-
-

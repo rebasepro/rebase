@@ -138,6 +138,29 @@ const databasesCollectionNoOrder: CollectionConfig = {
     propertiesOrder: undefined
 } as unknown as CollectionConfig;
 
+/**
+ * A relation that is *not* what the collection leads with: the row has text of
+ * its own, so the relation stays a chip.
+ */
+const collectionWithTrailingRelation: CollectionConfig = {
+    id: "labelled",
+    name: "Labelled",
+    slug: "labelled",
+    path: "labelled",
+    properties: {
+        id: {
+            name: "ID",
+            type: "string",
+            isId: "uuid"
+        } as unknown as Property,
+        label: {
+            name: "Label",
+            type: "string"
+        } as Property,
+        project: (databasesCollection.properties as Record<string, Property>).project
+    }
+} as unknown as CollectionConfig;
+
 // ---------------------------------------------------------------------------
 // getEntityPreviewKeys — with explicit propertiesOrder
 // ---------------------------------------------------------------------------
@@ -187,10 +210,21 @@ describe("resolveCollectionSlotKeys with propertiesOrder (databases collection)"
         expect(slotKeys.subtitleKey).toBe("connectionString");
     });
 
-    it("still separates relations into relationKeys when propertiesOrder is NOT set", () => {
+    // A collection that *leads* with a relation is named by it, ordered or not:
+    // the leading relation is what the row is about, and the rule reads
+    // declaration order rather than property names.
+    it("uses the leading relation as the title even without propertiesOrder", () => {
         const slotKeys = resolveCollectionSlotKeys(databasesCollectionNoOrder, mockAuthController, fields);
+        expect(slotKeys.titleKey).toBe("project");
+        // Already the row's headline — not repeated as a chip below it.
+        expect(slotKeys.relationKeys).not.toContain("project");
+        expect(slotKeys.subtitleKey).not.toBe("project");
+    });
+
+    it("still separates a relation that is not the leading property into relationKeys", () => {
+        const slotKeys = resolveCollectionSlotKeys(collectionWithTrailingRelation, mockAuthController, fields);
+        expect(slotKeys.titleKey).toBe("label");
         expect(slotKeys.relationKeys).toContain("project");
-        // subtitleKey should NOT be the relation
         expect(slotKeys.subtitleKey).not.toBe("project");
     });
 });

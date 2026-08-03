@@ -25,6 +25,8 @@ import { BooleanPreview } from "./components/BooleanPreview";
 import { NumberPropertyPreview } from "./property_previews/NumberPropertyPreview";
 import { ErrorView } from "@rebasepro/app";
 import { RelationPreview } from "./components/RelationPreview";
+import { InlineEntityListPreview } from "./components/InlineEntityListPreview";
+import { useIsNestedEntityPreview } from "../components/EntityPreviewNesting";
 import { UserPreview } from "./components/UserPreview";
 
 /**
@@ -34,6 +36,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
 
     const authController = useAuthController();
     const customizationController = useCustomizationController();
+    const nested = useIsNestedEntityPreview();
 
     let content: React.ReactNode | any;
     const {
@@ -219,28 +222,34 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
             content = <EmptyValue/>;
         } else if (Array.isArray(value)) {
             // Many-cardinality relation: value is an array of EntityRelation (or plain objects)
-            content = (
-                <div className="flex flex-col w-full gap-0.5">
-                    {(value as unknown[]).map((item: unknown, index: number) => {
-                        const entityRelation = normalizeToEntityRelation(item, "relation");
-                        if (!entityRelation) return null;
-                        return (
+            const relations = (value as unknown[])
+                .map(item => normalizeToEntityRelation(item, "relation"))
+                .filter(Boolean) as EntityRelation[];
+            const renderRelation = (entityRelation: EntityRelation, index: number) => <RelationPreview
+                key={`preview_rel_${propertyKey}_${index}`}
+                disabled={!property.relation}
+                previewProperties={property.admin?.previewProperties}
+                includeId={property.admin?.includeId}
+                includeEntityLink={property.admin?.includeEntityLink}
+                size={"small"}
+                relation={entityRelation}
+                textOnly={props.textOnly}
+            />;
+
+            content = nested || props.textOnly
+                // See ArrayOfReferencesPreview: nested lists stay on one line.
+                ? <InlineEntityListPreview items={relations}
+                    renderItem={renderRelation}/>
+                : (
+                    <div className="flex flex-col w-full gap-0.5">
+                        {relations.map((entityRelation, index) => (
                             <div className="w-full"
-                                key={`preview_rel_${propertyKey}_${index}`}>
-                                <RelationPreview
-                                    disabled={!property.relation}
-                                    previewProperties={property.admin?.previewProperties}
-                                    includeId={property.admin?.includeId}
-                                    includeEntityLink={property.admin?.includeEntityLink}
-                                    size={"small"}
-                                    relation={entityRelation}
-                                    textOnly={props.textOnly}
-                                />
+                                key={`preview_rel_wrapper_${propertyKey}_${index}`}>
+                                {renderRelation(entityRelation, index)}
                             </div>
-                        );
-                    })}
-                </div>
-            );
+                        ))}
+                    </div>
+                );
         } else {
             // Single-cardinality relation
             const relationValue = normalizeToEntityRelation(value, "relation");

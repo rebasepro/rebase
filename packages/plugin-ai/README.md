@@ -14,10 +14,31 @@ pnpm add @rebasepro/plugin-ai
 
 This plugin adds AI-powered capabilities to the Rebase admin panel:
 
-- **Form autofill** — An "Enhance" action button injected into snapshot forms that uses AI to suggest and fill field values based on collection schema and existing data.
-- **Editor autocomplete** — A streaming text autocomplete controller for rich text editors, powered by an AI backend.
+- **Form autofill** — An "Autofill" action in the entity form footer that fills fields from the collection schema, whatever is already in the record, and an optional instruction.
+- **Editor autocomplete** — A streaming inline continuation for the rich text editor.
 
 It registers as a standard `RebasePlugin`, injecting UI slots and providers automatically.
+
+## How it reaches a model
+
+The plugin talks to a small hosted service that Rebase runs and pays for. There is
+**nothing to configure and no API key to obtain** — install the plugin, mount it, done.
+
+Two consequences worth knowing:
+
+- **Requests are anonymous.** No auth token of any kind leaves your app. The service
+  cannot verify a self-hosted backend's JWT (you sign it with your own secret), so
+  asking for one would only hand a live credential to a third party that has no use
+  for it. Cost is bounded by rate limits and a daily ceiling instead.
+- **Your collection schema and the record's current values are sent** with each
+  autofill request, because the service has no other way to know the shape of what
+  it is filling. If that is not acceptable for your data, set `endpoint` and run the
+  service yourself — the reference implementation is `saas/backend/functions/ai.ts`
+  in the Rebase repository, and the wire format is documented in `src/api.ts`.
+
+The plugin renders nothing until the service's `GET /status` reports itself
+available, so an unreachable host or an exhausted daily quota means no Autofill
+button — never a button that fails when clicked.
 
 ## Key Exports
 
@@ -31,38 +52,39 @@ It registers as a standard `RebasePlugin`, injecting UI slots and providers auto
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `apiKey` | `string` | Built-in default key | API key for the data enhancement service |
-| `getConfigForPath` | `(props: { path, collection, user }) => boolean` | — | Return `false` to disable enhancement for specific paths |
-| `host` | `string` | — | Custom API host (development only) |
+| `getConfigForPath` | `(props: { path, collection, user }) => boolean` | — | Return `false` to disable autofill for specific paths |
+| `endpoint` | `string` | Rebase's hosted service | Base URL of the AI service. Point it at your own deployment to keep generation inside your infrastructure |
 
 ## Quick Start
 
 ```tsx
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
 
-// In your app setup:
 const dataEnhancementPlugin = useDataEnhancementPlugin({
-    getConfigForPath: ({ path, collection }) => {
-        // Disable for certain collections
-        return collection.name !== "system_logs";
-    }
+    getConfigForPath: ({ collection }) => collection.name !== "system_logs"
 });
 
 // Pass to your Rebase app:
-<RebaseFirebaseApp
-    plugins={[dataEnhancementPlugin]}
-    // ...other props
-/>
+// <Rebase plugins={[dataEnhancementPlugin]} ... />
 ```
+
+### Self-hosting the service
+
+```tsx
+const dataEnhancementPlugin = useDataEnhancementPlugin({
+    endpoint: "https://ai.internal.example.com"
+});
+```
+
+Your endpoint needs to answer `GET /status`, `POST /autofill` (SSE), `POST /autocomplete`
+(SSE) and `POST /prompts`.
 
 ### Editor AI Autocomplete
 
 ```tsx
 import { useEditorAIController } from "@rebasepro/plugin-ai";
 
-const aiController = useEditorAIController({
-    getAuthToken: () => firebaseUser.getIdToken()
-});
+const aiController = useEditorAIController();
 
 // Use in a rich text editor:
 await aiController.autocomplete(
@@ -73,6 +95,14 @@ await aiController.autocomplete(
     }
 );
 ```
+
+## Migrating from the FireCMS-era plugin
+
+The `apiKey` and `host` props are gone. `apiKey` shipped a hardcoded key in the
+published package and pointed at a service that no longer exists; `host` is now
+`endpoint` and is a supported production option rather than a development-only
+escape hatch. `useEditorAIController` no longer takes `getAuthToken` — it needs no
+token.
 
 ## Related Packages
 

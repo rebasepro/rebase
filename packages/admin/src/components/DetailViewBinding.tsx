@@ -9,6 +9,7 @@ import { PluginProviderStack, resolveComponentRef, useComponentOverride, Collect
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { EntityViewBinding } from "./EntityViewBinding";
 import { EntityIdentityBar } from "./EntityIdentityBar";
+import { SplitListCloseButton } from "./CollectionViewBinding/SplitListCloseButton";
 import { EntityInspector, InspectorTab } from "./EntityInspector";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
@@ -76,6 +77,11 @@ export interface DetailViewBindingProps<M extends Record<string, unknown> = Reco
     onEditClick?: () => void;
     layout?: "side_panel" | "full_screen" | "split" | "dialog";
     barActions?: (params: BarActionsParams) => React.ReactNode;
+    /**
+     * Controls the owning panel puts at the identity bar's leading edge, ahead
+     * of the breadcrumb — the side panel's close button.
+     */
+    barActionsStart?: React.ReactNode;
 }
 
 export function DetailViewBinding<M extends Record<string, unknown>>({
@@ -134,7 +140,8 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
     entity,
     dataLoading,
     layout = "full_screen",
-    barActions
+    barActions,
+    barActionsStart
 }: DetailViewBindingProps<M> & {
     entity?: Entity<M>,
     dataLoading: boolean,
@@ -527,6 +534,13 @@ entityId }
             saving={false}
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
+            leading={<>
+                {barActionsStart}
+                {/* Split view: closing the list is opening this record
+                    full screen, and the control for it belongs at this
+                    bar's leading edge. */}
+                {layout === "split" && <SplitListCloseButton/>}
+            </>}
             trailing={<>
                 {editButton}
                 {pluginActionsTop}

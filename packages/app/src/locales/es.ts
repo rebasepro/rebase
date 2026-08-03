@@ -82,6 +82,7 @@ export const es: RebaseTranslations = {
     log_out: "Cerrar sesión",
     column_cannot_be_edited: "Esta columna no se puede editar directamente",
     close: "Cerrar",
+    hide_list: "Ocultar lista",
     unsaved_local_changes: "Cambios locales sin guardar",
     unsaved_local_changes_description: "Este documento ha sido editado localmente y tiene cambios sin guardar. Estos cambios locales se perderán si no los aplicas.",
     preview_changes: "Previsualizar cambios",

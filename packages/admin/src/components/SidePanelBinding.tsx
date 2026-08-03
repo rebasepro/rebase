@@ -193,16 +193,19 @@ entityId }
                         parentCollectionSlugs={parentCollectionSlugs}
                         parentEntityIds={parentEntityIds}
                         onEditClick={openEditView}
+                        barActionsStart={
+                            // At the bar's leading edge, where the breadcrumb
+                            // starts: the corner of the panel it closes.
+                            <IconButton
+                                className="self-center"
+                                size={"small"}
+                                onClick={onClose}>
+                                <XIcon/>
+                            </IconButton>}
                         barActions={({
                             status,
                             values
                         }) => <div className="flex gap-1">
-                                <IconButton
-                                    className="self-center"
-                                    size={"small"}
-                                    onClick={onClose}>
-                                    <XIcon/>
-                                </IconButton>
                                 {allowFullScreen && <IconButton
                                     className="self-center"
                                     size={"small"}
@@ -242,16 +245,19 @@ entityId }
                         onValuesModified={onValuesModified}
                         onSaved={onUpdate}
                         navigateBack={closeEditView}
+                        barActionsStart={
+                            // At the bar's leading edge, where the breadcrumb
+                            // starts: the corner of the panel it closes.
+                            <IconButton
+                                className="self-center"
+                                size={"small"}
+                                onClick={onClose}>
+                                <XIcon/>
+                            </IconButton>}
                         barActions={({
                             status,
                             values
                         }) => <div className="flex gap-1">
-                                <IconButton
-                                    className="self-center"
-                                    size={"small"}
-                                    onClick={onClose}>
-                                    <XIcon/>
-                                </IconButton>
                                 {allowFullScreen && <IconButton
                                     className="self-center"
                                     size={"small"}

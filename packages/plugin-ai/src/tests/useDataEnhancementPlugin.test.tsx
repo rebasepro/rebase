@@ -18,7 +18,8 @@ if (typeof window !== "undefined") {
 }
 
 import { renderHook } from "@testing-library/react";
-import { DEFAULT_API_KEY, useDataEnhancementPlugin } from "../useDataEnhancementPlugin";
+import { useDataEnhancementPlugin } from "../useDataEnhancementPlugin";
+import { DEFAULT_AI_ENDPOINT } from "../api";
 
 jest.mock("@rebasepro/admin", () => ({
     useUrlController: () => ({})
@@ -35,27 +36,37 @@ describe("useDataEnhancementPlugin hook", () => {
         // the indexed form only compiled because nothing type-checked this file.
         // `toMatchObject` needs no narrowing and pins the fields together, which
         // is what "correct metadata" actually means.
-        //
-        // `apiKey` is compared against the exported constant, not a copy of it:
-        // a copy pins the key rather than the wiring that hands it to the
-        // provider.
         expect(plugin).toMatchObject({
             key: "data_enhancement",
             slots: [{ slot: "form.actions" }],
-            providers: [{ scope: "form", props: { apiKey: DEFAULT_API_KEY } }]
+            providers: [{ scope: "form" }]
         });
     });
 
-    it("accepts and forwards custom apiKey and host props", () => {
-        const customProps = {
-            apiKey: "custom-key",
-            host: "https://custom-host.com"
-        };
-        const { result } = renderHook(() => useDataEnhancementPlugin(customProps));
-        const plugin = result.current;
+    it("ships no credentials", () => {
+        // The FireCMS-era plugin exported a hardcoded `fcms-…` key as
+        // `DEFAULT_API_KEY` and handed it to the provider. Anyone who installed
+        // the package got a copy. Nothing key-shaped may reach the provider
+        // props again — the hosted service authenticates nobody by design.
+        const { result } = renderHook(() => useDataEnhancementPlugin());
+        const props = result.current.providers?.[0]?.props ?? {};
+        expect(Object.keys(props)).toEqual(expect.not.arrayContaining(["apiKey", "firebaseToken", "token"]));
+        expect(JSON.stringify(props)).not.toMatch(/fcms-/);
+    });
 
-        expect(plugin).toMatchObject({
-            providers: [{ props: { apiKey: "custom-key", host: "https://custom-host.com" } }]
+    it("forwards a custom endpoint so a self-hoster can proxy the service", () => {
+        const { result } = renderHook(() => useDataEnhancementPlugin({ endpoint: "https://ai.example.com" }));
+
+        expect(result.current).toMatchObject({
+            providers: [{ props: { endpoint: "https://ai.example.com" } }]
         });
+    });
+
+    it("leaves the endpoint unset so the client falls back to the hosted default", () => {
+        // Compared against the exported constant rather than a copy of the URL:
+        // a copy pins the string, this pins the wiring.
+        const { result } = renderHook(() => useDataEnhancementPlugin());
+        expect(result.current.providers?.[0]?.props?.endpoint).toBeUndefined();
+        expect(DEFAULT_AI_ENDPOINT).toMatch(/^https:\/\//);
     });
 });

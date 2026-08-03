@@ -3,7 +3,7 @@ import type { Property, RelationProperty } from "@rebasepro/types";
 import type { Entity, EntityRelation } from "@rebasepro/types";
 import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/app";
-import { getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/app";
+import { getLeadingRelationTitleKey, getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
@@ -119,7 +119,15 @@ export function resolveCollectionSlotKeys(
     authController: AuthController,
     propertyConfigs: Record<string, PropertyConfig>
 ): CollectionSlotKeys {
-    const titleKeyCandidates = getTitlePropertyCandidates(collection);
+    // One row per entity: when the collection leads with a relation and holds no
+    // name of its own, that relation *is* what the row is called. See
+    // `getLeadingRelationTitleKey` — the general ranking keeps relations last,
+    // which is right for a detail header but leaves a junction row titleless.
+    const rankedCandidates = getTitlePropertyCandidates(collection);
+    const leadingRelationKey = getLeadingRelationTitleKey(collection);
+    const titleKeyCandidates = leadingRelationKey
+        ? [leadingRelationKey, ...rankedCandidates.filter(key => key !== leadingRelationKey)]
+        : rankedCandidates;
     const titleKey = titleKeyCandidates[0];
     const imageKey = getEntityImagePreviewPropertyKey(collection);
 
@@ -188,7 +196,9 @@ export function resolveCollectionSlotKeys(
     if (!hasExplicitOrder) {
         for (const [key, prop] of Object.entries(collection.properties)) {
             const p = prop as Property;
-            if (p.type === "relation") {
+            // The relation filling the title slot is already the row's headline;
+            // repeating it as a chip below says the same thing twice.
+            if (p.type === "relation" && key !== titleKey) {
                 relationKeys.push(key);
             }
         }

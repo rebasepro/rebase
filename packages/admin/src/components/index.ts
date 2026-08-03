@@ -25,6 +25,8 @@ export * from "./ReferenceWidget";
 export * from "./SearchIconsView";
 export * from "./FieldCaption";
 export * from "./EntityPreviewBinding";
+export * from "./EntityPreviewNesting";
+export * from "./InlineEntityPreview";
 
 // history is lazy-loaded by EditViewBinding and resolutions.ts
 // export * from "./history";

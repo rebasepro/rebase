@@ -29,6 +29,7 @@ import { getEntityPreviewKeys, getEntityTitlePropertyKeyForEntity } from "../uti
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";
+import { NestedEntityPreviewBoundary } from "./EntityPreviewNesting";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type EntityPreviewBindingProps = {
@@ -114,7 +115,10 @@ export function EntityPreviewBindingData({
         : undefined;
 
     return (
-        <>
+        // Everything below renders *inside* this preview: a reference or
+        // relation among the preview properties collapses to one line instead
+        // of nesting another bordered card with its own id and action button.
+        <NestedEntityPreviewBoundary>
             <div className={cls("flex  shrink-0", {
                 "w-6 h-6 mx-1 my-0.5": size === "small" || size === "smallest",
                 "w-8 h-8 ml-1 mr-2 m-2 self-start": size === "medium",
@@ -214,7 +218,7 @@ export function EntityPreviewBindingData({
                 </div>}
 
             {actions && <div className="flex-shrink-0">{actions}</div>}
-        </>
+        </NestedEntityPreviewBoundary>
     );
 }
 

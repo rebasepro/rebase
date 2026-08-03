@@ -91,6 +91,12 @@ export function FormEnhanceAction({
             values: formContext!.values,
             instructions: prompt,
             replaceValues: true
+        }).catch(() => {
+            // The controller has already shown the failure in a snackbar. This
+            // handler exists so the rejection is not left unhandled: nothing
+            // awaits the click, so an uncaught one surfaces as a console error
+            // on top of the message the operator has already been given.
+            return null;
         }).finally(() => {
             setLoading(false);
         });

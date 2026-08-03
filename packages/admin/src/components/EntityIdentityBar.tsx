@@ -61,6 +61,12 @@ export interface EntityIdentityBarProps {
 
     /** Close / full-screen buttons supplied by the panel that owns this view. */
     trailing?: React.ReactNode;
+
+    /**
+     * Controls the owning panel puts at the bar's leading edge, ahead of the
+     * breadcrumb — where the side panel's close button lives.
+     */
+    leading?: React.ReactNode;
 }
 
 /**
@@ -90,7 +96,8 @@ export function EntityIdentityBar({
     onViewHistory,
     recordActions,
     pluginActions,
-    trailing
+    trailing,
+    leading
 }: EntityIdentityBarProps) {
 
     const { t } = useTranslation();
@@ -109,6 +116,8 @@ export function EntityIdentityBar({
             "bg-surface-50 dark:bg-surface-900",
             defaultBorderMixin
         )}>
+            {leading}
+
             {onBack && (
                 <Tooltip title={t("back")}>
                     <IconButton size={"small"} onClick={onBack} aria-label={t("back")}>

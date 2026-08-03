@@ -74,6 +74,7 @@ export const it: RebaseTranslations = {
     log_out: "Esci",
     column_cannot_be_edited: "Questa colonna non può essere modificata direttamente",
     close: "Chiudi",
+    hide_list: "Nascondi elenco",
     unsaved_local_changes: "Modifiche locali non salvate",
     unsaved_local_changes_description: "Questo documento è stato modificato localmente e ha modifiche non salvate. Queste modifiche locali andranno perse se non le applichi.",
     preview_changes: "Anteprima modifiche",

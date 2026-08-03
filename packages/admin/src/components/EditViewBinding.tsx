@@ -44,6 +44,7 @@ import type { EntityFormBindingProps } from "../form";
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { EditFormActions } from "./EditFormActions";
 import { EntityIdentityBar } from "./EntityIdentityBar";
+import { SplitListCloseButton } from "./CollectionViewBinding/SplitListCloseButton";
 import { useRecordActions } from "../hooks/useRecordActions";
 import { useSideDialogContext } from "./SideDialogs";
 import { useAdminContext } from "../hooks/useAdminContext";
@@ -52,6 +53,7 @@ import { useEntityDisplayTitle } from "../hooks/useEntityDisplayTitle";
 import { createFormexStub, getEntityFromCache } from "@rebasepro/app";
 import { usePermissions } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
+import { withViewMode } from "../util/view_mode";
 import { useNavigate } from "react-router";
 
 import { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../util/view_constants";
@@ -89,6 +91,11 @@ export interface EditViewBindingProps<M extends Record<string, unknown> = Record
     navigateBack?: () => void;
     layout?: "side_panel" | "full_screen" | "split" | "dialog";
     barActions?: (params: BarActionsParams) => React.ReactNode;
+    /**
+     * Controls the owning panel puts at the identity bar's leading edge, ahead
+     * of the breadcrumb — the side panel's close button.
+     */
+    barActionsStart?: React.ReactNode;
     formProps?: Partial<EntityFormBindingProps<M>>,
     /**
      * Pre-populate the form with these values when creating a new entity.
@@ -184,6 +191,7 @@ export function EditViewBindingInner<M extends Record<string, unknown>>({
     dataLoading,
     layout = "side_panel",
     barActions,
+    barActionsStart,
     status,
     setStatus,
     formProps,
@@ -681,6 +689,12 @@ parentEntityIds,
             saving={Boolean(formContext?.isSaving)}
             hasErrors={hasFormErrors}
             saveDisabled={!canEdit || saveDisabled}
+            // Full screen replaces the collection entirely, leaving browser Back
+            // as the only route to it. The detail view has carried this arrow
+            // for that reason; the edit view is reached the same way.
+            onBack={layout === "full_screen"
+                ? () => navigate(withViewMode(urlController.buildUrlCollectionPath(path)))
+                : undefined}
             onSave={canEdit && formContext ? () => {
                 sideDialogContext.setPendingClose?.(false);
                 formContext.submit();
@@ -694,6 +708,13 @@ parentEntityIds,
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
             recordActions={recordActionItems}
             pluginActions={formPluginActions}
+            leading={<>
+                {barActionsStart}
+                {/* Split view: closing the list is opening this record
+                    full screen, and the control for it belongs at this
+                    bar's leading edge. */}
+                {layout === "split" && <SplitListCloseButton/>}
+            </>}
             trailing={<>
                 {pluginActionsTop}
                 {fullScreenButton}

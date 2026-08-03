@@ -81,6 +81,7 @@ export interface RebaseTranslations {
     log_out: string;
     column_cannot_be_edited: string;
     close: string;
+    hide_list: string;
     unsaved_local_changes: string;
     unsaved_local_changes_description: string;
     preview_changes: string;

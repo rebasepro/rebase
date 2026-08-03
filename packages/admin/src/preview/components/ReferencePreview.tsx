@@ -8,9 +8,13 @@ import { Skeleton } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView } from "@rebasepro/app";
 import { EntityPreviewBinding, EntityPreviewContainer } from "../../components/EntityPreviewBinding";
+import {
+    InlineEntityPreview,
+    InlineEntityPreviewMissing,
+    InlineEntityPreviewSkeleton
+} from "../../components/InlineEntityPreview";
+import { useIsNestedEntityPreview } from "../../components/EntityPreviewNesting";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
-import { getEntityTitlePropertyKeyForEntity } from "../../util/previews";
-import { getValueInPath } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type ReferencePreviewProps = {
@@ -30,9 +34,10 @@ export type ReferencePreviewProps = {
  */
 export const ReferencePreview = function ReferencePreview(props: ReferencePreviewProps) {
     const reference = props.reference;
+    const nested = useIsNestedEntityPreview();
     if (!(typeof reference === "object" && "isEntityReference" in reference && reference.isEntityReference())) {
         console.warn("Reference preview received value of type", typeof reference);
-        if (props.textOnly) {
+        if (props.textOnly || nested) {
             return <span>{String(reference)}</span>;
         }
         return <EntityPreviewContainer
@@ -62,6 +67,7 @@ function ReferencePreviewInternalInner({
     collection
 }: ReferencePreviewProps & { collection?: AdminCollection }) {
     const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);
+    const nested = useIsNestedEntityPreview();
 
     if (!collection) {
         if (ResolvedMissingReference !== DefaultMissingReference) {
@@ -69,6 +75,10 @@ function ReferencePreviewInternalInner({
         } else {
             if (textOnly) {
                 return <span>{reference.path}</span>;
+            }
+            if (nested) {
+                return <InlineEntityPreviewMissing label={String(reference.id)}
+                    tooltip={`Collection not found: ${reference.path}`}/>;
             }
             return <EntityPreviewContainer
                 onClick={onClick}
@@ -130,6 +140,11 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
 
     const ResolvedEntityPreview = useComponentOverride("EntityPreview", EntityPreviewBinding);
     const customizationController = useCustomizationController();
+    const nested = useIsNestedEntityPreview();
+
+    // Nested inside another preview, or filling a title slot: one line of text,
+    // not a second card. See {@link InlineEntityPreview}.
+    const inline = nested || Boolean(textOnly);
 
     const {
         entity,
@@ -157,8 +172,9 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
             tooltip={reference.path}/>;
     }
     if (body) {
-        if (textOnly) {
-            return <span>{reference.id}</span>;
+        if (inline) {
+            return <InlineEntityPreviewMissing label={String(reference.id)}
+                tooltip={reference.pathWithId}/>;
         }
 
         return (
@@ -171,8 +187,8 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     }
 
     if (dataLoading && !usedEntity) {
-        if (textOnly) {
-            return <Skeleton className="inline-block w-20 h-4" />;
+        if (inline) {
+            return <InlineEntityPreviewSkeleton/>;
         }
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
@@ -184,8 +200,9 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
     }
 
     if (!usedEntity) {
-        if (textOnly) {
-            return <span>{reference.id}</span>;
+        if (inline) {
+            return <InlineEntityPreviewMissing label={String(reference.id)}
+                tooltip={"Entity not found"}/>;
         }
         return (
             <EntityPreviewContainer onClick={disabled ? undefined : onClick}
@@ -196,11 +213,14 @@ function ReferencePreviewExisting<M extends Record<string, unknown> = Record<str
         );
     }
 
-    if (textOnly) {
-        const titleProperty = getEntityTitlePropertyKeyForEntity(collection, usedEntity.values, usedEntity.id);
-        const titleValue = titleProperty ? getValueInPath(usedEntity.values, titleProperty) : undefined;
-        const displayValue = titleValue !== undefined && titleValue !== null ? String(titleValue) : String(reference.id);
-        return <span className="truncate">{displayValue}</span>;
+    if (inline) {
+        return <InlineEntityPreview entity={usedEntity}
+            collection={collection}
+            disabled={disabled}
+            onClick={onClick}
+            // In a title slot the row itself is the click target; only a
+            // preview nested inside a card opens its own side panel.
+            includeEntityLink={!textOnly && includeEntityLink !== false}/>;
     }
 
     return <ResolvedEntityPreview size={size}

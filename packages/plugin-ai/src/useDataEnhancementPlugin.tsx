@@ -5,23 +5,12 @@ import { RebasePlugin } from "@rebasepro/admin-types";
 import { DataEnhancementControllerProvider } from "./components/DataEnhancementControllerProvider";
 import { FormEnhanceAction } from "./components/FormEnhanceAction";
 
-/**
- * Key used when the host app supplies none. Exported so a test can assert that
- * this is the value threaded through to the provider without transcribing the
- * literal — a copy in a test pins the key rather than the wiring, and makes
- * rotating it a test failure.
- */
-export const DEFAULT_API_KEY = "fcms-U9jdDii0xXWSDC34asfrf54lbkFJBfKfRWcEDEwdc4V5wDWEDF";
-
 export interface DataEnhancementPluginProps {
-
-    apiKey?: string;
 
     /**
      * Use this function to determine if the data enhancement plugin should be enabled for a given path.
      * If this function is not provided, the plugin will be enabled for all paths.
      * If the function returns false, the plugin will be disabled for the given path.
-     * You can also return a configuration object to override the default configuration.
      *
      * @param path
      * @param collection
@@ -33,10 +22,17 @@ export interface DataEnhancementPluginProps {
     }) => boolean;
 
     /**
-     * Host to use for the data enhancement API.
-     * This prop is only use in development mode.
+     * Base URL of the AI service.
+     *
+     * Defaults to the one Rebase hosts, which is free to use and needs no
+     * configuration. Point it at your own deployment to keep generation inside
+     * your infrastructure — the wire format is documented in `src/api.ts`, and
+     * the reference implementation is `saas/backend/functions/ai.ts`.
+     *
+     * Whatever it points at, the plugin renders nothing until that host's
+     * `GET /status` reports itself available.
      */
-    host?: string;
+    endpoint?: string;
 }
 
 /**
@@ -46,8 +42,8 @@ export interface DataEnhancementPluginProps {
  */
 export function useDataEnhancementPlugin(props?: DataEnhancementPluginProps): RebasePlugin {
 
-    const apiKey = props?.apiKey ?? DEFAULT_API_KEY;
     const getConfigForPath = props?.getConfigForPath;
+    const endpoint = props?.endpoint;
 
     return React.useMemo(() => ({
         key: "data_enhancement",
@@ -63,11 +59,10 @@ export function useDataEnhancementPlugin(props?: DataEnhancementPluginProps): Re
                 scope: "form" as const,
                 Component: DataEnhancementControllerProvider as React.ComponentType<any>,
                 props: {
-                    apiKey,
                     getConfigForPath,
-                    host: props?.host
+                    endpoint
                 }
             }
         ]
-    }), [apiKey, getConfigForPath, props?.host]);
+    }), [getConfigForPath, endpoint]);
 }

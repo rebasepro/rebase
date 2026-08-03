@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { withViewMode } from "../../util/view_mode";
+import { useSplitView } from "./SplitViewContext";
 
 export type CollectionViewStartActionsProps<M extends Record<string, unknown>> = {
     collection: AdminCollection<M>;
@@ -49,6 +50,7 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
 
     const navigate = useNavigate();
     const urlController = useUrlController();
+    const splitView = useSplitView();
 
     // Filters dialog state
     const [filtersDialogOpen, setFiltersDialogOpen] = useState(false);
@@ -77,10 +79,12 @@ parentEntityIds,
         navigate(withViewMode(urlController.buildUrlCollectionPath(path)));
     }, [navigate, urlController, path]);
 
-    // It closes the open record rather than navigating anywhere, so it says so.
-    // This is the split view's close control: the entity pane no longer carries
-    // an expand button of its own.
-    const backButton = compact && (
+    // In a split view the control that closes the list lives at the leading
+    // edge of the record's app bar (`SplitListCloseButton`), not here.
+    //
+    // Outside one — a compact list with no record open beside it — the only
+    // thing this can mean is "leave the record behind".
+    const backButton = compact && !splitView?.detailOpen && (
         <Tooltip title={t("close")} key={"close_tooltip"}>
             <IconButton
                 size="small"

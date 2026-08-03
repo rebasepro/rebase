@@ -74,6 +74,7 @@ export const hi: RebaseTranslations = {
     log_out: "लॉग आउट",
     column_cannot_be_edited: "इस कॉलम को सीधे संपादित नहीं किया जा सकता",
     close: "बंद करें",
+    hide_list: "सूची छिपाएँ",
     unsaved_local_changes: "सहेजे नहीं गए स्थानीय परिवर्तन",
     unsaved_local_changes_description: "इस दस्तावेज़ को स्थानीय स्तर पर संपादित किया गया था और इसमें सहेजे नहीं गए परिवर्तन हैं। यदि आप इन्हें लागू नहीं करते हैं तो ये स्थानीय परिवर्तन खो जाएंगे।",
     preview_changes: "परिवर्तनों का पूर्वावलोकन करें",

@@ -15,6 +15,7 @@ import { useNavigate, useLocation } from "react-router";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { withViewMode } from "../../util/view_mode";
+import { SplitViewProvider } from "./SplitViewContext";
 
 export type SplitListViewProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: AdminCollection<M>;
@@ -408,8 +409,22 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
         </div>
     ) : <></>;
 
+    // Closing the list is the full-screen entity route: the same `#full` the
+    // entity pane's expand button used, so there is one way to give the record
+    // the whole window and one way back out of it.
+    const openFullScreen = useCallback(() => {
+        if (selectedEntityId === undefined) return;
+        const suffix = isEditMode ? "/edit" : "";
+        navigate(`${buildUrl(`${path}/${selectedEntityId}${suffix}`)}#full`);
+    }, [navigate, buildUrl, path, selectedEntityId, isEditMode]);
+
+    const splitViewController = useMemo(() => ({
+        detailOpen: selectedEntityId !== undefined,
+        openFullScreen
+    }), [selectedEntityId, openFullScreen]);
+
     return (
-        <>
+        <SplitViewProvider value={splitViewController}>
             <ResizablePanels
                 stacked={!largeLayout}
                 firstPanel={listPanel}
@@ -428,6 +443,6 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                 }}
                 handleCancel={() => blocker?.reset?.()}
                 body={<>You have unsaved changes in this <b>{collection.singularName ?? collection.name}</b>.</>}/>
-        </>
+        </SplitViewProvider>
     );
 }

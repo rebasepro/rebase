@@ -1,37 +1,24 @@
+import React from "react";
 import { autocompleteStream } from "../api";
 import { EditorAIController } from "@rebasepro/admin";
 
-export function useEditorAIController({ getAuthToken }: { getAuthToken?: () => Promise<string> }): EditorAIController {
-    const autocomplete = async (textBefore: string, textAfter: string, onUpdate: (delta: string) => void) => {
-        if (!getAuthToken) {
-            throw new Error("Firebase token is required");
-        }
-        const firebaseToken = await getAuthToken();
-        return autocompleteStream({
-            firebaseToken,
-            textBefore,
-            textAfter,
-            onUpdate
-        });
-    }
-
-    return {
-        autocomplete
-    };
+/**
+ * Inline continuation for the rich-text editor's slash command.
+ *
+ * No token is threaded through any more. The previous version demanded a
+ * Firebase ID token and threw `"Firebase token is required"` when it could not
+ * get one — in a Rebase app there is no such thing, and the token it actually
+ * sent was a Rebase JWT the receiving service had no way to verify. The hosted
+ * service authenticates nobody; see `src/api.ts`.
+ */
+export function useEditorAIController({ endpoint }: { endpoint?: string } = {}): EditorAIController {
+    return React.useMemo(() => ({
+        autocomplete: (textBefore: string, textAfter: string, onUpdate: (delta: string) => void) =>
+            autocompleteStream({
+                endpoint,
+                textBefore,
+                textAfter,
+                onDelta: onUpdate
+            })
+    }), [endpoint]);
 }
-
-// async function * generateLoremIpsum(): AsyncGenerator<string> {
-//     const loremIpsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n# Heading\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
-//
-//     const words = loremIpsum.split(" ");
-//
-//     for (const word of words) {
-//         yield word;
-//         await new Promise(resolve => setTimeout(resolve, 100));
-//     }
-// }
-//
-// const generator = generateLoremIpsum();
-// for await (const word of generator) {
-//
-// }
