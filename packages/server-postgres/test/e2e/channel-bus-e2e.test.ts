@@ -79,7 +79,10 @@ describe("Channel bus (E2E, two backend instances)", () => {
         await realtime.configureChannelBus(new PostgresChannelBus(db as never, connectionString));
 
         const server = createServer();
-        createPostgresWebSocket(server, realtime, {} as unknown as PostgresBackendDriver);
+        // See channel-history-e2e: since 80fb57e08 an absent auth config means
+        // "require auth", so this opts out explicitly. Both instances are
+        // anonymous public channels; what is under test is the bus between them.
+        createPostgresWebSocket(server, realtime, {} as unknown as PostgresBackendDriver, { requireAuth: false });
         await new Promise<void>(resolve => server.listen(0, resolve));
         const address = server.address();
         if (!address || typeof address === "string") throw new Error("No server port");

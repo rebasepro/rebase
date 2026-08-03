@@ -131,9 +131,17 @@ describe("Channel history (E2E, two real clients)", () => {
         ]);
 
         server = createServer();
-        // No auth config → `requireAuth` is false, which is what an anonymous
-        // public channel looks like. The driver is unused by channel frames.
-        createPostgresWebSocket(server, realtime, {} as unknown as PostgresBackendDriver);
+        // `requireAuth: false` has to be said now. It used to be what *omitting*
+        // the auth config meant, and this line relied on that — but the socket
+        // defaulting open while the HTTP routes defaulted closed was the bug
+        // 80fb57e08 fixed, so an absent config now means "require auth" and
+        // every frame below would come back UNAUTHORIZED.
+        //
+        // Opting out is right here: what is under test is channel mechanics —
+        // ordering, replay, retention — on an anonymous public channel. The
+        // authenticated socket path is covered end-to-end by client-sdk-e2e.
+        // The driver is unused by channel frames.
+        createPostgresWebSocket(server, realtime, {} as unknown as PostgresBackendDriver, { requireAuth: false });
 
         await new Promise<void>(resolve => server.listen(0, resolve));
         const address = server.address();
