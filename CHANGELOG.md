@@ -40,6 +40,16 @@
 
   `DatabaseConnection` is still a name you can import from `@rebasepro/server` — that is the point of removing it. Two different shapes answered to it: a local alias for `DriverConnection`, and the canonical `DatabaseConnection` from `@rebasepro/types` that the package re-exports. Deleting the alias leaves one. If your import resolved to the alias, it was the driver connection and wants `DriverConnection`; if it type-checks unchanged, it was already the canonical one.
 
+- **Default foreign-key column names were mangled for irregular plurals, and are fixed.** `generateForeignKeyName` singularized by chopping a trailing `s` off the snake-cased name, which produced `categorie_id` for `categories`, `addres_id` for `addresses`, never `child_id` (it gave `children_id`), and — because `toSnakeCase` splits on every capital before the chop — `ur_l_id` for `URLs`. It singularizes first now, with the package's real `singular()`, then snake-cases. Two guards: a double-`s` ending is never a plural marker, and a name that singularizes to nothing keeps its original.
+
+  **This changes the default column name for affected relations**, so an existing database has the old name. Boot-ensure migrates it: when a table carries the relation column under its pre-singularization name and not its current one, it emits `ALTER TABLE … RENAME COLUMN "categorie_id" TO "category_id"` rather than `ADD COLUMN`. In Postgres a rename is metadata-only — the values stay put and the column's indexes and constraints travel with it. Adding was the actual bug: it created the new column empty beside the populated old one, every statement succeeded, and the relation then read the empty one.
+
+  If you named the column explicitly, nothing changes — this is only the default.
+
+- **`firestoreToCMSModel` and `cmsToFirestoreModel` are renamed** to `firestoreToRebaseModel` and `rebaseToFirestoreModel` in `@rebasepro/firebase`. They reached consumers through the package barrel's `export *`, so this is a breaking rename with no alias — a shim would keep the word in the API it is being removed from. (`toCmsRow` → `toFlatRow` moves with them, but is internal to `server-postgres`.)
+
+- **MongoDB search matched no field.** `buildSearchConditions` selected searchable columns with `prop?.dataType === "string"`. No property in `@rebasepro/types` has ever had a `dataType` field — a real collection carries `type` — so the loop matched nothing for every collection a user could declare, `orConditions` came back empty, and the fallback turned every search into a `$text` query, which needs a text index and throws `IndexNotFound` without one. The suite passed because its fixtures were written with the same wrong key.
+
 - **`admin.widthPercentage` is gone — use `admin.span`.** Field width is a span over a shared four-column grid now, so two fields line up whatever order they were declared in. A raw percentage could not line up with anything: `33` and `35` produced different widths that looked like a mistake, and nothing snapped to a common edge.
 
   ```diff
@@ -82,6 +92,18 @@
   The refusal carries `code: "managed_project"`, which is what it already used, so a caller already branching on that code needs no change.
 
 ### Security
+
+- **`realtime.requireAuth: true` opened the socket instead of closing it.** The connection handler seeds every session with `authenticated: !requireAuth`, so a `requireAuth` that resolves false does not skip a later check — it marks each connecting client as *already authenticated*. Both sockets computed it as
+
+  ```ts
+  authConfig.requireAuth !== false && !!authConfig.jwtSecret
+  ```
+
+  which ANDs the one setting whose entire purpose is to demand authentication together with the presence of a **local** secret. On a server that authenticates through an `AuthAdapter` — or through anything other than `auth.jwtSecret` — that expression is false, so asking for authentication was what granted it, silently, to everyone who connected.
+
+- **The socket answered the opposite of the HTTP routes.** One product decision — "does this server require an authenticated caller?" — with two enforcement points that each computed it. `init.ts` had `resolveRequireAuth`: no auth configured means auth is required, an `AuthAdapter` always means required, and only an explicit `requireAuth: false` opens it. The socket carried its own copy, and the two disagreed on the case that matters most: with no auth configuration at all, `/api/data` answered 401 to every read while the socket admitted everyone and served the same rows. Not a weaker gate on the socket — the opposite answer.
+
+  The socket's expression is gone rather than corrected; both enforcement points call `resolveRequireAuth`, and the tests pin that they agree rather than restating each answer separately.
 
 - **`policy.authenticated()` admitted anonymous visitors.** There were two sentinels for "nobody is signed in". The types, the policy compiler, the JavaScript evaluator and the anonymous-grant linter were all built on `ANONYMOUS_USER_ID` (`'anonymous'`); the request path scoped unauthenticated callers as `'anon'`. So `policy.authenticated()` — the sanctioned, documented way to write "signed in", the thing the linter *tells you to use* — compiled to `auth.uid() <> 'anonymous'` and was true for every signed-out caller.
 
