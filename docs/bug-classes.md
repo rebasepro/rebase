@@ -459,6 +459,45 @@ red.
 
 ---
 
+## 16. A retry that runs inside the failure
+
+A `try` around a fast path with a slower fallback in the `catch` is ordinary, and
+it is wrong the moment both run on the same Postgres transaction. The first
+statement to raise aborts the transaction; every statement after it returns
+`25P02` — *current transaction is aborted, commands ignored until end of
+transaction block* — regardless of what it asked. The fallback cannot succeed,
+and it overwrites the diagnosis with one about a transaction the user never
+mentioned.
+
+Reads here run in a transaction because that is where `SET LOCAL ROLE` binds RLS,
+so every read path inherits this. `FetchService` had five of these: catch a
+failed `db.query.findFirst/findMany`, log a warning, retry with `db.select`.
+Visiting `/c/products/new` in the admin sent `new` to a `uuid` column, which
+raised `22P02` — "invalid input syntax for type uuid" — and what reached the
+browser was `Database error in "products" [25P02]`. The real cause was in a
+`logger.warn` nobody was reading.
+
+The tell is a **`catch` that issues a query**. Ask what the caught error means:
+if it came *back from* Postgres, the connection's transaction is already lost and
+the retry is guaranteed to fail. If the query was never built — a missing
+reciprocal relation, a method that isn't there — nothing was sent, the
+transaction is intact, and the fallback is exactly right. `reachedDatabase()` is
+that question: `extractPgError(e) !== null`.
+
+**Sweep:** grep the drivers for `catch` blocks containing `db.`, `this.db`, or
+`tx.`. Then grep for the second half of the pair — a `logger.warn` describing a
+fallback — and check the rethrow guard is there.
+
+**Watch for:** the class hiding a second bug. Here the fallback masked one that
+should never have reached Postgres at all: an id no key column can hold names no
+row, which is a 404. `parseIdValues` validated numeric keys and let anything
+through for `uuid`, so the panel's own URLs could raise `22P02`. Judge that from
+the **column**, not the config — `isId: "uuid"` is a claim about a key, and a
+`text` column holding ids of some other shape is a working app you must not start
+rejecting.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -610,3 +649,21 @@ file compiling.
 | 1049 tables end to end | clean — 528ms to read the catalog, 99ms to generate, 631 of 1049 tables left in the navigation. |
 | five schemas in one database (AdventureWorks) | clean — introspection is per-schema, and each of the five classified independently. |
 | duplicate property keys, self-imports, junctions pointing at absent tables, self-owning tables | swept across all ten; after the two fixes above, none. |
+
+### Last sweep — 2026-08-03, the record history panel
+
+Started from "I saved a product and it does not show up in the history view".
+The revision was recorded correctly; the panel had no reason to refetch. What
+the reproduction walked through found two more.
+
+| checked | result |
+|---|---|
+| `useHistory`, after a save | **BUG** — refetched on entity id, slug, offset and revert, and nothing else. Save happens from the identity bar *above* the panel, so the panel stays open across it and kept showing the list it fetched when it opened. The save count now joins the entity identity key. |
+| the inspector's scrim | **BUG** — `absolute inset-0 bg-black/25` over the whole record, so the first click into the form went to the scrim and closed the panel. A revision list could never be open while you edited the record it belongs to, which is the only time watching it is worth anything. Docked as a flex sibling; both bindings. |
+| `/c/products/new` | **BUG** (class 16) — `Database error in "products" [25P02]` rendered as the page. Two defects: an unaddressable id reaching Postgres, and a fallback query re-running inside the aborted transaction. |
+| the other four `catch` → `db.select` fallbacks in `FetchService` | same class, same guard. All five rethrow a PG-coded error now. |
+| `catch` blocks issuing queries elsewhere in the driver | clean — `PersistService`, `RelationService` and `PostgresBackendDriver` have none. |
+| `fetchWithDrizzleQuery` | has the shape, but is **dead** — private, no callers. Left alone; noted here so the next grep does not stop on it. |
+| `parseIdValues` for numeric keys | already threw, which made `GET /users/abc` a 500 rather than a 404. Both read paths answer "no such row" now, and the two tests that pinned the throw were rewritten to the new contract. |
+| whether the uuid check could reject a working app | it could, if taken from `isId: "uuid"` — `getPrimaryKeys` lets the config win over the schema. Read from the Drizzle column type instead (`idCanAddressTable`), and a key the schema does not carry stays addressable rather than 404-ing rows that exist. |
+| the gates | broken on purpose, all three times: reverting the identity key reddens 2 of 3 history tests; the id guard and the rethrow have their own. Writing the history test also found that `useHistory`'s fetch callback keys off `apiConfig` identity — a mock rebuilding it per render span 376 fetches before the assertion timed out. Stable in the app, fragile by construction. |
