@@ -13,6 +13,7 @@ import { doctorCommand } from "./commands/doctor";
 import { skillsCommand } from "./commands/skills";
 import { apiKeysCommand } from "./commands/api-keys";
 import { telemetryCommand } from "./commands/telemetry";
+import { isEnabled } from "./telemetry";
 import { cloudCommand } from "./commands/cloud";
 import { appsCommand } from "./commands/apps";
 import { requireProjectRoot } from "./utils/project";
@@ -241,5 +242,24 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--help, -h")}      Show this help message
 
 ${chalk.gray("Documentation: https://rebase.pro/docs")}
-`);
+${telemetryNotice()}`);
+}
+
+/**
+ * One line about usage sharing, in the global help.
+ *
+ * Every other tool that collects anything prints a first-run notice. Ours asks
+ * at the end of `rebase init` — but someone who installs the CLI and never runs
+ * `init`, or who joins a project someone else scaffolded, would otherwise never
+ * learn the subsystem exists. This is the cheapest place to close that: the
+ * help is what an unfamiliar user reads first.
+ *
+ * It states the current setting rather than a generic sentence, so it is also
+ * the fastest answer to "is this thing on?".
+ */
+function telemetryNotice(): string {
+    const sharing = isEnabled();
+    return chalk.gray(
+        `Usage sharing: ${sharing ? "on" : "off"} — ${chalk.cyan("rebase telemetry")} to inspect or change\n`
+    );
 }

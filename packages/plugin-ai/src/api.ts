@@ -233,6 +233,8 @@ export async function autocompleteStream(props: {
  */
 export async function fetchPromptSuggestions(props: {
     entityName: string;
+    /** Ties suggestions to the domain — see the note on the service's side. */
+    entityDescription?: string;
     input?: string;
     endpoint?: string;
     signal?: AbortSignal;
@@ -243,6 +245,7 @@ export async function fetchPromptSuggestions(props: {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 entityName: props.entityName,
+                entityDescription: props.entityDescription,
                 input: props.input
             }),
             signal: props.signal

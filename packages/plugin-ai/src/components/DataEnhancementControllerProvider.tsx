@@ -244,10 +244,13 @@ selected }))
     const editorAIController = useEditorAIController({ endpoint });
 
     const getSamplePrompts = useCallback(
-        (entityName: string, input?: string) => fetchPromptSuggestions({ endpoint,
-entityName,
-input }),
-        [endpoint]
+        (entityName: string, input?: string) => fetchPromptSuggestions({
+            endpoint,
+            entityName,
+            entityDescription: collection.description,
+            input
+        }),
+        [endpoint, collection.description]
     );
 
     const dataEnhancementController: DataEnhancementController = useMemo(() => ({

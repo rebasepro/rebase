@@ -11,6 +11,7 @@ import {
     resolveTsx,
     findEnvFile
 } from "../utils/project";
+import { recordEvent } from "../telemetry";
 
 export async function schemaCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
     if (!subcommand || subcommand === "--help") {
@@ -19,6 +20,11 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     }
 
     const projectRoot = requireProjectRoot();
+
+    // Fire-and-forget, and a no-op unless the developer opted in. Never awaited:
+    // the command is what the user is waiting for, and a slow collector must not
+    // sit in front of it.
+    void recordEvent("cli.schema_generate", { subcommand: subcommand ?? "none" }, { projectRoot });
     const backendDir = requireBackendDir(projectRoot);
 
     const activePlugin = getActiveBackendPlugin(backendDir);
