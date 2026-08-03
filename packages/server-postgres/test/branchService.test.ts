@@ -161,34 +161,54 @@ describe("BranchService", () => {
             expect(poolManager.disconnectDatabase).toHaveBeenCalledWith("production_db");
         });
 
-        it("should sanitize the branch name — stripping special characters", async () => {
+        it("keeps the name it was given, hyphens and all", async () => {
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never)
                 .mockResolvedValueOnce(undefined as never)
                 .mockResolvedValueOnce(undefined as never);
 
-            const result = await service.createBranch("my-feature/branch!@#");
+            const result = await service.createBranch("my-feature-branch");
 
-            expect(result.name).toBe("myfeaturebranch");
+            // Previously `myfeaturebranch`: the hyphens were stripped and the
+            // caller was told a different name than it asked for.
+            expect(result.name).toBe("my-feature-branch");
 
             // The returned name proves nothing about the statement: a database
-            // name cannot be a bind parameter, so the sanitised value is spliced
-            // into the DDL text and any surviving character lands inside the
-            // identifier. Both identifiers must also be double-quoted, or a name
-            // that merely *starts* legal (`myfeature drop...`) would parse as
-            // more than one token.
+            // name cannot be a bind parameter, so it is spliced into the DDL
+            // text. Both identifiers must be double-quoted — that is what makes
+            // a hyphen safe to keep, and what stops a name that merely *starts*
+            // legal (`myfeature drop...`) parsing as more than one token.
             expect(statementAt(db, 1).sql).toBe(
-                'CREATE DATABASE "rb_myfeaturebranch" TEMPLATE "my_app_db"'
+                'CREATE DATABASE "rb_my-feature-branch" TEMPLATE "my_app_db"'
             );
             expect(statementAt(db, 1).params).toEqual([]);
 
             // The metadata row, by contrast, is fully parameterised.
             expect(statementAt(db, 2).params).toEqual([
-                "myfeaturebranch",
-                "rb_myfeaturebranch",
+                "my-feature-branch",
+                "rb_my-feature-branch",
                 "my_app_db",
                 expect.any(String)
             ]);
+        });
+
+        it("refuses a name it cannot represent rather than quietly changing it", async () => {
+            await expect(service.createBranch("my-feature/branch!@#")).rejects.toThrow(
+                /only letters, digits, underscores, and hyphens/
+            );
+
+            // Refused before anything ran: no existence check, and above all no
+            // CREATE DATABASE with a half-accepted name spliced into it.
+            expect(db.execute).not.toHaveBeenCalled();
+        });
+
+        it("refuses a name Postgres would silently truncate", async () => {
+            // 63 bytes is the identifier limit and "rb_" is part of the budget,
+            // so 61 characters overflows by one. Postgres does not complain — it
+            // just makes the database under a shorter name, which is the same
+            // silent rename by another route.
+            await expect(service.createBranch("a".repeat(61))).rejects.toThrow(/too long/);
+            expect(db.execute).not.toHaveBeenCalled();
         });
 
         it("should throw when the branch already exists in metadata", async () => {
@@ -258,7 +278,7 @@ describe("BranchService", () => {
 
         it("should throw when branch name is entirely special characters", async () => {
             await expect(service.createBranch("---!!!")).rejects.toThrow(
-                "Branch name must contain at least one alphanumeric character"
+                "Invalid branch name: only letters, digits, underscores, and hyphens are allowed."
             );
         });
     });
@@ -416,20 +436,26 @@ created_at: now }]
             expect(result!.sizeBytes).toBeUndefined();
         });
 
-        it("should sanitize the branch name input", async () => {
+        it("looks a branch up under exactly the name it was created with", async () => {
             db.execute.mockResolvedValueOnce({ rows: [] } as never);
 
-            await service.getBranchInfo("my-branch!");
+            await service.getBranchInfo("my-branch");
 
-            // Should still call execute (with sanitized name)
             expect(db.execute).toHaveBeenCalledTimes(1);
 
-            // A lookup by the raw name would silently miss, because the row was
-            // stored under the sanitised one — so the branch would read as
-            // "not found" rather than as itself.
+            // The row is stored under the name as given, so this is the only
+            // lookup that can find it. It used to query "mybranch", which
+            // matched only because create had mangled the name the same way.
             const statement = statementAt(db, 0);
-            expect(statement.params).toEqual(["mybranch"]);
+            expect(statement.params).toEqual(["my-branch"]);
             expect(statement.sql).toContain("b.name = $1");
+        });
+
+        it("rejects a name that could never have been created", async () => {
+            await expect(service.getBranchInfo("my-branch!")).rejects.toThrow(
+                /only letters, digits, underscores, and hyphens/
+            );
+            expect(db.execute).not.toHaveBeenCalled();
         });
     });
 
@@ -459,15 +485,21 @@ created_at: now }]
             expect(result.name).toBe("MyBranch123");
         });
 
-        it("should strip spaces, hyphens, dots, and other special chars", async () => {
+        it("keeps hyphens, and refuses the characters it cannot keep", async () => {
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never)
                 .mockResolvedValueOnce(undefined as never)
                 .mockResolvedValueOnce(undefined as never);
 
-            const result = await service.createBranch("my branch.v2-rc1");
+            // A hyphen is representable, so it survives. `my branch.v2-rc1` used
+            // to come back as `mybranchv2rc1` — three characters quietly gone.
+            expect((await service.createBranch("v2-rc1")).name).toBe("v2-rc1");
 
-            expect(result.name).toBe("mybranchv2rc1");
+            // A space and a dot are not, so the name is refused rather than
+            // turned into a different one.
+            await expect(service.createBranch("my branch.v2-rc1")).rejects.toThrow(
+                /only letters, digits, underscores, and hyphens/
+            );
         });
     });
 });

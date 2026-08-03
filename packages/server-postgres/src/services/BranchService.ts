@@ -64,20 +64,41 @@ function validateIdentifier(value: string, label: string): void {
 }
 
 /**
- * Sanitize a user-provided branch name to a safe PostgreSQL identifier.
- * Only allows alphanumeric characters and underscores.
+ * Postgres truncates identifiers at NAMEDATALEN-1 = 63 bytes, and does it
+ * silently. The prefix comes out of the same budget.
  */
-function sanitizeBranchName(name: string): string {
-    return name.replace(/[^a-zA-Z0-9_]/g, "");
+const MAX_BRANCH_NAME_LENGTH = 63 - BRANCH_DB_PREFIX.length;
+
+/**
+ * Check a user-provided branch name, and otherwise leave it exactly as given.
+ *
+ * This used to strip everything outside [a-zA-Z0-9_], so `my-feature` was
+ * quietly created as `myfeature`: the name you typed was not the name `list`
+ * gave back. Nothing ever needed that. Every identifier this service builds is
+ * double-quoted (see `CREATE DATABASE` below), which is what makes a hyphen
+ * safe, and `validateIdentifier` has always accepted hyphens for the `--from`
+ * source database — the two disagreed about the same character class.
+ *
+ * Refusing a name we cannot represent is better than representing a different
+ * one, which is also why the length is checked here rather than left to
+ * Postgres, whose answer to an over-long identifier is a silent rename.
+ */
+function assertValidBranchName(name: string): void {
+    validateIdentifier(name, "branch name");
+    if (name.length > MAX_BRANCH_NAME_LENGTH) {
+        throw new Error(
+            `Branch name "${name}" is too long: ${name.length} characters, maximum ${MAX_BRANCH_NAME_LENGTH}. ` +
+            "Postgres truncates identifiers past 63 bytes, which would give the branch a name you did not choose."
+        );
+    }
 }
 
 /**
  * Convert a user-facing branch name to the actual PostgreSQL database name.
  */
 function toBranchDbName(name: string): string {
-    const sanitized = sanitizeBranchName(name);
-    if (!sanitized) throw new Error("Branch name must contain at least one alphanumeric character.");
-    return `${BRANCH_DB_PREFIX}${sanitized}`;
+    assertValidBranchName(name);
+    return `${BRANCH_DB_PREFIX}${name}`;
 }
 
 export class BranchService {
@@ -120,15 +141,14 @@ export class BranchService {
         }
 
         const dbName = toBranchDbName(name);
-        const sanitizedName = sanitizeBranchName(name);
         const sourceDb = options?.source || this.poolManager.defaultDatabaseName;
 
         // Check if branch already exists
         const existing = await this.db.execute(
-            sql`SELECT name FROM rebase.branches WHERE name = ${sanitizedName} OR db_name = ${dbName}`
+            sql`SELECT name FROM rebase.branches WHERE name = ${name} OR db_name = ${dbName}`
         );
         if ((existing.rows as unknown[]).length > 0) {
-            throw new Error(`Branch "${sanitizedName}" already exists.`);
+            throw new Error(`Branch "${name}" already exists.`);
         }
 
         // Disconnect any idle pools to the source DB so TEMPLATE works.
@@ -158,12 +178,12 @@ export class BranchService {
         // Record metadata in the default database
         const now = new Date();
         await this.db.execute(
-            sql`INSERT INTO rebase.branches (name, db_name, parent_db, created_at) 
-                VALUES (${sanitizedName}, ${dbName}, ${sourceDb}, ${now.toISOString()})`
+            sql`INSERT INTO rebase.branches (name, db_name, parent_db, created_at)
+                VALUES (${name}, ${dbName}, ${sourceDb}, ${now.toISOString()})`
         );
 
         return {
-            name: sanitizedName,
+            name,
             parentDatabase: sourceDb,
             createdAt: now
         };
@@ -174,20 +194,35 @@ export class BranchService {
      * Cannot delete the main/default database.
      */
     async deleteBranch(name: string): Promise<void> {
-        const sanitizedName = sanitizeBranchName(name);
-        const dbName = toBranchDbName(name);
+        assertValidBranchName(name);
 
-        // Safety: never delete the default database
-        if (dbName === this.poolManager.defaultDatabaseName) {
+        // Safety, first pass: a request that would target the default database
+        // is refused before any metadata is read, so the answer costs nothing
+        // and cannot depend on what a row happens to say.
+        if (toBranchDbName(name) === this.poolManager.defaultDatabaseName) {
             throw new Error("Cannot delete the main database.");
         }
 
-        // Verify the branch exists in our metadata
+        // Verify the branch exists, and take the database name from the row
+        // rather than deriving it again. A branch created before names stopped
+        // being stripped is recorded as `rb_myfeature` while `my-feature` now
+        // derives `rb_my-feature`; re-deriving would drop a database this row
+        // never named — or, if that name happened to exist, somebody else's.
+        // The stored value is the only one that is true by construction.
         const existing = await this.db.execute(
-            sql`SELECT db_name FROM rebase.branches WHERE name = ${sanitizedName}`
+            sql`SELECT db_name FROM rebase.branches WHERE name = ${name}`
         );
-        if ((existing.rows as unknown[]).length === 0) {
-            throw new Error(`Branch "${sanitizedName}" not found.`);
+        const existingRows = existing.rows as Record<string, unknown>[];
+        if (existingRows.length === 0) {
+            throw new Error(`Branch "${name}" not found.`);
+        }
+        const dbName = existingRows[0].db_name as string;
+
+        // Safety, second pass: the first checked a name we derived, this checks
+        // the one we are about to drop. They differ for any row written under
+        // the old scheme, and it is this one that governs.
+        if (dbName === this.poolManager.defaultDatabaseName) {
+            throw new Error("Cannot delete the main database.");
         }
 
         // Disconnect any pools to this branch before dropping
@@ -201,7 +236,7 @@ export class BranchService {
             const pgError = extractPgError(err);
             if (pgError?.code === PG_OBJECT_IN_USE) {
                 throw new Error(
-                    `Cannot delete branch "${sanitizedName}": the database has active connections. ` +
+                    `Cannot delete branch "${name}": the database has active connections. ` +
                     "Close other clients and try again."
                 );
             }
@@ -210,7 +245,7 @@ export class BranchService {
 
         // Remove metadata
         await this.db.execute(
-            sql`DELETE FROM rebase.branches WHERE name = ${sanitizedName}`
+            sql`DELETE FROM rebase.branches WHERE name = ${name}`
         );
     }
 
@@ -242,15 +277,16 @@ export class BranchService {
      * Get info about a specific branch.
      */
     async getBranchInfo(name: string): Promise<BranchInfo | undefined> {
-        const sanitizedName = sanitizeBranchName(name);
+        assertValidBranchName(name);
 
         const result = await this.db.execute(sql`
-            SELECT 
+            SELECT
                 b.name,
+                b.db_name,
                 b.parent_db,
                 b.created_at
             FROM rebase.branches b
-            WHERE b.name = ${sanitizedName}
+            WHERE b.name = ${name}
         `);
 
         const rows = result.rows as Record<string, unknown>[];
@@ -258,10 +294,12 @@ export class BranchService {
 
         const row = rows[0];
 
-        // Attempt to get size — may fail if the DB was externally dropped
+        // Attempt to get size — may fail if the DB was externally dropped.
+        // Same reason as `deleteBranch`: the size of a re-derived name is the
+        // size of some other database, or of nothing.
         let sizeBytes: number | undefined;
         try {
-            const dbName = toBranchDbName(sanitizedName);
+            const dbName = row.db_name as string;
             const sizeResult = await this.db.execute(
                 sql`SELECT pg_database_size(${dbName}) as size_bytes`
             );

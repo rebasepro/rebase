@@ -91,6 +91,19 @@
 
   The refusal carries `code: "managed_project"`, which is what it already used, so a caller already branching on that code needs no change.
 
+- **`rebase db branch` keeps the name you give it.** Branch names were stripped of everything outside `[a-zA-Z0-9_]`, so `rebase db branch create my-feature` answered `✓ Branch "myfeature" created` — a different name than the one asked for, and the only one `list` would ever show.
+
+  ```diff
+  - $ rebase db branch create my-feature
+  -   ✓ Branch "myfeature" created successfully.
+  + $ rebase db branch create my-feature
+  +   ✓ Branch "my-feature" created successfully.
+  ```
+
+  Nothing needed the stripping: every identifier the branch service builds is double-quoted, which is what makes a hyphen safe, and the validator used for `--from` had always accepted hyphens — the two disagreed about the same character class. A name that *cannot* be represented (a space, a dot, a slash) is now refused with `Invalid branch name: only letters, digits, underscores, and hyphens are allowed.` rather than quietly turned into a different one. Names are also capped at 60 characters, because Postgres truncates identifiers past 63 bytes silently, which is the same rename by another route.
+
+  **Branches created before this keep the name they were stored under.** `my-feature` from an older release is recorded as `myfeature`, and that is what `list` shows and what `delete` takes. `delete` and `info` now read the database name from the metadata row instead of re-deriving it, so those older branches drop the database they actually own — re-deriving would have aimed at `rb_my-feature`, which is either nothing or somebody else's database.
+
 ### Security
 
 - **`realtime.requireAuth: true` opened the socket instead of closing it.** The connection handler seeds every session with `authenticated: !requireAuth`, so a `requireAuth` that resolves false does not skip a later check — it marks each connecting client as *already authenticated*. Both sockets computed it as

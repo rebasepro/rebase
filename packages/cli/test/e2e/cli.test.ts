@@ -361,17 +361,10 @@ env: cleanEnv });
             cwd: scaffoldedDir,
             env: cleanEnv
         });
-        // `e2etestbranch`, not `e2e-test-branch`: `sanitizeBranchName` strips
-        // everything outside [a-zA-Z0-9_] so the name can back a `rb_<name>`
-        // database, and it is the *sanitized* form that gets recorded. Create,
-        // list and delete all sanitize alike, so a hyphenated name works end to
-        // end — it is only ever displayed stripped.
-        //
-        // Asserted on the hyphenated input on purpose: that is the case where
-        // the two forms differ, and pinning it here is what would catch the
-        // stripping changing, or becoming inconsistent between the verbs.
-        const SANITIZED = "e2etestbranch";
-        expect(listRes.stdout).toContain(SANITIZED);
+        // The hyphenated name, exactly as created. It used to come back as
+        // `e2etestbranch`; names are kept as given now and a name that cannot
+        // be kept is refused instead.
+        expect(listRes.stdout).toContain("e2e-test-branch");
 
         await execa("node", [
             cliBin,
@@ -394,10 +387,9 @@ env: cleanEnv });
             cwd: scaffoldedDir,
             env: cleanEnv
         });
-        // Was `not.toContain("e2e-test-branch")`, which passed without proving
-        // anything: `list` never prints the hyphenated form, so the assertion
-        // held whether or not the delete did a thing. Same string `list` is
-        // checked for above, which is the only one that can go absent.
-        expect(afterDelete.stdout).not.toContain(SANITIZED);
+        // Meaningful only because `list` above is asserted to contain this same
+        // string: while names were stripped, `list` never printed the
+        // hyphenated form at all, so this held whether or not delete did a thing.
+        expect(afterDelete.stdout).not.toContain("e2e-test-branch");
     }, 240_000); // 4 minutes total execution allowance
 });
