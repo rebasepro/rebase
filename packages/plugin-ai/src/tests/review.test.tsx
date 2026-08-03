@@ -258,3 +258,136 @@ describe("autofill review", () => {
         expect(result.current.review).toBeNull();
     });
 });
+
+describe("autofill review — runs that overlap or are abandoned", () => {
+
+    it("does not write into a review the operator already dismissed", async () => {
+        // Closing the dialog mid-generation must not leave late frames landing
+        // in a review that is no longer on screen.
+        mockService(() => streamingResponse([AUTOFILL_BODY]));
+        const { result, setFieldValue } = await mountController();
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        let pending: Promise<void>;
+        act(() => {
+            pending = result.current.generate({ values: {} });
+        });
+        act(() => result.current.dismissReview());
+        await act(async () => {
+            await pending!;
+        });
+
+        expect(result.current.review).toBeNull();
+        expect(setFieldValue).not.toHaveBeenCalled();
+    });
+
+    it("does not let an earlier run's fields leak into a later one", async () => {
+        // Two clicks in quick succession. The first run's frames must not
+        // appear in the second run's review — the operator would be reviewing
+        // proposals for an instruction they replaced.
+        const first = [
+            'event: suggestion\ndata: {"key":"title","value":"FIRST RUN"}',
+            'event: done\ndata: {"suggestions":{"title":"FIRST RUN"}}',
+            ""
+        ].join("\n\n");
+        const second = [
+            'event: suggestion\ndata: {"key":"stock","value":7}',
+            'event: done\ndata: {"suggestions":{"stock":7}}',
+            ""
+        ].join("\n\n");
+
+        let call = 0;
+        (global as any).fetch = jest.fn((url: string) => {
+            if (String(url).endsWith("/status")) {
+                return Promise.resolve({ ok: true,
+status: 200,
+json: async () => ({ available: true }) });
+            }
+            if (String(url).endsWith("/autofill")) {
+                return Promise.resolve(streamingResponse([call++ === 0 ? first : second]));
+            }
+            return Promise.resolve({ ok: true,
+status: 200,
+json: async () => ({ prompts: [] }) });
+        });
+
+        const { result } = await mountController();
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        await act(async () => {
+            await result.current.generate({ values: {} });
+        });
+        await act(async () => {
+            await result.current.generate({ values: {} });
+        });
+
+        const keys = result.current.review?.fields.map(f => f.key);
+        expect(keys).toEqual(["stock"]);
+        expect(JSON.stringify(result.current.review)).not.toMatch(/FIRST RUN/);
+    });
+
+    it("applies only the fields that finished, if applied mid-stream", async () => {
+        // The Apply button counts non-pending rows; applying must honour the
+        // same rule, or a half-written sentence lands in the record.
+        mockService(() => streamingResponse([
+            'event: suggestion_delta\ndata: {"key":"title","text":"half a sen"}\n\n' +
+            'event: suggestion\ndata: {"key":"stock","value":9}\n\n'
+        ]));
+        const { result, setFieldValue } = await mountController();
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        await act(async () => {
+            await result.current.generate({ values: {} });
+        });
+
+        // The stream ended without completing `title`, so it is dropped rather
+        // than offered — the only thing held for it is a half-written sentence.
+        expect(result.current.review?.fields.map(f => f.key)).toEqual(["stock"]);
+
+        act(() => result.current.applyReview());
+
+        expect(setFieldValue).toHaveBeenCalledTimes(1);
+        expect(setFieldValue).toHaveBeenCalledWith("stock", 9);
+    });
+
+    it("drops a date the model returned as unparseable rather than storing NaN", async () => {
+        const collection = {
+            name: "Posts",
+            singularName: "Post",
+            properties: { publishedAt: { type: "date",
+name: "Published at" } }
+        } as any;
+
+        (global as any).fetch = jest.fn((url: string) => {
+            if (String(url).endsWith("/status")) {
+                return Promise.resolve({ ok: true,
+status: 200,
+json: async () => ({ available: true }) });
+            }
+            return Promise.resolve(streamingResponse([
+                'event: suggestion\ndata: {"key":"publishedAt","value":"not a date"}\n\nevent: done\ndata: {"suggestions":{}}\n\n'
+            ]));
+        });
+
+        const setFieldValue = jest.fn();
+        const wrapper = ({ children }: { children: React.ReactNode }) => (
+            <DataEnhancementControllerProvider
+                path={"posts"}
+                collection={collection}
+                formContext={{ values: {},
+setFieldValue } as any}
+                {...({} as any)}>
+                {children}
+            </DataEnhancementControllerProvider>
+        );
+        const { result } = renderHook(() => useDataEnhancementController(), { wrapper });
+        await waitFor(() => expect(result.current.enabled).toBe(true));
+
+        await act(async () => {
+            await result.current.generate({ values: {} });
+        });
+        act(() => result.current.applyReview());
+
+        expect(setFieldValue).not.toHaveBeenCalled();
+    });
+});

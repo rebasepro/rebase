@@ -118,10 +118,21 @@ export function errorClass(error: unknown): string {
  * turning into an incident. Strings are capped at 64 characters because no
  * legitimate enumerated value is longer, and a path or a message always is.
  */
+/**
+ * Key names that shadow an `Object.prototype` member.
+ *
+ * `__proto__` is already excluded by the pattern (it starts with an
+ * underscore), and assigning any of these to an object literal shadows rather
+ * than pollutes — so nothing is exploitable here. They are refused because a
+ * stored property called `constructor` is a trap for every consumer downstream
+ * that reaches for `properties.constructor` and gets a string.
+ */
+const RESERVED_KEYS = new Set(["constructor", "prototype", "hasownproperty", "tostring", "valueof"]);
+
 export function sanitize(properties: Record<string, unknown>): Record<string, TelemetryValue> {
     const out: Record<string, TelemetryValue> = {};
     for (const [key, value] of Object.entries(properties)) {
-        if (!/^[a-z][a-z0-9_]{0,31}$/.test(key)) continue;
+        if (!/^[a-z][a-z0-9_]{0,31}$/.test(key) || RESERVED_KEYS.has(key.toLowerCase())) continue;
         if (typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
             out[key] = value;
         } else if (typeof value === "string" && value.length > 0 && value.length <= 64) {

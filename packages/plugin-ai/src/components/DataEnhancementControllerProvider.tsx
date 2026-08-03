@@ -187,8 +187,13 @@ proposed: String(existing.proposed ?? "") + text }
             setReview((current) => current && {
                 ...current,
                 status: "ready",
-                fields: current.fields.map((f) => ({ ...f,
-pending: false }))
+                // Fields still pending when the run ended never received a final
+                // value — the model's JSON was cut off mid-string, so all we
+                // hold is a half-written sentence. Marking them complete would
+                // make that sentence applicable, which is the exact outcome the
+                // review exists to prevent. They are dropped instead: the review
+                // only ever offers what the service actually finished.
+                fields: current.fields.filter((f) => !f.pending)
             });
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : "Autofill could not be completed";
@@ -199,8 +204,9 @@ pending: false }))
                 ...current,
                 status: "failed",
                 error: message,
-                fields: current.fields.map((f) => ({ ...f,
-pending: false }))
+                // Same rule as the success path: a field interrupted mid-write
+                // is not something the operator can be offered.
+                fields: current.fields.filter((f) => !f.pending)
             });
         }
     }, [collection, endpoint, upsertField]);

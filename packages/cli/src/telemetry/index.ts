@@ -66,18 +66,31 @@ export function isEnabled(env: NodeJS.ProcessEnv = process.env, cwd: string = pr
     return suppressionReason(env, cwd) === null;
 }
 
-/** Record the user's answer. `false` is final — nothing prompts again. */
-export function setConsent(enabled: boolean): void {
+/**
+ * Record the user's answer. `false` is final — nothing prompts again.
+ *
+ * Returns whether the choice could actually be persisted. A read-only or full
+ * home directory makes `writeConfig` throw, and the direction of that failure
+ * matters enormously: someone turning sharing **off** who sees a stack trace,
+ * or worse sees nothing, is left sharing. The caller is expected to say so and
+ * point at `REBASE_TELEMETRY_DISABLED`, which needs no disk.
+ */
+export function setConsent(enabled: boolean): boolean {
     const config = readConfig();
-    writeConfig({
-        ...config,
-        enabled,
-        decidedAt: new Date().toISOString(),
-        // An id is minted only on acceptance. Generating one at decline time
-        // would create the very record the user just refused.
-        machineId: enabled ? (config.machineId ?? undefined) : undefined
-    });
-    if (enabled) ensureMachineId();
+    try {
+        writeConfig({
+            ...config,
+            enabled,
+            decidedAt: new Date().toISOString(),
+            // An id is minted only on acceptance. Generating one at decline
+            // time would create the very record the user just refused.
+            machineId: enabled ? (config.machineId ?? undefined) : undefined
+        });
+        if (enabled) ensureMachineId();
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 /**

@@ -407,3 +407,43 @@ describe("ensureProjectId", () => {
         expect(JSON.parse(fetchMock.mock.calls[0][1].body).projectId).toBeUndefined();
     });
 });
+
+describe("when the disk will not cooperate", () => {
+
+    it("reports a failed opt-out instead of leaving the user believing it worked", async () => {
+        // The failure direction that matters. Someone turning sharing off who
+        // sees nothing is left sharing — the one outcome this whole subsystem
+        // exists to make impossible.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+
+        vi.spyOn(fs, "writeFileSync").mockImplementation(() => {
+            throw Object.assign(new Error("EROFS: read-only file system"), { code: "EROFS" });
+        });
+
+        expect(telemetry.setConsent(false)).toBe(false);
+    });
+
+    it("reports a failed opt-in rather than pretending to have recorded it", async () => {
+        const telemetry = await load();
+        vi.spyOn(fs, "writeFileSync").mockImplementation(() => {
+            throw Object.assign(new Error("ENOSPC"), { code: "ENOSPC" });
+        });
+        expect(telemetry.setConsent(true)).toBe(false);
+    });
+
+    it("says it worked when it did", async () => {
+        const telemetry = await load();
+        expect(telemetry.setConsent(true)).toBe(true);
+        expect(telemetry.setConsent(false)).toBe(true);
+    });
+
+    it("keeps the config unreadable to other users on a shared machine", async () => {
+        // It sits beside credentials.json, and a world-readable identifier is a
+        // way to link one developer's activity to another's.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        const mode = fs.statSync(telemetry.configPath()).mode & 0o777;
+        expect(mode).toBe(0o600);
+    });
+});

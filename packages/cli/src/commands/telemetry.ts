@@ -23,12 +23,24 @@ export async function telemetryCommand(rawArgs: string[]): Promise<void> {
             printPayload();
             return;
         case "enable":
-            setConsent(true);
+            if (!setConsent(true)) {
+                console.error(chalk.red(`Could not write ${configPath()} — sharing was not enabled.`));
+                process.exitCode = 1;
+                return;
+            }
             console.log(chalk.green("Anonymous usage sharing enabled."));
             console.log(chalk.gray(`Inspect what gets sent with ${chalk.cyan("rebase telemetry show")}.`));
             return;
         case "disable":
-            setConsent(false);
+            if (!setConsent(false)) {
+                // The failure direction that matters. Someone turning sharing
+                // off must never be left believing it worked — so this is loud,
+                // non-zero, and points at the switch that needs no disk.
+                console.error(chalk.red(`Could not write ${configPath()} — sharing is still ON.`));
+                console.error(chalk.yellow(`Set ${chalk.cyan("REBASE_TELEMETRY_DISABLED=1")} in your environment instead; it needs no file.`));
+                process.exitCode = 1;
+                return;
+            }
             console.log(chalk.gray("Anonymous usage sharing disabled. Nothing further will be sent."));
             return;
         default:
