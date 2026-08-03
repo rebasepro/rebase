@@ -241,39 +241,75 @@ url };
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Tenant hostnames
+   Platform configuration
    ═══════════════════════════════════════════════════════════════ */
 
+/** One place a deploy can actually land, as the control plane describes it. */
+export interface DeployTarget {
+    clusterId?: string | null;
+    provider: string;
+    region?: string;
+    label?: string;
+    baseDomain?: string;
+}
+
+export interface PlatformConfig {
+    tenantBaseDomain?: string;
+    deployTargets?: DeployTarget[];
+}
+
 /**
- * The base domain tenant projects are served at, as reported by the control
- * plane (`platform-config`, which derives it from the same TENANT_BASE_DOMAIN
- * the ingress and the console read — see saas/backend/src/utils/tenant-domain.ts).
+ * The control plane's public, non-secret self-description (`platform-config`).
  *
- * The CLI cannot know this value: it is per-deployment configuration (production
- * serves tenants at `rebase.website`, a dev control plane at `localhost`). It
- * used to be hardcoded to `rebase.pro`, so `cloud projects create` congratulated
- * the user with a URL that resolves nowhere near their app.
+ * None of it is knowable from the CLI side: it is per-deployment configuration —
+ * production serves tenants at `rebase.website` on GKE, a dev control plane at
+ * `localhost` on Docker. Guessing produced two separate lies: a congratulation
+ * URL that resolved nowhere near the app, and a `provider` the project does not
+ * run on (see `createProject`).
  *
  * Cached per host for the process: it is fixed for a control plane's lifetime,
  * and `projects list` formats one host per row off a single fetch.
  *
- * @returns the base domain, or `undefined` if the control plane doesn't serve
+ * @returns the config, or `undefined` if the control plane doesn't serve
  *   `platform-config` (an older deployment) or the request failed. A failure is
- *   cached too — the caller renders a subdomain either way, and a short-lived
- *   CLI should not retry once per row.
+ *   cached too — a short-lived CLI should not retry once per row. Note the
+ *   distinction callers rely on: `undefined` means "this control plane cannot
+ *   tell us", whereas `deployTargets: []` is a control plane stating that it has
+ *   no infrastructure configured.
  */
-const tenantBaseDomainCache = new Map<string, Promise<string | undefined>>();
+const platformConfigCache = new Map<string, Promise<PlatformConfig | undefined>>();
 
-export function fetchTenantBaseDomain(client: CloudClient, url: string): Promise<string | undefined> {
-    let pending = tenantBaseDomainCache.get(url);
+export function fetchPlatformConfig(client: CloudClient, url: string): Promise<PlatformConfig | undefined> {
+    let pending = platformConfigCache.get(url);
     if (!pending) {
         pending = client.functions
-            .invoke<{ tenantBaseDomain?: string }>("platform-config", undefined, { method: "GET" })
-            .then((cfg) => cfg?.tenantBaseDomain?.trim() || undefined)
+            .invoke<PlatformConfig>("platform-config", undefined, { method: "GET" })
+            .then((cfg) => cfg ?? undefined)
             .catch(() => undefined);
-        tenantBaseDomainCache.set(url, pending);
+        platformConfigCache.set(url, pending);
     }
     return pending;
+}
+
+/**
+ * The base domain tenant projects are served at, derived from the same
+ * TENANT_BASE_DOMAIN the ingress and the console read (see
+ * saas/backend/src/utils/tenant-domain.ts).
+ */
+export function fetchTenantBaseDomain(client: CloudClient, url: string): Promise<string | undefined> {
+    return fetchPlatformConfig(client, url).then((cfg) => cfg?.tenantBaseDomain?.trim() || undefined);
+}
+
+/**
+ * The infrastructure a deploy for this control plane would ACTUALLY use, in the
+ * resolver's own preference order (saas/backend/src/k8s/resolve.ts).
+ *
+ * @returns the targets, or `undefined` when the control plane cannot say.
+ */
+export function fetchDeployTargets(client: CloudClient, url: string): Promise<DeployTarget[] | undefined> {
+    return fetchPlatformConfig(client, url).then((cfg) =>
+        Array.isArray(cfg?.deployTargets) ? cfg.deployTargets : undefined
+    );
 }
 
 /**

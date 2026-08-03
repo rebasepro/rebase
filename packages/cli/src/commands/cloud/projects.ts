@@ -13,6 +13,8 @@ import {
     colorStatus,
     keyValues,
     fetchTenantBaseDomain,
+    fetchDeployTargets,
+    type DeployTarget,
     projectHost,
     success,
     fail,
@@ -94,6 +96,69 @@ vmSize: "cx21" };
     }
 }
 
+/**
+ * Where this project says it runs.
+ *
+ * `provider`/`region` are a *request*: no code downstream reads them to pick a
+ * deploy target — that comes from the project's cluster record or the ambient
+ * in-cluster context (saas/backend/src/k8s/resolve.ts). So a wrong value here is
+ * never contradicted by a failure; it just sits in the record. The CLI used to
+ * default to `hetzner`/`nbg1` unconditionally, which is how projects running on
+ * our GKE cluster came to describe themselves as Hetzner in the console — and
+ * `provider` is half the Stripe compute lookup key (`compute_<provider>_<vmSize>`),
+ * so that is a mispricing, not a cosmetic slip.
+ *
+ * The control plane already publishes the infrastructure that actually exists,
+ * and the console's create wizard reads it. Ask the same question here.
+ *
+ * Exported for tests: the decision is pure, so it can be pinned without a
+ * control plane. The fetching and the exit live in `resolveRequestedTarget`.
+ *
+ * @param requested `--provider`, if the caller named one. An explicit flag wins:
+ *   it is the caller stating intent, and `deploy` corrects the record anyway.
+ * @param targets What the control plane says exists, or `undefined` when it
+ *   cannot say — an older deployment with no `platform-config`, or a failed
+ *   request. That is different from an empty list, which is a control plane
+ *   stating it has no infrastructure at all.
+ * @returns the target to record, or `null` when the control plane answered that
+ *   there is none.
+ */
+export function chooseRequestedTarget(
+    requested: string | undefined,
+    targets: DeployTarget[] | undefined
+): { provider: string; region?: string } | null {
+    if (requested) return { provider: requested,
+region: undefined };
+
+    // Keep the historical default against a control plane that cannot answer,
+    // rather than refusing to create a project against it.
+    if (!targets) return { provider: "hetzner",
+region: undefined };
+
+    if (targets.length === 0) return null;
+
+    // The resolver returns targets in its own preference order, and the first is
+    // the one a deploy would use.
+    const [target] = targets;
+    return { provider: target.provider,
+region: target.region?.trim() || undefined };
+}
+
+async function resolveRequestedTarget(
+    client: CloudClient,
+    url: string,
+    requested: string | undefined
+): Promise<{ provider: string; region?: string }> {
+    const chosen = chooseRequestedTarget(requested, await fetchDeployTargets(client, url));
+    if (!chosen) {
+        fail(
+            "This control plane has no deploy targets configured.",
+            `Register a cluster, or pass ${chalk.bold("--provider")} and ${chalk.bold("--region")} to record one anyway.`
+        );
+    }
+    return chosen;
+}
+
 export async function createProject(rawArgs: string[]): Promise<void> {
     const args = arg(
         {
@@ -140,11 +205,18 @@ message: "Subdomain:" });
     const subdomain = (args["--subdomain"] || a.subdomain || "").trim().toLowerCase();
     const gitRepoUrl = (args["--repo"] || a.repo || "").trim();
     const gitBranch = (args["--branch"] || a.branch || "main").trim();
-    const provider = (args["--provider"] || a.provider || "hetzner").trim();
+    const target = await resolveRequestedTarget(
+        client,
+        url,
+        (args["--provider"] || a.provider)?.trim() || undefined
+    );
+    const provider = target.provider;
     // region + vmSize are required by the control plane; default sensibly per
-    // provider so a headless `projects create` needs only name + subdomain.
+    // provider so a headless `projects create` needs only name + subdomain. The
+    // target's own region wins where it has one: a per-provider guess is how a
+    // GKE project ended up recorded in `nbg1`.
     const defaults = providerDefaults(provider);
-    const region = (args["--region"] || defaults.region).trim();
+    const region = (args["--region"] || target.region || defaults.region).trim();
     const vmSize = (args["--vm-size"] || defaults.vmSize).trim();
 
     if (!name || !subdomain) {

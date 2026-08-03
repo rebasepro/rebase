@@ -383,6 +383,82 @@ schemas and is what surfaced both bugs above.
 
 ---
 
+## 14. A field the platform writes and never reads back
+
+A column that nothing downstream consults cannot be wrong in a way anything
+notices. It is not dead — it is displayed, and it is billed on — but no code path
+compares it to reality, so it drifts silently and forever.
+
+A cloud project's `provider`/`region` are the case. They are a *request*: the
+deploy target comes from the project's cluster record or the resolver's ambient
+rung, never from these columns. `rebase cloud projects create` defaulted them to
+`hetzner`/`nbg1`, and the only writer of the truth — `stampActualTarget` — was
+called from the two build paths but not from the managed-bundle path. So projects
+that only ever deployed bundles sat in the console reading "Hetzner · Nbg1" while
+running on GKE, and billed against a `compute_hetzner_*` Stripe price. Nothing
+failed, because nothing asked.
+
+The tell is a field with **no reader that can disagree**. Compare a wrong
+`gitBranch`, which fails the next clone: a field the code acts on is corrected by
+reality within one deploy. This class survives precisely because it is inert.
+
+**Sweep:** for each column a client can set, grep for a read *other than*
+display, serialization or billing. If the only readers render it, ask what writes
+the truth and whether every path that learns the truth writes it — the bug here
+was one of three paths having the call. Then check the field is not an input to
+something that silently accepts anything: `compute_${provider}_${vmSize}` builds
+a Stripe lookup key by concatenation, so a wrong half produces a plausible key
+for a price that may not exist.
+
+**Watch for:** a "correct it when we find out" stamp that declines to write when
+the truth is unknown. `stampActualTarget` skips `region` when the resolved target
+has none, which left `gcp · nbg1` — a Hetzner region on a Google target, wrong in
+a way that reads as data. Log it, and make the unknown knowable (`MANAGED_REGION`
+on the control plane).
+
+---
+
+## 15. A hook that decrypts for whoever asks
+
+Field-level encryption is usually written as a symmetric pair — encrypt in
+`beforeSave`, decrypt in `afterRead` — and the second half quietly answers a
+question nobody asked out loud: *decrypt for whom?*
+
+`registerEncryptionHooks` decrypted for every reader. A `GET /api/data/clusters`
+therefore returned a live kubeconfig — root on the cluster every tenant runs on —
+and the S3 secret guarding every tenant's database backups. RLS admitted only the
+`admin` role, so the exposure was scoped to platform admins rather than
+customers, which is why it survived review: the *row* access was correct, and the
+question of what is inside the row was never separately asked.
+
+`env-var-hooks.ts` had already answered it for weaker secrets, and its comment is
+the rule: **a page load is not consent** to put a secret in a response body, a
+browser cache and a proxy log. Where a person genuinely needs one back there is a
+deliberate reveal endpoint that says so at the point of use (`db-info.ts`,
+`env-vars.ts POST /reveal`).
+
+**Sweep:** grep for `afterRead` alongside any decrypt/unmask/reveal call, and for
+each one ask which identities reach it. `isTrustedServerContext` is the test —
+`service` is the platform, everything else is a caller, and an *absent* context is
+a caller too (fail closed). Then confirm the withheld value is not load-bearing
+for a client: check the console and the CLI for a reader of that field, not just
+of the collection. Both proved to want only presence (`secretSet`) and non-secret
+columns.
+
+**Watch for:** returning a mask instead of the stored bytes. A mask is what an
+edit form reads and writes straight back, storing `••••••` as the secret.
+
+**Gate:** the unit test cannot settle this one, because it *builds* the context it
+asserts on — the same trap `saas/backend/src/utils/auth-context.ts` documents.
+`encryption-read-scope.test.ts` reads a real row through the real driver and
+*observes* the identity the hook was handed. It was verified against three
+mutants: the guard removed, the guard inverted, and — the failure mode that
+motivated it — `withTransaction` dropping the user from its per-transaction
+delegate, which would have refused the platform its own kubeconfig. All three go
+red.
+
+---
+
 ## The discipline
 
 When you find a bug:

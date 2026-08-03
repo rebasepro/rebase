@@ -7,7 +7,13 @@
  * so it can only come from the control plane (`platform-config`).
  */
 import { describe, it, expect, vi } from "vitest";
-import { fetchTenantBaseDomain, formatTenantHost, projectHost, type CloudClient } from "./context";
+import {
+    fetchDeployTargets,
+    fetchTenantBaseDomain,
+    formatTenantHost,
+    projectHost,
+    type CloudClient
+} from "./context";
 
 /** A client whose only exercised surface is `functions.invoke`. */
 function fakeClient(invoke: (name: string) => Promise<unknown>): CloudClient {
@@ -77,5 +83,49 @@ describe("fetchTenantBaseDomain", () => {
     it("treats a blank base domain as unknown rather than building `acme.`", async () => {
         const client = fakeClient(async () => ({ tenantBaseDomain: "   " }));
         await expect(fetchTenantBaseDomain(client, "https://blank.example")).resolves.toBeUndefined();
+    });
+});
+
+describe("fetchDeployTargets", () => {
+    it("reads the infrastructure the control plane says exists", async () => {
+        const client = fakeClient(async () => ({
+            tenantBaseDomain: "rebase.website",
+            deployTargets: [{ clusterId: null,
+provider: "gcp",
+region: "europe-west1" }]
+        }));
+        await expect(fetchDeployTargets(client, "https://t.example")).resolves.toEqual([
+            { clusterId: null,
+provider: "gcp",
+region: "europe-west1" }
+        ]);
+    });
+
+    it("shares one request with the base-domain lookup", async () => {
+        // Both read the same `platform-config` document, and `projects create`
+        // needs both. Two round trips for one document would be one too many.
+        const client = fakeClient(async () => ({ tenantBaseDomain: "rebase.website",
+deployTargets: [] }));
+        const url = "https://shared.example";
+        await Promise.all([fetchTenantBaseDomain(client, url), fetchDeployTargets(client, url)]);
+        expect(client.functions.invoke).toHaveBeenCalledTimes(1);
+    });
+
+    it("distinguishes an empty list from a control plane that cannot answer", async () => {
+        // `[]` is an answer — no infrastructure configured — and `undefined` is
+        // a gap. `projects create` treats them differently: it refuses on the
+        // first and keeps its historical default on the second.
+        const empty = fakeClient(async () => ({ deployTargets: [] }));
+        await expect(fetchDeployTargets(empty, "https://empty.example")).resolves.toEqual([]);
+
+        const old = fakeClient(async () => {
+            throw Object.assign(new Error("Not found"), { status: 404 });
+        });
+        await expect(fetchDeployTargets(old, "https://old-targets.example")).resolves.toBeUndefined();
+    });
+
+    it("treats a non-array `deployTargets` as no answer at all", async () => {
+        const client = fakeClient(async () => ({ deployTargets: "gcp" }));
+        await expect(fetchDeployTargets(client, "https://junk.example")).resolves.toBeUndefined();
     });
 });
