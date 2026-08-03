@@ -7,19 +7,16 @@ import * as dotenv from "dotenv";
 import readline from "readline";
 
 import {
-    TableRow,
-    TableColumn,
-    EnumValue,
-    PrimaryKeyRow,
-    ForeignKeyRow,
     buildTablesMap,
     buildEnumMap,
-    identifyJoinTables,
     generateCollectionFile,
     generateIndexContent,
     mergeIndexContent,
     safeHostFromUrl
 } from "./introspect-db-logic";
+import { countRowsUpTo, readSchemaMetadata } from "./introspect-db-queries";
+import { classifyTables, lookupCandidates, LOOKUP_MAX_ROWS } from "./introspect-db-structure";
+import { parseCheckConstraints } from "./introspect-db-constraints";
 import { logger } from "@rebasepro/server";
 
 async function main() {
@@ -89,82 +86,41 @@ async function main() {
     logger.info(chalk.gray(`Introspecting schema '${pgSchema}'...`));
 
     try {
-        // 1. Get Tables
-        const { rows: tables } = await client.query<TableRow>(`
-            SELECT table_name
-            FROM information_schema.tables
-            WHERE table_schema = $1 AND table_type = 'BASE TABLE'
-              AND table_name NOT LIKE 'drizzle_%'
-              AND table_name NOT LIKE 'rebase_%'
-            ORDER BY table_name
-        `, [pgSchema]);
+        const metadata = await readSchemaMetadata(client, pgSchema);
+        const enumMap = buildEnumMap(metadata.enumValues);
+        const tablesMap = buildTablesMap(metadata.tables, metadata.columns, metadata.pks, metadata.fks);
+        const fks = metadata.fks;
 
-        // 2. Get Columns
-        const { rows: columns } = await client.query<TableColumn>(`
-            SELECT 
-                c.table_name, 
-                c.column_name, 
-                c.data_type, 
-                c.udt_name, 
-                c.is_nullable, 
-                c.column_default,
-                (SELECT a.atttypmod FROM pg_attribute a 
-                 JOIN pg_class pc ON a.attrelid = pc.oid 
-                 WHERE pc.relname = c.table_name 
-                   AND a.attname = c.column_name 
-                   AND pc.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = c.table_schema)) as atttypmod
-            FROM information_schema.columns c
-            WHERE c.table_schema = $1
-        `, [pgSchema]);
+        // Only tables that could structurally be a code list are counted, and
+        // each count stops at the threshold — see `countRowsUpTo`. Introspection
+        // runs against a database it does not own, so "cheap on a table of any
+        // size" is a requirement, not an optimization.
+        for (const table of lookupCandidates(metadata, tablesMap)) {
+            try {
+                metadata.rowCounts[table] = await countRowsUpTo(client, pgSchema, table, LOOKUP_MAX_ROWS);
+            } catch (err) {
+                // A table this run cannot read is simply not classified as a code
+                // list; everything else about it still generates.
+                logger.info(chalk.gray(`  (skipped row count for ${table}: ${err instanceof Error ? err.message : String(err)})`));
+            }
+        }
 
-        // 2b. Get Enum Types and their values
-        const { rows: enumValues } = await client.query<EnumValue>(`
-            SELECT t.typname AS enum_name,
-                   e.enumlabel AS enum_value,
-                   e.enumsortorder AS sort_order
-            FROM pg_type t
-            JOIN pg_enum e ON t.oid = e.enumtypid
-            JOIN pg_namespace n ON t.typnamespace = n.oid
-            WHERE n.nspname = $1
-            ORDER BY t.typname, e.enumsortorder
-        `, [pgSchema]);
+        const classifications = classifyTables(metadata, tablesMap);
+        const checkFacts = parseCheckConstraints(metadata.checks);
+        const joinTables = new Set(
+            Array.from(classifications.values())
+                .filter((c) => c.role === "junction")
+                .map((c) => c.table)
+        );
 
-        // Build a map: enum_name -> ordered list of values
-        const enumMap = buildEnumMap(enumValues);
+        const roleCount = (role: string) =>
+            Array.from(classifications.values()).filter((c) => c.role === role).length;
 
-        // 3. Get Primary Keys
-        const { rows: pks } = await client.query<PrimaryKeyRow>(`
-            SELECT t.relname as table_name, a.attname as column_name
-            FROM   pg_index i
-            JOIN   pg_attribute a ON a.attrelid = i.indrelid
-                                AND a.attnum = ANY(i.indkey)
-            JOIN   pg_class t ON t.oid = i.indrelid
-            JOIN   pg_namespace n ON n.oid = t.relnamespace
-            WHERE  i.indisprimary AND n.nspname = $1
-        `, [pgSchema]);
-
-        // 4. Get Foreign Keys
-        const { rows: fks } = await client.query<ForeignKeyRow>(`
-            SELECT
-                tc.table_name, 
-                kcu.column_name, 
-                ccu.table_name AS foreign_table_name,
-                ccu.column_name AS foreign_column_name 
-            FROM 
-                information_schema.table_constraints AS tc 
-                JOIN information_schema.key_column_usage AS kcu
-                  ON tc.constraint_name = kcu.constraint_name
-                  AND tc.table_schema = kcu.table_schema
-                JOIN information_schema.constraint_column_usage AS ccu
-                  ON ccu.constraint_name = tc.constraint_name
-                  AND ccu.table_schema = tc.table_schema
-            WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = $1
-        `, [pgSchema]);
-
-        const tablesMap = buildTablesMap(tables, columns, pks, fks);
-        const joinTables = identifyJoinTables(tablesMap);
-
-        logger.info(chalk.blue(`Found ${tablesMap.size} tables (including ${joinTables.size} detected join tables).`));
+        logger.info(chalk.blue(`Found ${tablesMap.size} tables.`));
+        logger.info(chalk.gray(
+            `  ${roleCount("entity")} entities, ${joinTables.size} join tables (folded into relations), ` +
+            `${roleCount("lookup")} code lists, ${roleCount("owned-child")} owned by another table (hidden from navigation).`
+        ));
 
         let runDataInference = false;
         if (args["--no-data-inference"]) {
@@ -224,7 +180,8 @@ async function main() {
                     joinTables,
                     tablesMap,
                     enumMap,
-                    sampleData
+                    sampleData,
+                    { metadata, classifications, checkFacts }
                 );
 
                 fs.writeFileSync(filePath, fileContent, "utf-8");

@@ -350,6 +350,39 @@ these are the test's mistake and half are the product's.
 
 ---
 
+## 13. Generated code, checked by substring
+
+A code generator that emits *source text* has no compiler between it and its
+output, so two mistakes are free.
+
+The first is asking questions of the text with `includes`. The introspection
+generator decided whether to emit a validation minimum with
+`!extra.includes("min:")`. `admin:` ends in `min:`. Every property that had
+picked up an admin block therefore claimed to already have a minimum, and
+silently dropped the one the database declared — on `varchar` bounds and on
+`CHECK (length(slug) >= 3)` alike. A key in generated code is preceded by a
+newline, a brace or a comma, never by another identifier character, and the
+predicate has to say so.
+
+The second is that nothing typechecks the output. The same generator emitted
+`icon` and `propertiesOrder` at the top level of a `PostgresCollectionConfig`,
+which declares neither — they belong in the `admin` block, and have since the
+BaaS/admin split. Every generated file was a type error, and the panel, which
+reads the block, never saw either value. No assertion caught it because every
+assertion was about substrings, and the substrings were all present. Two lines
+below, a self-referencing foreign key made a file import its own default export
+under the name it declares three lines later.
+
+**Sweep:** grep the generators for `.includes("` on emitted text —
+`introspect-db-logic.ts` is one; `generate-drizzle-schema`, the DDL emitters and
+the ts-morph schema editor are the others — and check whether the needle can
+occur as a suffix of a longer identifier. Then, for anything that writes a file
+a user will compile, build a `ts.createProgram` over the output and assert zero
+diagnostics; `introspect-real-generation.test.ts` does this over four real
+schemas and is what surfaced both bugs above.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -460,3 +493,44 @@ bug reached two different ways: once by a boolean expression that inverted its
 own meaning, once by a type signature that silently ate the argument which would
 have made the expression irrelevant. Neither had a test, and the test that
 existed for the gate stubbed the verifier so that it could not have failed.
+
+---
+
+### Last sweep — 2026-08-03
+
+Introspection: reading a schema's structure instead of mirroring its tables. The
+work was a feature, but it was done against four databases loaded into a real
+PostgreSQL server rather than against built fixtures, and every finding below is
+something only a real schema produced.
+
+| checked | result |
+|---|---|
+| every generated collection, put through `ts.createProgram` | **BUG** (class 13) — `icon` and `propertiesOrder` were emitted at the top level of a `PostgresCollectionConfig`, which declares neither. Every file introspection has ever written was a type error, and the admin panel never read either value. Now nested in `admin`, and pinned by compiling the output of four real schemas. |
+| a self-referencing foreign key (`northwind.employees.reports_to`) | **BUG** (class 13) — the file imported its own default export: `TS2440`. Both sample schemas that have a manager column hit it. |
+| `!extra.includes("min:")` as a "already set?" guard | **BUG** (class 13) — `admin:` ends in `min:`, so every property with an admin block dropped its declared minimum. |
+| `information_schema.tables` against a partitioned table | **BUG** — pagila's `payment` is partitioned by month, and every partition was reported as a base table. 70 tables in, 70 collections out, 26 of them `payment_p2022_*` with their own navigation entries. Reads `pg_class` and excludes `relispartition` now. |
+| foreign keys on a partitioned table | **BUG** — pagila declares `payment`'s three keys on each partition and none on the parent, so reading `pg_constraint` at face value left the `payment` collection with no relations at all. Attributed to the partition root, deduplicated. |
+| `information_schema.constraint_column_usage` for composite keys | **BUG** — reports the cross product of the constraint's columns, so a two-column key comes back as four rows, two of them pairing the wrong columns. Replaced with `unnest(conkey/confkey) WITH ORDINALITY` joined on the ordinal. |
+| `array_agg(a.attname)` through node-pg | **BUG** — no parser exists for an array of `name`, so the driver returns the literal string `{a,b}`. Every consumer indexes it as an array and would have failed silently. `::text` added. |
+| `film.fulltext` (`tsvector`, NOT NULL, trigger-maintained) | **BUG** — emitted as a required free-text field, so every create through the panel was impossible. Read-only and hidden from the list now, along with generated columns. |
+| the name-based `created_at`/`updated_at` check | replaced for classification purposes by "temporal column with a transaction-clock default", which catches pagila's `last_update` and a schema written in any language. The name-based branch stays for `autoValue`, which is a separate question. |
+| `identifyJoinTables`, which decided by column name | superseded for the CLI by structural classification: two single-column keys, unique together, no payload, nothing referencing it. `northwind.order_details` has the key shape and three payload columns — the old rule folded it into a many-to-many and dropped price, quantity and discount from the UI. |
+
+### Sweep continued — 2026-08-03, ten more real databases
+
+The first pass ran against three sample databases. Three is not a sample: they
+are all small, all normalized the same way, and all written to teach SQL. The
+sweep was repeated against every real Postgres schema that could be fetched and
+loaded — GitLab (1049 tables), MusicBrainz (374), Discourse (350), MediaWiki
+(64), OpenStreetMap (56), Temporal (37), AdventureWorks (68 across five
+schemas), plus the original three. Two more bugs, both of which stop a generated
+file compiling.
+
+| checked | result |
+|---|---|
+| foreign key columns not named `*_id` | **BUG** (class 13) — MusicBrainz names every foreign key after the table it points at (`area_tag (area, tag)`), and both columns are in the primary key, so both stayed as properties *and* claimed the relation's key. `area:` was declared twice: TS1117, in 67 of its 339 collections. The existing guard fired only when the stripped name matched the column, which is not the same condition. Now the relation takes the first free key of three candidates, with a numbered tail so it is total. |
+| `multiline` / `markdown` on a `body` column | **BUG** (class 13) — emitted at the top of the property, where `StringProperty` declares neither. Six OpenStreetMap tables have a `body` column; the same defect was in the sampled-data inference path, which additionally emitted two `admin: {` blocks in one property when two of its branches fired. Both fixed, and the inference path is now compiled by a test of its own. |
+| schemas that declare no foreign keys at all | working as intended, and worth stating: MediaWiki and Temporal declare none, so nothing classifies and every table stays an entity. Structural inference has nothing to read, and inventing relationships from column names is the thing it exists not to do. |
+| 1049 tables end to end | clean — 528ms to read the catalog, 99ms to generate, 631 of 1049 tables left in the navigation. |
+| five schemas in one database (AdventureWorks) | clean — introspection is per-schema, and each of the five classified independently. |
+| duplicate property keys, self-imports, junctions pointing at absent tables, self-owning tables | swept across all ten; after the two fixes above, none. |

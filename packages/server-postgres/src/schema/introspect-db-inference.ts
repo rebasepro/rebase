@@ -19,6 +19,10 @@ export function inferPropertyFromData(
 ): InferenceResult {
     const result: InferenceResult = {};
     const extraLines: string[] = [];
+    // Collected separately and emitted as one block at the end. Pushed inline,
+    // two admin-owned options from different branches produced two `admin: {`
+    // blocks in one property — a duplicate key, which is also a compile error.
+    const adminOptions: string[] = [];
 
     // Filter out null/undefined for analysis
     const validValues = sampleValues.filter(v => v !== null && v !== undefined && v !== "");
@@ -189,10 +193,14 @@ export function inferPropertyFromData(
             }
         }
 
+        // `multiline` and `markdown` are *admin* property options, so they have
+        // to sit inside the `admin` block. Emitted at the top of the property —
+        // where they were — `PostgresCollectionConfig` does not declare them and
+        // the generated file does not compile.
         if (hasMarkdown) {
-            extraLines.push("            multiline: true,\n            markdown: true");
+            adminOptions.push("multiline: true", "markdown: true");
         } else if (hasNewlines || maxLength > 100) {
-            extraLines.push("            multiline: true");
+            adminOptions.push("multiline: true");
         }
 
         if (maxLength > 0 && maxLength < 10000) { // arbitrary cap to avoid huge limits
@@ -212,7 +220,8 @@ export function inferPropertyFromData(
         if (allAbsoluteUrls) {
             const isImage = validValues.some(v => typeof v === "string" && v.match(/\.(jpeg|jpg|gif|png|webp|svg)/i));
             if (isImage || isMedia) {
-                extraLines.push("            url: true,\n            admin: {\n                urlPreview: \"image\"\n            }");
+                extraLines.push("            url: true");
+                adminOptions.push("urlPreview: \"image\"");
             } else {
                 extraLines.push("            url: true");
             }
@@ -224,13 +233,14 @@ export function inferPropertyFromData(
                 const inferredStoragePath = lastSlash > 0 ? firstVal.substring(0, lastSlash) : "files";
                 extraLines.push(`            storage: {\n                storagePath: "${inferredStoragePath}"\n            }`);
             } else if (isUrl) {
-                if (isMedia) {
-                    extraLines.push("            url: true,\n            admin: {\n                urlPreview: \"image\"\n            }");
-                } else {
-                    extraLines.push("            url: true");
-                }
+                extraLines.push("            url: true");
+                if (isMedia) adminOptions.push("urlPreview: \"image\"");
             }
         }
+    }
+
+    if (adminOptions.length > 0) {
+        extraLines.push(`            admin: {\n${adminOptions.map((o) => `                ${o}`).join(",\n")}\n            }`);
     }
 
     result.extra = extraLines.length > 0 ? "\n" + extraLines.join(",\n") + "," : "";

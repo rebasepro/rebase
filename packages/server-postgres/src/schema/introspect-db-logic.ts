@@ -8,11 +8,25 @@
  */
 import { inferPropertyFromData } from "./introspect-db-inference";
 import { humanize } from "./introspect-db-naming";
+import { mapPgType } from "./introspect-db-types";
+import type { CheckFactsByTable } from "./introspect-db-constraints";
+import type { TableClassification } from "./introspect-db-structure";
+import {
+    buildColumnFacts,
+    deriveKanbanProperty,
+    deriveListProperties,
+    deriveSort,
+    deriveTitleProperty,
+    isDerivedIndexColumn,
+    isReadOnlyColumn
+} from "./introspect-db-structure";
 
 // ── Typed interfaces for SQL query results ────────────────────────────
 
 export interface TableRow {
     table_name: string;
+    /** True for the parent of a partitioned table (`relkind = 'p'`). */
+    is_partitioned?: boolean;
 }
 
 export interface TableColumn {
@@ -23,6 +37,18 @@ export interface TableColumn {
     is_nullable: string;
     column_default: string | null;
     atttypmod: number | null;
+    /** 1-based position in the table, as declared. */
+    ordinal_position?: number;
+    /** `"ALWAYS"` for a generated column, `"NEVER"` otherwise. */
+    is_generated?: string;
+    /** `"YES"` for an identity column. */
+    is_identity?: string;
+    /** `"ALWAYS"` or `"BY DEFAULT"` on an identity column. */
+    identity_generation?: string | null;
+    /** The declared `varchar(n)` / `char(n)` bound, if any. */
+    character_maximum_length?: number | null;
+    numeric_precision?: number | null;
+    numeric_scale?: number | null;
 }
 
 export interface EnumValue {
@@ -41,6 +67,57 @@ export interface ForeignKeyRow {
     column_name: string;
     foreign_table_name: string;
     foreign_column_name: string;
+    /** Name of the FK constraint — the only way to tell composite keys apart. */
+    constraint_name?: string;
+    /** 1-based position of this column within its constraint. */
+    ordinal?: number;
+    /** `"CASCADE"`, `"RESTRICT"`, `"SET NULL"`, `"SET DEFAULT"`, `"NO ACTION"`. */
+    delete_rule?: string;
+}
+
+/** A unique constraint or unique index, as an ordered column list. */
+export interface UniqueConstraintRow {
+    table_name: string;
+    constraint_name: string;
+    column_names: string[];
+}
+
+/** A CHECK constraint, as `pg_get_constraintdef` renders it. */
+export interface CheckConstraintRow {
+    table_name: string;
+    constraint_name: string;
+    definition: string;
+}
+
+/** A `COMMENT ON TABLE` (null `column_name`) or `COMMENT ON COLUMN`. */
+export interface CommentRow {
+    table_name: string;
+    column_name: string | null;
+    comment: string;
+}
+
+/**
+ * Everything one introspection run reads from the database.
+ *
+ * Passed around as one value so a new signal means a new field here rather than
+ * a new parameter on every function between the query and the generator — the
+ * shape `generateCollectionFile` had grown to seven positional arguments by.
+ */
+export interface SchemaMetadata {
+    schema: string;
+    tables: TableRow[];
+    columns: TableColumn[];
+    enumValues: EnumValue[];
+    pks: PrimaryKeyRow[];
+    fks: ForeignKeyRow[];
+    uniques: UniqueConstraintRow[];
+    checks: CheckConstraintRow[];
+    comments: CommentRow[];
+    /**
+     * Row counts for the tables that needed one, capped — see `countRowsUpTo`.
+     * Absent for every table introspection never had a reason to count.
+     */
+    rowCounts: Record<string, number>;
 }
 
 export interface TableMeta {
@@ -160,54 +237,7 @@ export function getIconForTable(tableName: string): string {
     return "Database";
 }
 
-/**
- * Map a PostgreSQL data type to a Rebase property type.
- */
-export function mapPgType(dataType: string): string {
-    const dt = dataType.toLowerCase();
-
-    // Interval MUST be checked before numeric ("interval" contains "int")
-    if (dt === "interval") return "string";
-
-    // Array types MUST be checked before numeric ("_int4" contains "int")
-    if (dt === "array" || dt.startsWith("_")) return "array";
-
-    // Numeric types
-    if (
-        dt.includes("int") || // integer, smallint, bigint
-        dt.includes("numeric") ||
-        dt.includes("decimal") ||
-        dt.includes("serial") || // serial, bigserial
-        dt === "real" ||
-        dt === "float4" ||
-        dt === "float8" ||
-        dt === "double precision" ||
-        dt === "money"
-    ) {
-        return "number";
-    }
-
-    // Boolean
-    if (dt.includes("bool")) return "boolean";
-
-    // Date / Time
-    if (dt.includes("time") || dt.includes("date")) return "date";
-
-    // JSON
-    if (dt === "json" || dt === "jsonb") return "map";
-
-    // Binary
-    if (dt === "bytea") return "binary";
-
-    // Network types
-    if (dt === "inet" || dt === "cidr" || dt === "macaddr" || dt === "macaddr8") return "string";
-
-    // UUID
-    if (dt === "uuid") return "string";
-
-    // Text/varchar/char — default to string
-    return "string";
-}
+export { mapPgType };
 
 // ── Build the enum map from query results ─────────────────────────────
 
@@ -246,6 +276,20 @@ export function buildTablesMap(
 
 // ── Identify join tables ──────────────────────────────────────────────
 
+/**
+ * Join tables, identified by column name.
+ *
+ * Superseded for the CLI by `classifyTables` in `./introspect-db-structure`,
+ * which asks the database instead: two single-column keys, unique together, no
+ * payload column, nothing referencing the table. This rule folds away
+ * `northwind.order_details` — which has the key shape and carries unit price,
+ * quantity and discount — because it recognises `id`, `created_at` and
+ * `updated_at` by name and calls everything else a foreign key.
+ *
+ * Still used by `./introspect-runtime`, which builds collections in memory from
+ * a narrower set of catalog queries and has no unique-constraint or row-count
+ * data to reason with.
+ */
 export function identifyJoinTables(tablesMap: Map<string, TableMeta>): Set<string> {
     const joinTables = new Set<string>();
     for (const [tableName, meta] of tablesMap.entries()) {
@@ -520,6 +564,83 @@ export interface GeneratedFile {
 }
 
 /**
+ * The structural analysis a run can hand the generator.
+ *
+ * Optional in full, and the generator degrades to exactly its previous output
+ * without it. That is not politeness towards old callers: three existing test
+ * suites and the `rebase init` scaffold path build a `TableMeta` by hand and
+ * have no database to read constraints or row counts from, and they must keep
+ * producing a valid collection.
+ */
+export interface GenerationContext {
+    metadata?: SchemaMetadata;
+    classifications?: Map<string, TableClassification>;
+    checkFacts?: CheckFactsByTable;
+}
+
+/** Adds entries to a property's `validation` block, creating it if absent. */
+function withValidation(extra: string, entries: string[]): string {
+    if (entries.length === 0) return extra;
+    const block = entries.map((e) => `                ${e}`).join(",\n");
+    if (extra.includes("validation: {")) {
+        return extra.replace("validation: {", `validation: {\n${block},`);
+    }
+    return `${extra}\n            validation: {\n${block}\n            },`;
+}
+
+/**
+ * Whether a property's generated text already sets `key:` as an object key.
+ *
+ * A bare `extra.includes("min:")` looks like it answers this and does not:
+ * `admin:` ends in `min:`, so every property with an admin block claimed to
+ * have a minimum already and silently lost the one the database declared. The
+ * leading-delimiter requirement is the whole point — a key is preceded by a
+ * newline, a brace or a comma, never by another identifier character.
+ */
+function hasGeneratedKey(extra: string, key: string): boolean {
+    return new RegExp(`(^|[\\s{,])${key}\\s*:`).test(extra);
+}
+
+/** Adds entries to a property's `admin` block, creating it if absent. */
+function withAdminOptions(extra: string, entries: string[]): string {
+    if (entries.length === 0) return extra;
+    const block = entries.map((e) => `                ${e}`).join(",\n");
+    if (extra.includes("admin: {")) {
+        return extra.replace("admin: {", `admin: {\n${block},`);
+    }
+    return `${extra}\n            admin: {\n${block}\n            },`;
+}
+
+/** A TypeScript string literal, escaped. */
+function quote(value: string): string {
+    return JSON.stringify(value);
+}
+
+/**
+ * The first candidate key not already used, or a numbered fallback.
+ *
+ * The numbered tail exists so this is total: a table can hold two foreign keys
+ * whose columns strip to the same name, and a function that returns a key it
+ * cannot guarantee is free has just moved the duplicate one line down.
+ */
+function firstFreeKey(candidates: string[], taken: ReadonlyMap<string, unknown>): string {
+    for (const candidate of candidates) {
+        if (!taken.has(candidate)) return candidate;
+    }
+    const base = candidates[candidates.length - 1];
+    for (let suffix = 2; ; suffix++) {
+        const candidate = `${base}_${suffix}`;
+        if (!taken.has(candidate)) return candidate;
+    }
+}
+
+/** A property-key array, one key per line, indented for the admin block. */
+function formatKeyList(keys: string[]): string {
+    if (keys.length === 0) return "[]";
+    return `[\n${keys.map((k) => `            ${quote(k)}`).join(",\n")}\n        ]`;
+}
+
+/**
  * Generate the full TypeScript file content for a single collection.
  * Pure function — no I/O.
  */
@@ -530,18 +651,53 @@ export function generateCollectionFile(
     joinTables: Set<string>,
     tablesMap: Map<string, TableMeta>,
     enumMap: Map<string, string[]>,
-    sampleData?: Record<string, unknown>[]
+    sampleData?: Record<string, unknown>[],
+    context: GenerationContext = {}
 ): string {
     const collectionName = humanize(tableName);
     const singular = singularize(collectionName);
     const icon = getIconForTable(tableName);
 
+    const classification = context.classifications?.get(tableName);
+    const checkFacts: CheckFactsByTable = context.checkFacts ?? new Map();
+    const tableChecks = checkFacts.get(tableName);
+    const columnComments = new Map<string, string>();
+    let tableComment: string | undefined;
+    for (const comment of context.metadata?.comments ?? []) {
+        if (comment.table_name !== tableName) continue;
+        if (comment.column_name === null) tableComment = comment.comment;
+        else columnComments.set(comment.column_name, comment.comment);
+    }
+    const singleColumnUniques = new Set(
+        (context.metadata?.uniques ?? [])
+            .filter((u) => u.table_name === tableName && u.column_names.length === 1)
+            .map((u) => u.column_names[0])
+    );
+
     const imports = new Set<string>(['import { PostgresCollectionConfig } from "@rebasepro/types";']);
+
+    /**
+     * Imports the collection a relation points at — unless it is this one.
+     *
+     * A self-referencing key (`employees.reports_to -> employees`, which both
+     * northwind and chinook have) otherwise made the file import its own default
+     * export under the name it declares three lines later: `TS2440: Import
+     * declaration conflicts with local declaration`. The relation target is a
+     * thunk, so referring to the local const directly is fine — it is only
+     * dereferenced after the module has finished evaluating.
+     */
+    const importCollection = (otherTable: string): string => {
+        const varName = toCollectionVarName(otherTable);
+        if (otherTable !== tableName) imports.add(`import ${varName} from "./${otherTable}";`);
+        return varName;
+    };
 
     let propsOutput = "";
     let relationsOutput = "";
     const orderEntries: PropertyOrderEntry[] = [];
     const propertyBlocks = new Map<string, string>();
+    /** Properties the list view will not render, so `listProperties` skips them. */
+    const hiddenFromCollection = new Set<string>();
     let columnIndex = 0;
 
     // Detect composite primary keys
@@ -576,10 +732,21 @@ export function generateCollectionFile(
             if (inferred.extra) inferenceExtra = inferred.extra;
         }
 
+        const columnChecks = tableChecks?.get(col.column_name);
+
         // Enum values — generate real enum from the PG enum
         if (isEnumColumn && colEnumValues) {
             const enumEntries = colEnumValues
                 .map((v) => `{ id: "${v}", label: "${humanize(v)}" }`)
+                .join(", ");
+            extra += `\n            enum: [${enumEntries}],`;
+        } else if (columnChecks?.enumValues && !inferenceExtra.includes("enum:") && propType === "string") {
+            // `CHECK (col IN (…))` is the other way a schema declares a closed
+            // set. It is the same statement as a Postgres enum type, made by an
+            // author who did not want a type — and until now the form offered a
+            // free-text box for it and let the database reject the write.
+            const enumEntries = columnChecks.enumValues
+                .map((v) => `{ id: ${quote(v)}, label: ${quote(humanize(v))} }`)
                 .join(", ");
             extra += `\n            enum: [${enumEntries}],`;
         }
@@ -588,8 +755,10 @@ export function generateCollectionFile(
         if (finalPropType === "date") {
             if (colNameLower === "created_at" || colNameLower === "createdat") {
                 extra += "\n            autoValue: \"on_create\",\n            admin: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
+                hiddenFromCollection.add(col.column_name);
             } else if (colNameLower === "updated_at" || colNameLower === "updatedat") {
                 extra += "\n            autoValue: \"on_update\",\n            admin: {\n                readOnly: true,\n                hideFromCollection: true\n            },";
+                hiddenFromCollection.add(col.column_name);
             } else if (col.column_default && (col.column_default.includes("now()") || col.column_default.includes("CURRENT_TIMESTAMP"))) {
                 extra += "\n            autoValue: \"on_create\",\n            admin: {\n                readOnly: true\n            },";
             }
@@ -626,7 +795,12 @@ export function generateCollectionFile(
             } else if (colNameLower === "description" || colNameLower === "summary" || colNameLower === "excerpt") {
                 extra += "\n            admin: {\n                multiline: true\n            },";
             } else if (colNameLower === "content" || colNameLower === "body") {
-                extra += "\n            multiline: true,\n            markdown: true,";
+                // Inside `admin`, because that is where both options live. At the
+                // top of the property — where these were — the generated file
+                // does not compile: `StringProperty` declares neither. Six of
+                // OpenStreetMap's tables have a `body` column, which is how this
+                // surfaced.
+                extra += "\n            admin: {\n                multiline: true,\n                markdown: true\n            },";
             } else if (col.data_type === "text") {
                 extra += "\n            admin: {\n                multiline: true\n            },";
             }
@@ -636,6 +810,63 @@ export function generateCollectionFile(
         if (inferenceExtra) {
             extra += inferenceExtra;
             if (!extra.endsWith(",")) extra += ",";
+        }
+
+        // ── Rules the database already enforces ──────────────────────────────
+        // Everything below is read from the catalog, not guessed from the data
+        // or the column's name. Each one is a constraint a write would hit
+        // anyway; surfacing it means the form says no before the database does.
+        const declaredValidation: string[] = [];
+
+        // `varchar(n)` — a bound the author wrote down and nothing has read.
+        if (finalPropType === "string" &&
+            typeof col.character_maximum_length === "number" &&
+            col.character_maximum_length > 0 &&
+            !hasGeneratedKey(extra, "max")) {
+            declaredValidation.push(`max: ${col.character_maximum_length}`);
+        }
+
+        if (columnChecks) {
+            if (finalPropType === "number") {
+                if (columnChecks.min !== undefined && !hasGeneratedKey(extra, "min")) declaredValidation.push(`min: ${columnChecks.min}`);
+                if (columnChecks.max !== undefined && !hasGeneratedKey(extra, "max")) declaredValidation.push(`max: ${columnChecks.max}`);
+                if (columnChecks.moreThan !== undefined) declaredValidation.push(`moreThan: ${columnChecks.moreThan}`);
+                if (columnChecks.lessThan !== undefined) declaredValidation.push(`lessThan: ${columnChecks.lessThan}`);
+            }
+            if (finalPropType === "string") {
+                if (columnChecks.lengthMin !== undefined && !hasGeneratedKey(extra, "min")) declaredValidation.push(`min: ${columnChecks.lengthMin}`);
+                if (columnChecks.lengthMax !== undefined && !declaredValidation.some((v) => v.startsWith("max:")) && !hasGeneratedKey(extra, "max")) {
+                    declaredValidation.push(`max: ${columnChecks.lengthMax}`);
+                }
+            }
+        }
+
+        // A single-column unique index is the same promise `validation.unique`
+        // makes. Composite uniqueness is not: it constrains the combination, and
+        // marking either column unique on its own would reject valid rows.
+        if (singleColumnUniques.has(col.column_name) && !meta.pks.includes(col.column_name)) {
+            declaredValidation.push("unique: true");
+        }
+
+        extra = withValidation(extra, declaredValidation);
+
+        // A generated column rejects every write, and a tsvector holds lexeme
+        // positions rather than text, so an editable field for either is a field
+        // that can only ever produce an error.
+        if (isReadOnlyColumn(col) && !hasGeneratedKey(extra, "readOnly")) {
+            const options = ["readOnly: true"];
+            if (isDerivedIndexColumn(col) && !hasGeneratedKey(extra, "hideFromCollection")) {
+                options.push("hideFromCollection: true");
+                hiddenFromCollection.add(col.column_name);
+            }
+            extra = withAdminOptions(extra, options);
+        }
+
+        // `COMMENT ON COLUMN` — documentation the author already wrote, which
+        // introspection has never carried across.
+        const columnComment = columnComments.get(col.column_name);
+        if (columnComment) {
+            extra = `\n            description: ${quote(columnComment)},${extra}`;
         }
 
         // Identify IDs (unless already inferred as UUID/CUID by inferenceEngine)
@@ -656,7 +887,10 @@ export function generateCollectionFile(
             extra += `\n            dimensions: ${dims},`;
         }
 
-        if (col.is_nullable === "NO" && !meta.pks.includes(col.column_name) && !col.column_default) {
+        // `required` on a column the user cannot write is a form that cannot be
+        // submitted: pagila's `film.fulltext` is NOT NULL and maintained by a
+        // trigger, so demanding it of the user blocks every create.
+        if (col.is_nullable === "NO" && !meta.pks.includes(col.column_name) && !col.column_default && !isReadOnlyColumn(col)) {
             if (extra.includes("validation: {")) {
                 extra = extra.replace("validation: {", "validation: {\n                required: true,");
             } else {
@@ -690,12 +924,26 @@ export function generateCollectionFile(
     for (const fk of meta.fks) {
         const targetTableName = fk.foreign_table_name;
         if (!joinTables.has(targetTableName)) {
-            let relName = fk.column_name.replace(/_id$/, "");
-            if (meta.pks.includes(fk.column_name) && relName === fk.column_name) {
-                // If the FK is also the PK and its name doesn't imply a relation (like "id"),
-                // use the target table name to avoid conflicting with the PK property.
-                relName = targetTableName;
-            }
+            // The relation gets its own property key, and it must not be one this
+            // file has already used — a duplicate key in an object literal is a
+            // TypeScript error, so the whole collection stops compiling.
+            //
+            // The collision needs three things at once and is invisible without
+            // all three: a foreign key column that does *not* end in `_id`, that
+            // column also being part of the primary key (which is what keeps it
+            // as a property of its own rather than folding it into the relation),
+            // and the stripped name matching the target table. MusicBrainz names
+            // every foreign key after the table it points at — `area_tag (area,
+            // tag)` — so 67 of its 339 collections came out with a property
+            // declared twice.
+            const relName = firstFreeKey(
+                [
+                    fk.column_name.replace(/_id$/, ""),
+                    targetTableName,
+                    `${fk.column_name.replace(/_id$/, "")}_relation`
+                ],
+                propertyBlocks
+            );
             // Push the relation property key, not the FK column name
             orderEntries.push({
                 key: relName,
@@ -709,8 +957,7 @@ export function generateCollectionFile(
                 }
             });
 
-            const targetCollectionCamel = toCollectionVarName(targetTableName);
-            imports.add(`import ${targetCollectionCamel} from "./${targetTableName}";`);
+            const targetCollectionCamel = importCollection(targetTableName);
 
             const relHumanName = humanize(relName);
 
@@ -734,8 +981,7 @@ export function generateCollectionFile(
     for (const fk of inverseFks) {
         const sourceTableName = fk.table_name;
 
-        const targetCollectionCamel = toCollectionVarName(sourceTableName);
-        imports.add(`import ${targetCollectionCamel} from "./${sourceTableName}";`);
+        const targetCollectionCamel = importCollection(sourceTableName);
 
         relationsOutput += `
         {
@@ -788,8 +1034,7 @@ export function generateCollectionFile(
         if (otherFk) {
             const targetTableName = otherFk.foreign_table_name;
 
-            const targetCollectionCamel = toCollectionVarName(targetTableName);
-            imports.add(`import ${targetCollectionCamel} from "./${targetTableName}";`);
+            const targetCollectionCamel = importCollection(targetTableName);
 
             // Both sides of a many-to-many are `manyToMany`. There is no owning
             // and inverse side to pick between any more, so this no longer
@@ -821,18 +1066,69 @@ export function generateCollectionFile(
         propsOutput += propertyBlocks.get(key) || "";
     }
 
+    // ── The admin block ──────────────────────────────────────────────────
+    // `icon` and `propertiesOrder` used to be emitted at the *top level* of the
+    // config, where they have not belonged since the admin block was split out:
+    // `PostgresCollectionConfig` does not declare them, so every generated file
+    // was a type error, and the panel — which reads the block — never saw them.
+    const adminEntries: string[] = [`icon: "${icon}"`];
+
+    if (classification) {
+        const derivedFacts = context.metadata
+            ? buildColumnFacts(meta, context.metadata, enumMap, checkFacts)
+            : undefined;
+
+        if (classification.role === "owned-child") {
+            // The rows are already reachable: every inbound foreign key renders
+            // as a tab on the parent. A second, top-level entry for them is what
+            // turns a navigation of eight nouns into a list of thirty tables.
+            adminEntries.push("hideFromNavigation: true");
+        } else if (classification.role === "lookup") {
+            adminEntries.push('group: "Reference"');
+        }
+
+        if (derivedFacts) {
+            const titleProperty = deriveTitleProperty(derivedFacts);
+            if (titleProperty) adminEntries.push(`titleProperty: ${quote(titleProperty)}`);
+
+            const kanbanProperty = deriveKanbanProperty(derivedFacts);
+            if (kanbanProperty) adminEntries.push(`kanban: {\n            columnProperty: ${quote(kanbanProperty)}\n        }`);
+
+            const sort = deriveSort(derivedFacts);
+            if (sort) adminEntries.push(`sort: [${quote(sort[0])}, "desc"]`);
+        }
+
+        const listProperties = deriveListProperties(sortedPropertiesOrder, hiddenFromCollection);
+        if (listProperties) {
+            adminEntries.push(`listProperties: ${formatKeyList(listProperties)}`);
+        }
+    }
+
+    adminEntries.push(`propertiesOrder: ${formatKeyList(sortedPropertiesOrder)}`);
+
+    const adminBlock = `\n    admin: {\n        ${adminEntries.join(",\n        ")}\n    }`;
+
+    const descriptionBlock = tableComment
+        ? `\n    description: ${quote(tableComment)},`
+        : "";
+
+    // The classification is stated in the file because it is a *decision*, and a
+    // decision the reader may disagree with. Naming the evidence tells them
+    // which line to delete when they do.
+    const classificationNote = classification && classification.role !== "entity"
+        ? `\n// Introspected as a ${classification.role}: ${classification.reason}.\n`
+        : "";
+
     const collectionVarName = toCollectionVarName(tableName);
     const fileContent = `${Array.from(imports).join("\n")}
-
+${classificationNote}
 const ${collectionVarName}: PostgresCollectionConfig = {
     name: "${collectionName}",
     singularName: "${singular}",
     slug: "${tableName}",
-    table: "${tableName}",
-    icon: "${icon}",
+    table: "${tableName}",${descriptionBlock}
     properties: {${propsOutput}
-    },${relationsBlock}
-    propertiesOrder: ${JSON.stringify(sortedPropertiesOrder, null, 8).replace(/]$/, "    ]")}
+    },${relationsBlock}${adminBlock}
 };
 
 export default ${collectionVarName};

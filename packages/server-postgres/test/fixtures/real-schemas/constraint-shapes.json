@@ -1,0 +1,640 @@
+{
+  "schema": "public",
+  "tables": [
+    {
+      "table_name": "constraint_shapes",
+      "is_partitioned": false
+    },
+    {
+      "table_name": "constraint_shapes_child",
+      "is_partitioned": false
+    }
+  ],
+  "columns": [
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "NO",
+      "column_default": null,
+      "ordinal_position": 1,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32,
+      "numeric_scale": 0,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "price",
+      "data_type": "numeric",
+      "udt_name": "numeric",
+      "is_nullable": "NO",
+      "column_default": null,
+      "ordinal_position": 2,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "discount",
+      "data_type": "real",
+      "udt_name": "float4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 3,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 24,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "quantity",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 4,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32,
+      "numeric_scale": 0,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "rating",
+      "data_type": "smallint",
+      "udt_name": "int2",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 5,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 16,
+      "numeric_scale": 0,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "temperature",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 6,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32,
+      "numeric_scale": 0,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "exact_count",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 7,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32,
+      "numeric_scale": 0,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "percent",
+      "data_type": "numeric",
+      "udt_name": "numeric",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 8,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 5,
+      "numeric_scale": 2,
+      "atttypmod": 327686
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "status",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "NO",
+      "column_default": null,
+      "ordinal_position": 9,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "tier",
+      "data_type": "character varying",
+      "udt_name": "varchar",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 10,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": 20,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": 24
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "visibility",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 11,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "pinned_kind",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 12,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "apostrophe_set",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 13,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "code",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 14,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "slug",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 15,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "fixed_len",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 16,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "start_day",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 17,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32,
+      "numeric_scale": 0,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "end_day",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 18,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32,
+      "numeric_scale": 0,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "either_way",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 19,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32,
+      "numeric_scale": 0,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "email",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 20,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "payload",
+      "data_type": "jsonb",
+      "udt_name": "jsonb",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 21,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "not_reserved",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 22,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "email_unique",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 23,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "search",
+      "data_type": "tsvector",
+      "udt_name": "tsvector",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 24,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "computed_total",
+      "data_type": "numeric",
+      "udt_name": "numeric",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 25,
+      "is_generated": "ALWAYS",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "udt_name": "timestamptz",
+      "is_nullable": "NO",
+      "column_default": "now()",
+      "ordinal_position": 26,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes_child",
+      "column_name": "id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "NO",
+      "column_default": null,
+      "ordinal_position": 1,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32,
+      "numeric_scale": 0,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes_child",
+      "column_name": "parent_id",
+      "data_type": "integer",
+      "udt_name": "int4",
+      "is_nullable": "NO",
+      "column_default": null,
+      "ordinal_position": 2,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": 32,
+      "numeric_scale": 0,
+      "atttypmod": -1
+    },
+    {
+      "table_name": "constraint_shapes_child",
+      "column_name": "note",
+      "data_type": "text",
+      "udt_name": "text",
+      "is_nullable": "YES",
+      "column_default": null,
+      "ordinal_position": 3,
+      "is_generated": "NEVER",
+      "is_identity": "NO",
+      "identity_generation": null,
+      "character_maximum_length": null,
+      "numeric_precision": null,
+      "numeric_scale": null,
+      "atttypmod": -1
+    }
+  ],
+  "enumValues": [],
+  "pks": [
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "id"
+    },
+    {
+      "table_name": "constraint_shapes_child",
+      "column_name": "id"
+    }
+  ],
+  "fks": [
+    {
+      "table_name": "constraint_shapes_child",
+      "column_name": "parent_id",
+      "foreign_table_name": "constraint_shapes",
+      "foreign_column_name": "id",
+      "constraint_name": "constraint_shapes_child_parent_id_fkey",
+      "ordinal": 1,
+      "delete_rule": "CASCADE"
+    }
+  ],
+  "uniques": [
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_email_unique_key",
+      "column_names": [
+        "email_unique"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_apostrophe_set_check",
+      "definition": "CHECK ((apostrophe_set = ANY (ARRAY['it''s'::text, 'won''t'::text])))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_check",
+      "definition": "CHECK ((start_day < end_day))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_code_check",
+      "definition": "CHECK ((char_length(code) <= 10))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_discount_check",
+      "definition": "CHECK (((discount >= (0)::double precision) AND (discount <= (1)::double precision)))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_either_way_check",
+      "definition": "CHECK (((either_way < 0) OR (either_way > 100)))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_email_check",
+      "definition": "CHECK ((email ~~ '%@%'::text))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_exact_count_check",
+      "definition": "CHECK ((exact_count = 42))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_fixed_len_check",
+      "definition": "CHECK ((length(fixed_len) = 8))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_not_reserved_check",
+      "definition": "CHECK ((not_reserved <> ALL (ARRAY['admin'::text, 'root'::text])))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_payload_check",
+      "definition": "CHECK ((jsonb_typeof(payload) = 'object'::text))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_percent_check",
+      "definition": "CHECK (((percent >= 0.00) AND (percent <= 100.00)))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_pinned_kind_check",
+      "definition": "CHECK ((pinned_kind = 'only-one'::text))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_price_check",
+      "definition": "CHECK ((price > (0)::numeric))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_quantity_check",
+      "definition": "CHECK ((quantity >= 1))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_rating_check",
+      "definition": "CHECK (((rating >= 1) AND (rating <= 5)))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_slug_check",
+      "definition": "CHECK (((length(slug) >= 3) AND (length(slug) <= 64)))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_status_check",
+      "definition": "CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_temperature_check",
+      "definition": "CHECK (((temperature > '-50'::integer) AND (temperature < 60)))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_tier_check",
+      "definition": "CHECK (((tier)::text = ANY ((ARRAY['free'::character varying, 'pro'::character varying, 'enterprise'::character varying])::text[])))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "constraint_shapes_visibility_check",
+      "definition": "CHECK ((visibility = ANY (ARRAY['public'::text, 'private'::text])))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "quantity_upper_bound",
+      "definition": "CHECK ((quantity <= 1000))"
+    },
+    {
+      "table_name": "constraint_shapes",
+      "constraint_name": "status_not_legacy",
+      "definition": "CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text, 'legacy'::text])))"
+    }
+  ],
+  "comments": [
+    {
+      "table_name": "constraint_shapes",
+      "column_name": null,
+      "comment": "Every CHECK shape the parser is expected to handle."
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "price",
+      "comment": "Unit price, before tax."
+    },
+    {
+      "table_name": "constraint_shapes",
+      "column_name": "status",
+      "comment": "Publication state."
+    }
+  ],
+  "rowCounts": {}
+}
