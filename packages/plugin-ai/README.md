@@ -14,14 +14,28 @@ pnpm add @rebasepro/plugin-ai
 
 This plugin adds AI-powered capabilities to the Rebase admin panel:
 
-- **Form autofill** — An "Autofill" action in the entity form footer that fills fields from the collection schema, whatever is already in the record, and an optional instruction.
+- **Form autofill** — An "Autofill" action in the entity form footer that proposes values from the collection schema, whatever is already in the record, and an optional instruction.
 - **Editor autocomplete** — A streaming inline continuation for the rich text editor.
 
 It registers as a standard `RebasePlugin`, injecting UI slots and providers automatically.
 
+### Autofill proposes; it does not edit
+
+Clicking **Autofill** opens a review. Fields stream into that list as the model
+writes them, so a long run shows progress — but the record is not touched. Each row
+shows the proposed value, and the current value struck through when the proposal
+would replace one. Untick anything you don't want, then **Apply** writes the rest in
+a single step. **Discard** leaves the record exactly as it was.
+
+This is a deliberate change from the FireCMS-era behaviour, where generated text was
+streamed directly into the live form fields. That approach mutated the record before
+anyone had agreed to it, showed half-written sentences that read as bugs, and relied
+on heuristics to guess whether each token should append to or replace what you had
+already typed — with no way back but retyping.
+
 ## How it reaches a model
 
-The plugin talks to a small hosted service that Rebase runs and pays for. There is
+The plugin talks to a small hosted service that Rebase runs and pays for (Gemini 3.6 Flash, behind Rebase’s own credits). There is
 **nothing to configure and no API key to obtain** — install the plugin, mount it, done.
 
 Two consequences worth knowing:

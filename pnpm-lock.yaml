@@ -228,7 +228,7 @@ importers:
         version: 19.2.3(@types/react@19.2.17)
       '@vitejs/plugin-react':
         specifier: ^6.0.4
-        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-ebf51a3-20250411)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-af1b7da-20250417)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       eslint-plugin-import:
         specifier: ^2.32.0
         version: 2.32.0(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.8.0(jiti@2.7.0))
@@ -319,7 +319,7 @@ importers:
         version: 8.65.0(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       '@vitejs/plugin-react':
         specifier: ^6.0.4
-        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-ebf51a3-20250411)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-af1b7da-20250417)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       eslint:
         specifier: ^10.8.0
         version: 10.8.0(jiti@2.7.0)
@@ -380,7 +380,7 @@ importers:
         version: 19.2.3(@types/react@19.2.17)
       '@vitejs/plugin-react':
         specifier: ^6.0.4
-        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-ebf51a3-20250411)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-af1b7da-20250417)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       eslint:
         specifier: ^10.8.0
         version: 10.8.0(jiti@2.7.0)
@@ -561,7 +561,7 @@ importers:
         version: 2.0.12
       '@vitejs/plugin-react':
         specifier: ^6.0.4
-        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-ebf51a3-20250411)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-af1b7da-20250417)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       jest:
         specifier: ^30.4.2
         version: 30.4.2(@types/node@26.1.2)
@@ -610,7 +610,7 @@ importers:
         version: 2.0.12
       '@vitejs/plugin-react':
         specifier: ^6.0.4
-        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-ebf51a3-20250411)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-af1b7da-20250417)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       hono:
         specifier: ^4.12.27
         version: 4.12.32
@@ -875,7 +875,7 @@ importers:
         version: 19.2.3(@types/react@19.2.17)
       '@vitejs/plugin-react':
         specifier: ^6.0.4
-        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-ebf51a3-20250411)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-af1b7da-20250417)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       jest:
         specifier: ^30.4.2
         version: 30.4.2(@types/node@26.1.2)
@@ -1904,6 +1904,9 @@ importers:
       '@google-cloud/storage':
         specifier: ^7.0.0
         version: 7.21.0
+      '@google/genai':
+        specifier: ^2.15.0
+        version: 2.15.0(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))
       '@hono/node-server':
         specifier: ^2.0.12
         version: 2.0.12(hono@4.12.32)
@@ -2029,7 +2032,7 @@ importers:
         version: 19.2.3(@types/react@19.2.17)
       '@vitejs/plugin-react':
         specifier: ^6.0.4
-        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-ebf51a3-20250411)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+        version: 6.0.4(babel-plugin-react-compiler@19.0.0-beta-af1b7da-20250417)(vite@8.1.5(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
       jsdom:
         specifier: ^30.0.0
         version: 30.0.0
@@ -3369,6 +3372,15 @@ packages:
   '@google-cloud/storage@7.21.0':
     resolution: {integrity: sha512-l+IFTkd+6Y5LoAuXyYCKNAKtw/Ci+rAMqgdTB1jv4iZiLhw0rtq+0qjIRbBizXkNzEFmXiXUW0H7sZQQvk1ffA==}
     engines: {node: '>=14'}
+
+  '@google/genai@2.15.0':
+    resolution: {integrity: sha512-Q41TvqwBQ9NcmWdh6qxY5qrpg+0FaVHD7febQoH007pykxzco4ohScBUP4BBBy+Q8j5D8euIBSRIBDfWuNVCKA==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@modelcontextprotocol/sdk': ^1.25.2
+    peerDependenciesMeta:
+      '@modelcontextprotocol/sdk':
+        optional: true
 
   '@google/generative-ai@0.24.1':
     resolution: {integrity: sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q==}
@@ -5781,6 +5793,9 @@ packages:
 
   '@types/request@2.48.13':
     resolution: {integrity: sha512-FGJ6udDNUCjd19pp0Q3iTiDkwhYup7J8hpMW9c4k53NrccQFFWKRho6hvtPPEhnXWKvukfwAlB6DbDz4yhH5Gg==}
+
+  '@types/retry@0.12.0':
+    resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
 
   '@types/sax@1.2.7':
     resolution: {integrity: sha512-rO73L89PJxeYM3s3pPPjiPgVVcymqU490g0YO5n5By0k2Erzj6tay/4lr1CHAAU4JyOWd1rpQ8bCf6cZfHU96A==}
@@ -9789,6 +9804,10 @@ packages:
     resolution: {integrity: sha512-NXAOdnEe5FsZJfT4oK84lE1Y5cFFdWlRuOo5tww8DyNMxyRXwn39fIkUtNLKppcPC+UYU/bXujNCUGDv01y7CA==}
     engines: {node: '>=20'}
 
+  p-retry@4.6.2:
+    resolution: {integrity: sha512-312Id396EbJdvRONlngUx0NydfrIQ5lsYu0znKVUzVvArzEIt08V1qhtyESbGVd1FGX7UKtiFp5uwKZdM8wIuQ==}
+    engines: {node: '>=8'}
+
   p-timeout@7.0.1:
     resolution: {integrity: sha512-AxTM2wDGORHGEkPCt8yqxOTMgpfbEHqF51f/5fJCmwFC3C/zNcGT63SymH2ttOAaiIws2zVg4+izQCjrakcwHg==}
     engines: {node: '>=20'}
@@ -13474,6 +13493,19 @@ snapshots:
       - encoding
       - supports-color
 
+  '@google/genai@2.15.0(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))':
+    dependencies:
+      google-auth-library: 10.7.0
+      p-retry: 4.6.2
+      protobufjs: 7.6.5
+      ws: 8.21.1
+    optionalDependencies:
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+
   '@google/generative-ai@0.24.1': {}
 
   '@grpc/grpc-js@1.9.16':
@@ -15950,9 +15982,11 @@ snapshots:
       '@types/tough-cookie': 4.0.5
       form-data: 4.0.6
 
+  '@types/retry@0.12.0': {}
+
   '@types/sax@1.2.7':
     dependencies:
-      '@types/node': 24.13.3
+      '@types/node': 26.1.2
 
   '@types/ssh2@1.15.5':
     dependencies:
@@ -20749,6 +20783,11 @@ snapshots:
     dependencies:
       eventemitter3: 5.0.4
       p-timeout: 7.0.1
+
+  p-retry@4.6.2:
+    dependencies:
+      '@types/retry': 0.12.0
+      retry: 0.13.1
 
   p-timeout@7.0.1: {}
 

@@ -1,5 +1,4 @@
-
-import React, { useCallback, useDeferredValue, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 
 import {
     Button,
@@ -22,27 +21,33 @@ import { EntityStatus, Properties, Property } from "@rebasepro/types";
 import { PluginFormActionProps } from "@rebasepro/admin-types";
 import { isPropertyBuilder, stripCollectionPath } from "@rebasepro/common";
 import { useDataEnhancementController } from "./DataEnhancementControllerProvider";
+import { AutofillReviewDialog } from "./AutofillReviewDialog";
 import { SamplePrompt } from "../types/data_enhancement_controller";
 
 export function FormEnhanceAction({
-    entityId,
     path,
     status,
     collection,
-    formContext,
-    openEntityMode
+    formContext
 }: PluginFormActionProps) {
-
 
     const storageKey = createLocalStorageKey(path, status);
 
-    const [loading, setLoading] = React.useState(false);
     const dataEnhancementController = useDataEnhancementController();
 
     const [samplePrompts, setSamplePrompts] = React.useState<SamplePrompt[] | undefined>(undefined);
     const [instructions, setInstructions] = React.useState<string>("");
 
     const getSamplePrompts = dataEnhancementController?.getSamplePrompts;
+
+    /**
+     * Driven by the controller rather than by local state.
+     *
+     * There is exactly one run at a time, and the review owns it — a second
+     * `loading` flag here could disagree with the dialog about whether the
+     * model is still writing.
+     */
+    const loading = dataEnhancementController?.review?.status === "generating";
 
     const loadingPrompts = useRef(false);
     const updateSuggestedPrompts = useCallback(async function updateSuggestedPrompts(instructions?: string) {
@@ -60,9 +65,6 @@ export function FormEnhanceAction({
     },
         [collection.name, collection.singularName, getSamplePrompts, status]);
 
-    const deferredValues = useDeferredValue(formContext?.values);
-    // const enoughData = countStringCharacters(deferredValues, collection.properties) > 20;
-
     useEffect(() => {
         if (!dataEnhancementController) return;
         if (!samplePrompts) {
@@ -76,9 +78,12 @@ export function FormEnhanceAction({
         updateSuggestedPrompts().then();
     }, [dataEnhancementController, status]);
 
-    const enhance = (prompt?: string) => {
+    /**
+     * Starts a run and opens the review. Nothing is written to the form here —
+     * see {@link AutofillReviewDialog}.
+     */
+    const generate = (prompt?: string) => {
         if (!dataEnhancementController || !formContext?.values) return;
-        setLoading(true);
         if (prompt) {
             addRecentPrompt(storageKey, prompt);
             setSamplePrompts([{
@@ -86,144 +91,133 @@ export function FormEnhanceAction({
                 type: "recent"
             }, ...(samplePrompts ?? []).slice(0, 5)]);
         }
-        return dataEnhancementController.enhance({
-            entityId,
-            values: formContext!.values,
-            instructions: prompt,
-            replaceValues: true
-        }).catch(() => {
-            // The controller has already shown the failure in a snackbar. This
-            // handler exists so the rejection is not left unhandled: nothing
-            // awaits the click, so an uncaught one surfaces as a console error
-            // on top of the message the operator has already been given.
-            return null;
-        }).finally(() => {
-            setLoading(false);
-        });
+        // The controller records a failure in the review itself, so there is
+        // nothing to catch here — but the promise is still explicitly handled
+        // so a rejection can never surface as an unhandled one.
+        dataEnhancementController.generate({
+            values: formContext.values,
+            instructions: prompt
+        }).catch(() => undefined);
     };
 
     if (!dataEnhancementController?.enabled)
         return null;
 
-    const suggestions = dataEnhancementController.suggestions;
-    const hasSuggestions = Object.values(suggestions).filter(Boolean).length > 0;
-
-    const disabledSuggestionActions = !hasSuggestions;
-    const promptSuggestionsEnabled = (samplePrompts ?? []).length > 0 && instructions.length === 0;
-
-    // const noIdSet = !formContext?.entityId;
-
     function submit() {
-        enhance(instructions);
+        generate(instructions);
     }
 
     return (
-        <Menu
-            align={"end"}
-            sideOffset={8}
-            className={"max-w-[100vw]"}
-            // Never full width: this used to stretch to fill the form's
-            // `w-80 2xl:w-96` side rail in full screen. That rail is gone, and
-            // in the footer a stretched button reads as the primary action.
-            trigger={<Button variant={"filled"}
-                color={"neutral"}
-                size={"small"}
-                disabled={loading}>
-                {!loading && <AIIcon size={"small"}/>}
-                {loading && <CircularProgress size={"small"}/>}
-                Autofill
-            </Button>}>
+        <>
+            <Menu
+                align={"end"}
+                sideOffset={8}
+                className={"max-w-[100vw]"}
+                // Never full width: this used to stretch to fill the form's
+                // `w-80 2xl:w-96` side rail in full screen. That rail is gone, and
+                // in the footer a stretched button reads as the primary action.
+                trigger={<Button variant={"filled"}
+                    color={"neutral"}
+                    size={"small"}
+                    disabled={loading}>
+                    {!loading && <AIIcon size={"small"}/>}
+                    {loading && <CircularProgress size={"small"}/>}
+                    Autofill
+                </Button>}>
 
-            <MenuItem className={"py-4"}
-                onClick={() => {
-                    enhance();
-                }}>
-                <AIIcon size={"small"}/>
-                Autofill based on the current content
-            </MenuItem>
-
-            <Separator orientation={"horizontal"} className={"mt-2"}/>
-
-            {samplePrompts?.map((samplePrompt, index) => {
-                return <MenuItem
-                    key={index + "_" + samplePrompt.prompt}
+                <MenuItem className={"py-4"}
                     onClick={() => {
-                        setInstructions(samplePrompt.prompt);
-                        enhance(samplePrompt.prompt);
-                    }}
-                >
-                    <div className={"pl-9 grow text-text-secondary dark:text-text-secondary-dark"}>
-                        {samplePrompt.prompt}
-                    </div>
+                        generate();
+                    }}>
+                    <AIIcon size={"small"}/>
+                    Autofill based on the current content
+                </MenuItem>
 
-                    {samplePrompt.type === "recent" && <IconButton
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            removeRecentPrompt(storageKey, samplePrompt.prompt);
-                            setSamplePrompts((samplePrompts ?? []).filter(p => p.prompt !== samplePrompt.prompt));
+                <Separator orientation={"horizontal"} className={"mt-2"}/>
+
+                {samplePrompts?.map((samplePrompt, index) => {
+                    return <MenuItem
+                        key={index + "_" + samplePrompt.prompt}
+                        onClick={() => {
+                            setInstructions(samplePrompt.prompt);
+                            generate(samplePrompt.prompt);
                         }}
-                        size={"smallest"}
                     >
-                        <XIcon size={iconSize.smallest}/>
-                    </IconButton>
-                    }
-                </MenuItem>;
-            })}
+                        <div className={"pl-9 grow text-text-secondary dark:text-text-secondary-dark"}>
+                            {samplePrompt.prompt}
+                        </div>
 
-            <Separator orientation={"horizontal"}/>
-
-            <div
-                className={cls(
-                    "my-2 w-[500px] max-w-full flex items-start text-surface-700 dark:text-surface-200"
-                )}>
-
-                <TextareaAutosize
-                    className={cls("p-4 rounded-lg resize-none bg-surface-100 dark:bg-surface-950 mx-2 w-full grow outline-hidden max-h-[300px] overflow-auto", focusedDisabled)}
-                    value={instructions}
-                    autoFocus={status === "new"}
-                    disabled={loading}
-                    onFocus={(event) => {
-                        event.stopPropagation();
-                    }}
-                    placeholder={"...or provide instructions"}
-                    onKeyDown={(e) => {
-                        e.stopPropagation();
-                        if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            submit();
+                        {samplePrompt.type === "recent" && <IconButton
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                removeRecentPrompt(storageKey, samplePrompt.prompt);
+                                setSamplePrompts((samplePrompts ?? []).filter(p => p.prompt !== samplePrompt.prompt));
+                            }}
+                            size={"smallest"}
+                        >
+                            <XIcon size={iconSize.smallest}/>
+                        </IconButton>
                         }
+                    </MenuItem>;
+                })}
 
-                    }}
-                    onChange={(e) => {
-                        setInstructions(e.target.value);
-                    }}
-                />
+                <Separator orientation={"horizontal"}/>
 
-                <IconButton
-                    size={"small"}
-                    onClick={() => {
-                        setInstructions("");
-                    }}
-                    color={!instructions ? "primary" : undefined}
-                    disabled={loading || !instructions}>
-                    <XIcon size={iconSize.small}/>
-                </IconButton>
+                <div
+                    className={cls(
+                        "my-2 w-[500px] max-w-full flex items-start text-surface-700 dark:text-surface-200"
+                    )}>
 
-                <IconButton
-                    onClick={() => enhance(instructions)}
-                    size={"small"}
-                    color={!instructions ? "primary" : undefined}
-                    disabled={loading || !instructions}>
-                    {loading &&
-                        <CircularProgress size={"smallest"}/>}
-                    {!loading &&
-                        <SendIcon color={"primary"}/>}
-                </IconButton>
+                    <TextareaAutosize
+                        className={cls("p-4 rounded-lg resize-none bg-surface-100 dark:bg-surface-950 mx-2 w-full grow outline-hidden max-h-[300px] overflow-auto", focusedDisabled)}
+                        value={instructions}
+                        autoFocus={status === "new"}
+                        disabled={loading}
+                        onFocus={(event) => {
+                            event.stopPropagation();
+                        }}
+                        placeholder={"...or provide instructions"}
+                        onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                submit();
+                            }
 
-            </div>
+                        }}
+                        onChange={(e) => {
+                            setInstructions(e.target.value);
+                        }}
+                    />
 
-        </Menu>
+                    <IconButton
+                        size={"small"}
+                        onClick={() => {
+                            setInstructions("");
+                        }}
+                        color={!instructions ? "primary" : undefined}
+                        disabled={loading || !instructions}>
+                        <XIcon size={iconSize.small}/>
+                    </IconButton>
+
+                    <IconButton
+                        onClick={() => generate(instructions)}
+                        size={"small"}
+                        color={!instructions ? "primary" : undefined}
+                        disabled={loading || !instructions}>
+                        {loading &&
+                            <CircularProgress size={"smallest"}/>}
+                        {!loading &&
+                            <SendIcon color={"primary"}/>}
+                    </IconButton>
+
+                </div>
+
+            </Menu>
+
+            <AutofillReviewDialog/>
+        </>
     );
 }
 

@@ -89,7 +89,8 @@ function parseEventBlock(block: string): ServerSentEvent | undefined {
         else if (field === "data") dataLines.push(value);
     }
     if (dataLines.length === 0) return undefined;
-    return { event, data: dataLines.join("\n") };
+    return { event,
+data: dataLines.join("\n") };
 }
 
 /** Pull a message out of the control plane's `{ error: { message } }` envelope. */
@@ -252,7 +253,8 @@ export async function fetchPromptSuggestions(props: {
         return {
             prompts: prompts
                 .filter((p): p is string => typeof p === "string")
-                .map((prompt) => ({ prompt, type: "sample" as const }))
+                .map((prompt) => ({ prompt,
+type: "sample" as const }))
         };
     } catch {
         return { prompts: [] };

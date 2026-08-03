@@ -1,17 +1,17 @@
 import React, { PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import {
-    AutofillResult,
+    AutofillReview,
     DataEnhancementController,
-    EnhanceParams,
-    InputProperty
+    GenerateParams,
+    InputProperty,
+    ProposedField
 } from "../types/data_enhancement_controller";
-import { useAuthController, useSnackbarController } from "@rebasepro/app";
 import { CollectionConfig } from "@rebasepro/types";
 import { PluginFormActionProps } from "@rebasepro/admin-types";
 import { autofillStream, fetchAiStatus, fetchPromptSuggestions } from "../api";
-import { getAppendableSuggestion } from "../utils/suggestions";
 import { getSimplifiedProperties } from "../utils/properties";
+import { flatMapEntityValues } from "../utils/values";
 import { useEditorAIController } from "../editor/useEditorAIController";
 import { getValueInPath } from "@rebasepro/utils";
 
@@ -32,16 +32,10 @@ export const useDataEnhancementController = (): DataEnhancementController => use
 function getPropertyFromKey(properties: Record<string, InputProperty>, propertyKey: string): InputProperty | undefined {
     if (propertyKey in properties) {
         return properties[propertyKey];
-    } else {
-        //split the property key
-        const split = propertyKey.split(".");
-        if (split.length === 1) {
-            return undefined;
-        }
-        const parentKey = split.slice(0, split.length - 1).join(".");
-        return getPropertyFromKey(properties, parentKey);
-
     }
+    const split = propertyKey.split(".");
+    if (split.length === 1) return undefined;
+    return getPropertyFromKey(properties, split.slice(0, -1).join("."));
 }
 
 /**
@@ -72,36 +66,32 @@ export function DataEnhancementControllerProvider({
 
     const [allowedHere, setAllowedHere] = useState(false);
     const [serviceAvailable, setServiceAvailable] = useState(false);
-    const [suggestions, setSuggestions] = useState<Record<string, string | number>>({});
-    const [loadingSuggestions, setLoadingSuggestions] = useState<string[]>([]);
+    const [review, setReview] = useState<AutofillReview | null>(null);
 
-    const enhancingInProgress = useRef(false);
-
-    const authController = useAuthController();
-    const snackbarController = useSnackbarController();
-
-    const properties = useMemo(() => getSimplifiedProperties(collection.properties, formContext?.values ?? {}), [formContext?.values]);
-    const valuesRef = React.useRef(formContext?.values ?? {});
-    useEffect(() => {
-        if (!enhancingInProgress.current)
-            valuesRef.current = formContext?.values ?? {};
-    }, [formContext?.values]);
-
-    const allowReferenceDataSelection = false;
+    const properties = useMemo(
+        () => getSimplifiedProperties(collection.properties, formContext?.values ?? {}),
+        [collection.properties, formContext?.values]
+    );
 
     /**
-     * The host app's own opt-out.
+     * Read inside the streaming callbacks, which outlive the render that
+     * started the run.
      *
-     * The previous version of this only ever called `setEnabled(true)` — there
-     * was no `else` — so a `getConfigForPath` that returned `false` after
-     * having returned `true` for another collection left the plugin switched on.
+     * The operator is free to keep typing while the model works — nothing here
+     * writes to the form — so the callbacks must not close over a stale
+     * property map from whichever render happened to kick the run off.
      */
+    const propertiesRef = useRef(properties);
+    propertiesRef.current = properties;
+
+    /** The host app's own opt-out. */
     useEffect(() => {
         if (!getConfigForPath) {
             setAllowedHere(true);
             return;
         }
-        setAllowedHere(Boolean(getConfigForPath({ path, collection })));
+        setAllowedHere(Boolean(getConfigForPath({ path,
+collection })));
     }, [getConfigForPath, path, collection]);
 
     /**
@@ -115,7 +105,8 @@ export function DataEnhancementControllerProvider({
     useEffect(() => {
         if (!allowedHere) return;
         const abort = new AbortController();
-        fetchAiStatus({ endpoint, signal: abort.signal })
+        fetchAiStatus({ endpoint,
+signal: abort.signal })
             .then((status) => setServiceAvailable(status.available))
             .catch(() => setServiceAvailable(false));
         return () => abort.abort();
@@ -123,182 +114,155 @@ export function DataEnhancementControllerProvider({
 
     const enabled = allowedHere && serviceAvailable;
 
-    const clearSuggestion = useCallback((propertyKey: string) => {
-        setSuggestions((prev) => {
-            //remove propertyKey from prev
-            const {
-                [propertyKey]: _,
-                ...rest
-            } = prev;
-            return rest;
+    /** Add or update one row in the review, preserving arrival order. */
+    const upsertField = useCallback((key: string, update: (existing: ProposedField | undefined) => ProposedField) => {
+        setReview((current) => {
+            if (!current) return current;
+            const index = current.fields.findIndex((f) => f.key === key);
+            const next = update(index === -1 ? undefined : current.fields[index]);
+            const fields = index === -1
+                ? [...current.fields, next]
+                : current.fields.map((f, i) => (i === index ? next : f));
+            return { ...current,
+fields };
         });
     }, []);
 
-    const appendValueDelta = useCallback((propertyKey: string, delta: string) => {
+    const generate = useCallback(async (params: GenerateParams<Record<string, unknown>>): Promise<void> => {
 
-        const property = getPropertyFromKey(properties, propertyKey);
-        if (delta === null || property?.disabled) {
-            return;
-        }
+        const currentProperties = propertiesRef.current;
+        const flatValues = flatMapEntityValues(params.values ?? {}) as Record<string, unknown>;
 
-        const value = getValueInPath(valuesRef.current, propertyKey);
+        setReview({
+            status: "generating",
+            fields: [],
+            instructions: params.instructions
+        });
 
-        const currentValue = value ? (value as string) + "" : "";
-        const updatedValue = currentValue + delta;
-        valuesRef.current = {
-            ...valuesRef.current,
-            [propertyKey]: updatedValue
-        };
-        formContext?.setFieldValue(propertyKey, updatedValue, false);
-        setSuggestions(prev => ({
-            ...prev,
-            [propertyKey]: (prev[propertyKey] ?? "") + delta
-        }));
-    }, [properties, formContext]);
-
-    /**
-     * Apply one completed field.
-     *
-     * The append-vs-replace dance below is what makes autofill feel additive
-     * rather than destructive: when the generated text starts with what the
-     * operator already typed, their words are kept and the rest is appended.
-     */
-    const applyValue = useCallback((propertyKey: string, rawValue: unknown, replaceValues: boolean) => {
-
-        setLoadingSuggestions((prev) => prev.filter(p => p !== propertyKey));
-
-        const property = getPropertyFromKey(properties, propertyKey);
-        if (!property || property.disabled) return;
-
-        const suggestion = coerceToProperty(rawValue, property);
-        if (suggestion === null || suggestion === undefined) return;
-
-        const value = getValueInPath(valuesRef.current, propertyKey);
-
-        // Only text can be appended to. A number, a boolean, a date or an array
-        // of tags is a whole value or nothing — the old code ran all of them
-        // through the string-append path, which stringified them into the field.
-        if (typeof suggestion !== "string" || replaceValues) {
-            formContext?.setFieldValue(propertyKey, suggestion);
-            if (typeof suggestion === "string" || typeof suggestion === "number") {
-                setSuggestions(prev => ({ ...prev, [propertyKey]: suggestion }));
-            }
-            return;
-        }
-
-        const appendableValue = getAppendableSuggestion(suggestion, value);
-        const currentValue = value ? (value as string) + "" : "";
-
-        if (appendableValue) {
-            formContext?.setFieldValue(propertyKey, suggestion);
-        } else {
-            const multiline = property.fieldConfigId === "multiline" || property.fieldConfigId === "markdown";
-            const trimmedValue = currentValue.trimEnd();
-            if (multiline && (trimmedValue.endsWith(".") || trimmedValue.endsWith("?") || trimmedValue.endsWith("!") || trimmedValue.endsWith(":"))) {
-                formContext?.setFieldValue(propertyKey, trimmedValue + "\n\n" + suggestion.trimStart());
-            } else {
-                formContext?.setFieldValue(propertyKey, trimmedValue + (trimmedValue.length > 0 ? " " : "") + suggestion);
-            }
-        }
-
-        setSuggestions(prev => ({
-            ...prev,
-            [propertyKey]: appendableValue ?? suggestion
-        }));
-    }, [properties, formContext]);
-
-    const editorAIController = useEditorAIController({ endpoint });
-
-    const clearAllSuggestions = useCallback(() => {
-        setSuggestions({});
-    }, []);
-
-    const enhance = useCallback(async (props: EnhanceParams<Record<string, unknown>>): Promise<AutofillResult | null> => {
-
-        if (!authController.user) {
-            snackbarController.open({
-                type: "warning",
-                message: "You need to be logged in to use autofill"
-            });
-            return Promise.reject(new Error("Not logged in"));
-        }
-
-        if (props.propertyKey) {
-            clearSuggestion(props.propertyKey);
-        } else {
-            clearAllSuggestions();
-        }
-
-        setLoadingSuggestions((prev) => [...prev, ...(props.propertyKey ? [props.propertyKey] : Object.keys(properties))]);
-        enhancingInProgress.current = true;
+        const labelFor = (key: string) => currentProperties[key]?.name ?? key;
 
         try {
-            const result = await autofillStream({
+            await autofillStream({
                 endpoint,
                 request: {
                     entityName: collection.singularName ?? collection.name,
                     entityDescription: collection.description,
-                    values: (props.values ?? {}) as Record<string, unknown>,
-                    properties,
-                    propertyKey: props.propertyKey,
-                    propertyInstructions: props.propertyInstructions,
-                    instructions: props.instructions
+                    // Flattened to dotted paths so the keys line up with the
+                    // property map: the service is told about `seo.title`, so it
+                    // has to be told the value of `seo.title` too, not of `seo`.
+                    values: flatValues,
+                    properties: currentProperties,
+                    propertyKey: params.propertyKey,
+                    propertyInstructions: params.propertyInstructions,
+                    instructions: params.instructions
                 },
-                onDelta: appendValueDelta,
-                onValue: (key, value) => applyValue(key, value, props.replaceValues ?? false)
+                onDelta: (key, text) => {
+                    upsertField(key, (existing) => existing
+                        ? { ...existing,
+proposed: String(existing.proposed ?? "") + text }
+                        : {
+                            key,
+                            label: labelFor(key),
+                            currentValue: getValueInPath(params.values, key),
+                            proposed: text,
+                            pending: true,
+                            selected: true
+                        });
+                },
+                onValue: (key, value) => {
+                    const coerced = coerceToProperty(value, getPropertyFromKey(currentProperties, key));
+                    upsertField(key, (existing) => ({
+                        key,
+                        label: existing?.label ?? labelFor(key),
+                        currentValue: existing?.currentValue ?? getValueInPath(params.values, key),
+                        proposed: coerced,
+                        pending: false,
+                        // A row the operator already deselected mid-stream stays
+                        // deselected when its final value lands.
+                        selected: existing?.selected ?? true
+                    }));
+                }
             });
 
-            if (Object.keys(result.suggestions).length === 0) {
-                snackbarController.open({
-                    type: "info",
-                    autoHideDuration: 1800,
-                    message: "No fields were updated"
-                });
-            }
-            return result;
+            setReview((current) => current && {
+                ...current,
+                status: "ready",
+                fields: current.fields.map((f) => ({ ...f,
+pending: false }))
+            });
         } catch (e: unknown) {
             const message = e instanceof Error ? e.message : "Autofill could not be completed";
-            snackbarController.open({
-                type: "error",
-                message
+            // Kept in the review rather than fired into a snackbar: a run that
+            // produced three good fields and then failed should still let the
+            // operator apply the three.
+            setReview((current) => current && {
+                ...current,
+                status: "failed",
+                error: message,
+                fields: current.fields.map((f) => ({ ...f,
+pending: false }))
             });
-            throw e;
-        } finally {
-            setLoadingSuggestions([]);
-            enhancingInProgress.current = false;
         }
-    }, [
-        authController.user, clearSuggestion, clearAllSuggestions, properties, endpoint,
-        collection, appendValueDelta, applyValue, snackbarController
-    ]);
+    }, [collection, endpoint, upsertField]);
 
-    const getSamplePrompts = useCallback(async (entityName: string, input?: string) => {
-        return fetchPromptSuggestions({
-            endpoint,
-            entityName,
-            input
+    const toggleField = useCallback((key: string) => {
+        setReview((current) => current && {
+            ...current,
+            fields: current.fields.map((f) => (f.key === key ? { ...f,
+selected: !f.selected } : f))
         });
-    }, [endpoint]);
+    }, []);
+
+    const toggleAll = useCallback((selected: boolean) => {
+        setReview((current) => current && {
+            ...current,
+            fields: current.fields.map((f) => ({ ...f,
+selected }))
+        });
+    }, []);
+
+    const dismissReview = useCallback(() => setReview(null), []);
+
+    const applyReview = useCallback(() => {
+        setReview((current) => {
+            if (!current) return null;
+            for (const field of current.fields) {
+                if (!field.selected || field.pending) continue;
+                if (field.proposed === undefined || field.proposed === null) continue;
+                formContext?.setFieldValue(field.key, field.proposed);
+            }
+            return null;
+        });
+    }, [formContext]);
+
+    const editorAIController = useEditorAIController({ endpoint });
+
+    const getSamplePrompts = useCallback(
+        (entityName: string, input?: string) => fetchPromptSuggestions({ endpoint,
+entityName,
+input }),
+        [endpoint]
+    );
 
     const dataEnhancementController: DataEnhancementController = useMemo(() => ({
         enabled,
-        suggestions,
-        clearSuggestion,
-        enhance,
-        allowReferenceDataSelection,
-        clearAllSuggestions,
+        review,
+        generate,
+        toggleField,
+        toggleAll,
+        applyReview,
+        dismissReview,
         getSamplePrompts,
-        loadingSuggestions,
         editorAIController
     }), [
         enabled,
-        suggestions,
-        clearSuggestion,
-        enhance,
-        allowReferenceDataSelection,
-        clearAllSuggestions,
+        review,
+        generate,
+        toggleField,
+        toggleAll,
+        applyReview,
+        dismissReview,
         getSamplePrompts,
-        loadingSuggestions,
         editorAIController
     ]);
 
