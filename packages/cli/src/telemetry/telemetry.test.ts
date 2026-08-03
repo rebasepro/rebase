@@ -242,3 +242,78 @@ describe("endpoint", () => {
         delete process.env.REBASE_TELEMETRY_ENDPOINT;
     });
 });
+
+describe("project-level policy", () => {
+
+    /** A scratch project with a rebase.json carrying the given telemetry value. */
+    function project(value: boolean | undefined): string {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-project-"));
+        const manifest: Record<string, unknown> = { rebase: "^1",
+apps: {} };
+        if (value !== undefined) manifest.telemetry = value;
+        fs.writeFileSync(path.join(dir, "rebase.json"), JSON.stringify(manifest, null, 2), "utf-8");
+        return dir;
+    }
+
+    it("lets a repository switch sharing off for everyone who clones it", async () => {
+        // An organisation setting policy for work done on its behalf. This has
+        // to beat an individual's opt-in or it is worth nothing.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        const dir = project(false);
+
+        expect(telemetry.suppressionReason(process.env, dir)).toBe("project_opt_out");
+        expect(telemetry.isEnabled(process.env, dir)).toBe(false);
+
+        const fetchMock = vi.fn();
+        (global as any).fetch = fetchMock;
+        await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("refuses to let a repository switch sharing ON for anyone", async () => {
+        // The asymmetry, and the reason this is not just a per-project mirror of
+        // the machine setting: rebase.json is committed, so a `true` would be one
+        // developer consenting for every colleague who later clones it.
+        const telemetry = await load();
+        const dir = project(true);
+
+        expect(telemetry.readProjectPolicy(dir)).toBe("ignored_opt_in");
+        // Still "not asked" — the file did not answer on the developer's behalf.
+        expect(telemetry.suppressionReason(process.env, dir)).toBe("not_asked");
+        expect(telemetry.isEnabled(process.env, dir)).toBe(false);
+    });
+
+    it("leaves an individual's own decision intact when the project says nothing", async () => {
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        const dir = project(undefined);
+        expect(telemetry.isEnabled(process.env, dir)).toBe(true);
+    });
+
+    it("still honours an opt-out in a manifest too malformed to parse", async () => {
+        // A repository that says no should be obeyed even when it is broken —
+        // "your JSON has a trailing comma" is not a reason to start sending.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-project-"));
+        fs.writeFileSync(path.join(dir, "rebase.json"), '{ "rebase": "^1", "telemetry": false, }', "utf-8");
+        expect(telemetry.suppressionReason(process.env, dir)).toBe("project_opt_out");
+    });
+
+    it("finds the policy from a subdirectory of the project", async () => {
+        // `rebase dev` run from `backend/` must still see its own repo's opt-out.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        const dir = project(false);
+        const nested = path.join(dir, "backend", "src");
+        fs.mkdirSync(nested, { recursive: true });
+        expect(telemetry.suppressionReason(process.env, nested)).toBe("project_opt_out");
+    });
+
+    it("reports no policy outside a project", async () => {
+        const telemetry = await load();
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-not-a-project-"));
+        expect(telemetry.readProjectPolicy(dir)).toBe("unset");
+    });
+});

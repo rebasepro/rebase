@@ -1,7 +1,7 @@
 import chalk from "chalk";
 
 import { describeState } from "../telemetry/consent";
-import { configPath, endpoint, previewEvent, readConfig, setConsent } from "../telemetry";
+import { configPath, endpoint, previewEvent, readConfig, readProjectPolicy, setConsent } from "../telemetry";
 
 /**
  * `rebase telemetry` — the command that makes the rest of it inspectable.
@@ -40,6 +40,15 @@ export async function telemetryCommand(rawArgs: string[]): Promise<void> {
 function printStatus(): void {
     console.log("");
     console.log(`  Status:   ${describeState()}`);
+    if (readProjectPolicy() === "ignored_opt_in") {
+        // Said out loud rather than silently ignored: a maintainer who wrote
+        // `"telemetry": true` believes they turned something on, and leaving
+        // them to believe it is worse than refusing.
+        console.log("");
+        console.log(chalk.yellow("  Note: this project's rebase.json sets \"telemetry\": true, which is ignored."));
+        console.log(chalk.gray("        A committed file cannot consent on behalf of everyone who clones it."));
+        console.log(chalk.gray(`        Only "telemetry": false is honoured there. Use ${chalk.cyan("rebase telemetry enable")}.`));
+    }
     console.log(`  Endpoint: ${chalk.gray(endpoint())}`);
     console.log(`  Config:   ${chalk.gray(configPath())}`);
     console.log("");
@@ -81,6 +90,11 @@ ${chalk.bold("Commands")}
   ${chalk.blue("show")}       Print the exact payload that would be sent
   ${chalk.blue("enable")}     Start sharing
   ${chalk.blue("disable")}    Stop sharing, permanently
+
+${chalk.bold("Project policy")}
+  ${chalk.blue('"telemetry": false')} in ${chalk.blue("rebase.json")} disables sharing for everyone who
+  clones the repository, overriding each developer's own choice.
+  ${chalk.gray('"telemetry": true is ignored — a committed file cannot consent for others.')}
 
 ${chalk.bold("Environment")}
   ${chalk.blue("DO_NOT_TRACK")}                 Set to disable, across every tool that honours it

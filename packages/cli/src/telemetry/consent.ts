@@ -122,5 +122,7 @@ export function describeState(env: NodeJS.ProcessEnv = process.env): string {
             return `${chalk.gray("disabled")} — the ${chalk.cyan("REBASE_TELEMETRY_DISABLED")} environment variable is set`;
         case "ci":
             return `${chalk.gray("disabled")} — this looks like CI (${chalk.cyan("CI")} is set), which is never counted`;
+        case "project_opt_out":
+            return `${chalk.gray("disabled")} — this project's ${chalk.cyan("rebase.json")} sets ${chalk.cyan('"telemetry": false')}`;
     }
 }

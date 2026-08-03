@@ -1,10 +1,13 @@
 import { ensureMachineId, ensureProjectId, readConfig, writeConfig } from "./identity";
 import { buildEvent, TelemetryEvent, TelemetryEventName } from "./payload";
+import { readProjectPolicy } from "./project";
 
 export { TELEMETRY_SCHEMA_VERSION, bucket, durationBucket, errorClass, buildEvent, sanitize } from "./payload";
 export type { TelemetryEvent, TelemetryEventName, TelemetryValue } from "./payload";
 export { configPath, readConfig, writeConfig } from "./identity";
 export type { TelemetryConfig } from "./identity";
+export { readProjectPolicy } from "./project";
+export type { ProjectTelemetryPolicy } from "./project";
 
 /**
  * Where events go. Overridable so a fork can point at its own collector, and so
@@ -22,7 +25,8 @@ export type SuppressionReason =
     | "declined"
     | "do_not_track"
     | "rebase_telemetry_disabled"
-    | "ci";
+    | "ci"
+    | "project_opt_out";
 
 /**
  * The one function that decides whether anything leaves the machine.
@@ -38,11 +42,19 @@ export type SuppressionReason =
  * `CI` is refused for a different reason: a build runner is not a person, and
  * counting one is both useless and misleading. A single pipeline re-running on
  * every push would otherwise outweigh every real developer in the data.
+ *
+ * A project's own `"telemetry": false` is checked *before* the machine setting,
+ * because it has to beat an individual opt-in to be worth anything — see
+ * project.ts on why the reverse is refused.
  */
-export function suppressionReason(env: NodeJS.ProcessEnv = process.env): SuppressionReason | null {
+export function suppressionReason(
+    env: NodeJS.ProcessEnv = process.env,
+    cwd: string = process.cwd()
+): SuppressionReason | null {
     if (env.DO_NOT_TRACK && env.DO_NOT_TRACK !== "0") return "do_not_track";
     if (env.REBASE_TELEMETRY_DISABLED && env.REBASE_TELEMETRY_DISABLED !== "0") return "rebase_telemetry_disabled";
     if (env.CI && env.CI !== "false") return "ci";
+    if (readProjectPolicy(cwd) === "opt_out") return "project_opt_out";
 
     const config = readConfig();
     if (config.enabled === undefined) return "not_asked";
@@ -50,8 +62,8 @@ export function suppressionReason(env: NodeJS.ProcessEnv = process.env): Suppres
     return null;
 }
 
-export function isEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-    return suppressionReason(env) === null;
+export function isEnabled(env: NodeJS.ProcessEnv = process.env, cwd: string = process.cwd()): boolean {
+    return suppressionReason(env, cwd) === null;
 }
 
 /** Record the user's answer. `false` is final — nothing prompts again. */
@@ -108,7 +120,10 @@ export async function recordEvent(
     options: { projectRoot?: string; timeoutMs?: number } = {}
 ): Promise<void> {
     try {
-        if (!isEnabled()) return;
+        // The project's own policy is read relative to the project being acted
+        // on, not the shell's cwd — `rebase dev` run from a subdirectory must
+        // still see its own repository's opt-out.
+        if (!isEnabled(process.env, options.projectRoot ?? process.cwd())) return;
 
         const machineId = ensureMachineId();
         const projectId = options.projectRoot ? ensureProjectId(options.projectRoot) : undefined;

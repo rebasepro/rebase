@@ -200,6 +200,21 @@ export interface RebaseProjectManifest {
      * common project and must not be required to say so.
      */
     storage?: Record<string, RebaseStorageSourceConfig>;
+    /**
+     * Repository-wide opt-out from anonymous CLI usage sharing.
+     *
+     * **Only `false` does anything.** It suppresses sharing for everyone who
+     * clones this repository, overriding each developer's own opt-in — an
+     * organisation setting policy for work done on its behalf, the same shape
+     * as a committed `.npmrc`.
+     *
+     * `true` is deliberately ignored, and the CLI says so rather than obeying
+     * quietly. This file is committed, so a `true` here would be one developer
+     * answering a privacy question for every colleague who later clones the
+     * repo — consent by proxy, which is the exact thing opt-in exists to
+     * prevent. Individuals opt in with `rebase telemetry enable`.
+     */
+    telemetry?: boolean;
 }
 
 /**
