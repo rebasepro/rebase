@@ -137,6 +137,25 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             let baseType = (numProp.validation?.integer || isId) ? `integer("${colName}")` : `numeric("${colName}")`;
             if (numProp.columnType) {
                 if (numProp.columnType === "double precision") baseType = `doublePrecision("${colName}")`;
+                // `bigint` and `bigserial` are the only pg-core builders that
+                // *require* a config argument: without `mode`, drizzle cannot
+                // know whether to hand back a `number` or a `bigint`, and the
+                // emitted call does not typecheck.
+                //
+                // This is why `schema.generated.ts` drifted. Regenerating it
+                // produced a file that would not compile, so the bigint lines
+                // were hand-patched — and every regeneration after that looked
+                // like a large, alarming diff nobody wanted to ship. The file
+                // then sat stale for long enough that a security fix to two RLS
+                // policies never reached production.
+                //
+                // `number` rather than `bigint`: these are counters and byte
+                // totals that every caller already treats as numbers, and
+                // switching the runtime type would be a breaking change to
+                // every consumer of the generated schema.
+                else if (numProp.columnType === "bigint" || numProp.columnType === "bigserial") {
+                    baseType = `${numProp.columnType}("${colName}", { mode: "number" })`;
+                }
                 else baseType = `${numProp.columnType}("${colName}")`;
             }
 

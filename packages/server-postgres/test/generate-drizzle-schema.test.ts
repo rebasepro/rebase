@@ -421,9 +421,37 @@ columnType: "bigserial" }
                 expect(cleanResult).toContain("n_real: real(\"n_real\"),");
                 expect(cleanResult).toContain("n_dp: doublePrecision(\"n_dp\"),");
                 expect(cleanResult).toContain("n_num: numeric(\"n_num\"),");
-                expect(cleanResult).toContain("n_bigint: bigint(\"n_bigint\"),");
                 expect(cleanResult).toContain("n_serial: serial(\"n_serial\"),");
-                expect(cleanResult).toContain("n_bigserial: bigserial(\"n_bigserial\"),");
+                // `bigint` and `bigserial` are the only pg-core builders that
+                // require a config argument — without `mode`, drizzle cannot
+                // know whether to return a `number` or a `bigint`, and the
+                // emitted call does not typecheck.
+                //
+                // These two assertions previously pinned the output *without*
+                // it, so the generator produced a `schema.generated.ts` that
+                // would not compile. The file was hand-patched instead, and
+                // every regeneration after that looked like an alarming diff
+                // nobody wanted to ship — which is how a security fix to two
+                // RLS policies sat unshipped in the repository.
+                expect(cleanResult).toContain("n_bigint: bigint(\"n_bigint\", { mode: \"number\" }),");
+                expect(cleanResult).toContain("n_bigserial: bigserial(\"n_bigserial\", { mode: \"number\" }),");
+            });
+
+            it("emits bigint columns that actually compile", async () => {
+                // The property the two assertions above are really about, stated
+                // directly: a generated bigint column must carry a `mode`. A
+                // bare `bigint("x")` is a type error at the call site, so a
+                // generated schema containing one cannot be built.
+                const collections: CollectionConfig[] = [{
+                    slug: "counters",
+                    table: "counters",
+                    name: "Counters",
+                    properties: { hits: { type: "number", columnType: "bigint" } }
+                }];
+                const result = cleanSchema(await generateSchema(collections));
+
+                expect(result).toMatch(/bigint\("hits", \{ mode: "number" \}\)/);
+                expect(result).not.toMatch(/bigint\("hits"\)/);
             });
 
             it("should combine isId='increment' with columnType overrides safely", async () => {
@@ -436,7 +464,10 @@ isId: "increment",
 columnType: "bigint" } }
                 }];
                 const result = await generateSchema(collections);
-                expect(cleanSchema(result)).toContain("n_inc: bigint(\"n_inc\").generatedByDefaultAsIdentity().primaryKey()");
+                // The `mode` config survives the identity/primary-key chaining —
+                // it is part of the builder call, not an afterthought appended
+                // to it.
+                expect(cleanSchema(result)).toContain("n_inc: bigint(\"n_inc\", { mode: \"number\" }).generatedByDefaultAsIdentity().primaryKey()");
             });
 
             it("should combine validation.unique with columnType override", async () => {
