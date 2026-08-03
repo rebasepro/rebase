@@ -4,6 +4,7 @@ import {
     Button,
     CircularProgress,
     cls,
+    fieldBackgroundMixin,
     focusedDisabled,
     IconButton,
     iconSize,
@@ -164,13 +165,20 @@ export function FormEnhanceAction({
 
                 <Separator orientation={"horizontal"}/>
 
+                {/* `px-4` and `gap-4` are MenuItem's own paddings, so the input
+                    row lines up with the items above it instead of sitting 8px
+                    to their left — which is what `mx-2` on the textarea did. */}
                 <div
                     className={cls(
-                        "my-2 w-[500px] max-w-full flex items-start text-surface-700 dark:text-surface-200"
+                        "my-2 px-4 py-2 gap-4 w-[500px] max-w-full flex items-start text-surface-700 dark:text-surface-200"
                     )}>
 
+                    {/* `fieldBackgroundMixin`, the same surface every other input
+                        in the codebase uses. It was `dark:bg-surface-950`, which
+                        theme.css defines as literal `#000000` — a pure black
+                        rectangle inside an already-dark menu. */}
                     <TextareaAutosize
-                        className={cls("p-4 rounded-lg resize-none bg-surface-100 dark:bg-surface-950 mx-2 w-full grow outline-hidden max-h-[300px] overflow-auto", focusedDisabled)}
+                        className={cls("p-3 rounded-lg resize-none w-full grow outline-hidden max-h-[300px] overflow-auto", fieldBackgroundMixin, focusedDisabled)}
                         value={instructions}
                         autoFocus={status === "new"}
                         disabled={loading}
@@ -208,8 +216,14 @@ export function FormEnhanceAction({
                         disabled={loading || !instructions}>
                         {loading &&
                             <CircularProgress size={"smallest"}/>}
+                        {/* Sized, and no `color`. These icons are re-exported
+                            straight from lucide, so `color` lands on the SVG as
+                            a CSS colour — and `"primary"` is not one, which is
+                            why this button rendered empty. Every other icon in
+                            the codebase passes `size` alone and inherits
+                            `currentColor` from the button. */}
                         {!loading &&
-                            <SendIcon color={"primary"}/>}
+                            <SendIcon size={iconSize.small}/>}
                     </IconButton>
 
                 </div>
