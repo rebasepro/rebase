@@ -16,7 +16,22 @@ allowBuilds:
   '@firebase/util': true
   '@google/genai': false
   cpu-features: true
-  esbuild: true
+  # Deliberately off. esbuild's postinstall replaces its `bin/esbuild` JS shim
+  # with the native binary as a startup optimisation — but pnpm has already
+  # written a `.bin` shim that invokes the target with `node`, because the file
+  # it inspected had a `#!/usr/bin/env node` shebang. After the swap that shim
+  # feeds an ELF to node, and every `pnpm exec esbuild` dies with
+  # `SyntaxError: Invalid or unexpected token` on the line reading `ELF`.
+  #
+  # It only bites where the install is genuinely re-run — a Docker build whose
+  # `pnpm fetch` layer was invalidated by a lockfile change. That made it look
+  # dormant for as long as deploys reused the cached layer, and it took the
+  # control-plane build down the first time the lockfile moved.
+  #
+  # Skipping the script leaves the JS shim in place; it resolves
+  # `@esbuild/<platform>` and spawns the same binary itself. The only cost is a
+  # few milliseconds of startup per invocation.
+  esbuild: false
   mongodb-memory-server: true
   nx: true
   protobufjs: true
