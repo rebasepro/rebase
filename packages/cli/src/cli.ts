@@ -12,6 +12,7 @@ import { authCommand } from "./commands/auth";
 import { doctorCommand } from "./commands/doctor";
 import { skillsCommand } from "./commands/skills";
 import { apiKeysCommand } from "./commands/api-keys";
+import { telemetryCommand } from "./commands/telemetry";
 import { cloudCommand } from "./commands/cloud";
 import { appsCommand } from "./commands/apps";
 import { requireProjectRoot } from "./utils/project";
@@ -71,7 +72,7 @@ export async function entry(args: string[]) {
     const subcommand = words[1];
 
     // Show global help only when no command given, or --help with no recognized command
-    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk"];
+    const namespacedCommands = ["init", "schema", "db", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "cloud", "apps", "eject", "generate-sdk", "telemetry"];
     if (!command || (parsedArgs["--help"] && !namespacedCommands.includes(command))) {
         printHelp();
         return;
@@ -170,6 +171,10 @@ export async function entry(args: string[]) {
             await cloudCommand(effectiveSubcommand, args);
             break;
 
+        case "telemetry":
+            await telemetryCommand(args);
+            break;
+
         default:
             console.error(chalk.red(`Unknown command: ${command}`));
             console.log("");
@@ -222,6 +227,7 @@ ${chalk.green.bold("API Keys")}
   ${chalk.blue.bold("api-keys list")}           List all service API keys
   ${chalk.blue.bold("api-keys create")}         Create a new scoped API key
   ${chalk.blue.bold("api-keys revoke")}         Revoke an existing API key
+  ${chalk.blue.bold("telemetry")}               Anonymous usage sharing (opt-in, off by default)
   ${chalk.blue.bold("api-keys")} ${chalk.gray("--help")}         Show API key command help
 
 ${chalk.green.bold("Rebase Cloud")}

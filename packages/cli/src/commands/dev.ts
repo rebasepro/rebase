@@ -32,6 +32,7 @@ import {
     resolvePluginCliScript
 } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import { recordEvent } from "../telemetry";
 
 /**
  * Quote a path for the shell `execa` runs the backend through.
@@ -179,6 +180,15 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     }
 
     const projectRoot = requireProjectRoot();
+
+    // Fire-and-forget, and a no-op unless the developer opted in. Deliberately
+    // not awaited: `rebase dev` starting is the thing the user is waiting for,
+    // and a slow collector must never be in front of it.
+    void recordEvent("cli.dev", {
+        backend_only: Boolean(args["--backend-only"]),
+        frontend_only: Boolean(args["--frontend-only"]),
+        generate: Boolean(args["--generate"])
+    }, { projectRoot });
     const backendDir = findBackendDir(projectRoot);
     const frontendDir = findFrontendDir(projectRoot);
     const backendOnly = args["--backend-only"] || false;

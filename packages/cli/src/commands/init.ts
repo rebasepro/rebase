@@ -12,6 +12,8 @@ import crypto from "crypto";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { resolveCloudUrl, writeLink } from "./cloud/context";
 import type { PackageManager, PMCommands } from "../utils/package-manager";
+import { promptForConsent } from "../telemetry/consent";
+import { durationBucket, recordEvent } from "../telemetry";
 
 const access = promisify(fs.access);
 
@@ -456,6 +458,7 @@ setupKey: options.setupKey })
 }
 
 async function createProject(options: InitOptions) {
+    const startedAt = Date.now();
     // Check if directory already exists and is not empty
     if (fs.existsSync(options.targetDirectory)) {
         if (fs.readdirSync(options.targetDirectory).length !== 0) {
@@ -704,6 +707,28 @@ async function createProject(options: InitOptions) {
     console.log("");
     console.log(`  ${chalk.cyan("rebase skills install")}  ${chalk.gray("or")}  ${chalk.cyan(pmCommands.run("skills:install").join(" "))}`);
     console.log("");
+
+    // Asked here, at the very end, and never before: the project exists, it
+    // worked, and the user has something to judge us on. Nothing has been
+    // written or transmitted up to this line — declining leaves no id and no
+    // file. See telemetry/consent.ts for why the order matters.
+    //
+    // `--yes` and non-TTY runs never reach the prompt, so CI behaviour is
+    // unchanged.
+    const initProperties = {
+        preset: options.headless ? "none" : options.preset,
+        headless: Boolean(options.headless),
+        package_manager: options.pm,
+        installed_deps: Boolean(options.installDeps),
+        introspected,
+        own_database: Boolean(options.databaseUrl),
+        cloud_linked: Boolean(options.cloudProject),
+        git: Boolean(options.git),
+        duration: durationBucket(Date.now() - startedAt)
+    };
+    if (await promptForConsent("cli.init", initProperties)) {
+        await recordEvent("cli.init", initProperties, { projectRoot: options.targetDirectory });
+    }
 }
 
 /**
