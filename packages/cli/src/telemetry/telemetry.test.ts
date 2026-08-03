@@ -317,3 +317,71 @@ apps: {} };
         expect(telemetry.readProjectPolicy(dir)).toBe("unset");
     });
 });
+
+describe("ensureProjectId", () => {
+
+    function projectDir(state?: string): string {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-pid-"));
+        fs.mkdirSync(path.join(dir, ".rebase"));
+        if (state !== undefined) fs.writeFileSync(path.join(dir, ".rebase", "state.json"), state, "utf-8");
+        return dir;
+    }
+
+    it("preserves the other commands' keys when it adds its own", async () => {
+        // `state.json` is shared — `generate_sdk`, `apps` and `auth` all read it.
+        // Clobbering their keys to store a telemetry id would break the project.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        const dir = projectDir('{"lastSdkOutput":"./src/sdk","apiUrl":"http://localhost:3001"}');
+        (global as any).fetch = vi.fn().mockResolvedValue({ ok: true });
+
+        await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
+
+        const state = JSON.parse(fs.readFileSync(path.join(dir, ".rebase", "state.json"), "utf-8"));
+        expect(state.lastSdkOutput).toBe("./src/sdk");
+        expect(state.apiUrl).toBe("http://localhost:3001");
+        expect(state.telemetryProjectId).toMatch(/^[0-9a-f-]{36}$/);
+    });
+
+    it("reuses the id it already stored", async () => {
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        const dir = projectDir('{"telemetryProjectId":"11111111-2222-3333-4444-555555555555"}');
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+        (global as any).fetch = fetchMock;
+
+        await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
+
+        expect(JSON.parse(fetchMock.mock.calls[0][1].body).projectId)
+            .toBe("11111111-2222-3333-4444-555555555555");
+    });
+
+    it("does not overwrite a state.json it cannot parse", async () => {
+        // Better to report no project than to destroy another command's state.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        const dir = projectDir("{ this is not json");
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+        (global as any).fetch = fetchMock;
+
+        await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
+
+        expect(fs.readFileSync(path.join(dir, ".rebase", "state.json"), "utf-8")).toBe("{ this is not json");
+        expect(JSON.parse(fetchMock.mock.calls[0][1].body).projectId).toBeUndefined();
+    });
+
+    it("reports no project when there is no .rebase directory to write into", async () => {
+        // A command run outside a project must not scatter directories around
+        // the filesystem just to have something to count.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-bare-"));
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+        (global as any).fetch = fetchMock;
+
+        await telemetry.recordEvent("cli.dev", {}, { projectRoot: dir });
+
+        expect(fs.existsSync(path.join(dir, ".rebase"))).toBe(false);
+        expect(JSON.parse(fetchMock.mock.calls[0][1].body).projectId).toBeUndefined();
+    });
+});

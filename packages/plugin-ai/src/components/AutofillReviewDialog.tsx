@@ -69,7 +69,12 @@ export function AutofillReviewDialog() {
                                 size={"small"}
                                 onCheckedChange={() => controller.toggleAll(!allSelected)}
                             />
-                            <Typography variant={"label"} color={"secondary"}>
+                            {/* `component="span"`: the Typography `label`
+                                variant renders a <label> element, and this sits
+                                inside the row's own <label>. Nested labels are
+                                invalid HTML and stop the text toggling the
+                                checkbox — clicking "Select all" did nothing. */}
+                            <Typography variant={"label"} component={"span"} color={"secondary"}>
                                 {allSelected ? "Deselect all" : "Select all"}
                             </Typography>
                         </label>
@@ -150,7 +155,8 @@ function ProposedFieldRow({ field, onToggle }: { field: ProposedField, onToggle:
 
             <div className={"flex flex-col gap-1 min-w-0 grow"}>
                 <div className={"flex items-center gap-2"}>
-                    <Typography variant={"label"}>{field.label}</Typography>
+                    {/* See the note above: never a bare `label` variant inside a <label>. */}
+                    <Typography variant={"label"} component={"span"}>{field.label}</Typography>
                     {replaces && (
                         <Typography variant={"caption"} color={"secondary"}>
                             replaces the current value
