@@ -96,6 +96,12 @@ app/uploads/
 !e2e/baas-typecheck/stubs/*.d.ts
 !app/config/*.d.ts
 !packages/cli/templates/template/config/*.d.ts
+# `examples/firebase` declares `*.css` here, so `import "./index.css"` typechecks.
+# Untracked, it passed locally and failed `check:examples` on a clean checkout
+# with TS2882 — the same silent swallow, found the first run CI got that far.
+!examples/firebase/src/env.d.ts
+# The `virtual:starlight/*` module shims the website's own build needs.
+!website/src/starlight.d.ts
 
 # Temporary test, linting, and scratch outputs
 /e2e-screenshots/
