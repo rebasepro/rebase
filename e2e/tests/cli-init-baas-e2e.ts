@@ -226,8 +226,12 @@ async function run() {
         const secrets = await api(base, "/api/data/secrets");
         check("table without RLS is not served", secrets.status === 404, `status ${secrets.status}`);
 
+        // 501, not 404: the router is mounted and refuses, deliberately. An
+        // unexplained 404 on a route the admin UI just called reads as a broken
+        // deploy and gets debugged as one, so the server answers with the
+        // reason instead. See `schemaEditorOff` in the server's `init.ts`.
         const editor = await api(base, "/api/schema-editor/collection/save", { method: "POST" });
-        check("schema editor is off", editor.status === 404, `status ${editor.status}`);
+        check("schema editor is off", editor.status === 501, `status ${editor.status}`);
 
         const swagger = await fetch(`${base}/api/swagger`);
         check("swagger is served", swagger.ok, `status ${swagger.status}`);

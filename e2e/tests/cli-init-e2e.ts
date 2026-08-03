@@ -995,14 +995,21 @@ timeout: 10000 });
 
             // Click Create/Save button
             console.log("Saving the new book entry...");
-            const createButton = page.locator('button[type="submit"]', { hasText: /Create/i }).filter({ visible: true }).first();
+            // Not `button[type="submit"]`: the entity view's identity bar carries
+            // Save/Create, and `EditFormActions` renders nothing at all when the
+            // container owns the actions — so this view has no submit-typed
+            // button to find. Matched by label, like the Add button above.
+            const createButton = page.locator("button", { hasText: /^(Create|Save)$/ }).filter({ visible: true }).first();
             await createButton.waitFor({ state: "visible",
 timeout: 10000 });
             await createButton.click();
 
-            // Wait for entry to show in table
+            // Wait for entry to show in table.
+            // `.first()`: saving keeps the record open, so the title also appears
+            // in the identity bar above the table, and a bare text locator is a
+            // strict-mode violation on the two.
             console.log("Verifying book row in table...");
-            const tableRow = page.locator("text=The Great Gatsby");
+            const tableRow = page.locator("text=The Great Gatsby").first();
             await tableRow.waitFor({ state: "visible",
 timeout: 10000 });
             await page.screenshot({ path: path.join(screenshotDir, "8-book-added-successfully.png") });
