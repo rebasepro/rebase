@@ -9,7 +9,9 @@ describe("choosing which frontends to serve from the backend", () => {
         const { apps, skipped } = foldableApps({
             apps: {
                 backend: { type: "backend" },
-                web: { type: "static", build: "pnpm build", output: "frontend/dist" }
+                web: { type: "static",
+build: "pnpm build",
+output: "frontend/dist" }
             }
         });
         expect(skipped).toEqual([]);
@@ -25,8 +27,11 @@ spa: true });
         // an admin panel deployed with neither.
         const { apps } = foldableApps({
             apps: {
-                site: { type: "static", output: "a/dist" },
-                admin: { type: "static", output: "b/dist", path: "/admin" }
+                site: { type: "static",
+output: "a/dist" },
+                admin: { type: "static",
+output: "b/dist",
+path: "/admin" }
             }
         });
         expect(apps.map(a => a.name).sort()).toEqual(["admin", "site"]);
@@ -36,9 +41,15 @@ spa: true });
         // The "/"-rooted app's catch-all claims everything registered after it.
         const { apps } = foldableApps({
             apps: {
-                site: { type: "static", output: "a/dist", path: "/" },
-                admin: { type: "static", output: "b/dist", path: "/admin" },
-                docs: { type: "static", output: "c/dist", path: "/docs/api" }
+                site: { type: "static",
+output: "a/dist",
+path: "/" },
+                admin: { type: "static",
+output: "b/dist",
+path: "/admin" },
+                docs: { type: "static",
+output: "c/dist",
+path: "/docs/api" }
             }
         });
         expect(apps.map(a => a.path)).toEqual(["/docs/api", "/admin", "/"]);
@@ -52,7 +63,8 @@ spa: true });
     });
 
     it("explains a static app that declares no output", () => {
-        const { apps, skipped } = foldableApps({ apps: { web: { type: "static", build: "x" } } });
+        const { apps, skipped } = foldableApps({ apps: { web: { type: "static",
+build: "x" } } });
         expect(apps).toEqual([]);
         expect(skipped[0].reason).toMatch(/no output directory/i);
     });

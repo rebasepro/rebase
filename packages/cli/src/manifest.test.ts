@@ -21,7 +21,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    fs.rmSync(scratch, { recursive: true, force: true });
+    fs.rmSync(scratch, { recursive: true,
+force: true });
 });
 
 function touch(relative: string): void {
@@ -38,7 +39,8 @@ describe("validateManifest", () => {
     it("accepts a minimal manifest", () => {
         const { manifest, issues } = validateManifest({
             rebase: "^1",
-            apps: { backend: { type: "backend", runtime: "managed" } }
+            apps: { backend: { type: "backend",
+runtime: "managed" } }
         });
 
         expect(issues).toEqual([]);
@@ -55,7 +57,8 @@ describe("validateManifest", () => {
         // it at the top level is naming the wrong thing, not missing a field.
         const { issues } = validateManifest({
             runtime: "^1",
-            apps: { backend: { type: "backend", runtime: "managed" } }
+            apps: { backend: { type: "backend",
+runtime: "managed" } }
         });
 
         const issue = issues.find(i => i.path === "rebase");
@@ -108,7 +111,8 @@ describe("validateManifest", () => {
     it("rejects app names that would not survive being put in a URL", () => {
         const { issues } = validateManifest({
             rebase: "^1",
-            apps: { "My App": { type: "backend", runtime: "managed" } }
+            apps: { "My App": { type: "backend",
+runtime: "managed" } }
         });
         expect(issues[0].message).toMatch(/lowercase/);
     });
@@ -116,7 +120,8 @@ describe("validateManifest", () => {
     it("rejects reserved app names", () => {
         const { issues } = validateManifest({
             rebase: "^1",
-            apps: { api: { type: "backend", runtime: "managed" } }
+            apps: { api: { type: "backend",
+runtime: "managed" } }
         });
         expect(issues[0].message).toMatch(/reserved/);
     });
@@ -125,8 +130,10 @@ describe("validateManifest", () => {
         const { issues } = validateManifest({
             rebase: "^1",
             apps: {
-                one: { type: "backend", runtime: "managed" },
-                two: { type: "backend", runtime: "managed" }
+                one: { type: "backend",
+runtime: "managed" },
+                two: { type: "backend",
+runtime: "managed" }
             }
         });
         expect(issues.some(i => i.message.includes("at most one backend"))).toBe(true);
@@ -135,7 +142,9 @@ describe("validateManifest", () => {
     it("refuses paths that escape the project directory", () => {
         const { issues } = validateManifest({
             rebase: "^1",
-            apps: { web: { type: "static", root: "../../etc", output: "dist" } }
+            apps: { web: { type: "static",
+root: "../../etc",
+output: "dist" } }
         });
         expect(issues.some(i => i.message.includes("inside the project"))).toBe(true);
     });
@@ -143,7 +152,9 @@ describe("validateManifest", () => {
     it("refuses absolute paths", () => {
         const { issues } = validateManifest({
             rebase: "^1",
-            apps: { web: { type: "static", root: "/etc", output: "dist" } }
+            apps: { web: { type: "static",
+root: "/etc",
+output: "dist" } }
         });
         expect(issues.some(i => i.message.includes("relative"))).toBe(true);
     });
@@ -161,7 +172,8 @@ describe("validateManifest", () => {
         it("rejects a value that is neither", () => {
             const { issues } = validateManifest({
                 rebase: "^1",
-                apps: { backend: { type: "backend", runtime: "hosted" } }
+                apps: { backend: { type: "backend",
+runtime: "hosted" } }
             });
             expect(issues.some(i => i.path === "apps.backend.runtime")).toBe(true);
         });
@@ -188,7 +200,9 @@ describe("validateManifest", () => {
             const { issues } = validateManifest({
                 rebase: "^1",
                 apps: {
-                    backend: { type: "backend", runtime: "managed", dockerfile: "Dockerfile" }
+                    backend: { type: "backend",
+runtime: "managed",
+dockerfile: "Dockerfile" }
                 }
             });
             expect(issues.find(i => i.path === "apps.backend.dockerfile")?.message)
@@ -199,7 +213,9 @@ describe("validateManifest", () => {
     it("reports backend.mode as removed rather than ignoring it", () => {
         const { issues } = validateManifest({
             rebase: "^1",
-            apps: { backend: { type: "backend", runtime: "managed", mode: "baas" } }
+            apps: { backend: { type: "backend",
+runtime: "managed",
+mode: "baas" } }
         });
         expect(issues.find(i => i.path === "apps.backend.mode")?.message)
             .toMatch(/no longer a field/);
@@ -209,7 +225,10 @@ describe("validateManifest", () => {
         it("accepts an absolute sub-path", () => {
             const { issues } = validateManifest({
                 rebase: "^1",
-                apps: { admin: { type: "static", root: "a", output: "a/dist", path: "/admin" } }
+                apps: { admin: { type: "static",
+root: "a",
+output: "a/dist",
+path: "/admin" } }
             });
             expect(issues).toEqual([]);
         });
@@ -217,7 +236,10 @@ describe("validateManifest", () => {
         it.each(["admin", "../admin", "/admin/.."])("rejects %s", (bad) => {
             const { issues } = validateManifest({
                 rebase: "^1",
-                apps: { admin: { type: "static", root: "a", output: "a/dist", path: bad } }
+                apps: { admin: { type: "static",
+root: "a",
+output: "a/dist",
+path: bad } }
             });
             expect(issues.find(i => i.path === "apps.admin.path")?.message)
                 .toMatch(/absolute path/);
@@ -226,7 +248,10 @@ describe("validateManifest", () => {
         it("rejects a trailing slash, so mounting has one shape to reason about", () => {
             const { issues } = validateManifest({
                 rebase: "^1",
-                apps: { admin: { type: "static", root: "a", output: "a/dist", path: "/admin/" } }
+                apps: { admin: { type: "static",
+root: "a",
+output: "a/dist",
+path: "/admin/" } }
             });
             expect(issues.find(i => i.path === "apps.admin.path")?.message)
                 .toMatch(/must not end with a slash/);
@@ -238,8 +263,13 @@ describe("validateManifest", () => {
             const { issues } = validateManifest({
                 rebase: "^1",
                 apps: {
-                    site: { type: "static", root: "s", output: "s/dist" },
-                    admin: { type: "static", root: "a", output: "a/dist", path: "/" }
+                    site: { type: "static",
+root: "s",
+output: "s/dist" },
+                    admin: { type: "static",
+root: "a",
+output: "a/dist",
+path: "/" }
                 }
             });
             expect(issues.find(i => i.path === "apps.admin.path")?.message)
@@ -250,8 +280,13 @@ describe("validateManifest", () => {
             const { issues } = validateManifest({
                 rebase: "^1",
                 apps: {
-                    site: { type: "static", root: "s", output: "s/dist" },
-                    admin: { type: "static", root: "a", output: "a/dist", path: "/admin" }
+                    site: { type: "static",
+root: "s",
+output: "s/dist" },
+                    admin: { type: "static",
+root: "a",
+output: "a/dist",
+path: "/admin" }
                 }
             });
             expect(issues).toEqual([]);
@@ -289,7 +324,7 @@ root: "a",
 output: "a/dist",
 pathh: "/admin" });
 
-        expect(issues).toEqual([]);           // not fatal
+        expect(issues).toEqual([]); // not fatal
         expect(warnings.join(" ")).toMatch(/apps\.admin\.pathh/);
         expect(warnings.join(" ")).toMatch(/Did you mean "path"/);
     });
@@ -462,9 +497,15 @@ describe("buildableApps", () => {
         const order = buildableApps({
             rebase: "^1",
             apps: {
-                site: { type: "static", root: "site", output: "site/dist" },
-                backend: { type: "backend", runtime: "managed" },
-                admin: { type: "static", root: "admin", output: "admin/dist", path: "/admin" }
+                site: { type: "static",
+root: "site",
+output: "site/dist" },
+                backend: { type: "backend",
+runtime: "managed" },
+                admin: { type: "static",
+root: "admin",
+output: "admin/dist",
+path: "/admin" }
             }
         }).map(a => a.name);
 
@@ -478,8 +519,11 @@ describe("assessManagedCompatibility", () => {
         const result = assessManagedCompatibility({
             rebase: "^1",
             apps: {
-                backend: { type: "backend", runtime: "managed" },
-                web: { type: "static", root: "f", output: "f/dist" }
+                backend: { type: "backend",
+runtime: "managed" },
+                web: { type: "static",
+root: "f",
+output: "f/dist" }
             }
         });
 
@@ -490,7 +534,9 @@ describe("assessManagedCompatibility", () => {
     it("reads the declared value rather than deducing one", () => {
         const result = assessManagedCompatibility({
             rebase: "^1",
-            apps: { backend: { type: "backend", runtime: "custom", dockerfile: "Dockerfile" } }
+            apps: { backend: { type: "backend",
+runtime: "custom",
+dockerfile: "Dockerfile" } }
         });
 
         expect(result.eligible).toBe(false);
@@ -502,7 +548,9 @@ describe("assessManagedCompatibility", () => {
         // it simply is not the repository that selects the runtime.
         const result = assessManagedCompatibility({
             rebase: "^1",
-            apps: { web: { type: "static", root: "f", output: "f/dist" } }
+            apps: { web: { type: "static",
+root: "f",
+output: "f/dist" } }
         });
 
         expect(result.eligible).toBe(false);

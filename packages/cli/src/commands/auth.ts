@@ -125,7 +125,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
             if (!searchData || typeof searchData !== "object") {
                 throw new Error("Invalid response format from user search API.");
             }
-            
+
             let userId: string | undefined;
             if (Array.isArray(searchData)) {
                 const firstUser = searchData[0] as unknown;

@@ -69,10 +69,10 @@ const APP_TYPES = ["backend", "static"] as const;
  */
 const REMOVED_APP_TYPES: Record<string, string> = {
     admin:
-        'the admin panel is an ordinary static app now — declare it as ' +
+        "the admin panel is an ordinary static app now — declare it as " +
         '{ "type": "static", "root": "frontend", "output": "frontend/dist", "path": "/admin" }',
     custom:
-        'who owns the server is a property of the backend now — declare ' +
+        "who owns the server is a property of the backend now — declare " +
         '{ "type": "backend", "runtime": "custom" } instead of a separate app',
     mobile:
         "mobile apps are no longer declared in the manifest — nothing consumed this type. " +
@@ -410,14 +410,16 @@ function validateStorageSources(
 ): DeclaredStorageSources | undefined {
     if (raw === undefined) return undefined;
     if (!isRecord(raw)) {
-        issues.push({ path: "storage", message: "must be an object keyed by storage source name" });
+        issues.push({ path: "storage",
+message: "must be an object keyed by storage source name" });
         return undefined;
     }
 
     const sources: DeclaredStorageSources = {};
     for (const [key, value] of Object.entries(raw)) {
         if (!isRecord(value)) {
-            issues.push({ path: `storage.${key}`, message: "must be an object" });
+            issues.push({ path: `storage.${key}`,
+message: "must be an object" });
             continue;
         }
         if (typeof value.engine !== "string" || value.engine.trim() === "") {
@@ -435,7 +437,8 @@ function validateStorageSources(
             continue;
         }
         if (value.label !== undefined && typeof value.label !== "string") {
-            issues.push({ path: `storage.${key}.label`, message: "must be a string" });
+            issues.push({ path: `storage.${key}.label`,
+message: "must be a string" });
             continue;
         }
         try {
@@ -459,7 +462,7 @@ function validateStorageSources(
     if (collision) {
         issues.push({
             path: `storage.${collision.b}`,
-            message: `maps to the same environment variable suffix ` +
+            message: "maps to the same environment variable suffix " +
                 `("${collision.suffix || "(none)"}") as "${collision.a}", so the two would read ` +
                 "each other's configuration — rename one of them"
         });

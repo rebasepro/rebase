@@ -28,7 +28,8 @@ function captureStdout(): { output: () => string; restore: () => void } {
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
     };
-    return { output: () => chunks.join(""), restore: () => { process.stdout.write = orig; } };
+    return { output: () => chunks.join(""),
+restore: () => { process.stdout.write = orig; } };
 }
 
 /* ── fake SDK client ────────────────────────────────────────────── */
@@ -50,7 +51,8 @@ function fakeClient(spec: FakeClientSpec) {
                 delete: async () => ({})
             })
         },
-        auth: { getSession: () => ({ accessToken: "t", expiresAt: Date.now() + 1e9 }) }
+        auth: { getSession: () => ({ accessToken: "t",
+expiresAt: Date.now() + 1e9 }) }
     };
 }
 
@@ -87,7 +89,8 @@ import { cloudCommand, positionals } from "./index";
 import { statusCommand, storageCommand } from "./resources";
 
 function useClient(client: unknown): void {
-    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ client, url: "https://cp.example" });
+    (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ client,
+url: "https://cp.example" });
 }
 
 beforeEach(() => setJsonModeForTest(true));
@@ -100,10 +103,12 @@ afterEach(() => {
 
 describe("parseEnvAssignment", () => {
     it("splits KEY=VALUE on the first =", () => {
-        expect(parseEnvAssignment(["DB_URL=postgres://a=b"])).toEqual({ key: "DB_URL", value: "postgres://a=b" });
+        expect(parseEnvAssignment(["DB_URL=postgres://a=b"])).toEqual({ key: "DB_URL",
+value: "postgres://a=b" });
     });
     it("supports KEY VALUE form", () => {
-        expect(parseEnvAssignment(["KEY", "val"])).toEqual({ key: "KEY", value: "val" });
+        expect(parseEnvAssignment(["KEY", "val"])).toEqual({ key: "KEY",
+value: "val" });
     });
     it("returns null when no key", () => {
         expect(parseEnvAssignment([])).toBeNull();
@@ -122,7 +127,9 @@ describe("resolveExtensionAlias", () => {
 
 describe("buildSettingsPatch", () => {
     it("includes only the flags supplied, lowercasing the subdomain", () => {
-        expect(buildSettingsPatch({ name: "New", subdomain: "ACME" })).toEqual({ name: "New", subdomain: "acme" });
+        expect(buildSettingsPatch({ name: "New",
+subdomain: "ACME" })).toEqual({ name: "New",
+subdomain: "acme" });
     });
     it("is empty when nothing is passed", () => {
         expect(buildSettingsPatch({})).toEqual({});
@@ -131,23 +138,31 @@ describe("buildSettingsPatch", () => {
 
 describe("isRollbackable (the safety rule)", () => {
     it("is true only for a successful deploy with an image", () => {
-        expect(isRollbackable({ id: 1, status: "success", imageUrl: "img:1" })).toBe(true);
+        expect(isRollbackable({ id: 1,
+status: "success",
+imageUrl: "img:1" })).toBe(true);
     });
     it("is false when the image is missing, even if successful", () => {
-        expect(isRollbackable({ id: 1, status: "success" })).toBe(false);
+        expect(isRollbackable({ id: 1,
+status: "success" })).toBe(false);
     });
     it("is false for a failed deploy that has an image", () => {
-        expect(isRollbackable({ id: 1, status: "failed", imageUrl: "img:1" })).toBe(false);
+        expect(isRollbackable({ id: 1,
+status: "failed",
+imageUrl: "img:1" })).toBe(false);
     });
 });
 
 describe("deploymentDurationMs", () => {
     it("is null while a build is still running (no finishedAt)", () => {
-        expect(deploymentDurationMs({ id: 1, createdAt: "2026-01-01T00:00:00Z" })).toBeNull();
+        expect(deploymentDurationMs({ id: 1,
+createdAt: "2026-01-01T00:00:00Z" })).toBeNull();
     });
     it("is finishedAt − createdAt in ms", () => {
         expect(
-            deploymentDurationMs({ id: 1, createdAt: "2026-01-01T00:00:00Z", finishedAt: "2026-01-01T00:00:08Z" })
+            deploymentDurationMs({ id: 1,
+createdAt: "2026-01-01T00:00:00Z",
+finishedAt: "2026-01-01T00:00:08Z" })
         ).toBe(8000);
     });
 });
@@ -162,12 +177,26 @@ describe("env list --json", () => {
                 expect(opts?.method).toBe("GET");
                 return {
                     vars: [
-                        { id: "1", key: "PUBLIC_URL", secret: false, valueSet: true, createdAt: null, updatedAt: null },
-                        { id: "2", key: "STRIPE_SECRET", secret: true, valueSet: true, createdAt: null, updatedAt: null }
+                        { id: "1",
+key: "PUBLIC_URL",
+secret: false,
+valueSet: true,
+createdAt: null,
+updatedAt: null },
+                        { id: "2",
+key: "STRIPE_SECRET",
+secret: true,
+valueSet: true,
+createdAt: null,
+updatedAt: null }
                     ],
                     pendingRedeploy: true,
                     pendingSince: null,
-                    limits: { maxVars: 100, maxValueBytes: 1, maxTotalBytes: 1, keyPattern: "x", reservedKeys: [] }
+                    limits: { maxVars: 100,
+maxValueBytes: 1,
+maxTotalBytes: 1,
+keyPattern: "x",
+reservedKeys: [] }
                 };
             }
         });
@@ -194,7 +223,15 @@ describe("env reveal of a secret var", () => {
     it("fails without calling /reveal (write-only)", async () => {
         const invoke = vi.fn(async (name: string, _b: unknown, opts?: { path?: string }) => {
             if (name === "env-vars" && opts?.path === "proj_1") {
-                return { vars: [{ id: "2", key: "STRIPE_SECRET", secret: true, valueSet: true, createdAt: null, updatedAt: null }], pendingRedeploy: false, pendingSince: null, limits: {} };
+                return { vars: [{ id: "2",
+key: "STRIPE_SECRET",
+secret: true,
+valueSet: true,
+createdAt: null,
+updatedAt: null }],
+pendingRedeploy: false,
+pendingSince: null,
+limits: {} };
             }
             throw new Error("reveal should NOT be called for a secret var");
         });
@@ -220,14 +257,24 @@ describe("env reveal of a secret var", () => {
 
 describe("rollback --json", () => {
     const rows: DeploymentRow[] = [
-        { id: "d3", status: "failed", imageUrl: "img:3", createdAt: "2026-01-03T00:00:00Z" },
-        { id: "d2", status: "success", imageUrl: "img:2", createdAt: "2026-01-02T00:00:00Z" },
-        { id: "d1", status: "success", imageUrl: "img:1", createdAt: "2026-01-01T00:00:00Z" }
+        { id: "d3",
+status: "failed",
+imageUrl: "img:3",
+createdAt: "2026-01-03T00:00:00Z" },
+        { id: "d2",
+status: "success",
+imageUrl: "img:2",
+createdAt: "2026-01-02T00:00:00Z" },
+        { id: "d1",
+status: "success",
+imageUrl: "img:1",
+createdAt: "2026-01-01T00:00:00Z" }
     ];
 
     it("refuses an explicitly named ineligible deploy WITHOUT calling deploy/rollback", async () => {
         const invoke = vi.fn(async () => ({}));
-        useClient(fakeClient({ invoke, find: async () => ({ data: rows }) }));
+        useClient(fakeClient({ invoke,
+find: async () => ({ data: rows }) }));
 
         const cap = captureStdout();
         const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
@@ -251,7 +298,8 @@ describe("rollback --json", () => {
             rolledBackTo: body.deploymentId,
             imageUrl: "img:2"
         }));
-        useClient(fakeClient({ invoke, find: async () => ({ data: rows }) }));
+        useClient(fakeClient({ invoke,
+find: async () => ({ data: rows }) }));
 
         const cap = captureStdout();
         await rollbackCommand(["node", "rebase", "cloud", "rollback", "--yes", "--json"]);
@@ -297,7 +345,8 @@ describe("db info --json", () => {
 
     it("includes the password only when --reveal is passed", async () => {
         const invoke = vi.fn(async (_n: string, _b: unknown, opts?: { path?: string }) => {
-            if (opts?.path === "reveal") return { password: "s3cr3t", connectionString: "postgres://u:s3cr3t@h/app" };
+            if (opts?.path === "reveal") return { password: "s3cr3t",
+connectionString: "postgres://u:s3cr3t@h/app" };
             return infoBody;
         });
         useClient(fakeClient({ invoke }));
@@ -315,8 +364,16 @@ describe("db info --json", () => {
 describe("deployments list --json", () => {
     it("shapes rows with rollbackable + duration and a stable trigger object", async () => {
         const rows: DeploymentRow[] = [
-            { id: "d2", status: "deploying", createdAt: "2026-01-02T00:00:00Z", triggerSource: "cli", triggeredBy: "user" },
-            { id: "d1", status: "success", imageUrl: "img:1", createdAt: "2026-01-01T00:00:00Z", finishedAt: "2026-01-01T00:00:10Z" }
+            { id: "d2",
+status: "deploying",
+createdAt: "2026-01-02T00:00:00Z",
+triggerSource: "cli",
+triggeredBy: "user" },
+            { id: "d1",
+status: "success",
+imageUrl: "img:1",
+createdAt: "2026-01-01T00:00:00Z",
+finishedAt: "2026-01-01T00:00:10Z" }
         ];
         useClient(fakeClient({ find: async () => ({ data: rows }) }));
         const cap = captureStdout();
@@ -334,7 +391,11 @@ describe("deployments list --json", () => {
 
 describe("triggerInfo", () => {
     it("normalises unknown source/by to 'unknown'", () => {
-        expect(triggerInfo({ id: 1, triggerSource: "bogus", triggeredBy: "??" })).toEqual({ by: "unknown", source: "unknown", userId: "" });
+        expect(triggerInfo({ id: 1,
+triggerSource: "bogus",
+triggeredBy: "??" })).toEqual({ by: "unknown",
+source: "unknown",
+userId: "" });
     });
 });
 
@@ -342,7 +403,8 @@ describe("triggerInfo", () => {
 
 describe("confirmDestructive", () => {
     it("returns immediately when --yes was passed", async () => {
-        await expect(context.confirmDestructive({ yes: true, prompt: "x" })).resolves.toBeUndefined();
+        await expect(context.confirmDestructive({ yes: true,
+prompt: "x" })).resolves.toBeUndefined();
     });
 
     it("REFUSES (never prompts) in JSON/non-TTY mode without --yes", async () => {
@@ -351,7 +413,8 @@ describe("confirmDestructive", () => {
         const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
             throw new Error("__exit__");
         }) as never);
-        await expect(context.confirmDestructive({ yes: false, prompt: "delete?" })).rejects.toThrow("__exit__");
+        await expect(context.confirmDestructive({ yes: false,
+prompt: "delete?" })).rejects.toThrow("__exit__");
         cap.restore();
         exit.mockRestore();
         const parsed = JSON.parse(cap.output().trim());

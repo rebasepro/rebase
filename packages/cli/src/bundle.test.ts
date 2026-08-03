@@ -19,7 +19,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    fs.rmSync(scratch, { recursive: true, force: true });
+    fs.rmSync(scratch, { recursive: true,
+force: true });
 });
 
 function write(relative: string, content: string): string {
@@ -126,14 +127,17 @@ describe("collectDeclaredDependencies", () => {
         write("backend/package.json", JSON.stringify({ dependencies: { pg: "^8.0.0" } }));
         write("config/package.json", JSON.stringify({ dependencies: { zod: "^4.0.0" } }));
 
-        expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0", zod: "^4.0.0" });
+        expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0",
+zod: "^4.0.0" });
     });
 
     it("omits packages the runtime image already provides", () => {
         // Installing a second copy of the server beside the one running the
         // process is wasted space at best and a version conflict at worst.
         write("backend/package.json", JSON.stringify({
-            dependencies: { "@rebasepro/server": "^0.11.0", hono: "^4.0.0", pg: "^8.0.0" }
+            dependencies: { "@rebasepro/server": "^0.11.0",
+hono: "^4.0.0",
+pg: "^8.0.0" }
         }));
 
         expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0" });
@@ -141,7 +145,8 @@ describe("collectDeclaredDependencies", () => {
 
     it("omits workspace protocol versions, which mean nothing outside the repo", () => {
         write("backend/package.json", JSON.stringify({
-            dependencies: { "my-config": "workspace:*", pg: "^8.0.0" }
+            dependencies: { "my-config": "workspace:*",
+pg: "^8.0.0" }
         }));
 
         expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0" });
@@ -154,7 +159,8 @@ describe("collectDeclaredDependencies", () => {
         // try — and fail — to `npm install` it from the registry.
         write("config/package.json", JSON.stringify({ name: "dadaki-config" }));
         write("backend/package.json", JSON.stringify({
-            dependencies: { "dadaki-config": "*", pg: "^8.0.0" }
+            dependencies: { "dadaki-config": "*",
+pg: "^8.0.0" }
         }));
         fs.mkdirSync(path.join(scratch, "backend/node_modules"), { recursive: true });
         fs.symlinkSync(
@@ -238,8 +244,10 @@ describe("detectNativeDependencies", () => {
     });
 
     it("terminates on a dependency cycle", () => {
-        write("node_modules/a/package.json", JSON.stringify({ name: "a", dependencies: { b: "1" } }));
-        write("node_modules/b/package.json", JSON.stringify({ name: "b", dependencies: { a: "1" } }));
+        write("node_modules/a/package.json", JSON.stringify({ name: "a",
+dependencies: { b: "1" } }));
+        write("node_modules/b/package.json", JSON.stringify({ name: "b",
+dependencies: { a: "1" } }));
 
         expect(detectNativeDependencies(scratch, { a: "^1.0.0" })).toEqual([]);
     });
@@ -331,8 +339,12 @@ describe("folding a frontend into the backend bundle", () => {
     it("copies the assets in and records them in the manifest", () => {
         // The runtime finds the site through `entry.static`, not by guessing a
         // directory name — so copying without recording serves nothing.
-        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: { config: "config" } });
-        const assetsDir = assets({ "index.html": "<html>", "assets/app.js": "//", "assets/logo.svg": "<svg>" });
+        const bundleDir = bundleWith({ bundleFormat: 1,
+app: "backend",
+entry: { config: "config" } });
+        const assetsDir = assets({ "index.html": "<html>",
+"assets/app.js": "//",
+"assets/logo.svg": "<svg>" });
 
         const { fileCount } = fold(bundleDir, assetsDir);
 
@@ -351,24 +363,34 @@ spa: true }]);
         // `entry.static` used to be one string and folding overwrote it, so the
         // second app silently replaced the first — in the tree AND the manifest
         // — and the bundle deployed looking complete.
-        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
-        fold(bundleDir, assets({ "index.html": "site" }), { appName: "site", path: "/" });
-        fold(bundleDir, assets({ "index.html": "admin" }), { appName: "admin", path: "/admin" });
+        const bundleDir = bundleWith({ bundleFormat: 1,
+app: "backend",
+entry: {} });
+        fold(bundleDir, assets({ "index.html": "site" }), { appName: "site",
+path: "/" });
+        fold(bundleDir, assets({ "index.html": "admin" }), { appName: "admin",
+path: "/admin" });
 
         expect(fs.readFileSync(path.join(bundleDir, "static", "site", "index.html"), "utf8")).toBe("site");
         expect(fs.readFileSync(path.join(bundleDir, "static", "admin", "index.html"), "utf8")).toBe("admin");
 
         const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
         expect(manifest.entry.static).toEqual([
-            { path: "/", dir: "static/site", spa: true },
-            { path: "/admin", dir: "static/admin", spa: true }
+            { path: "/",
+dir: "static/site",
+spa: true },
+            { path: "/admin",
+dir: "static/admin",
+spa: true }
         ]);
     });
 
     it("replaces a previous fold of the SAME app rather than merging into it", () => {
         // A stale asset from the last build served alongside the new ones is a
         // cache bug that survives a deploy, which is the worst kind.
-        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
+        const bundleDir = bundleWith({ bundleFormat: 1,
+app: "backend",
+entry: {} });
         fold(bundleDir, assets({ "old.html": "old" }));
         fold(bundleDir, assets({ "new.html": "new" }));
 
@@ -380,16 +402,24 @@ spa: true }]);
     });
 
     it("does not disturb a sibling app when one is rebuilt", () => {
-        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
-        fold(bundleDir, assets({ "index.html": "admin" }), { appName: "admin", path: "/admin" });
-        fold(bundleDir, assets({ "index.html": "site v2" }), { appName: "site", path: "/" });
+        const bundleDir = bundleWith({ bundleFormat: 1,
+app: "backend",
+entry: {} });
+        fold(bundleDir, assets({ "index.html": "admin" }), { appName: "admin",
+path: "/admin" });
+        fold(bundleDir, assets({ "index.html": "site v2" }), { appName: "site",
+path: "/" });
 
         expect(fs.readFileSync(path.join(bundleDir, "static", "admin", "index.html"), "utf8")).toBe("admin");
     });
 
     it("records spa: false so a static site keeps its 404s", () => {
-        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
-        fold(bundleDir, assets({ "index.html": "site" }), { appName: "docs", path: "/docs", spa: false });
+        const bundleDir = bundleWith({ bundleFormat: 1,
+app: "backend",
+entry: {} });
+        fold(bundleDir, assets({ "index.html": "site" }), { appName: "docs",
+path: "/docs",
+spa: false });
 
         const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8"));
         expect(manifest.entry.static[0].spa).toBe(false);
@@ -402,7 +432,9 @@ spa: true }]);
     });
 
     it("refuses assets that do not exist, rather than shipping an empty site", () => {
-        const bundleDir = bundleWith({ bundleFormat: 1, app: "backend", entry: {} });
+        const bundleDir = bundleWith({ bundleFormat: 1,
+app: "backend",
+entry: {} });
         expect(() => fold(bundleDir, path.join(bundleDir, "nope")))
             .toThrow(/No built assets/i);
     });
@@ -471,7 +503,8 @@ describe("detectFrameworkDepDrift", () => {
 
     it("ignores packages that are not @rebasepro", () => {
         write("package.json", JSON.stringify({
-            dependencies: { zod: "^3.0.0", hono: "1.0.0" }
+            dependencies: { zod: "^3.0.0",
+hono: "1.0.0" }
         }));
         expect(detectFrameworkDepDrift(scratch, "0.12.0").behind).toEqual([]);
     });

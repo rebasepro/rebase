@@ -197,13 +197,17 @@ interface DbInfoResponse {
  * unavailable, never a placeholder.
  */
 async function dbInfo(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--reveal": Boolean, "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const args = arg({ "--reveal": Boolean,
+"--project": String,
+"-p": "--project" }, { argv: rawArgs.slice(2),
+permissive: true });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
 
     try {
-        const info = await client.functions.invoke<DbInfoResponse>("db-info", undefined, { method: "GET", path: projectId });
+        const info = await client.functions.invoke<DbInfoResponse>("db-info", undefined, { method: "GET",
+path: projectId });
 
         let password: string | undefined;
         let connectionString: string | undefined;
@@ -254,7 +258,8 @@ async function dbInfo(rawArgs: string[]): Promise<void> {
                 portForward: info.portForward,
                 unavailableReason: info.unavailableReason,
                 // Only present when explicitly revealed.
-                ...(args["--reveal"] ? { password, connectionString } : {})
+                ...(args["--reveal"] ? { password,
+connectionString } : {})
             }
         );
     } catch (e) {
@@ -271,7 +276,9 @@ async function backupCommand(rawArgs: string[]): Promise<void> {
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
 
-    const args = arg({ "--yes": Boolean, "-y": "--yes" }, { argv: rawArgs.slice(2), permissive: true });
+    const args = arg({ "--yes": Boolean,
+"-y": "--yes" }, { argv: rawArgs.slice(2),
+permissive: true });
 
     try {
         if (action === "create") {
@@ -284,7 +291,8 @@ type: "manual" },
             if (!res.success) fail(res.error || "Backup failed.");
             emit(
                 () => success(`Backup created: ${res.backup?.filename ?? "(unknown)"}`),
-                { success: true, backup: res.backup ?? null }
+                { success: true,
+backup: res.backup ?? null }
             );
             return;
         }
@@ -303,7 +311,8 @@ filename },
                 { path: "restore" }
             );
             if (!res.success) fail(res.error || "Restore failed.");
-            emit(() => success(res.message || "Restore complete"), { success: true, message: res.message ?? null });
+            emit(() => success(res.message || "Restore complete"), { success: true,
+message: res.message ?? null });
             return;
         }
 
@@ -355,7 +364,9 @@ filename },
                     console.log(chalk.gray("  Short-lived signed URL — fetch it with curl/wget."));
                     console.log("");
                 },
-                { name: res.name, size: res.size, url: res.url }
+                { name: res.name,
+size: res.size,
+url: res.url }
             );
             return;
         }
@@ -383,7 +394,8 @@ path: `list/${projectId}` }
                 }
                 console.log("");
             },
-            { projectId, backups: res.backups ?? [] }
+            { projectId,
+backups: res.backups ?? [] }
         );
     } catch (e) {
         reportError(e, "Backup operation failed");
@@ -405,8 +417,13 @@ path: `list/${projectId}` }
  */
 async function pitrCommand(rawArgs: string[]): Promise<void> {
     const args = arg(
-        { "--target": String, "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" },
-        { argv: rawArgs.slice(2), permissive: true }
+        { "--target": String,
+"--yes": Boolean,
+"-y": "--yes",
+"--project": String,
+"-p": "--project" },
+        { argv: rawArgs.slice(2),
+permissive: true }
     );
     const action = cloudPositionals(rawArgs).slice(2)[0] || "status";
     const { client } = await requireClient(rawArgs);
@@ -448,7 +465,9 @@ async function pitrCommand(rawArgs: string[]): Promise<void> {
                 "backup",
                 // acknowledgeNoCutover is required by the server: the caller must
                 // affirm this only STAGES a copy. The confirm prompt above says so.
-                { projectId, targetTime: target, acknowledgeNoCutover: true },
+                { projectId,
+targetTime: target,
+acknowledgeNoCutover: true },
                 { path: "pitr-restore" }
             );
             emit(

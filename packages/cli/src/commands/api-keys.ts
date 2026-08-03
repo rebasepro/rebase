@@ -202,7 +202,8 @@ async function createKey(rawArgs: string[]): Promise<void> {
             return; // unreachable but satisfies TS
         }
     } else if (args["--full-access"]) {
-        permissions = [{ collection: "*", operations: ["read", "write", "delete"] }];
+        permissions = [{ collection: "*",
+operations: ["read", "write", "delete"] }];
     } else {
         // No silent full-access default: a "scoped keys" feature should not
         // hand out read/write/delete on every collection when the flag is
@@ -220,7 +221,10 @@ async function createKey(rawArgs: string[]): Promise<void> {
     let expires_at: string | null = null;
     const expiresFlag = args["--expires"];
     if (expiresFlag) {
-        const days: Record<string, number> = { "7d": 7, "30d": 30, "90d": 90, "1y": 365 };
+        const days: Record<string, number> = { "7d": 7,
+"30d": 30,
+"90d": 90,
+"1y": 365 };
         if (days[expiresFlag]) {
             expires_at = new Date(Date.now() + days[expiresFlag] * 86400000).toISOString();
         } else {

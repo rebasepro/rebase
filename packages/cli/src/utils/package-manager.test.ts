@@ -246,7 +246,9 @@ describe("type contracts", () => {
 describe("pnpmAvailabilityFromProbe", () => {
     it("reports absent when the binary is not on PATH", () => {
         expect(pnpmAvailabilityFromProbe({
-            status: null, signal: null, error: Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" })
+            status: null,
+signal: null,
+error: Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" })
         })).toBe(false);
     });
 
@@ -256,33 +258,44 @@ describe("pnpmAvailabilityFromProbe", () => {
         // missing. Calling it missing silently scaffolded npm projects for
         // developers who had pnpm.
         expect(pnpmAvailabilityFromProbe({
-            status: null, signal: "SIGTERM", error: Object.assign(new Error("ETIMEDOUT"), { code: "ETIMEDOUT" })
+            status: null,
+signal: "SIGTERM",
+error: Object.assign(new Error("ETIMEDOUT"), { code: "ETIMEDOUT" })
         })).toBe(true);
     });
 
     it("reports available when killed by a signal even without an error code", () => {
-        expect(pnpmAvailabilityFromProbe({ status: null, signal: "SIGKILL" })).toBe(true);
+        expect(pnpmAvailabilityFromProbe({ status: null,
+signal: "SIGKILL" })).toBe(true);
     });
 
     it("reports available on a clean exit", () => {
-        expect(pnpmAvailabilityFromProbe({ status: 0, signal: null })).toBe(true);
+        expect(pnpmAvailabilityFromProbe({ status: 0,
+signal: null })).toBe(true);
     });
 
     it("reports absent on a non-zero exit — installed but broken is not usable", () => {
-        expect(pnpmAvailabilityFromProbe({ status: 3, signal: null })).toBe(false);
+        expect(pnpmAvailabilityFromProbe({ status: 3,
+signal: null })).toBe(false);
     });
 
     it("reports absent for an unrecognised spawn error rather than guessing", () => {
         expect(pnpmAvailabilityFromProbe({
-            status: null, signal: null, error: Object.assign(new Error("EACCES"), { code: "EACCES" })
+            status: null,
+signal: null,
+error: Object.assign(new Error("EACCES"), { code: "EACCES" })
         })).toBe(false);
     });
 
     it("does not confuse a timeout with a missing binary", () => {
         // The precise conflation the old `status === 0` check made: both cases
         // have status null, and it answered false to both.
-        const timedOut = { status: null, signal: "SIGTERM" as const, error: Object.assign(new Error(""), { code: "ETIMEDOUT" }) };
-        const missing = { status: null, signal: null, error: Object.assign(new Error(""), { code: "ENOENT" }) };
+        const timedOut = { status: null,
+signal: "SIGTERM" as const,
+error: Object.assign(new Error(""), { code: "ETIMEDOUT" }) };
+        const missing = { status: null,
+signal: null,
+error: Object.assign(new Error(""), { code: "ENOENT" }) };
         expect(pnpmAvailabilityFromProbe(timedOut)).not.toBe(pnpmAvailabilityFromProbe(missing));
     });
 });

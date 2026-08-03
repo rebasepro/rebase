@@ -732,7 +732,9 @@ export function detectFrameworkDepDrift(projectRoot: string, cliVersion: string)
                 for (const [name, range] of Object.entries(block ?? {})) {
                     if (!name.startsWith("@rebasepro/")) continue;
                     if (typeof range !== "string") continue;
-                    found.push({ name, range, file: relative });
+                    found.push({ name,
+range,
+file: relative });
                 }
             }
         } catch {
@@ -751,7 +753,8 @@ export function detectFrameworkDepDrift(projectRoot: string, cliVersion: string)
             .map(b => b.join("."))
     );
 
-    return { behind, disagreeing: bounds.size > 1 ? [...bounds].sort() : [] };
+    return { behind,
+disagreeing: bounds.size > 1 ? [...bounds].sort() : [] };
 }
 
 /**
@@ -988,7 +991,7 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
         console.log(chalk.yellow(`  ⚠ ${unusedEntry} is not the bundle's entry point — it is not compiled or shipped.`));
         console.log(chalk.dim(`      The runtime boots the bundle itself and mounts ${compiled}.`));
         console.log(chalk.dim(`      Routes defined there will not exist once deployed: move them to ${paths.functions}/,`));
-        console.log(chalk.dim(`      or run \`rebase eject\` to make this file the entrypoint and own the image.`));
+        console.log(chalk.dim("      or run `rebase eject` to make this file the entrypoint and own the image."));
     }
 
     log(options, chalk.dim(`  compiling ${includes.length} source group(s) → ${path.relative(projectRoot, outDir)}/`));
@@ -1208,7 +1211,8 @@ export function foldStaticIntoBundle(options: {
     // manifest — and the bundle deployed looking complete.
     const dir = path.posix.join("static", appName);
     const staticOut = path.join(bundleDir, "static", appName);
-    fs.rmSync(staticOut, { recursive: true, force: true });
+    fs.rmSync(staticOut, { recursive: true,
+force: true });
     fs.mkdirSync(staticOut, { recursive: true });
     fs.cpSync(assetsDir, staticOut, { recursive: true });
 
@@ -1302,11 +1306,16 @@ spa: options.spa ?? true }] },
     // An empty package.json keeps the runtime's boot-time install a clean no-op.
     fs.writeFileSync(
         path.join(outDir, "package.json"),
-        `${JSON.stringify({ name: "rebase-bundle", private: true, type: "module", dependencies: {} }, null, 2)}\n`,
+        `${JSON.stringify({ name: "rebase-bundle",
+private: true,
+type: "module",
+dependencies: {} }, null, 2)}\n`,
         "utf8"
     );
 
-    return { outDir, manifest, fileCount };
+    return { outDir,
+manifest,
+fileCount };
 }
 
 /**

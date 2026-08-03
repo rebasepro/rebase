@@ -554,8 +554,10 @@ async function createProject(options: InitOptions) {
                 await execa("git", ["config", "user.email"], { cwd: options.targetDirectory });
             } catch {
                 identity = {
-                    GIT_AUTHOR_NAME: "Rebase", GIT_AUTHOR_EMAIL: "noreply@rebase.pro",
-                    GIT_COMMITTER_NAME: "Rebase", GIT_COMMITTER_EMAIL: "noreply@rebase.pro"
+                    GIT_AUTHOR_NAME: "Rebase",
+GIT_AUTHOR_EMAIL: "noreply@rebase.pro",
+                    GIT_COMMITTER_NAME: "Rebase",
+GIT_COMMITTER_EMAIL: "noreply@rebase.pro"
                 };
             }
             await execa("git", ["commit", "-m", "Initial commit from Rebase"], {
@@ -757,11 +759,13 @@ async function createProject(options: InitOptions) {
 async function applyHeadless(targetDirectory: string, headless: boolean): Promise<void> {
     if (!headless) return;
 
-    fs.rmSync(path.join(targetDirectory, "frontend"), { recursive: true, force: true });
+    fs.rmSync(path.join(targetDirectory, "frontend"), { recursive: true,
+force: true });
     // Collections only. `rebase build` reads the absence of this directory as
     // "introspect from the database", and the overlay replaces config/index.ts
     // with one that exports the storage hook alone.
-    fs.rmSync(path.join(targetDirectory, "config", "collections"), { recursive: true, force: true });
+    fs.rmSync(path.join(targetDirectory, "config", "collections"), { recursive: true,
+force: true });
     for (const stray of ["admin.d.ts", "frontend-assets.d.ts"]) {
         fs.rmSync(path.join(targetDirectory, "config", stray), { force: true });
     }
@@ -922,11 +926,11 @@ async function replacePlaceholders(options: InitOptions) {
             `These packages have no ${cliVersion} release, so the newest thing on the\n` +
             `registry is a prerelease:\n\n${lines}\n\n` +
             `Scaffolding would pin those alongside the ${cliVersion} packages and produce\n` +
-            `an app that cannot install or run. That is a release gap in Rebase itself —\n` +
-            `not a problem with your machine, your network, or your package manager.\n\n` +
-            `Stopped before writing dependency versions or installing anything. The\n` +
+            "an app that cannot install or run. That is a release gap in Rebase itself —\n" +
+            "not a problem with your machine, your network, or your package manager.\n\n" +
+            "Stopped before writing dependency versions or installing anything. The\n" +
             `project directory ${path.basename(options.targetDirectory)}/ was created and is safe to delete.\n` +
-            `Please report this with the list above.`
+            "Please report this with the list above."
         );
     }
 

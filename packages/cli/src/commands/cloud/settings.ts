@@ -105,7 +105,8 @@ async function setSettings(rawArgs: string[]): Promise<void> {
             "--project": String,
             "-p": "--project"
         },
-        { argv: rawArgs.slice(2), permissive: true }
+        { argv: rawArgs.slice(2),
+permissive: true }
     );
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -134,7 +135,9 @@ async function setSettings(rawArgs: string[]): Promise<void> {
         await client.data.collection("projects").update(projectId, patch);
         emit(
             () => success(`Updated ${Object.keys(patch).join(", ")} for project ${projectRef}`),
-            { success: true, projectId, updated: patch }
+            { success: true,
+projectId,
+updated: patch }
         );
     } catch (e) {
         reportError(e, "Failed to update settings");

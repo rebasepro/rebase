@@ -126,7 +126,11 @@ async function listExtensions(rawArgs: string[]): Promise<void> {
                 }
                 console.log("");
             },
-            { projectId, databaseType: res.databaseType, reason: res.reason, source: res.source, extensions: res.extensions }
+            { projectId,
+databaseType: res.databaseType,
+reason: res.reason,
+source: res.source,
+extensions: res.extensions }
         );
     } catch (e) {
         reportError(e, "Failed to list extensions");
@@ -134,7 +138,11 @@ async function listExtensions(rawArgs: string[]): Promise<void> {
 }
 
 async function enableExtension(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const args = arg({ "--yes": Boolean,
+"-y": "--yes",
+"--project": String,
+"-p": "--project" }, { argv: rawArgs.slice(2),
+permissive: true });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -161,7 +169,8 @@ async function enableExtension(rawArgs: string[]): Promise<void> {
             });
         }
 
-        const res = await client.functions.invoke<EnableResult>("extensions", { projectId, extensionName: name }, { path: "enable" });
+        const res = await client.functions.invoke<EnableResult>("extensions", { projectId,
+extensionName: name }, { path: "enable" });
         emit(
             () => {
                 if (res.pending) {
@@ -190,7 +199,11 @@ async function enableExtension(rawArgs: string[]): Promise<void> {
 }
 
 async function disableExtension(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const args = arg({ "--yes": Boolean,
+"-y": "--yes",
+"--project": String,
+"-p": "--project" }, { argv: rawArgs.slice(2),
+permissive: true });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -215,7 +228,8 @@ async function disableExtension(rawArgs: string[]): Promise<void> {
             });
         }
 
-        const res = await client.functions.invoke<DisableResult>("extensions", { projectId, extensionName: name }, { path: "disable" });
+        const res = await client.functions.invoke<DisableResult>("extensions", { projectId,
+extensionName: name }, { path: "disable" });
         emit(
             () => success(res.message || `Disabled ${name}`),
             {

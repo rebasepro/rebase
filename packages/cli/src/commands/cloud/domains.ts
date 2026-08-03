@@ -59,7 +59,8 @@ interface VerifyResult extends DomainSetup {
 }
 
 async function fetchDomainSetup(client: CloudClient, projectId: string): Promise<DomainSetup> {
-    return client.functions.invoke<DomainSetup>("verify-domain", undefined, { method: "GET", path: projectId });
+    return client.functions.invoke<DomainSetup>("verify-domain", undefined, { method: "GET",
+path: projectId });
 }
 
 function printRecords(setup: DomainSetup): void {
@@ -125,7 +126,8 @@ async function listDomains(rawArgs: string[]): Promise<void> {
                 console.log("");
                 if (setup.status !== "verified") printRecords(setup);
             },
-            { projectId, ...setup }
+            { projectId,
+...setup }
         );
     } catch (e) {
         reportError(e, "Failed to load custom domain");
@@ -151,7 +153,9 @@ async function addDomain(rawArgs: string[]): Promise<void> {
                 console.log(chalk.gray("  Publish the records above, then run `rebase cloud domains verify`."));
                 console.log("");
             },
-            { success: true, projectId, ...setup }
+            { success: true,
+projectId,
+...setup }
         );
     } catch (e) {
         reportError(e, "Failed to register domain");
@@ -186,7 +190,12 @@ async function verifyDomains(rawArgs: string[]): Promise<void> {
                     printRecords(res);
                 }
             },
-            { projectId, verified: res.verified, status: res.status, domain: res.domain, checks: res.checks, instructions: res.instructions }
+            { projectId,
+verified: res.verified,
+status: res.status,
+domain: res.domain,
+checks: res.checks,
+instructions: res.instructions }
         );
         if (!res.verified) process.exit(1);
     } catch (e) {
@@ -195,7 +204,11 @@ async function verifyDomains(rawArgs: string[]): Promise<void> {
 }
 
 async function removeDomain(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const args = arg({ "--yes": Boolean,
+"-y": "--yes",
+"--project": String,
+"-p": "--project" }, { argv: rawArgs.slice(2),
+permissive: true });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -209,7 +222,8 @@ async function removeDomain(rawArgs: string[]): Promise<void> {
         await client.data.collection("projects").update(projectId, { customDomain: "" });
         emit(
             () => success(`Removed the custom domain from project ${projectRef}`),
-            { success: true, projectId }
+            { success: true,
+projectId }
         );
     } catch (e) {
         reportError(e, "Failed to remove domain");

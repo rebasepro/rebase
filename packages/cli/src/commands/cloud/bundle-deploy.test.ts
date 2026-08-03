@@ -12,19 +12,24 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    fs.rmSync(scratch, { recursive: true, force: true });
+    fs.rmSync(scratch, { recursive: true,
+force: true });
 });
 
 function manifest(overrides: Partial<RebaseBundleManifest> = {}): RebaseBundleManifest {
     return {
         bundleFormat: 2,
-        runtime: { range: "^1", builtAgainst: "1.4.2", contract: 1 },
+        runtime: { range: "^1",
+builtAgainst: "1.4.2",
+contract: 1 },
         schemaVersion: "v1:abc",
         app: "backend",
         kind: "backend",
         hooks: { native: false },
         deps: { declared: {} },
-        build: { cli: "0.11.0", node: "22", createdAt: "2026-07-24T00:00:00Z" },
+        build: { cli: "0.11.0",
+node: "22",
+createdAt: "2026-07-24T00:00:00Z" },
         ...overrides
     } as RebaseBundleManifest;
 }
@@ -53,7 +58,9 @@ describe("readBundleManifest", () => {
 
 describe("bundleDeployBody", () => {
     it("carries the manifest so the control plane can validate intake fast", () => {
-        const body = bundleDeployBody({ projectId: "p1", bundleId: "b1", manifest: manifest() });
+        const body = bundleDeployBody({ projectId: "p1",
+bundleId: "b1",
+manifest: manifest() });
         expect(body.projectId).toBe("p1");
         expect(body.bundleId).toBe("b1");
         expect((body.bundleManifest as RebaseBundleManifest).schemaVersion).toBe("v1:abc");
@@ -61,12 +68,20 @@ describe("bundleDeployBody", () => {
     });
 
     it("defaults the app to the manifest's app, overridable", () => {
-        expect(bundleDeployBody({ projectId: "p", bundleId: "b", manifest: manifest({ app: "api" }) }).app).toBe("api");
-        expect(bundleDeployBody({ projectId: "p", bundleId: "b", manifest: manifest(), app: "web" }).app).toBe("web");
+        expect(bundleDeployBody({ projectId: "p",
+bundleId: "b",
+manifest: manifest({ app: "api" }) }).app).toBe("api");
+        expect(bundleDeployBody({ projectId: "p",
+bundleId: "b",
+manifest: manifest(),
+app: "web" }).app).toBe("web");
     });
 
     it("passes the framework version and an optional message", () => {
-        const body = bundleDeployBody({ projectId: "p", bundleId: "b", manifest: manifest(), message: "ship it" });
+        const body = bundleDeployBody({ projectId: "p",
+bundleId: "b",
+manifest: manifest(),
+message: "ship it" });
         expect(body.frameworkVersion).toBe("1.4.2");
         expect(body.message).toBe("ship it");
     });
@@ -111,9 +126,12 @@ describe("declaredAppsFrom", () => {
                 site: { type: "static" }
             }
         })).toEqual([
-            { name: "backend", type: "backend" },
-            { name: "admin", type: "static" },
-            { name: "site", type: "static" }
+            { name: "backend",
+type: "backend" },
+            { name: "admin",
+type: "static" },
+            { name: "site",
+type: "static" }
         ]);
     });
 

@@ -35,7 +35,8 @@ describe("projectHost", () => {
         // The server reads the project's cluster (admin-only under RLS, so the
         // CLI cannot) and resolves the host the ingress actually serves.
         expect(projectHost(
-            { subdomain: "acme", host: "acme.europe-west1.rebase.website" },
+            { subdomain: "acme",
+host: "acme.europe-west1.rebase.website" },
             "rebase.website"
         )).toBe("acme.europe-west1.rebase.website");
     });

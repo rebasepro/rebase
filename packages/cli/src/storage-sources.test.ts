@@ -12,10 +12,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-    fs.rmSync(scratch, { recursive: true, force: true });
+    fs.rmSync(scratch, { recursive: true,
+force: true });
 });
 
-const base = { rebase: "^1", apps: { backend: { type: "backend", runtime: "managed" } } };
+const base = { rebase: "^1",
+apps: { backend: { type: "backend",
+runtime: "managed" } } };
 
 describe("rebase.json storage block", () => {
     it("is optional — omitting it means one default source", () => {
@@ -29,20 +32,25 @@ describe("rebase.json storage block", () => {
             ...base,
             storage: {
                 "(default)": { engine: "s3" },
-                media: { engine: "s3", label: "Media" },
-                avatars: { engine: "firebase", transport: "direct" }
+                media: { engine: "s3",
+label: "Media" },
+                avatars: { engine: "firebase",
+transport: "direct" }
             }
         });
         expect(issues).toEqual([]);
         expect(manifest?.storage).toEqual({
             "(default)": { engine: "s3" },
-            media: { engine: "s3", label: "Media" },
-            avatars: { engine: "firebase", transport: "direct" }
+            media: { engine: "s3",
+label: "Media" },
+            avatars: { engine: "firebase",
+transport: "direct" }
         });
     });
 
     it("requires an engine", () => {
-        const { issues } = validateManifest({ ...base, storage: { media: { label: "Media" } } });
+        const { issues } = validateManifest({ ...base,
+storage: { media: { label: "Media" } } });
         expect(issues).toHaveLength(1);
         expect(issues[0].path).toBe("storage.media.engine");
     });
@@ -50,7 +58,8 @@ describe("rebase.json storage block", () => {
     it("rejects an unknown transport", () => {
         const { issues } = validateManifest({
             ...base,
-            storage: { media: { engine: "s3", transport: "sideways" } }
+            storage: { media: { engine: "s3",
+transport: "sideways" } }
         });
         expect(issues[0].path).toBe("storage.media.transport");
     });
@@ -60,19 +69,22 @@ describe("rebase.json storage block", () => {
         // silently reads `media-cdn`'s bucket and credentials.
         const { issues } = validateManifest({
             ...base,
-            storage: { "media-cdn": { engine: "s3" }, media_cdn: { engine: "s3" } }
+            storage: { "media-cdn": { engine: "s3" },
+media_cdn: { engine: "s3" } }
         });
         expect(issues).toHaveLength(1);
         expect(issues[0].message).toMatch(/same environment variable suffix/);
     });
 
     it("rejects a key that cannot become a variable name", () => {
-        const { issues } = validateManifest({ ...base, storage: { "---": { engine: "s3" } } });
+        const { issues } = validateManifest({ ...base,
+storage: { "---": { engine: "s3" } } });
         expect(issues[0].path).toBe("storage.---");
     });
 
     it("rejects a non-object storage block", () => {
-        const { issues } = validateManifest({ ...base, storage: ["media"] });
+        const { issues } = validateManifest({ ...base,
+storage: ["media"] });
         expect(issues[0].path).toBe("storage");
     });
 });

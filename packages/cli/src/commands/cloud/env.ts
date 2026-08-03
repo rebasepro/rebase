@@ -155,10 +155,12 @@ export function parseEnvAssignment(operands: string[]): { key: string; value: st
     if (!first) return null;
     const eq = first.indexOf("=");
     if (eq > 0) {
-        return { key: first.slice(0, eq).trim(), value: first.slice(eq + 1) };
+        return { key: first.slice(0, eq).trim(),
+value: first.slice(eq + 1) };
     }
     // `set KEY VALUE` form — VALUE is the next operand (may be absent ⇒ empty).
-    return { key: first.trim(), value: operands[1] ?? "" };
+    return { key: first.trim(),
+value: operands[1] ?? "" };
 }
 
 /**
@@ -185,8 +187,12 @@ export function buildTimeEnvPrefix(key: string): string | undefined {
 
 async function setEnv(rawArgs: string[]): Promise<void> {
     const args = arg(
-        { "--secret": Boolean, "--force": Boolean, "--project": String, "-p": "--project" },
-        { argv: rawArgs.slice(2), permissive: true }
+        { "--secret": Boolean,
+"--force": Boolean,
+"--project": String,
+"-p": "--project" },
+        { argv: rawArgs.slice(2),
+permissive: true }
     );
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
@@ -207,14 +213,15 @@ async function setEnv(rawArgs: string[]): Promise<void> {
     if (buildTimePrefix && !args["--force"]) {
         fail(
             `${parsed!.key} is read by your bundler at BUILD time, and project variables are applied at ` +
-                `rollout — after the image is built. Setting it here would not reach the bundle.`,
+                "rollout — after the image is built. Setting it here would not reach the bundle.",
             `Put ${buildTimePrefix}* variables in the source you deploy (a committed .env, or your build ` +
-                `config), then \`rebase cloud deploy\`. Pass --force if your build genuinely reads this at run time.`,
+                "config), then `rebase cloud deploy`. Pass --force if your build genuinely reads this at run time.",
             "build_time_variable"
         );
     }
 
-    const body: { key: string; value: string; secret?: boolean } = { key: parsed!.key, value: parsed!.value };
+    const body: { key: string; value: string; secret?: boolean } = { key: parsed!.key,
+value: parsed!.value };
     if (args["--secret"]) body.secret = true;
 
     try {
@@ -260,7 +267,9 @@ async function unsetEnv(rawArgs: string[]): Promise<void> {
                 console.log(`  ${chalk.yellow("Pending redeploy")} — run \`rebase cloud deploy\` to apply it.`);
                 console.log("");
             },
-            { success: true, key, pendingRedeploy: res.pendingRedeploy }
+            { success: true,
+key,
+pendingRedeploy: res.pendingRedeploy }
         );
     } catch (e) {
         reportError(e, "Failed to remove environment variable");
@@ -296,7 +305,8 @@ async function revealEnv(rawArgs: string[]): Promise<void> {
     try {
         const res = await client.functions.invoke<{ key: string; value: string }>(
             "env-vars",
-            { projectId, key },
+            { projectId,
+key },
             { path: "reveal" }
         );
         emit(
@@ -305,7 +315,8 @@ async function revealEnv(rawArgs: string[]): Promise<void> {
                 console.log(`  ${chalk.bold(res.key)}=${res.value}`);
                 console.log("");
             },
-            { key: res.key, value: res.value }
+            { key: res.key,
+value: res.value }
         );
     } catch (e) {
         reportError(e, "Failed to reveal environment variable");
@@ -313,7 +324,12 @@ async function revealEnv(rawArgs: string[]): Promise<void> {
 }
 
 async function pullEnv(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--out": String, "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const args = arg({ "--out": String,
+"--yes": Boolean,
+"-y": "--yes",
+"--project": String,
+"-p": "--project" }, { argv: rawArgs.slice(2),
+permissive: true });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -323,7 +339,8 @@ async function pullEnv(rawArgs: string[]): Promise<void> {
         const list = await fetchEnvVars(client, projectId);
 
         if (fs.existsSync(outPath)) {
-            await confirmDestructive({ yes: Boolean(args["--yes"]), prompt: `Overwrite ${outPath}?` });
+            await confirmDestructive({ yes: Boolean(args["--yes"]),
+prompt: `Overwrite ${outPath}?` });
         }
 
         // Only non-secret, value-set variables can be written — a secret var is
@@ -333,7 +350,8 @@ async function pullEnv(rawArgs: string[]): Promise<void> {
         const lines: string[] = [];
         for (const v of list.vars) {
             if (v.secret) {
-                skipped.push({ key: v.key, reason: "secret (write-only)" });
+                skipped.push({ key: v.key,
+reason: "secret (write-only)" });
                 continue;
             }
             if (!v.valueSet) {
@@ -343,7 +361,8 @@ async function pullEnv(rawArgs: string[]): Promise<void> {
             }
             const revealed = await client.functions.invoke<{ key: string; value: string }>(
                 "env-vars",
-                { projectId, key: v.key },
+                { projectId,
+key: v.key },
                 { path: "reveal" }
             );
             // Quote values that contain whitespace or a hash so a dotenv reader
@@ -363,7 +382,10 @@ async function pullEnv(rawArgs: string[]): Promise<void> {
                     console.log("");
                 }
             },
-            { success: true, path: outPath, written, skipped }
+            { success: true,
+path: outPath,
+written,
+skipped }
         );
     } catch (e) {
         reportError(e, "Failed to pull environment variables");

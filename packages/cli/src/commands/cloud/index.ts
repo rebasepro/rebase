@@ -54,7 +54,8 @@ import { requireProjectRef, initOutputMode, GLOBAL_CLOUD_FLAGS } from "./context
  * as the real dispatcher was broken.
  */
 export function positionals(rawArgs: string[]): string[] {
-    const rest = arg(GLOBAL_CLOUD_FLAGS, { argv: rawArgs.slice(3), permissive: true })._;
+    const rest = arg(GLOBAL_CLOUD_FLAGS, { argv: rawArgs.slice(3),
+permissive: true })._;
     let i = 0;
     while (i < rest.length && rest[i].startsWith("-")) i++;
     return rest.slice(i);

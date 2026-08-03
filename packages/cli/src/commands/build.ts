@@ -69,7 +69,8 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
             "--help": Boolean,
             "-h": "--help"
         },
-        { argv: rawArgs.slice(3), permissive: true }
+        { argv: rawArgs.slice(3),
+permissive: true }
     );
 
     if (args["--help"]) {

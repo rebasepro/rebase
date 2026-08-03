@@ -503,7 +503,8 @@ let JSON_MODE = false;
  * (handy for tests, which otherwise leave it at its `false` default).
  */
 export function initOutputMode(rawArgs: string[]): boolean {
-    const parsed = arg({ "--json": Boolean }, { argv: rawArgs.slice(2), permissive: true });
+    const parsed = arg({ "--json": Boolean }, { argv: rawArgs.slice(2),
+permissive: true });
     JSON_MODE =
         Boolean(parsed["--json"]) ||
         process.env.REBASE_JSON === "1" ||
@@ -588,7 +589,9 @@ export function warn(message: string, hint?: string): void {
 /** Print an error (+ optional hint) and exit non-zero. Never returns. */
 export function fail(message: string, hint?: string, code?: string): never {
     if (JSON_MODE) {
-        printJson({ error: { message: stripAnsi(message), code: code ?? null, hint: hint ? stripAnsi(hint) : undefined } });
+        printJson({ error: { message: stripAnsi(message),
+code: code ?? null,
+hint: hint ? stripAnsi(hint) : undefined } });
         process.exit(1);
     }
     console.error("");
@@ -616,7 +619,10 @@ export async function confirmDestructive(opts: { yes: boolean; prompt: string })
         );
     }
     const { confirmed } = (await inquirer.prompt([
-        { type: "confirm", name: "confirmed", default: false, message: opts.prompt }
+        { type: "confirm",
+name: "confirmed",
+default: false,
+message: opts.prompt }
     ] as unknown as Parameters<typeof inquirer.prompt>[0])) as { confirmed: boolean };
     if (!confirmed) {
         console.log(chalk.gray("  Aborted."));

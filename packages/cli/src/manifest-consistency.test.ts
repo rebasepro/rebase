@@ -28,9 +28,12 @@ const repoRoot = path.resolve(here, "../../..");
 
 /** Every committed `rebase.json`, by the directory that owns it. */
 const MANIFESTS = [
-    { name: "app (reference project)", dir: path.join(repoRoot, "app") },
-    { name: "init template", dir: path.join(repoRoot, "packages/cli/templates/template") },
-    { name: "headless overlay", dir: path.join(repoRoot, "packages/cli/templates/overlays/baas") }
+    { name: "app (reference project)",
+dir: path.join(repoRoot, "app") },
+    { name: "init template",
+dir: path.join(repoRoot, "packages/cli/templates/template") },
+    { name: "headless overlay",
+dir: path.join(repoRoot, "packages/cli/templates/overlays/baas") }
 ];
 
 interface Backend {

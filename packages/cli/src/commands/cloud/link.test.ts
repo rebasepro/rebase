@@ -74,11 +74,11 @@ describe("interactive prompts use a type inquirer still registers", () => {
 
     it("actually detects a bad prompt, so the guard cannot pass vacuously", () => {
         // Without this, a regex that matched nothing would report a clean repo.
-        const bad = `inquirer.prompt([{ type: "list", name: "picked", message: "Pick:" }])`;
+        const bad = "inquirer.prompt([{ type: \"list\", name: \"picked\", message: \"Pick:\" }])";
         expect(promptTypesIn(bad)).toEqual(["list"]);
-        const good = `inquirer.prompt([{ type: "select", name: "picked", message: "Pick:" }])`;
+        const good = "inquirer.prompt([{ type: \"select\", name: \"picked\", message: \"Pick:\" }])";
         expect(promptTypesIn(good)).toEqual(["select"]);
         // And it ignores the unrelated `type:` fields this codebase is full of.
-        expect(promptTypesIn(`{ type: "string", columnType: "text" }`)).toEqual([]);
+        expect(promptTypesIn("{ type: \"string\", columnType: \"text\" }")).toEqual([]);
     });
 });

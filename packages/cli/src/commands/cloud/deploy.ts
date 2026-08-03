@@ -72,7 +72,8 @@ function sleep(ms: number): Promise<void> {
 function run(cmd: string, cmdArgs: string[], cwd?: string, env?: NodeJS.ProcessEnv): Promise<void> {
     return new Promise((resolve, reject) => {
         const child = spawn(cmd, cmdArgs, { cwd,
-env: env ? { ...process.env, ...env } : undefined,
+env: env ? { ...process.env,
+...env } : undefined,
 stdio: ["ignore", "ignore", "pipe"] });
         let stderr = "";
         child.stderr.on("data", (d) => (stderr += d.toString()));
@@ -304,7 +305,11 @@ async function deployBundle(opts: {
         // describe its other apps.
     }
 
-    const body = bundleDeployBody({ projectId, bundleId, manifest, message: opts.message, declaredApps });
+    const body = bundleDeployBody({ projectId,
+bundleId,
+manifest,
+message: opts.message,
+declaredApps });
 
     try {
         const res = await client.functions.invoke<{
@@ -314,7 +319,9 @@ async function deployBundle(opts: {
         }>("deploy", body);
         if (!res?.deployment?.id) fail("Control plane did not return a deployment id.");
         if (isJsonMode()) {
-            printJson({ success: true, deploymentId: String(res.deployment.id), managed: res.managed === true });
+            printJson({ success: true,
+deploymentId: String(res.deployment.id),
+managed: res.managed === true });
         } else {
             console.log(chalk.green(`  ✓ Managed deploy started (deployment ${res.deployment.id}).`));
             console.log(chalk.gray("    Track it with `rebase cloud logs` or in the console."));
@@ -432,7 +439,9 @@ export function planBareDeploy(
     const repo = pick(projectRow, "gitRepoUrl", "git_repo_url");
     if (repo) {
         const branch = pick(projectRow, "gitBranch", "git_branch");
-        return { managed, source: "git", lines: [`Building from git: ${repo}${branch ? ` (${branch})` : ""}.`] };
+        return { managed,
+source: "git",
+lines: [`Building from git: ${repo}${branch ? ` (${branch})` : ""}.`] };
     }
 
     if (pick(deploymentRow, "sourceRef", "source_ref")) {

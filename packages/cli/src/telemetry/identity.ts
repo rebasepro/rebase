@@ -101,23 +101,39 @@ machineId });
 /**
  * The checkout's id, generating one if this project has none.
  *
- * Returns `undefined` when there is nowhere to put it — `.rebase/` is created
- * by `rebase init`, so a command run outside a project simply reports no
- * project, rather than scattering directories across the filesystem.
+ * The directory is created when it is missing, but **only** where a
+ * `rebase.json` proves this really is a project root. An earlier version
+ * required `.rebase/` to already exist, on the assumption that `rebase init`
+ * created it — it does not. It is written only when a scaffold is linked to
+ * Rebase Cloud, so every self-hosted project reported no `projectId` at all,
+ * for ever. That silently broke the funnel this id exists for, on exactly the
+ * population the telemetry is meant to learn about.
+ *
+ * The `rebase.json` check is what keeps the fix from being "scatter `.rebase/`
+ * wherever a command happens to run": no manifest, no project, no directory,
+ * and the event simply reports no project.
  */
 export function ensureProjectId(projectRoot: string): string | undefined {
+    if (!fs.existsSync(path.join(projectRoot, "rebase.json"))) return undefined;
+
     const dir = path.join(projectRoot, ".rebase");
-    if (!fs.existsSync(dir)) return undefined;
+    try {
+        fs.mkdirSync(dir, { recursive: true });
+    } catch {
+        return undefined;
+    }
 
     const file = path.join(dir, "state.json");
     let state: Record<string, unknown> = {};
-    try {
-        const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
-        if (raw && typeof raw === "object") state = raw;
-    } catch {
-        // `state.json` is shared with other commands. A parse failure here must
-        // not destroy their keys, so we do not write in that case.
-        return undefined;
+    if (fs.existsSync(file)) {
+        try {
+            const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
+            if (raw && typeof raw === "object") state = raw;
+        } catch {
+            // `state.json` is shared with other commands. A parse failure here
+            // must not destroy their keys, so we do not write in that case.
+            return undefined;
+        }
     }
 
     if (typeof state.telemetryProjectId === "string") return state.telemetryProjectId;

@@ -27,7 +27,8 @@ describe("storage state reporting", () => {
         // bucket. Reading the row alone said "none".
         const line = stripAnsi(
             describeStorageState({
-                effective: { kind: "durable", summary: "dadaki-uploads on storage.googleapis.com" },
+                effective: { kind: "durable",
+summary: "dadaki-uploads on storage.googleapis.com" },
                 configured: "none",
                 overridden: false,
                 source: "environment"
@@ -41,7 +42,8 @@ describe("storage state reporting", () => {
     it("says where the setting came from when env vars shadow the row", () => {
         const line = stripAnsi(
             describeStorageState({
-                effective: { kind: "durable", summary: "bucket on AWS S3" },
+                effective: { kind: "durable",
+summary: "bucket on AWS S3" },
                 configured: "configured",
                 overridden: true,
                 source: "environment"
@@ -60,7 +62,8 @@ describe("storage state reporting", () => {
 
     it("names what is missing from a half-configured backend", () => {
         const line = stripAnsi(
-            describeStorageState({ effective: { kind: "incomplete", missing: ["S3_ACCESS_KEY_ID"] } })
+            describeStorageState({ effective: { kind: "incomplete",
+missing: ["S3_ACCESS_KEY_ID"] } })
         );
         expect(line).toContain("incomplete");
         expect(line).toContain("S3_ACCESS_KEY_ID");
@@ -81,17 +84,20 @@ describe("database state reporting", () => {
         // changed by `db test`, so "managed (untested)" was reporting the
         // absence of a manual test on a project that had just deployed
         // against that database.
-        const line = stripAnsi(describeDatabaseState({ type: "managed", connectionStatus: "untested" }));
+        const line = stripAnsi(describeDatabaseState({ type: "managed",
+connectionStatus: "untested" }));
         expect(line).toContain("managed");
         expect(line).toContain("not tested");
         expect(line).toContain("db test");
     });
 
     it("reports a real verdict once there is one", () => {
-        expect(stripAnsi(describeDatabaseState({ type: "managed", connectionStatus: "connected" }))).toBe(
+        expect(stripAnsi(describeDatabaseState({ type: "managed",
+connectionStatus: "connected" }))).toBe(
             "managed (connected)"
         );
-        expect(stripAnsi(describeDatabaseState({ type: "byodb", connectionStatus: "failed" }))).toBe(
+        expect(stripAnsi(describeDatabaseState({ type: "byodb",
+connectionStatus: "failed" }))).toBe(
             "byodb (failed)"
         );
     });
@@ -147,7 +153,8 @@ describe("deployments list", () => {
     });
 
     it("reports absent label and version as null, never as an empty string", () => {
-        const view = deploymentView({ id: 44, deployMessage: "   " } as DeploymentRow);
+        const view = deploymentView({ id: 44,
+deployMessage: "   " } as DeploymentRow);
         expect(view.message).toBeNull();
         expect(view.frameworkVersion).toBeNull();
     });
@@ -173,7 +180,8 @@ describe("describeRuntime", () => {
     it("says nothing about a framework it was not told", () => {
         // A release whose image tag is not a semver records no framework
         // version. Inventing one would defeat the reason for storing it.
-        const line = stripAnsi(describeRuntime({ runtimeMode: "managed", runtimeVersion: "1.2.0" }));
+        const line = stripAnsi(describeRuntime({ runtimeMode: "managed",
+runtimeVersion: "1.2.0" }));
         expect(line).toContain("managed 1.2.0");
         expect(line).not.toContain("framework");
     });
@@ -189,7 +197,8 @@ describe("describeRuntime", () => {
     });
 
     it("does not claim a runtime for a custom project", () => {
-        const line = stripAnsi(describeRuntime({ runtimeMode: "custom", runtimeVersion: null }));
+        const line = stripAnsi(describeRuntime({ runtimeMode: "custom",
+runtimeVersion: null }));
         expect(line).toContain("custom");
         expect(line).not.toContain("managed");
     });
@@ -201,7 +210,8 @@ describe("describeRuntime", () => {
         // useless as the tell for an accidental eject, since it was equally the
         // resting value of every project nothing had happened to.
         for (const mode of [null, undefined, "  "]) {
-            const line = stripAnsi(describeRuntime({ runtimeMode: mode, runtimeVersion: null }));
+            const line = stripAnsi(describeRuntime({ runtimeMode: mode,
+runtimeVersion: null }));
             expect(line).toContain("not deployed yet");
             expect(line).not.toContain("your own image");
         }

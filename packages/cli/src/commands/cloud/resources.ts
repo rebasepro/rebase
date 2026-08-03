@@ -147,7 +147,8 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
             // that fails, yields `undefined` — which prints as a blank. A blank
             // is a better answer than a wrong one for exactly this field.
             client.functions
-                .invoke<StorageState>("storage-provision", undefined, { method: "GET", path: projectId })
+                .invoke<StorageState>("storage-provision", undefined, { method: "GET",
+path: projectId })
                 .catch(() => undefined),
             latestDeployment(client, projectId),
             fetchTenantBaseDomain(client, url)
@@ -178,7 +179,9 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
                 status: project.status ?? null,
                 url: projectHost(project, baseDomain) ?? null,
                 branch: project.gitBranch ?? null,
-                lastDeploy: deploy ? { id: String(deploy.id), status: deploy.status ?? null, createdAt: deploy.createdAt ?? null } : null,
+                lastDeploy: deploy ? { id: String(deploy.id),
+status: deploy.status ?? null,
+createdAt: deploy.createdAt ?? null } : null,
                 runtime: {
                     mode: project.runtimeMode ?? "custom",
                     version: project.runtimeVersion ?? null,
@@ -187,7 +190,8 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
                     range: project.runtimeRange ?? null,
                     pin: project.runtimeVersionPin ?? null
                 },
-                database: db ? { type: db.type ?? null, connectionStatus: db.connectionStatus ?? null } : null,
+                database: db ? { type: db.type ?? null,
+connectionStatus: db.connectionStatus ?? null } : null,
                 storage: storage ?? null
             }
         );
@@ -403,7 +407,8 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
             "--region": String,
             "--force-path-style": Boolean
         },
-        { argv: rawArgs.slice(3), permissive: true }
+        { argv: rawArgs.slice(3),
+permissive: true }
     );
 
     const bucket = parsed["--bucket"];

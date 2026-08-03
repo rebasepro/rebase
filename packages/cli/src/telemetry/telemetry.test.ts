@@ -320,12 +320,33 @@ apps: {} };
 
 describe("ensureProjectId", () => {
 
+    /** A real project root: what makes it one is the manifest, not `.rebase/`. */
     function projectDir(state?: string): string {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-pid-"));
-        fs.mkdirSync(path.join(dir, ".rebase"));
-        if (state !== undefined) fs.writeFileSync(path.join(dir, ".rebase", "state.json"), state, "utf-8");
+        fs.writeFileSync(path.join(dir, "rebase.json"), '{"rebase":"^1","apps":{}}', "utf-8");
+        if (state !== undefined) {
+            fs.mkdirSync(path.join(dir, ".rebase"));
+            fs.writeFileSync(path.join(dir, ".rebase", "state.json"), state, "utf-8");
+        }
         return dir;
     }
+
+    it("creates .rebase/ in a project that has none yet", async () => {
+        // `rebase init` does not create it — that only happens when a scaffold
+        // is linked to Rebase Cloud. Requiring it meant every self-hosted
+        // project reported no projectId for ever, which broke the funnel this
+        // id exists for.
+        const telemetry = await load();
+        telemetry.setConsent(true);
+        const dir = projectDir();
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+        (global as any).fetch = fetchMock;
+
+        await telemetry.recordEvent("cli.init", {}, { projectRoot: dir });
+
+        expect(fs.existsSync(path.join(dir, ".rebase", "state.json"))).toBe(true);
+        expect(JSON.parse(fetchMock.mock.calls[0][1].body).projectId).toMatch(/^[0-9a-f-]{36}$/);
+    });
 
     it("preserves the other commands' keys when it adds its own", async () => {
         // `state.json` is shared — `generate_sdk`, `apps` and `auth` all read it.
@@ -370,9 +391,10 @@ describe("ensureProjectId", () => {
         expect(JSON.parse(fetchMock.mock.calls[0][1].body).projectId).toBeUndefined();
     });
 
-    it("reports no project when there is no .rebase directory to write into", async () => {
-        // A command run outside a project must not scatter directories around
-        // the filesystem just to have something to count.
+    it("reports no project, and creates nothing, outside a project", async () => {
+        // The manifest is what proves this is a project root. Without it a
+        // command run anywhere would scatter `.rebase/` across the filesystem
+        // just to have something to count.
         const telemetry = await load();
         telemetry.setConsent(true);
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-bare-"));

@@ -86,7 +86,8 @@ describe("findProjectRoot", () => {
         // An app nested inside a monorepo owns itself: the manifest beside it
         // is the project, not the workspace root several levels up.
         const outer = createDir("monorepo");
-        writeJSON(path.join(outer, "package.json"), { name: "mono", workspaces: ["backend"] });
+        writeJSON(path.join(outer, "package.json"), { name: "mono",
+workspaces: ["backend"] });
         createDir("monorepo", "backend");
 
         const inner = createDir("monorepo", "apps", "shop");

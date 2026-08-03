@@ -51,7 +51,8 @@ function captureStdout(): { output: () => string; restore: () => void } {
         chunks.push(typeof s === "string" ? s : String(s));
         return true;
     };
-    return { output: () => chunks.join(""), restore: () => { process.stdout.write = orig; } };
+    return { output: () => chunks.join(""),
+restore: () => { process.stdout.write = orig; } };
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -71,7 +72,8 @@ describe("functions probe (the misrouted-mount detector)", () => {
      * fine. This pins the endpoint so that cannot come back.
      */
     it("probes the listing endpoint, never a function's own path", () => {
-        expect(probe("functions").path({ collection: "users", fn: "doc-content" })).toBe("/api/functions");
+        expect(probe("functions").path({ collection: "users",
+fn: "doc-content" })).toBe("/api/functions");
     });
 
     it("treats 200 as mounted", () => {
@@ -90,7 +92,8 @@ describe("functions probe (the misrouted-mount detector)", () => {
     });
 
     describe("refine, against the listing body", () => {
-        const t = (fn?: string) => ({ collection: "users", fn });
+        const t = (fn?: string) => ({ collection: "users",
+fn });
         const listing = { functions: [{ name: "doc-content" }, { name: "hello" }] };
 
         it("counts the loaded functions when no name was asked for", () => {
@@ -215,8 +218,16 @@ describe("every probe", () => {
 
 describe("overallVerdict", () => {
     const r = (verdict: Verdict): ProbeResult => ({
-        id: "x", label: "x", method: "GET", url: "u", status: 200,
-        ms: 1, verdict, meaning: "", healthy: "", statusOk: verdict === "ok"
+        id: "x",
+label: "x",
+method: "GET",
+url: "u",
+status: 200,
+        ms: 1,
+verdict,
+meaning: "",
+healthy: "",
+statusOk: verdict === "ok"
     });
 
     it("is ok only when every probe is ok", () => {
@@ -241,7 +252,8 @@ describe("runProbe", () => {
         vi.stubGlobal("fetch", vi.fn(async () => {
             throw new Error("ENOTFOUND");
         }));
-        const res = await runProbe("https://nope.example", probe("health"), { collection: "users", fn: "health" });
+        const res = await runProbe("https://nope.example", probe("health"), { collection: "users",
+fn: "health" });
         expect(res.status).toBeNull();
         expect(res.verdict).toBe("fail");
     });
@@ -260,7 +272,8 @@ describe("runProbe", () => {
     it("posts a JSON body for the auth probe", async () => {
         const fetchMock = vi.fn(async () => new Response("", { status: 400 }));
         vi.stubGlobal("fetch", fetchMock);
-        await runProbe("https://app.example", probe("auth"), { collection: "users", fn: "health" });
+        await runProbe("https://app.example", probe("auth"), { collection: "users",
+fn: "health" });
         const init = fetchMock.mock.calls[0][1] as RequestInit;
         expect(init.method).toBe("POST");
         expect(init.body).toBe("{}");
@@ -308,7 +321,10 @@ describe("parseRequestLine", () => {
     it("extracts status, method, path and latency", () => {
         expect(
             parseRequestLine('{"message":"request","status":200,"method":"GET","path":"/api/data/x","latencyMs":12}')
-        ).toEqual({ status: 200, method: "GET", path: "/api/data/x", latencyMs: 12 });
+        ).toEqual({ status: 200,
+method: "GET",
+path: "/api/data/x",
+latencyMs: 12 });
     });
 
     it("returns null for a line that is not a request record", () => {
@@ -394,13 +410,15 @@ function fakeClient(spec: {
             collection: (name: string) => ({
                 find: async () => ({ data: [] }),
                 findById: async (id: string) =>
-                    spec.findById ? spec.findById(name, id) : { subdomain: "proj-one", host: "proj-one.apps.example" },
+                    spec.findById ? spec.findById(name, id) : { subdomain: "proj-one",
+host: "proj-one.apps.example" },
                 update: async () => ({}),
                 create: async () => ({}),
                 delete: async () => ({})
             })
         },
-        auth: { getSession: () => ({ accessToken: "t", expiresAt: Date.now() + 1e9 }) }
+        auth: { getSession: () => ({ accessToken: "t",
+expiresAt: Date.now() + 1e9 }) }
     };
 }
 
@@ -481,7 +499,8 @@ describe("debug health --json", () => {
             if (p === "/api/functions") {
                 return new Response(
                     JSON.stringify({ functions: [{ name: "doc-content" }, { name: "hello" }] }),
-                    { status: 200, headers: { "Content-Type": "application/json" } }
+                    { status: 200,
+headers: { "Content-Type": "application/json" } }
                 );
             }
             // A function's bare mount point — 404 even though all is well.
@@ -581,7 +600,10 @@ describe("debug is read-only", () => {
                 database: "rebase",
                 username: "app",
                 passwordAvailable: true,
-                portForward: { namespace: "rebase-tenant-proj_1", service: "postgres-rw", localPort: 5432, remotePort: 5432 },
+                portForward: { namespace: "rebase-tenant-proj_1",
+service: "postgres-rw",
+localPort: 5432,
+remotePort: 5432 },
                 unavailableReason: null
             };
         });
@@ -608,8 +630,14 @@ describe("debug is read-only", () => {
                 cpu: "3.1%",
                 memory: "80 MiB / 512 MiB",
                 placement: {
-                    cluster: "prod", provider: "gcp", region: "eu", namespace: "rebase-tenant-proj_1",
-                    host: "proj-one.apps.example", image: "img:1", replicas: { available: 1, desired: 1 }
+                    cluster: "prod",
+provider: "gcp",
+region: "eu",
+namespace: "rebase-tenant-proj_1",
+                    host: "proj-one.apps.example",
+image: "img:1",
+replicas: { available: 1,
+desired: 1 }
                 }
             })
         });
@@ -636,7 +664,8 @@ describe("debug is read-only", () => {
 
 describe("--since validation", () => {
     it("rejects an unparseable duration instead of silently using a default", async () => {
-        useClient(fakeClient({ invoke: async () => ({ logs: "", pods: [] }) }));
+        useClient(fakeClient({ invoke: async () => ({ logs: "",
+pods: [] }) }));
         const cap = captureStdout();
         const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
             throw new Error("__exit__");

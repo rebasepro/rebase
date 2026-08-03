@@ -105,7 +105,9 @@ export function triggerInfo(dep: DeploymentRow): { by: string; source: string; u
     const by = typeof byRaw === "string" && (TRIGGERED_BY as readonly string[]).includes(byRaw) ? byRaw : "unknown";
     const source =
         typeof srcRaw === "string" && (TRIGGER_SOURCES as readonly string[]).includes(srcRaw) ? srcRaw : "unknown";
-    return { by, source, userId: str(dep, "triggeredByUserId", "triggered_by_user_id") ?? "" };
+    return { by,
+source,
+userId: str(dep, "triggeredByUserId", "triggered_by_user_id") ?? "" };
 }
 
 /** Shape one deployment row into the stable JSON view the CLI publishes. */
@@ -169,8 +171,12 @@ export function parseDeploymentsLimit(raw: number | undefined): number {
 
 export async function deploymentsListCommand(rawArgs: string[]): Promise<void> {
     const args = arg(
-        { "--limit": Number, "--all": Boolean, "--project": String, "-p": "--project" },
-        { argv: rawArgs.slice(2), permissive: true }
+        { "--limit": Number,
+"--all": Boolean,
+"--project": String,
+"-p": "--project" },
+        { argv: rawArgs.slice(2),
+permissive: true }
     );
     const limit = args["--all"] ? MAX_DEPLOYMENTS_LIMIT : parseDeploymentsLimit(args["--limit"]);
     const { client } = await requireClient(rawArgs);
@@ -213,7 +219,10 @@ export async function deploymentsListCommand(rawArgs: string[]): Promise<void> {
                 }
                 console.log("");
             },
-            { projectId, limit, truncated, deployments: views }
+            { projectId,
+limit,
+truncated,
+deployments: views }
         );
     } catch (e) {
         reportError(e, "Failed to list deployments");
@@ -221,7 +230,11 @@ export async function deploymentsListCommand(rawArgs: string[]): Promise<void> {
 }
 
 export async function rollbackCommand(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const args = arg({ "--yes": Boolean,
+"-y": "--yes",
+"--project": String,
+"-p": "--project" }, { argv: rawArgs.slice(2),
+permissive: true });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -280,7 +293,9 @@ export async function rollbackCommand(rawArgs: string[]): Promise<void> {
             deployment: { id: string };
             rolledBackTo: string;
             imageUrl: string;
-        }>("deploy", { projectId, deploymentId: String(target!.id), client: "cli" }, { path: "rollback" });
+        }>("deploy", { projectId,
+deploymentId: String(target!.id),
+client: "cli" }, { path: "rollback" });
 
         emit(
             () => {
@@ -306,7 +321,11 @@ export async function rollbackCommand(rawArgs: string[]): Promise<void> {
 }
 
 export async function cancelCommand(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--yes": Boolean, "-y": "--yes", "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const args = arg({ "--yes": Boolean,
+"-y": "--yes",
+"--project": String,
+"-p": "--project" }, { argv: rawArgs.slice(2),
+permissive: true });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -321,7 +340,8 @@ export async function cancelCommand(rawArgs: string[]): Promise<void> {
     try {
         const res = await client.functions.invoke<{ success: boolean; deploymentId: string; buildJobDeleted: boolean }>(
             "deploy",
-            explicitId ? { projectId, deploymentId: explicitId } : { projectId },
+            explicitId ? { projectId,
+deploymentId: explicitId } : { projectId },
             { path: "cancel" }
         );
         emit(
@@ -330,7 +350,9 @@ export async function cancelCommand(rawArgs: string[]): Promise<void> {
                 if (res.buildJobDeleted) console.log(chalk.gray("  The build job was deleted."));
                 console.log("");
             },
-            { success: true, deploymentId: res.deploymentId, buildJobDeleted: res.buildJobDeleted }
+            { success: true,
+deploymentId: res.deploymentId,
+buildJobDeleted: res.buildJobDeleted }
         );
     } catch (e) {
         const err = e as { status?: number };

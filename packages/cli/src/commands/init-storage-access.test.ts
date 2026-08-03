@@ -83,7 +83,8 @@ describe("the template's storageAuthorize", () => {
             key,
             bucket: "uploads",
             operation,
-            user: roles === undefined ? null : { uid: "u1", roles }
+            user: roles === undefined ? null : { uid: "u1",
+roles }
         });
 
     it("lets anyone read a public/ object", () => {

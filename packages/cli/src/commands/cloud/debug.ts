@@ -109,7 +109,8 @@ const NO_RESPONSE: ProbeReading = {
 };
 
 function serverError(what: string): ProbeReading {
-    return { verdict: "fail", meaning: `the server is running but ${what}` };
+    return { verdict: "fail",
+meaning: `the server is running but ${what}` };
 }
 
 /**
@@ -125,7 +126,8 @@ export const PROBES: ProbeSpec[] = [
         healthy: "200 — the backend is up",
         interpret: (status) => {
             if (status === null) return NO_RESPONSE;
-            if (status === 200) return { verdict: "ok", meaning: "the backend is up and serving" };
+            if (status === 200) return { verdict: "ok",
+meaning: "the backend is up and serving" };
             if (status === 404) {
                 return {
                     verdict: "fail",
@@ -134,7 +136,8 @@ export const PROBES: ProbeSpec[] = [
                 };
             }
             if (status >= 500) return serverError("its health endpoint is failing");
-            return { verdict: "unknown", meaning: "unexpected for a health endpoint" };
+            return { verdict: "unknown",
+meaning: "unexpected for a health endpoint" };
         }
     },
     {
@@ -145,7 +148,8 @@ export const PROBES: ProbeSpec[] = [
         healthy: "200 — the frontend is being served",
         interpret: (status) => {
             if (status === null) return NO_RESPONSE;
-            if (status === 200) return { verdict: "ok", meaning: "the frontend bundle is being served" };
+            if (status === 200) return { verdict: "ok",
+meaning: "the frontend bundle is being served" };
             if (status === 404) {
                 return {
                     verdict: "warn",
@@ -154,7 +158,8 @@ export const PROBES: ProbeSpec[] = [
                 };
             }
             if (status >= 500) return serverError("the root route throws");
-            return { verdict: "unknown", meaning: "unexpected at the site root" };
+            return { verdict: "unknown",
+meaning: "unexpected at the site root" };
         }
     },
     {
@@ -169,10 +174,12 @@ export const PROBES: ProbeSpec[] = [
             // The probe deliberately posts an empty body: a healthy auth route
             // must reject it. Reachability is what is being tested, not a login.
             if (status === 400 || status === 422) {
-                return { verdict: "ok", meaning: "auth is mounted and rejected the empty body, as it should" };
+                return { verdict: "ok",
+meaning: "auth is mounted and rejected the empty body, as it should" };
             }
             if (status === 401 || status === 403) {
-                return { verdict: "ok", meaning: "auth is mounted and refused the credentials" };
+                return { verdict: "ok",
+meaning: "auth is mounted and refused the credentials" };
             }
             if (status === 404) {
                 return {
@@ -187,7 +194,8 @@ export const PROBES: ProbeSpec[] = [
                 };
             }
             if (status >= 500) return serverError("the login route throws — often a missing or unmigrated auth table");
-            return { verdict: "unknown", meaning: "unexpected for a login route" };
+            return { verdict: "unknown",
+meaning: "unexpected for a login route" };
         }
     },
     {
@@ -199,7 +207,8 @@ export const PROBES: ProbeSpec[] = [
         interpret: (status) => {
             if (status === null) return NO_RESPONSE;
             if (status === 401 || status === 403) {
-                return { verdict: "ok", meaning: "unauthenticated reads are refused — row-level security is enforced" };
+                return { verdict: "ok",
+meaning: "unauthenticated reads are refused — row-level security is enforced" };
             }
             if (status === 200) {
                 // Legal, and sometimes intended. Never silently called healthy.
@@ -220,7 +229,8 @@ export const PROBES: ProbeSpec[] = [
                     "the read reached the database and failed — most often an RLS policy naming a column or table that is not there"
                 );
             }
-            return { verdict: "unknown", meaning: "unexpected for a data read" };
+            return { verdict: "unknown",
+meaning: "unexpected for a data read" };
         }
     },
     {
@@ -246,11 +256,13 @@ export const PROBES: ProbeSpec[] = [
         healthy: "200 — the functions router is mounted and lists its functions",
         interpret: (status) => {
             if (status === null) return NO_RESPONSE;
-            if (status === 200) return { verdict: "ok", meaning: "the functions router is mounted" };
+            if (status === 200) return { verdict: "ok",
+meaning: "the functions router is mounted" };
             if (status === 401 || status === 403) {
                 // The listing is behind auth on this deployment. That still
                 // proves the router is there, which is what is being tested.
-                return { verdict: "ok", meaning: "the functions router is mounted (its listing requires auth)" };
+                return { verdict: "ok",
+meaning: "the functions router is mounted (its listing requires auth)" };
             }
             if (status === 404) {
                 return {
@@ -260,7 +272,8 @@ export const PROBES: ProbeSpec[] = [
                 };
             }
             if (status >= 500) return serverError("the functions router throws");
-            return { verdict: "unknown", meaning: "unexpected for the functions listing" };
+            return { verdict: "unknown",
+meaning: "unexpected for the functions listing" };
         },
         needsBody: true,
         refine: (body, t) => {
@@ -415,8 +428,12 @@ const LOG_PREFIX_RE = /^(?:(\d{4}-\d{2}-\d{2}T[\d:.]+Z?)\s+)?(?:\[([^\]]+)\]\s+)
 
 export function parseLogLine(line: string): ParsedLogLine {
     const m = LOG_PREFIX_RE.exec(line);
-    if (!m) return { ts: null, pod: null, text: line };
-    return { ts: m[1] ?? null, pod: m[2] ?? null, text: m[3] ?? "" };
+    if (!m) return { ts: null,
+pod: null,
+text: line };
+    return { ts: m[1] ?? null,
+pod: m[2] ?? null,
+text: m[3] ?? "" };
 }
 
 /**
@@ -554,7 +571,8 @@ async function resolveOrigin(
     url: string,
     projectId: string
 ): Promise<string> {
-    const parsed = arg({ "--host": String }, { argv: rawArgs.slice(3), permissive: true });
+    const parsed = arg({ "--host": String }, { argv: rawArgs.slice(3),
+permissive: true });
     if (parsed["--host"]) {
         const h = parsed["--host"].trim().replace(/\/+$/, "");
         return /^https?:\/\//.test(h) ? h : `https://${h}`;
@@ -584,8 +602,10 @@ async function resolveOrigin(
 
 async function healthCommand(rawArgs: string[]): Promise<void> {
     const parsed = arg(
-        { "--collection": String, "--function": String },
-        { argv: rawArgs.slice(3), permissive: true }
+        { "--collection": String,
+"--function": String },
+        { argv: rawArgs.slice(3),
+permissive: true }
     );
     const targets: ProbeTargets = {
         collection: parsed["--collection"] || "users",
@@ -637,7 +657,9 @@ async function healthCommand(rawArgs: string[]): Promise<void> {
             }
             console.log("");
         },
-        { origin, overall, probes: results }
+        { origin,
+overall,
+probes: results }
     );
 
     // A failing probe is a failing command — this is meant to be usable in a
@@ -661,8 +683,11 @@ interface LogViewOptions {
 
 async function logView(rawArgs: string[], view: LogViewOptions): Promise<void> {
     const parsed = arg(
-        { "--since": String, "--tail": Number, "--previous": Boolean },
-        { argv: rawArgs.slice(3), permissive: true }
+        { "--since": String,
+"--tail": Number,
+"--previous": Boolean },
+        { argv: rawArgs.slice(3),
+permissive: true }
     );
 
     const sinceArg = parsed["--since"];
@@ -723,7 +748,9 @@ async function logView(rawArgs: string[], view: LogViewOptions): Promise<void> {
 }
 
 async function requestsCommand(rawArgs: string[]): Promise<void> {
-    const parsed = arg({ "--since": String, "--tail": Number }, { argv: rawArgs.slice(3), permissive: true });
+    const parsed = arg({ "--since": String,
+"--tail": Number }, { argv: rawArgs.slice(3),
+permissive: true });
     const sinceArg = parsed["--since"];
     if (sinceArg !== undefined && parseSince(sinceArg) === null) {
         fail(`--since must be a duration like 15m, 2h or 90s; received "${sinceArg}".`);
@@ -735,7 +762,8 @@ async function requestsCommand(rawArgs: string[]): Promise<void> {
 
     let res: RuntimeLogsResponse;
     try {
-        res = await fetchRuntimeLogs(client, projectId, { sinceSeconds, tailLines: parsed["--tail"] ?? 1000 });
+        res = await fetchRuntimeLogs(client, projectId, { sinceSeconds,
+tailLines: parsed["--tail"] ?? 1000 });
     } catch (e) {
         reportError(e, "Failed to fetch runtime logs");
     }
@@ -773,7 +801,8 @@ async function requestsCommand(rawArgs: string[]): Promise<void> {
             }
             console.log("");
         },
-        { sinceSeconds, requests: shown }
+        { sinceSeconds,
+requests: shown }
     );
 }
 
@@ -843,7 +872,8 @@ async function podCommand(rawArgs: string[]): Promise<void> {
                 console.log("");
             }
         },
-        { status: m.status ?? null, placement: p }
+        { status: m.status ?? null,
+placement: p }
     );
 }
 
@@ -868,7 +898,8 @@ async function dbDebugCommand(rawArgs: string[]): Promise<void> {
 
     let info: DbInfo;
     try {
-        info = await client.functions.invoke<DbInfo>("db-info", undefined, { method: "GET", path: projectId });
+        info = await client.functions.invoke<DbInfo>("db-info", undefined, { method: "GET",
+path: projectId });
     } catch (e) {
         reportError(e, "Failed to read database connection info");
     }
@@ -943,7 +974,9 @@ export async function debugCommand(action: string | undefined, rawArgs: string[]
             await healthCommand(rawArgs);
             break;
         case "logs":
-            await logView(rawArgs, { defaultSinceSeconds: 900, limit: 200, title: "📄 Logs" });
+            await logView(rawArgs, { defaultSinceSeconds: 900,
+limit: 200,
+title: "📄 Logs" });
             break;
         case "errors":
             await logView(rawArgs, {

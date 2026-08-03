@@ -54,7 +54,9 @@ export function packBundle(bundleDir: string, outPath: string): Promise<void> {
             // which GNU tar on the runtime image then warns about once per file.
             // Harmless, but it buries real extraction errors in noise.
             ["-czf", outPath, "--no-xattrs", "--exclude", "node_modules", "-C", bundleDir, "."],
-            { stdio: "inherit", env: { ...process.env, COPYFILE_DISABLE: "1" } }
+            { stdio: "inherit",
+env: { ...process.env,
+COPYFILE_DISABLE: "1" } }
         );
         child.on("error", reject);
         child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`tar exited ${code}`))));
@@ -134,7 +136,8 @@ export async function uploadBundle(
         `${url}/api/functions/deploy/bundle/upload?projectId=${encodeURIComponent(projectId)}`,
         {
             method: "POST",
-            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/gzip" },
+            headers: { Authorization: `Bearer ${token}`,
+"Content-Type": "application/gzip" },
             body: bytes
         }
     );

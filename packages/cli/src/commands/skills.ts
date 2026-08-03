@@ -65,7 +65,7 @@ function getSkillsSourceDir(): string {
     if (!fs.existsSync(skillsDir)) {
         throw new Error(
             `Skills directory not found at ${skillsDir}. ` +
-            `Make sure @rebasepro/agent-skills is installed.`
+            "Make sure @rebasepro/agent-skills is installed."
         );
     }
 

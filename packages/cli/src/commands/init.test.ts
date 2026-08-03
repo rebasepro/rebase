@@ -1038,7 +1038,10 @@ describe("buildInitQuestions", () => {
 describe("what gets scaffolded", () => {
     it("asks when --headless is not given", () => {
         const questions = buildInitQuestions({
-            nameArg: "x", hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
+            nameArg: "x",
+hasGitFlag: true,
+hasInstallFlag: true,
+pm: "pnpm"
         });
 
         const q = questions.find((q) => q.name === "headless");
@@ -1054,7 +1057,11 @@ describe("what gets scaffolded", () => {
 
     it("does not ask when --headless is given", () => {
         const questions = buildInitQuestions({
-            nameArg: "x", headlessArg: true, hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
+            nameArg: "x",
+headlessArg: true,
+hasGitFlag: true,
+hasInstallFlag: true,
+pm: "pnpm"
         });
 
         expect(questions.find((q) => q.name === "headless")).toBeUndefined();
@@ -1062,7 +1069,11 @@ describe("what gets scaffolded", () => {
 
     it("skips the collections preset when headless, which declares none", () => {
         const questions = buildInitQuestions({
-            nameArg: "x", headlessArg: true, hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
+            nameArg: "x",
+headlessArg: true,
+hasGitFlag: true,
+hasInstallFlag: true,
+pm: "pnpm"
         });
 
         const preset = questions.find((q) => q.name === "preset") as
@@ -1072,7 +1083,10 @@ describe("what gets scaffolded", () => {
 
     it("asks for a preset once the answer is not headless", () => {
         const questions = buildInitQuestions({
-            nameArg: "x", hasGitFlag: true, hasInstallFlag: true, pm: "pnpm"
+            nameArg: "x",
+hasGitFlag: true,
+hasInstallFlag: true,
+pm: "pnpm"
         });
 
         const preset = questions.find((q) => q.name === "preset") as
@@ -1091,7 +1105,8 @@ describe("baas overlay", () => {
         // passes `mode: "baas"`.
         const manifest = JSON.parse(fs.readFileSync(path.join(overlay, "rebase.json"), "utf8"));
 
-        expect(manifest.apps.backend).toEqual({ type: "backend", runtime: "managed" });
+        expect(manifest.apps.backend).toEqual({ type: "backend",
+runtime: "managed" });
         expect(Object.values(manifest.apps).some((app: any) => app.type === "static")).toBe(false);
         expect(fs.existsSync(path.join(overlay, "backend", "src", "index.ts"))).toBe(false);
     });
