@@ -28,8 +28,15 @@ export function useHistory(params: {
     entityId: string | number | undefined;
     enabled?: boolean;
     pageSize?: number;
+    /**
+     * Bumped by the caller when the record is saved. A save is the one event
+     * that adds a revision, and nothing else here would notice it: without
+     * this the open panel keeps showing the list it fetched when it opened,
+     * so the revision you just created never appears.
+     */
+    refreshToken?: number;
 }): UseEntityHistoryResult {
-    const { slug, entityId, enabled = true, pageSize = 10 } = params;
+    const { slug, entityId, enabled = true, pageSize = 10, refreshToken } = params;
     const apiConfig = useApiConfig();
     const apiBase = useApiBase();
 
@@ -41,7 +48,11 @@ export function useHistory(params: {
     const [offset, setOffset] = useState(0);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // Track the current entity identity so we can detect stale responses
+    // Track the current entity identity so we can detect stale responses.
+    // `refreshToken` is part of the identity on purpose: a save makes the list
+    // we are holding a stale page of a longer list, which is the same problem
+    // as having moved to a different record.
+    const entityKey = `${slug}/${entityId}/${refreshToken ?? 0}`;
     const currentEntityRef = useRef<string | undefined>(undefined);
 
     const fetchEntries = useCallback(async (
@@ -66,7 +77,6 @@ signal });
 
             // Check if the request was aborted or the entity changed while in-flight
             if (signal?.aborted) return;
-            const entityKey = `${slug}/${entityId}`;
             if (currentEntityRef.current !== entityKey) return;
 
             if (!response.ok) {
@@ -91,12 +101,11 @@ signal });
         } finally {
             setIsLoading(false);
         }
-    }, [apiConfig, apiBase, slug, entityId, enabled, pageSize]);
+    }, [apiConfig, apiBase, slug, entityId, entityKey, enabled, pageSize]);
 
     // Single unified effect: reset state when entity changes, fetch when offset changes.
     // Uses AbortController to cancel stale requests on entity change or unmount.
     useEffect(() => {
-        const entityKey = `${slug}/${entityId}`;
         const isNewEntity = currentEntityRef.current !== entityKey;
 
         if (isNewEntity) {
@@ -118,7 +127,7 @@ signal });
         return () => {
             abortController.abort();
         };
-    }, [fetchEntries, offset, enabled, entityId, slug, refreshTrigger]);
+    }, [fetchEntries, offset, enabled, entityId, entityKey, refreshTrigger]);
 
     const loadMore = useCallback(() => {
         if (!isLoading && hasMore && offset + entries.length < total) {

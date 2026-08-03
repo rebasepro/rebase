@@ -421,6 +421,10 @@ parentEntityIds,
     );
 
     const [inspectorTab, setInspectorTab] = useState<InspectorTab | null>(null);
+    // A save adds a revision, and the inspector can be open while it happens:
+    // Save lives in the identity bar, above the panel. Counting saves gives the
+    // history list something to react to.
+    const [savedCount, setSavedCount] = useState(0);
 
     /* ---- record actions, in the bar's overflow menu ---------------------- */
 
@@ -600,6 +604,7 @@ parentEntityIds,
                 formProps?.onFormContextReady?.(formContext);
             }}
             onSaved={(params) => {
+                setSavedCount(count => count + 1);
                 const res = {
                     ...params,
                     selectedTab: MAIN_TAB_VALUE === activeTab ? undefined : activeTab
@@ -758,26 +763,35 @@ parentEntityIds,
             </Tabs>
         </div>}
 
-        {globalLoading
-            ? <EntityFormSkeleton collection={collection} />
-            : <>
-                {entityReadOnlyView}
-                {entityView}
-            </>}
+        {/* The record and the inspector share the space below the bar rather
+            than stacking, so the form stays reachable while the panel is open.
+            `min-w-0` keeps a wide form from pushing the panel off the edge. */}
+        <div className={"flex-1 min-h-0 flex"}>
 
-        {customViewsView}
+            <div className={"flex-1 min-w-0 flex flex-col"}>
+                {globalLoading
+                    ? <EntityFormSkeleton collection={collection} />
+                    : <>
+                        {entityReadOnlyView}
+                        {entityView}
+                    </>}
 
-        {subCollectionsViews}
+                {customViewsView}
 
-        <EntityInspector
-            tab={inspectorTab}
-            onTabChange={setInspectorTab}
-            onClose={() => setInspectorTab(null)}
-            collection={collection as AdminCollection}
-            entity={usedEntity as Entity<Record<string, unknown>> | undefined}
-            formContext={formContext as FormContext<Record<string, unknown>> | undefined}
-            values={formContext?.values ?? usedEntity?.values}
-            includeHistory={includeHistoryView}/>
+                {subCollectionsViews}
+            </div>
+
+            <EntityInspector
+                tab={inspectorTab}
+                onTabChange={setInspectorTab}
+                onClose={() => setInspectorTab(null)}
+                collection={collection as AdminCollection}
+                entity={usedEntity as Entity<Record<string, unknown>> | undefined}
+                formContext={formContext as FormContext<Record<string, unknown>> | undefined}
+                values={formContext?.values ?? usedEntity?.values}
+                refreshToken={savedCount}
+                includeHistory={includeHistoryView}/>
+        </div>
 
     </div>;
 

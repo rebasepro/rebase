@@ -16,8 +16,12 @@ import { useHistory } from "../../hooks/useHistory";
 export function EntityHistoryView<M extends Record<string, unknown>>({
     entity,
     collection,
-    formContext
-}: EntityCustomViewParams<M>) {
+    formContext,
+    refreshToken
+}: EntityCustomViewParams<M> & {
+    /** Bumped once per save, so the list picks up the revision it just made. */
+    refreshToken?: number;
+}) {
 
     const { t } = useTranslation();
     const snackbarController = useSnackbarController();
@@ -37,7 +41,8 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
         slug,
         entityId,
         enabled: !!entityId,
-        pageSize: 10
+        pageSize: 10,
+        refreshToken
     });
 
     const [revertHistoryId, setRevertHistoryId] = useState<string | undefined>();

@@ -581,22 +581,29 @@ entityId }
             </Tabs>
         </div>}
 
-        {globalLoading
-            ? <DetailViewSkeleton collection={collection} />
-            : mainView}
+        {/* See EditViewBinding: the inspector docks beside the record rather
+            than over it, so the record stays readable and scrollable. */}
+        <div className={"flex-1 min-h-0 flex"}>
 
-        {customViewsView}
-        {subCollectionsViews}
+            <div className={"flex-1 min-w-0 flex flex-col"}>
+                {globalLoading
+                    ? <DetailViewSkeleton collection={collection} />
+                    : mainView}
 
-        <EntityInspector
-            tab={inspectorTab}
-            onTabChange={setInspectorTab}
-            onClose={() => setInspectorTab(null)}
-            collection={collection as AdminCollection}
-            entity={usedEntity as Entity<Record<string, unknown>> | undefined}
-            formContext={readOnlyFormContext as FormContext<Record<string, unknown>> | undefined}
-            values={usedEntity?.values}
-            includeHistory={includeHistoryView}/>
+                {customViewsView}
+                {subCollectionsViews}
+            </div>
+
+            <EntityInspector
+                tab={inspectorTab}
+                onTabChange={setInspectorTab}
+                onClose={() => setInspectorTab(null)}
+                collection={collection as AdminCollection}
+                entity={usedEntity as Entity<Record<string, unknown>> | undefined}
+                formContext={readOnlyFormContext as FormContext<Record<string, unknown>> | undefined}
+                values={usedEntity?.values}
+                includeHistory={includeHistoryView}/>
+        </div>
 
     </div>;
 
