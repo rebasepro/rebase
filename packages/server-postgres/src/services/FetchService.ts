@@ -12,6 +12,7 @@ import {
     requirePrimaryKeys,
     deriveRowAddress,
     parseIdValues,
+    idCanAddressTable,
     buildCompositeId,
     COMPOSITE_ID_SEPARATOR
 } from "./collection-helpers";
@@ -23,6 +24,7 @@ import { PostgresCollectionRegistry } from "../collections/PostgresCollectionReg
 import { toFlatRow, toRestRow, isJunctionRelation } from "./row-pipeline";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 import { ApiError, logger } from "@rebasepro/server";
+import { reachedDatabase } from "../utils/pg-error-utils";
 
 /** Type-safe accessor for Drizzle's relational query API via dynamic table name */
 type DbQueryAccessor = Record<string, RelationalQueryBuilder<any, any>> | undefined;
@@ -588,6 +590,11 @@ idColumn };
             throw new Error(`ID field '${idInfo.fieldName}' not found in table for collection '${collectionPath}'`);
         }
 
+        // An address the key columns cannot hold names no row — the same answer
+        // as a well-formed id nobody has. Asking Postgres instead raises 22P02
+        // and aborts the transaction around this read.
+        if (!idCanAddressTable(id, table, idInfoArray)) return undefined;
+
         const parsedIdObj = parseIdValues(id, idInfoArray);
         const parsedId = parsedIdObj[idInfo.fieldName];
 
@@ -618,6 +625,7 @@ idColumn };
                     logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
                     logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
+                if (reachedDatabase(e)) throw e;
                 logger.warn(`[FetchService] db.query.findFirst failed for ${collectionPath}, falling back to db.select`, { error: e });
             }
         }
@@ -743,6 +751,7 @@ idColumn };
                     logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
                     logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
+                if (reachedDatabase(e)) throw e;
                 logger.warn(`[FetchService] db.query.findMany failed for ${collectionPath}, falling back to db.select`, { error: e });
             }
         }
@@ -1173,6 +1182,7 @@ relatedTo: hop }, include
                     logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
                     logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
+                if (reachedDatabase(e)) throw e;
                 logger.warn(`[fetchCollectionForRest] db.query.findMany failed for ${collectionPath}, falling back`, { error: e });
             }
         }
@@ -1246,6 +1256,9 @@ relatedTo: hop }, include
         const idInfo = idInfoArray[0];
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
+        // See `fetchOne`: an unaddressable id is a 404, not a database error.
+        if (!idCanAddressTable(id, table, idInfoArray)) return null;
+
         const parsedIdObj = parseIdValues(id, idInfoArray);
         const parsedId = parsedIdObj[idInfo.fieldName];
 
@@ -1279,6 +1292,7 @@ relatedTo: hop }, include
                     logger.error(`[FetchService] ResolvedRelation inference error for collection '${collectionPath}': ${e.message}`);
                     logger.error("Hint: This usually means a relation in your drizzle schema is missing a reciprocal 'one()' or 'many()' definition. Run 'rebase schema generate' to fix this.");
                 }
+                if (reachedDatabase(e)) throw e;
                 logger.warn(`[fetchOneForRest] db.query.findFirst failed for ${collectionPath}, falling back`, { error: e });
             }
         }

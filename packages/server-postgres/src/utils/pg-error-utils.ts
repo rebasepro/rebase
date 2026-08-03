@@ -80,6 +80,25 @@ export function extractPgError(error: unknown): PostgresError | null {
 }
 
 /**
+ * Whether the failure came back from Postgres rather than from building the
+ * query — which decides whether a fallback query is worth issuing.
+ *
+ * Reads here run inside a transaction (that is where `SET LOCAL ROLE` binds
+ * RLS). Once a statement raises, that transaction is aborted, and every later
+ * statement on it returns `25P02` — "current transaction is aborted, commands
+ * ignored until end of transaction block". So a retry after a database error
+ * cannot succeed, and it replaces a precise diagnosis ("invalid input syntax
+ * for type uuid") with a generic one. Rethrow instead.
+ *
+ * A query the driver could not even build — a missing reciprocal relation, say
+ * — never reached Postgres, leaves the transaction usable, and is exactly what
+ * the fallback paths exist for.
+ */
+export function reachedDatabase(error: unknown): boolean {
+    return extractPgError(error) !== null;
+}
+
+/**
  * Walk the error cause chain and return the deepest meaningful message.
  */
 export function extractCauseMessage(error: unknown): string | null {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
-import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, sanitizeErrorForClient, isRoleSwitchingPermissionError, classifyConnectFailure } from "../src/utils/pg-error-utils";
+import { extractPgError, extractCauseMessage, pgErrorToFriendlyMessage, sanitizeErrorForClient, isRoleSwitchingPermissionError, classifyConnectFailure, reachedDatabase } from "../src/utils/pg-error-utils";
 import { logger } from "@rebasepro/server";
 // Imported from the module rather than the package barrel: the barrel is
 // mocked below, so `ApiError` would come back undefined through it.
@@ -306,6 +306,33 @@ describe("pg-error-utils", () => {
             expect(result.message).not.toContain("select");
             expect(result.message).not.toContain("Failed query");
             expect(result.message).toContain("Check server logs");
+        });
+    });
+
+    describe("reachedDatabase", () => {
+
+        // The read paths catch a failed relational query and retry with
+        // db.select. That retry is only safe when the first attempt never got
+        // as far as Postgres — otherwise the transaction is already aborted and
+        // the retry returns 25P02, replacing "invalid input syntax for type
+        // uuid" with "current transaction is aborted".
+
+        it("is true for a Drizzle-wrapped PG error, however deep", () => {
+            const pgError = Object.assign(new Error("invalid input syntax for type uuid: \"new\""), { code: "22P02" });
+            const wrapped = new Error("Failed query: select ...", { cause: pgError });
+            expect(reachedDatabase(wrapped)).toBe(true);
+            expect(reachedDatabase(new Error("outer", { cause: wrapped }))).toBe(true);
+        });
+
+        it("is false for a query the driver could not build", () => {
+            // The case the fallback exists for: no statement was ever sent.
+            expect(reachedDatabase(new Error("There is not enough information to infer relation"))).toBe(false);
+            expect(reachedDatabase(new TypeError("qb.findFirst is not a function"))).toBe(false);
+        });
+
+        it("is false for non-errors", () => {
+            expect(reachedDatabase(undefined)).toBe(false);
+            expect(reachedDatabase("boom")).toBe(false);
         });
     });
 

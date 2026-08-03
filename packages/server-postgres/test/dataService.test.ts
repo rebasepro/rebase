@@ -1009,10 +1009,14 @@ status: "active" }
             ).rejects.toThrow("Table not found for collection");
         });
 
-        it("should handle invalid ID types", async () => {
+        it("reports an id no row could have as no row, not as an error", async () => {
+            // An `integer` key cannot hold "invalid-number", so nothing has
+            // that address — which the REST layer already renders as 404.
+            // Throwing made it a 500, and on a `uuid` key the same input
+            // reached Postgres and aborted the read's transaction.
             await expect(
                 dataService.fetchOne("users", "invalid-number")
-            ).rejects.toThrow("Invalid numeric ID: invalid-number");
+            ).resolves.toBeUndefined();
         });
     });
 

@@ -130,10 +130,52 @@ name: "Test" };
             expect(entity?.id).toBe("123");
         });
 
-        it("should throw error for invalid numeric ID", async () => {
+        it("reports an id no row could have as no row, not as an error", async () => {
+            // See the same case in dataService.test.ts: unaddressable is 404,
+            // not 500 — and on a uuid key, not an aborted transaction either.
             await expect(
                 dataService.fetchOne("test", "invalid-number")
-            ).rejects.toThrow("Invalid numeric ID: invalid-number");
+            ).resolves.toBeUndefined();
+        });
+
+        it("never sends a non-UUID to a uuid key column", async () => {
+            // `/c/products/new` in the admin. Postgres answers a uuid
+            // comparison against "new" with 22P02 and aborts the transaction
+            // the read runs in, so the error the user sees is the 25P02 that
+            // the *next* statement raises — about a transaction they never
+            // asked for. The column can be asked first, and cannot hold it.
+            const uuidTable = {
+                id: { name: "id",
+columnType: "PgUUID",
+dataType: "string",
+primary: true },
+                name: { name: "name" },
+                _def: { tableName: "uuid_table" }
+            };
+            const uuidCollection: CollectionConfig = {
+                slug: "uuidthings",
+                name: "UUID things",
+                table: "uuid_table",
+                properties: {
+                    id: { type: "string",
+isId: "uuid" },
+                    name: { type: "string" }
+                }
+            } as CollectionConfig;
+
+            jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path =>
+                (path === "uuidthings" || path === "uuid_table") ? uuidCollection : undefined);
+            jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName =>
+                tableName === "uuid_table" ? uuidTable as any : undefined);
+
+            await expect(dataService.fetchOne("uuidthings", "new")).resolves.toBeUndefined();
+            expect(db.select).not.toHaveBeenCalled();
+
+            // A well-formed uuid still reaches the database.
+            db.limit.mockResolvedValue([{ id: "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+name: "Test" }]);
+            await dataService.fetchOne("uuidthings", "3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+            expect(db.select).toHaveBeenCalled();
         });
 
         it("should handle zero as valid ID", async () => {

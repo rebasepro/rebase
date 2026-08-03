@@ -7,6 +7,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
     buildCompositeId,
     parseIdValues,
+    isAddressableId,
     getDeclaredPrimaryKeys,
     COMPOSITE_ID_SEPARATOR,
     PrimaryKeyInfo
@@ -74,6 +75,13 @@ user_id: 2 });
         expect(() => parseIdValues("not-a-number", numericId)).toThrow(/Invalid numeric ID/);
     });
 
+    it("passes a non-UUID through rather than judge a config's claim", () => {
+        // `isUUID` here comes from `isId: "uuid"`, which is a declaration about
+        // a key and not the column's type. Callers that want to refuse the
+        // query ask `isAddressableId` with column-derived key info.
+        expect(parseIdValues("new", uuidKey)).toEqual({ id: "new" });
+    });
+
     it("throws when a composite address has the wrong number of parts", () => {
         expect(() => parseIdValues("1", composite)).toThrow(/Composite ID parts mismatch/);
         expect(() => parseIdValues("1:::2:::3", composite)).toThrow(/Composite ID parts mismatch/);
@@ -81,6 +89,51 @@ user_id: 2 });
 
     it("returns nothing when the collection declares no keys", () => {
         expect(parseIdValues("1", [])).toEqual({});
+    });
+});
+
+describe("isAddressableId", () => {
+
+    it("accepts an id the key columns can actually hold", () => {
+        expect(isAddressableId("3f2504e0-4f89-11d3-9a0c-0305e82c3301", uuidKey)).toBe(true);
+        expect(isAddressableId("42", numericId)).toBe(true);
+        expect(isAddressableId(42, numericId)).toBe(true);
+        expect(isAddressableId("anything", stringSku)).toBe(true);
+        expect(isAddressableId("1:::2", composite)).toBe(true);
+    });
+
+    it("rejects an id no row could have, so callers can answer 404", () => {
+        // `/c/products/new` is the one that reaches users: a route segment that
+        // was never an id at all.
+        expect(isAddressableId("new", uuidKey)).toBe(false);
+        expect(isAddressableId("not-a-number", numericId)).toBe(false);
+        expect(isAddressableId("1", composite)).toBe(false);
+        expect(isAddressableId("x:::2", composite)).toBe(false);
+    });
+
+    it("rejects everything for a collection with no key", () => {
+        expect(isAddressableId("1", [])).toBe(false);
+    });
+
+    it("never calls addressable an id parseIdValues refuses to build", () => {
+        // A gap in this direction is a 500: the caller decides to query, and
+        // then the query cannot be built. The reverse gap is allowed — see the
+        // UUID case, where only the column knows.
+        const cases: [string, PrimaryKeyInfo[]][] = [
+            ["3f2504e0-4f89-11d3-9a0c-0305e82c3301", uuidKey],
+            ["new", uuidKey],
+            ["42", numericId],
+            ["not-a-number", numericId],
+            ["ABC-1", stringSku],
+            ["1:::2", composite],
+            ["1", composite],
+            ["x:::2", composite]
+        ];
+
+        for (const [id, keys] of cases) {
+            if (!isAddressableId(id, keys)) continue;
+            expect(() => parseIdValues(id, keys)).not.toThrow();
+        }
     });
 });
 

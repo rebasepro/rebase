@@ -7,9 +7,9 @@ import { logger } from "@rebasepro/server";
 // Row identity is derived on both sides of the wire — the driver parses an
 // incoming address into key columns, the admin derives one from a served row —
 // so the implementation lives in `common` and both agree by construction.
-export { buildCompositeId, parseIdValues, COMPOSITE_ID_SEPARATOR } from "@rebasepro/common";
+export { buildCompositeId, parseIdValues, isAddressableId, COMPOSITE_ID_SEPARATOR } from "@rebasepro/common";
 export type { PrimaryKeyInfo } from "@rebasepro/common";
-import { buildCompositeId, COMPOSITE_ID_SEPARATOR, getDeclaredPrimaryKeys } from "@rebasepro/common";
+import { buildCompositeId, COMPOSITE_ID_SEPARATOR, getDeclaredPrimaryKeys, isAddressableId } from "@rebasepro/common";
 import type { PrimaryKeyInfo } from "@rebasepro/common";
 
 /**
@@ -38,6 +38,33 @@ export function getColumnMeta(col: AnyPgColumn): DrizzleColumnMeta {
         dataType: typeof raw.dataType === "string" ? raw.dataType : undefined,
         primary: typeof raw.primary === "boolean" ? raw.primary : undefined
     };
+}
+
+/**
+ * Whether an address could name a row in this table, judged by the columns.
+ *
+ * {@link getPrimaryKeys} lets a config's `isId: "uuid"` win over the schema, so
+ * its `isUUID` is a claim rather than a fact — right for deriving addresses,
+ * wrong for refusing a query. Here the Drizzle column type decides, because it
+ * is what Postgres will enforce: a `uuid` column meets `/c/products/new` with
+ * `22P02`, which aborts the surrounding transaction and turns every later
+ * statement into an unrelated-looking `25P02`.
+ */
+export function idCanAddressTable(
+    id: string | number,
+    table: PgTable,
+    idInfoArray: PrimaryKeyInfo[]
+): boolean {
+    const columnBacked = idInfoArray.map(info => {
+        const col = table[info.fieldName as keyof typeof table] as AnyPgColumn | undefined;
+        const meta = col ? getColumnMeta(col) : undefined;
+        // No column to ask (a key the schema does not carry) leaves the id
+        // addressable: refusing on a guess would 404 rows that do exist.
+        if (!meta?.columnType) return info;
+        return { ...info,
+            isUUID: meta.columnType === "PgUUID" };
+    });
+    return isAddressableId(id, columnBacked);
 }
 
 export function getCollectionByPath(collectionPath: string, registry: PostgresCollectionRegistry): CollectionConfig {
