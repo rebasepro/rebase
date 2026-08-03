@@ -292,8 +292,8 @@ export interface SerializableReferenceProperty extends SerializableBaseProperty 
  */
 export type SerializableRelation =
     | { kind: "belongsTo"; target?: string; relationName?: string; localKey?: string; onUpdate?: OnAction; onDelete?: OnAction }
-    | { kind: "hasOne"; target?: string; relationName?: string; foreignKeyOnTarget?: string; onUpdate?: OnAction; onDelete?: OnAction }
-    | { kind: "hasMany"; target?: string; relationName?: string; foreignKeyOnTarget?: string; onUpdate?: OnAction; onDelete?: OnAction }
+    | { kind: "hasOne"; target?: string; relationName?: string; foreignKeyOnTarget?: string; sourceKey?: string; onUpdate?: OnAction; onDelete?: OnAction }
+    | { kind: "hasMany"; target?: string; relationName?: string; foreignKeyOnTarget?: string; sourceKey?: string; onUpdate?: OnAction; onDelete?: OnAction }
     | {
         kind: "manyToMany";
         target?: string;

@@ -135,12 +135,12 @@ function validateProperty(
             // silently honoured by whichever consumer read it first.
             const allowedByKind: Record<string, string[]> = {
                 belongsTo: ["localKey"],
-                hasOne: ["foreignKeyOnTarget"],
-                hasMany: ["foreignKeyOnTarget"],
+                hasOne: ["foreignKeyOnTarget", "sourceKey"],
+                hasMany: ["foreignKeyOnTarget", "sourceKey"],
                 manyToMany: ["through"],
                 via: ["joinPath", "cardinality"]
             };
-            const linkFields = ["localKey", "foreignKeyOnTarget", "through", "joinPath", "cardinality"];
+            const linkFields = ["localKey", "foreignKeyOnTarget", "sourceKey", "through", "joinPath", "cardinality"];
             const allowed = allowedByKind[String(link.kind)] ?? [];
             for (const field of linkFields) {
                 if (link[field] !== undefined && !allowed.includes(field)) {

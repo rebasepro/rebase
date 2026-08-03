@@ -7,10 +7,34 @@ import {
     areCollectionsEqual,
     areCollectionListsEqual,
     NAVIGATION_DEFAULT_GROUP_NAME,
-    NAVIGATION_ADMIN_GROUP_NAME
+    NAVIGATION_ADMIN_GROUP_NAME,
+    NAVIGATION_BOTTOM_GROUP_NAMES,
+    isBottomPinnedGroupName
 } from "../../src/hooks/navigation/utils";
 import type { CollectionConfig } from "@rebasepro/types";
 import type { AppView, RebasePlugin, NavigationGroupMapping } from "@rebasepro/admin-types";
+
+// ---------------------------------------------------------------------------
+// isBottomPinnedGroupName
+// ---------------------------------------------------------------------------
+describe("isBottomPinnedGroupName", () => {
+    it("pins the two names it has always pinned", () => {
+        // Kept for compatibility: apps have relied on `group: "Settings"`
+        // landing last since before there was a flag for it.
+        for (const name of NAVIGATION_BOTTOM_GROUP_NAMES) {
+            expect(isBottomPinnedGroupName(name)).toBe(true);
+        }
+        expect(isBottomPinnedGroupName(NAVIGATION_ADMIN_GROUP_NAME)).toBe(true);
+    });
+
+    it("does not pin a translated or renamed group", () => {
+        // The failure this documents: the same group, relabelled, silently
+        // stops sinking. `pinToBottom` is the way to keep the behaviour.
+        expect(isBottomPinnedGroupName("Ajustes")).toBe(false);
+        expect(isBottomPinnedGroupName("settings")).toBe(false);
+        expect(isBottomPinnedGroupName(undefined)).toBe(false);
+    });
+});
 
 // ---------------------------------------------------------------------------
 // getGroup

@@ -37,13 +37,7 @@ export function resolveRelation(
         );
     }
 
-    const targetCollection = target();
-    if (!targetCollection?.slug) {
-        throw new Error(
-            `Relation${relation.relationName ? ` '${relation.relationName}'` : ""} on ` +
-            `'${sourceCollection.slug}' has a \`target\` that did not resolve to a collection.`
-        );
-    }
+    const targetCollection = callTarget(relation, sourceCollection, propertyKey, target);
 
     // The name is the address: the `include` key, the admin tab, and the
     // segment of a nested path. Declared name wins, then the declaring
@@ -80,7 +74,8 @@ export function resolveRelation(
                 cardinality: "one",
                 writable: true,
                 shared: false,
-                foreignKeyOnTarget: relation.foreignKeyOnTarget ?? generateForeignKeyName(sourceName)
+                foreignKeyOnTarget: relation.foreignKeyOnTarget ?? generateForeignKeyName(sourceName),
+                sourceKey: relation.sourceKey
             };
 
         case "hasMany":
@@ -90,7 +85,11 @@ export function resolveRelation(
                 cardinality: "many",
                 writable: true,
                 shared: false,
-                foreignKeyOnTarget: relation.foreignKeyOnTarget ?? generateForeignKeyName(sourceName)
+                foreignKeyOnTarget: relation.foreignKeyOnTarget ?? generateForeignKeyName(sourceName),
+                // Not defaulted: the source's primary key needs the driver's
+                // schema to resolve, which resolution does not have. `undefined`
+                // means "the primary key" — see `ResolvedHasMany.sourceKey`.
+                sourceKey: relation.sourceKey
             };
 
         case "manyToMany": {
@@ -131,4 +130,70 @@ export function resolveRelation(
             throw new Error(`Unknown relation kind: ${JSON.stringify(exhaustive)}`);
         }
     }
+}
+
+/** How this relation is addressed in an error message, before it has a resolved name. */
+function describe(relation: Relation, sourceCollection: CollectionConfig, propertyKey?: string): string {
+    const name = relation.relationName ?? propertyKey;
+    return `Relation${name ? ` '${name}'` : ""} on '${sourceCollection.slug}'`;
+}
+
+/**
+ * Call the `target` thunk, and translate the two ways an import cycle breaks it
+ * into an error that names the cause.
+ *
+ * The thunk exists to defer the reference until every module has finished
+ * evaluating, and for a cycle that closes at import time it does. What it cannot
+ * defer is a cycle that leaves the binding permanently unusable, and there are
+ * two shapes of that:
+ *
+ *  - **ESM/TDZ.** `const` and `class` bindings in a not-yet-evaluated module are
+ *    in the temporal dead zone, so reading one throws `ReferenceError: x is not
+ *    defined`. The stack points at the thunk — a one-line arrow function that is
+ *    obviously fine — and says nothing about the cycle that made it throw.
+ *  - **CJS interop.** The half-initialised module object has no `default` yet,
+ *    the import resolves to `undefined`, and the thunk returns it without
+ *    complaint. That one used to surface here as "did not resolve to a
+ *    collection", which is true and unhelpful.
+ *
+ * Both mean the same thing, and the fix for both is the same: break the cycle,
+ * or move the relation into the collection that does not close it.
+ */
+function callTarget(
+    relation: Relation,
+    sourceCollection: CollectionConfig,
+    propertyKey: string | undefined,
+    target: Relation["target"]
+): ReturnType<Relation["target"]> {
+    let targetCollection: ReturnType<Relation["target"]> | undefined;
+    try {
+        targetCollection = target();
+    } catch (error) {
+        // A ReferenceError from inside the thunk is a binding that was never
+        // initialised — nothing else in a one-expression arrow can raise one.
+        if (error instanceof ReferenceError) {
+            throw new Error(
+                `${describe(relation, sourceCollection, propertyKey)} targets a collection that is not ` +
+                `initialized yet — almost always an import cycle between the two collection files. ` +
+                `Break the cycle (move the shared piece into a third module, or import the target ` +
+                `lazily) so the target's module finishes evaluating before the registry is built.`,
+                { cause: error }
+            );
+        }
+        throw error;
+    }
+
+    if (!targetCollection?.slug) {
+        throw new Error(
+            `${describe(relation, sourceCollection, propertyKey)} has a \`target\` that resolved to ` +
+            `${targetCollection === undefined ? "`undefined`" : "something that is not a collection"}. ` +
+            (targetCollection === undefined
+                ? "Under CommonJS interop an import cycle resolves the default import to `undefined`, " +
+                  "so check whether this collection and its target import each other. Otherwise the thunk " +
+                  "is returning the wrong value — it must return the collection itself, not a promise or a module."
+                : "The thunk must return a collection config with a `slug`.")
+        );
+    }
+
+    return targetCollection;
 }

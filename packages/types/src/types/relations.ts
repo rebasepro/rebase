@@ -82,6 +82,15 @@ export interface HasOneRelation extends RelationBase {
      * Defaults to `<thisCollection>_id`.
      */
     foreignKeyOnTarget?: string;
+    /**
+     * Column on **this** collection's table whose value `foreignKeyOnTarget`
+     * holds. Defaults to this collection's primary key.
+     *
+     * Set it when the two sides are joined on a natural key rather than on the
+     * row id — an external identity id, a SKU, a tenant slug. See
+     * {@link HasManyRelation.sourceKey}, which this mirrors.
+     */
+    sourceKey?: string;
 }
 
 /**
@@ -100,6 +109,30 @@ export interface HasManyRelation extends RelationBase {
      * Defaults to `<thisCollection>_id`.
      */
     foreignKeyOnTarget?: string;
+    /**
+     * Column on **this** collection's table whose value `foreignKeyOnTarget`
+     * holds. Defaults to this collection's primary key.
+     *
+     * The mirror of `localKey` on {@link BelongsToRelation}: that one names the
+     * column this side reads from, this one names the column the other side
+     * points at. Without it the pair can only be joined on the row id, which
+     * makes a natural-key link — `auth_user_id ↔ auth_user_id`, a SKU, a tenant
+     * slug — inexpressible as `hasMany`, and it has to drop to the read-only
+     * `via`.
+     *
+     * The column must be unique: the link addresses one source row per value,
+     * and Postgres will not accept a foreign key against a non-unique column.
+     *
+     * ```ts
+     * applications: {
+     *     kind: "hasMany",
+     *     target: () => talentApplications,
+     *     sourceKey: "auth_user_id",
+     *     foreignKeyOnTarget: "auth_user_id"
+     * }
+     * ```
+     */
+    sourceKey?: string;
 }
 
 /**
@@ -248,6 +281,8 @@ export interface ResolvedHasOne extends ResolvedRelationBase {
     shared: false;
     /** Column on the target's table. */
     foreignKeyOnTarget: string;
+    /** @see ResolvedHasMany.sourceKey */
+    sourceKey?: string;
 }
 
 /** @group Models */
@@ -258,6 +293,22 @@ export interface ResolvedHasMany extends ResolvedRelationBase {
     shared: false;
     /** Column on the target's table. */
     foreignKeyOnTarget: string;
+    /**
+     * Column on the source's table that `foreignKeyOnTarget` points at, or
+     * `undefined` for the source's primary key.
+     *
+     * The one optional field on a resolved relation, and deliberately so. Every
+     * other default is filled in here because it can be: a table name and a
+     * column name are derivable from the relation and its two endpoints alone.
+     * The primary key is not — this driver resolves it from `isId`, then the
+     * Drizzle schema, then a column named `id`, and the middle tier does not
+     * exist at resolution time.
+     *
+     * So `undefined` is a sentinel with exactly one meaning, not a field a
+     * consumer is invited to guess at. Read it through `sourceKeyField()`,
+     * which is the only place that turns it into a column name.
+     */
+    sourceKey?: string;
 }
 
 /** @group Models */

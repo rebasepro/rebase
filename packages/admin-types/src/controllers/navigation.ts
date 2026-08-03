@@ -162,8 +162,24 @@ export interface AppView {
      * Views sharing the same group name will be visually grouped
      * together in the drawer and home page. If not set, the view
      * falls into the default "Views" group.
+     *
+     * Two names are special: a group called `"Admin"` or `"Settings"` sinks to
+     * the bottom of the drawer, by string comparison on the name. That predates
+     * {@link pinToBottom} and still works, but rename the group — translate the
+     * label, say — and the ordering silently stops happening. Use
+     * `pinToBottom` for anything that is not literally one of those two words.
      */
     group?: string;
+
+    /**
+     * Sink this view's group to the bottom of the drawer, below the ordinary
+     * groups.
+     *
+     * What `group: "Settings"` has always done, said out loud. Setting it on
+     * any one view in a group pins the whole group, since the drawer orders
+     * groups and not individual views.
+     */
+    pinToBottom?: boolean;
 
     /**
      * Component to be rendered. This can be any React component, and can use

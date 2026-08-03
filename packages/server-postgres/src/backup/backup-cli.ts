@@ -100,6 +100,8 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
             "--out": String,
             "--exclude-schema": [String],
             "--no-owner": Boolean,
+            "--enable-row-security": Boolean,
+            "--row-security-role": String,
             "-o": "--out"
         },
         { argv: rawArgs.slice(2), permissive: true }
@@ -129,6 +131,23 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
     }
     logger.info(chalk.gray(`  Using pg_dump ${pf.toolMajor} against server ${pf.serverMajor}.`));
 
+    // Opt-in, and loud. With row security on, pg_dump stops refusing to read
+    // rows it cannot see and starts leaving them out — an exit-0 backup that
+    // is quietly short. Anyone choosing that should know they chose it.
+    const rowSecurity = args["--enable-row-security"]
+        ? { uid: "rebase-db-backup", roles: [args["--row-security-role"] || "admin"] }
+        : undefined;
+
+    if (rowSecurity) {
+        logger.warn("");
+        logger.warn(chalk.yellow("  ⚠  Dumping with row-level security ON."));
+        logger.warn(chalk.gray(`     Reading as roles [${rowSecurity.roles.join(", ")}], which satisfies the generated`));
+        logger.warn(chalk.gray("     `admin_full_access` policy. This backup contains exactly the rows those"));
+        logger.warn(chalk.gray("     policies admit — a table whose policies have no admin rule comes out short,"));
+        logger.warn(chalk.gray("     and pg_dump will not say so. Prefer granting the dumping role BYPASSRLS."));
+        logger.warn("");
+    }
+
     try {
         if (dest.kind === "local") {
             // Honour an explicit `…/name.dump` path; otherwise treat it as a
@@ -141,7 +160,8 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
                 fileName: explicitFile ? path.basename(dest.path) : undefined,
                 excludeSchemas: args["--exclude-schema"],
                 noOwner: args["--no-owner"],
-                inheritStdio: true
+                inheritStdio: true,
+                rowSecurity
             });
             await assertDumpValid(dump.localFile);
             logger.info("");
@@ -156,7 +176,8 @@ export async function backupCommand(rawArgs: string[]): Promise<void> {
                 dbName,
                 excludeSchemas: args["--exclude-schema"],
                 noOwner: args["--no-owner"],
-                inheritStdio: true
+                inheritStdio: true,
+                rowSecurity
             });
             try {
                 await assertDumpValid(dump.localFile);
@@ -395,6 +416,24 @@ ${chalk.green.bold("Options")}
   ${chalk.blue("--out, -o")} <dest>        Local path or s3://…/gs://… URL (default: ./backups)
   ${chalk.blue("--exclude-schema")} <s>    Exclude a schema (repeatable)
   ${chalk.blue("--no-owner")}              Omit ownership commands from the dump
+  ${chalk.blue("--enable-row-security")}   Dump as an admin subject instead of failing on RLS
+                             ${chalk.red("(may produce a partial dump — see below)")}
+  ${chalk.blue("--row-security-role")} <r> Role to read as with the flag above (default: admin)
+
+${chalk.green.bold("Row-level security")}
+  On a managed Postgres the dumping role usually owns nothing and has no
+  BYPASSRLS, so pg_dump refuses:
+
+    ERROR: query would be affected by row-level security policy for table "..."
+
+  That refusal is the safe behaviour. --enable-row-security replaces it by
+  reading as an admin subject: Rebase sets app.uid/app.user_roles so the
+  generated admin_full_access policy admits the dump. The dump then contains
+  exactly what those policies admit ${chalk.red("and no error is raised for what they do not")} —
+  a table whose policies lack an admin rule comes out short, silently.
+
+  Granting the dumping role BYPASSRLS is the option that keeps a backup
+  meaning "every row".
 
 ${chalk.green.bold("Notes")}
   Backups may contain secrets and PII. Use private storage destinations and

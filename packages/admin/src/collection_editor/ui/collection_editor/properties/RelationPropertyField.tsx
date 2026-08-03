@@ -67,6 +67,7 @@ export function RelationPropertyField({
     const targetSlug = getTargetSlug(link.target);
     const localKey = link.localKey ?? "";
     const foreignKeyOnTarget = link.foreignKeyOnTarget ?? "";
+    const sourceKey = link.sourceKey ?? "";
     const through = link.through;
     const throughTable = through?.table ?? "";
     const throughSourceColumn = through?.sourceColumn ?? "";
@@ -199,6 +200,21 @@ targetColumn: "" };
                     />
                     <FieldCaption>
                         Column on the target table that references this table&apos;s primary key
+                    </FieldCaption>
+                    <TextField
+                        className={"mt-4"}
+                        value={sourceKey}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+                            setFieldValue("relation.sourceKey", e.target.value)
+                        }
+                        label={"Source key (optional)"}
+                        disabled={disabled}
+                        placeholder={"defaults to this table's primary key"}
+                    />
+                    <FieldCaption>
+                        Column on <em>this</em> table that the foreign key above points at. Leave empty
+                        unless the two sides are joined on a natural key — an external identity id, a
+                        SKU — rather than on the row id. It must be unique.
                     </FieldCaption>
                 </div>
             )}

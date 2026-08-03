@@ -1,5 +1,5 @@
 import { PgTable, AnyPgColumn } from "drizzle-orm/pg-core";
-import { CollectionConfig, Property } from "@rebasepro/types";
+import { CollectionConfig, Property, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { getTableName } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
@@ -147,6 +147,45 @@ export function requirePrimaryKeys(collection: CollectionConfig, registry: Postg
         );
     }
     return keys;
+}
+
+/**
+ * The column on the *source* table that a `hasOne`/`hasMany` link points at.
+ *
+ * `sourceKey` is authored when the two sides join on a natural key — an
+ * external identity id, a SKU — and left off when they join on the row id,
+ * which is the overwhelming majority. That makes `undefined` the only optional
+ * field on a resolved relation, so it gets exactly one reader: this function.
+ * Every consumer that needs the column asks here, and none of them re-derives
+ * "or else the primary key" for itself. That is the whole point — the fallback
+ * chains this codebase removed from relation resolution were dangerous because
+ * they were *duplicated* and could disagree, not because they existed.
+ */
+export function sourceKeyField(
+    relation: ResolvedHasOne | ResolvedHasMany,
+    sourceCollection: CollectionConfig,
+    registry: PostgresCollectionRegistry
+): string {
+    if (relation.sourceKey) return relation.sourceKey;
+    return requirePrimaryKeys(sourceCollection, registry)[0].fieldName;
+}
+
+/**
+ * Whether this link joins on something other than the source's primary key.
+ *
+ * Callers that hold a parent *id* — which is most of them, since an id is what
+ * a URL carries — must translate it to the source key's value before it can be
+ * compared with the target's foreign key. Those that hold the parent *row*, or
+ * that build a correlated subquery over the source table, can read the column
+ * directly and skip the lookup.
+ */
+export function joinsOnNaturalKey(
+    relation: ResolvedHasOne | ResolvedHasMany,
+    sourceCollection: CollectionConfig,
+    registry: PostgresCollectionRegistry
+): boolean {
+    if (!relation.sourceKey) return false;
+    return relation.sourceKey !== requirePrimaryKeys(sourceCollection, registry)[0].fieldName;
 }
 
 /**

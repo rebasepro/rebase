@@ -6,6 +6,8 @@
  * not require a database.
  */
 
+import { forLibpq } from "../utils/connection-string";
+
 /**
  * A parsed backup destination. `--out` (and the scheduled-backup config)
  * accepts either a local filesystem path or an object-storage URL.
@@ -172,6 +174,45 @@ export function joinStorageKey(prefix: string, fileName: string): string {
 }
 
 /**
+ * The identity `pg_dump` reads rows as, when row security is left on.
+ *
+ * Not optional, and that is the whole design. `pg_dump --enable-row-security`
+ * on its own is the dangerous command in this file: it turns the "query would
+ * be affected by row-level security policy" *error* into a dump that exits 0
+ * and is silently missing every row the dumping role's policies exclude. A
+ * backup that looks fine and restores most of your data is worse than one that
+ * refused to run.
+ *
+ * So the flag is unreachable without a subject to evaluate the policies
+ * against. Rebase's generated policies read `app.uid` and `app.user_roles`;
+ * supplying an admin role satisfies the `admin_full_access` rule and the dump
+ * sees everything that rule sees.
+ */
+export interface RowSecurityIdentity {
+    /** Written to `app.uid`. Any non-empty value — it is only an audit trail. */
+    uid: string;
+    /** Written to `app.user_roles`. Must include a role the policies admit. */
+    roles: string[];
+}
+
+/**
+ * `PGOPTIONS` carrying an identity, for a libpq tool that has no other way to
+ * set a GUC.
+ *
+ * A backslash escape rather than quoting, which is what libpq's `-c` parsing
+ * takes: a space inside a value ends the option otherwise, so a role list is
+ * comma-joined and never spaced.
+ */
+export function buildRowSecurityPgOptions(identity: RowSecurityIdentity): string {
+    const escape = (value: string) => value.replace(/([\\ ])/g, "\\$1");
+    return [
+        `-c app.uid=${escape(identity.uid)}`,
+        `-c app.user_id=${escape(identity.uid)}`,
+        `-c app.user_roles=${escape(identity.roles.join(","))}`
+    ].join(" ");
+}
+
+/**
  * Assemble the `pg_dump` argument vector. Uses the custom format (`-Fc`),
  * which is compressed and restorable selectively via `pg_restore`.
  */
@@ -182,16 +223,68 @@ export function buildPgDumpArgs(opts: {
     excludeSchemas?: string[];
     /** Number of parallel jobs (directory format only; ignored for -Fc). */
     noOwner?: boolean;
+    /**
+     * Dump with row security on, as this identity. Omit — which is the default
+     * — and `pg_dump` errors rather than skipping rows it cannot see.
+     */
+    rowSecurity?: RowSecurityIdentity;
 }): string[] {
     const args = ["--format=custom", "--no-password", `--file=${opts.outFile}`];
     if (opts.noOwner) {
         args.push("--no-owner");
     }
+    if (opts.rowSecurity) {
+        args.push("--enable-row-security");
+    }
     for (const schema of opts.excludeSchemas ?? []) {
         args.push(`--exclude-schema=${schema}`);
     }
-    args.push(opts.connectionString);
+    args.push(forLibpq(opts.connectionString));
     return args;
+}
+
+/**
+ * Whether a `pg_dump` failure is the row-security one, and what to do about it.
+ *
+ * The error text names the table and nothing else, so the first read of it is
+ * "why would a backup be affected by RLS at all?" — the answer being that the
+ * dumping role is not the tables' owner and has no `BYPASSRLS`, which is the
+ * normal state of the `postgres` user on Cloud SQL, RDS and every other managed
+ * Postgres. Nothing about that is visible from the message.
+ *
+ * Returns `null` for any other failure, so the caller reports it unchanged.
+ */
+export function diagnoseRowSecurityDumpFailure(error: unknown): string | null {
+    const text = [
+        (error as { stderr?: unknown })?.stderr,
+        (error as { message?: unknown })?.message
+    ].map(part => (typeof part === "string" ? part : "")).join("\n");
+
+    if (!/row-level security policy/i.test(text)) return null;
+
+    const table = text.match(/for table "([^"]+)"/)?.[1];
+
+    return [
+        `pg_dump cannot read ${table ? `"${table}"` : "one of the tables"} because row-level security applies to it.`,
+        "",
+        "  The dumping role is neither the table's owner nor `BYPASSRLS`, which is the normal",
+        "  state of the `postgres` user on Cloud SQL, RDS and other managed Postgres — there is",
+        "  no superuser to hand out.",
+        "",
+        "  Two ways out:",
+        "",
+        "    • Grant the dumping role BYPASSRLS, or make it the owner, and run this again. The",
+        "      dump then contains every row, which is what a backup should mean.",
+        "",
+        "    • Re-run with --enable-row-security to dump as an admin subject instead. Rebase",
+        "      sets `app.uid`/`app.user_roles` so the generated `admin_full_access` policy",
+        "      admits the dump. Read the warning it prints: the result contains exactly the",
+        "      rows those policies admit, and any table whose policies do not include an",
+        "      admin rule comes out short — with no error.",
+        "",
+        "  Do not reach for a bare `pg_dump --enable-row-security` by hand. Without the",
+        "  settings above it succeeds and silently omits rows."
+    ].join("\n");
 }
 
 /**
@@ -211,7 +304,7 @@ export function buildPgRestoreArgs(opts: {
     exitOnError?: boolean;
     noOwner?: boolean;
 }): string[] {
-    const args = ["--format=custom", "--no-password", `--dbname=${opts.connectionString}`];
+    const args = ["--format=custom", "--no-password", `--dbname=${forLibpq(opts.connectionString)}`];
     if (opts.clean) {
         args.push("--clean", "--if-exists");
     }
@@ -255,7 +348,7 @@ export function buildPgDumpallGlobalsArgs(opts: {
         "--no-role-passwords",
         "--no-password",
         `--file=${opts.outFile}`,
-        `--dbname=${opts.connectionString}`
+        `--dbname=${forLibpq(opts.connectionString)}`
     ];
 }
 

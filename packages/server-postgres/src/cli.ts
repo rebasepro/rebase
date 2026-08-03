@@ -16,6 +16,7 @@ import {
     promptConfirm
 } from "./cli-helpers";
 import { checkDatabaseConnectivity, diagnoseDbError } from "./cli-errors";
+import { forLibpq } from "./utils/connection-string";
 import { AUTH_BOOTSTRAP_SQL } from "./schema/auth-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
 
@@ -693,19 +694,25 @@ async function runAtlas(
     const devDatabaseUrl = getDevDatabaseUrl(databaseUrl);
     await ensureDevDatabaseExists(databaseUrl, devDatabaseUrl);
 
+    // Atlas speaks libpq, which rejects the `sslmode=no-verify` that
+    // node-postgres accepts — see `forLibpq`. Rewritten only for the argv, so
+    // everything above still connects with the URL as configured.
+    const atlasUrl = forLibpq(databaseUrl);
+    const atlasDevUrl = forLibpq(devDatabaseUrl);
+
     const atlasArgs = [domain, ...args];
 
     if (domain === "schema") {
         if (args.includes("apply")) {
-            atlasArgs.push("--url", databaseUrl, "--dev-url", devDatabaseUrl);
+            atlasArgs.push("--url", atlasUrl, "--dev-url", atlasDevUrl);
         } else if (args.includes("clean") || args.includes("inspect")) {
-            atlasArgs.push("--url", databaseUrl);
+            atlasArgs.push("--url", atlasUrl);
         }
     } else if (domain === "migrate") {
         if (args.includes("diff")) {
-            atlasArgs.push("--dev-url", devDatabaseUrl);
+            atlasArgs.push("--dev-url", atlasDevUrl);
         } else if (args.includes("apply") || args.includes("status")) {
-            atlasArgs.push("--url", databaseUrl, "--revisions-schema", "rebase");
+            atlasArgs.push("--url", atlasUrl, "--revisions-schema", "rebase");
             if (args.includes("apply")) {
                 atlasArgs.push("--allow-dirty");
             }

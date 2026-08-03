@@ -7,6 +7,26 @@ import { deepEqual as equal } from "fast-equals";
 export const NAVIGATION_DEFAULT_GROUP_NAME = "Views";
 export const NAVIGATION_ADMIN_GROUP_NAME = "Admin";
 
+/**
+ * Group names that sink to the bottom of the drawer on their name alone.
+ *
+ * A magic string, and it stays one for compatibility: apps have been relying on
+ * `group: "Settings"` landing last since before there was a flag, and taking it
+ * away would silently reshuffle their navigation.
+ *
+ * It is a bad way to ask for the behaviour, though — it is invisible from the
+ * `group?: string` type, and it is defeated by the most ordinary edit there is:
+ * translating the label. `group: "Ajustes"` is the same group to a reader and a
+ * different one to this comparison, so the ordering just quietly stops
+ * happening. Set {@link AppView.pinToBottom} instead, which says so.
+ */
+export const NAVIGATION_BOTTOM_GROUP_NAMES = ["Admin", "Settings"] as const;
+
+/** Whether a group sinks to the bottom by virtue of its name. @see NAVIGATION_BOTTOM_GROUP_NAMES */
+export function isBottomPinnedGroupName(groupName?: string): boolean {
+    return groupName !== undefined && (NAVIGATION_BOTTOM_GROUP_NAMES as readonly string[]).includes(groupName);
+}
+
 export function getGroup(collectionOrView: AdminCollection | AppView) {
     const trimmed = collectionOrView.group?.trim();
     if (!trimmed || trimmed === "") {

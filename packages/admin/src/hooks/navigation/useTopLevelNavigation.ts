@@ -6,7 +6,7 @@ import { deepEqual as equal } from "fast-equals";
 import { CollectionRegistryController } from "@rebasepro/types";
 import { CollectionRegistry } from "@rebasepro/common";
 
-import { computeNavigationGroups, getGroup, NAVIGATION_ADMIN_GROUP_NAME, NAVIGATION_DEFAULT_GROUP_NAME } from "./utils";
+import { computeNavigationGroups, getGroup, isBottomPinnedGroupName, NAVIGATION_ADMIN_GROUP_NAME, NAVIGATION_DEFAULT_GROUP_NAME } from "./utils";
 
 export type UseTopLevelNavigationProps = {
     collections: AdminCollection[];
@@ -178,10 +178,18 @@ export function useTopLevelNavigation(
             }, [] as NavigationEntry[])
         ];
 
-        const groupOrderValue = (groupName?: string): number => {
-            if (groupName === NAVIGATION_ADMIN_GROUP_NAME || groupName === "Settings" || groupName === "Admin") return 1;
-            return 0;
-        };
+        // Groups that sink to the bottom. Two sources, because the string
+        // comparison predates the flag and apps depend on it: the names in
+        // `NAVIGATION_BOTTOM_GROUP_NAMES`, and any group holding a view that
+        // asked for it — which is the only one of the two that survives the
+        // group being renamed or translated.
+        const pinnedGroups = new Set<string>();
+        for (const view of [...(views ?? []), ...(adminViews ?? [])]) {
+            if (view.pinToBottom) pinnedGroups.add(getGroup(view));
+        }
+
+        const groupOrderValue = (groupName?: string): number =>
+            (isBottomPinnedGroupName(groupName) || (groupName !== undefined && pinnedGroups.has(groupName))) ? 1 : 0;
 
         const usedViewsOrder = viewsOrder ?? navigationEntriesOrder;
         navigationEntries = navigationEntries.sort((a, b) => {
@@ -218,8 +226,11 @@ export function useTopLevelNavigation(
         ];
 
         const uniqueGroupsArray = [...new Set(allDefinedGroups)];
-        const lastGroups = uniqueGroupsArray.filter(g => g === NAVIGATION_ADMIN_GROUP_NAME || g === "Settings" || g === "Admin");
-        const otherGroups = uniqueGroupsArray.filter(g => g !== NAVIGATION_ADMIN_GROUP_NAME && g !== "Settings" && g !== "Admin");
+        // Same rule the entry sort uses — read through `groupOrderValue` rather
+        // than repeated inline, so the drawer's group order and the entries
+        // inside it cannot disagree about which groups are last.
+        const lastGroups = uniqueGroupsArray.filter(g => groupOrderValue(g) === 1);
+        const otherGroups = uniqueGroupsArray.filter(g => groupOrderValue(g) === 0);
         const uniqueGroups = [...otherGroups, ...lastGroups] as string[];
 
         const computedTopLevelNav = {

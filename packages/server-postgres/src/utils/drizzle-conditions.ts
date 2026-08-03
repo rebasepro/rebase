@@ -175,10 +175,11 @@ export class DrizzleConditionBuilder {
     static buildRelationScopeCondition(
         relation: ResolvedRelation,
         /**
-         * Lazy: only `via` and `belongsTo` need the parent's own table. A
-         * foreign key on the target and a junction are both expressible from
-         * the parent's *id* alone, and requiring the table for them would make
-         * a child listing fail on a parent whose table isn't registered.
+         * Lazy: `via`, `belongsTo`, and a foreign key that points at a
+         * `sourceKey` need the parent's own table. A junction and a plain
+         * foreign key are expressible from the parent's *id* alone, and
+         * requiring the table for them would make a child listing fail on a
+         * parent whose table isn't registered.
          */
         parent: () => { table: PgTable<any>; idColumn: AnyPgColumn },
         parentId: string | number,
@@ -239,7 +240,16 @@ export class DrizzleConditionBuilder {
                         `relation '${relation.relationName}'.`
                     );
                 }
-                return eq(fkColumn, parentId);
+                if (!relation.sourceKey) return eq(fkColumn, parentId);
+
+                // A link on a natural key: the foreign key holds a column of the
+                // parent row, not its id, so the parent has to be read. As a
+                // subquery rather than a prior SELECT, for the same reason
+                // `belongsTo` below is — one statement sees one snapshot, and a
+                // scope condition that read the key separately could be built
+                // from a value the very next statement no longer agrees with.
+                const { table, idColumn } = parent();
+                return sql`${fkColumn} = (SELECT ${sql.identifier(relation.sourceKey)} FROM ${table} WHERE ${idColumn} = ${parentId})`;
             }
 
             case "belongsTo": {
@@ -385,7 +395,22 @@ export class DrizzleConditionBuilder {
             // inverse, so reversing it into a filter is a different problem
             // from the two shapes below rather than a third case of them.
             if (relation && (hasForeignKeyOnTarget(relation) || isManyToMany(relation)) && registry && sourceIdColumn) {
-                return { kind: "relation", relation, registry, sourceIdColumn };
+                // The `EXISTS` correlates the target's foreign key with a column
+                // on *this* table, and that is the primary key only when the
+                // link joins on it. A `sourceKey` names a different one, and
+                // correlating on the id anyway silently matches nothing —
+                // "filter by this relation" would quietly return zero rows.
+                const correlationColumn = hasForeignKeyOnTarget(relation) && relation.sourceKey
+                    ? columnAt(relation.sourceKey)
+                    : sourceIdColumn;
+                if (!correlationColumn) {
+                    throw new Error(
+                        `\`sourceKey: "${(relation as ResolvedForeignKeyOnTarget).sourceKey}"\` on relation ` +
+                        `'${relation.relationName}' is not a column on '${collectionPath}', so a filter on ` +
+                        "that relation has nothing to correlate against."
+                    );
+                }
+                return { kind: "relation", relation, registry, sourceIdColumn: correlationColumn };
             }
         }
 

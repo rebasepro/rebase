@@ -40,6 +40,17 @@ describe("resolveRelation — defaults", () => {
         expect(r).toMatchObject({ kind: "hasMany", cardinality: "many", foreignKeyOnTarget: "post_id" });
     });
 
+    it("passes `sourceKey` through, and leaves it undefined when unset", () => {
+        // The one field resolution does not default, because the default is the
+        // source's primary key and that needs the driver's schema to resolve.
+        const natural = resolveRelation(
+            { kind: "hasMany", relationName: "apps", target: () => tags, sourceKey: "auth_user_id" }, posts);
+        expect(natural).toMatchObject({ kind: "hasMany", sourceKey: "auth_user_id" });
+
+        const byId = resolveRelation({ kind: "hasMany", relationName: "apps", target: () => tags }, posts);
+        expect(byId.kind === "hasMany" && byId.sourceKey).toBeUndefined();
+    });
+
     it("derives a junction table both sides agree on", () => {
         const fromPosts = resolveRelation({ kind: "manyToMany", relationName: "tags", target: () => tags }, posts);
         const fromTags = resolveRelation({ kind: "manyToMany", relationName: "posts", target: () => posts }, tags);
@@ -76,7 +87,51 @@ describe("resolveRelation — defaults", () => {
         // The old resolver wrapped every relation in a try/catch and silently
         // omitted whatever it could not work out.
         expect(() => resolveRelation({ kind: "hasMany", relationName: "x", target: (() => undefined) as never }, posts))
-            .toThrow(/did not resolve to a collection/);
+            .toThrow(/resolved to `undefined`/);
+    });
+});
+
+/**
+ * The thunk defers the reference, so a cycle that closes at import time is
+ * fine. A cycle that leaves the binding permanently unusable is not, and both
+ * of its shapes used to surface as something other than "import cycle".
+ */
+describe("resolveRelation — import cycles", () => {
+
+    it("names the cycle when the thunk hits a dead binding", () => {
+        // What a `const`/`class` in a not-yet-evaluated ES module does: the
+        // thunk itself is fine, the binding it reads is in the TDZ.
+        const target = (() => {
+            throw new ReferenceError("jobsCollection is not defined");
+        }) as never;
+
+        expect(() => resolveRelation({ kind: "belongsTo", relationName: "promoted_job", target }, posts))
+            .toThrow(/'promoted_job' on 'posts' targets a collection that is not initialized yet.*import cycle/s);
+    });
+
+    it("keeps the original ReferenceError as the cause", () => {
+        const original = new ReferenceError("jobsCollection is not defined");
+        const target = (() => { throw original; }) as never;
+
+        try {
+            resolveRelation({ kind: "belongsTo", relationName: "promoted_job", target }, posts);
+            throw new Error("expected resolveRelation to throw");
+        } catch (error) {
+            expect((error as Error).cause).toBe(original);
+        }
+    });
+
+    it("does not swallow errors that are not dead bindings", () => {
+        const target = (() => { throw new TypeError("the thunk itself is broken"); }) as never;
+        expect(() => resolveRelation({ kind: "belongsTo", target }, posts, "k"))
+            .toThrow(/the thunk itself is broken/);
+    });
+
+    it("points at CJS interop when the thunk returns undefined", () => {
+        // The other shape: the half-initialised module has no `default` yet, so
+        // the thunk returns `undefined` rather than throwing.
+        expect(() => resolveRelation({ kind: "belongsTo", target: (() => undefined) as never }, posts, "promoted_job"))
+            .toThrow(/'promoted_job' on 'posts'.*resolved to `undefined`.*import cycle/s);
     });
 });
 

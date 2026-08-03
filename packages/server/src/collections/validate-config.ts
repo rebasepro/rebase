@@ -156,6 +156,7 @@ const RELATION_KEYS = new Set<string>([
     "validation",
     "localKey",
     "foreignKeyOnTarget",
+    "sourceKey",
     "through",
     "joinPath",
     "cardinality"
@@ -166,13 +167,13 @@ const RELATION_KINDS = ["belongsTo", "hasOne", "hasMany", "manyToMany", "via"];
 /** Which link field each `kind` admits. Anything else is a leftover shape. */
 const RELATION_FIELDS_BY_KIND: Record<string, string[]> = {
     belongsTo: ["localKey"],
-    hasOne: ["foreignKeyOnTarget"],
-    hasMany: ["foreignKeyOnTarget"],
+    hasOne: ["foreignKeyOnTarget", "sourceKey"],
+    hasMany: ["foreignKeyOnTarget", "sourceKey"],
     manyToMany: ["through"],
     via: ["joinPath", "cardinality"]
 };
 
-const RELATION_LINK_FIELDS = ["localKey", "foreignKeyOnTarget", "through", "joinPath", "cardinality"];
+const RELATION_LINK_FIELDS = ["localKey", "foreignKeyOnTarget", "sourceKey", "through", "joinPath", "cardinality"];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What used to be legal, and is not.

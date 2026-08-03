@@ -41,6 +41,8 @@ like the other `rebase db` commands (`DATABASE_URL`, falling back to
 | `--out`, `-o` | Destination: a local path/directory, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. Defaults to `$BACKUP_DESTINATION` or `./backups`. |
 | `--exclude-schema <s>` | Exclude a schema from the dump (repeatable). |
 | `--no-owner` | Omit ownership commands (useful when restoring as a different role). |
+| `--enable-row-security` | Dump as an admin subject instead of failing on RLS. **May produce a partial dump** — see below. |
+| `--row-security-role <r>` | Role to read as with the flag above. Defaults to `admin`. |
 
 Backup files are named `rebase-<db>-<YYYYMMDD>T<HHMMSS>Z.dump`. The UTC
 timestamp is embedded so retention can be computed from the filename alone.
@@ -64,6 +66,43 @@ be the reason your last good backup is deleted.
 For `s3://` destinations the CLI builds a storage client from the same `S3_*`
 variables your backend uses (`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
 `S3_REGION`, `S3_ENDPOINT`, `S3_FORCE_PATH_STYLE`).
+
+#### Row-level security, and the dump that is silently short
+
+On a managed Postgres — Cloud SQL, RDS, and the rest — there is no superuser to
+hand out, so the role you connect as usually owns none of your tables and has
+no `BYPASSRLS`. Row-level security therefore applies to it, and `pg_dump`
+refuses to run:
+
+```
+pg_dump: error: query failed: ERROR: query would be affected by row-level
+security policy for table "company_leads"
+```
+
+**That refusal is the safe behaviour.** The obvious next move — adding
+`--enable-row-security` by hand — is the dangerous one: it does not error, it
+succeeds, and the dump quietly contains only the rows the dumping role's
+policies admit. You get an exit code of 0, a plausible file size, and a backup
+that is missing data you will not discover until you restore it.
+
+Two real ways out, in order of preference:
+
+1. **Grant the dumping role `BYPASSRLS`, or make it the tables' owner.** The
+   dump then contains every row, which is what a backup should mean.
+
+   ```sql
+   ALTER ROLE my_backup_role BYPASSRLS;
+   ```
+
+2. **`rebase db backup --enable-row-security`.** Rebase sets `app.uid` and
+   `app.user_roles` (via `PGOPTIONS`) so the generated `admin_full_access`
+   policy admits the dump, and prints a warning saying what you have traded.
+   The flag cannot be passed without that identity — the two travel together by
+   construction, because `--enable-row-security` on its own is the failure mode
+   above.
+
+   The result contains exactly the rows those policies admit. A table whose
+   policies include no admin rule comes out short, and nothing will say so.
 
 ### `rebase db restore <backup> [options]`
 

@@ -22,4 +22,5 @@ export * from "./components/EmptyValue";
 export * from "./components/ImagePreview";
 export * from "./components/ReferencePreview";
 export * from "./components/RelationPreview";
+export * from "./components/RelationPreviewDepth";
 export * from "./components/UserPreview";

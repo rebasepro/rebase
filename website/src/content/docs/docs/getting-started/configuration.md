@@ -17,6 +17,18 @@ All configuration is done via environment variables in your `.env` file at the p
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/mydb` |
 | `JWT_SECRET` | Secret key for signing JWT tokens. Use a strong random string (min 32 chars). **Required in production** (auto-generated in development). | `a1b2c3d4e5...` |
 
+> **`sslmode=no-verify` is a node-postgres spelling, not a libpq one.**
+>
+> Rebase and the Node driver accept it — encrypt, but do not check the
+> certificate. `psql`, `pg_dump`, `pg_restore` and Atlas do not, and they do not
+> degrade: they refuse to start with `invalid sslmode value: "no-verify"`.
+>
+> Rebase's own commands (`rebase db push`, `rebase db backup`, `rebase db
+> restore`) rewrite it to the equivalent `sslmode=require` before shelling out,
+> so they work with the URL as configured. Reaching for `psql` by hand does not
+> — swap in `sslmode=require` there, which encrypts without verifying in exactly
+> the same way.
+
 ### Frontend
 
 | Variable | Description | Default |

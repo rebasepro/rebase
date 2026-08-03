@@ -41,6 +41,7 @@ export type RelationDraft = {
     target?: string;
     localKey?: string;
     foreignKeyOnTarget?: string;
+    sourceKey?: string;
     through?: { table?: string; sourceColumn?: string; targetColumn?: string };
     joinPath?: JoinStep[];
     cardinality?: "one" | "many";
@@ -119,7 +120,8 @@ kind: "belongsTo",
             return {
                 ...common,
                 kind: draft.kind,
-                ...(draft.foreignKeyOnTarget ? { foreignKeyOnTarget: draft.foreignKeyOnTarget } : {})
+                ...(draft.foreignKeyOnTarget ? { foreignKeyOnTarget: draft.foreignKeyOnTarget } : {}),
+                ...(draft.sourceKey ? { sourceKey: draft.sourceKey } : {})
             };
         case "manyToMany":
             return { ...common,

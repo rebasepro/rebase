@@ -1,7 +1,7 @@
 import { and, eq, inArray, or, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
-import { CollectionConfig, FilterValues, ResolvedRelation, ResolvedManyToMany } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
 import { hasForeignKeyOnTarget, isManyToMany, type ResolvedVia } from "@rebasepro/types";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
@@ -11,6 +11,8 @@ import {
     requirePrimaryKeys,
     parseIdValues,
     buildCompositeId,
+    joinsOnNaturalKey,
+    sourceKeyField,
     type PrimaryKeyInfo
 } from "./collection-helpers";
 import { parseDataFromServer } from "../data-transformer";
@@ -168,16 +170,120 @@ export class RelationService {
     private assertSingleKeyAddressable(
         parentCollection: CollectionConfig,
         parentPks: PrimaryKeyInfo[],
-        via: string
+        via: string,
+        relation?: ResolvedRelation
     ): void {
+        // A `sourceKey` names the single column the link actually points at, so
+        // the parent's key can be as wide as it likes — nothing here references
+        // it. That is the one way out of this error, and the message below now
+        // has to say so.
+        if (relation && hasForeignKeyOnTarget(relation) && relation.sourceKey) return;
+
         if (parentPks.length > 1) {
             throw new Error(
                 `Relation on '${parentCollection.slug}' uses '${via}', a single foreign-key column, but ` +
                 `'${parentCollection.slug}' is keyed on ${parentPks.map(k => `'${k.fieldName}'`).join(" + ")}. ` +
-                `One column cannot reference a composite key — express this relation with \`joinPath\`, whose ` +
+                `One column cannot reference a composite key — give the relation a \`sourceKey\` naming ` +
+                `a single unique column to point at, or express it with \`joinPath\`, whose ` +
                 `\`on.from\`/\`on.to\` take every key column.`
             );
         }
+    }
+
+    /**
+     * What the target's foreign key holds, for each of these parent rows.
+     *
+     * Ordinarily the parent's id, and then this is free. When the relation
+     * declares a `sourceKey` the two are different values, and the mapping
+     * between them lives in the source table — so it costs one SELECT, issued
+     * once for the whole batch rather than per parent.
+     *
+     * Both directions come back because both are needed and deriving one from
+     * the other by hand is how a batch loader ends up attributing a child to the
+     * wrong parent: reads translate id → key to build the WHERE, and then
+     * translate key → id to attribute each row that comes back.
+     */
+    /**
+     * The value a related row's foreign key must hold to belong to this parent.
+     *
+     * `undefined` when the parent's source key is null — which is not an error
+     * here, only in the callers that were about to write it. Exposed for
+     * {@link PersistService}, which stamps this onto a child created under a
+     * nested path and would otherwise write the id and lose the row.
+     */
+    async parentKeyValue(
+        parentCollection: CollectionConfig,
+        relation: ResolvedHasOne | ResolvedHasMany,
+        parentId: string | number,
+        db: DrizzleClient = this.db
+    ): Promise<string | number | undefined> {
+        const { keyByParentId } = await this.resolveSourceKeys(parentCollection, relation, [parentId], db);
+        return keyByParentId.get(String(parentId));
+    }
+
+    private async resolveSourceKeys(
+        parentCollection: CollectionConfig,
+        relation: ResolvedHasOne | ResolvedHasMany,
+        parentIds: (string | number)[],
+        // Writes pass their transaction: reading the source key on the pool
+        // while the same transaction is holding an uncommitted change to it
+        // would translate the id against a stale value.
+        db: DrizzleClient = this.db
+    ): Promise<{ keyByParentId: Map<string, string | number>; parentIdByKey: Map<string, string | number> }> {
+        const keyByParentId = new Map<string, string | number>();
+        const parentIdByKey = new Map<string, string | number>();
+
+        const parentPks = requirePrimaryKeys(parentCollection, this.registry);
+
+        if (!joinsOnNaturalKey(relation, parentCollection, this.registry)) {
+            // The ordinary case, and it must stay free of a round-trip: the
+            // key IS the id. Parsed, not passed through — an id arrives as the
+            // string from a URL, and comparing "7" against an integer column is
+            // how this returns nothing at all.
+            for (const id of parentIds) {
+                const value = parseIdValues(id, parentPks)[parentPks[0].fieldName];
+                keyByParentId.set(String(id), value);
+                parentIdByKey.set(String(value), id);
+            }
+            return { keyByParentId, parentIdByKey };
+        }
+
+        const field = sourceKeyField(relation, parentCollection, this.registry);
+        const parentTable = getTableForCollection(parentCollection, this.registry);
+        const keyColumn = parentTable[field as keyof typeof parentTable] as AnyPgColumn;
+        if (!keyColumn) {
+            throw new Error(
+                `\`sourceKey: "${field}"\` on relation '${relation.relationName}' is not a column on ` +
+                `'${parentCollection.slug}'. It names a column on the source table, not on the target.`
+            );
+        }
+
+        const rows = await db
+            .select()
+            .from(parentTable)
+            .where(this.parentKeyCondition(parentTable, parentPks, parentIds));
+
+        for (const row of rows as Array<Record<string, unknown>>) {
+            const keyValue = row[field] as string | number | null;
+            if (keyValue === null || keyValue === undefined) continue;
+            const parentId = buildCompositeId(row, parentPks);
+            keyByParentId.set(String(parentId), keyValue);
+            // A duplicate here means the source key is not unique, which makes
+            // "which parent does this child belong to" unanswerable. Refuse
+            // rather than pick the last one seen.
+            const existing = parentIdByKey.get(String(keyValue));
+            if (existing !== undefined && String(existing) !== String(parentId)) {
+                throw new Error(
+                    `\`sourceKey: "${field}"\` on relation '${relation.relationName}' is not unique on ` +
+                    `'${parentCollection.slug}': rows '${existing}' and '${parentId}' both hold ` +
+                    `'${keyValue}'. Add a unique constraint — a link that addresses more than one source ` +
+                    `row cannot say which one a related row belongs to.`
+                );
+            }
+            parentIdByKey.set(String(keyValue), parentId);
+        }
+
+        return { keyByParentId, parentIdByKey };
     }
 
     /**
@@ -292,7 +398,21 @@ export class RelationService {
             return rows;
         }
 
-        // Handle other relation types
+        // Handle other relation types.
+        //
+        // The query builder compares the target's foreign key against a value,
+        // and for a link on a natural key that value is not the id in the URL.
+        // Resolved first, before anything is built, so a parent that reaches
+        // nothing costs one statement rather than two.
+        const matchValue = hasForeignKeyOnTarget(relation)
+            ? (await this.resolveSourceKeys(parentCollection, relation, [parentId]))
+                .keyByParentId.get(String(parentId))
+            : parsedParentId;
+
+        // A parent whose source key is null reaches nothing: NULL never equals
+        // a foreign key. Say so with an empty list rather than an `= NULL`.
+        if (matchValue === undefined) return [];
+
         let query = this.db.select().from(targetTable).$dynamic();
 
         // Build additional filter conditions
@@ -322,7 +442,7 @@ export class RelationService {
             query,
             query,
             relation,
-            parsedParentId,
+            matchValue,
             targetTable,
             parentTable,
             parentIdCol,
@@ -400,6 +520,16 @@ export class RelationService {
         if (!parentTable) throw new Error("Parent table not found");
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
+        // Same translation the listing does, and it has to be: `isRelated`
+        // gates writes on this count, so a count built from a different value
+        // than the read would authorise rows the read never returned.
+        const matchValue = hasForeignKeyOnTarget(relation)
+            ? (await this.resolveSourceKeys(parentCollection, relation, [parentId]))
+                .keyByParentId.get(String(parentId))
+            : parsedParentId;
+
+        if (matchValue === undefined) return 0;
+
         // Start count with distinct to avoid duplicates from junction tables
         let query = this.db.select({ count: sql<number>`count(distinct ${targetIdField})` }).from(targetTable).$dynamic();
 
@@ -407,7 +537,7 @@ export class RelationService {
         query = DrizzleConditionBuilder.buildRelationCountQuery(
             query,
             relation,
-            parsedParentId,
+            matchValue,
             targetTable,
             parentTable,
             parentIdCol,
@@ -640,8 +770,22 @@ export class RelationService {
         this.assertSingleKeyAddressable(
             parentCollection,
             parentPks,
-            hasForeignKeyOnTarget(relation) ? relation.foreignKeyOnTarget : relation.relationName
+            hasForeignKeyOnTarget(relation) ? relation.foreignKeyOnTarget : relation.relationName,
+            relation
         );
+
+        // One lookup for the whole batch, both directions: the WHERE is built
+        // from the source-key values, and each row that comes back carries one
+        // of those values rather than a parent id.
+        const { keyByParentId, parentIdByKey } = hasForeignKeyOnTarget(relation)
+            ? await this.resolveSourceKeys(parentCollection, relation, parentIds)
+            : { keyByParentId: new Map<string, string | number>(), parentIdByKey: new Map<string, string | number>() };
+
+        const matchValues = hasForeignKeyOnTarget(relation)
+            ? [...keyByParentId.values()]
+            : parsedParentIds;
+        if (matchValues.length === 0) return new Map();
+
         let query = this.db.select().from(targetTable).$dynamic();
 
         // Build the relation query with ALL parent IDs
@@ -649,7 +793,7 @@ export class RelationService {
             query,
             query,
             relation,
-            parsedParentIds, // Pass array instead of single ID
+            matchValues, // Pass array instead of single ID
             targetTable,
             parentTable,
             parentIdCol,
@@ -661,28 +805,24 @@ export class RelationService {
         const results = await query;
         const resultMap = new Map<string, RelatedRow<Record<string, unknown>>>();
 
-        // Build a Set<string> for O(1) parent-ID lookups that is immune to
-        // number-vs-string type mismatches (Drizzle may return either depending
-        // on the column type and driver).
-        const parentIdSet = new Set(parsedParentIds.map(String));
-
         // Map results back to parent rows
         for (const row of results as Array<Record<string, unknown>>) {
             const targetRow = (row[getTableName(targetCollection)] || row) as Record<string, unknown>;
-
-            // Determine the parent ID this result belongs to based on the relation type
-            let parentId: string | number | undefined;
 
             // The parent's key is on the target row, in the relation's own
             // column. There used to be a second branch here that guessed the
             // column by appending `_id` to `inverseRelationName`, reached only
             // when the foreign key had not been resolved — which cannot happen
             // now that resolution fills it in.
-            if (hasForeignKeyOnTarget(relation)) {
-                parentId = targetRow[relation.foreignKeyOnTarget] as string | number | undefined;
-            }
+            if (!hasForeignKeyOnTarget(relation)) continue;
 
-            if (parentId !== undefined && parentIdSet.has(String(parentId))) {
+            // Keyed by string throughout: Drizzle returns a numeric column as a
+            // number or a string depending on the column type and the driver.
+            const foreignKeyValue = targetRow[relation.foreignKeyOnTarget] as string | number | undefined;
+            if (foreignKeyValue === undefined || foreignKeyValue === null) continue;
+
+            const parentId = parentIdByKey.get(String(foreignKeyValue));
+            if (parentId !== undefined) {
                 resultMap.set(String(parentId), await this.toRelatedRow(targetRow, targetCollection, targetPks));
             }
         }
@@ -811,15 +951,26 @@ export class RelationService {
         this.assertSingleKeyAddressable(
             parentCollection,
             parentPks,
-            hasForeignKeyOnTarget(relation) ? relation.foreignKeyOnTarget : relation.relationName
+            hasForeignKeyOnTarget(relation) ? relation.foreignKeyOnTarget : relation.relationName,
+            relation
         );
+
+        const { keyByParentId, parentIdByKey } = hasForeignKeyOnTarget(relation)
+            ? await this.resolveSourceKeys(parentCollection, relation, parentIds)
+            : { keyByParentId: new Map<string, string | number>(), parentIdByKey: new Map<string, string | number>() };
+
+        const matchValues = hasForeignKeyOnTarget(relation)
+            ? [...keyByParentId.values()]
+            : parsedParentIds;
+        if (matchValues.length === 0) return new Map();
+
         let query = this.db.select().from(targetTable).$dynamic();
 
         query = applyDynamicRelationQuery(
             query,
             query,
             relation,
-            parsedParentIds,
+            matchValues,
             targetTable,
             parentTable,
             parentIdCol,
@@ -831,23 +982,18 @@ export class RelationService {
         const results = await query;
         const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
 
-        // Build a Set<string> for O(1) parent-ID lookups that is immune to
-        // number-vs-string type mismatches (Drizzle may return either depending
-        // on the column type and driver).
-        const parentIdSet = new Set(parsedParentIds.map(String));
-
         for (const row of results as Array<Record<string, unknown>>) {
             const targetRow = (row[getTableName(targetCollection)] || row) as Record<string, unknown>;
 
-            let parentId: string | number | undefined;
-
             // Junction-backed relations returned earlier in this method, so
             // what reaches here names the parent with a column on the target.
-            if (hasForeignKeyOnTarget(relation)) {
-                parentId = targetRow[relation.foreignKeyOnTarget] as string | number | undefined;
-            }
+            if (!hasForeignKeyOnTarget(relation)) continue;
 
-            if (parentId !== undefined && parentIdSet.has(String(parentId))) {
+            const foreignKeyValue = targetRow[relation.foreignKeyOnTarget] as string | number | undefined;
+            if (foreignKeyValue === undefined || foreignKeyValue === null) continue;
+
+            const parentId = parentIdByKey.get(String(foreignKeyValue));
+            if (parentId !== undefined) {
                 const key = String(parentId);
                 const arr = resultMap.get(key) || [];
                 arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks));
@@ -994,10 +1140,19 @@ export class RelationService {
                     continue;
                 }
 
-                const parentPks = requirePrimaryKeys(collection, this.registry);
-                const parentIdInfo = parentPks[0];
-                const parsedParentIdObj = parseIdValues(id, parentPks);
-                const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
+                // What the children's foreign key must hold — the parent's id
+                // unless the link declares a `sourceKey`, and then the value of
+                // that column on this parent row.
+                const parentKeyValue = (await this.resolveSourceKeys(collection, relation, [id], tx))
+                    .keyByParentId.get(String(id));
+
+                if (parentKeyValue === undefined) {
+                    throw new Error(
+                        `Cannot write relation '${key}' on '${collection.slug}': row '${id}' has no value in ` +
+                        `\`sourceKey: "${sourceKeyField(relation, collection, this.registry)}"\`, so there is ` +
+                        "nothing for the related rows to point at."
+                    );
+                }
 
                 // Clear existing links not in the new set
                 if (targetEntityIds.length > 0) {
@@ -1005,19 +1160,19 @@ export class RelationService {
                     await tx
                         .update(targetTable)
                         .set({ [relation.foreignKeyOnTarget]: null })
-                        .where(and(eq(fkCol, parsedParentId), sql`${targetIdCol} NOT IN (${sql.join(parsedTargetIds)})`));
+                        .where(and(eq(fkCol, parentKeyValue), sql`${targetIdCol} NOT IN (${sql.join(parsedTargetIds)})`));
 
                     // Set FK for the provided targets
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget]: parsedParentId })
+                        .set({ [relation.foreignKeyOnTarget]: parentKeyValue })
                         .where(inArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]));
                 } else {
                     // If empty array provided, clear all existing links for this parent
                     await tx
                         .update(targetTable)
                         .set({ [relation.foreignKeyOnTarget]: null })
-                        .where(eq(fkCol, parsedParentId));
+                        .where(eq(fkCol, parentKeyValue));
                 }
             } else {
                 logger.warn(`Many relation '${key}' in collection '${collection.slug}' lacks write configuration and will be skipped during save.`);
@@ -1095,14 +1250,25 @@ export class RelationService {
                     continue;
                 }
 
-                const parsedSourceIdObj = parseIdValues(sourceEntityId, sourcePks);
-                const parsedSourceId = parsedSourceIdObj[sourceIdInfo.fieldName];
+                // The value the target's foreign key holds: this row's id, or
+                // the column named by `sourceKey` when the link joins on one.
+                const sourceKeyValue = (await this.resolveSourceKeys(sourceCollection, relation, [sourceEntityId], tx))
+                    .keyByParentId.get(String(sourceEntityId));
+
+                if (sourceKeyValue === undefined) {
+                    throw new Error(
+                        `Cannot write relation '${relation.relationName}' on '${sourceCollection.slug}': row ` +
+                        `'${sourceEntityId}' has no value in \`sourceKey: ` +
+                        `"${sourceKeyField(relation, sourceCollection, this.registry)}"\`, so there is nothing ` +
+                        "for the related row to point at."
+                    );
+                }
 
                 if (newValue === null || newValue === undefined) {
                     await tx
                         .update(targetTable)
                         .set({ [relation.foreignKeyOnTarget!]: null })
-                        .where(eq(foreignKeyColumn, parsedSourceId));
+                        .where(eq(foreignKeyColumn, sourceKeyValue));
                 } else {
                     const parsedNewTargetIdObj = parseIdValues(newValue as string | number, targetPks);
                     const parsedNewTargetId = parsedNewTargetIdObj[targetIdInfo.fieldName];
@@ -1112,12 +1278,12 @@ export class RelationService {
                     await tx
                         .update(targetTable)
                         .set({ [relation.foreignKeyOnTarget!]: null })
-                        .where(eq(foreignKeyColumn, parsedSourceId));
+                        .where(eq(foreignKeyColumn, sourceKeyValue));
 
                     // Then, update the new target row to point to this source row
                     await tx
                         .update(targetTable)
-                        .set({ [relation.foreignKeyOnTarget!]: parsedSourceId })
+                        .set({ [relation.foreignKeyOnTarget!]: sourceKeyValue })
                         .where(eq(targetIdField, parsedNewTargetId));
                 }
             } catch (e) {

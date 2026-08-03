@@ -135,6 +135,21 @@ kind: relation.kind };
                             fix: `add the column, or set \`foreignKeyOnTarget\` to one of: ${quote(targetColumns)}`
                         });
                     }
+                    // `sourceKey` is the easiest of the two to put on the wrong
+                    // side — it is the only column in a `hasMany` that lives
+                    // here rather than on the target, and naming a target column
+                    // reads perfectly well right next to `foreignKeyOnTarget`.
+                    if (relation.sourceKey && !sourceColumns.has(relation.sourceKey)) {
+                        defects.push({
+                            ...at,
+                            problem: `\`sourceKey: "${relation.sourceKey}"\` is not a column on \`${sourceTableName}\``,
+                            fix: targetColumns.has(relation.sourceKey)
+                                ? `it is a column on the *target* table \`${targetTableName}\` — \`sourceKey\` names ` +
+                                  "the column on this collection that the target's foreign key points at, so it " +
+                                  `must be one of: ${quote(sourceColumns)}`
+                                : `add the column, or set \`sourceKey\` to one of: ${quote(sourceColumns)}`
+                        });
+                    }
                     break;
                 }
 

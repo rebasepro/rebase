@@ -102,6 +102,38 @@ relations: [
 
 `hasOne` is the same link with at most one row on the far side.
 
+#### Joining on a natural key
+
+By default the target's foreign key holds the source row's **id**. When the two
+sides are joined on something else — an external identity id, a SKU, a tenant
+slug — name that column with `sourceKey`:
+
+```typescript
+relations: [
+    {
+        kind: "hasMany",
+        relationName: "applications",
+        target: () => applicationsCollection,
+        sourceKey: "auth_user_id",          // column on THIS table
+        foreignKeyOnTarget: "auth_user_id"  // column on the TARGET's table
+    }
+]
+// → reads applications.auth_user_id = talents.auth_user_id
+```
+
+`sourceKey` is the mirror of `localKey` on `belongsTo`: that one names the
+column this side reads *from*, this one names the column the other side points
+*at*. Without it a link like the above is not expressible as `hasMany` at all
+and has to drop to [`via`](#via--an-explicit-join-chain), which is read-only.
+
+The column must be unique. A link that addresses more than one source row
+cannot say which one a related row belongs to, and Postgres will not accept a
+foreign key against a non-unique column either. Rebase checks this at read
+time and refuses rather than picking one.
+
+A parent whose `sourceKey` is `NULL` reaches no rows, and writing through the
+relation is an error — there is nothing for the related rows to point at.
+
 ### manyToMany — through a junction
 
 ```typescript
@@ -402,11 +434,13 @@ interface BelongsToRelation extends RelationBase {
 interface HasOneRelation extends RelationBase {
     kind: "hasOne";
     foreignKeyOnTarget?: string;    // column on the TARGET's table
+    sourceKey?: string;             // column on THIS table; defaults to the primary key
 }
 
 interface HasManyRelation extends RelationBase {
     kind: "hasMany";
     foreignKeyOnTarget?: string;    // column on the TARGET's table
+    sourceKey?: string;             // column on THIS table; defaults to the primary key
 }
 
 interface ManyToManyRelation extends RelationBase {
@@ -428,6 +462,11 @@ What you write above is the *authoring* shape. Internally Rebase works with
 optional, plus `cardinality`, `targetSlug`, and two flags — `writable` (false
 only for `via`) and `shared` (true when the target rows belong to other parents
 too, so a removal unlinks rather than deletes).
+
+`sourceKey` is the one exception to "nothing optional": its default is the
+source's primary key, and resolving that needs the driver's schema, which
+resolution does not have. `undefined` there means "the primary key" and nothing
+else.
 
 You never write a `ResolvedRelation`. On a relation property, `relation` is
 yours and `resolvedRelation` is the filled-in one, stamped during

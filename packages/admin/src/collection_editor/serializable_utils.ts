@@ -195,7 +195,8 @@ function toSerializableRelation(link: Relation): SerializableRelation {
             return {
                 kind: link.kind,
                 ...common,
-                ...(link.foreignKeyOnTarget ? { foreignKeyOnTarget: link.foreignKeyOnTarget } : {})
+                ...(link.foreignKeyOnTarget ? { foreignKeyOnTarget: link.foreignKeyOnTarget } : {}),
+                ...(link.sourceKey ? { sourceKey: link.sourceKey } : {})
             };
         case "manyToMany":
             return { kind: "manyToMany", ...common, ...(link.through ? { through: link.through } : {}) };

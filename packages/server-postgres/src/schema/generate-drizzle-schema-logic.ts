@@ -785,8 +785,14 @@ export const generateSchema = async (collections: CollectionConfig[], stripPolic
                                     // name (e.g. "client_id") may differ from the property key
                                     // (e.g. "clientId") when `columnName` is set.
                                     const drizzleFieldKey = resolvePropertyKeyForColumn(collection, otherRel.foreignKeyOnTarget);
+                                    // The column the far side points at: its
+                                    // primary key, unless the link names another
+                                    // one with `sourceKey`.
+                                    const referencedKey = otherRel.sourceKey
+                                        ? resolvePropertyKeyForColumn(otherCollection, otherRel.sourceKey)
+                                        : getPrimaryKeyName(otherCollection);
                                     const synthKey = `_synth_${otherTableVar}_${drizzleFieldKey}`;
-                                    tableRelations.push(`    "${synthKey}": one(${otherTableVar}, {\n        fields: [${tableVarName}.${drizzleFieldKey}],\n        references: [${otherTableVar}.${getPrimaryKeyName(otherCollection)}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
+                                    tableRelations.push(`    "${synthKey}": one(${otherTableVar}, {\n        fields: [${tableVarName}.${drizzleFieldKey}],\n        references: [${otherTableVar}.${referencedKey}],\n        relationName: \"${drizzleRelationName}\"\n    })`);
                                     emittedRelationNames.add(deduplicationKey);
                                 }
                             }

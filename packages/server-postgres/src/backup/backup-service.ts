@@ -18,6 +18,9 @@ import {
     buildBackupFilename,
     buildPgDumpArgs,
     buildPgDumpallGlobalsArgs,
+    buildRowSecurityPgOptions,
+    diagnoseRowSecurityDumpFailure,
+    type RowSecurityIdentity,
     buildPgRestoreArgs,
     buildPgRestoreListArgs,
     checkToolServerCompatibility,
@@ -140,6 +143,15 @@ export async function createDump(opts: {
     inheritStdio?: boolean;
     includeGlobals?: boolean;
     env?: Record<string, string | undefined>;
+    /**
+     * Dump with row security left on, reading as this identity.
+     *
+     * The escape hatch for a managed Postgres, where the dumping role owns
+     * nothing and has no `BYPASSRLS`. Off by default, and deliberately so: with
+     * row security on, `pg_dump` stops erroring on rows it cannot see and
+     * simply omits them. See {@link RowSecurityIdentity}.
+     */
+    rowSecurity?: RowSecurityIdentity;
 }): Promise<BackupResult> {
     const env = opts.env ?? process.env;
     const bin = resolvePgBinary("pg_dump", env);
@@ -159,13 +171,34 @@ export async function createDump(opts: {
         connectionString: opts.connectionString,
         outFile: localFile,
         excludeSchemas: opts.excludeSchemas,
-        noOwner: opts.noOwner
+        noOwner: opts.noOwner,
+        rowSecurity: opts.rowSecurity
     });
 
-    await execa(bin, args, {
-        stdio: opts.inheritStdio ? "inherit" : "pipe",
-        env: { ...(env as Record<string, string>) }
-    });
+    // `PGOPTIONS` is the only way to set a GUC on a tool that takes no SQL.
+    // Built from the same object that added `--enable-row-security`, so the
+    // flag cannot travel without the identity that makes it safe.
+    const dumpEnv: Record<string, string> = { ...(env as Record<string, string>) };
+    if (opts.rowSecurity) {
+        dumpEnv.PGOPTIONS = [env.PGOPTIONS, buildRowSecurityPgOptions(opts.rowSecurity)]
+            .filter(Boolean).join(" ");
+    }
+
+    try {
+        await execa(bin, args, {
+            stdio: opts.inheritStdio ? "inherit" : "pipe",
+            env: dumpEnv
+        });
+    } catch (error) {
+        // The RLS failure names a table and no cause. Replace it with the
+        // cause and the two ways out; anything else is re-thrown untouched.
+        const diagnosis = diagnoseRowSecurityDumpFailure(error);
+        if (!diagnosis) throw error;
+        throw new BackupToolError(
+            diagnosis,
+            "Run `rebase db backup --help` for the flag, and read what it says about partial dumps."
+        );
+    }
 
     const sizeBytes = fs.existsSync(localFile) ? fs.statSync(localFile).size : 0;
 

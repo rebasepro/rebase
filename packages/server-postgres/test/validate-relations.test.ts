@@ -83,7 +83,14 @@ foreignKeyOnTarget: "post_id" },
                     through: { table: "posts_tags",
 sourceColumn: "post_id",
 targetColumn: "tag_id" }
-                }
+                },
+                // A link on a natural key: `author_id` is on `posts`, and the
+                // comments carry it too.
+                { kind: "hasMany",
+relationName: "sibling_comments",
+target: () => commentsCollection,
+sourceKey: "author_id",
+foreignKeyOnTarget: "post_id" }
             ])).toEqual([]);
         });
 
@@ -122,6 +129,37 @@ foreignKeyOnTarget: "article_id" }
             ]);
             expect(d.problem).toContain("is not a column on the target table `comments`");
             expect(d.fix).toContain("`post_id`");
+        });
+
+        it("a sourceKey that names a column on the target instead of the source", () => {
+            // The likeliest way to get `sourceKey` wrong, because it sits next
+            // to `foreignKeyOnTarget` and every other column in the block does
+            // live on the target.
+            const [d] = defectsFor([
+                {
+                    kind: "hasMany",
+                    relationName: "comments",
+                    target: () => commentsCollection,
+                    foreignKeyOnTarget: "post_id",
+                    sourceKey: "post_id"
+                }
+            ]);
+            expect(d.problem).toContain("`sourceKey: \"post_id\"` is not a column on `posts`");
+            expect(d.fix).toContain("it is a column on the *target* table `comments`");
+        });
+
+        it("a sourceKey that exists nowhere", () => {
+            const [d] = defectsFor([
+                {
+                    kind: "hasMany",
+                    relationName: "comments",
+                    target: () => commentsCollection,
+                    foreignKeyOnTarget: "post_id",
+                    sourceKey: "auth_user_id"
+                }
+            ]);
+            expect(d.problem).toContain("`sourceKey: \"auth_user_id\"` is not a column on `posts`");
+            expect(d.fix).toContain("add the column");
         });
 
         it("the junction-name footgun: a derived table that was never created", () => {

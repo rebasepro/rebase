@@ -328,9 +328,15 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                         const targetCollection = relation.target();
                         const targetTable = registry.getTable(getTableName(targetCollection));
                         const pks = getPrimaryKeys(collection, registry!);
-                        const currentId = buildCompositeId(data, pks);
+                        // What the target's foreign key holds. Ordinarily this
+                        // row's id; for a link on a natural key, the value of
+                        // the column it points at — which is on the row already,
+                        // so this costs nothing extra.
+                        const currentId = relation.sourceKey
+                            ? (data as Record<string, unknown>)[relation.sourceKey] as string | number | undefined
+                            : buildCompositeId(data, pks);
 
-                        if (targetTable && currentId) {
+                        if (targetTable && currentId !== undefined && currentId !== null && currentId !== "") {
                             const foreignKeyColumn = targetTable[relation.foreignKeyOnTarget as keyof typeof targetTable] as AnyPgColumn;
                             if (foreignKeyColumn) {
                                 // Query the target table to find row that references this row

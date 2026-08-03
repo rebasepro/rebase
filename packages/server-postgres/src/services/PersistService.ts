@@ -1,7 +1,7 @@
 import { eq, and, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany } from "@rebasepro/types";
+import { CollectionConfig, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -240,16 +240,30 @@ export class PersistService {
                     throw ApiError.notFound(`No row "${id}" in "${collectionPath}" to update.`);
                 }
             } else {
-                // One-to-many create: stamp the parent's id onto the child's FK.
+                // One-to-many create: stamp the parent's key onto the child's FK.
                 const targetColumnName = this.resolveParentForeignKeyColumn(hop);
 
                 if (targetColumnName) {
-                    const parsedParentId = parentIdForWrite();
-                    const existingValue = (effectiveValues as Record<string, unknown>)[targetColumnName];
-                    if (existingValue !== undefined && existingValue !== null && existingValue !== parsedParentId) {
-                        logger.warn(`Overriding provided value '${existingValue}' for FK '${targetColumnName}' with path parent id '${parsedParentId}'.`);
+                    // Not necessarily the id in the path: a link with a
+                    // `sourceKey` is pointed at a column on the parent row, and
+                    // stamping the id would create a child that belongs to
+                    // nobody — a row the read path would never return again.
+                    const parentKeyValue = hasForeignKeyOnTarget(hop.relation)
+                        ? await this.relationService.parentKeyValue(hop.parentCollection, hop.relation, hop.parentId)
+                        : parentIdForWrite();
+
+                    if (parentKeyValue === undefined) {
+                        throw ApiError.badRequest(
+                            `Cannot create under "${collectionPath}": the parent row has no value in ` +
+                            `\`sourceKey\`, so the new row has nothing to point at.`
+                        );
                     }
-                    (effectiveValues as Record<string, unknown>)[targetColumnName] = parsedParentId;
+
+                    const existingValue = (effectiveValues as Record<string, unknown>)[targetColumnName];
+                    if (existingValue !== undefined && existingValue !== null && existingValue !== parentKeyValue) {
+                        logger.warn(`Overriding provided value '${existingValue}' for FK '${targetColumnName}' with path parent key '${parentKeyValue}'.`);
+                    }
+                    (effectiveValues as Record<string, unknown>)[targetColumnName] = parentKeyValue;
                 }
             }
         }

@@ -277,6 +277,33 @@ function SaveButton() {
 }
 ```
 
+`open()` takes `{ type, title?, message, autoHideDuration?, action? }`.
+
+The `action` slot renders a button next to the message, which is where undo
+belongs — the window in which undo means anything is the window the snackbar is
+on screen:
+
+```typescript
+const rejectApplication = async (application: Application) => {
+    const previous = application.status;
+    await setStatus(application.id, "rejected");
+
+    snackbar.open({
+        type: "success",
+        message: `Rejected ${application.name}`,
+        action: {
+            label: "Undo",
+            onClick: () => setStatus(application.id, previous)
+        }
+    });
+};
+```
+
+The snackbar dismisses itself once the action is clicked, so the same undo
+cannot fire twice. Two snackbars carrying the same message both appear when
+each has an action — rejecting two applications in a row leaves you a way back
+from each.
+
 ## `useStorageSource`
 
 Access file storage operations:

@@ -109,6 +109,53 @@ const navigationStateController = useBuildNavigationStateController({
 
 The dashboard now appears in the sidebar under "Analytics" and is accessible at `/dashboard`.
 
+### Pinning the group to the bottom
+
+Groups named `"Admin"` or `"Settings"` sink below the others in the drawer, by
+string comparison on the name. That is easy to lose — translate the label and
+the ordering silently stops happening — so say it explicitly instead:
+
+```tsx
+{ slug: "dashboard", name: "Dashboard", view: <DashboardView />, group: "Ajustes", pinToBottom: true }
+```
+
+Setting `pinToBottom` on any one view in a group pins the whole group, since
+the drawer orders groups rather than individual views.
+
+## Navigating from a custom view
+
+A view component receives no props. To route somewhere — another custom view, a
+collection, an entity — reach for `useUrlController`, which is exported from
+`@rebasepro/admin`:
+
+```tsx
+import { useUrlController } from "@rebasepro/admin";
+
+function DashboardView() {
+    const urlController = useUrlController();
+
+    return (
+        <>
+            <button onClick={() => urlController.navigate(urlController.buildAppUrlPath("reports"))}>
+                Reports
+            </button>
+            <button onClick={() => urlController.navigate(urlController.buildUrlCollectionPath("orders"))}>
+                All orders
+            </button>
+            <button onClick={() => urlController.navigate(urlController.buildUrlCollectionPath("orders/B34SAP8Z"))}>
+                Order B34SAP8Z
+            </button>
+        </>
+    );
+}
+```
+
+Build the path rather than hard-coding it: collection URLs are prefixed
+(`orders` → `/c/orders`) and the prefix is not part of the public contract.
+
+`useSidePanel` opens an entity in the side panel instead of navigating, which is
+usually what you want for a row in a list.
+
 ## Adding Charts
 
 Install a charting library:
