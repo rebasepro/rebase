@@ -141,8 +141,6 @@
   "packages/firebase/src/hooks/useInitialiseFirebase.ts::React Hook useEffect has missing dependencies: 'authDomain', 'firebaseConfig', 'fromUrl', and 'initFirebase'. Either include them or remove the dependency array.": 1,
   "packages/firebase/src/hooks/useInitialiseFirebase.ts::React Hook useEffect has missing dependencies: 'firebaseConfig' and 'onFirebaseInit'. Either include them or remove the dependency array. If 'onFirebaseInit' changes too often, find the parent component that defines it and wrap that definition in useCallback.": 1,
   "packages/forms/src/useCreateFormex.tsx::React Hook useEffect has missing dependencies: 'validate' and 'validateOnInitialRender'. Either include them or remove the dependency array.": 1,
-  "packages/plugin-ai/src/components/DataEnhancementControllerProvider.tsx::React Hook useCallback has a missing dependency: 'authController'. Either include it or remove the dependency array.": 1,
-  "packages/plugin-ai/src/components/DataEnhancementControllerProvider.tsx::React Hook useMemo has a missing dependency: 'collection.properties'. Either include it or remove the dependency array.": 1,
   "packages/plugin-ai/src/components/FormEnhanceAction.tsx::React Hook useCallback has missing dependencies: 'collection.properties' and 'storageKey'. Either include them or remove the dependency array.": 1,
   "packages/plugin-ai/src/components/FormEnhanceAction.tsx::React Hook useEffect has a missing dependency: 'updateSuggestedPrompts'. Either include it or remove the dependency array.": 1,
   "packages/plugin-insights/src/engine/useInsightsData.ts::React Hook useEffect has missing dependencies: 'context' and 'definition'. Either include them or remove the dependency array.": 1,
