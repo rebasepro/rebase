@@ -35,12 +35,13 @@ describe("ADMIN_COLLECTION_KEYS", () => {
         expect([...ADMIN_COLLECTION_KEYS]).toEqual(sorted);
     });
 
-    it("covers the 39 fields the split moved off the collection", () => {
+    it("covers the 40 fields the split moved off the collection", () => {
         // A bare count, as a tripwire. If this number changes, either a field was
         // added to the admin block (add it above too) or one was moved back out to
         // the contract — and the second is a decision, not a refactor.
-        // 39 since `form` (the generated form's section/rail layout) joined.
-        expect(ADMIN_COLLECTION_KEYS).toHaveLength(39);
+        // 40 since `display` joined; `titleProperty` is still listed because
+        // it is still read, and the schema editor has to know where to write it.
+        expect(ADMIN_COLLECTION_KEYS).toHaveLength(40);
     });
 
     it("names nothing that belongs to the BaaS contract", () => {
@@ -224,6 +225,45 @@ describe("admin key fields are checked against the collection's properties", () 
     } as const;
 
     const base = { name: "Posts", slug: "posts", table: "posts", properties } as const;
+
+    it("checks a display path against the collection's own properties", () => {
+        const good = defineCollection({
+            ...base,
+            admin: {
+                display: {
+                    title: "title",
+                    subtitle: "profile.displayName",   // dotted path into a map
+                    status: "score" as never           // any property, any type
+                }
+            }
+        });
+        expect(good.admin?.display?.title).toBe("title");
+    });
+
+    it("rejects a misspelled display path", () => {
+        // The reason this block is worth having at all: `titleProperty: "titel"`
+        // used to be caught, and every other role was unchecked because it could
+        // not be declared.
+        // @ts-expect-error — "titel" is not a property of this collection
+        defineCollection({ ...base, admin: { display: { title: "titel" } } });
+    });
+
+    it("accepts a resolver in any role, sync or async", () => {
+        const good = defineCollection({
+            ...base,
+            admin: {
+                display: {
+                    title: ({ entity }) => String(entity.values.title ?? ""),
+                    subtitle: async ({ entity, context }) => {
+                        void context;
+                        return String(entity.id);
+                    },
+                    tags: () => ["one", "two"]
+                }
+            }
+        });
+        expect(typeof good.admin?.display?.title).toBe("function");
+    });
 
     it("accepts every legitimate form", () => {
         const good = defineCollection({

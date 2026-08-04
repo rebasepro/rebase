@@ -2,6 +2,8 @@ import { isRelationalCollectionConfig, type Property, type Relation } from "@reb
 import { generateForeignKeyName } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/admin-types";
 import { getPrimaryKeys, isPropertyBuilder } from "@rebasepro/common";
+import { getPropertyInPath } from "./property-path";
+import { getDisplayPropertyKey, hasDeclaredDisplay } from "./entity-display";
 
 /**
  * How good a property is as the human-readable title of an entity.
@@ -182,8 +184,13 @@ export function getTitlePropertyCandidates<M extends Record<string, unknown>>(
 ): string[] {
     if (!collection.properties) return [];
 
-    if (collection.titleProperty && collection.properties[collection.titleProperty as string]) {
-        return [collection.titleProperty as string];
+    // `getPropertyInPath`, not `properties[key]`: a declared title on a nested
+    // field — `profile.display_name` — was looked up flat, found nothing, and
+    // silently fell through to the derived ranking. The dotted form has been
+    // documented as valid the whole time.
+    const declared = getDisplayPropertyKey(collection, "title");
+    if (declared && getPropertyInPath(collection.properties, declared)) {
+        return [declared];
     }
 
     const idKeys = new Set<string>(getPrimaryKeys(collection) as string[]);
@@ -237,7 +244,9 @@ export function getLeadingRelationTitleKey<M extends Record<string, unknown>>(
     collection: AdminCollection<M>
 ): string | undefined {
     if (!collection.properties) return undefined;
-    if (collection.titleProperty) return undefined;
+    // The collection states what it is called, in one form or the other; either
+    // way it is not asking for the leading-relation heuristic.
+    if (hasDeclaredDisplay(collection, "title")) return undefined;
 
     const idKeys = new Set<string>(getPrimaryKeys(collection) as string[]);
     const foreignKeys = getForeignKeyColumns(collection);

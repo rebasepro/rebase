@@ -69,7 +69,7 @@ export const productsCollection = defineCollection({
 
 ## Eine Sammlung deklarieren: `defineCollection`
 
-Umschließen Sie das Literal mit `defineCollection`. Zur Laufzeit ist es die Identitätsfunktion — es gibt das Objekt unverändert zurück und kostet daher nichts. Was es bringt, ist Inferenz: ein `const`-Typparameter erfasst Ihre `properties`-Schlüssel als Literaltypen, wodurch sie in der Editor-Vervollständigung für `admin.titleProperty`, `admin.sort` und `admin.propertiesOrder` erscheinen.
+Umschließen Sie das Literal mit `defineCollection`. Zur Laufzeit ist es die Identitätsfunktion — es gibt das Objekt unverändert zurück und kostet daher nichts. Was es bringt, ist Inferenz: ein `const`-Typparameter erfasst Ihre `properties`-Schlüssel als Literaltypen, wodurch sie in der Editor-Vervollständigung für `admin.display`, `admin.sort` und `admin.propertiesOrder` erscheinen.
 
 ```typescript
 import { defineCollection } from "@rebasepro/admin-types";
@@ -83,7 +83,7 @@ const products = defineCollection({
         price: { name: "Price", type: "number" }
     },
     admin: {
-        titleProperty: "name",   // Vervollständigung: "name" | "price"
+        display: { title: "name" },   // Vervollständigung: "name" | "price"
         sort: ["price", "asc"]   // Vervollständigung beim ersten Element
     }
 });
@@ -166,7 +166,7 @@ Innerhalb von `admin`, außer `history` — das ist eine Backend-Funktion und bl
 | `history` | `boolean` | `false` | Änderungen in der Entitätshistorie verfolgen |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Standardwerte bei jedem Speichern anwenden |
 | `previewProperties` | `string[]` | — | Eigenschaften, die in Referenzvorschauen angezeigt werden sollen |
-| `titleProperty` | `string` | — | Eigenschaft, die als Entitätstitel verwendet werden soll |
+| `display` | `EntityDisplay` | — | Was jede Anzeigerolle füllt — `title`, `subtitle`, `image`, `status`, `date`, `tags` |
 
 ### Erweitert
 

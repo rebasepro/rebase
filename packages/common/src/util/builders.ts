@@ -14,14 +14,14 @@ import {
 // ── defineCollection ─────────────────────────────────────────────────────
 // A smarter builder that uses `const` type-parameter inference (TS 5.0+)
 // to capture literal property types automatically. This gives you
-// autocomplete on `titleProperty`, `sort`, `propertiesOrder`, `fixedFilter`,
+// autocomplete on `display.title`, `sort`, `propertiesOrder`, `fixedFilter`,
 // callbacks, etc. — without writing `as const` or passing manual generics.
 
 /**
  * Define a PostgreSQL-backed collection with full type inference.
  *
  * The `const P` generic captures literal property types from your
- * `properties` object, which enables autocomplete on `titleProperty`,
+ * `properties` object, which enables autocomplete on `display.title`,
  * `sort`, `propertiesOrder`, `fixedFilter`, and entity callbacks.
  *
  * @example
@@ -34,7 +34,7 @@ import {
  *         name: { name: "Name", type: "string", validation: { required: true } },
  *         price: { name: "Price", type: "number" },
  *     },
- *     titleProperty: "name",  // ✅ autocomplete: "name" | "price"
+ *     display: { title: "name" },  // ✅ autocomplete: "name" | "price"
  *     sort: ["price", "asc"], // ✅ autocomplete on first element
  * });
  * ```

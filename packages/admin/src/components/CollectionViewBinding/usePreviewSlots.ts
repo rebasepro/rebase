@@ -3,12 +3,14 @@ import type { Property, RelationProperty } from "@rebasepro/types";
 import type { Entity, EntityRelation } from "@rebasepro/types";
 import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/app";
+import { getDisplayPropertyKey } from "@rebasepro/app";
 import { getLeadingRelationTitleKey, getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
 import { getValueInPath } from "@rebasepro/utils";
 import type { AuthController } from "@rebasepro/admin-types";
 import { ChipColorScheme, CHIP_COLORS, CHIP_SEED_KEYS } from "@rebasepro/ui";
+import { useEntityDisplay } from "../../hooks/useEntityDisplay";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */
 function relationCardinality(relation: { kind?: string; cardinality?: string } | undefined): "one" | "many" | undefined {
@@ -23,12 +25,18 @@ function relationCardinality(relation: { kind?: string; cardinality?: string } |
 // ── Slot types ────────────────────────────────────────────────────────
 
 /**
- * A resolved "slot" containing the property definition, key, and the
- * concrete value extracted from a entity.
+ * A resolved "slot": what fills one display role for one record.
+ *
+ * `property` and `propertyKey` are set when the value was read off the record,
+ * and absent when a `display` resolver computed it — a computed title has no
+ * column behind it, so there is nothing to render it *as*. Renderers must go
+ * through {@link SlotValue}, which makes that choice once: a property renders
+ * with its own preview (an enum keeps its coloured chip, a date its format), a
+ * computed value renders as text.
  */
 export interface PreviewSlot {
-    property: Property;
-    propertyKey: string;
+    property?: Property;
+    propertyKey?: string;
     value: unknown;
 }
 
@@ -129,10 +137,19 @@ export function resolveCollectionSlotKeys(
         ? [leadingRelationKey, ...rankedCandidates.filter(key => key !== leadingRelationKey)]
         : rankedCandidates;
     const titleKey = titleKeyCandidates[0];
+    // `getEntityImagePreviewPropertyKey` prefers `display.image` itself, so
+    // every caller of it — this, the reference card, the board — agrees.
     const imageKey = getEntityImagePreviewPropertyKey(collection);
 
-    // Status: first string-enum that isn't the title
-    let statusKey: string | undefined;
+    // Status: declared, else the first string-enum that isn't the title.
+    //
+    // Everything below this line is inference — "the first enum", "a key that
+    // looks like a timestamp", "the longest remaining string". It is a good
+    // guess and it is only a guess, so a collection that states the role wins
+    // outright and the ladder is skipped. That is the whole point of
+    // `admin.display`: the heuristics stay for the collections that never say
+    // anything, and stop overruling the ones that do.
+    let statusKey: string | undefined = getDisplayPropertyKey(collection, "status");
 
     // 1. Explicitly defined in previewProperties
     if (!statusKey && collection.previewProperties) {
@@ -169,13 +186,15 @@ export function resolveCollectionSlotKeys(
         }
     }
 
-    // Date: prefer well-known timestamp fields, fallback to any date
-    let dateKey: string | undefined;
+    // Date: declared, else a well-known timestamp field, else any date
+    let dateKey: string | undefined = getDisplayPropertyKey(collection, "date");
     const dateCandidates = ["updated_at", "updatedAt", "modified_at", "modifiedAt", "created_at", "createdAt"];
-    for (const candidate of dateCandidates) {
-        if (collection.properties[candidate]) {
-            dateKey = candidate;
-            break;
+    if (!dateKey) {
+        for (const candidate of dateCandidates) {
+            if (collection.properties[candidate]) {
+                dateKey = candidate;
+                break;
+            }
         }
     }
     if (!dateKey) {
@@ -222,7 +241,8 @@ export function resolveCollectionSlotKeys(
             const scoreB = propB?.type === "string" ? (propB.admin?.multiline ? 2 : 1) : 0;
             return scoreB - scoreA;
         });
-    const subtitleKey = sortedPreviewKeys.length > 0 ? sortedPreviewKeys[0] : undefined;
+    const subtitleKey = getDisplayPropertyKey(collection, "subtitle")
+        ?? (sortedPreviewKeys.length > 0 ? sortedPreviewKeys[0] : undefined);
 
     return { titleKey,
 titleKeyCandidates,
@@ -506,43 +526,26 @@ function resolveRelationDisplayName(
     }
 
     // Helper: extract display name from entity values using the target collection
+    //
+    // This used to carry a ranking of its own — priority keys `name/title/label/
+    // displayName`, then the first visible non-id string — which is a *seventh*
+    // answer to "what is this record called", and one that disagreed with the
+    // shared one: it read `titleProperty` with a flat lookup (so a dotted path
+    // was ignored), never saw `display.title`, and ranked by key name where the
+    // shared ranking excludes identifiers structurally. A chip and the record it
+    // points at could therefore be labelled differently on the same screen.
+    //
+    // What is left here is the part that is genuinely local: a relation carries
+    // *eagerly loaded* values, not an entity, so a resolver cannot run against
+    // it — a computed title falls back to the ranked property, which is the same
+    // thing the list row shows while its own resolver is in flight.
     const extractDisplayName = (values: Record<string, unknown>): string | undefined => {
         if (targetCollection) {
-            const targetTitleKey = targetCollection.titleProperty as string | undefined;
-            if (targetTitleKey && values[targetTitleKey] !== undefined) {
-                return String(values[targetTitleKey]);
-            }
-
-            // Helper to check if a property is hidden/internal
-            const isHiddenProp = (p: Property): boolean => {
-                if (p.admin?.hideFromCollection) return true;
-                if (typeof p.admin?.disabled === "object" && p.admin.disabled.hidden) return true;
-                return false;
-            };
-
-            // Helper to check if a property is a visible, non-id string
-            const isDisplayCandidate = (p: Property): boolean => {
-                return p.type === "string" && !p.admin?.multiline && !p.admin?.markdown && !p.storage
-                    && !("isId" in p && p.isId) && !isHiddenProp(p);
-            };
-
-            // Prioritize common title-like fields: name, title, label, displayName
-            const priorityKeys = ["name", "title", "label", "displayName"];
-            for (const pk of priorityKeys) {
-                const p = targetCollection.properties[pk] as Property | undefined;
-                if (p && isDisplayCandidate(p) && values[pk] !== undefined && values[pk] !== null) {
-                    return String(values[pk]);
-                }
-            }
-
-            // Fallback: find first visible, non-id string property in target
-            for (const [k, p] of Object.entries(targetCollection.properties)) {
-                const tp = p as Property;
-                if (isDisplayCandidate(tp)) {
-                    if (values[k] !== undefined && values[k] !== null) {
-                        return String(values[k]);
-                    }
-                }
+            for (const key of getTitlePropertyCandidates(targetCollection)) {
+                const value = getValueInPath(values, key);
+                if (value === undefined || value === null || value === "") continue;
+                if (typeof value === "string" && looksLikeIdentifierValue(value)) continue;
+                return String(value);
             }
         }
         // Generic fallback: walk entity values for any short string.
@@ -581,4 +584,68 @@ function resolveRelationDisplayName(
 
     // 3. Final fallback: show the ID
     return id !== undefined ? String(id) : undefined;
+}
+
+/**
+ * The slots for one record, with `admin.display` resolvers applied.
+ *
+ * {@link resolveEntitySlots} answers the question from values already in hand —
+ * which is everything a slot filled by a property needs, and nothing a slot
+ * filled by a *resolver* can use. A computed title may have to be fetched, so it
+ * arrives after the first render; this hook is where the two meet.
+ *
+ * Until a resolver lands, the derived slot shows. That is deliberate: a list of
+ * fifty rows must not blank its titles for a beat while fifty promises settle,
+ * and the derived answer — the best-ranked property carrying a readable value —
+ * is a reasonable thing to be looking at meanwhile. When the resolved value
+ * arrives it replaces the slot outright, property and all, because there is no
+ * property behind a computed value (see {@link PreviewSlot}).
+ *
+ * Every role is hooked unconditionally, so the hook order is fixed regardless of
+ * what a given collection declares.
+ */
+export function useEntitySlots(
+    entity: Entity<Record<string, unknown>>,
+    collection: AdminCollection<Record<string, unknown>>,
+    slotKeys: CollectionSlotKeys
+): EntityPreviewSlots {
+
+    const derived = useMemo(
+        () => resolveEntitySlots(entity, collection, slotKeys),
+        [entity, collection, slotKeys]
+    );
+
+    const params = { collection,
+entity };
+    const title = useEntityDisplay<string>("title", params);
+    const subtitle = useEntityDisplay<string>("subtitle", params);
+    const image = useEntityDisplay<string>("image", params);
+    const status = useEntityDisplay<string>("status", params);
+    const date = useEntityDisplay<Date | string | number>("date", params);
+
+    return useMemo(() => {
+        // `source` is set only when the value came from a property, so its
+        // absence is exactly the "this was computed" signal — no second flag to
+        // keep in step with the first.
+        const computed = (
+            resolved: { value: unknown, source?: unknown }
+        ): PreviewSlot | undefined =>
+            resolved.value !== undefined && resolved.source === undefined
+                ? { value: resolved.value }
+                : undefined;
+
+        const computedDate = computed(date);
+
+        return {
+            ...derived,
+            title: computed(title) ?? derived.title,
+            subtitle: computed(subtitle) ?? derived.subtitle,
+            image: computed(image) ?? derived.image,
+            status: computed(status) ?? derived.status,
+            date: computedDate
+                ? { ...computedDate,
+formatted: formatDateValue(computedDate.value) }
+                : derived.date
+        };
+    }, [derived, title, subtitle, image, status, date]);
 }

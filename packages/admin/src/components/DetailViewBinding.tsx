@@ -46,9 +46,7 @@ import {
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigate } from "react-router";
-import { getValueInPath } from "@rebasepro/utils";
-import { getEntityTitlePropertyKeyForEntity, isUserSelectProperty, resolveTitleToString } from "../util/previews";
-import { getUserLabel, useResolvedUser } from "../hooks/useResolvedUsers";
+import { useEntityDisplayTitle } from "../hooks/useEntityDisplayTitle";
 
 
 import { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../util/view_constants";
@@ -291,18 +289,13 @@ entityId }
     const formViewConfig = (collection as AdminCollection<M> & { formView?: FormViewConfig<M> }).formView;
     const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<EntityCustomViewParams>(formViewConfig.Builder as ComponentRef<EntityCustomViewParams>) : null;
 
-    // Title resolution
-    const titlePropertyKey = getEntityTitlePropertyKeyForEntity(collection, usedEntity?.values, usedEntity?.id);
-    const rawTitle = usedEntity?.values && titlePropertyKey ? getValueInPath(usedEntity.values, titlePropertyKey) : undefined;
-    // A user picker stores an id: resolve it to the person, like a relation.
-    const titleUser = useResolvedUser(isUserSelectProperty(collection, titlePropertyKey) && typeof rawTitle === "string"
-        ? rawTitle
-        : undefined);
-    const title = titleUser
-        ? getUserLabel(titleUser)
-        : (rawTitle !== undefined && rawTitle !== null
-            ? resolveTitleToString(rawTitle)
-            : (collection.singularName ?? collection.name));
+    // The heading, resolved the one way — this used to be a copy of
+    // `useEntityDisplayTitle`'s body, and the two had already drifted.
+    const title = useEntityDisplayTitle({
+        collection,
+        entity: usedEntity,
+        status: "existing"
+    });
 
     // Non-action custom views
     const nonActionCustomViews = useMemo(() =>

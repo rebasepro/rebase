@@ -69,7 +69,7 @@ export const productsCollection = defineCollection({
 
 ## En déclarer une : `defineCollection`
 
-Enveloppez le littéral dans `defineCollection`. À l'exécution, c'est la fonction identité — elle renvoie l'objet inchangé — donc son coût est nul. Ce qu'elle apporte, c'est l'inférence : un paramètre de type `const` capture les clés de `properties` comme types littéraux, ce qui les fait apparaître dans la complétion de l'éditeur pour `admin.titleProperty`, `admin.sort` et `admin.propertiesOrder`.
+Enveloppez le littéral dans `defineCollection`. À l'exécution, c'est la fonction identité — elle renvoie l'objet inchangé — donc son coût est nul. Ce qu'elle apporte, c'est l'inférence : un paramètre de type `const` capture les clés de `properties` comme types littéraux, ce qui les fait apparaître dans la complétion de l'éditeur pour `admin.display`, `admin.sort` et `admin.propertiesOrder`.
 
 ```typescript
 import { defineCollection } from "@rebasepro/admin-types";
@@ -83,7 +83,7 @@ const products = defineCollection({
         price: { name: "Price", type: "number" }
     },
     admin: {
-        titleProperty: "name",   // complétion : "name" | "price"
+        display: { title: "name" },   // complétion : "name" | "price"
         sort: ["price", "asc"]   // complétion sur le premier élément
     }
 });
@@ -166,7 +166,7 @@ Dans `admin`, sauf `history`, qui est une fonctionnalité du backend et reste au
 | `history` | `boolean` | `false` | Suivre les modifications dans l'historique de l'entité |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Appliquer les valeurs par défaut à chaque sauvegarde |
 | `previewProperties` | `string[]` | — | Propriétés à afficher dans les aperçus de référence |
-| `titleProperty` | `string` | — | Propriété à utiliser comme titre de l'entité |
+| `display` | `EntityDisplay` | — | Ce qui remplit chaque rôle d'affichage — `title`, `subtitle`, `image`, `status`, `date`, `tags` |
 
 ### Avancé
 

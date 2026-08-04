@@ -41,6 +41,7 @@ export const ADMIN_COLLECTION_KEYS = [
     "defaultSize",
     "defaultViewMode",
     "disableDefaultActions",
+    "display",
     "enabledViews",
     "entityActions",
     "entityViews",

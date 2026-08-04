@@ -6,7 +6,8 @@ import { PropertyPreview } from "../../preview";
 import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { BoardItemViewProps } from "@rebasepro/ui";
-import { useCollectionSlotKeys, resolveEntitySlots } from "./usePreviewSlots";
+import { useCollectionSlotKeys, useEntitySlots } from "./usePreviewSlots";
+import { SlotValue } from "./SlotValue";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type BoardCardBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = BoardItemViewProps<Entity<M>> & {
@@ -46,13 +47,10 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
         customizationController.propertyConfigs
     );
 
-    const slots = useMemo(
-        () => resolveEntitySlots(
-            entity as Entity<Record<string, unknown>>,
-            collection as AdminCollection<Record<string, unknown>>,
-            slotKeys
-        ),
-        [entity, collection, slotKeys]
+    const slots = useEntitySlots(
+        entity as Entity<Record<string, unknown>>,
+        collection as AdminCollection<Record<string, unknown>>,
+        slotKeys
     );
 
     const handleClick = useCallback((e: React.MouseEvent) => {
@@ -126,13 +124,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
                             selectionEnabled && "group-hover/card:opacity-30",
                             selected && "opacity-0"
                         )}>
-                            <PropertyPreview
-                                property={slots.image.property}
-                                propertyKey={slots.image.propertyKey}
-                                size="small"
-                                value={slots.image.value}
-                                fill={true}
-                            />
+                            <SlotValue slot={slots.image} size="small" fill={true}/>
                         </div>
                     ) : (
                         <div className={cls(
@@ -177,12 +169,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
                     {/* Title slot */}
                     <div className="line-clamp-2 text-sm font-medium">
                         {slots.title ? (
-                            <PropertyPreview
-                                propertyKey={slots.title.propertyKey}
-                                value={slots.title.value}
-                                property={slots.title.property}
-                                size="small"
-                            />
+                            <SlotValue slot={slots.title} size="small"/>
                         ) : (
                             <span className="text-surface-500">{entity.id}</span>
                         )}
@@ -193,12 +180,7 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
                             {typeof slots.subtitle.value === "string" ? (
                                 <Markdown source={slots.subtitle.value} size="small" />
                             ) : (
-                                <PropertyPreview
-                                    propertyKey={slots.subtitle.propertyKey}
-                                    value={slots.subtitle.value}
-                                    property={slots.subtitle.property}
-                                    size="small"
-                                />
+                                <SlotValue slot={slots.subtitle} size="small"/>
                             )}
                         </div>
                     ) : (

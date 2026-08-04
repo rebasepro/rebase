@@ -3,10 +3,9 @@ import * as React from "react";
 import { Entity } from "@rebasepro/types";
 import { cls, LinkIcon, Skeleton, Tooltip } from "@rebasepro/ui";
 import { useAnalyticsController } from "@rebasepro/app";
-import { getValueInPath } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
-import { getEntityTitlePropertyKeyForEntity } from "../util/previews";
+import { useEntityTitle } from "../hooks/useEntityDisplay";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";
 
@@ -57,14 +56,15 @@ export function InlineEntityPreview({
 
     const collection = collectionProp ?? collectionRegistryController.getCollection(entity.path);
 
-    const titlePropertyKey = collection
-        ? getEntityTitlePropertyKeyForEntity(collection, entity.values, entity.id)
-        : undefined;
-    const titleValue = titlePropertyKey ? getValueInPath(entity.values, titlePropertyKey) : undefined;
-    const resolvedLabel = label
-        ?? (titleValue !== undefined && titleValue !== null && String(titleValue).trim().length > 0
-            ? String(titleValue)
-            : String(entity.id));
+    // The id is the right fallback *here* specifically: this renders a pointer at
+    // another record, and a pointer with no label is still followable if it says
+    // which record it points at. A page heading makes the opposite choice.
+    const { value: title } = useEntityTitle({
+        collection: collection as AdminCollection,
+        entity,
+        enabled: Boolean(collection)
+    });
+    const resolvedLabel = label ?? title ?? String(entity.id);
 
     const interactive = !disabled && (onClick !== undefined || (includeEntityLink && collection !== undefined));
 

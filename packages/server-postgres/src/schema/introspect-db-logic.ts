@@ -1089,7 +1089,7 @@ export function generateCollectionFile(
 
         if (derivedFacts) {
             const titleProperty = deriveTitleProperty(derivedFacts);
-            if (titleProperty) adminEntries.push(`titleProperty: ${quote(titleProperty)}`);
+            if (titleProperty) adminEntries.push(`display: { title: ${quote(titleProperty)} }`);
 
             const kanbanProperty = deriveKanbanProperty(derivedFacts);
             if (kanbanProperty) adminEntries.push(`kanban: {\n            columnProperty: ${quote(kanbanProperty)}\n        }`);

@@ -1,4 +1,5 @@
 import type { AdditionalFieldDelegate, AdminCollection } from "@rebasepro/admin-types";
+import { AdditionalFieldValue } from "../AdditionalFieldValue";
 import React, { useCallback, useMemo, useRef } from "react";
 import { Entity, User, Property } from "@rebasepro/types";
 import { CollectionSize, RebaseContext } from "@rebasepro/admin-types";
@@ -214,12 +215,10 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
 
         const child: React.ReactNode = Builder
             ? <Builder entity={entity} context={context}/>
-            : <>
-                {additionalField.value?.({
-                    entity,
-                    context: context as RebaseContext
-                })?.toString()}
-            </>;
+            : <AdditionalFieldValue
+                field={additionalField}
+                entity={entity}
+                context={context as RebaseContext}/>;
 
         return (
             <EntityTableCell

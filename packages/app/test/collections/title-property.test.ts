@@ -183,10 +183,26 @@ type: "relation",
             expect(getTitlePropertyKey(collection)).toBe("tag");
         });
 
-        it("honours an explicit titleProperty", () => {
+        it("honours an explicit display.title", () => {
             const collection: AdminCollection = {
                 name: "Talents",
                 slug: "talents",
+                table: "talents",
+                display: { title: "email" },
+                properties: {
+                    full_name: { name: "Full Name",
+type: "string" },
+                    email: { name: "Email",
+type: "string" }
+                }
+            };
+            expect(getTitlePropertyKey(collection)).toBe("email");
+        });
+
+        it("still honours the deprecated titleProperty", () => {
+            const collection: AdminCollection = {
+                name: "Talents",
+                slug: "talents-legacy",
                 table: "talents",
                 titleProperty: "email",
                 properties: {
@@ -197,6 +213,32 @@ type: "string" }
                 }
             };
             expect(getTitlePropertyKey(collection)).toBe("email");
+        });
+
+        it("resolves a declared title that points into a map", () => {
+            // `properties[path]` is a flat lookup, so a dotted title silently
+            // fell through to the ranking and a collection got whichever
+            // property the ranking liked — even though the dotted form has been
+            // documented as valid the whole time.
+            const collection: AdminCollection = {
+                name: "People",
+                slug: "people",
+                table: "people",
+                display: { title: "profile.display_name" },
+                properties: {
+                    nickname: { name: "Nickname",
+type: "string" },
+                    profile: {
+                        name: "Profile",
+                        type: "map",
+                        properties: {
+                            display_name: { name: "Display name",
+type: "string" }
+                        }
+                    }
+                }
+            };
+            expect(getTitlePropertyKey(collection)).toBe("profile.display_name");
         });
 
         it("ignores hidden and image properties", () => {

@@ -326,7 +326,7 @@ const exercisesCollection: PostgresCollectionConfig = {
         group: "Fitness",
         defaultViewMode: "table",
         enabledViews: ["table", "cards"],
-        titleProperty: "name",
+        display: { title: "name" },
         propertiesOrder: [
             "name",
             "body_parts",

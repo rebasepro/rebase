@@ -16,7 +16,8 @@ import {
 } from "@rebasepro/app";
 import { useAnalyticsController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
-import { useCollectionSlotKeys, resolveEntitySlots } from "./usePreviewSlots";
+import { useCollectionSlotKeys, useEntitySlots } from "./usePreviewSlots";
+import { SlotValue } from "./SlotValue";
 
 export type EntityCardBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     entity: Entity<M>;
@@ -56,13 +57,10 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
         customizationController.propertyConfigs
     );
 
-    const slots = useMemo(
-        () => resolveEntitySlots(
-            entity as Entity<Record<string, unknown>>,
-            collection as AdminCollection<Record<string, unknown>>,
-            slotKeys
-        ),
-        [entity, collection, slotKeys]
+    const slots = useEntitySlots(
+        entity as Entity<Record<string, unknown>>,
+        collection as AdminCollection<Record<string, unknown>>,
+        slotKeys
     );
 
     const handleClick = (e?: React.MouseEvent) => {
@@ -104,13 +102,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
             <div className="aspect-[4/3] relative overflow-hidden bg-surface-100 dark:bg-surface-900">
                 {slots.image ? (
                     <div className="w-full h-full">
-                        <PropertyPreview
-                            property={slots.image.property}
-                            propertyKey={slots.image.propertyKey}
-                            size="medium"
-                            value={slots.image.value}
-                            fill={true}
-                        />
+                        <SlotValue slot={slots.image} size="medium" fill={true}/>
                     </div>
                 ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -160,12 +152,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                 {/* Title slot */}
                 <div className="truncate my-1 text-sm font-medium min-h-[20px]">
                     {slots.title ? (
-                        <PropertyPreview
-                            propertyKey={slots.title.propertyKey}
-                            value={slots.title.value}
-                            property={slots.title.property}
-                            size="small"
-                        />
+                        <SlotValue slot={slots.title} size="small"/>
                     ) : (
                         <Typography variant="body2" className="text-surface-500">
                             {entity.id}
@@ -176,12 +163,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                 {/* Subtitle slot */}
                 {slots.subtitle && (
                     <div className="line-clamp-3 [&_div]:line-clamp-3 text-xs text-surface-600 dark:text-surface-400 [&_p]:!my-1 [&_p:first-child]:!mt-0 [&_p:last-child]:!mb-0">
-                        <PropertyPreview
-                            propertyKey={slots.subtitle.propertyKey}
-                            value={slots.subtitle.value}
-                            property={slots.subtitle.property}
-                            size="small"
-                        />
+                        <SlotValue slot={slots.subtitle} size="small"/>
                     </div>
                 )}
 
@@ -211,12 +193,7 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                 {/* Status slot */}
                 {slots.status && (
                     <div className="mt-1">
-                        <PropertyPreview
-                            propertyKey={slots.status.propertyKey}
-                            value={slots.status.value}
-                            property={slots.status.property}
-                            size="small"
-                        />
+                        <SlotValue slot={slots.status} size="small"/>
                     </div>
                 )}
             </div>

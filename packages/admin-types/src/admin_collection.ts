@@ -43,6 +43,7 @@ import type {
     ViewMode
 } from "./collections";
 import type { EntityCustomView, FormViewConfig } from "./types/entity_views";
+import type { EntityDisplay } from "./types/entity_display";
 import type { FormLayoutConfig } from "./types/form_layout";
 import type { EntityAction } from "./types/entity_actions";
 import type { ExportConfig } from "./types/export_import";
@@ -64,6 +65,19 @@ import type { CollectionComponentOverrideMap } from "./types/component_overrides
 export type PropertyPath<M> =
     | Extract<keyof M, string>
     | `${Extract<keyof M, string>}.${string}`;
+
+/**
+ * The `display` block for a collection, with its property paths checked
+ * against `M`.
+ *
+ * `EntityDisplay` is generic over the path type so that
+ * `@rebasepro/admin-types`' two halves do not import each other in a cycle;
+ * this alias is what an authoring site actually names.
+ */
+export type CollectionDisplay<
+    M extends Record<string, unknown> = Record<string, unknown>,
+    USER extends User = User
+> = EntityDisplay<PropertyPath<M>, M, USER>;
 
 /**
  * A key naming a *column* in the list view: a property path, a child-collection
@@ -152,9 +166,37 @@ export type AdminCollectionOptions<
     listProperties?: ColumnKey<M>[];
 
     /**
-     * Title property of the entity. This is the property that will be used
-     * as the title in entity related views and references.
-     * If not specified, the first property simple text property will be used.
+     * How a record of this collection shows up — its title, subtitle, image,
+     * status, date and tags.
+     *
+     * Each role takes a property path or a resolver, and a resolver may be
+     * async:
+     *
+     * ```ts
+     * display: {
+     *     title: "name",
+     *     image: "cover.url",
+     *     subtitle: ({ entity }) => `${entity.values.city}, ${entity.values.country}`,
+     *     status: async ({ entity, context }) =>
+     *         (await context.data.audits.get(`${entity.id}/latest`))?.state
+     * }
+     * ```
+     *
+     * Every role left out is derived from the property schema exactly as before,
+     * so a collection that says nothing renders as it always did. See
+     * {@link EntityDisplay} for what each role means and
+     * {@link EntityDisplayResolver} for what a resolver is handed.
+     */
+    readonly display?: EntityDisplay<PropertyPath<M>, M, USER>;
+
+    /**
+     * @deprecated Moved to `display.title`, which takes the same string and also
+     * accepts a resolver. Still honoured, and warns once per collection at
+     * runtime; `display.title` wins if both are set.
+     *
+     * Kept on the type rather than only at runtime so the move shows up as a
+     * strikethrough with a working replacement beside it, instead of as a title
+     * that silently reverts to the derived one.
      */
     readonly titleProperty?: PropertyPath<M>;
 

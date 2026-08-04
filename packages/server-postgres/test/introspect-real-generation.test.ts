@@ -144,8 +144,8 @@ describe("the generated admin block", () => {
     });
 
     it("names a title property when the schema supports one", () => {
-        expect(adminBlock(pagila.files.get("film")!)).toContain('titleProperty: "title"');
-        expect(adminBlock(northwind.files.get("products")!)).toContain('titleProperty: "product_name"');
+        expect(adminBlock(pagila.files.get("film")!)).toContain('display: { title: "title" }');
+        expect(adminBlock(northwind.files.get("products")!)).toContain('display: { title: "product_name" }');
     });
 
     it("sorts by the single database-maintained stamp", () => {
@@ -419,7 +419,7 @@ describe("generating without a structural analysis", () => {
         const bare = generateCollectionFile(
             "film", tables.get("film")!, metadata.fks, new Set(), tables, buildEnumMap(metadata.enumValues)
         );
-        expect(bare).not.toContain("titleProperty");
+        expect(bare).not.toContain("display: { title");
         expect(bare).not.toContain("hideFromNavigation");
         expect(bare).not.toContain("listProperties");
     });

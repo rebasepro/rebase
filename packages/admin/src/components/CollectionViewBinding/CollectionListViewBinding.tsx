@@ -24,7 +24,8 @@ import { getEntityPreviewKeys } from "../../util/previews";
 import { IconForView } from "@rebasepro/app";
 import { getIcon } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
-import { useCollectionSlotKeys, resolveEntitySlots, type CollectionSlotKeys } from "./usePreviewSlots";
+import { useCollectionSlotKeys, useEntitySlots, type CollectionSlotKeys } from "./usePreviewSlots";
+import { SlotValue } from "./SlotValue";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { resolveEntityAction } from "../../util/resolutions";
 
@@ -628,8 +629,11 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     selectionController?: SelectionController<M>;
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }) {
-    // ── Resolve slots (pure function, no hooks) ──
-    const slots = resolveEntitySlots(
+    // ── Resolve slots ──
+    // A hook now, not a pure call: a `display` resolver may have to fetch what
+    // fills a slot, so the row subscribes to the result and re-renders when it
+    // lands. `ListRow` is memoized, which is what keeps that to the one row.
+    const slots = useEntitySlots(
         entity as Entity<Record<string, unknown>>,
         collection as AdminCollection<Record<string, unknown>>,
         slotKeys
@@ -696,7 +700,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 <div className="flex-shrink-0">
                     {slots.image ? (
                         <div className={cls("w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-100 dark:bg-surface-900", defaultBorderMixin)}>
-                            <PropertyPreview propertyKey={slots.image.propertyKey} value={slots.image.value} property={slots.image.property} size="small" fill={true}/>
+                            <SlotValue slot={slots.image} size="small" fill={true}/>
                         </div>
                     ) : (
                         <div className={cls("w-10 h-10 rounded-lg bg-surface-100 dark:bg-surface-900 flex items-center justify-center border", defaultBorderMixin)}>
@@ -715,13 +719,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 <div className="truncate">
                     {slots.title?.value !== undefined ? (
                         <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                            <PropertyPreview
-                                propertyKey={slots.title.propertyKey}
-                                value={slots.title.value}
-                                property={slots.title.property}
-                                size="small"
-                                textOnly={true}
-                            />
+                            <SlotValue slot={slots.title} size="small" textOnly={true}/>
                         </Typography>
                     ) : (
                         <Typography component="div" variant="body2" className="font-semibold text-surface-500 dark:text-surface-400 font-mono text-xs transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
@@ -734,13 +732,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 {slots.subtitle && (
                     <div className="truncate mt-0.5">
                         <Typography variant="caption" component="div" className="text-surface-500 dark:text-surface-400 truncate">
-                            <PropertyPreview
-                                propertyKey={slots.subtitle.propertyKey}
-                                value={slots.subtitle.value}
-                                property={slots.subtitle.property}
-                                size="small"
-                                textOnly={true}
-                            />
+                            <SlotValue slot={slots.subtitle} size="small" textOnly={true}/>
                         </Typography>
                     </div>
                 )}
@@ -825,12 +817,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                     {/* STATUS slot — hidden when row is narrow */}
                     {slots.status && (
                         <div className="flex-shrink-0 @max-[400px]:hidden">
-                            <PropertyPreview
-                                propertyKey={slots.status.propertyKey}
-                                value={slots.status.value}
-                                property={slots.status.property}
-                                size="small"
-                            />
+                            <SlotValue slot={slots.status} size="small"/>
                         </div>
                     )}
 

@@ -69,7 +69,7 @@ export const productsCollection = defineCollection({
 
 ## Dichiararne una: `defineCollection`
 
-Racchiudi il literal in `defineCollection`. A runtime è la funzione identità — restituisce l'oggetto invariato — quindi non costa nulla. Ciò che offre è l'inferenza: un parametro di tipo `const` cattura le chiavi di `properties` come tipi literal, ed è questo che le porta nel completamento dell'editor per `admin.titleProperty`, `admin.sort` e `admin.propertiesOrder`.
+Racchiudi il literal in `defineCollection`. A runtime è la funzione identità — restituisce l'oggetto invariato — quindi non costa nulla. Ciò che offre è l'inferenza: un parametro di tipo `const` cattura le chiavi di `properties` come tipi literal, ed è questo che le porta nel completamento dell'editor per `admin.display`, `admin.sort` e `admin.propertiesOrder`.
 
 ```typescript
 import { defineCollection } from "@rebasepro/admin-types";
@@ -83,7 +83,7 @@ const products = defineCollection({
         price: { name: "Price", type: "number" }
     },
     admin: {
-        titleProperty: "name",   // completamento: "name" | "price"
+        display: { title: "name" },   // completamento: "name" | "price"
         sort: ["price", "asc"]   // completamento sul primo elemento
     }
 });
@@ -166,7 +166,7 @@ Dentro `admin`, tranne `history`, che è una funzionalità del backend e resta a
 | `history` | `boolean` | `false` | Traccia le modifiche nella cronologia dell'entità |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Applica i valori predefiniti ad ogni salvataggio |
 | `previewProperties` | `string[]` | — | Proprietà da visualizzare nelle anteprime di riferimento |
-| `titleProperty` | `string` | — | Proprietà da usare come titolo dell'entità |
+| `display` | `EntityDisplay` | — | Cosa riempie ogni ruolo di visualizzazione — `title`, `subtitle`, `image`, `status`, `date`, `tags` |
 
 ### Avanzate
 

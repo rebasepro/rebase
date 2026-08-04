@@ -19,6 +19,7 @@ import { getFormFieldKeys, resolveFormLayout, useCustomizationController } from 
 import { getValueInPath } from "@rebasepro/utils";
 
 import { FieldBlock, spanClass } from "../form/components/FieldBlock";
+import { AdditionalFieldValue } from "./AdditionalFieldValue";
 import { FormSections } from "../form/components/FormSections";
 import { FormRail } from "../form/components/FormRail";
 import { useRailVisible } from "../form/components/useRailVisible";
@@ -143,10 +144,10 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
             const child = AdditionalFieldBuilder
                 ? <AdditionalFieldBuilder entity={entity} context={additionalFieldContext}/>
                 : <div className={"w-full"}>
-                    {additionalField.value?.({
-                        entity,
-                        context: additionalFieldContext
-                    })?.toString()}
+                    <AdditionalFieldValue
+                        field={additionalField}
+                        entity={entity}
+                        context={additionalFieldContext}/>
                 </div>;
 
             return (

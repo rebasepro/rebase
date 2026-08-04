@@ -193,7 +193,7 @@ const ticketsCollection: PostgresCollectionConfig = {
             columnProperty: "status"
         },
         orderProperty: "__order",
-        titleProperty: "subject",
+        display: { title: "subject" },
         propertiesOrder: [
             "ticket_number",
             "subject",

@@ -162,7 +162,7 @@ export default productsCollection;
 | `admin.propertiesOrder` | `string[]` | — | Field display order in forms and table |
 | `admin.form` | `FormLayoutConfig` | — | Form layout: `sidebar`, `sections`, `showRecordMeta`. See **Form layout** below |
 | `admin.entityViews` | `(string \| EntityCustomView)[]` | — | Custom tabs on entity detail |
-| `admin.titleProperty` | `string` | first text prop | Property used as entity title in previews |
+| `admin.display` | `EntityDisplay` | derived | What fills each display role — `title`, `subtitle`, `image`, `status`, `date`, `tags`. Each takes a property path or a resolver (may be async). See **Entity display** below |
 | `admin.previewProperties` | `string[]` | — | Properties shown when this collection is referenced |
 | `admin.listProperties` | `string[]` | — | Columns to display in list view |
 | `admin.selectionEnabled` | `boolean` | — | Enable row selection checkboxes |
@@ -1283,11 +1283,38 @@ This narrows the type of `entity` for the remainder of the component, allowing s
 
 ## Entity Preview & Title Resolution
 
+### Entity display
+
+Six roles — `title`, `subtitle`, `image`, `status`, `date`, `tags` — fill every
+surface that draws a record. Each is derived from the properties, and each can be
+stated as a property path or as a function:
+
+```typescript
+admin: {
+    display: {
+        title: "name",
+        image: "cover",
+        subtitle: ({ entity }) => `in ${entity.values.city}`,
+        // A resolver may be async: this reads a document the record does not carry.
+        status: async ({ entity, context }) =>
+            (await context.data.audits.get(`${entity.id}/latest`))?.state
+    }
+}
+```
+
+While an async resolver is in flight the surface shows the derived value and swaps
+the resolved one in; results are cached per record and per role. Return
+`undefined` when a record has nothing for a role — the surface picks its own
+fallback. Prefer a path when the value is on the record: it keeps the property's
+own rendering (an enum stays a chip, a date stays formatted).
+
+`admin.titleProperty` is the old name of `display.title`. It is still read, and
+warns once per collection.
+
 ### Title Property Selection
-By default, the property used as the entity's display title (previews, headers) is resolved as follows:
-1. If `titleProperty` is explicitly specified on the collection, it is used.
-2. If `propertiesOrder` is explicitly defined on the collection, the first non-ID property that is either a `relation` or `string` type is chosen as the title key.
-3. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
+When `display.title` is not set, the property used as the entity's display title (previews, headers) is resolved as follows:
+1. If `propertiesOrder` is explicitly defined on the collection, the first non-ID property that is either a `relation` or `string` type is chosen as the title key.
+2. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
 
 ### Relation Previews in Tables
 When `propertiesOrder` is explicitly set, relation properties are *not* automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).

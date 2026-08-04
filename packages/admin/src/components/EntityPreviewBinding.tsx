@@ -25,7 +25,8 @@ import {
 import { useAnalyticsController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { getPropertyInPath } from "../util/property_utils";
-import { getEntityPreviewKeys, getEntityTitlePropertyKeyForEntity } from "../util/previews";
+import { getEntityPreviewKeys } from "../util/previews";
+import { useEntityTitle } from "../hooks/useEntityDisplay";
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";
@@ -87,6 +88,13 @@ export function EntityPreviewBindingData({
 
     const collection = collectionProp ?? collectionRegistryController.getCollection(entity.path);
 
+    // Above the `!collection` return, because hooks are. `useEntityTitle`
+    // tolerates a missing collection for exactly this reason.
+    const title = useEntityTitle({
+        collection,
+        entity
+    });
+
     const listProperties = useMemo(() => {
         if (!collection) return [];
         return previewKeys ?? getEntityPreviewKeys(authController, collection, customizationController.propertyConfigs, previewKeys, size === "medium" || size === "large" ? 3 : 2);
@@ -100,7 +108,7 @@ export function EntityPreviewBindingData({
         );
     }
 
-    const titleProperty = includeTitle ? getEntityTitlePropertyKeyForEntity(collection, entity.values, entity.id) : undefined;
+    const titleProperty = includeTitle ? title.source?.key : undefined;
     const imagePropertyKey = includeImage ? getEntityImagePreviewPropertyKey(collection) : undefined;
     const imageProperty = imagePropertyKey ? collection.properties[imagePropertyKey] : undefined;
     const ofProp = imageProperty && "of" in imageProperty ? imageProperty.of : undefined;
@@ -148,20 +156,24 @@ export function EntityPreviewBindingData({
                         </div>
                         : <Skeleton/>)}
 
-                {titleProperty && (
+                {/* A title that came from a property keeps that property's own
+                    rendering — an enum stays its coloured chip, a relation stays
+                    a link. A computed one is text, because that is all a
+                    resolver returns. */}
+                {includeTitle && (titleProperty || title.value) && (
                     <div
                         className={"truncate my-0.5 text-sm font-medium text-text-primary dark:text-text-primary-dark"}>
-                        {
-                            entity
+                        {!entity && titleProperty
+                            ? <SkeletonPropertyComponent
+                                property={getPropertyInPath(collection.properties, titleProperty) as Property}
+                                size={"medium"}/>
+                            : titleProperty
                                 ? <PropertyPreview
-                                    propertyKey={titleProperty as string}
-                                    value={getValueInPath(entity.values, titleProperty) as never}
-                                    property={collection.properties[titleProperty as string] as Property}
+                                    propertyKey={titleProperty}
+                                    value={title.source?.value as never}
+                                    property={getPropertyInPath(collection.properties, titleProperty) as Property}
                                     size={"medium"}/>
-                                : <SkeletonPropertyComponent
-                                    property={collection.properties[titleProperty as string] as Property}
-                                    size={"medium"}/>
-                        }
+                                : title.value}
                     </div>
                 )}
 

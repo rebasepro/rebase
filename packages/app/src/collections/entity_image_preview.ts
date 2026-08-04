@@ -1,6 +1,19 @@
 import { CollectionConfig } from "@rebasepro/types";
+import type { AdminCollection } from "@rebasepro/admin-types";
+import { getDisplayPropertyKey } from "./entity-display";
 
+/**
+ * The property that fills a record's image slot.
+ *
+ * `admin.display.image` first, then six fallbacks in descending confidence —
+ * the first image-typed storage property, an array of them, a URL rendered as an
+ * image, and so on. The ladder stays for collections that say nothing; a
+ * collection that names its picture is not guessed at.
+ */
 export function getEntityImagePreviewPropertyKey<M extends Record<string, unknown>>(collection: CollectionConfig<M>): string | undefined {
+
+    const declared = getDisplayPropertyKey(collection as AdminCollection<M>, "image");
+    if (declared) return declared;
 
     // find first storage property of type image
     for (const key in collection.properties) {

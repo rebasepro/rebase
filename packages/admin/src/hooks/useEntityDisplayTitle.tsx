@@ -1,60 +1,49 @@
 import type { AdminCollection } from "@rebasepro/admin-types";
-import type { EntityStatus } from "@rebasepro/types";
-import { getValueInPath } from "@rebasepro/utils";
-import { getEntityTitlePropertyKeyForEntity, isUserSelectProperty, resolveTitleToString } from "../util/previews";
-import { getUserLabel, useResolvedUser } from "./useResolvedUsers";
+import type { Entity, EntityStatus } from "@rebasepro/types";
+import { useEntityTitle } from "./useEntityDisplay";
 
 export interface UseEntityDisplayTitleParams<M extends Record<string, unknown>> {
     collection: AdminCollection<M>;
+    /** The record. Needed for a computed title; see {@link useEntityTitle}. */
+    entity?: Entity<M>;
+    /** Live form values, when they are ahead of the entity. */
     values?: Record<string, unknown>;
-    entityId?: string | number;
     status: EntityStatus;
 }
 
 /**
- * The human name for a record, for the identity bar and the breadcrumb.
+ * The heading for a record: the identity bar and the breadcrumb.
  *
- * The guard on `status` is the point. The title resolver walks candidate
- * properties and returns the first non-empty one, and on a brand new entity the
- * only populated values are the property defaults — so creating a blog post
- * opened a page headed **draft**, the default of its `status` enum. A record
- * that does not exist yet has no name; it has an intent.
+ * Everything about *what a record is called* lives in {@link useEntityTitle}.
+ * What is left here is the heading's own two rules, which are presentation, not
+ * identity:
+ *
+ * The guard on `status` is the first. The title resolver returns the first
+ * candidate carrying a value, and on a brand new entity the only values are the
+ * property defaults — so creating a blog post opened a page headed **draft**,
+ * the default of its `status` enum. A record that does not exist yet has no
+ * name; it has an intent.
+ *
+ * The fallback is the second. A page needs a heading even when the record has
+ * nothing readable in it, and the honest one is what kind of thing it is.
  */
 export function useEntityDisplayTitle<M extends Record<string, unknown>>({
     collection,
+    entity,
     values,
-    entityId,
     status
 }: UseEntityDisplayTitleParams<M>): string {
 
     const isNew = status === "new";
-
-    const titlePropertyKey = getEntityTitlePropertyKeyForEntity(collection, values, entityId);
-    const rawTitle = !isNew && values && titlePropertyKey
-        ? getValueInPath(values, titlePropertyKey)
-        : undefined;
-
-    // A user picker stores an id: resolve it to the person, like a relation.
-    const titleUser = useResolvedUser(
-        isUserSelectProperty(collection, titlePropertyKey) && typeof rawTitle === "string"
-            ? rawTitle
-            : undefined
-    );
-
     const singular = collection.singularName ?? collection.name;
 
-    if (isNew) {
-        return `New ${singular.toLowerCase()}`;
-    }
+    const { value: title } = useEntityTitle<M>({
+        collection,
+        entity,
+        values,
+        enabled: !isNew
+    });
 
-    if (titleUser) {
-        return getUserLabel(titleUser);
-    }
-
-    if (rawTitle !== undefined && rawTitle !== null) {
-        const resolved = resolveTitleToString(rawTitle);
-        if (resolved) return resolved;
-    }
-
-    return singular;
+    if (isNew) return `New ${singular.toLowerCase()}`;
+    return title ?? singular;
 }

@@ -413,8 +413,8 @@ parentEntityIds,
 
     const displayTitle = useEntityDisplayTitle({
         collection,
+        entity: usedEntity,
         values: (formContext?.values ?? usedEntity?.values) as Record<string, unknown> | undefined,
-        entityId,
         status
     });
 

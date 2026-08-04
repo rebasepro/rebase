@@ -69,7 +69,7 @@ export const productsCollection = defineCollection({
 
 ## Declarando uma: `defineCollection`
 
-Envolva o literal em `defineCollection`. Em tempo de execução é a função identidade — devolve o objeto inalterado — portanto não custa nada. O que ela traz é inferência: um parâmetro de tipo `const` captura as chaves de `properties` como tipos literais, que é o que as coloca no autocompletar do editor para `admin.titleProperty`, `admin.sort` e `admin.propertiesOrder`.
+Envolva o literal em `defineCollection`. Em tempo de execução é a função identidade — devolve o objeto inalterado — portanto não custa nada. O que ela traz é inferência: um parâmetro de tipo `const` captura as chaves de `properties` como tipos literais, que é o que as coloca no autocompletar do editor para `admin.display`, `admin.sort` e `admin.propertiesOrder`.
 
 ```typescript
 import { defineCollection } from "@rebasepro/admin-types";
@@ -83,7 +83,7 @@ const products = defineCollection({
         price: { name: "Price", type: "number" }
     },
     admin: {
-        titleProperty: "name",   // autocompletar: "name" | "price"
+        display: { title: "name" },   // autocompletar: "name" | "price"
         sort: ["price", "asc"]   // autocompletar no primeiro elemento
     }
 });
@@ -166,7 +166,7 @@ Dentro de `admin`, exceto `history`, que é um recurso do backend e permanece no
 | `history` | `boolean` | `false` | Rastrear mudanças no histórico da entidade |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Aplicar valores padrão em cada salvamento |
 | `previewProperties` | `string[]` | — | Propriedades a serem exibidas nas pré-visualizações de referência |
-| `titleProperty` | `string` | — | Propriedade a ser usada como título da entidade |
+| `display` | `EntityDisplay` | — | O que preenche cada função de exibição — `title`, `subtitle`, `image`, `status`, `date`, `tags` |
 
 ### Avançado
 

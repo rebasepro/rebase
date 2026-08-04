@@ -3,26 +3,7 @@ import { useMemo } from "react";
 ;
 import { getSubcollections } from "@rebasepro/common";
 import type { AdminCollection } from "@rebasepro/admin-types";
-
-/**
- * Get a property in a property tree from a dot-path like `address.street`.
- * Inlined here to avoid importing property-aware utilities from the admin layer.
- */
-function getPropertyInPath(properties: Properties, path: string): Property | undefined {
-    if (typeof properties === "object") {
-        if (path in properties) {
-            return (properties as Record<string, Property>)[path];
-        }
-        if (path.includes(".")) {
-            const pathSegments = path.split(".");
-            const childProperty = (properties as Record<string, Property>)[pathSegments[0]];
-            if (typeof childProperty === "object" && childProperty.type === "map" && childProperty.properties) {
-                return getPropertyInPath(childProperty.properties, pathSegments.slice(1).join("."));
-            }
-        }
-    }
-    return undefined;
-}
+import { getPropertyInPath } from "../../collections/property-path";
 
 export type PropertyColumnConfig = {
     key: string;

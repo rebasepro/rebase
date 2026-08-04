@@ -288,7 +288,7 @@ describe("template collections", () => {
     // The template is the first Rebase code anyone reads, so it has to model the
     // idiom we actually recommend. A bare `const x: CollectionConfig = {…}`
     // annotation typechecks but infers nothing, which costs completion on
-    // `admin.titleProperty` / `sort` / `propertiesOrder` — the whole reason
+    // `admin.display.title` / `sort` / `propertiesOrder` — the whole reason
     // `defineCollection` exists.
     it("each blog collection is declared with defineCollection", () => {
         const collectionsDir = path.join(TEMPLATE_DIR, "config", "collections");

@@ -17,6 +17,7 @@ import { Alert, Button, cls, Dialog, DialogActions, DialogContent, DialogTitle, 
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 
 import { FieldBlock, isSelfLabellingProperty, spanClass } from "./components/FieldBlock";
+import { AdditionalFieldValue } from "../components/AdditionalFieldValue";
 import { FormRail } from "./components/FormRail";
 import { FormSections } from "./components/FormSections";
 import { useRailVisible } from "./components/useRailVisible";
@@ -440,10 +441,10 @@ export function EntityForm<M extends Record<string, unknown>>({
             const child = AdditionalFieldBuilder
                 ? <AdditionalFieldBuilder entity={entity} context={additionalFieldContext}/>
                 : <div className={"w-full"}>
-                    {additionalField.value?.({
-                        entity,
-                        context: additionalFieldContext
-                    })?.toString()}
+                    <AdditionalFieldValue
+                        field={additionalField}
+                        entity={entity}
+                        context={additionalFieldContext}/>
                 </div>;
 
             return (
