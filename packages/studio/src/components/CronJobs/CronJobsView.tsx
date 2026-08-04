@@ -133,7 +133,15 @@ export function CronJobsView() {
         setLogsLoading(true);
         c.cron.getJobLogs(selectedId, { limit: 25 })
             .then(res => { if (!cancelled) setLogs(res.logs); })
-            .catch(() => { if (!cancelled) setLogs([]); })
+            .catch((e: unknown) => {
+                if (cancelled) return;
+                // Same reasoning as `refreshLogs`: an empty log list is a claim.
+                setLogs([]);
+                snackbarRef.current.open({
+                    type: "error",
+                    message: e instanceof Error ? e.message : String(e)
+                });
+            })
             .finally(() => { if (!cancelled) setLogsLoading(false); });
 
         return () => { cancelled = true; };
@@ -146,7 +154,17 @@ export function CronJobsView() {
         try {
             const res = await c.cron.listJobs();
             setJobs(res.jobs);
-        } catch { /* swallow */ }
+        } catch (e: unknown) {
+            // Swallowed before, which left the list showing whatever it last
+            // held — or nothing — after a failed refresh. "No cron jobs" and
+            // "could not read the cron jobs" are not the same statement, and
+            // this view has a snackbar precisely so they can be told apart; the
+            // initial load already uses it.
+            snackbarRef.current.open({
+                type: "error",
+                message: e instanceof Error ? e.message : String(e)
+            });
+        }
     }
 
     async function refreshLogs(id: string) {
@@ -156,7 +174,14 @@ export function CronJobsView() {
         try {
             const res = await c.cron.getJobLogs(id, { limit: 25 });
             setLogs(res.logs);
-        } catch { setLogs([]); }
+        } catch (e: unknown) {
+            // Clearing the list silently reads as "this job has never run".
+            setLogs([]);
+            snackbarRef.current.open({
+                type: "error",
+                message: e instanceof Error ? e.message : String(e)
+            });
+        }
         finally { setLogsLoading(false); }
     }
 
