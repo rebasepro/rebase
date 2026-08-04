@@ -986,6 +986,27 @@ resolved by reading five lines.
 | the 181 baselined `exhaustive-deps` findings | **not churned**, deliberately. Sampled the 32 whose missing dependency is query-shaped; the two most promising — `useDataTableController`'s `defaultFilter` and `EntitiesCount`'s `filter` — are both correct as written. `defaultFilter` is an inline object at its call sites, so adding it would reset the user's filter on every render, and `filter` is deliberately keyed through a serialised `filterKey`. The repo's own note on this baseline is right: adding the dependency is as often the bug as the fix. |
 | every dynamic write in the workspace (class 22, run properly) | **BUG** — 323 of them; 320 accumulate into a local object under keys from a schema or a config. The three that take keys from a *request body* are in the Postgres transformer, and two were exploitable: `JSON.parse` makes `__proto__` an own property, so it passes `hasOwnProperty` and then replaces the row's prototype. `Object.prototype` is safe; the row is not, and `row.isAdmin` answers `true` while `Object.keys` shows nothing. Reachable only where `assertKnownWriteFields` stands down — a collection with no declared properties, or `strictWrites: false` — which are the configurations that trust the body most. |
 
+### Clicking through the running app
+
+Everything above was found by reading. This is what an hour of actually using
+the panel added, which is the argument for doing both.
+
+| checked | result |
+|---|---|
+| starting the app at all | **BUG** — the frontend's Vite alias list named fourteen workspace packages and omitted `admin-types`, so it resolved to the *primary checkout's* built `dist`. An edit there does nothing in dev and the stale build runs instead, which is worse than nothing happening. The list carried a comment about the last time it was caught missing one (`utils`). Derived from the directory now. |
+| the demo's login screen | **BUG** (class 5) — "No account needed … Just click **Sign in with email**", above a button rendered `disabled={!privacyAccepted}` with the checkbox unchecked. The first instruction a visitor is given does nothing and nothing says why. |
+| a product card with a missing image | **BUG** — rendered the English literal `"File not found"` while `file_not_found` is translated into seven locales. Which opened the question below. |
+| every translated key, against literals in the admin | **BUG**, systemic — 209 strings that have a key are also written out in English, on lines that never call `t(`. Ratcheted by `check:untranslated`, which accepts `t("k") ?? "English"` because a default is not a defect. |
+| the list view's search and its count | **verified** — searching `chair` in 200 products showed 4 cards and "All 4 entries loaded". The count fix, working against real data. |
+| the kanban board's search | **verified** — 60 cards and a column reading "Open 11" became 4 cards and "Open 2". Both halves of that fix — the subscription and the per-column count — confirmed end to end. |
+| the numeric fields on a record | clean, and worth recording as a near-miss: the screenshot appeared to show `28,9` with a comma, which would have been a decimal round-trip bug. `input.value` is `28.9`. I misread a glyph at 1440px, and checking took a minute. |
+| `/c/products/new` | clean — "new" is a URL *hash* (`#new`), so that path really is a request for an entity with the id `new`, and the 404 is the intended outcome of an earlier fix. |
+| the create form and its validation | clean — required fields flag, and the summary reads "Please fix the highlighted errors before saving." |
+
+The two verified rows are the point of the exercise as much as the bugs: both
+fixes were written blind against unit tests, and neither had been seen working.
+
+
 Two process notes worth as much as the findings.
 
 The first four commits of this sweep contained **only their new test files**.
