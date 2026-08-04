@@ -4,6 +4,7 @@ import type { AdminCollection } from "@rebasepro/admin-types";
 import { getPrimaryKeys, isPropertyBuilder } from "@rebasepro/common";
 import { getPropertyInPath } from "./property-path";
 import { getDisplayPropertyKey, hasDeclaredDisplay } from "./entity-display";
+import { isStorageProperty } from "./summary-property";
 
 /**
  * How good a property is as the human-readable title of an entity.
@@ -56,19 +57,6 @@ function normalizeKey(key: string): string {
 
 function isHidden(property: Property): boolean {
     return Boolean(property.admin?.hideFromCollection);
-}
-
-/**
- * File-storage backed content (single image, array of images, generic upload…).
- * Rendered by the dedicated image slot, so never a title.
- */
-function isStorageProperty(property: Property): boolean {
-    if (property.type === "string" && (property.storage || property.admin?.urlPreview === "image")) return true;
-    if (property.type === "array" && property.of && !Array.isArray(property.of)) {
-        const inner = property.of;
-        if (inner.type === "string" && (inner.storage || inner.admin?.urlPreview === "image")) return true;
-    }
-    return false;
 }
 
 /**

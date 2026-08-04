@@ -7,6 +7,7 @@ import type { PropertyPreviewProps } from "../../types/components/PropertyPrevie
 import { UrlComponentPreview } from "../components/UrlComponentPreview";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { Chip, cls, getColorSchemeForSeed } from "@rebasepro/ui";
+import { collapseToSingleLine } from "../compact_text";
 
 /**
  * @group Preview components
@@ -16,7 +17,8 @@ export function StringPropertyPreview({
     value,
     property,
     size,
-    textOnly
+    textOnly,
+    compact
 }: PropertyPreviewProps<StringProperty>): React.ReactElement {
 
     const strValue = value as string;
@@ -45,10 +47,11 @@ export function StringPropertyPreview({
         );
     } else {
         if (!strValue) return <></>;
-        // When used as a title/subtitle (textOnly), collapse newlines so the
-        // parent `truncate` can clamp it to a single line.
-        if (textOnly) {
-            const singleLine = strValue.replace(/\s*\n\s*/g, " ");
+        // A title/subtitle (textOnly) or a card line (compact) is one line, and
+        // `truncate` only clamps text that has no newlines of its own to break
+        // on — so the newlines come out here rather than in CSS.
+        if (textOnly || compact) {
+            const singleLine = collapseToSingleLine(strValue);
             return size === "small"
                 ? <span className={"text-sm"}>{singleLine}</span>
                 : <>{singleLine}</>;

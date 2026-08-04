@@ -9,4 +9,5 @@ export * from "./navigation_utils";
 export * from "./parent_references_from_path";
 export * from "./property-path";
 export * from "./property_presentation";
+export * from "./summary-property";
 export * from "./title-property";

@@ -191,6 +191,113 @@ name: "Title" } as Property
         const result = getEntityPreviewKeys(mockAuthController, collection, fields, ["title", "nonexistent"]);
         expect(result).toEqual(["title"]);
     });
+
+    // -----------------------------------------------------------------------
+    // Values that have no one-line form. The card is a fixed-height box; a
+    // property that renders as a document or a table cannot fill a line of it.
+    // -----------------------------------------------------------------------
+
+    /** The shape that produced the bug: an author whose third column is a bio. */
+    const authorsCollection = {
+        id: "authors",
+        name: "Authors",
+        path: "authors",
+        propertiesOrder: ["id", "name", "email", "picture", "bio", "twitter"],
+        properties: {
+            id: { type: "string",
+name: "ID",
+isId: "uuid" },
+            name: { type: "string",
+name: "Name" },
+            email: { type: "string",
+name: "Email" },
+            picture: { type: "string",
+name: "Picture",
+storage: { storagePath: "author_pictures/" } },
+            bio: { type: "string",
+name: "Bio",
+admin: { markdown: true } },
+            twitter: { type: "string",
+name: "Twitter" }
+        }
+    } as unknown as CollectionConfig;
+
+    it("does not spend a card line on a Markdown field when plain ones remain", () => {
+        const result = getEntityPreviewKeys(mockAuthController, authorsCollection, fields);
+        expect(result).not.toContain("bio");
+        expect(result).toEqual(["name", "email", "twitter"]);
+    });
+
+    it("falls back to a Markdown field when it is all there is", () => {
+        const collection = {
+            id: "articles",
+            name: "Articles",
+            path: "articles",
+            properties: {
+                body: { type: "string",
+name: "Body",
+admin: { markdown: true } }
+            }
+        } as unknown as CollectionConfig;
+
+        expect(getEntityPreviewKeys(mockAuthController, collection, fields)).toEqual(["body"]);
+    });
+
+    it("still returns a Markdown field when the collection asks for it by name", () => {
+        const result = getEntityPreviewKeys(mockAuthController, authorsCollection, fields, ["bio"]);
+        expect(result).toEqual(["bio"]);
+    });
+
+    it("excludes maps and arrays of maps, which render as tables", () => {
+        const collection = {
+            id: "test",
+            name: "Test",
+            path: "test",
+            properties: {
+                title: { type: "string",
+name: "Title" },
+                address: { type: "map",
+name: "Address",
+properties: { street: { type: "string",
+name: "Street" } } },
+                contacts: { type: "array",
+name: "Contacts",
+of: { type: "map",
+name: "Contact",
+properties: {} } },
+                tags: { type: "array",
+name: "Tags",
+of: { type: "string",
+name: "Tag" } }
+            }
+        } as unknown as CollectionConfig;
+
+        const result = getEntityPreviewKeys(mockAuthController, collection, fields);
+        expect(result).not.toContain("address");
+        expect(result).not.toContain("contacts");
+        expect(result).toEqual(["title", "tags"]);
+    });
+
+    it("orders long text after short text regardless of propertiesOrder", () => {
+        // `propertiesOrder` states the column order of the collection table. It
+        // is not a claim that the first columns summarise a record, and reading
+        // it as one is what put a biography on an author card.
+        const collection = {
+            id: "test",
+            name: "Test",
+            path: "test",
+            propertiesOrder: ["description", "status"],
+            properties: {
+                description: { type: "string",
+name: "Description",
+admin: { multiline: true } },
+                status: { type: "string",
+name: "Status" }
+            }
+        } as unknown as CollectionConfig;
+
+        expect(getEntityPreviewKeys(mockAuthController, collection, fields)).toEqual(["status", "description"]);
+    });
 });
 
 // ---------------------------------------------------------------------------

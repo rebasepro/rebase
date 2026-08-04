@@ -719,7 +719,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 <div className="truncate">
                     {slots.title?.value !== undefined ? (
                         <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                            <SlotValue slot={slots.title} size="small" textOnly={true}/>
+                            <SlotValue slot={slots.title} size="small"/>
                         </Typography>
                     ) : (
                         <Typography component="div" variant="body2" className="font-semibold text-surface-500 dark:text-surface-400 font-mono text-xs transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
@@ -732,7 +732,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 {slots.subtitle && (
                     <div className="truncate mt-0.5">
                         <Typography variant="caption" component="div" className="text-surface-500 dark:text-surface-400 truncate">
-                            <SlotValue slot={slots.subtitle} size="small" textOnly={true}/>
+                            <SlotValue slot={slots.subtitle} size="small"/>
                         </Typography>
                     </div>
                 )}

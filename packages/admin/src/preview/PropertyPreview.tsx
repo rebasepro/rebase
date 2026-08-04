@@ -27,6 +27,7 @@ import { ErrorView } from "@rebasepro/app";
 import { RelationPreview } from "./components/RelationPreview";
 import { InlineEntityListPreview } from "./components/InlineEntityListPreview";
 import { useIsNestedEntityPreview } from "../components/EntityPreviewNesting";
+import { markdownToPlainText } from "./compact_text";
 import { UserPreview } from "./components/UserPreview";
 
 /**
@@ -49,6 +50,13 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
         interactive,
         fill
     } = props;
+
+    // A preview rendered inside an entity preview fills one line of a card and
+    // has no room to grow — see {@link PropertyPreviewProps.compact}. The card
+    // is the thing that knows this, and it says so by opening a nesting
+    // boundary, so the depth is the signal rather than a prop every caller
+    // between here and there would have to forward.
+    const compact = props.compact ?? (nested || Boolean(props.textOnly));
 
     const property = resolveProperty({
         propertyKey,
@@ -103,7 +111,9 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                             fill={fill}
                             previewType={stringProperty.admin?.urlPreview}/>;
             } else if (stringProperty.admin?.markdown) {
-                content = <Markdown source={value} size={"small"}/>;
+                content = compact
+                    ? <span className={"text-sm"}>{markdownToPlainText(value)}</span>
+                    : <Markdown source={value} size={"small"}/>;
             } else if (stringProperty.userSelect) {
                 content = <UserPreview
                     value={value}
@@ -113,6 +123,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 />;
             } else {
                 content = <StringPropertyPreview {...props}
+                    compact={compact}
                     property={stringProperty}
                     value={value}/>;
             }
@@ -129,6 +140,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
             if (arrayProperty.of) {
                 if (Array.isArray(arrayProperty.of)) {
                     content = <ArrayPropertyPreview {...props}
+                        compact={compact}
                         value={value}
                         property={arrayProperty}/>;
                 } else if (arrayProperty.of.type === "reference") {
@@ -153,6 +165,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                     } else {
                         content = <ArrayOfStringsPreview
                             {...props}
+                            compact={compact}
                             property={property as ArrayProperty}
                             value={value as string[]}/>;
                     }
@@ -163,11 +176,13 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                         property={property as ArrayProperty}/>;
                 } else {
                     content = <ArrayPropertyPreview {...props}
+                        compact={compact}
                         value={value}
                         property={property as ArrayProperty}/>;
                 }
             } else if (arrayProperty.oneOf) {
                 content = <ArrayOneOfPreview {...props}
+                    compact={compact}
                     value={value}
                     property={property as ArrayProperty}/>;
             }
@@ -178,6 +193,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
         if (typeof value === "object") {
             content =
                 <MapPropertyPreview {...props}
+                    compact={compact}
                     value={value as Record<string, any>}
                     property={property as MapProperty}/>;
         } else {

@@ -97,6 +97,7 @@ template: "raw-data" })
             "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
             "@rebasepro/app": path.resolve(__dirname, "../../packages/app/src"),
             "@rebasepro/types": path.resolve(__dirname, "../../packages/types/src"),
+            "@rebasepro/admin-types": path.resolve(__dirname, "../../packages/admin-types/src"),
             "@rebasepro/common": path.resolve(__dirname, "../../packages/common/src"),
             // Every other workspace package resolves to source; without this one
             // `utils` alone came from its built `dist`, so edits to it did nothing
