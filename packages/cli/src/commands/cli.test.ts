@@ -40,9 +40,13 @@ vi.mock("./doctor", () => ({
 vi.mock("./cloud", () => ({
     cloudCommand: vi.fn()
 }));
-vi.mock("../utils/project", () => ({
-    requireProjectRoot: vi.fn(() => "/projects/shop"),
-    MANIFEST_FILENAME: "rebase.json"
+// Spread the real module rather than listing the two exports this file cares
+// about. A hand-listed mock fails the whole suite the day a command imports a
+// third helper — which is what happened when `readEnvFile` was added — and the
+// failure names the mock, not the import, so it reads as a broken test.
+vi.mock("../utils/project", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("../utils/project")>()),
+    requireProjectRoot: vi.fn(() => "/projects/shop")
 }));
 
 import path from "path";

@@ -13,6 +13,7 @@ import {
     requireProjectRoot,
     requireBackendDir,
     findEnvFile,
+    readEnvFile,
     resolveTsx
 } from "../utils/project";
 
@@ -121,19 +122,11 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
     const projectRoot = requireProjectRoot();
 
     // 1. Try API-first reset
-    let envServiceKey: string | undefined;
+    // Was a single-key regex, which did not match `export REBASE_SERVICE_KEY=…`
+    // and kept a trailing `# comment` in the value. The command then fell
+    // through to the direct-database path as though no key were configured.
     const envFile = findEnvFile(projectRoot);
-    if (envFile && fs.existsSync(envFile)) {
-        try {
-            const envContent = fs.readFileSync(envFile, "utf8");
-            const match = envContent.match(/^\s*REBASE_SERVICE_KEY\s*=\s*['"]?(.*?)['"]?\s*$/m);
-            if (match && match[1]) {
-                envServiceKey = match[1];
-            }
-        } catch {
-            // Ignore
-        }
-    }
+    const envServiceKey: string | undefined = readEnvFile(projectRoot).REBASE_SERVICE_KEY;
 
     let baseUrl = process.env.REBASE_BASE_URL;
     let serviceKey = process.env.REBASE_SERVICE_KEY || envServiceKey;

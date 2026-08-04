@@ -14,7 +14,8 @@ import {
     findBackendDir,
     findFrontendDir,
     findEnvFile,
-    getActiveBackendPlugin
+    getActiveBackendPlugin,
+    readEnvFile
 } from "./project";
 
 let tmpDir: string;
@@ -279,5 +280,53 @@ describe("getActiveBackendPlugin", () => {
         const backendDir = createDir("bad-pkg", "backend");
         writeFile(path.join(backendDir, "package.json"), "not json");
         expect(getActiveBackendPlugin(backendDir)).toBeNull();
+    });
+});
+
+/**
+ * How the CLI reads a project's `.env`.
+ *
+ * It read it four different ways: `dotenv` in `start`, a hand-rolled
+ * `indexOf("=")` loop in `api-keys`, a single-key regex in `auth`, and its own
+ * splitting in `cloud env`. `dotenv` is a declared dependency of this package,
+ * so three of those existed for no reason and diverged from the one that is
+ * correct — with the result that the same project worked under `rebase start`
+ * and failed under `rebase api-keys list`.
+ */
+describe("readEnvFile", () => {
+    function writeEnv(contents: string): string {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-env-"));
+        fs.writeFileSync(path.join(root, ".env"), contents, "utf-8");
+        return root;
+    }
+
+    it("reads a plain assignment", () => {
+        expect(readEnvFile(writeEnv("REBASE_SERVICE_KEY=sk_abc\n")).REBASE_SERVICE_KEY).toBe("sk_abc");
+    });
+
+    it("reads a line written with `export`", () => {
+        // Common in a file meant to be `source`d as well as loaded. The
+        // hand-rolled parser keyed this as `export REBASE_SERVICE_KEY`, so the
+        // command reported the key as not configured while it was right there.
+        expect(readEnvFile(writeEnv("export REBASE_SERVICE_KEY=sk_abc\n")).REBASE_SERVICE_KEY).toBe("sk_abc");
+    });
+
+    it("drops a trailing comment instead of putting it in the value", () => {
+        // Worse than being unset: the comment travelled into an Authorization
+        // header, and the request came back 401 with nothing pointing here.
+        expect(readEnvFile(writeEnv("REBASE_SERVICE_KEY=sk_abc # prod key\n")).REBASE_SERVICE_KEY).toBe("sk_abc");
+    });
+
+    it("keeps a value that legitimately contains a hash inside quotes", () => {
+        expect(readEnvFile(writeEnv('PASSWORD="p#ssw0rd"\n')).PASSWORD).toBe("p#ssw0rd");
+    });
+
+    it("keeps a value containing an equals sign", () => {
+        expect(readEnvFile(writeEnv("DATABASE_URL=postgres://u:p@h/db?a=b\n")).DATABASE_URL)
+            .toBe("postgres://u:p@h/db?a=b");
+    });
+
+    it("returns an empty object when there is no env file", () => {
+        expect(readEnvFile(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-env-")))).toEqual({});
     });
 });

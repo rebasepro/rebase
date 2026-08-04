@@ -7,6 +7,7 @@
 import fs from "fs";
 import path from "path";
 import { execSync } from "child_process";
+import dotenv from "dotenv";
 import chalk from "chalk";
 
 /** The authored project manifest. Its presence alone marks a project root. */
@@ -163,6 +164,37 @@ export function findEnvFile(projectRoot: string): string | null {
     }
 
     return null;
+}
+
+/**
+ * Read the project's `.env` into a plain object.
+ *
+ * One reader, because there were four: `dotenv` in `start`, a hand-rolled
+ * `indexOf("=")` loop in `api-keys`, a single-key regex in `auth`, and its own
+ * splitting in `cloud env`. `dotenv` is a declared dependency of this package,
+ * so the other three existed for no reason and disagreed with the correct one
+ * on the two things people actually write in a `.env`:
+ *
+ *   - `export KEY=value`, which the hand-rolled parser keyed as
+ *     `export KEY` — so the command reported the key as unset while it was
+ *     right there in the file;
+ *   - `KEY=value # comment`, whose comment travelled into the value and then
+ *     into an `Authorization` header, coming back as a 401 with nothing
+ *     pointing at the cause.
+ *
+ * Returns `{}` when the project has no `.env`, so callers can treat "absent"
+ * and "empty" alike.
+ */
+export function readEnvFile(projectRoot: string): Record<string, string> {
+    const envFile = findEnvFile(projectRoot);
+    if (!envFile || !fs.existsSync(envFile)) return {};
+    try {
+        return dotenv.parse(fs.readFileSync(envFile, "utf-8"));
+    } catch {
+        // An unreadable or malformed file is not worth failing a command over;
+        // the caller reports the missing value it was looking for.
+        return {};
+    }
 }
 
 /**

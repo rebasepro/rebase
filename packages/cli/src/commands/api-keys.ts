@@ -10,7 +10,7 @@ import arg from "arg";
 import chalk from "chalk";
 import {
     requireProjectRoot,
-    findEnvFile
+    readEnvFile
 } from "../utils/project";
 import fs from "fs";
 import path from "path";
@@ -19,29 +19,13 @@ import path from "path";
    Env helper — reads SERVICE_KEY and PORT from .env
    ═══════════════════════════════════════════════════════════════ */
 
-function loadEnv(projectRoot: string): Record<string, string> {
-    const envFile = findEnvFile(projectRoot);
-    const env: Record<string, string> = {};
-    if (envFile && fs.existsSync(envFile)) {
-        const content = fs.readFileSync(envFile, "utf-8");
-        for (const line of content.split("\n")) {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed.startsWith("#")) continue;
-            const idx = trimmed.indexOf("=");
-            if (idx > 0) {
-                const key = trimmed.slice(0, idx).trim();
-                let value = trimmed.slice(idx + 1).trim();
-                // Strip surrounding quotes
-                if ((value.startsWith('"') && value.endsWith('"')) ||
-                    (value.startsWith("'") && value.endsWith("'"))) {
-                    value = value.slice(1, -1);
-                }
-                env[key] = value;
-            }
-        }
-    }
-    return env;
-}
+/**
+ * Was a hand-rolled `indexOf("=")` loop. It keyed `export KEY=value` as
+ * `export KEY` and carried a trailing `# comment` into the value — so a key
+ * that was present read as absent, or reached an `Authorization` header with a
+ * comment attached and came back 401. See `readEnvFile`.
+ */
+const loadEnv = readEnvFile;
 
 function resolveBaseUrl(env: Record<string, string>, projectRoot?: string): string {
     // An explicit override always wins.
