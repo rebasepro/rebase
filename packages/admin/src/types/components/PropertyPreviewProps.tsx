@@ -61,4 +61,12 @@ export interface PropertyPreviewProps<P extends Property | Property, CustomProps
      */
     textOnly?: boolean;
 
+    /**
+     * The caller has already labelled this value, so the preview must not
+     * repeat the property name. A boolean is the one that does: it renders its
+     * name beside the checkbox, which reads as a caption in a table cell and as
+     * a stutter under a field label — "VIP" over a checkbox saying "VIP".
+     */
+    hideLabel?: boolean;
+
 }

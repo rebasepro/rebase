@@ -1,8 +1,32 @@
 import type { Property } from "@rebasepro/types";
+import type { PropertySpan } from "@rebasepro/admin-types";
 import React from "react";
 import { cls, ErrorBoundary, Typography } from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";
 import { PropertyIdCopyTooltip } from "../../components/PropertyIdCopyTooltip";
+
+/**
+ * Grid placement for a span.
+ *
+ * Written out as literal class strings rather than composed, because Tailwind
+ * scans source text: a template literal would produce classes that exist at
+ * runtime and were never generated into the stylesheet.
+ *
+ * Below the column breakpoint every field takes the single available column, so
+ * the side panel, the dialog and mobile all get a plain stack.
+ *
+ * Lives here rather than in the form, because the read-only rendering of a
+ * record places its fields on the same grid — a record that changes shape when
+ * you press Edit is the bug this whole layout exists to avoid.
+ */
+export function spanClass(span: PropertySpan): string {
+    switch (span) {
+        case 1: return "@2xl/col:col-span-1";
+        case 2: return "@2xl/col:col-span-2";
+        case 3: return "@2xl/col:col-span-3";
+        case 4: return "@2xl/col:col-span-4";
+    }
+}
 
 /**
  * Does this property's editor supply its own heading?

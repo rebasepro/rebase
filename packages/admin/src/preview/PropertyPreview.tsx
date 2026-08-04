@@ -270,7 +270,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
 
     } else if (property.type === "boolean") {
         if (typeof value === "boolean") {
-            content = <BooleanPreview value={value} size={size} property={property}/>;
+            content = <BooleanPreview value={value} size={size} property={property} hideLabel={props.hideLabel}/>;
         } else {
             content = buildWrongValueType(propertyKey, property.type, value);
         }

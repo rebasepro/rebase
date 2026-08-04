@@ -380,20 +380,31 @@ entityId }
     }, [onTabChange, path, entityId, collection]);
 
     const propertyDetailView = () => {
-        // formView.Builder replaces the default property display
+        // formView.Builder replaces the default property display. It gets the
+        // centred column the record used to be given here; the default display
+        // now lays itself out, rail included.
         if (FormViewBuilder && usedEntity) {
-            return <ErrorBoundary>
-                <Suspense fallback={<CircularProgressCenter />}>
-                    <FormViewBuilder
-                        collection={collection}
-                        parentCollectionSlugs={parentCollectionSlugs}
-                        parentEntityIds={parentEntityIds}
-                        entity={usedEntity}
-                        modifiedValues={usedEntity?.values}
-                        formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
-                    />
-                </Suspense>
-            </ErrorBoundary>;
+            return <div className={"flex-1 min-w-0 overflow-y-auto flex justify-center items-start"}>
+                <div className={cls(
+                    "w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
+                    layout === "dialog"
+                        ? "pt-5 pb-12 px-6 sm:px-8"
+                        : "pt-6 pb-16 px-5 sm:px-8"
+                )}>
+                    <ErrorBoundary>
+                        <Suspense fallback={<CircularProgressCenter />}>
+                            <FormViewBuilder
+                                collection={collection}
+                                parentCollectionSlugs={parentCollectionSlugs}
+                                parentEntityIds={parentEntityIds}
+                                entity={usedEntity}
+                                modifiedValues={usedEntity?.values}
+                                formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
+                            />
+                        </Suspense>
+                    </ErrorBoundary>
+                </div>
+            </div>;
         }
 
         return (
@@ -402,6 +413,9 @@ entityId }
                     entity={usedEntity}
                     collection={collection}
                     path={path}
+                    asPage
+                    openEntityMode={layout}
+                    formContext={readOnlyFormContext}
                 />}
             </>
         );
@@ -508,19 +522,16 @@ entityId }
     // Main content view. The title, the `path/id` chip and the empty band under
     // them have moved into the identity bar, and the `w-80 2xl:w-96` rail that
     // held a single Edit button is gone — the bar holds it now.
+    //
+    // The scroll now lives on the record's own column rather than on this row,
+    // so the metadata rail beside it stays put while the record scrolls — the
+    // same arrangement the form uses.
     const mainView = <div
         className={cls(
-            "flex-1 flex flex-row w-full overflow-y-auto justify-center",
+            "flex-1 flex flex-row w-full min-h-0",
             !mainViewVisible ? "hidden" : ""
         )}>
-        <div className={cls(
-            "w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
-            layout === "dialog"
-                ? "pt-5 pb-12 px-6 sm:px-8"
-                : "pt-6 pb-16 px-5 sm:px-8"
-        )}>
-            {propertyDetailView()}
-        </div>
+        {propertyDetailView()}
     </div>;
 
     let result = <div className="relative flex flex-col h-full w-full bg-white dark:bg-surface-800">

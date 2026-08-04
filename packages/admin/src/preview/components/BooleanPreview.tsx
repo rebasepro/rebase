@@ -8,18 +8,21 @@ import { PreviewSize } from "../../types/components/PropertyPreviewProps";
 export function BooleanPreview({
     value,
     size,
-    property
+    property,
+    hideLabel
 }: {
     value: boolean,
     size: PreviewSize,
     property: Property,
+    /** The caller already shows the name — see `PropertyPreviewProps.hideLabel`. */
+    hideLabel?: boolean,
 }): React.ReactElement {
     return <div className={"flex flex-row gap-2 items-center"}>
         <Checkbox checked={value}
             padding={false}
             size={size}
             color={"secondary"}/>
-        {property.name && <span
+        {!hideLabel && property.name && <span
             className={cls("text-text-secondary dark:text-text-secondary-dark", size === "small" ? "text-sm" : "")}>{property.name}</span>}
     </div>;
 }

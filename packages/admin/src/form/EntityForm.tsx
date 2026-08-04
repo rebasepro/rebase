@@ -16,7 +16,7 @@ import type { ResolvedFormField } from "@rebasepro/app";
 import { Alert, Button, cls, Dialog, DialogActions, DialogContent, DialogTitle, iconSize, paperMixin, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 
-import { FieldBlock, isSelfLabellingProperty } from "./components/FieldBlock";
+import { FieldBlock, isSelfLabellingProperty, spanClass } from "./components/FieldBlock";
 import { FormRail } from "./components/FormRail";
 import { FormSections } from "./components/FormSections";
 import { useRailVisible } from "./components/useRailVisible";
@@ -704,25 +704,6 @@ export function EntityForm<M extends Record<string, unknown>>({
 
         </Formex>
     );
-}
-
-/**
- * Grid placement for a span.
- *
- * Written out as literal class strings rather than composed, because Tailwind
- * scans source text: a template literal would produce classes that exist at
- * runtime and were never generated into the stylesheet.
- *
- * Below the column breakpoint every field takes the single available column, so
- * the side panel, the dialog and mobile all get a plain stack.
- */
-function spanClass(span: 1 | 2 | 3 | 4): string {
-    switch (span) {
-        case 1: return "@2xl/col:col-span-1";
-        case 2: return "@2xl/col:col-span-2";
-        case 3: return "@2xl/col:col-span-3";
-        case 4: return "@2xl/col:col-span-4";
-    }
 }
 
 function useOnAutoSave<M extends Record<string, unknown>>(autoSave: undefined | boolean, formex: FormexController<M>, lastSavedValues: React.MutableRefObject<EntityValues<M> | undefined>, save: (values: EntityValues<M>) => Promise<Entity<M> | void>) {

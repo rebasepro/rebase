@@ -524,35 +524,39 @@ parentEntityIds,
     const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<EntityCustomViewParams>(formViewConfig.Builder as ComponentRef<EntityCustomViewParams>) : null;
     const formViewIncludeActions = formViewConfig?.includeActions !== false;
 
-    const entityReadOnlyView = !canEdit && entity ? <div
-        className={cls("flex-1 flex flex-row w-full overflow-y-auto justify-center", (canEdit || !mainViewVisible || selectedSecondaryForm) ? "hidden" : "")}>
-        <div
-            className={cls("relative flex flex-col max-w-4xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-6xl w-full h-fit")}>
-            <Typography className={"mt-16 mb-8 mx-8"} variant={"h4"}>
-                {collection.singularName ?? collection.name}
-            </Typography>
-            {FormViewBuilder && readOnlyFormContext ? (
-                <ErrorBoundary>
-                    <Suspense fallback={<CircularProgressCenter />}>
-                        <FormViewBuilder
-                            collection={collection}
-                            parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
-                            entity={usedEntity}
-                            modifiedValues={usedEntity?.values}
-                            formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
-                        />
-                    </Suspense>
-                </ErrorBoundary>
-            ) : (
-                <EntityViewBinding
-                    className={"px-8 h-full overflow-auto"}
-                    entity={entity}
-                    path={path}
-                    collection={collection} />
-            )}
-            <div className="h-16" />
-        </div>
-    </div> : null;
+    // Without edit permission the record is rendered read-only — the same
+    // sections, spans and rail as the form, so losing the permission changes the
+    // controls and nothing else. The `h4` that used to head this repeated the
+    // collection name the identity bar above it already carries.
+    const entityReadOnlyView = !canEdit && entity ? (
+        FormViewBuilder && readOnlyFormContext
+            ? <div className={cls(
+                "flex-1 flex flex-row w-full overflow-y-auto justify-center",
+                (canEdit || !mainViewVisible || selectedSecondaryForm) ? "hidden" : ""
+            )}>
+                <div className={"w-full max-w-3xl 2xl:max-w-4xl flex flex-col pt-6 pb-16 px-5 sm:px-8"}>
+                    <ErrorBoundary>
+                        <Suspense fallback={<CircularProgressCenter />}>
+                            <FormViewBuilder
+                                collection={collection}
+                                parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
+                                entity={usedEntity}
+                                modifiedValues={usedEntity?.values}
+                                formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
+                            />
+                        </Suspense>
+                    </ErrorBoundary>
+                </div>
+            </div>
+            : <EntityViewBinding
+                className={cls((canEdit || !mainViewVisible || selectedSecondaryForm) ? "hidden" : "")}
+                entity={entity}
+                path={path}
+                collection={collection}
+                asPage
+                openEntityMode={layout}
+                formContext={readOnlyFormContext}/>
+    ) : null;
 
     const entityView = FormViewBuilder ? (
         // formView.Builder replaces the default form
