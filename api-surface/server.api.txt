@@ -90,7 +90,6 @@ function isAuthAdapter
 function isDatabaseAdapter
 function isLocalhostOrigin
 function isOperationAllowed
-function isRebaseApiError
 function isTransformableImage
 function listBackupObjects
 function listenWithPortRetry

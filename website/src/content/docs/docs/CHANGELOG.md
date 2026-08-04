@@ -6,6 +6,10 @@ title: Changelog
 
 ## [Unreleased]
 
+### Fixed
+
+- **The navigation drawer remembers whether you collapsed it, and stops expanding on its own.** Two separate reasons the drawer kept turning up open. First, `autoOpenDrawer` was destructured in `Scaffold` and then never read, so the hover handlers were attached unconditionally: the collapsed rail floated open whenever the pointer crossed it, in every admin, whatever the prop said. It is honoured now, and it is off by default. Second, the open/closed state was plain `useState` — every reload threw the choice away. It is persisted under the `rebase-drawer-open` key in `localStorage`, so the last toggle is what you get back. `defaultDrawerOpen` still seeds the very first visit and is ignored after that. Small layouts are excluded from persistence on purpose: there the drawer is a modal sheet, and restoring it would drop an overlay over the content on load.
+
 ## [0.13.0] - 2026-08-03
 
 ### Breaking
