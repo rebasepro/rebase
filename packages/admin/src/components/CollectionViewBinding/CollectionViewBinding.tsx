@@ -823,6 +823,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             collection={collection}
             filter={tableController.filterValues}
             sortBy={tableController.sortBy}
+            searchString={tableController.searchString}
             onCountChange={setDocsCount}
         />;
 
@@ -1302,17 +1303,26 @@ function DefaultCollectionEmptyState({
  */
 const inflightCountRequests = new Map<string, Promise<number>>();
 
-function EntitiesCount({
+export function EntitiesCount({
     path,
     collection,
     filter,
     sortBy,
+    searchString,
     onCountChange
 }: {
     path: string,
     collection: AdminCollection,
     filter?: FilterValues<any>,
     sortBy?: [string, "asc" | "desc"],
+    /**
+     * Required, not optional. The term sits in the same scope as the element
+     * that mounts this and is passed to the toolbar and the empty state beside
+     * it — it was simply not passed here, so a searched list showed the count
+     * of the unsearched collection. A required prop is what stops the next
+     * caller doing the same; there is no useful "count without the search".
+     */
+    searchString: string | undefined,
     onCountChange?: (count: number | null | undefined) => void,
 }) {
 
@@ -1344,12 +1354,17 @@ function EntitiesCount({
         const orderByParams: [string, "asc" | "desc"] | undefined = sortByProperty && currentSort ? [String(sortByProperty), currentSort] : undefined;
 
         // Deduplicate inflight count requests (e.g. React StrictMode double-mount)
-        const cacheKey = `${path}|${filterKey}|${sortByProperty ?? ""}|${currentSort ?? ""}`;
+        // The search term is part of the query, so it is part of the key. The
+        // cache is module-level and outlives an unmount, so a key that omits it
+        // does not merely lose precision — it answers one search with a
+        // different search's total.
+        const cacheKey = `${path}|${filterKey}|${sortByProperty ?? ""}|${currentSort ?? ""}|${searchString ?? ""}`;
         let countPromise = inflightCountRequests.get(cacheKey);
         if (!countPromise) {
             countPromise = accessor.count({
                 where: whereParams,
-                orderBy: orderByParams
+                orderBy: orderByParams,
+                searchString
             });
             inflightCountRequests.set(cacheKey, countPromise);
             // Clean up the inflight entry once resolved/rejected
@@ -1364,7 +1379,7 @@ function EntitiesCount({
         });
 
         return () => { cancelled = true; };
-    }, [path, filterKey, sortByProperty, currentSort]);
+    }, [path, filterKey, sortByProperty, currentSort, searchString]);
 
     // Count is now displayed in the breadcrumb bar, this component only fetches and reports
     return null;
