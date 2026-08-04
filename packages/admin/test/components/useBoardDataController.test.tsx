@@ -43,6 +43,57 @@ function updateFor(column: string): (entities: unknown[]) => void {
     return (entities) => (call[1] as (res: { data: unknown[] }) => void)({ data: entities });
 }
 
+/**
+ * The board accepts a `searchString`, stores it in a ref, lists it as an effect
+ * dependency — so typing re-subscribes every column — and then passed it to
+ * none of its three queries. `currentSearchString` was read into a local in two
+ * places and used in neither. Searching a board did nothing but make it flicker.
+ */
+describe("useBoardDataController search", () => {
+    beforeEach(() => {
+        listen.mockReset();
+        find.mockReset();
+        count.mockReset();
+        listen.mockReturnValue(() => { /* unsubscribe */ });
+        find.mockResolvedValue({ data: [] });
+        count.mockResolvedValue(0);
+    });
+
+    it("narrows every column subscription by the search term", async () => {
+        renderHook(() => useBoardDataController<Task>({
+            fullPath: "tasks",
+            collection,
+            columnProperty: "status",
+            columns: ["open"],
+            orderProperty: "order",
+            pageSize: 10,
+            searchString: "widget",
+            filterValues: undefined
+        } as never));
+
+        await waitFor(() => expect(listen).toHaveBeenCalled());
+        expect(listen.mock.calls[0][0]).toMatchObject({ searchString: "widget" });
+    });
+
+    it("narrows each column's count by the same term", async () => {
+        renderHook(() => useBoardDataController<Task>({
+            fullPath: "tasks",
+            collection,
+            columnProperty: "status",
+            columns: ["open"],
+            orderProperty: "order",
+            pageSize: 10,
+            searchString: "widget",
+            filterValues: undefined
+        } as never));
+
+        // Otherwise the column header counts the unsearched collection while
+        // the column below it shows the searched rows.
+        await waitFor(() => expect(count).toHaveBeenCalled());
+        expect(count.mock.calls[0][0]).toMatchObject({ searchString: "widget" });
+    });
+});
+
 describe("useBoardDataController", () => {
 
     beforeEach(() => {

@@ -408,7 +408,8 @@ values: { ...e.values,
             where: whereFilter,
             limit: itemCount,
             orderBy: orderByParam,
-            include: includeParams
+            include: includeParams,
+            searchString: currentSearchString
         });
 
         const onError = (error: Error) => {
@@ -446,7 +447,12 @@ values: { ...e.values,
                 where: whereFilter,
                 limit: itemCount,
                 orderBy: orderByParam,
-                include: includeParams
+                include: includeParams,
+                // Read into a local at the top of this function and then used
+                // nowhere, in both places it was read. The board took a search
+                // term, re-subscribed every column when it changed, and
+                // returned the same rows.
+                searchString: currentSearchString
             }, res => {
                 liveDataReceived = true;
                 onUpdate(res.data as Entity<M>[]);
@@ -539,7 +545,10 @@ values: { ...e.values,
                     };
 
                     accessor.count({
-                        where: whereFilter
+                        where: whereFilter,
+                        // Or the column header counts the unsearched collection
+                        // while the column beneath it shows searched rows.
+                        searchString: currentSearchString
                     }).then(count => {
                         if (isCleaningUpRef.current) return;
                         setColumnData(prev => ({
