@@ -533,6 +533,16 @@ one's rows. Name the shape once when several places need it
 that checks the seven fields someone remembered will keep passing when the
 eighth is added and forgotten.
 
+**The same class runs along a second axis: call sites rather than fields.** A
+feature applied by hand wherever it is needed is applied at *most* of them.
+`logical` reached two of the three `count()` calls in the REST generator;
+`projectResponseFields` was wired into two of the four routes that return rows;
+the count inside `find()` was missed while the `count()` beside it was fixed.
+Each looks complete from the site you are reading. The sweep is to enumerate
+the call sites of the *feature* — every `count()`, every route that returns
+rows — and check each one, rather than reading the implementation and assuming
+its callers agree with it.
+
 ---
 
 ## 18. A predicate that discriminates nothing
@@ -778,6 +788,10 @@ touched, which turned out to be all of them.
 | `Idempotency-Key` under concurrency | **BUG** (class 19) — recall-then-write is not atomic; two tabs replaying one key both wrote. Claimed in one statement now, with 409 for the loser and a release path so a failed write does not strand the key for a day. |
 | `isRebaseApiError` | **BUG** (class 18) — `return error instanceof Error`. It guarded "classify as BAD_REQUEST", so an unreachable database was a 400. Deleted; the driver classifies from the SQLSTATE it already holds. |
 | `pnpm typecheck`, `pnpm -r test`, eslint | green throughout — 6,700 tests across 22 packages. |
+| `MongoDriver.fetchCollection` / `count` vs. `FetchCollectionProps` | **BUG** (class 17) — eight of eleven fields destructured, and `MongoDataService` had no parameter for `logical` or `offset` at all. `where(or(…))` returned the whole collection, `?offset=` served page one, and `count()` ignored both plus `searchString`. Implemented, forwarded whole, pinned against `mongodb-memory-server`. |
+| every `count()` call site against the query it is reported beside | **BUG** ×3 — the count inside `buildRebaseData.find()` passed only `filter`, so a narrowed page carried an unnarrowed total and `hasMore` offered a page that was not there; `usePostgresClientDriver.count` re-listed seven names and dropped `logical`; the REST generator's *nested* `/count` dropped it while its two siblings kept it. |
+| every route that returns rows, against `?fields=` | **BUG** — applied on two of four. Both subcollection reads parsed the parameter and returned every column, on endpoints whose OpenAPI lists it first. Invisible because the only coverage called `projectResponseFields` directly, which proves the function narrows a row and nothing about whether a request reaches it (class 3). |
+| `buildRoutedRebaseData` | clean — it delegates whole accessors and never re-lists a parameter. |
 
 Two process notes worth as much as the findings.
 
