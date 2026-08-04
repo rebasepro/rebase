@@ -15,26 +15,3 @@ debug: 3 };
     if (currentLevel < 1) console.warn = () => { };
     if (currentLevel < 0) console.error = () => { };
 }
-
-/** Module-scoped backup of the original console methods. */
-let originalConsole: Pick<Console, "log" | "warn" | "error" | "debug"> | undefined;
-
-/**
- * Reset console methods to their original state
- */
-export function resetConsole() {
-    // Store original methods if not already stored
-    if (!originalConsole) {
-        originalConsole = {
-            log: console.log,
-            warn: console.warn,
-            error: console.error,
-            debug: console.debug
-        };
-    }
-
-    console.log = originalConsole.log;
-    console.warn = originalConsole.warn;
-    console.error = originalConsole.error;
-    console.debug = originalConsole.debug;
-}

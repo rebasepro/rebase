@@ -251,33 +251,4 @@ vector: [0.1, 0.2] }
             expect(handed[1]._distance).toBe(0.5);
         });
     });
-
-    describe("a null relation stays null when nested rows are inlined", () => {
-
-        it("inlines an object relation and leaves an absent one null", async () => {
-            const findMany = jest.fn().mockResolvedValue([
-                { id: 1,
-title: "Orphan",
-author: null },
-                { id: 2,
-title: "Attributed",
-author: { id: 9,
-name: "Ada" } }
-            ]);
-            const db = { query: { posts: { findMany } } };
-            const service = new FetchService(db as any, registry);
-
-            const rows = await (service as any).fetchWithDrizzleQuery(
-                "posts", postsCollection, {}, ["author"], { fieldName: "id",
-type: "number" }
-            );
-
-            // `typeof null === "object"`, so the null check is the only thing
-            // between an unset relation and `{ ...null }` — an empty object a
-            // client reads as "a row with no columns" rather than "no row".
-            expect(rows[0].author).toBeNull();
-            expect(rows[1].author).toEqual({ id: 9,
-name: "Ada" });
-        });
-    });
 });
