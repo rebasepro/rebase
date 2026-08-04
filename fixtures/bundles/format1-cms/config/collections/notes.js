@@ -15,7 +15,7 @@ export default {
     name: "Notes",
     singularName: "Note",
     slug: "notes",
-    table: "corpus_notes_v1",
+    table: "corpus_notes_format1",
     properties: {
         id: {
             name: "ID",

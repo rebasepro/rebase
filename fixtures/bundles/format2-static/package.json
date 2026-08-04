@@ -1,5 +1,5 @@
 {
-  "name": "corpus-v2-static",
+  "name": "corpus-format2-static",
   "private": true,
   "type": "module",
   "dependencies": {}

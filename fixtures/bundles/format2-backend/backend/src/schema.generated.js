@@ -2,7 +2,7 @@
 // regenerated.
 import { pgTable, text, uuid, boolean, timestamp } from 'drizzle-orm/pg-core';
 
-export const notes = pgTable("corpus_notes_v2", {
+export const notes = pgTable("corpus_notes_format2", {
     id: uuid("id").primaryKey().defaultRandom(),
     title: text("title").notNull(),
     body: text("body"),

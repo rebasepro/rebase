@@ -1,5 +1,5 @@
 {
-  "name": "corpus-v1-format1-cms",
+  "name": "corpus-format2-backend",
   "private": true,
   "type": "module",
   "dependencies": {}

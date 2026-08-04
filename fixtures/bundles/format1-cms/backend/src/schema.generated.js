@@ -11,7 +11,7 @@
 // loading too, and that is the finding.
 import { pgTable, text, uuid, timestamp } from 'drizzle-orm/pg-core';
 
-export const notes = pgTable("corpus_notes_v1", {
+export const notes = pgTable("corpus_notes_format1", {
     id: uuid("id").primaryKey().defaultRandom(),
     title: text("title").notNull(),
     body: text("body"),

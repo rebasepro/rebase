@@ -56,19 +56,19 @@ interface CorpusEntry {
 
 const CORPUS: CorpusEntry[] = [
     {
-        dir: "v1-format1-cms",
+        dir: "format1-cms",
         describe: "bundle format 1 — `mode: cms`, a bundled admin at entry.admin",
         kind: "backend",
-        indexMarker: "CORPUS_V1_ADMIN_INDEX"
+        indexMarker: "CORPUS_FORMAT1_ADMIN_INDEX"
     },
     {
-        dir: "v2-backend",
+        dir: "format2-backend",
         describe: "bundle format 2 — `kind: backend`, entry.static as a list",
         kind: "backend",
-        indexMarker: "CORPUS_V2_SITE_INDEX"
+        indexMarker: "CORPUS_FORMAT2_SITE_INDEX"
     },
     {
-        dir: "v2-static",
+        dir: "format2-static",
         describe: "bundle format 2 — `kind: static`, no database at all",
         kind: "static",
         indexMarker: "CORPUS_STATIC_INDEX"
@@ -154,7 +154,7 @@ const staged: string[] = [];
 const DRIVER_SKEW = ["0.10.0", "0.11.0", "0.12.0", "0.13.0"];
 
 /** The fixture the skew pass exercises — current format, real collections, real writes. */
-const SKEW_FIXTURE = "v2-backend";
+const SKEW_FIXTURE = "format2-backend";
 
 /**
  * Stage a fixture carrying a SPECIFIC published driver, stitched the way a
@@ -423,7 +423,7 @@ async function verifyBundle(entry: CorpusEntry, bundleDir: string): Promise<void
             // The collections actually loaded, and their tables actually exist —
             // boot creates them additively. A bundle whose collections silently
             // failed to load looks perfectly healthy right up to the first query.
-            const slug = entry.dir === "v1-format1-cms" ? "notes" : "notes";
+            const slug = entry.dir === "format1-cms" ? "notes" : "notes";
             const authed = await get(`/api/data/${slug}?limit=1`, asService);
             check(`GET /api/data/${slug} as a service`, authed.status === 200,
                 `${authed.status} ${authed.body.slice(0, 70)}`);

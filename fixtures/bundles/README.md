@@ -43,11 +43,11 @@ lands on a database some earlier runtime already wrote to.
 
 | Fixture | Specimen of |
 | --- | --- |
-| `v1-format1-cms` | bundle format 1 — `mode: "cms"`, a bundled admin at `entry.admin`, `entry.static` absent |
-| `v2-backend` | bundle format 2 — `kind: "backend"`, `entry.static` as a list |
-| `v2-static` | bundle format 2 — `kind: "static"`, no database at all |
+| `format1-cms` | bundle format 1 — `mode: "cms"`, a bundled admin at `entry.admin`, `entry.static` absent |
+| `format2-backend` | bundle format 2 — `kind: "backend"`, `entry.static` as a list |
+| `format2-static` | bundle format 2 — `kind: "static"`, no database at all |
 
-`v1-format1-cms` is the one carrying the most weight. New-bundle-on-old-runtime
+`format1-cms` is the one carrying the most weight. New-bundle-on-old-runtime
 is caught for free by the `bundleFormat` gate; **old-bundle-on-new-runtime is
 caught by nothing** — a renamed field simply reads as absent and every gate keyed
 on it skips in silence. `upgradeLegacyManifest` is what normalises it, and this
