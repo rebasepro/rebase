@@ -112,4 +112,46 @@ values: { name: "Test" } } });
         await admin.listBranches();
         expect(mockWsClient.listBranches).toHaveBeenCalled();
     });
+
+    it("hands the socket every part of a subscription's query", () => {
+        const { result } = renderHook(() => usePostgresClientDriver({ wsClient: mockWsClient } as any));
+        const driver = result.current;
+
+        const logical = {
+            type: "or",
+            conditions: [{ column: "status", operator: "==", value: "draft" }]
+        };
+        const onUpdate = jest.fn();
+
+        driver.listenCollection!({
+            path: "posts",
+            filter: { author: ["==", "u1"] },
+            logical,
+            limit: 10,
+            offset: 20,
+            orderBy: "created_at",
+            order: "desc",
+            searchString: "widget",
+            onUpdate
+        } as any);
+
+        // Asserted as a whole rather than field by field: this hop used to
+        // destructure a hand-written list of seven names, and the two it left
+        // out — `offset` and `logical` — were accepted by the caller's types and
+        // then silently dropped.
+        expect(mockWsClient.listenCollection).toHaveBeenCalledWith(
+            {
+                path: "posts",
+                filter: { author: ["==", "u1"] },
+                logical,
+                limit: 10,
+                offset: 20,
+                orderBy: "created_at",
+                order: "desc",
+                searchString: "widget"
+            },
+            expect.any(Function),
+            undefined
+        );
+    });
 });

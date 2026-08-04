@@ -92,17 +92,15 @@ order });
         },
 
         listenCollection<M extends Record<string, any>>(props: ListenCollectionProps<M>): () => void {
-            const { path, filter, limit, startAfter, orderBy, searchString, order, onUpdate, onError } = props;
+            // Everything except the callbacks is the query. Re-listing the
+            // fields by hand is what dropped `offset` and `logical` on this
+            // hop — a page-two subscription that asked the server for page one,
+            // and an `or(...)` subscription that asked for everything.
+            const { onUpdate, onError, ...query } = props;
             return client.listenCollection(
-                { path,
-filter,
-limit,
-startAfter,
-orderBy,
-searchString,
-order },
-                (rows: Record<string, unknown>[]) => props.onUpdate(rows),
-                props.onError
+                query,
+                (rows: Record<string, unknown>[]) => onUpdate(rows),
+                onError
             );
         },
 

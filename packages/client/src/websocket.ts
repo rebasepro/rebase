@@ -1803,16 +1803,22 @@ onError });
     }
 
     private createCollectionSubscriptionKey(props: FetchCollectionProps): string {
-        // Create a deterministic key based on subscription parameters
+        // Derived from the props, not a hand-listed subset of them.
+        //
+        // Two subscriptions share one server subscription when their keys
+        // match, so a field left off the key makes two different queries
+        // collide and hands the second listener the first one's rows. `offset`
+        // and `logical` were both missing: page two of a live list showed page
+        // one, and two views filtered by different `or(...)` groups saw the
+        // same rows. Listing fields by hand is what let that happen, so the key
+        // now covers whatever `FetchCollectionProps` carries.
+        //
+        // `collection` is the exception: it is the whole collection config,
+        // property thunks and all, so it contributes its name as before.
+        const { collection, ...query } = props as FetchCollectionProps & Record<string, unknown>;
         const key = {
-            path: props.path,
-            filter: props.filter,
-            limit: props.limit,
-            startAfter: props.startAfter,
-            orderBy: props.orderBy,
-            order: props.order,
-            searchString: props.searchString,
-            collection: props.collection?.name
+            ...query,
+            collection: collection?.name
         };
         // Use replacer function (not array) to sort keys at all levels for deterministic output
         return JSON.stringify(key, (_, value) => {

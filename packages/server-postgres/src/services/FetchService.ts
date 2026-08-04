@@ -954,6 +954,16 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            /**
+             * An `or(...)`/`and(...)` group, applied alongside `filter`.
+             *
+             * `fetchRowsWithConditions` below has always applied this; it was
+             * simply absent from this signature, so the only callers that could
+             * pass one were the ones that went around this method. Realtime
+             * came through here, which is why a subscription filtered by a
+             * logical group was pushed every row in the table.
+             */
+            logical?: LogicalCondition;
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;

@@ -149,6 +149,59 @@ subscriptionId: "sub-1" }
         });
     });
 
+    describe("Subscription narrowing", () => {
+        // The subscribe payload is unpacked field by field into the stored
+        // request, so anything left off that list is accepted over the wire and
+        // then silently ignored — for the initial fetch and for every refetch
+        // after it.
+
+        it("pages a subscription by the offset it was given", async () => {
+            const ws = new MockWebSocket() as any;
+            realtimeService.addClient("client-1", ws);
+
+            await realtimeService.handleClientMessage("client-1", {
+                type: "subscribe_collection",
+                payload: { path: "posts", subscriptionId: "sub-1", limit: 10, offset: 20 }
+            });
+
+            // Without this a live list on page three served page one.
+            expect(mockFetchCollection).toHaveBeenCalledWith(
+                "posts",
+                expect.objectContaining({ offset: 20 })
+            );
+            const stored = realtimeService.subscriptions.get("sub-1");
+            expect(stored.collectionRequest.offset).toBe(20);
+        });
+
+        it("applies the logical group it was given", async () => {
+            const ws = new MockWebSocket() as any;
+            realtimeService.addClient("client-1", ws);
+
+            const logical = {
+                type: "or",
+                conditions: [
+                    { column: "status", operator: "==", value: "draft" },
+                    { column: "status", operator: "==", value: "review" }
+                ]
+            };
+
+            await realtimeService.handleClientMessage("client-1", {
+                type: "subscribe_collection",
+                payload: { path: "posts", subscriptionId: "sub-1", logical }
+            });
+
+            // A dropped filter does not fail the subscription — it widens it,
+            // so the client was pushed every row instead of the ones it asked
+            // for.
+            expect(mockFetchCollection).toHaveBeenCalledWith(
+                "posts",
+                expect.objectContaining({ logical })
+            );
+            const stored = realtimeService.subscriptions.get("sub-1");
+            expect(stored.collectionRequest.logical).toEqual(logical);
+        });
+    });
+
     describe("Collection Synchronization", () => {
         it("triggers debounced refetch and omits dummy rows on PG_NOTIFY invalidation", async () => {
             const ws = new MockWebSocket() as any;

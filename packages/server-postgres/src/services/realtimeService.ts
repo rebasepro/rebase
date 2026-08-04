@@ -4,7 +4,7 @@ import { Client as PgClient } from "pg";
 import { randomUUID } from "crypto";
 import { DataService } from "./dataService";
 
-import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, CollectionConfig, RebaseCallContext, resolveClientListLimit } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenOneProps, DataDriver, CollectionUpdateMessage, SingleUpdateMessage, CollectionPatchMessage, WebSocketMessage, FilterValues, LogicalCondition, CollectionConfig, RebaseCallContext, resolveClientListLimit } from "@rebasepro/types";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig } from "../interfaces";
@@ -39,6 +39,28 @@ interface DataDriverWithData extends DataDriver {
 
 type RealTimeListenCollectionProps = ListenCollectionProps & {
     subscriptionId: string
+};
+
+/**
+ * The narrowing a collection subscription was created with, kept so that every
+ * refetch answers the same query the initial fetch did.
+ *
+ * Named once because it used to be written out inline in five places, and a
+ * field missing from one of them is accepted over the wire and then silently
+ * ignored: `offset` was declared on the incoming props and never stored, so a
+ * live list on page three served page one, and `logical` was never stored
+ * either, so an `or(...)` subscription was pushed every row in the table.
+ */
+type StoredCollectionRequest = {
+    filter?: Record<string, unknown>;
+    logical?: LogicalCondition;
+    orderBy?: string;
+    order?: "desc" | "asc";
+    limit?: number;
+    offset?: number;
+    startAfter?: Record<string, unknown>;
+    databaseId?: string;
+    searchString?: string;
 };
 
 type RealTimeListenEntityProps = ListenOneProps & { subscriptionId: string };
@@ -119,16 +141,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         path: string;
         id?: string | number;
         // Store full collection request parameters for proper refetching
-        collectionRequest?: {
-            filter?: Record<string, unknown>;
-            orderBy?: string;
-            order?: "desc" | "asc";
-            limit?: number;
-            offset?: number;
-            startAfter?: Record<string, unknown>;
-            databaseId?: string;
-            searchString?: string;
-        };
+        collectionRequest?: StoredCollectionRequest;
         // Auth context for RLS — when set, refetches run in a transaction
         // with set_config('app.uid', ...) / set_config('app.user_roles', ...)
         authContext?: SubscriptionAuthContext;
@@ -212,16 +225,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         type: "collection" | "single";
         path: string;
         id?: string | number;
-        collectionRequest?: {
-            filter?: Record<string, unknown>;
-            orderBy?: string;
-            order?: "desc" | "asc";
-            limit?: number;
-            offset?: number;
-            startAfter?: Record<string, unknown>;
-            databaseId?: string;
-            searchString?: string;
-        };
+        collectionRequest?: StoredCollectionRequest;
         authContext?: SubscriptionAuthContext;
     }) {
         this.debugLog("📋 [RealtimeService] Registering DataDriver subscription:", subscriptionId, subscription.authContext ? "(with auth)" : "(no auth)");
@@ -448,9 +452,11 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 path: request.path,
                 collectionRequest: {
                     filter: request.filter,
+                    logical: request.logical,
                     orderBy: request.orderBy,
                     order: request.order,
                     limit: boundedLimit,
+                    offset: request.offset,
                     startAfter: request.startAfter as Record<string, unknown> | undefined,
                     databaseId: request.collection?.databaseId,
                     searchString: request.searchString
@@ -458,17 +464,12 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 authContext
             });
 
-            // Send initial data
+            // Send initial data. Built from the request the subscription just
+            // stored, so the first answer and every refetch after it cannot
+            // describe different queries.
             const rows = await this.fetchCollectionWithAuth(
                 request.path,
-                {
-                    filter: request.filter,
-                    orderBy: request.orderBy,
-                    order: request.order,
-                    limit: boundedLimit,
-                    startAfter: request.startAfter as Record<string, unknown> | undefined,
-                    searchString: request.searchString
-                },
+                this._subscriptions.get(subscriptionId)!.collectionRequest!,
                 authContext
             );
 
@@ -679,7 +680,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private debouncedCollectionRefetch(
         subscriptionId: string,
         notifyPath: string,
-        subscription: { clientId: string; collectionRequest?: { filter?: Record<string, unknown>; orderBy?: string; order?: "desc" | "asc"; limit?: number; offset?: number; startAfter?: Record<string, unknown>; databaseId?: string; searchString?: string }; authContext?: SubscriptionAuthContext }
+        subscription: { clientId: string; collectionRequest?: StoredCollectionRequest; authContext?: SubscriptionAuthContext }
     ) {
         const timerKey = `ws_${subscriptionId}`;
         const existing = this.refetchTimers.get(timerKey);
@@ -705,7 +706,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private debouncedDriverRefetch(
         subscriptionId: string,
         notifyPath: string,
-        subscription: { collectionRequest?: { filter?: Record<string, unknown>; orderBy?: string; order?: "desc" | "asc"; limit?: number; offset?: number; startAfter?: Record<string, unknown>; databaseId?: string; searchString?: string }; authContext?: SubscriptionAuthContext },
+        subscription: { collectionRequest?: StoredCollectionRequest; authContext?: SubscriptionAuthContext },
         callback: (data: Record<string, unknown>[] | Record<string, unknown> | null) => void
     ) {
         const timerKey = `drv_${subscriptionId}`;
@@ -731,7 +732,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     private async fetchCollectionWithAuth(
         notifyPath: string,
-        collectionRequest: { filter?: Record<string, unknown>; orderBy?: string; order?: "desc" | "asc"; limit?: number; offset?: number; startAfter?: Record<string, unknown>; databaseId?: string; searchString?: string },
+        collectionRequest: StoredCollectionRequest,
         authContext?: SubscriptionAuthContext
     ): Promise<Record<string, unknown>[]> {
         if (this.driver) {
@@ -740,6 +741,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 path: notifyPath,
                 collection: collection,
                 filter: collectionRequest.filter as FetchCollectionProps["filter"],
+                logical: collectionRequest.logical,
                 orderBy: collectionRequest.orderBy,
                 order: collectionRequest.order,
                 limit: collectionRequest.limit,
@@ -772,6 +774,7 @@ roles: ["anon"] };
                 } else {
                     fetchedEntities = await txEntityService.fetchCollection(notifyPath, {
                         filter: collectionRequest.filter as FilterValues<string>,
+                        logical: collectionRequest.logical,
                         orderBy: collectionRequest.orderBy,
                         order: collectionRequest.order,
                         limit: collectionRequest.limit,
