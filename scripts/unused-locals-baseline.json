@@ -123,9 +123,6 @@
   "packages/server-postgres/src/services/RelationService.ts::parentCollection": 1,
   "packages/server-postgres/src/services/RelationService.ts::sourceIdInfo": 1,
   "packages/server/src/auth/api-keys/api-key-store.ts::HEX_CHARS": 1,
-  "packages/server/src/auth/password.ts::SCRYPT_PARAMS": 1,
-  "packages/server/src/auth/routes.ts::logoutSchema": 1,
-  "packages/server/src/auth/routes.ts::updateProfileSchema": 1,
   "packages/server/src/init.ts::collectionAuthConfig": 1,
   "packages/server/src/services/routed-realtime-service.ts::CHANNEL_MESSAGE_TYPES": 1,
   "packages/server/src/utils/dev-port.ts::attempt": 1,
@@ -141,11 +138,7 @@
   "packages/studio/src/components/StorageView/StorageView.tsx::isImage": 1,
   "packages/studio/src/components/StorageView/StorageView.tsx::isVideo": 1,
   "packages/ui/src/components/DateTimeField.tsx::pad": 1,
-  "packages/ui/src/components/VirtualTable/fields/VirtualTableDateField.tsx::disabled": 1,
-  "packages/ui/src/components/VirtualTable/fields/VirtualTableDateField.tsx::error": 1,
-  "packages/ui/src/components/VirtualTable/fields/VirtualTableInput.tsx::disabled": 1,
   "packages/ui/src/components/VirtualTable/VirtualTable.tsx::listeners": 1,
   "packages/ui/src/components/VirtualTable/VirtualTableHeaderRow.tsx::rowHeight": 1,
-  "packages/ui/src/views/CollectionView/CollectionView.tsx::canCreate": 1,
   "scripts/codemod/admin-collection-view-model.mjs::changedRefs": 1
 }

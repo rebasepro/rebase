@@ -50,6 +50,13 @@ export function VirtualTableInput(props: {
         <TextareaAutosize
             className={focusedDisabled}
             ref={ref}
+            // Destructured above and passed to nothing, so a property carrying
+            // `admin: { disabled: true }` stayed typeable in the table and the
+            // debounced write fired on blur. `readOnly` as well as `disabled`:
+            // a disabled textarea is skipped by keyboard navigation, and a cell
+            // you cannot tab through is worse than one you cannot edit.
+            disabled={disabled}
+            readOnly={disabled}
             style={{
                 padding: 0,
                 margin: 0,

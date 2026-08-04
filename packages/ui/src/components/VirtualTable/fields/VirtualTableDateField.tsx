@@ -22,6 +22,13 @@ export function VirtualTableDateField(props: {
         <DateTimeField
             value={internalValue ?? undefined}
             onChange={(dateValue) => updateValue(dateValue ?? null)}
+            // Same omission as `VirtualTableInput`: destructured and forwarded
+            // nowhere, so a disabled date cell was still editable. `error` went
+            // the same way — it drives `DateTimeField`'s invalid styling, and a
+            // prop a caller passes should reach something rather than sit in a
+            // destructure.
+            disabled={disabled}
+            error={Boolean(error)}
             invisible={true}
             // Without this the field falls back to DateTimeField's own default of
             // `size="large"` (min-h-64px), which overflows a table cell and makes

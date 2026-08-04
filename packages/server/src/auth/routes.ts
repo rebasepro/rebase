@@ -208,13 +208,11 @@ export function createAuthRoutes(config: AuthModuleConfig): Hono<HonoEnv> {
         // answer is simply "not signed in".
         refreshToken: z.string().min(1).optional()
     });
-    const logoutSchema = z.object({
-        refreshToken: z.string().optional()
-    });
-    const updateProfileSchema = z.object({
-        displayName: z.string().max(255).optional(),
-        photoURL: z.string().url().max(2048).optional()
-    });
+    // `logoutSchema` and `updateProfileSchema` were declared here and used by
+    // nothing: `/auth/logout` and `PATCH /auth/me` live in `session-routes.ts`,
+    // which declares its own and applies them. Two copies of a validation rule,
+    // one of them unreachable, is a rule that will be tightened in the wrong
+    // file some day.
 
     /** Parse a Zod schema against the request body, throwing ApiError on failure */
     function parseBody<T>(schema: z.ZodSchema<T>, body: unknown): T {

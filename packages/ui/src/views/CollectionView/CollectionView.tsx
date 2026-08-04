@@ -323,7 +323,13 @@ export function CollectionView<T extends Record<string, unknown> = Record<string
                     <CollectionKanbanView<T>
                         {...sharedProps}
                         kanbanProperty={resolvedKanbanProperty}
-                        onRowCreate={onRowCreate}
+                        // `canCreate` is documented as "whether creation is
+                        // allowed (shows the + button)" and was destructured
+                        // and read nowhere, so the button showed regardless.
+                        // The kanban view draws its add affordance exactly when
+                        // it has a callback, so withholding the callback is
+                        // what the prop means.
+                        onRowCreate={canCreate ? onRowCreate : undefined}
                     />
                 ) : (
                     <div className="flex items-center justify-center p-8">

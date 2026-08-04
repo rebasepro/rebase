@@ -1,14 +1,27 @@
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { scrypt, randomBytes, timingSafeEqual, type ScryptOptions } from "crypto";
 import { promisify } from "util";
 
-const scryptAsync = promisify(scrypt);
+// `promisify` resolves to the 4-argument overload of `scrypt`, which has no
+// options parameter — so passing one is a type error, and that is exactly why
+// the parameters below sat unused. Named here so the options overload is the
+// one this module calls.
+const scryptAsync = promisify(scrypt) as (
+    password: string,
+    salt: Buffer,
+    keylen: number,
+    options: ScryptOptions
+) => Promise<Buffer>;
 
-// Scrypt parameters (recommended values for 2024+)
+// Scrypt parameters (recommended values for 2024+).
+//
+// Passed explicitly. They were declared here and handed to neither call, which
+// happened to be harmless because they are also Node's defaults — so raising
+// any of them would have changed nothing while reading as though it had. That
+// is the failure worth avoiding: the next person to strengthen this needs the
+// edit to take effect.
 const SALT_LENGTH = 32;
 const KEY_LENGTH = 64;
-const SCRYPT_PARAMS = { N: 16384,
-r: 8,
-p: 1 };
+const SCRYPT_PARAMS = { N: 16384, r: 8, p: 1 };
 
 export interface PasswordValidationResult {
     valid: boolean;
@@ -53,7 +66,7 @@ export function validatePasswordStrength(password: string): PasswordValidationRe
  */
 export async function hashPassword(password: string): Promise<string> {
     const salt = randomBytes(SALT_LENGTH);
-    const derivedKey = await scryptAsync(password, salt, KEY_LENGTH) as Buffer;
+    const derivedKey = await scryptAsync(password, salt, KEY_LENGTH, SCRYPT_PARAMS);
     return `${salt.toString("hex")}:${derivedKey.toString("hex")}`;
 }
 
@@ -70,7 +83,7 @@ export async function verifyPassword(password: string, storedHash: string): Prom
     const salt = Buffer.from(saltHex, "hex");
     const storedKey = Buffer.from(hashHex, "hex");
 
-    const derivedKey = await scryptAsync(password, salt, KEY_LENGTH) as Buffer;
+    const derivedKey = await scryptAsync(password, salt, KEY_LENGTH, SCRYPT_PARAMS);
 
     // Use timing-safe comparison to prevent timing attacks
     return timingSafeEqual(derivedKey, storedKey);
