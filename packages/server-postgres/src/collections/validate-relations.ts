@@ -2,6 +2,7 @@ import { getTableColumns } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 
 import { PostgresCollectionRegistry } from "./PostgresCollectionRegistry";
 
@@ -57,6 +58,68 @@ const quote = (xs: Iterable<string>) => Array.from(xs).map(s => `\`${s}\``).join
 
 /** `on.from` / `on.to` accept a single column or a composite tuple. */
 const asColumns = (value: string | string[]): string[] => Array.isArray(value) ? value : [value];
+
+/**
+ * Distinguish "this column name is wrong" from "the generated schema is old".
+ *
+ * They present identically here — a relation asks for a column the registered
+ * table does not have — but they are opposite problems with opposite fixes, and
+ * getting them the wrong way round is how the 0.12 → 0.13 upgrade bricked
+ * projects.
+ *
+ * The registered table is not the database. It comes from the project's
+ * checked-in `backend/src/schema.generated.ts`, and 0.13 changed the rule that
+ * derives foreign-key names: `categories` yields `category_id` where it used to
+ * yield `categorie_id`. Boot-ensure renames the database column to match, so by
+ * the time this runs the *database* is correct and the *generated module* is the
+ * stale one. Reporting "not a column" then points at the wrong artifact, and the
+ * generic fix — "set `through.targetColumn` to one of: …", listing the legacy
+ * name because that is what the stale module still has — talks the reader into
+ * pinning a column that no longer exists.
+ *
+ * So when the wanted name is what the current rule derives, and the table
+ * carries what the *previous* rule would have derived from the same source, say
+ * that instead.
+ *
+ * @param wanted   the column the relation asks for
+ * @param available every column the registered table has
+ * @param sources  names the default could have been derived from (a slug, a
+ *                 relation name) — checking against these rather than guessing
+ *                 backwards from `wanted` keeps the match exact
+ */
+function staleCodegenRename(
+    wanted: string,
+    available: Set<string>,
+    sources: string[]
+): { legacy: string; current: string } | null {
+    for (const source of sources) {
+        if (!source) continue;
+        const current = generateForeignKeyName(source);
+        const legacy = legacyForeignKeyName(source);
+        // Only a name that actually moved, and only when the table still has the
+        // old spelling and not the new one.
+        if (current !== wanted || legacy === current) continue;
+        if (available.has(legacy) && !available.has(current)) return { legacy, current };
+    }
+    return null;
+}
+
+/** The shared explanation, so every relation kind reports it identically. */
+function staleCodegenDefect(
+    table: string,
+    { legacy, current }: { legacy: string; current: string }
+): Pick<RelationDefect, "problem" | "fix"> {
+    return {
+        problem:
+            `the generated Drizzle schema still declares \`${legacy}\` on \`${table}\`, but this ` +
+            `release derives \`${current}\` — the generated schema predates the foreign-key ` +
+            "naming fix and no longer describes the database",
+        fix:
+            "regenerate it with `rebase schema generate` (or `pnpm run schema:generate`). The " +
+            "database column has already been renamed for you at boot, so nothing else is needed. " +
+            `To keep \`${legacy}\` instead, name it explicitly on the relation and regenerate.`
+    };
+}
 
 /**
  * Relations whose names do not resolve against the registered schema.
@@ -117,11 +180,20 @@ kind: relation.kind };
             switch (relation.kind) {
                 case "belongsTo": {
                     if (!sourceColumns.has(relation.localKey)) {
-                        defects.push({
-                            ...at,
-                            problem: `\`localKey: "${relation.localKey}"\` is not a column on \`${sourceTableName}\``,
-                            fix: `add the column, or set \`localKey\` to one of: ${quote(sourceColumns)}`
-                        });
+                        // `localKey` defaults to the relation name run through
+                        // the foreign-key rule, so it moves with that rule.
+                        const stale = staleCodegenRename(
+                            relation.localKey,
+                            sourceColumns,
+                            [relation.relationName, targetCollection.slug]
+                        );
+                        defects.push(stale
+                            ? { ...at, ...staleCodegenDefect(sourceTableName, stale) }
+                            : {
+                                ...at,
+                                problem: `\`localKey: "${relation.localKey}"\` is not a column on \`${sourceTableName}\``,
+                                fix: `add the column, or set \`localKey\` to one of: ${quote(sourceColumns)}`
+                            });
                     }
                     break;
                 }
@@ -129,11 +201,20 @@ kind: relation.kind };
                 case "hasOne":
                 case "hasMany": {
                     if (!targetColumns.has(relation.foreignKeyOnTarget)) {
-                        defects.push({
-                            ...at,
-                            problem: `\`foreignKeyOnTarget: "${relation.foreignKeyOnTarget}"\` is not a column on the target table \`${targetTableName}\``,
-                            fix: `add the column, or set \`foreignKeyOnTarget\` to one of: ${quote(targetColumns)}`
-                        });
+                        // The default is derived from *this* collection's slug —
+                        // the column on the target that points back here.
+                        const stale = staleCodegenRename(
+                            relation.foreignKeyOnTarget,
+                            targetColumns,
+                            [collection.slug]
+                        );
+                        defects.push(stale
+                            ? { ...at, ...staleCodegenDefect(targetTableName, stale) }
+                            : {
+                                ...at,
+                                problem: `\`foreignKeyOnTarget: "${relation.foreignKeyOnTarget}"\` is not a column on the target table \`${targetTableName}\``,
+                                fix: `add the column, or set \`foreignKeyOnTarget\` to one of: ${quote(targetColumns)}`
+                            });
                     }
                     // `sourceKey` is the easiest of the two to put on the wrong
                     // side — it is the only column in a `hasMany` that lives
@@ -167,14 +248,24 @@ kind: relation.kind };
                         break;
                     }
                     const junctionColumns = columnNames(junction);
+                    // Junction columns are the ones that actually moved in 0.13:
+                    // each defaults to its endpoint collection's *slug* run
+                    // through the foreign-key rule, and slugs are plural.
+                    const derivedFrom = {
+                        sourceColumn: [collection.slug],
+                        targetColumn: [targetCollection.slug]
+                    } as const;
                     for (const [label, column] of [["sourceColumn", sourceColumn], ["targetColumn", targetColumn]] as const) {
                         if (!junctionColumns.has(column)) {
-                            defects.push({
-                                ...at,
-                                problem: `\`through.${label}: "${column}"\` is not a column on the junction table \`${table}\``,
-                                fix: `set \`through.${label}\` to one of: ${quote(junctionColumns)}` +
-                                    (label === "sourceColumn" ? " — it is the column naming *this* collection" : "")
-                            });
+                            const stale = staleCodegenRename(column, junctionColumns, [...derivedFrom[label]]);
+                            defects.push(stale
+                                ? { ...at, ...staleCodegenDefect(table, stale) }
+                                : {
+                                    ...at,
+                                    problem: `\`through.${label}: "${column}"\` is not a column on the junction table \`${table}\``,
+                                    fix: `set \`through.${label}\` to one of: ${quote(junctionColumns)}` +
+                                        (label === "sourceColumn" ? " — it is the column naming *this* collection" : "")
+                                });
                         }
                     }
                     break;

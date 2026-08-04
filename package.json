@@ -63,6 +63,8 @@
     "check:names": "node scripts/headless-guard/check-package-names.mjs",
     "check:deps": "node scripts/check-undeclared-deps.mjs",
     "check:api-surface": "node scripts/check-api-surface.mjs",
+    "check:runtime-image": "node scripts/check-runtime-image.mjs",
+    "check:runtime-image:live": "node scripts/check-runtime-image.mjs --live",
     "check:hooks": "node scripts/check-hooks-baseline.mjs",
     "harness": "node scripts/harness/harness.mjs",
     "harness:preflight": "node scripts/harness/harness.mjs preflight",

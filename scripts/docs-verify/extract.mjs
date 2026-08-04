@@ -11,6 +11,49 @@ import path from "node:path";
 const CHECKED_LANGS = new Set(["ts", "typescript", "tsx", "js", "javascript", "jsx"]);
 
 /**
+ * A ```diff fence carries migration guidance, and until now none of it was ever
+ * compiled — `diff` is not in CHECKED_LANGS, so every one was silently skipped.
+ *
+ * That is how 0.13's headline migration shipped wrong. The changelog told readers
+ * to rewrite `rebase.data.projects.find()` as `rebase.dataAsAdmin.projects.find()`;
+ * the removal was real and the runtime alias was real, but the replacement line
+ * did not typecheck against an untyped server singleton. Prose about types is
+ * still code, and this is the one kind of code a reader copies while their build
+ * is already broken.
+ *
+ * Opt in per fence by naming the language in the meta — the fence declares what
+ * it is rather than a heuristic guessing:
+ *
+ *     ```diff ts
+ *     - const rows = await rebase.data.projects.find();
+ *     + const rows = await rebase.dataAsAdmin.projects.find();
+ *     ```
+ *
+ * Untagged ```diff fences stay skipped, because plenty of them are env files,
+ * YAML or shell.
+ */
+const DIFF_LANG_IN_META = /(^|\s)(ts|typescript|tsx|js|javascript|jsx)(\s|$)/;
+
+/**
+ * Reduce a diff body to the code it is telling the reader to end up with.
+ *
+ * Removed lines become EMPTY rather than being dropped: a `-` line is the old
+ * API, which after a breaking change does not compile by design, and deleting
+ * the line outright would shift every subsequent line number so diagnostics
+ * pointed at the wrong line of the doc.
+ */
+function applyDiff(lines) {
+    return lines.map((line) => {
+        if (/^\s*-/.test(line)) return "";
+        // `+ foo` and ` foo` (context) both become `foo`: strip the marker and
+        // the single space diff convention puts after it.
+        const plus = line.match(/^(\s*)\+ ?(.*)$/);
+        if (plus) return plus[1] + plus[2];
+        return line.replace(/^ /, "");
+    });
+}
+
+/**
  * Opt-out for deliberately-pseudocode blocks. Either form works:
  *   ```ts no-verify
  *   <!-- docs-verify: ignore -->  (on the line immediately above the fence)
@@ -58,6 +101,7 @@ export function extractSnippets(root, globs = DEFAULT_GLOBS) {
         let fenceChar = "";
         let fenceLen = 0;
         let lang = "";
+        let isDiff = false;
         let optedOut = false;
         let bodyStart = 0;
         /** @type {string[]} */
@@ -75,6 +119,13 @@ export function extractSnippets(root, globs = DEFAULT_GLOBS) {
                 fenceChar = open[2][0];
                 fenceLen = open[2].length;
                 lang = (open[3] || "").toLowerCase();
+                // A language-tagged diff is compiled as that language, with the
+                // diff markers resolved when the fence closes.
+                isDiff = lang === "diff";
+                if (isDiff) {
+                    const tagged = open[4].toLowerCase().match(DIFF_LANG_IN_META);
+                    lang = tagged ? tagged[2] : lang;
+                }
                 const prev = i > 0 ? lines[i - 1] : "";
                 optedOut = META_OPT_OUT.test(open[4]) || COMMENT_OPT_OUT.test(prev);
                 bodyStart = i + 2; // 1-based line of the first body line
@@ -90,9 +141,9 @@ export function extractSnippets(root, globs = DEFAULT_GLOBS) {
                     if (optedOut) {
                         skipped++;
                     } else {
-                        const code = body
-                            .map((l) => (fenceIndent && l.startsWith(fenceIndent) ? l.slice(fenceIndent.length) : l))
-                            .join("\n");
+                        const dedented = body
+                            .map((l) => (fenceIndent && l.startsWith(fenceIndent) ? l.slice(fenceIndent.length) : l));
+                        const code = (isDiff ? applyDiff(dedented) : dedented).join("\n");
                         if (code.trim()) {
                             snippets.push({
                                 file,

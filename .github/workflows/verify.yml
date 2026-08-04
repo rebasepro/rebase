@@ -98,6 +98,16 @@ jobs:
       - name: Init template typecheck
         run: pnpm run check:templates
 
+      # The scaffold hands every new project a compose file naming a container
+      # image. 0.13.0 shipped with that image published nowhere, so the first
+      # command in the file failed with "repository does not exist" — and nothing
+      # noticed, because `verify-selfhost.mts` deliberately covers everything about
+      # self-hosting EXCEPT the container and the tag. Hermetic: it asserts an
+      # automatically-triggered workflow publishes the image, not that the registry
+      # currently answers. The live probe belongs to the release, and runs there.
+      - name: Shipped image references have a publisher
+        run: pnpm run check:runtime-image
+
       # Renames leak where a codemod cannot see them: a bare name in an array,
       # a .astro file, an extensionless .env.example, a Tailwind @source path.
       - name: Package name guard

@@ -1136,7 +1136,7 @@ const products = defineCollection({
         price: { name: "Price", type: "number" }
     },
     admin: {
-        titleProperty: "name",       // completion: "name" | "price"
+        display: { title: "name" },  // completion: "name" | "price"
         sort: ["price", "asc"],      // completion on the first element
         propertiesOrder: ["name", "price"]
     }
@@ -1145,13 +1145,13 @@ const products = defineCollection({
 
 ```typescript
     admin: {
-        titleProperty: "nmae"
-        //             ~~~~~~ Type '"nmae"' is not assignable to type
-        //                    'PropertyPath<…>'. Did you mean '"name"'?
+        display: { title: "nmae" }
+        //                ~~~~~~ Type '"nmae"' is not assignable to type
+        //                       'PropertyPath<…>'. Did you mean '"name"'?
     }
 ```
 
-The checked fields are `titleProperty`, `sort`, `propertiesOrder` and `listProperties`.
+The checked fields are `display`, `sort`, `propertiesOrder` and `listProperties`.
 Three forms are accepted besides a plain property key:
 
 | Form | Example | Notes |
@@ -1392,7 +1392,7 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 | `history` | `boolean` | `false` | Track changes in entity history |
 | `alwaysApplyDefaultValues` | `boolean` | `false` | Apply default values on every save |
 | `previewProperties` | `string[]` | — | Properties to display in reference previews |
-| `titleProperty` | `string` | — | Property to use as the entity title |
+| `display` | `EntityDisplay` | — | What fills each display role — see [Entity display](#entity-display) |
 
 #### Advanced
 
@@ -1412,13 +1412,81 @@ Inside `admin`, except `history`, which is a backend feature and stays at the to
 | `driver` | `string` | Database driver to use (default: `"(default)"`) |
 | `databaseId` | `string` | Database/schema ID within the driver |
 
-### Entity Previews & Title Resolution
+### Entity display
+
+Every surface that draws a record draws some subset of six roles: **title**,
+**subtitle**, **image**, **status**, **date** and **tags**. A list row is image +
+title + subtitle + status + date, a card is the same with the image on top, a
+reference picker is title + subtitle, and a page heading is the title alone.
+
+Each role is derived from your properties, and each can be stated instead — as a
+property path, or as a function:
+
+```typescript
+const exercises = defineCollection({
+    name: "Exercises",
+    slug: "exercises",
+    table: "exercises",
+    properties: {
+        name: { name: "Name", type: "string" },
+        cover: { name: "Cover", type: "string", storage: { storagePath: "covers/" } },
+        city: { name: "City", type: "string" }
+    },
+    admin: {
+        display: {
+            title: "name",                                  // a property path
+            image: "cover",
+            subtitle: ({ entity }) => `in ${entity.values.city}`   // computed
+        }
+    }
+});
+```
+
+Anything you leave out keeps its derived value, so stating one role does not
+mean stating all six.
+
+#### Computed and async roles
+
+A resolver may be `async`, which is what lets a role read something the record
+does not carry — a document in a subcollection, a value behind an API:
+
+```typescript
+admin: {
+    display: {
+        // The exercise's name lives one document down, per locale.
+        title: async ({ entity, context }) => {
+            const locale = await context.data.exercise_locales.get(`${entity.id}/de-DE`);
+            return locale?.exercise_title;
+        }
+    }
+}
+```
+
+While the promise is in flight the surface shows the derived value and swaps the
+resolved one in when it lands — a title is never a spinner. Results are cached
+per record and per role, and concurrent asks for the same pair share one call, so
+a list of fifty rows resolves each row once rather than once per render.
+
+Return `undefined` when a record has nothing for the role; the surface's own
+fallback is better informed about what belongs there instead (a heading uses the
+singular collection name, a link uses the id). A resolver that throws is treated
+as `undefined` and logged once — a title that cannot be fetched must not take
+down the row that shows it.
+
+Prefer a path whenever the value is on the record: a path keeps the property's
+own rendering, so an enum status stays a coloured chip and a date stays
+formatted, which a resolver returning a bare string cannot express.
+
+:::note[Renamed from `titleProperty`]
+`admin.titleProperty` is now `admin.display.title`. The same string works there,
+and the new field also takes a resolver. The old key is still read, and warns
+once per collection at startup.
+:::
 
 #### Title Property Selection
-By default, the property used as the entity's display title (previews, headers) is resolved automatically:
-1. If `titleProperty` is explicitly specified on the collection, it is used.
-2. If `propertiesOrder` is explicitly defined, the first non-ID property that is either a `relation` or `string` type is chosen as the title.
-3. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
+When `display.title` is not set, the property used as the entity's display title (previews, headers) is resolved automatically:
+1. If `propertiesOrder` is explicitly defined, the first non-ID property that is either a `relation` or `string` type is chosen as the title.
+2. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
 
 #### Relation Previews in Tables
 When `propertiesOrder` is explicitly set, relation properties are **not** automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).

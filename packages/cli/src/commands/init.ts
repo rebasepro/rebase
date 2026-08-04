@@ -694,9 +694,16 @@ GIT_COMMITTER_EMAIL: "noreply@rebase.pro"
     }
 
     console.log("");
+    // `--headless --introspect` had these two claims fighting: the step above
+    // announced "collections generated!" and this line then said there are none.
+    // Both were reachable at once, and the reader has to believe one of them.
     console.log(isBaas
-        ? chalk.gray("This starts a headless API (Hono + PostgreSQL). There are no collection files: ")
-            + chalk.gray("the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.")
+        ? introspected
+            ? chalk.gray("This starts a headless API (Hono + PostgreSQL) over the collections just ")
+                + chalk.gray("generated from your database in config/collections. Edit them to change what the ")
+                + chalk.gray("API exposes; docs are at /api/swagger.")
+            : chalk.gray("This starts a headless API (Hono + PostgreSQL). There are no collection files: ")
+                + chalk.gray("the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.")
         : chalk.gray("This starts both the backend (Hono + PostgreSQL)")
             + chalk.gray(" and the frontend (Vite + React) concurrently."));
     console.log("");

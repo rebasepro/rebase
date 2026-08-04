@@ -205,6 +205,78 @@ function checkAdminTypesDeclared() {
 }
 
 /**
+ * Every ambient type library a template tsconfig pins must be a declared
+ * dependency of the workspace that pins it.
+ *
+ * This is `checkAdminTypesDeclared`'s sibling, and it exists for the same reason:
+ * a reference to a package the manifest never declares. `config/tsconfig.json`
+ * pins `types: ["node"]` — deliberately, to stop tsc sweeping the pnpm virtual
+ * store — but `config/package.json` never depended on `@types/node`. Under
+ * pnpm's isolated layout there is no `@types/node` reachable from `config/`, so
+ * the workspace could not compile itself:
+ *
+ *     config build$ tsc
+ *     error TS2688: Cannot find type definition file for 'node'
+ *
+ * That is `pnpm -r build` — and the config workspace's own `build` script —
+ * failing in a project one minute after `rebase init`.
+ *
+ * The compile step below cannot catch it and should not try. It writes its own
+ * tsconfig with `typeRoots` pointed at the repo's `node_modules`, because it is
+ * checking the *collection files*, not the project's dependency graph. Those
+ * synthetic typeRoots resolve `node` no matter what the template declares, which
+ * is exactly why the omission survived: the only program that ever compiled
+ * these files was one that had been handed the answer.
+ *
+ * So assert it on the manifests instead — cheap, and resolution cannot fool it.
+ */
+function checkPinnedTypesAreDeclared() {
+    const problems = [];
+
+    /** Which package supplies `types: ["<entry>"]`. */
+    const providerOf = (entry) => {
+        // `vite/client` is shipped by `vite` itself; `node` comes from `@types/node`.
+        if (entry.includes("/")) return entry.startsWith("@") ? entry.split("/").slice(0, 2).join("/") : entry.split("/")[0];
+        return `@types/${entry}`;
+    };
+
+    for (const workspace of ["config", "backend", "frontend"]) {
+        const tsconfigPath = path.join(templateRoot, workspace, "tsconfig.json");
+        const manifestPath = path.join(templateRoot, workspace, "package.json");
+        if (!fs.existsSync(tsconfigPath) || !fs.existsSync(manifestPath)) continue;
+
+        // The template tsconfigs carry explanatory comments, so this is JSONC.
+        const raw = fs.readFileSync(tsconfigPath, "utf8")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/(^|[^:])\/\/.*$/gm, "$1");
+        let pinned;
+        try {
+            pinned = JSON.parse(raw).compilerOptions?.types;
+        } catch (e) {
+            problems.push(`${workspace}/tsconfig.json could not be parsed after stripping comments: ${e.message}`);
+            continue;
+        }
+        if (!Array.isArray(pinned)) continue;
+
+        const pkg = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+        const declared = new Set(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }));
+
+        for (const entry of pinned) {
+            const provider = providerOf(entry);
+            if (!declared.has(provider)) {
+                problems.push(
+                    `${workspace}/tsconfig.json pins types: ["${entry}"] but ${workspace}/package.json ` +
+                    `does not depend on ${provider} — under pnpm the workspace cannot compile itself ` +
+                    `(TS2688)`
+                );
+            }
+        }
+    }
+
+    return problems;
+}
+
+/**
  * The other direction, which nothing asserted: the BaaS flavour must not carry the
  * admin layer at all.
  *
@@ -245,6 +317,15 @@ if (baasProblems.length > 0) {
     for (const p of baasProblems) console.error(`    ${p}`);
 } else {
     console.log("  ok   baas has no admin layer");
+}
+
+const pinnedTypeProblems = checkPinnedTypesAreDeclared();
+if (pinnedTypeProblems.length > 0) {
+    failed++;
+    console.log("  FAIL pinned ambient types are declared dependencies");
+    for (const p of pinnedTypeProblems) console.error(`    ${p}`);
+} else {
+    console.log("  ok   pinned ambient types are declared dependencies");
 }
 
 const declarationProblems = checkAdminTypesDeclared();
