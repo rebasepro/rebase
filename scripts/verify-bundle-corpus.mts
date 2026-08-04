@@ -34,6 +34,8 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { execFileSync } from "child_process";
+import { createRequire } from "module";
 import { fileURLToPath } from "url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -142,18 +144,212 @@ function stage(bundleDir: string, name: string): string {
 
 const staged: string[] = [];
 
-for (const entry of CORPUS) {
-    const fixtureDir = path.join(CORPUS_DIR, entry.dir);
-    console.log(`\n\x1b[1m▸ ${entry.dir}\x1b[0m \x1b[2m${entry.describe}\x1b[0m`);
+/**
+ * Driver versions a deployed bundle may still be carrying.
+ *
+ * Pinned, not discovered from npm: a corpus whose inputs move is not a corpus.
+ * Add a version when one ships; remove one only when no deployed project can
+ * still be on it, which is a decision about the fleet and not about this file.
+ */
+const DRIVER_SKEW = ["0.10.0", "0.11.0", "0.12.0", "0.13.0"];
 
-    if (!fs.existsSync(fixtureDir)) {
-        check("fixture exists", false, fixtureDir);
-        continue;
+/** The fixture the skew pass exercises — current format, real collections, real writes. */
+const SKEW_FIXTURE = "v2-backend";
+
+/**
+ * Stage a fixture carrying a SPECIFIC published driver, stitched the way a
+ * deployed pod is stitched.
+ *
+ * This is the axis the corpus could not see. `stage()` above lends the whole
+ * donor `node_modules`, so both halves come from this checkout and every run
+ * boots current-driver + current-server — a pairing that exists on no tenant
+ * anywhere. Production is the opposite: `docker/entrypoint.mjs` symlinks ONLY
+ * `@rebasepro/server` from the image over the bundle's copy, so a project runs
+ * today's server against whatever driver it was built with, possibly years old.
+ *
+ * That combination has already taken production down once — a driver too old to
+ * have the `refresh_tokens` constraint the newer runtime assumed, which is why
+ * `minimumFrameworkVersion` exists on a runtime release. It is NULL on every
+ * release ever registered, so nothing has ever enforced it. This is the thing
+ * that would have caught it.
+ *
+ * `npm install` rather than a donor symlink, because the point is to get the
+ * driver's own dependency closure as npm would resolve it for a real project.
+ */
+function stageWithDriver(fixtureDir: string, name: string, driverVersion: string): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), `rebase-corpus-${name}-d${driverVersion}-`));
+    fs.cpSync(fixtureDir, dir, { recursive: true });
+
+    // npm needs something to install into; the fixture has no package.json
+    // because a bundle is not a package.
+    fs.writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: `corpus-${name}`, version: "0.0.0", private: true, type: "module" }, null, 2)
+    );
+
+    execFileSync(
+        "npm",
+        ["install", "--no-save", "--no-audit", "--no-fund", "--loglevel=error",
+            `@rebasepro/server-postgres@${driverVersion}`],
+        { cwd: dir, stdio: "pipe", encoding: "utf8" }
+    );
+
+    // The entrypoint's RUNTIME_PROVIDED, reproduced: the image's server wins over
+    // the bundle's copy, and ONLY the server. Without this the bundle would run
+    // the old server too, which is a pairing production never produces either —
+    // and the whole point is that the two halves move independently.
+    const target = path.join(dir, "node_modules", "@rebasepro", "server");
+    fs.rmSync(target, { recursive: true, force: true });
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.symlinkSync(path.join(ROOT, "packages", "server"), target, "dir");
+
+    return dir;
+}
+
+/**
+ * An empty database for one skew run, dropped and recreated so a rerun starts
+ * where a fresh deployment starts: with nothing, and a driver that has to build
+ * its own tables or fail trying.
+ */
+async function freshDatabase(baseUrl: string, driverVersion: string): Promise<string> {
+    // Resolved from a package that actually depends on `pg`, rather than from
+    // `scripts/` which does not — same reason the runtime imports above go by
+    // path. `createRequire` rather than a directory import, because `pg` is CJS
+    // and ESM will not read `main` out of a directory.
+    const anchors = [
+        path.join(ROOT, "packages", "server-postgres", "package.json"),
+        path.join(ROOT, "app", "backend", "package.json")
+    ].filter(p => fs.existsSync(p));
+
+    let pg: any;
+    for (const anchor of anchors) {
+        try {
+            pg = createRequire(anchor)("pg");
+            break;
+        } catch { /* try the next anchor */ }
+    }
+    if (!pg) throw new Error("No `pg` package found to create the skew database with — run an install first.");
+
+    const name = `rebase_corpus_skew_${driverVersion.replace(/[^a-zA-Z0-9]/g, "_")}`;
+
+    const admin = new pg.Client({ connectionString: baseUrl });
+    await admin.connect();
+    try {
+        // Identifiers cannot be bind parameters; the name is built from a
+        // version string this file pins, and non-alphanumerics are stripped above.
+        await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
+        await admin.query(`CREATE DATABASE "${name}"`);
+    } finally {
+        await admin.end();
     }
 
-    const bundleDir = stage(fixtureDir, entry.dir);
-    staged.push(bundleDir);
+    const url = new URL(baseUrl);
+    url.pathname = `/${name}`;
+    return url.toString();
+}
 
+/**
+ * Boot the representative fixture once per historical driver.
+ *
+ * Needs the network. Skipped rather than failed when `CORPUS_SKIP_SKEW` is set,
+ * so an offline local run still exercises the format axis — but it announces the
+ * skip, because a silently narrowed gate is the failure mode this whole file
+ * exists to prevent.
+ */
+async function runSkewPass(): Promise<void> {
+    const fixtureDir = path.join(CORPUS_DIR, SKEW_FIXTURE);
+    const entry = CORPUS.find(e => e.dir === SKEW_FIXTURE);
+    if (!entry) throw new Error(`SKEW_FIXTURE ${SKEW_FIXTURE} is not in CORPUS`);
+
+    const sharedUrl = process.env.DATABASE_URL!;
+
+    if (process.env.CORPUS_SKIP_SKEW) {
+        console.log(
+            `\n\x1b[33m▸ version skew SKIPPED\x1b[0m \x1b[2m(CORPUS_SKIP_SKEW set) — ` +
+            `${DRIVER_SKEW.length} driver version(s) not tested\x1b[0m`
+        );
+        return;
+    }
+
+    for (const driverVersion of DRIVER_SKEW) {
+        console.log(
+            `\n\x1b[1m▸ ${SKEW_FIXTURE} on driver ${driverVersion}\x1b[0m ` +
+            `\x1b[2mtoday's @rebasepro/server over a bundle built with server-postgres ${driverVersion}\x1b[0m`
+        );
+        let bundleDir: string;
+        try {
+            bundleDir = stageWithDriver(fixtureDir, SKEW_FIXTURE, driverVersion);
+            staged.push(bundleDir);
+        } catch (err) {
+            check(`installs @rebasepro/server-postgres@${driverVersion}`, false,
+                err instanceof Error ? err.message.split("\n")[0] : String(err));
+            continue;
+        }
+
+        // A database of this driver's own, and the reason is the whole point of
+        // the pass. The format axis deliberately shares one database because a
+        // runtime upgrade lands on a database an earlier runtime wrote to — true
+        // there, and wrong here: sharing hands the old driver tables that only a
+        // NEWER one could have created.
+        //
+        // That is not hypothetical. The first version of this pass shared, and
+        // every driver went green while the 0.10.0 run was logging "Collection
+        // tables will NOT be created, so every /api/data route will fail on a
+        // missing relation" — it then read a row the current driver had inserted
+        // minutes earlier, same id in all four runs. A gate that reports success
+        // over a log line saying the opposite is worse than no gate.
+        try {
+            process.env.DATABASE_URL = await freshDatabase(sharedUrl, driverVersion);
+        } catch (err) {
+            check(`provisions a database for driver ${driverVersion}`, false,
+                err instanceof Error ? err.message : String(err));
+            continue;
+        }
+
+        try {
+            // Give the database the tables a project of this era would already
+            // have, by booting the current driver over it once and shutting it
+            // down. Without this the pass answers the wrong question.
+            //
+            // Two different things can go wrong with an old driver, and only one
+            // of them is what a fleet upgrade does:
+            //
+            //   * it cannot CREATE collection tables at boot — true of every
+            //     driver before 0.13, and it matters when a project adds a
+            //     collection, not when the platform moves it to a new image.
+            //   * it cannot SERVE tables that already exist — this is the fleet
+            //     case, because every project being moved has been running.
+            //
+            // Testing on an empty database only ever measures the first, and
+            // reddens permanently for every historical driver, which is how a
+            // gate gets switched off. The seed makes the assertions below
+            // measure the second.
+            const seedDir = stage(fixtureDir, `${SKEW_FIXTURE}-seed`);
+            staged.push(seedDir);
+            const seed = await bootFromBundle({ bundleDir: seedDir, listen: false, handleSignals: false });
+            await seed.shutdown?.().catch(() => {});
+
+            await verifyBundle(entry, bundleDir);
+        } catch (err) {
+            check(`seeds a database for driver ${driverVersion}`, false,
+                err instanceof Error ? err.message : String(err));
+        } finally {
+            process.env.DATABASE_URL = sharedUrl;
+        }
+    }
+}
+
+/**
+ * Boot one staged bundle and assert everything a deployed project depends on.
+ *
+ * Factored out because the same assertions have to run twice over: once per
+ * bundle *shape* (the format axis, below) and once per *driver version* the
+ * bundle might be carrying (the skew axis, further down). Both are ways a
+ * deployed project can stop working under a runtime it did not choose, and a
+ * check that only proves one of them is a check that reads as coverage it does
+ * not have.
+ */
+async function verifyBundle(entry: CorpusEntry, bundleDir: string): Promise<void> {
     // Read the manifest before booting: a format the runtime refuses is a
     // different (and much louder) failure than one that boots and misbehaves,
     // and the corpus should tell them apart.
@@ -163,7 +359,7 @@ for (const entry of CORPUS) {
         check("manifest reads on this runtime", true);
     } catch (err) {
         check("manifest reads on this runtime", false, err instanceof Error ? err.message : String(err));
-        continue;
+        return;
     }
 
     // Format 1 said `mode`; format 2 says `kind`. An old bundle must arrive at
@@ -178,7 +374,7 @@ for (const entry of CORPUS) {
         check("boots", true);
     } catch (err) {
         check("boots", false, err instanceof Error ? err.message : String(err));
-        continue;
+        return;
     }
 
     const get = async (url: string, headers: Record<string, string> = {}) => {
@@ -262,9 +458,29 @@ for (const entry of CORPUS) {
     }
 }
 
+// ── Axis 1: bundle shape ─────────────────────────────────────────────────────
+// Every format we have ever shipped, on the driver this checkout has.
+for (const entry of CORPUS) {
+    const fixtureDir = path.join(CORPUS_DIR, entry.dir);
+    console.log(`\n\x1b[1m▸ ${entry.dir}\x1b[0m \x1b[2m${entry.describe}\x1b[0m`);
+
+    if (!fs.existsSync(fixtureDir)) {
+        check("fixture exists", false, fixtureDir);
+        continue;
+    }
+
+    const bundleDir = stage(fixtureDir, entry.dir);
+    staged.push(bundleDir);
+    await verifyBundle(entry, bundleDir);
+}
+
+// ── Axis 2: version skew ─────────────────────────────────────────────────────
+await runSkewPass();
+
 for (const dir of staged) fs.rmSync(dir, { recursive: true, force: true });
 
 console.log(failures === 0
-    ? "\n\x1b[32m✓ Bundle corpus passed — every shipped bundle shape still boots.\x1b[0m\n"
+    ? `\n\x1b[32m✓ Bundle corpus passed — every shipped bundle shape still boots, and ` +
+      `today's runtime still serves a project carrying any of ${DRIVER_SKEW.join(", ")}.\x1b[0m\n`
     : `\n\x1b[31m✗ ${failures} check(s) failed.\x1b[0m\n`);
 process.exit(failures === 0 ? 0 : 1);
