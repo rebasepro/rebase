@@ -9,7 +9,6 @@ import orderItemsCollection from "./order_items";
 import ticketsCollection from "./tickets";
 import productLocalesCollection from "./product_locales";
 import exercisesCollection from "./exercises";
-import slashedSlugProbe from "./slashed_slug_probe";
 import usersCollection from "./users";
 
 /**
@@ -31,7 +30,6 @@ export const collections = [
     ticketsCollection,
     // Fitness
     exercisesCollection,
-    slashedSlugProbe,
     // Settings
     usersCollection
 ];
