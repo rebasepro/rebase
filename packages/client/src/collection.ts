@@ -11,7 +11,7 @@ import {
     WhereValue,
     WriteOptions
 } from "@rebasepro/types";
-import { collectAllPages, paginateFind } from "@rebasepro/common";
+import { collectAllPages, paginateFind, resolveFindWindow } from "@rebasepro/common";
 
 import { SDKQueryBuilder } from "./sdk_query_builder";
 
@@ -212,15 +212,36 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             options?: ObserveOptions
         ) {
             let closed = false;
-            const emit = (result: FindResult<M>) => {
+            // Two sources race into one callback: the one-shot fetch below and
+            // the subscription beside it. Whichever resolves last used to win,
+            // so a socket update that landed first was overwritten by the
+            // fetch's older snapshot and stayed wrong until the next change.
+            // `listenCollection` replays cached rows synchronously to a second
+            // subscriber, so a second component observing the same query hit
+            // that ordering every time.
+            let liveDelivered = false;
+            let signature: string | undefined;
+
+            const deliver = (result: FindResult<M>, fromLive: boolean) => {
                 if (closed) return;
+                // Once the socket has spoken, the fetch issued alongside it is
+                // older news — delivering it would move the app backwards.
+                if (fromLive) liveDelivered = true;
+                else if (liveDelivered) return;
+                // The de-duplication `observe()` documents. Keyed on the rows
+                // and the total, the same two things the offline layer keys on,
+                // so both implementations mean the same thing by "changed".
+                const next = `${result.meta?.total ?? ""}|${JSON.stringify(result.data)}`;
+                if (signature !== undefined && next === signature) return;
+                signature = next;
                 onResult({ ...result, fromCache: false, hasPendingWrites: false, partial: false });
             };
-            client.find(params).then(emit).catch((error) => {
+
+            client.find(params).then((result) => deliver(result, false)).catch((error) => {
                 if (!closed) onError?.(error as Error);
             });
             const live = options?.realtime !== false && client.listen
-                ? client.listen(params, emit, onError)
+                ? client.listen(params, (result) => deliver(result, true), onError)
                 : undefined;
             return () => {
                 closed = true;
@@ -235,15 +256,25 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             options?: ObserveOptions
         ) {
             let closed = false;
-            const emit = (row: M | undefined) => {
+            let liveDelivered = false;
+            let signature: string | undefined;
+
+            // Same ordering and de-duplication rules as `observe`, for one row.
+            const deliver = (row: M | undefined, fromLive: boolean) => {
                 if (closed) return;
+                if (fromLive) liveDelivered = true;
+                else if (liveDelivered) return;
+                const next = row === undefined ? " missing" : JSON.stringify(row);
+                if (signature !== undefined && next === signature) return;
+                signature = next;
                 onResult(row, { fromCache: false, hasPendingWrites: false });
             };
-            client.findById(id).then(emit).catch((error) => {
+
+            client.findById(id).then((row) => deliver(row, false)).catch((error) => {
                 if (!closed) onError?.(error as Error);
             });
             const live = options?.realtime !== false && client.listenById
-                ? client.listenById(id, emit, onError)
+                ? client.listenById(id, (row) => deliver(row, true), onError)
                 : undefined;
             return () => {
                 closed = true;
@@ -280,69 +311,80 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         client.listen = (params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void) => {
             let active = true;
             let lastUpdateId = 0;
+            // The last total a `count()` actually returned. A later count that
+            // fails says nothing about how big the collection is, so it must
+            // not be allowed to replace this with the length of one page.
+            let lastKnownTotal: number | undefined;
+            const window = resolveFindWindow(params);
             const unsub = ws.listenCollection(
                 {
                     path: slug,
                     filter: params?.where,
+                    // The group used to be dropped here, so a subscription
+                    // filtered with `or(...)` was pushed every row instead.
+                    logical: params?.logical,
                     limit: params?.limit,
-                    startAfter: params?.offset ? String(params.offset) : undefined,
+                    // `offset` used to be stringified into `startAfter`, which
+                    // is a cursor *row*, not a row count — so the server was
+                    // handed "20" where it expected a keyset value, and the
+                    // offset it does understand never arrived at all.
+                    offset: window.driverOffset,
                     orderBy: params?.orderBy?.[0],
                     order: params?.orderBy?.[1],
                     searchString: params?.searchString
                 },
                 (incomingRows: Record<string, unknown>[]) => {
                     const currentUpdateId = ++lastUpdateId;
-                    const requestedLimit = params?.limit || 20;
-                    const offset = params?.offset || 0;
+                    // What the server pages by when the caller names no limit.
+                    // A hardcoded 20 here described a window the rows had not
+                    // come from, and any app sizing its next request off
+                    // `meta.limit` was told the wrong number.
+                    const requestedLimit = window.limit;
+                    const offset = window.offset;
 
                     // WS client already delivers flat rows — just cast
                     const rows = incomingRows as M[];
 
-                    // Heuristic metadata (used as fallback if count call fails)
-                    const heuristicTotal = rows.length;
-                    const heuristicHasMore = rows.length >= requestedLimit;
-
-                    // Try to get authoritative count; fall back to heuristic
-                    if (client.count) {
-                        client.count(params)
-                            .then((total) => {
-                                if (active && currentUpdateId === lastUpdateId) {
-                                    onUpdate({
-                                        data: rows,
-                                        meta: {
-                                            total,
-                                            limit: requestedLimit,
-                                            offset,
-                                            hasMore: offset + rows.length < total
-                                        }
-                                    });
-                                }
-                            })
-                            .catch(() => {
-                                // Count failed — use heuristic meta
-                                if (active && currentUpdateId === lastUpdateId) {
-                                    onUpdate({
-                                        data: rows,
-                                        meta: {
-                                            total: heuristicTotal,
-                                            limit: requestedLimit,
-                                            offset,
-                                            hasMore: heuristicHasMore
-                                        }
-                                    });
-                                }
-                            });
-                    } else {
-                        // No count method — fire immediately with heuristic meta
+                    const emit = (total: number, hasMore: boolean) => {
+                        if (!active || currentUpdateId !== lastUpdateId) return;
                         onUpdate({
                             data: rows,
                             meta: {
-                                total: heuristicTotal,
+                                total,
                                 limit: requestedLimit,
                                 offset,
-                                hasMore: heuristicHasMore
+                                hasMore
                             }
                         });
+                    };
+
+                    // With no count to go on, the only defensible total is a
+                    // lower bound: the rows on this page plus the ones paged
+                    // past to reach them. Reporting `rows.length` claimed a
+                    // collection read at offset 10 held two rows.
+                    const emitWithoutCount = () => emit(
+                        offset + rows.length,
+                        rows.length >= requestedLimit
+                    );
+
+                    if (client.count) {
+                        client.count(params)
+                            .then((total) => {
+                                lastKnownTotal = total;
+                                emit(total, offset + rows.length < total);
+                            })
+                            .catch(() => {
+                                // A count that failed is not evidence about the
+                                // size of the collection. Keep the last real
+                                // answer; only guess if there has never been one.
+                                if (lastKnownTotal !== undefined) {
+                                    emit(lastKnownTotal, offset + rows.length < lastKnownTotal);
+                                } else {
+                                    emitWithoutCount();
+                                }
+                            });
+                    } else {
+                        emitWithoutCount();
                     }
                 },
                 onError

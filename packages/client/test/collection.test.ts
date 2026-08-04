@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+// Asserted rather than restated: these tests previously wrote `limit: 20`, a
+// number the client invented and no layer of the stack agreed with. Naming the
+// constant is what makes the assertion about the server's page size instead of
+// about the line above it.
+import { DEFAULT_LIST_LIMIT } from "@rebasepro/types";
 import { createCollectionClient } from "../src/collection";
 import { Transport } from "../src/transport";
 import { RebaseWebSocketClient } from "../src/websocket";
@@ -376,7 +381,7 @@ values: { title: "B" } }
                 data: entities,
                 meta: {
                     total: 37,
-                    limit: 20,
+                    limit: DEFAULT_LIST_LIMIT,
                     offset: 0,
                     hasMore: true
                 }
@@ -455,7 +460,7 @@ values: { title: "B" } }
                 data: entities,
                 meta: {
                     total: 2,
-                    limit: 20,
+                    limit: DEFAULT_LIST_LIMIT,
                     offset: 0,
                     hasMore: false
                 }
@@ -493,7 +498,7 @@ values: { title: "B" } }
                 data: entities,
                 meta: {
                     total: 1,
-                    limit: 20,
+                    limit: DEFAULT_LIST_LIMIT,
                     offset: 0,
                     hasMore: false
                 }
