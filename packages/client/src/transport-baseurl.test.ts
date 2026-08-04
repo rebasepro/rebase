@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "@jest/globals";
+import { describe, it, expect, afterEach, jest } from "@jest/globals";
 import { createTransport } from "./transport";
 
 /**
@@ -49,5 +49,53 @@ describe("transport baseUrl resolution", () => {
     it("stays relative off-browser, where there is no origin to borrow", () => {
         setWindow(undefined);
         expect(createTransport({}).baseUrl).toBe("");
+    });
+});
+
+describe("baseUrl that already contains the apiPath", () => {
+    /**
+     * The docblock on `baseUrl` says this "silently builds `/api/api/…` and
+     * every request 404s" — a failure mode understood well enough to be written
+     * down, and still left to be discovered at runtime. This package's own
+     * tests configured it that way a dozen times over, which is about as clear
+     * a signal as a trap gets.
+     */
+    it("warns rather than silently building /api/api", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        createTransport({ baseUrl: "http://localhost:3000/api" });
+
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("/api/api"));
+        warn.mockRestore();
+    });
+
+    it("warns for a custom apiPath too, and tolerates a trailing slash", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        createTransport({ baseUrl: "https://api.example.com/v2/", apiPath: "/v2" });
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
+    });
+
+    it("says nothing about a baseUrl that merely ends in a similar word", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        createTransport({ baseUrl: "https://rapid.example.com" });
+        createTransport({ baseUrl: "https://example.com/myapi" });
+        createTransport({ baseUrl: "https://example.com" });
+
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+});
+
+describe("storageUrlOrigin that already contains the apiPath", () => {
+    it("warns, because storage composes it the same way baseUrl is composed", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        createTransport({
+            baseUrl: "https://example.com",
+            storageUrlOrigin: "https://files.example.com/api"
+        });
+
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("storageUrlOrigin"));
+        warn.mockRestore();
     });
 });

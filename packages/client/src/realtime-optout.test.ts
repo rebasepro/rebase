@@ -50,7 +50,7 @@ describe("realtime opt-out", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
-        createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        createRebaseClient({ baseUrl: "http://localhost:3000" });
 
         expect(opened).toHaveLength(0);
     });
@@ -59,7 +59,7 @@ describe("realtime opt-out", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
-        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
 
         // Asking for the channel is not using it.
         const channel = client.realtime.channel("doc:1");
@@ -73,7 +73,7 @@ describe("realtime opt-out", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
-        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
         expect(opened).toHaveLength(0);
 
         client.collection("posts").listen!(undefined, () => { /* noop */ });
@@ -85,7 +85,7 @@ describe("realtime opt-out", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
-        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
 
         client.collection("posts").listen!(undefined, () => { /* noop */ });
         client.collection("authors").listen!(undefined, () => { /* noop */ });
@@ -102,7 +102,7 @@ describe("realtime opt-out", () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => { /* capture */ });
         const debug = jest.spyOn(console, "debug").mockImplementation(() => { /* capture */ });
 
-        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
         void client.realtime.channel("doc:1"); // obtained, never used
 
         expect(opened).toHaveLength(0);
@@ -118,7 +118,7 @@ describe("realtime opt-out", () => {
         delete globalThis.WebSocket;
         const warn = jest.spyOn(console, "warn").mockImplementation(() => { /* capture */ });
 
-        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
         expect(warn).not.toHaveBeenCalled();
 
         void client.realtime.channel("doc:1").join();
@@ -134,7 +134,7 @@ describe("realtime opt-out", () => {
         globalThis.WebSocket = FakeWebSocket;
 
         const client = createRebaseClient({
-            baseUrl: "http://localhost:3000/api",
+            baseUrl: "http://localhost:3000",
             realtime: false
         });
 
@@ -148,7 +148,7 @@ describe("realtime opt-out", () => {
         globalThis.WebSocket = FakeWebSocket;
 
         createRebaseClient({
-            baseUrl: "http://localhost:3000/api",
+            baseUrl: "http://localhost:3000",
             websocketUrl: "ws://localhost:3000",
             realtime: false
         });
@@ -160,7 +160,7 @@ describe("realtime opt-out", () => {
         const { FakeWebSocket, opened, closed } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
-        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
         client.collection("posts").listen!(undefined, () => { /* noop */ });
         expect(opened).toHaveLength(1);
 
@@ -176,7 +176,7 @@ describe("realtime opt-out", () => {
         const { FakeWebSocket, opened } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
-        const client = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
         client.collection("posts").listen!(undefined, () => { /* noop */ });
         expect(opened).toHaveLength(1);
 
@@ -190,10 +190,10 @@ describe("realtime opt-out", () => {
         const { FakeWebSocket } = trackingWebSocket();
         globalThis.WebSocket = FakeWebSocket;
 
-        const offline = createRebaseClient({ baseUrl: "http://localhost:3000/api", realtime: false });
+        const offline = createRebaseClient({ baseUrl: "http://localhost:3000", realtime: false });
         expect(() => offline.close()).not.toThrow();
 
-        const live = createRebaseClient({ baseUrl: "http://localhost:3000/api" });
+        const live = createRebaseClient({ baseUrl: "http://localhost:3000" });
         live.close();
         expect(() => live.close()).not.toThrow();
     });
@@ -205,7 +205,7 @@ describe("realtime opt-out", () => {
         globalThis.WebSocket = FakeWebSocket;
 
         const client = createRebaseClient({
-            baseUrl: "http://localhost:3000/api",
+            baseUrl: "http://localhost:3000",
             realtime: false
         });
 
@@ -244,7 +244,7 @@ isAnonymous: false }
         })) as unknown as typeof globalThis.fetch;
 
         const client = createRebaseClient({
-            baseUrl: "http://localhost:3000/api",
+            baseUrl: "http://localhost:3000",
             fetch: fetchMock
         });
 
@@ -265,7 +265,7 @@ isAnonymous: false }
         globalThis.WebSocket = FakeWebSocket;
 
         const client = createRebaseClient({
-            baseUrl: "http://localhost:3000/api",
+            baseUrl: "http://localhost:3000",
             realtime: false
         });
 

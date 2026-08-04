@@ -259,6 +259,28 @@ function resolveBaseUrl(configured?: string): string {
 export function createTransport(config: RebaseClientConfig, environment?: TransportEnvironment): Transport {
     const fetchFn = config.fetch || globalThis.fetch;
     const apiPath = config.apiPath || "/api";
+
+    // `apiPath` is appended to `baseUrl`, so a `baseUrl` that already ends in it
+    // builds `/api/api/…` and every request 404s. That was documented on
+    // `baseUrl` and left to be discovered at runtime — including by this
+    // package's own tests, which configured it that way a dozen times. A 404 on
+    // every call looks like a server that is down, not like a doubled path.
+    // `storageUrlOrigin` is checked alongside it because `storage.ts` composes
+    // it the same way — `${storageUrlOrigin ?? baseUrl}${apiPath}` — and its own
+    // docblock carries the same "no path" caveat.
+    for (const field of ["baseUrl", "storageUrlOrigin"] as const) {
+        const value = config[field];
+        if (!value || !apiPath) continue;
+        const trimmed = value.replace(/\/+$/, "");
+        if (!trimmed.endsWith(apiPath)) continue;
+        console.warn(
+            `[Rebase] ${field} ${JSON.stringify(value)} already ends with the API path ` +
+            `${JSON.stringify(apiPath)}, which is appended to it — requests will go to ` +
+            `${trimmed}${apiPath}/… and 404. Pass the origin only ` +
+            `(${JSON.stringify(trimmed.slice(0, trimmed.length - apiPath.length) || "/")}), or set ` +
+            "`apiPath` if the server really does mount the API one level deeper."
+        );
+    }
     let token = config.token;
     let tokenGetter: (() => Promise<string | null>) | undefined;
     let onUnauthorizedHandler = config.onUnauthorized;
