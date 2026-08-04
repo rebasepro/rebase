@@ -45,6 +45,7 @@ import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { EditFormActions } from "./EditFormActions";
 import { EntityIdentityBar } from "./EntityIdentityBar";
 import { SplitListCloseButton } from "./CollectionViewBinding/SplitListCloseButton";
+import { SplitListShowButton } from "./CollectionViewBinding/SplitListShowButton";
 import { useRecordActions } from "../hooks/useRecordActions";
 import { useSideDialogContext } from "./SideDialogs";
 import { useAdminContext } from "../hooks/useAdminContext";
@@ -96,6 +97,12 @@ export interface EditViewBindingProps<M extends Record<string, unknown> = Record
      * of the breadcrumb — the side panel's close button.
      */
     barActionsStart?: React.ReactNode;
+    /**
+     * Full screen only: bring the list back beside this record. Set when the
+     * record was opened out of a split collection, so folding the list away is
+     * reversible; it takes the place of the back arrow when present.
+     */
+    onShowList?: () => void;
     formProps?: Partial<EntityFormBindingProps<M>>,
     /**
      * Pre-populate the form with these values when creating a new entity.
@@ -192,6 +199,7 @@ export function EditViewBindingInner<M extends Record<string, unknown>>({
     layout = "side_panel",
     barActions,
     barActionsStart,
+    onShowList,
     status,
     setStatus,
     formProps,
@@ -691,6 +699,9 @@ parentEntityIds,
 
         <EntityIdentityBar
             collection={collection as AdminCollection}
+            collectionUrl={layout === "full_screen" || layout === "split"
+                ? withViewMode(urlController.buildUrlCollectionPath(path))
+                : undefined}
             title={displayTitle}
             entityId={status === "existing" ? entityId : undefined}
             status={status}
@@ -700,8 +711,10 @@ parentEntityIds,
             saveDisabled={!canEdit || saveDisabled}
             // Full screen replaces the collection entirely, leaving browser Back
             // as the only route to it. The detail view has carried this arrow
-            // for that reason; the edit view is reached the same way.
-            onBack={layout === "full_screen"
+            // for that reason; the edit view is reached the same way. Where the
+            // list can be unfolded back beside the record, that chevron reaches
+            // the same collection and the arrow beside it is noise.
+            onBack={layout === "full_screen" && !onShowList
                 ? () => navigate(withViewMode(urlController.buildUrlCollectionPath(path)))
                 : undefined}
             onSave={canEdit && formContext ? () => {
@@ -721,8 +734,9 @@ parentEntityIds,
                 {barActionsStart}
                 {/* Split view: closing the list is opening this record
                     full screen, and the control for it belongs at this
-                    bar's leading edge. */}
+                    bar's leading edge. Full screen carries its mirror. */}
                 {layout === "split" && <SplitListCloseButton/>}
+                {layout === "full_screen" && onShowList && <SplitListShowButton onClick={onShowList}/>}
             </>}
             trailing={<>
                 {pluginActionsTop}

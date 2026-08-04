@@ -10,11 +10,11 @@ import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBin
 import { EntityViewBinding } from "./EntityViewBinding";
 import { EntityIdentityBar } from "./EntityIdentityBar";
 import { SplitListCloseButton } from "./CollectionViewBinding/SplitListCloseButton";
+import { SplitListShowButton } from "./CollectionViewBinding/SplitListShowButton";
 import { EntityInspector, InspectorTab } from "./EntityInspector";
 import { CircularProgressCenter, iconSize } from "@rebasepro/ui";
 import {
     Alert,
-    ArrowLeftIcon,
     Button,
     CenteredView,
     cls,
@@ -34,6 +34,7 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { ErrorView, createFormexStub, usePermissions, useTranslation, getIcon } from "@rebasepro/app";
 
 import { removeInitialAndTrailingSlashes, resolveDefaultSelectedView } from "@rebasepro/app";
+import { withViewMode } from "../util/view_mode";
 import { resolvedSelectedEntityView } from "../util/resolutions";
 import {
     useCustomizationController,
@@ -82,6 +83,12 @@ export interface DetailViewBindingProps<M extends Record<string, unknown> = Reco
      * of the breadcrumb — the side panel's close button.
      */
     barActionsStart?: React.ReactNode;
+    /**
+     * Full screen only: bring the list back beside this record. Set when the
+     * record was opened out of a split collection, so folding the list away is
+     * reversible; it takes the place of the back arrow when present.
+     */
+    onShowList?: () => void;
 }
 
 export function DetailViewBinding<M extends Record<string, unknown>>({
@@ -141,7 +148,8 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
     dataLoading,
     layout = "full_screen",
     barActions,
-    barActionsStart
+    barActionsStart,
+    onShowList
 }: DetailViewBindingProps<M> & {
     entity?: Entity<M>,
     dataLoading: boolean,
@@ -472,24 +480,27 @@ entityId }
             );
         });
 
+    // The breadcrumb's destination, and the back arrow's when it renders. Both
+    // keep the view mode: a collection reached from one of its own records must
+    // come back as the user left it.
+    const collectionUrl = withViewMode(urlController.buildUrlCollectionPath(path));
+
     // Full screen is the one layout with no way out of its own: a side panel and a
     // dialog can be dismissed, and a split keeps the list beside it, but opening an
     // entity full screen replaces the collection entirely and left browser Back as
     // the only route back to it — which is not an affordance the page shows, and is
     // wrong anyway once the user has moved between tabs inside the entity.
-    const backToCollectionButton = layout === "full_screen" ? (
-        <Tooltip title={t("back")}>
-            <IconButton
-                size="small"
-                aria-label={t("back")}
-                onClick={() => navigate(urlController.buildUrlCollectionPath(path))}
-            >
-                <ArrowLeftIcon size={iconSize.smallest} />
-            </IconButton>
-        </Tooltip>
-    ) : null;
-
-    const shouldShowTopBar = Boolean(barActions) || hasAdditionalViews || layout === "side_panel" || layout === "dialog" || Boolean(backToCollectionButton);
+    //
+    // Unless the list can be unfolded back beside the record: that chevron
+    // leads to the same collection while keeping the record open, so it stands
+    // alone rather than beside an arrow going almost the same place.
+    //
+    // It goes to the bar's leading edge — where a back control reads as back,
+    // and where the edit view has always put the same arrow — rather than to
+    // the trailing edge among the record's own actions.
+    const backToCollection = layout === "full_screen" && !onShowList
+        ? () => navigate(collectionUrl)
+        : undefined;
 
     const fullScreenButton = !barActions && // Not in split: the list panel beside it carries the close control,
     // and an expand button there competes with it.
@@ -538,24 +549,26 @@ entityId }
 
         <EntityIdentityBar
             collection={collection as AdminCollection}
+            collectionUrl={layout === "full_screen" || layout === "split" ? collectionUrl : undefined}
             title={title}
             entityId={entityId}
             status={"existing"}
             dirty={false}
             saving={false}
+            onBack={backToCollection}
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
             leading={<>
                 {barActionsStart}
                 {/* Split view: closing the list is opening this record
                     full screen, and the control for it belongs at this
-                    bar's leading edge. */}
+                    bar's leading edge. Full screen carries its mirror. */}
                 {layout === "split" && <SplitListCloseButton/>}
+                {layout === "full_screen" && onShowList && <SplitListShowButton onClick={onShowList}/>}
             </>}
             trailing={<>
                 {editButton}
                 {pluginActionsTop}
-                {backToCollectionButton}
                 {fullScreenButton}
                 {barActions?.({
                     path,

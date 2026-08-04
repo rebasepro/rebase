@@ -1,6 +1,7 @@
 import type { AdminCollection } from "@rebasepro/admin-types";
 import type { EntityStatus } from "@rebasepro/types";
 import React, { useState } from "react";
+import { Link } from "react-router";
 import { useTranslation } from "@rebasepro/app";
 import {
     Button,
@@ -25,6 +26,15 @@ import {
 export interface EntityIdentityBarProps {
     /** Plural collection name, shown as the breadcrumb ahead of the title. */
     collection: AdminCollection;
+    /**
+     * Where the breadcrumb points. Without it the collection name is inert text
+     * that still reads as a breadcrumb — worse than no breadcrumb at all, and
+     * the only way back once a layout drops its back arrow.
+     *
+     * Left unset by the overlays (side panel, dialog), where the collection is
+     * already underneath and navigating would dismiss the record instead.
+     */
+    collectionUrl?: string;
     /** Resolved record title, already guarded against showing a field default. */
     title: string;
     entityId?: string | number;
@@ -81,6 +91,7 @@ export interface EntityIdentityBarProps {
  */
 export function EntityIdentityBar({
     collection,
+    collectionUrl,
     title,
     entityId,
     status,
@@ -126,10 +137,21 @@ export function EntityIdentityBar({
                 </Tooltip>
             )}
 
-            <Typography variant={"caption"}
-                className={"text-text-disabled dark:text-text-disabled-dark whitespace-nowrap hidden sm:block"}>
-                {collection.name}&nbsp;/
-            </Typography>
+            {collectionUrl
+                ? <Link to={collectionUrl}
+                    className={"visited:text-inherit dark:visited:text-inherit hidden sm:block"}>
+                    <Typography variant={"caption"}
+                        className={cls(
+                            "text-text-disabled dark:text-text-disabled-dark whitespace-nowrap",
+                            "hover:text-text-primary dark:hover:text-text-primary-dark transition-colors"
+                        )}>
+                        {collection.name}&nbsp;/
+                    </Typography>
+                </Link>
+                : <Typography variant={"caption"}
+                    className={"text-text-disabled dark:text-text-disabled-dark whitespace-nowrap hidden sm:block"}>
+                    {collection.name}&nbsp;/
+                </Typography>}
 
             <span className={"font-headers font-semibold text-[15px] tracking-tight truncate min-w-0"}
                 title={title}>

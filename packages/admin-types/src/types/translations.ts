@@ -85,6 +85,7 @@ export interface RebaseTranslations {
     column_cannot_be_edited: string;
     close: string;
     hide_list: string;
+    show_list: string;
     unsaved_local_changes: string;
     unsaved_local_changes_description: string;
     preview_changes: string;

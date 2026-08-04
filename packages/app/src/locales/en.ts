@@ -87,6 +87,7 @@ export const en: RebaseTranslations = {
     column_cannot_be_edited: "This column can't be edited directly",
     close: "Close",
     hide_list: "Hide list",
+    show_list: "Show list",
     unsaved_local_changes: "Unsaved Local changes",
     unsaved_local_changes_description: "This document was edited locally and has unsaved changes. These local changes will be lost if you don't apply them.",
     preview_changes: "Preview Changes",

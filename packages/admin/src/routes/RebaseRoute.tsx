@@ -233,6 +233,7 @@ function EntityFullScreenRoute({
     const urlController = useUrlController();
     const navigate = useNavigate();
     const location = useLocation();
+    const userConfigPersistence = useUserConfigurationPersistence();
 
     // defaultValues may be carried via location.state when openNewDocument() is called
     // for full-screen mode. We read it once on mount — after that, the form owns its state.
@@ -340,6 +341,30 @@ function EntityFullScreenRoute({
     // Determine if this is a detail-view-first collection showing the view page
     const isDetailMode = collection.defaultEntityAction === "view" && !isNew && !isCopy && entityId && !isEditRoute;
 
+    // A record is full screen either because its collection has no list to show
+    // beside it, or because the user folded that list away. Only the second is
+    // reversible, and it is reversible by dropping `#full` alone: this is the
+    // same URL the split route reads, so the same conditions decide it.
+    const splitListAvailable = !isNew && !isCopy && entityId !== undefined &&
+        navigationEntries[0]?.type === "collection" &&
+        (navigationEntries.length === 2 || navigationEntries.length === 3) &&
+        resolveOpenEntityMode({
+            collection,
+            viewMode: resolveViewMode({
+                collection,
+                search: location.search,
+                savedViewMode: userConfigPersistence?.getCollectionConfig(collection.slug)?.defaultViewMode as ViewMode | undefined
+            })
+        }) === "split";
+
+    const showList = splitListAvailable
+        ? () => navigate({
+            pathname,
+            search: location.search,
+            hash: ""
+        })
+        : undefined;
+
     if (isDetailMode) {
         return <>
             <DetailViewBinding
@@ -349,6 +374,7 @@ function EntityFullScreenRoute({
                 layout={"full_screen"}
                 path={collectionPath}
                 selectedTab={selectedTab ?? undefined}
+                onShowList={showList}
                 onEditClick={() => {
                     const editUrl = urlController.buildUrlCollectionPath(`${collectionPath}/${entityId}`) + "/edit";
                     navigate(editUrl + hash);
@@ -377,6 +403,7 @@ function EntityFullScreenRoute({
             path={collectionPath}
             copy={isCopy}
             selectedTab={selectedTab ?? undefined}
+            onShowList={showList}
             defaultValues={isNew ? defaultValues : undefined}
             onValuesModified={(modified) => blocked.current = modified}
             navigateBack={() => {

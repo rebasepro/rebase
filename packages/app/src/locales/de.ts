@@ -77,6 +77,7 @@ export const de: RebaseTranslations = {
     column_cannot_be_edited: "Diese Spalte kann nicht direkt bearbeitet werden",
     close: "Schließen",
     hide_list: "Liste ausblenden",
+    show_list: "Liste einblenden",
     unsaved_local_changes: "Ungespeicherte lokale Änderungen",
     unsaved_local_changes_description: "Dieses Dokument wurde lokal bearbeitet und weist ungespeicherte Änderungen auf. Diese lokalen Änderungen gehen verloren, wenn Sie sie nicht anwenden.",
     preview_changes: "Änderungen in der Vorschau anzeigen",
