@@ -16,6 +16,64 @@ import {
     resolveTsx
 } from "../utils/project";
 
+/** A user as the admin API returns it, reduced to what this command needs. */
+export interface ResolvedUser {
+    id: string;
+    email: string;
+}
+
+/**
+ * Pick the user with exactly this email out of a search response.
+ *
+ * `/api/admin/users?search=` is an `ILIKE '%…%'` over email **or display
+ * name**, ordered by role count descending. This used to take row `[0]` and
+ * reset it, then print the email it had been *given* as confirmation — so two
+ * ordinary situations ended in a successful-looking reset of somebody else's
+ * account:
+ *
+ *   - a substring collision: `bob@example.com` also matches
+ *     `robert.bob@example.com`;
+ *   - a display name, which is user-controlled and accepted up to 255
+ *     characters with no constraint on its content, containing an address
+ *     belonging to someone else.
+ *
+ * The ordering makes it worse rather than better — `array_length(roles) DESC
+ * NULLS LAST` puts the most privileged match first, so the account most likely
+ * to be reset by mistake is an admin's.
+ *
+ * Returns `undefined` when nothing matched exactly, which the caller reports
+ * rather than falling through to a guess. The direct-database fallback below
+ * has always matched with `eq(usersTable.email, email)`; this is the same
+ * definition, so the command no longer resets different accounts depending on
+ * whether the backend happened to be running.
+ */
+export function selectUserForEmail(payload: unknown, email: string): ResolvedUser | undefined {
+    const wanted = email.trim().toLowerCase();
+    if (!wanted) return undefined;
+
+    const rows: unknown[] = Array.isArray(payload)
+        ? payload
+        : (payload && typeof payload === "object" && Array.isArray((payload as { users?: unknown }).users)
+            ? (payload as { users: unknown[] }).users
+            : []);
+
+    for (const row of rows) {
+        if (!row || typeof row !== "object") continue;
+        const record = row as Record<string, unknown>;
+        const rowEmail = typeof record.email === "string" ? record.email.trim().toLowerCase() : undefined;
+        if (!rowEmail || rowEmail !== wanted) continue;
+
+        const id = typeof record.id === "string"
+            ? record.id
+            : (typeof record.uid === "string" ? record.uid : undefined);
+        if (!id) continue;
+
+        return { id, email: record.email as string };
+    }
+
+    return undefined;
+}
+
 export async function authCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
     if (!subcommand || subcommand === "--help") {
         printAuthHelp();
@@ -111,7 +169,10 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
         try {
             const finalPass = newPassword || "NewPassword123!";
             const cleanBaseUrl = baseUrl.replace(/\/+$/, "");
-            const searchUrl = `${cleanBaseUrl}/api/admin/users?search=${encodeURIComponent(email)}&limit=1`;
+            // Not `limit=1`: the search is fuzzy and ordered by role count, so
+            // the exact match is not necessarily first — asking for one row can
+            // make it unreachable. Ask for a page, then match exactly.
+            const searchUrl = `${cleanBaseUrl}/api/admin/users?search=${encodeURIComponent(email)}&limit=50`;
             const searchRes = await fetch(searchUrl, {
                 headers: {
                     "Authorization": `Bearer ${serviceKey}`,
@@ -126,29 +187,12 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
                 throw new Error("Invalid response format from user search API.");
             }
 
-            let userId: string | undefined;
-            if (Array.isArray(searchData)) {
-                const firstUser = searchData[0] as unknown;
-                if (firstUser && typeof firstUser === "object" && "id" in firstUser && typeof (firstUser as { id: unknown }).id === "string") {
-                    userId = (firstUser as { id: string }).id;
-                } else if (firstUser && typeof firstUser === "object" && "uid" in firstUser && typeof (firstUser as { uid: unknown }).uid === "string") {
-                    userId = (firstUser as { uid: string }).uid;
-                }
-            } else if ("users" in searchData && Array.isArray((searchData as { users: unknown }).users)) {
-                const users = (searchData as { users: unknown[] }).users;
-                const firstUser = users[0];
-                if (firstUser && typeof firstUser === "object" && "id" in firstUser && typeof (firstUser as { id: unknown }).id === "string") {
-                    userId = (firstUser as { id: string }).id;
-                } else if (firstUser && typeof firstUser === "object" && "uid" in firstUser && typeof (firstUser as { uid: unknown }).uid === "string") {
-                    userId = (firstUser as { uid: string }).uid;
-                }
+            const matched = selectUserForEmail(searchData, email);
+            if (!matched) {
+                throw new Error(`No user has the email ${email}.`);
             }
 
-            if (!userId) {
-                throw new Error(`User not found with email: ${email}`);
-            }
-
-            const resetUrl = `${cleanBaseUrl}/api/admin/users/${userId}/reset-password`;
+            const resetUrl = `${cleanBaseUrl}/api/admin/users/${matched.id}/reset-password`;
             const resetRes = await fetch(resetUrl, {
                 method: "POST",
                 headers: {
@@ -167,7 +211,9 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
             console.log("API reset successful.");
             console.log(chalk.bold("  🔑 Rebase Auth — Reset Password (via API)"));
             console.log("");
-            console.log(`  ${chalk.gray("Email:")} ${email}`);
+            // The address as stored, not as typed — they differ in case often
+            // enough that echoing the input hides which account was touched.
+            console.log(`  ${chalk.gray("Email:")} ${matched.email}`);
             console.log(`  ${chalk.gray("Password:")} ${finalPass}`);
             console.log("");
             return;
@@ -242,10 +288,12 @@ async function resetPassword() {
     if (result.length > 0) {
         console.log("✅ Password reset for: " + result[0].email);
         ${!newPassword ? 'console.log("   New password: " + newPassword);' : ""}
-    } else {
-        console.log("✗ User not found: " + email);
+        process.exit(0);
     }
-    process.exit(0);
+    // Nothing was updated, so nothing was reset. Exiting 0 here reported
+    // success for a no-op, which is what a script would have believed.
+    console.error("✗ User not found: " + email);
+    process.exit(1);
 }
 
 resetPassword().catch(console.error);
@@ -269,10 +317,23 @@ resetPassword().catch(console.error);
             env
         });
 
+        // The script is written into the user's backend directory, so every
+        // exit has to remove it. Without an `error` handler a failed spawn
+        // raises an unhandled event, the process dies before `close`, and
+        // `.tmp-reset-password.ts` is left behind to be committed.
+        const cleanup = () => {
+            try { fs.unlinkSync(tmpScriptPath); } catch { /* already gone */ }
+        };
+
         return new Promise((resolve) => {
+            child.on("error", (err) => {
+                cleanup();
+                console.error(chalk.red("✗ Could not run the reset script."));
+                console.error(chalk.gray(`  ${err.message}`));
+                process.exit(1);
+            });
             child.on("close", (code) => {
-                // Clean up temp script
-                try { fs.unlinkSync(tmpScriptPath); } catch { /* ignore */ }
+                cleanup();
                 if (code !== 0) {
                     process.exit(code ?? 1);
                 }
