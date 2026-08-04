@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 
 import { renderSkeletonImageThumbnail } from "../property_previews/SkeletonPropertyComponent";
 import { UrlComponentPreview } from "./UrlComponentPreview";
-import { ErrorView, useStorageSource, useStorageSources } from "@rebasepro/app";
+import { ErrorView, useStorageSource, useStorageSources, useTranslation } from "@rebasepro/app";
 import { resolveStorageSource } from "@rebasepro/common";
 import { DownloadConfig, FileType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
@@ -42,6 +42,7 @@ export function StorageThumbnailInternal({
     storageSourceKey
 }: StorageThumbnailProps) {
 
+    const { t } = useTranslation();
     const [error, setError] = React.useState<Error | undefined>(undefined);
     const defaultStorage = useStorageSource();
     const storageSources = useStorageSources();
@@ -85,7 +86,9 @@ export function StorageThumbnailInternal({
             : (filetype?.startsWith("audio") ? "audio" : "file"));
 
     if (downloadConfig?.fileNotFound)
-        return <ErrorView error={"File not found"}></ErrorView>
+        // `file_not_found` is translated into seven locales and this rendered
+        // the English literal, so a German panel said "File not found".
+        return <ErrorView error={t("file_not_found")}></ErrorView>
 
     return downloadConfig?.url
         ? <UrlComponentPreview previewType={previewType}

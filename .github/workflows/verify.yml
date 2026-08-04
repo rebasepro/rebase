@@ -148,6 +148,14 @@ jobs:
       - name: Test-script coverage
         run: pnpm run check:test-scripts
 
+      # The admin ships seven non-English locales and 200-odd strings that have
+      # a translation key are also written out as English literals, where no
+      # translation reaches them. Found by looking at the running panel: a
+      # product card with a missing image said "File not found", and
+      # `file_not_found` is translated seven ways.
+      - name: Untranslated-string ratchet
+        run: pnpm run check:untranslated
+
       # The docs verifier existed but ran in no pipeline at all, and defaulted to
       # exit 0, so documented APIs could drift from the source indefinitely — and
       # had: a wiring example that could not compile and a `userManagement` prop
