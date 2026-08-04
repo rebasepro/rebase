@@ -62,6 +62,7 @@
     "check:generated": "pnpm -C website run generate-all && git -c core.fsmonitor=false diff --exit-code -- website/public/llms.txt website/public/sitemap.md website/src/content/docs/docs/CHANGELOG.md",
     "check:names": "node scripts/headless-guard/check-package-names.mjs",
     "check:deps": "node scripts/check-undeclared-deps.mjs",
+    "check:api-surface": "node scripts/check-api-surface.mjs",
     "check:hooks": "node scripts/check-hooks-baseline.mjs",
     "harness": "node scripts/harness/harness.mjs",
     "harness:preflight": "node scripts/harness/harness.mjs preflight",

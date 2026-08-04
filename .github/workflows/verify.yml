@@ -144,6 +144,15 @@ jobs:
         env:
           NODE_OPTIONS: "--max_old_space_size=4096"
 
+      # `@rebasepro/server` is the one package `docker/entrypoint.mjs` symlinks
+      # over a deployed bundle's own copy, so its exports move underneath tenant
+      # code that is already built — during a fleet rollout nobody asked for. A
+      # removed export is therefore not a compile error for anyone; it is a boot
+      # failure, in a wave. 0.13.0 removed two exports from it with nothing here
+      # to notice. Reads dist/index.d.ts, hence after the build.
+      - name: Runtime API surface
+        run: pnpm run check:api-surface
+
       # The examples were in no pipeline and in no root script — `pnpm build`
       # covers `./packages/*` and `./app` only — so examples/firebase stopped
       # compiling at the BaaS/admin split and nothing said so for weeks. They
