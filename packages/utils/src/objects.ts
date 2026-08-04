@@ -37,6 +37,19 @@ export function pathTraversesPrototype(path: string | string[]): boolean {
 }
 
 /**
+ * Whether writing this single key with `obj[key] = …` would reach the prototype
+ * chain instead of creating a property.
+ *
+ * The single-key counterpart of {@link pathTraversesPrototype}, for the many
+ * places that copy an object one key at a time. `JSON.parse` creates
+ * `__proto__` as an *own* property, so it survives `hasOwnProperty` — and then
+ * `target[key] = value` invokes the setter and replaces the target's prototype.
+ */
+export function isPrototypePollutingKey(key: string): boolean {
+    return UNSAFE_PATH_SEGMENTS.has(key);
+}
+
+/**
  * Deeply get a value from an object via its path.
  */
 export function getIn(

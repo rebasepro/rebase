@@ -3,6 +3,7 @@ import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig, Properties, Property, ResolvedRelation, RelationProperty, Vector, BinaryProperty, hasForeignKeyOnTarget, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, type ResolvedVia } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
+import { isPrototypePollutingKey } from "@rebasepro/utils";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { DrizzleConditionBuilder } from "./utils/drizzle-conditions";
 import { getPrimaryKeys, buildCompositeId } from "./services/collection-helpers";
@@ -68,9 +69,15 @@ export function sanitizeAndConvertDates(obj: unknown): unknown {
     if (typeof obj === "object") {
         const newObj: Record<string, unknown> = {};
         for (const key in obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                newObj[key] = sanitizeAndConvertDates((obj as Record<string, unknown>)[key]);
-            }
+            if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+            // `JSON.parse` creates `__proto__` as an *own* property, so it gets
+            // past the check above — and `newObj[key] = …` then invokes the
+            // prototype setter instead of creating a property. The row's
+            // prototype becomes whatever the request body supplied, so
+            // `row.isAdmin` answers `true` while `Object.keys(row)` shows
+            // nothing of the sort. No column can be reached by these names.
+            if (isPrototypePollutingKey(key)) continue;
+            newObj[key] = sanitizeAndConvertDates((obj as Record<string, unknown>)[key]);
         }
         return newObj;
     }
@@ -126,6 +133,9 @@ joinPathRelationUpdates: [] };
     });
 
     for (const [key, value] of Object.entries(row)) {
+        // Same reasoning as `sanitizeAndConvertDates`: these keys come from the
+        // request body, and no column answers to them.
+        if (isPrototypePollutingKey(key)) continue;
         const property = properties[key as keyof M] as Property;
 
         // Coerce empty strings to null for any field that acts as a foreign key
