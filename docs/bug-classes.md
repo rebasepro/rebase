@@ -594,6 +594,55 @@ claim needs a release path on every exit.
 
 ---
 
+## 20. A value computed and then discarded
+
+Two bugs found the same afternoon, in unrelated files, both invisible to
+reading:
+
+* `useBoardDataController` read `searchStringRef.current` into
+  `currentSearchString` at the top of two functions and used it in neither. The
+  board took a search term, listed it as an effect dependency — so typing tore
+  down and rebuilt every column's subscription — and passed it to none of its
+  three queries. Searching a kanban board did nothing but make it flicker.
+* `CollectionViewBinding` called `useSlot("collection.error")`, selected the
+  first view when a load failed, assigned it to `pluginErrorView`, and rendered
+  a hardcoded banner instead. `collection.error` is a declared slot with its own
+  props interface and a `@group Plugins` docblock; it did nothing at all.
+
+Neither looks wrong on the page. The code that *does* the work is present and
+correct; what is missing is an absence, and absences are what reading is worst
+at. A reviewer sees `const currentSearchString = …` and their eye supplies the
+use.
+
+**This is exactly what `no-unused-vars` reports**, and it was reporting it the
+whole time. The rule is configured, correct, and structurally invisible: it
+reports at `warn`, and every `test:lint` script — and CI's own lint step — runs
+eslint with `--quiet`, which prints errors only. 3,642 warnings are suppressed
+workspace-wide.
+
+**Separate the two things the rule reports.** *"'x' is defined but never used"*
+is a stale import or an unused parameter: noise, nothing was computed, nothing
+is lost. *"'x' is assigned a value but never used"* is work that was done and
+thrown away, and that is the one worth a gate — 785 of the former, 155 of the
+latter.
+
+**Sweep:** `eslint <path>` **without** `--quiet`, filtered to
+`is assigned a value but never used`. Then read each one and ask what the value
+was *for*. Most are superseded leftovers — a `useCallback` replaced by a `Set`,
+a constant whose consumer moved — and the honest fix is deletion. The dangerous
+minority are a parameter that should have been forwarded, which is class 17
+wearing different clothes.
+
+**Do not fix these by renaming to `_`.** That silences the only detector of the
+next one. Delete it, or use it.
+
+**Gate it as a ratchet, not a cleanup.** `check:unused` pins the 155 and fails
+on the 156th, the same shape as `check:hooks` one rule over. The count was never
+the problem; 155 ambient findings make the 156th invisible, which is precisely
+how both bugs above survived.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -792,6 +841,15 @@ touched, which turned out to be all of them.
 | every `count()` call site against the query it is reported beside | **BUG** ×3 — the count inside `buildRebaseData.find()` passed only `filter`, so a narrowed page carried an unnarrowed total and `hasMore` offered a page that was not there; `usePostgresClientDriver.count` re-listed seven names and dropped `logical`; the REST generator's *nested* `/count` dropped it while its two siblings kept it. |
 | every route that returns rows, against `?fields=` | **BUG** — applied on two of four. Both subcollection reads parsed the parameter and returned every column, on endpoints whose OpenAPI lists it first. Invisible because the only coverage called `projectResponseFields` directly, which proves the function narrows a row and nothing about whether a request reaches it (class 3). |
 | `buildRoutedRebaseData` | clean — it delegates whole accessors and never re-lists a parameter. |
+| `rebase auth reset-password` | **BUG** — looked the user up with `?search=`, an `ILIKE '%…%'` over email **or display name**, took row `[0]`, reset it, and printed the email it had been *given*. `bob@example.com` also matches `robert.bob@example.com`; a display name is user-controlled and unconstrained. `ORDER BY array_length(roles) DESC` puts the most privileged match first, and `limit=1` made the exact match unreachable rather than merely outranked. The command's own direct-DB fallback matched exactly (class 2). |
+| the same command's exit code | **BUG** — the fallback ran `process.exit(0)` unconditionally, so resetting a nonexistent address reported success to any script reading `$?`. |
+| every `.env` reader in the CLI | **BUG** (class 2) — four: `dotenv` in `start`, a hand-rolled `indexOf("=")` loop in `api-keys`, a one-key regex in `auth`, its own splitting in `cloud env`. `dotenv` is a declared dependency. `export KEY=…` read as unset; `KEY=… # comment` carried the comment into an `Authorization` header and came back 401. |
+| CLI telemetry event names | **BUG** — `rebase db <anything>` was recorded as `cli.db_push` and `rebase schema <anything>` as `cli.schema_generate`, so anything counting pushes counted `db restore`. |
+| the admin's row count while searching | **BUG** — `EntitiesCount` was given `filter` and `sortBy` but not `searchString`, though the term sits in the same scope and is passed to the toolbar beside it. Its module-level in-flight cache was keyed the same way, so it would also have answered one search with another's total. |
+| `useBoardDataController` | **BUG** (class 20) — accepted a search term, re-subscribed every column when it changed, and passed it to none of its three queries. |
+| `collection.error` | **BUG** (class 20) — a declared, documented plugin slot, computed and rendered nowhere. |
+| every `is assigned a value but never used` in the workspace | **SYSTEMIC** — 155, reported by a correctly configured rule that no pipeline can show, because every lint invocation passes `--quiet`. Ratcheted by `check:unused`. |
+| the admin's other 86 discarded values | swept by hand: superseded leftovers, apart from the two above. |
 
 Two process notes worth as much as the findings.
 
