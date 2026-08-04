@@ -129,7 +129,16 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
 
     function emit(event: AuthChangeEvent, session: RebaseSession | null) {
         for (const fn of listeners) {
-            try { fn(event, session); } catch (e) { /* ignore */ }
+            try {
+                fn(event, session);
+            } catch (e) {
+                // Isolated so one bad handler cannot stop the rest being told —
+                // but reported, because the throw came from the caller's own
+                // code and discarding it made a broken `onAuthStateChange`
+                // handler look like an event that never fired. The socket in
+                // this package already reports handler errors this way.
+                console.error("Error in auth state change listener:", e);
+            }
         }
     }
 
