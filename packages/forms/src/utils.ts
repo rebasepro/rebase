@@ -28,6 +28,11 @@ export function getIn(
     def?: unknown,
     p = 0
 ): unknown {
+    // The read counterpart. `getIn(values, "constructor.prototype")` handing
+    // back `Object.prototype` is how a polluted value gets read back out, and
+    // how a form comes to render one.
+    if (pathTraversesPrototype(key)) return def;
+
     const path = toPath(key);
     let current: unknown = obj;
     while (current && p < path.length) {
@@ -43,6 +48,13 @@ export function getIn(
 }
 
 export function setIn(obj: unknown, path: string, value: unknown): unknown {
+    // Refused rather than sanitised: there is no legitimate reading of a form
+    // field whose path names the prototype chain, and silently rewriting the
+    // path would write the value somewhere the caller did not ask for.
+    // Returning the original object is what every other no-op in this function
+    // does.
+    if (pathTraversesPrototype(path)) return obj;
+
     const res = clone(obj) as Record<string, unknown>; // this keeps inheritance when obj is a class
     let resVal: Record<string, unknown> = res;
     let i = 0;
@@ -93,6 +105,25 @@ export function clone(value: unknown): unknown {
     } else {
         return value; // This is for primitive types which do not need cloning.
     }
+}
+
+/**
+ * Segments that reach the prototype chain rather than a property of the object.
+ *
+ * `res["__proto__"] = x` is a setter for the object's prototype, not an own
+ * property, so a path of `__proto__.polluted` wrote straight onto
+ * `Object.prototype` and gave every object in the process a `polluted`
+ * property. `constructor.prototype.x` arrived by a second route, and
+ * `__proto__.0` did it to arrays.
+ *
+ * These are paths, and a path here is a property key — which for a map property
+ * or a column mapped out of an imported CSV is data, not code.
+ */
+const UNSAFE_PATH_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Whether any segment of this path would traverse the prototype chain. */
+export function pathTraversesPrototype(path: string | string[]): boolean {
+    return toPath(path).some(segment => UNSAFE_PATH_SEGMENTS.has(segment));
 }
 
 function toPath(value: string | string[]) {
