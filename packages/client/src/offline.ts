@@ -15,6 +15,7 @@ import {
 import {
     isExactlyEvaluable,
     matchesParams,
+    resolvePagination,
     runLocalQuery,
     sortRows
 } from "./offline-query";
@@ -942,7 +943,7 @@ export class OfflineManager {
         if (!state) {
             return {
                 data: [],
-                meta: { total: 0, limit: params?.limit ?? 20, offset: params?.offset ?? 0, hasMore: false },
+                meta: { ...resolvePagination(params), total: 0, hasMore: false },
                 fromCache: true,
                 hasPendingWrites: false,
                 partial: true
@@ -1150,12 +1151,13 @@ export class OfflineManager {
     }
 
     private recordSnapshot(slug: string, params: FindParams | undefined, result: FindResult<AnyRow>): QuerySnapshot {
-        const meta = result.meta ?? { total: result.data?.length ?? 0, limit: 20, offset: 0, hasMore: false };
+        const window = resolvePagination(params);
+        const meta = result.meta ?? { total: result.data?.length ?? 0, ...window, hasMore: false };
         const snapshot: QuerySnapshot = {
             ids: (result.data ?? []).map((row) => row.id as string | number).filter((id) => id !== undefined),
             total: meta.total ?? result.data?.length ?? 0,
-            limit: meta.limit ?? params?.limit ?? 20,
-            offset: meta.offset ?? params?.offset ?? 0,
+            limit: meta.limit ?? window.limit,
+            offset: meta.offset ?? window.offset,
             hasMore: meta.hasMore ?? false
         };
         const state = this.collectionState(slug);

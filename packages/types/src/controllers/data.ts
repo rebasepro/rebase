@@ -38,13 +38,19 @@ export interface FilterCondition {
  *
  * `limit`/`offset` and `page` describe the same window two ways. If **both
  * `offset` and `page` are provided, `page` wins** — the backend computes
- * `offset = (page - 1) * (limit ?? 20)` and ignores the explicit `offset`.
- * Pick one style per query.
+ * `offset = (page - 1) * (limit ?? DEFAULT_LIST_LIMIT)` and ignores the
+ * explicit `offset`. Pick one style per query.
  *
  * @group Data
  */
 export interface FindParams<M extends Record<string, unknown> = Record<string, unknown>> {
-    /** Maximum number of items to return (default: 20). */
+    /**
+     * Maximum number of items to return.
+     *
+     * Defaults to {@link DEFAULT_LIST_LIMIT}, and is clamped to
+     * {@link MAX_LIST_LIMIT}. Both bounds are applied by the backend, so a
+     * read is never unbounded whether or not a limit was asked for.
+     */
     limit?: number;
     /**
      * Number of items to skip. Ignored when {@link FindParams.page} is also
@@ -53,7 +59,7 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
     offset?: number;
     /**
      * Page number (1-indexed), alternative to {@link FindParams.offset}.
-     * When set, overrides `offset` as `(page - 1) * (limit ?? 20)`.
+     * When set, overrides `offset` as `(page - 1) * (limit ?? DEFAULT_LIST_LIMIT)`.
      */
     page?: number;
     /**

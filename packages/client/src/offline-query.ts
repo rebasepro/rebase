@@ -9,6 +9,7 @@ import {
     toCanonicalOp
 } from "@rebasepro/types";
 import { FindParams } from "./transport";
+import { resolveFindWindow } from "@rebasepro/common";
 
 /**
  * A local evaluator for `FindParams`, so cached rows can answer a query the
@@ -38,8 +39,15 @@ const collator = typeof Intl !== "undefined" && typeof Intl.Collator === "functi
     ? new Intl.Collator(undefined, { numeric: false, sensitivity: "variant" })
     : undefined;
 
-/** The server's page size when the caller does not ask for one. */
-export const DEFAULT_PAGE_SIZE = 20;
+/**
+ * The server's page size when the caller does not ask for one.
+ *
+ * Re-exported rather than redeclared. This was its own `= 20` — a third
+ * constant of this name in the workspace, next to `@rebasepro/common`'s 200 and
+ * the 50 the REST layer actually applies — and a local copy of a number that
+ * belongs to another process is a number that goes stale silently.
+ */
+export { DEFAULT_LIST_LIMIT as DEFAULT_PAGE_SIZE } from "@rebasepro/types";
 
 function isNullish(value: unknown): boolean {
     return value === null || value === undefined;
@@ -311,12 +319,17 @@ function tiebreak(a: Record<string, unknown>, b: Record<string, unknown>): numbe
     return cmp ?? 0;
 }
 
-/** Resolve `page`/`offset`/`limit` the way the server does. */
+/**
+ * Resolve `page`/`offset`/`limit` the way the server does.
+ *
+ * It did not: this defaulted an absent limit to 20 while `/api/data` pages by
+ * 50, so the same `observe()` answered with 20 rows from the local database and
+ * 50 from the network — a list that changed length depending on which side
+ * answered, with `page` striding differently on each. Delegated now, so the
+ * sentence above is true by construction rather than by agreement.
+ */
 export function resolvePagination(params?: FindParams): { limit: number; offset: number } {
-    const limit = params?.limit ?? DEFAULT_PAGE_SIZE;
-    const offset = params?.page != null
-        ? Math.max(0, (params.page - 1) * limit)
-        : (params?.offset ?? 0);
+    const { limit, offset } = resolveFindWindow(params);
     return { limit, offset };
 }
 

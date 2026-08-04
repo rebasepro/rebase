@@ -10,7 +10,8 @@ import {
     runLocalQuery,
     sortRows
 } from "./offline-query";
-import { EntityRelation } from "@rebasepro/types";
+import { DEFAULT_LIST_LIMIT, EntityRelation } from "@rebasepro/types";
+import { resolveFindWindow } from "@rebasepro/common";
 import type { FindParams } from "./transport";
 
 type Row = Record<string, unknown>;
@@ -172,11 +173,36 @@ describe("local query engine", () => {
 
     describe("pagination", () => {
         it("resolves page over offset the way the server does", () => {
-            expect(resolvePagination()).toEqual({ limit: 20, offset: 0 });
             expect(resolvePagination({ limit: 10, offset: 30 })).toEqual({ limit: 10, offset: 30 });
             expect(resolvePagination({ limit: 10, page: 3 })).toEqual({ limit: 10, offset: 20 });
             // `page` wins over `offset`, and the first page is not negative.
             expect(resolvePagination({ limit: 10, page: 1, offset: 99 })).toEqual({ limit: 10, offset: 0 });
+        });
+
+        it("defaults to the same page size the server would apply", () => {
+            // Asserted against the constant, not against a number written here.
+            // This test used to say `{ limit: 20 }` — restating a default this
+            // module had invented, while `/api/data` paged by 50. The local
+            // answer and the network answer to one `observe()` were therefore
+            // different lengths, and the test agreed with the wrong one.
+            expect(resolvePagination()).toEqual({ limit: DEFAULT_LIST_LIMIT, offset: 0 });
+        });
+
+        it("agrees with the shared resolver on every shape of window", () => {
+            // The one that matters: the local evaluator and every other
+            // transport must resolve identical windows, or a cached list and a
+            // fetched list disagree about which rows page two holds.
+            for (const params of [
+                undefined,
+                { limit: 10 },
+                { offset: 30 },
+                { page: 4 },
+                { limit: 25, page: 2 },
+                { limit: 10, page: 1, offset: 99 }
+            ]) {
+                const { limit, offset } = resolveFindWindow(params);
+                expect(resolvePagination(params)).toEqual({ limit, offset });
+            }
         });
     });
 
