@@ -640,7 +640,19 @@ id };
 id: parsed.id });
                 if (!entity) throw ApiError.notFound("Entity not found");
 
-                return c.json(entity);
+                // `?fields=` is advertised on this endpoint too. It reached
+                // `queryOptions` and was read by nothing here, so a
+                // subcollection read returned every column while the root read
+                // narrowed — the same defect `projectResponseFields` exists to
+                // fix, surviving on the route family it was never wired into.
+                const nestedCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
+                if (!nestedCollection) return c.json(entity);
+                return c.json(projectResponseFields(
+                    [entity as Record<string, unknown>],
+                    queryOptions.fields,
+                    nestedCollection,
+                    { include: queryOptions.include }
+                )[0]);
             } else {
                 // GET /parent/:parentId/child — list entities.
                 //
@@ -676,8 +688,16 @@ id: parsed.id });
                     searchString
                 }) : entities.length;
 
+                const listCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
                 return c.json({
-                    data: entities,
+                    data: listCollection
+                        ? projectResponseFields(
+                            entities as Record<string, unknown>[],
+                            queryOptions.fields,
+                            listCollection,
+                            { include: queryOptions.include }
+                        )
+                        : entities,
                     meta: {
                         total,
                         limit: queryOptions.limit,
