@@ -132,6 +132,15 @@ jobs:
       - name: React hooks ratchet
         run: pnpm run check:hooks
 
+      # `@typescript-eslint/no-unused-vars` reports at `warn`, and every lint
+      # script runs eslint with `--quiet`, which prints errors only — so the rule
+      # has been firing into nothing. This ratchets the half that means work was
+      # computed and discarded, which is where the bugs are: a kanban board's
+      # search term and a plugin's error view were both sitting in that list,
+      # read into a variable and then used nowhere.
+      - name: Discarded-value ratchet
+        run: pnpm run check:unused
+
       # The docs verifier existed but ran in no pipeline at all, and defaulted to
       # exit 0, so documented APIs could drift from the source indefinitely — and
       # had: a wiring example that could not compile and a `userManagement` prop

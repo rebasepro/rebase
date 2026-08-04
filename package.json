@@ -64,6 +64,7 @@
     "check:deps": "node scripts/check-undeclared-deps.mjs",
     "check:api-surface": "node scripts/check-api-surface.mjs",
     "check:hooks": "node scripts/check-hooks-baseline.mjs",
+    "check:unused": "node scripts/check-unused-locals.mjs",
     "harness": "node scripts/harness/harness.mjs",
     "harness:preflight": "node scripts/harness/harness.mjs preflight",
     "harness:eval": "node scripts/harness/harness.mjs eval",

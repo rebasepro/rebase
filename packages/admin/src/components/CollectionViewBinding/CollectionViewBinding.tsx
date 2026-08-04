@@ -1127,13 +1127,18 @@ parentEntityIds,
 
                 {countFetcher}
 
-                {tableController.dataLoadingError && tableController.data.length > 0 && (
+                {/* A plugin's error view takes priority over the built-in
+                    banner, the same precedence the empty state uses. This was
+                    computed above and then rendered nowhere, so `collection.error`
+                    — a declared, documented slot with its own props interface —
+                    did nothing at all, and a plugin author had no way to tell. */}
+                {pluginErrorView ?? (tableController.dataLoadingError && tableController.data.length > 0 && (
                     <div className="flex items-center gap-4 px-4 py-2 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 flex-shrink-0">
                         <Typography variant="body2" className="text-red-700 dark:text-red-300 flex-1">
                             <strong>Warning:</strong> {tableController.dataLoadingError.message || "Failed to update data."}
                         </Typography>
                     </div>
-                )}
+                ))}
 
                 {/* When isSplitLayout, SplitListView is ALWAYS mounted — regardless
                     of viewMode. The toolbar + current view live in the left panel;
