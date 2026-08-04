@@ -643,6 +643,55 @@ how both bugs above survived.
 
 ---
 
+## 21. A declared extension point that nothing reads
+
+The most expensive kind of absent code, because it is *advertised*. A slot, an
+option, a query parameter — declared in a public type, given a props interface
+and a docblock, listed in the reference table beside the ones that work — and
+read by nothing. The user writes correct code against a correct-looking API and
+gets silence, with no way to tell whether the fault is theirs.
+
+Found in one sweep:
+
+* `?fields=` was applied on two of the four routes that return rows. The two
+  subcollection routes parsed it and returned every column.
+* `collection.error` — a declared plugin slot with its own props interface —
+  was computed into a variable and rendered nowhere.
+* `admin: { disabled: true }` reached the table's inline editor and was applied
+  to nothing, so the cell stayed typeable.
+* `CollectionView`'s `canCreate`, documented as "shows the + button", was
+  destructured and never read.
+* Seven of the twenty-nine plugin slots are rendered nowhere at all, while
+  appearing in the public reference in six languages.
+
+**Sweep by enumerating the declaration, not the implementation.** The
+declaration is a list — the keys of `SlotRegistry`, the fields of
+`AdminPropertyOptions`, the parameters in the OpenAPI — so walk it and ask of
+each entry "who reads this?". Reading the implementation cannot find these:
+what you are looking for is the absence of a call site, and absence is what
+reading is worst at.
+
+Nested access defeats naive greps. `property.admin?.disabled.disabledMessage`
+does not match `admin.disabledMessage`, and a cast — `(collection as
+AdminCollection & { formView?: … }).formView` — does not match
+`collection.formView`. A zero result is a lead, not a verdict.
+
+**The fix is not always to implement it.** Where a feature belongs is a product
+decision; the *silence* is the bug, and it is fixable on its own. Name the dead
+entries in a constant, warn when something registers for one — saying plainly
+that the gap is in the framework, not in the caller — and mark them in the
+reference.
+
+**Gate it in both directions.** `slot-render-sites.test.ts` derives the dead set
+by scanning for render sites and fails when it disagrees with the constant: a
+newly declared-but-unrendered entry fails until it is admitted, and an
+implemented one fails until it is removed. Without the second direction the list
+keeps warning about something that has started working, which teaches people to
+ignore it. And assert the scan found a plausible number of entries, or a broken
+parse passes by comparing two empty lists.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -875,6 +924,9 @@ it is how the third that is not gets found. A gate whose output is mostly noise
 still earns its keep if the noise is *cheap to classify* — every entry here was
 resolved by reading five lines.
 
+| every key of `SlotRegistry`, for a render site | **BUG** (class 21) — 7 of 29 rendered nowhere, while documented in six locales beside the 22 that work. Named, warned on registration, marked in the docs, and gated in both directions. |
+| every field of `AdminPropertyOptions`, for a reader | clean, after the `admin.disabled` fix. `clearOnDisabled` is read by `useClearRestoreValue` and `disabled.hidden` by `useColumnsIds`; both looked dead to a naive grep because the access is nested. |
+| every field of the admin collection block, for a reader | clean. `formView` looked dead only because it is read through a cast. |
 
 Two process notes worth as much as the findings.
 
