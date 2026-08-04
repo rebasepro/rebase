@@ -49,7 +49,12 @@ export function DemoLoginView({ authController, googleClientId }: DemoLoginViewP
                         "rounded-lg px-4 py-3 text-sm",
                         "bg-surface-100 text-surface-600 dark:bg-surface-900 dark:text-surface-300"
                     )}>
-                        No account needed — demo credentials are pre-filled. Just click <strong>Sign in with email</strong>.
+                        {/* Both steps, in order. This said "Just click Sign in
+                            with email" while `disabled={!privacyAccepted}` held
+                            the button inert, so the first thing a visitor is
+                            told to do did nothing and nothing said why. */}
+                        No account needed — demo credentials are pre-filled. Accept the privacy policy below,
+                        then click <strong>Sign in with email</strong>.
                     </div>
 
                     {/* Privacy policy checkbox */}
