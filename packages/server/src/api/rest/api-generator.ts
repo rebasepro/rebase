@@ -417,27 +417,46 @@ values: entity as Record<string, unknown> },
                 const idempotencyKey = c.req.header(IDEMPOTENCY_HEADER);
                 const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
                 const store = this.idempotency();
-                if (idempotencyKey && store) {
-                    const already = await store.recall(idempotencyKey, uid);
-                    // `null` is a legitimate stored body, so presence is the
-                    // test — not truthiness.
-                    if (already !== undefined) return c.json(already as never, 201);
+                // Claimed before the write, not after: the two-step
+                // recall-then-write let concurrent replays of one key both
+                // through, which is the duplicate this exists to stop.
+                const claimed = idempotencyKey && store
+                    ? await store.claim(idempotencyKey, uid)
+                    : undefined;
+                if (claimed?.status === "replay") {
+                    return c.json(claimed.response as never, 201);
+                }
+                if (claimed?.status === "in-flight") {
+                    throw ApiError.conflict(
+                        `A request with Idempotency-Key '${idempotencyKey}' is already in progress. ` +
+                        "Retry once it has answered; its result will be replayed.",
+                        "IDEMPOTENCY_KEY_IN_PROGRESS"
+                    );
                 }
 
-                const entity = await driver.save({
-                    path,
-                    values: body,
-                    collection: resolvedCollection,
-                    status: "new"
-                });
-
-                const response = this.formatResponse(entity);
-
-                if (idempotencyKey && store) {
-                    await store.remember(idempotencyKey, uid, response);
+                let response: unknown;
+                try {
+                    const entity = await driver.save({
+                        path,
+                        values: body,
+                        collection: resolvedCollection,
+                        status: "new"
+                    });
+                    response = this.formatResponse(entity);
+                } catch (error) {
+                    // Hand the key back, or one transient failure would refuse
+                    // every retry of it until the row aged out.
+                    if (claimed?.status === "claimed" && idempotencyKey && store) {
+                        await store.release(idempotencyKey, uid);
+                    }
+                    throw error;
                 }
 
-                return c.json(response, 201);
+                if (claimed?.status === "claimed" && idempotencyKey && store) {
+                    await store.complete(idempotencyKey, uid, response);
+                }
+
+                return c.json(response as never, 201);
             } catch (error) {
                 if (isRebaseApiError(error) && !error.code) {
                     // Only classify as BAD_REQUEST if it's an operational error

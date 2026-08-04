@@ -40,11 +40,42 @@ function principal(uid: string | undefined): string {
     return uid && uid.length > 0 ? uid : "\u0000anon";
 }
 
+/**
+ * What a caller may do with a key.
+ *
+ * `claimed` is the only outcome that permits the write. Recalling and then
+ * writing was not atomic: two requests carrying one key both missed the recall,
+ * both wrote, and `ON CONFLICT DO NOTHING` protected only the second row in
+ * *this* table — the duplicate row in the caller's collection, which is the
+ * thing the mechanism exists to prevent, was inserted anyway. The offline queue
+ * is shared across tabs, so two tabs reconnecting together is the ordinary case
+ * rather than an exotic one.
+ */
+export type IdempotencyClaim =
+    /** This key has already been answered; serve that answer again. */
+    | { status: "replay"; response: unknown }
+    /** Another request holds this key and has not answered yet. */
+    | { status: "in-flight" }
+    /** The key is ours; do the write, then `complete` or `release` it. */
+    | { status: "claimed" };
+
 export interface IdempotencyStore {
-    /** What this key answered before, or `undefined` if it is new. */
-    recall(key: string, uid: string | undefined): Promise<unknown | undefined>;
-    /** Record what this key answered. Never throws — see {@link createIdempotencyStore}. */
-    remember(key: string, uid: string | undefined, response: unknown): Promise<void>;
+    /**
+     * Take the key if it is free, atomically. Never throws — a store that
+     * cannot answer reports `claimed`, which degrades to no idempotency rather
+     * than to a refused write.
+     */
+    claim(key: string, uid: string | undefined): Promise<IdempotencyClaim>;
+    /** Record what this key answered. Never throws. */
+    complete(key: string, uid: string | undefined, response: unknown): Promise<void>;
+    /**
+     * Give the key back after the write it was claimed for failed.
+     *
+     * Without this a transient failure strands the key: every retry would be
+     * told `in-flight` until the row aged out, turning one failed write into a
+     * day of refusals.
+     */
+    release(key: string, uid: string | undefined): Promise<void>;
 }
 
 /**
@@ -91,29 +122,51 @@ export function createIdempotencyStore(driver: DataDriver): IdempotencyStore | u
     };
 
     return {
-        async recall(key, uid) {
-            if (!key || !(await ensure())) return undefined;
+        async claim(key, uid) {
+            if (!key || !(await ensure())) return { status: "claimed" };
             try {
+                // One statement decides it. A free key inserts; an expired one
+                // is taken over by the DO UPDATE, whose WHERE fails for a live
+                // row so the claim is refused. `RETURNING` therefore yields a
+                // row exactly when this request owns the key.
+                const claimed = await exec(
+                    `INSERT INTO ${TABLE} (key, uid, response, created_at)
+                     VALUES ($1, $2, NULL, NOW())
+                     ON CONFLICT (uid, key) DO UPDATE
+                       SET response = NULL, created_at = NOW()
+                       WHERE ${TABLE}.created_at < NOW() - INTERVAL '${TTL_HOURS} hours'
+                     RETURNING 1 AS claimed`,
+                    [key, principal(uid)]
+                );
+                if (claimed.length > 0) return { status: "claimed" };
+
+                // Refused, so a live row holds the key. A SQL NULL response
+                // means it is still being written; a JSONB `null` is a
+                // legitimate stored body, and the two are indistinguishable
+                // once node-pg has turned both into JS `null` — hence the
+                // explicit `IS NULL` column.
                 const rows = await exec(
-                    `SELECT response FROM ${TABLE}
-                     WHERE uid = $1 AND key = $2 AND created_at > NOW() - INTERVAL '${TTL_HOURS} hours'`,
+                    `SELECT response, response IS NULL AS pending FROM ${TABLE}
+                     WHERE uid = $1 AND key = $2`,
                     [principal(uid), key]
                 );
-                return rows[0]?.response;
+                const row = rows[0];
+                if (!row) return { status: "claimed" };
+                if (row.pending) return { status: "in-flight" };
+                return { status: "replay", response: row.response };
             } catch {
-                return undefined;
+                // Bookkeeping must never refuse a write: fall back to no
+                // idempotency, which is the behaviour without this table.
+                return { status: "claimed" };
             }
         },
 
-        async remember(key, uid, response) {
+        async complete(key, uid, response) {
             if (!key || !(await ensure())) return;
             try {
-                // ON CONFLICT DO NOTHING: two tabs replaying the same key at
-                // once must not turn a race into a 23505 that fails the write.
                 await exec(
-                    `INSERT INTO ${TABLE} (key, uid, response) VALUES ($1, $2, $3::jsonb)
-                     ON CONFLICT (uid, key) DO NOTHING`,
-                    [key, principal(uid), JSON.stringify(response ?? null)]
+                    `UPDATE ${TABLE} SET response = $3::jsonb WHERE uid = $1 AND key = $2`,
+                    [principal(uid), key, JSON.stringify(response ?? null)]
                 );
                 // Cheap and unsynchronised on purpose: an occasional extra pass
                 // costs less than a scheduler this package cannot assume exists.
@@ -122,6 +175,20 @@ export function createIdempotencyStore(driver: DataDriver): IdempotencyStore | u
                 }
             } catch {
                 /* Bookkeeping only — never fail the write it describes. */
+            }
+        },
+
+        async release(key, uid) {
+            if (!key || !(await ensure())) return;
+            try {
+                // Only an unanswered claim. A completed key must survive, or a
+                // later failure would erase a reply that is still owed.
+                await exec(
+                    `DELETE FROM ${TABLE} WHERE uid = $1 AND key = $2 AND response IS NULL`,
+                    [principal(uid), key]
+                );
+            } catch {
+                /* The row ages out on its own. */
             }
         }
     };

@@ -15,34 +15,66 @@ import type { CollectionConfig } from "../../types/src/types/collections";
  * inserts a duplicate. The key is the only thing that can tell them apart.
  */
 describe("create with an Idempotency-Key", () => {
-    /** Stands in for the `rebase.idempotency_keys` table. */
-    function createHarness() {
-        const keys = new Map<string, unknown>();
-        let nextId = 1;
-        const saved: Record<string, unknown>[] = [];
+    /**
+     * Stands in for the `rebase.idempotency_keys` table, modelling the
+     * semantics the real SQL relies on rather than matching its text: a row is
+     * claimed before the write runs, a claim with no response yet is in
+     * flight, and only the first claimant of a key gets to proceed.
+     */
+    function createStore() {
+        const PENDING = Symbol("pending");
+        const rows = new Map<string, { response: unknown | typeof PENDING }>();
+        const at = (uid: unknown, key: unknown) => `${String(uid)}::${String(key)}`;
 
-        const admin = {
+        return {
+            rows,
             async executeSql(sql: string, options?: { params?: unknown[] }) {
                 const params = options?.params ?? [];
-                if (/^\s*SELECT response/i.test(sql)) {
-                    const stored = keys.get(`${String(params[0])}::${String(params[1])}`);
-                    return stored === undefined ? [] : [{ response: stored }];
-                }
+                // claim: INSERT … ON CONFLICT DO UPDATE … RETURNING
                 if (/^\s*INSERT INTO/i.test(sql)) {
-                    const composite = `${String(params[1])}::${String(params[0])}`;
-                    // ON CONFLICT DO NOTHING — first writer wins.
-                    if (!keys.has(composite)) keys.set(composite, JSON.parse(String(params[2])));
+                    const composite = at(params[1], params[0]);
+                    if (rows.has(composite)) return [];      // fresh row: not claimed
+                    rows.set(composite, { response: PENDING });
+                    return [{ claimed: 1 }];
+                }
+                if (/^\s*SELECT response/i.test(sql)) {
+                    const row = rows.get(at(params[0], params[1]));
+                    if (!row) return [];
+                    return [{
+                        response: row.response === PENDING ? null : row.response,
+                        pending: row.response === PENDING
+                    }];
+                }
+                if (/^\s*UPDATE/i.test(sql)) {
+                    const composite = at(params[0], params[1]);
+                    if (rows.has(composite)) rows.set(composite, { response: JSON.parse(String(params[2])) });
+                    return [];
+                }
+                if (/^\s*DELETE FROM/i.test(sql) && /response IS NULL/i.test(sql)) {
+                    const composite = at(params[0], params[1]);
+                    if (rows.get(composite)?.response === PENDING) rows.delete(composite);
                     return [];
                 }
                 return [];
             }
         };
+    }
+
+    function createHarness(options?: { failFirstSave?: boolean; uid?: () => string }) {
+        let nextId = 1;
+        let saveAttempts = 0;
+        const saved: Record<string, unknown>[] = [];
+        const admin = createStore();
 
         const driver = {
             key: "postgres",
             initialised: true,
             admin,
             async save({ values }: { values: Record<string, unknown> }) {
+                saveAttempts += 1;
+                if (options?.failFirstSave && saveAttempts === 1) {
+                    throw new Error("connection reset");
+                }
                 // A serial column: the server assigns the id and ignores any the
                 // client invented. This is what makes a replay undetectable
                 // without a key.
@@ -60,11 +92,11 @@ describe("create with an Idempotency-Key", () => {
         app.onError(errorHandler);
         app.use("/*", async (c, next) => {
             c.set("driver", driver);
-            c.set("user", { uid: "user-1" });
+            c.set("user", { uid: options?.uid ? options.uid() : "user-1" });
             await next();
         });
         app.route("/", new RestApiGenerator(collections, driver).generateRoutes());
-        return { app, saved };
+        return { app, saved, attempts: () => saveAttempts };
     }
 
     const post = (app: Hono, body: unknown, key?: string) =>
@@ -113,44 +145,8 @@ describe("create with an Idempotency-Key", () => {
         // Mutation ids are generated on the client, so a key alone is guessable.
         // Scoping to the principal is what stops a write endpoint being used to
         // read somebody else's row back.
-        const keys = new Map<string, unknown>();
-        let nextId = 1;
-        const saved: Record<string, unknown>[] = [];
-        const admin = {
-            async executeSql(sql: string, options?: { params?: unknown[] }) {
-                const params = options?.params ?? [];
-                if (/^\s*SELECT response/i.test(sql)) {
-                    const stored = keys.get(`${String(params[0])}::${String(params[1])}`);
-                    return stored === undefined ? [] : [{ response: stored }];
-                }
-                if (/^\s*INSERT INTO/i.test(sql)) {
-                    const composite = `${String(params[1])}::${String(params[0])}`;
-                    if (!keys.has(composite)) keys.set(composite, JSON.parse(String(params[2])));
-                }
-                return [];
-            }
-        };
-        const driver = {
-            key: "postgres", initialised: true, admin,
-            async save({ values }: { values: Record<string, unknown> }) {
-                const row = { ...values, id: nextId++ };
-                saved.push(row);
-                return row;
-            }
-        } as unknown as DataDriver;
-        const collections = [{
-            slug: "posts", name: "Posts", singularName: "Post", properties: {}
-        }] as unknown as CollectionConfig[];
-
         let uid = "user-1";
-        const app = new Hono();
-        app.onError(errorHandler);
-        app.use("/*", async (c, next) => {
-            c.set("driver", driver);
-            c.set("user", { uid });
-            await next();
-        });
-        app.route("/", new RestApiGenerator(collections, driver).generateRoutes());
+        const { app, saved } = createHarness({ uid: () => uid });
 
         await post(app, { title: "mine" }, "shared-key");
         uid = "user-2";
@@ -158,5 +154,52 @@ describe("create with an Idempotency-Key", () => {
 
         expect(saved).toHaveLength(2);
         expect(await other.json()).toMatchObject({ title: "theirs" });
+    });
+
+    it("writes one row when two requests race on the same key", async () => {
+        // The queue is shared across tabs, so two tabs coming back online
+        // replay it together — the case the store's own comment anticipates.
+        // Recalling and then writing is not atomic: both requests missed the
+        // recall, both wrote, and the second insert into the key table was the
+        // only thing `ON CONFLICT DO NOTHING` protected.
+        const { app, saved } = createHarness();
+
+        const [first, second] = await Promise.all([
+            post(app, { title: "hello" }, "mut-1"),
+            post(app, { title: "hello" }, "mut-1")
+        ]);
+
+        expect(saved).toHaveLength(1);
+        const statuses = [first.status, second.status].sort();
+        expect(statuses).toEqual([201, 409]);
+    });
+
+    it("says a key is in progress rather than reporting a conflicting row", async () => {
+        const { app } = createHarness();
+
+        const [a, b] = await Promise.all([
+            post(app, { title: "hello" }, "mut-1"),
+            post(app, { title: "hello" }, "mut-1")
+        ]);
+        const losing = a.status === 409 ? a : b;
+
+        expect(await losing.json()).toMatchObject({
+            error: expect.objectContaining({ code: "IDEMPOTENCY_KEY_IN_PROGRESS" })
+        });
+    });
+
+    it("lets a retry through after the write it claimed the key for failed", async () => {
+        // Claiming before writing introduces a way to strand a key: if the write
+        // throws, an unreleased claim would answer every retry with 409 until
+        // the row aged out, turning one transient failure into a day of them.
+        const { app, saved, attempts } = createHarness({ failFirstSave: true });
+
+        const failed = await post(app, { title: "hello" }, "mut-1");
+        expect(failed.status).toBeGreaterThanOrEqual(400);
+
+        const retried = await post(app, { title: "hello" }, "mut-1");
+        expect(retried.status).toBe(201);
+        expect(attempts()).toBe(2);
+        expect(saved).toHaveLength(1);
     });
 });
