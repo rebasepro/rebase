@@ -18,6 +18,25 @@ export const isInteger = (obj: unknown): boolean =>
 export const isNaN = (obj: unknown): boolean => obj !== obj;
 
 /**
+ * Segments that reach the prototype chain rather than a property of the object.
+ *
+ * The twin of this function in `@rebasepro/forms` could be made to write onto
+ * `Object.prototype` through a path of `__proto__.x`. This copy survives the
+ * write by accident — its `clone` always spreads into a fresh object, while the
+ * form engine's has a "preserve class instances" branch that hands back
+ * `Object.prototype` itself — but `getIn` still *reads* through the chain, and
+ * handing back `Object.prototype` is how a polluted value is read out again.
+ *
+ * Closed on both sides here, so the two implementations agree.
+ */
+const UNSAFE_PATH_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Whether any segment of this path would traverse the prototype chain. */
+export function pathTraversesPrototype(path: string | string[]): boolean {
+    return toPath(path).some(segment => UNSAFE_PATH_SEGMENTS.has(segment));
+}
+
+/**
  * Deeply get a value from an object via its path.
  */
 export function getIn(
@@ -26,6 +45,8 @@ export function getIn(
     def?: unknown,
     p = 0
 ) {
+    if (pathTraversesPrototype(key)) return def;
+
     const path = toPath(key);
     while (obj && p < path.length) {
         obj = (obj as Record<string, unknown>)[path[p++]];
@@ -40,6 +61,11 @@ export function getIn(
 }
 
 export function setIn<T>(obj: T, path: string, value: unknown): T {
+    // See `pathTraversesPrototype`. This copy's `clone` happens to contain the
+    // write, but relying on that is relying on an implementation detail of a
+    // different function.
+    if (pathTraversesPrototype(path)) return obj;
+
     const res = clone(obj) as Record<string, unknown>;
     let resVal: Record<string, unknown> = res;
     let i = 0;
