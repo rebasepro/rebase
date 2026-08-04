@@ -36,8 +36,24 @@ jobs:
   # ══════════════════════════════════════════════════════════════
   # Canary — every push to main, and manual runs with channel=canary
   # ══════════════════════════════════════════════════════════════
+
+  # The same gate a stable release runs, before a canary publishes.
+  #
+  # Canary used to skip this on the reasoning that "a canary publishes if it
+  # compiles, which is what makes it a canary". What that bought in practice was
+  # a channel people install from that had passed nothing: canary
+  # 0.13.1-canary.gcd6689e went to npm while `check:hooks` was red, and would
+  # equally have published with a failing test suite, a broken template or a
+  # compose file naming an image nothing publishes. A prerelease is still the
+  # place to find problems — but by testing the release, not by shipping one
+  # nobody checked.
+  verify-canary:
+    if: ${{ github.event_name == 'push' || inputs.channel == 'canary' }}
+    uses: ./.github/workflows/verify.yml
+
   publish-canary:
     if: ${{ github.event_name == 'push' || inputs.channel == 'canary' }}
+    needs: verify-canary
     runs-on: ubuntu-latest
     concurrency:
       group: canary-publish-${{ github.ref }}

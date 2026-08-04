@@ -10,7 +10,7 @@ import path from "path";
 import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
-import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, TEMPLATE_PLACEHOLDER_FILES } from "./init.js";
+import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, TEMPLATE_PLACEHOLDER_FILES } from "./init.js";
 
 
 let tmpDir: string;
@@ -1190,5 +1190,42 @@ describe("init --help", () => {
 
     it("says --template does nothing for the baas flavor", () => {
         expect(helpText()).toContain("--template has no effect");
+    });
+});
+
+describe("resolveRuntimeImageTag", () => {
+    /**
+     * `.env` pins the runtime image tag `docker-compose.yml` pulls, and it used to
+     * pin whatever version the scaffolding CLI happened to be. That is right for a
+     * stable release and wrong for every prerelease: only stable publishes
+     * `rebasepro/server`, so a canary CLI wrote a tag that cannot exist and
+     * `docker compose up` died on `manifest unknown` — the same dead end as the
+     * missing-repository bug the pinning was added to prevent.
+     */
+    it("pins a stable CLI's own version", () => {
+        expect(resolveRuntimeImageTag("0.13.0")).toEqual({ tag: "0.13.0" });
+        expect(resolveRuntimeImageTag("1.0.0").note).toBeUndefined();
+    });
+
+    it("floats a prerelease to latest, and says why in the file", () => {
+        const canary = resolveRuntimeImageTag("0.13.1-canary.gcd6689e");
+        expect(canary.tag).toBe("latest");
+        // The note is the point: a floating tag is a real cost, so the reader is
+        // told they have one and what to do about it before they deploy.
+        expect(canary.note).toContain("0.13.1-canary.gcd6689e");
+        expect(canary.note).toMatch(/prerelease/i);
+        expect(canary.note).toMatch(/^#/m);
+    });
+
+    it("treats every semver prerelease form the same way", () => {
+        for (const version of ["0.14.0-rc.1", "2.0.0-beta.3", "0.13.1-canary.g0946568"]) {
+            expect(resolveRuntimeImageTag(version).tag).toBe("latest");
+        }
+    });
+
+    it("passes through the no-manifest fallback untouched", () => {
+        // `readCliVersion` answers "latest" when it cannot read its own manifest.
+        // That is already the floating tag, and it is not a prerelease string.
+        expect(resolveRuntimeImageTag("latest")).toEqual({ tag: "latest" });
     });
 });
