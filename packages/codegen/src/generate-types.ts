@@ -125,7 +125,24 @@ export function generateTypedefs(collections: CollectionConfig[]): string {
         let resolvedRelations: Record<string, ResolvedRelation> = {};
         try {
             resolvedRelations = resolveCollectionRelations(collection);
-        } catch { /* ignore */ }
+        } catch (e) {
+            // Swallowed before, which made this the quietest way to ship a
+            // wrong type. The foreign-key columns are emitted from the resolved
+            // relations rather than from the properties, so losing them drops
+            // both the relation fields *and* columns that exist in the
+            // database — and the resulting error surfaces in the user's code,
+            // typechecking against a `Database` that is missing `author_id`,
+            // with nothing pointing back at generation.
+            //
+            // A target thunk usually throws because of a circular import; the
+            // boot-time relation validator names the same cause.
+            console.warn(
+                `[rebase] Could not resolve the relations of "${collection.slug}", so its generated ` +
+                "type has no relation fields and none of their foreign-key columns. This is usually a " +
+                "circular import in the collection files — make sure the target is `() => otherCollection` " +
+                `and not evaluated at module load.\n  ${e instanceof Error ? e.message : String(e)}`
+            );
+        }
 
         lines.push(`  ${toSafeIdentifier(collection.slug)}: {`);
 
