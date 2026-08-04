@@ -145,14 +145,13 @@ export interface RebaseApiError extends Error {
     details?: unknown;
 }
 
-/**
- * Type guard for errors that carry optional API metadata (statusCode, code, details).
- * Returns true for any Error instance — the optional properties are then
- * checked via normal property access.
- */
-export function isRebaseApiError(error: unknown): error is RebaseApiError {
-    return error instanceof Error;
-}
+// `isRebaseApiError` was here. It read `return error instanceof Error`, so it
+// answered yes to every error while being named and used as though it
+// discriminated — the create and update handlers guarded a "classify this as
+// BAD_REQUEST" branch on it, and an unreachable database was therefore reported
+// to callers as a bad request. Deleted rather than repaired: the shape it
+// claimed to test is not decidable from an `Error`, and the layer that does
+// know — the driver, which holds the SQLSTATE — raises a real `ApiError`.
 
 /**
  * Hono error-handling middleware (`app.onError`).

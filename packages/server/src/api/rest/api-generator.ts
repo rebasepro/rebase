@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
-import { ApiError, isRebaseApiError } from "../errors";
+import { ApiError } from "../errors";
 import { parseQueryOptions, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
 import { assertKnownWriteFields, projectResponseFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
@@ -340,188 +340,169 @@ export class RestApiGenerator {
 
         // POST /collection - Create entity
         this.router.post(basePath, async (c) => {
-            try {
-                this.enforceApiKeyPermission(c, collection.slug);
-                const driver = this.getScopedDriver(c);
-                const path = collection.slug;
+            // Errors from here are deliberately not re-classified. This layer
+            // cannot tell a constraint violation from an unreachable database, and
+            // it used to call both `BAD_REQUEST` — a claim that the caller sent
+            // something wrong and should not retry. The driver holds the SQLSTATE
+            // and raises an `ApiError` for what is genuinely the request's fault;
+            // anything still unclassified here is ours, and that is a 500.
+            this.enforceApiKeyPermission(c, collection.slug);
+            const driver = this.getScopedDriver(c);
+            const path = collection.slug;
 
 
-                const body = await parseJsonBody(c);
+            const body = await parseJsonBody(c);
 
-                const isAuth = collection.auth;
-                const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
+            const isAuth = collection.auth;
+            const isAuthCollection = isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
 
-                const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
+            const collectionAuthConfig = typeof isAuth === "object" ? isAuth : undefined;
 
-                // Auth signups carry credential fields (`password`, provider
-                // bits) that the users collection does not declare as columns —
-                // `prepareUserCreation` turns them into what the table has. The
-                // adapter says which those are, so the body can still be checked
-                // for everything else. Skipping the check outright (as this used
-                // to) meant a typo on the users table was silently dropped and
-                // answered 201, while the same typo on `posts` was a 400.
-                if (!isAuthCollection) {
-                    assertKnownWriteFields(body, resolvedCollection);
-                } else {
-                    const contract = this.authAdapter?.describeUserCreationContract?.(collectionAuthConfig);
-                    if (contract?.validate) {
-                        assertKnownWriteFields(body, resolvedCollection, {
-                            extraKnownFields: contract.extraFields
-                        });
-                    }
-                }
-
-                if (isAuthCollection && this.authAdapter?.prepareUserCreation) {
-                    const prepared = await this.authAdapter.prepareUserCreation(body, collectionAuthConfig);
-
-                    const entity = await driver.save({
-                        path,
-                        values: prepared.values,
-                        collection: resolvedCollection,
-                        status: "new"
+            // Auth signups carry credential fields (`password`, provider
+            // bits) that the users collection does not declare as columns —
+            // `prepareUserCreation` turns them into what the table has. The
+            // adapter says which those are, so the body can still be checked
+            // for everything else. Skipping the check outright (as this used
+            // to) meant a typo on the users table was silently dropped and
+            // answered 201, while the same typo on `posts` was a 400.
+            if (!isAuthCollection) {
+                assertKnownWriteFields(body, resolvedCollection);
+            } else {
+                const contract = this.authAdapter?.describeUserCreationContract?.(collectionAuthConfig);
+                if (contract?.validate) {
+                    assertKnownWriteFields(body, resolvedCollection, {
+                        extraKnownFields: contract.extraFields
                     });
+                }
+            }
 
-                    const result = prepared.hookHandledEmail
-                        ? { temporaryPassword: prepared.clearPassword,
+            if (isAuthCollection && this.authAdapter?.prepareUserCreation) {
+                const prepared = await this.authAdapter.prepareUserCreation(body, collectionAuthConfig);
+
+                const entity = await driver.save({
+                    path,
+                    values: prepared.values,
+                    collection: resolvedCollection,
+                    status: "new"
+                });
+
+                const result = prepared.hookHandledEmail
+                    ? { temporaryPassword: prepared.clearPassword,
 invitationSent: prepared.invitationSent }
-                        : this.authAdapter.finalizeUserCreation
-                            ? await this.authAdapter.finalizeUserCreation(
-                                // `driver.save` returns the flat row — the row IS the
-                                // values. Reading `entity.values` here (an Entity-era
-                                // leftover) handed the adapter `undefined`, whose
-                                // `.email` threw inside the invite-email try block —
-                                // reported as "email delivery failed", so no
-                                // invitation was ever sent.
-                                { id: entity.id as string,
+                    : this.authAdapter.finalizeUserCreation
+                        ? await this.authAdapter.finalizeUserCreation(
+                            // `driver.save` returns the flat row — the row IS the
+                            // values. Reading `entity.values` here (an Entity-era
+                            // leftover) handed the adapter `undefined`, whose
+                            // `.email` threw inside the invite-email try block —
+                            // reported as "email delivery failed", so no
+                            // invitation was ever sent.
+                            { id: entity.id as string,
 values: entity as Record<string, unknown> },
-                                prepared.clearPassword
-                            )
-                            : { invitationSent: false };
+                            prepared.clearPassword
+                        )
+                        : { invitationSent: false };
 
-                    const response = this.formatResponse(entity) as Record<string, unknown>;
+                const response = this.formatResponse(entity) as Record<string, unknown>;
 
 
 
-                    return c.json({
-                        ...response,
-                        invitationSent: result.invitationSent,
-                        ...(result.temporaryPassword ? { temporaryPassword: result.temporaryPassword } : {}),
-                        ...("emailDeliveryFailed" in result && result.emailDeliveryFailed ? { emailDeliveryFailed: true } : {})
-                    }, 201);
-                }
+                return c.json({
+                    ...response,
+                    invitationSent: result.invitationSent,
+                    ...(result.temporaryPassword ? { temporaryPassword: result.temporaryPassword } : {}),
+                    ...("emailDeliveryFailed" in result && result.emailDeliveryFailed ? { emailDeliveryFailed: true } : {})
+                }, 201);
+            }
 
-                // Deliberately not applied to the auth-signup branch above: that
-                // response can carry a temporary password, and handing it out
-                // again on a replayed key is a credential disclosure the plain
-                // data path has no equivalent of.
-                const idempotencyKey = c.req.header(IDEMPOTENCY_HEADER);
-                const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
-                const store = this.idempotency();
-                // Claimed before the write, not after: the two-step
-                // recall-then-write let concurrent replays of one key both
-                // through, which is the duplicate this exists to stop.
-                const claimed = idempotencyKey && store
-                    ? await store.claim(idempotencyKey, uid)
-                    : undefined;
-                if (claimed?.status === "replay") {
-                    return c.json(claimed.response as never, 201);
-                }
-                if (claimed?.status === "in-flight") {
-                    throw ApiError.conflict(
-                        `A request with Idempotency-Key '${idempotencyKey}' is already in progress. ` +
-                        "Retry once it has answered; its result will be replayed.",
-                        "IDEMPOTENCY_KEY_IN_PROGRESS"
-                    );
-                }
+            // Deliberately not applied to the auth-signup branch above: that
+            // response can carry a temporary password, and handing it out
+            // again on a replayed key is a credential disclosure the plain
+            // data path has no equivalent of.
+            const idempotencyKey = c.req.header(IDEMPOTENCY_HEADER);
+            const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
+            const store = this.idempotency();
+            // Claimed before the write, not after: the two-step
+            // recall-then-write let concurrent replays of one key both
+            // through, which is the duplicate this exists to stop.
+            const claimed = idempotencyKey && store
+                ? await store.claim(idempotencyKey, uid)
+                : undefined;
+            if (claimed?.status === "replay") {
+                return c.json(claimed.response as never, 201);
+            }
+            if (claimed?.status === "in-flight") {
+                throw ApiError.conflict(
+                    `A request with Idempotency-Key '${idempotencyKey}' is already in progress. ` +
+                    "Retry once it has answered; its result will be replayed.",
+                    "IDEMPOTENCY_KEY_IN_PROGRESS"
+                );
+            }
 
-                let response: unknown;
-                try {
-                    const entity = await driver.save({
-                        path,
-                        values: body,
-                        collection: resolvedCollection,
-                        status: "new"
-                    });
-                    response = this.formatResponse(entity);
-                } catch (error) {
-                    // Hand the key back, or one transient failure would refuse
-                    // every retry of it until the row aged out.
-                    if (claimed?.status === "claimed" && idempotencyKey && store) {
-                        await store.release(idempotencyKey, uid);
-                    }
-                    throw error;
-                }
-
-                if (claimed?.status === "claimed" && idempotencyKey && store) {
-                    await store.complete(idempotencyKey, uid, response);
-                }
-
-                return c.json(response as never, 201);
+            let response: unknown;
+            try {
+                const entity = await driver.save({
+                    path,
+                    values: body,
+                    collection: resolvedCollection,
+                    status: "new"
+                });
+                response = this.formatResponse(entity);
             } catch (error) {
-                if (isRebaseApiError(error) && !error.code) {
-                    // Only classify as BAD_REQUEST if it's an operational error
-                    // (e.g. validation, DB constraints). Runtime bugs like TypeError,
-                    // RangeError etc. should remain as 500 INTERNAL_ERROR.
-                    const isRuntimeBug = error instanceof TypeError
-                        || error instanceof RangeError
-                        || error instanceof SyntaxError
-                        || error instanceof ReferenceError;
-                    if (!isRuntimeBug) {
-                        error.code = "BAD_REQUEST";
-                    }
+                // Hand the key back, or one transient failure would refuse
+                // every retry of it until the row aged out.
+                if (claimed?.status === "claimed" && idempotencyKey && store) {
+                    await store.release(idempotencyKey, uid);
                 }
                 throw error;
             }
+
+            if (claimed?.status === "claimed" && idempotencyKey && store) {
+                await store.complete(idempotencyKey, uid, response);
+            }
+
+            return c.json(response as never, 201);
         });
 
         // PUT /collection/:id - Update entity
         this.router.put(`${basePath}/:id`, async (c) => {
-            try {
-                this.enforceApiKeyPermission(c, collection.slug);
-                const id = c.req.param("id");
-                const driver = this.getScopedDriver(c);
+            // Errors from here are deliberately not re-classified. This layer
+            // cannot tell a constraint violation from an unreachable database, and
+            // it used to call both `BAD_REQUEST` — a claim that the caller sent
+            // something wrong and should not retry. The driver holds the SQLSTATE
+            // and raises an `ApiError` for what is genuinely the request's fault;
+            // anything still unclassified here is ours, and that is a 500.
+            this.enforceApiKeyPermission(c, collection.slug);
+            const id = c.req.param("id");
+            const driver = this.getScopedDriver(c);
 
 
-                const existingEntity = await driver.fetchOne({
-                    path: getCollectionDataPath(collection),
-                    id: String(id),
-                    collection: resolvedCollection
-                });
+            const existingEntity = await driver.fetchOne({
+                path: getCollectionDataPath(collection),
+                id: String(id),
+                collection: resolvedCollection
+            });
 
-                if (!existingEntity) {
-                    throw ApiError.notFound("Entity not found");
-                }
-
-                const body = await parseJsonBody(c);
-                assertKnownWriteFields(body, resolvedCollection);
-
-                const entity = await driver.save({
-                    path: getCollectionDataPath(collection),
-                    id: String(id),
-                    values: body,
-                    collection: resolvedCollection,
-                    status: "existing"
-                });
-
-                const response = this.formatResponse(entity);
-
-
-
-                return c.json(response);
-            } catch (error) {
-                if (isRebaseApiError(error) && !error.code) {
-                    // Only classify as BAD_REQUEST if it's an operational error.
-                    // Runtime bugs (TypeError, RangeError, etc.) stay as 500.
-                    const isRuntimeBug = error instanceof TypeError
-                        || error instanceof RangeError
-                        || error instanceof SyntaxError
-                        || error instanceof ReferenceError;
-                    if (!isRuntimeBug) {
-                        error.code = "BAD_REQUEST";
-                    }
-                }
-                throw error;
+            if (!existingEntity) {
+                throw ApiError.notFound("Entity not found");
             }
+
+            const body = await parseJsonBody(c);
+            assertKnownWriteFields(body, resolvedCollection);
+
+            const entity = await driver.save({
+                path: getCollectionDataPath(collection),
+                id: String(id),
+                values: body,
+                collection: resolvedCollection,
+                status: "existing"
+            });
+
+            const response = this.formatResponse(entity);
+
+
+
+            return c.json(response);
         });
 
         // DELETE /collection/:id - Delete entity

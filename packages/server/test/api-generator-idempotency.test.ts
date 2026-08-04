@@ -195,7 +195,7 @@ describe("create with an Idempotency-Key", () => {
         const { app, saved, attempts } = createHarness({ failFirstSave: true });
 
         const failed = await post(app, { title: "hello" }, "mut-1");
-        expect(failed.status).toBeGreaterThanOrEqual(400);
+        expect(failed.status).toBe(500);
 
         const retried = await post(app, { title: "hello" }, "mut-1");
         expect(retried.status).toBe(201);

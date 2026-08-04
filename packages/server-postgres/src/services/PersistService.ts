@@ -477,7 +477,20 @@ export class PersistService {
         const pgError = extractPgError(error);
 
         if (pgError) {
-            const { message } = pgErrorToFriendlyMessage(pgError, collectionSlug);
+            const { message, code } = pgErrorToFriendlyMessage(pgError, collectionSlug);
+            // This is the only layer that holds the SQLSTATE, so it is the only
+            // one that can say whose fault a failure was. Returning a bare
+            // `Error` threw that away, and the REST layer compensated by calling
+            // *every* unclassified error a 400 — so an unreachable database was
+            // reported to callers as a bad request. Classes 22 (data exception)
+            // and 23 (integrity constraint violation) are the caller's data;
+            // everything else — a dropped connection, a missing column, a
+            // permission problem — is ours, and stays a 500.
+            if (/^2[23]/.test(code)) {
+                return code === "23505"
+                    ? ApiError.conflict(message, `PG_${code}`)
+                    : ApiError.badRequest(message, `PG_${code}`);
+            }
             return new Error(message);
         }
 
