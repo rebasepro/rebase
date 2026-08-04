@@ -4,7 +4,7 @@
  * Translates Rebase filter conditions to MongoDB query operators.
  */
 
-import { CollectionConfig, FilterValues, WhereFilterOp } from "@rebasepro/types";
+import { CollectionConfig, FilterCondition, FilterValues, LogicalCondition, WhereFilterOp } from "@rebasepro/types";
 import { Filter, Document } from "mongodb";
 import { logger } from "@rebasepro/server";
 
@@ -67,48 +67,81 @@ export class MongoConditionBuilder {
             if (!filterParam) continue;
 
             const [op, value] = filterParam as [WhereFilterOp, any];
-
-            // Null-testing operators ignore their value.
-            if (op === "is-null") {
-                conditions.push({ [field]: { $eq: null } });
-                continue;
-            }
-            if (op === "is-not-null") {
-                conditions.push({ [field]: { $ne: null } });
-                continue;
-            }
-
-            // Pattern matching → regular expressions.
-            if (op === "like" || op === "ilike" || op === "not-like" || op === "not-ilike") {
-                const caseInsensitive = op === "ilike" || op === "not-ilike";
-                const regex = likePatternToRegExp(value, caseInsensitive);
-                const negated = op === "not-like" || op === "not-ilike";
-                conditions.push({
-                    [field]: negated ? { $not: regex } : { $regex: regex }
-                });
-                continue;
-            }
-
-            const mongoOp = REBASE_TO_MONGO_OP[op];
-
-            if (!mongoOp) {
-                logger.warn(`Unsupported filter operator: ${op}`);
-                continue;
-            }
-
-            // Handle array-contains specially
-            if (op === "array-contains") {
-                conditions.push({
-                    [field]: { $elemMatch: { $eq: value } }
-                });
-            } else {
-                conditions.push({
-                    [field]: { [mongoOp]: value }
-                });
-            }
+            const condition = this.buildCondition(field, op, value);
+            if (condition) conditions.push(condition);
         }
 
         return conditions;
+    }
+
+    /**
+     * One field, one operator, one value.
+     *
+     * Extracted so that `logical` groups translate through exactly this code.
+     * A group written as a second dialect is a group where `array-contains` or
+     * `ilike` quietly means something else than it does in `filter`, which is
+     * the kind of difference nobody finds until a query returns the wrong rows.
+     */
+    private static buildCondition(
+        field: string,
+        op: WhereFilterOp,
+        value: any
+    ): Filter<Document> | undefined {
+        // Null-testing operators ignore their value.
+        if (op === "is-null") return { [field]: { $eq: null } };
+        if (op === "is-not-null") return { [field]: { $ne: null } };
+
+        // Pattern matching → regular expressions.
+        if (op === "like" || op === "ilike" || op === "not-like" || op === "not-ilike") {
+            const caseInsensitive = op === "ilike" || op === "not-ilike";
+            const regex = likePatternToRegExp(value, caseInsensitive);
+            const negated = op === "not-like" || op === "not-ilike";
+            return { [field]: negated ? { $not: regex } : { $regex: regex } };
+        }
+
+        const mongoOp = REBASE_TO_MONGO_OP[op];
+
+        if (!mongoOp) {
+            logger.warn(`Unsupported filter operator: ${op}`);
+            return undefined;
+        }
+
+        // Handle array-contains specially
+        if (op === "array-contains") {
+            return { [field]: { $elemMatch: { $eq: value } } };
+        }
+        return { [field]: { [mongoOp]: value } };
+    }
+
+    /**
+     * Translate an `or(...)` / `and(...)` group, nesting included.
+     *
+     * Returns `undefined` for a group with nothing in it. `$or: []` is an error
+     * in Mongo and `$and: []` matches every document, so neither is a
+     * defensible reading of "no conditions".
+     */
+    static buildLogicalConditions(logical: LogicalCondition | undefined): Filter<Document> | undefined {
+        if (!logical || !Array.isArray(logical.conditions)) return undefined;
+
+        const parts: Filter<Document>[] = [];
+        for (const entry of logical.conditions) {
+            if (!entry) continue;
+            if ("type" in entry && "conditions" in entry) {
+                const nested = this.buildLogicalConditions(entry as LogicalCondition);
+                if (nested) parts.push(nested);
+                continue;
+            }
+            const { column, operator, value } = entry as FilterCondition;
+            const condition = this.buildCondition(column, operator, value);
+            if (condition) parts.push(condition);
+        }
+
+        // Through the same combiners the rest of this class uses, so a
+        // one-condition group reads as the bare condition — identical to how
+        // `filter` would have expressed it — rather than as `{ $and: [x] }`.
+        return logical.type === "or"
+            ? this.combineConditionsWithOr(parts)
+            : this.combineConditionsWithAnd(parts);
     }
 
     /**
@@ -191,6 +224,13 @@ export class MongoConditionBuilder {
      */
     static buildQuery<M extends Record<string, any>>(options: {
         filter?: FilterValues<Extract<keyof M, string>>;
+        /**
+         * An `or(...)`/`and(...)` group, AND-ed with `filter` and
+         * `searchString` — the three are independent, as `FindParams`
+         * documents. Absent here until now, so a group that reached this
+         * driver was dropped and the read ran unfiltered.
+         */
+        logical?: LogicalCondition;
         searchString?: string;
         properties?: CollectionConfig["properties"];
     }): Filter<Document> {
@@ -201,6 +241,9 @@ export class MongoConditionBuilder {
             const filterConditions = this.buildFilterConditions<M>(options.filter);
             conditions.push(...filterConditions);
         }
+
+        const logicalCondition = this.buildLogicalConditions(options.logical);
+        if (logicalCondition) conditions.push(logicalCondition);
 
         // Add search conditions
         if (options.searchString && options.properties) {

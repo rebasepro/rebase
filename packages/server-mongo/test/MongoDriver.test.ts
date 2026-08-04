@@ -157,6 +157,72 @@ age: 35 }
             expect(entities).toHaveLength(2);
         });
 
+        it("narrows by a logical group, and counts the same rows", async () => {
+            // `FetchCollectionProps.logical` was declared and never
+            // destructured here, and `MongoDataService` had no parameter for
+            // it — so this query used to come back as the whole collection.
+            // A dropped filter does not fail, it widens.
+            const logical = {
+                type: "or" as const,
+                conditions: [
+                    { column: "name", operator: "==" as const, value: "Alice" },
+                    { column: "name", operator: "==" as const, value: "Charlie" }
+                ]
+            };
+
+            const entities = await delegate.fetchCollection({
+                path: "users",
+                collection: mockCollection,
+                logical
+            });
+
+            expect(entities.map(e => e.name).sort()).toEqual(["Alice", "Charlie"]);
+            expect(await delegate.count({ path: "users", collection: mockCollection, logical })).toBe(2);
+        });
+
+        it("ANDs a logical group with `filter` rather than replacing it", async () => {
+            const entities = await delegate.fetchCollection({
+                path: "users",
+                collection: mockCollection,
+                filter: { age: [">=", 30] },
+                logical: {
+                    type: "or",
+                    conditions: [
+                        { column: "name", operator: "==", value: "Alice" },
+                        { column: "name", operator: "==", value: "Charlie" }
+                    ]
+                }
+            });
+
+            // Alice is 25, so the two clauses together leave only Charlie.
+            expect(entities.map(e => e.name)).toEqual(["Charlie"]);
+        });
+
+        it("skips by offset", async () => {
+            // `offset` is what the REST layer and the SDK both send. It was
+            // never read, so every page of a Mongo-backed collection was page
+            // one.
+            const entities = await delegate.fetchCollection({
+                path: "users",
+                collection: mockCollection,
+                orderBy: "age",
+                order: "asc",
+                offset: 1
+            });
+
+            expect(entities.map(e => e.age)).toEqual([30, 35]);
+        });
+
+        it("counts what a search narrowed to", async () => {
+            const props = { path: "users", collection: mockCollection, searchString: "Ali" };
+
+            const rows = await delegate.fetchCollection(props);
+            expect(rows).toHaveLength(1);
+            // The count ignored `searchString` entirely and reported the whole
+            // collection, so a searched list said "1 of 3".
+            expect(await delegate.count(props)).toBe(1);
+        });
+
         it("should apply ordering", async () => {
             const entities = await delegate.fetchCollection({
                 path: "users",

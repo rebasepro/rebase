@@ -109,23 +109,17 @@ propertyCallbacks: undefined };
     /**
      * Fetch a collection of rows
      */
-    async fetchCollection<M extends Record<string, any>>({
-        path,
-        collection,
-        filter,
-        limit,
-        startAfter,
-        orderBy,
-        searchString,
-        order
-    }: FetchCollectionProps<M>): Promise<Record<string, unknown>[]> {
+    async fetchCollection<M extends Record<string, any>>(
+        props: FetchCollectionProps<M>
+    ): Promise<Record<string, unknown>[]> {
+        // Forwarded whole rather than re-listed. The hand-written list here
+        // named eight of the eleven fields `FetchCollectionProps` declares, so
+        // `logical` and `offset` were accepted by every type-checked boundary
+        // above and then dropped — an `or(...)` query ran unfiltered and
+        // `?offset=` served page one.
+        const { path, collection, ...query } = props;
         const rows = await this.dataService.fetchCollection<M>(path, {
-            filter,
-            limit,
-            startAfter,
-            orderBy,
-            order,
-            searchString,
+            ...query,
             collection: collection as CollectionConfig
         });
 
@@ -656,9 +650,18 @@ propertyCallbacks: undefined };
     async count<M extends Record<string, any>>({
         path,
         collection,
-        filter
+        filter,
+        logical,
+        searchString
     }: FetchCollectionProps<M>): Promise<number> {
-        return this.dataService.count<M>(path, { filter });
+        // The same narrowing the listing gets, or the total describes a
+        // different query than the rows it is reported beside.
+        return this.dataService.count<M>(path, {
+            filter,
+            logical,
+            searchString,
+            collection: collection as CollectionConfig
+        });
     }
 
     /**

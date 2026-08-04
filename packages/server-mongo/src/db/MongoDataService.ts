@@ -6,7 +6,7 @@
  */
 
 import { Db, ObjectId, Collection, Document, FindOptions, Filter } from "mongodb";
-import { FilterValues, DataRepository, CollectionConfig, EntityReference } from "@rebasepro/types";
+import { FilterValues, DataRepository, CollectionConfig, EntityReference, LogicalCondition } from "@rebasepro/types";
 import { MongoConditionBuilder } from "./MongoConditionBuilder";
 import { logger } from "@rebasepro/server";
 
@@ -193,9 +193,12 @@ export class MongoDataService implements DataRepository {
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            /** An `or(...)`/`and(...)` group, AND-ed with `filter`. */
+            logical?: LogicalCondition;
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;
+            offset?: number;
             startAfter?: any;
             searchString?: string;
             databaseId?: string;
@@ -208,6 +211,7 @@ export class MongoDataService implements DataRepository {
         // Build query
         const query = options.rawQuery ?? MongoConditionBuilder.buildQuery<M>({
             filter: options.filter,
+            logical: options.logical,
             searchString: options.searchString,
             properties: options.collection?.properties ?? {}
         });
@@ -226,9 +230,14 @@ export class MongoDataService implements DataRepository {
             findOptions.limit = options.limit;
         }
 
-        // Apply pagination (skip-based for now, cursor-based would be better)
+        // Apply pagination. `offset` is the parameter the REST layer and the
+        // SDK both speak; it was absent here, so every `?offset=` reaching this
+        // driver was discarded and page three served page one. `startAfter`
+        // stays as the older spelling and wins when both are given.
         if (options.startAfter !== undefined) {
             findOptions.skip = Number(options.startAfter);
+        } else if (options.offset) {
+            findOptions.skip = options.offset;
         }
 
         const docs = await collection.find(query, findOptions).toArray();
@@ -265,15 +274,25 @@ export class MongoDataService implements DataRepository {
         collectionPath: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            /** An `or(...)`/`and(...)` group, AND-ed with `filter`. */
+            logical?: LogicalCondition;
+            searchString?: string;
+            collection?: CollectionConfig;
             databaseId?: string;
             rawQuery?: Filter<Document>;
         } = {}
     ): Promise<number> {
         const collection = this.getCollection(collectionPath);
 
-        const query = options.rawQuery ?? (options.filter
-            ? MongoConditionBuilder.buildQuery<M>({ filter: options.filter })
-            : {});
+        // Every narrowing the listing applies has to apply here too, or the
+        // count describes a different query than the one it is reported
+        // against. `logical` and `searchString` were both missing.
+        const query = options.rawQuery ?? MongoConditionBuilder.buildQuery<M>({
+            filter: options.filter,
+            logical: options.logical,
+            searchString: options.searchString,
+            properties: options.collection?.properties ?? {}
+        });
 
         return collection.countDocuments(query);
     }
