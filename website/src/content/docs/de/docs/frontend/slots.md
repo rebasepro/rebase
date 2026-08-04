@@ -80,7 +80,7 @@ const myPlugin: RebasePlugin = {
 | `collection.toolbar` | `CollectionToolbarProps` | Zusätzliche Widgets in der Toolbar-Zeile der Collection |
 | `collection.empty-state` | `CollectionEmptyStateProps` | Benutzerdefinierter Leerzustand, wenn die Collection keine Daten hat |
 | `collection.insights` | `CollectionInsightsSlotProps` | Insight-Widgets über der Collection-Tabelle |
-| `collection.filter-panel` | `CollectionFilterPanelProps` | Benutzerdefinierte Filter-Sidebar neben der Tabelle |
+| `collection.filter-panel` | `CollectionFilterPanelProps` | Benutzerdefinierte Filter-Sidebar neben der Tabelle. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
 
 #### Entität / Formular
 
@@ -90,22 +90,22 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Aktionen über der Formular-Aktionsleiste |
 | `form.before` | `PluginFormActionProps` | Inhalt vor dem Formulartitel/der Feldliste |
 | `form.after` | `PluginFormActionProps` | Inhalt nach der Formular-Feldliste |
-| `entity.row.actions` | `EntityRowActionsProps` | Aktionen pro Zeile in Entity-Tabellen |
-| `entity.field.before` | `EntityFieldSlotProps` | UI, die vor einem einzelnen Formularfeld eingefügt wird |
-| `entity.field.after` | `EntityFieldSlotProps` | UI, die nach einem einzelnen Formularfeld eingefügt wird |
+| `entity.row.actions` | `EntityRowActionsProps` | Aktionen pro Zeile in Entity-Tabellen. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
+| `entity.field.before` | `EntityFieldSlotProps` | UI, die vor einem einzelnen Formularfeld eingefügt wird. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
+| `entity.field.after` | `EntityFieldSlotProps` | UI, die nach einem einzelnen Formularfeld eingefügt wird. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
 
 #### Dashboard
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|-------------|
-| `dashboard.widget` | `DashboardWidgetProps` | Widgets auf dem Dashboard/der Startseite |
+| `dashboard.widget` | `DashboardWidgetProps` | Widgets auf dem Dashboard/der Startseite. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
 
 #### Global
 
 | Slot | Props-Typ | Beschreibung |
 |------|-----------|-------------|
-| `global.search` | `GlobalSearchProps` | Collection-übergreifende Suchleisten-Komponente |
-| `shell.toolbar` | `ShellToolbarProps` | Toolbar-Aktionen auf oberster Ebene in der App-Bar |
+| `global.search` | `GlobalSearchProps` | Collection-übergreifende Suchleisten-Komponente. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
+| `shell.toolbar` | `ShellToolbarProps` | Toolbar-Aktionen auf oberster Ebene in der App-Bar. **Noch nicht gerendert** — deklariert, aber derzeit rendert nichts im Admin diesen Slot. |
 
 #### Kanban
 

@@ -80,7 +80,7 @@ const myPlugin: RebasePlugin = {
 | `collection.toolbar` | `CollectionToolbarProps` | Widget extra all'interno della riga della toolbar della collezione |
 | `collection.empty-state` | `CollectionEmptyStateProps` | Stato vuoto personalizzato quando la collezione non ha dati |
 | `collection.insights` | `CollectionInsightsSlotProps` | Widget di insight sopra la tabella della collezione |
-| `collection.filter-panel` | `CollectionFilterPanelProps` | Barra laterale dei filtri personalizzata accanto alla tabella |
+| `collection.filter-panel` | `CollectionFilterPanelProps` | Barra laterale dei filtri personalizzata accanto alla tabella. **Non ancora renderizzato** — dichiarato, ma oggi nulla nel pannello lo renderizza. |
 
 #### Entità / Modulo
 
@@ -90,22 +90,22 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Azioni sopra la barra delle azioni del modulo |
 | `form.before` | `PluginFormActionProps` | Contenuto prima del titolo/elenco dei campi del modulo |
 | `form.after` | `PluginFormActionProps` | Contenuto dopo l'elenco dei campi del modulo |
-| `entity.row.actions` | `EntityRowActionsProps` | Azioni per riga nelle tabelle entità |
-| `entity.field.before` | `EntityFieldSlotProps` | UI iniettata prima di un singolo campo del modulo |
-| `entity.field.after` | `EntityFieldSlotProps` | UI iniettata dopo un singolo campo del modulo |
+| `entity.row.actions` | `EntityRowActionsProps` | Azioni per riga nelle tabelle entità. **Non ancora renderizzato** — dichiarato, ma oggi nulla nel pannello lo renderizza. |
+| `entity.field.before` | `EntityFieldSlotProps` | UI iniettata prima di un singolo campo del modulo. **Non ancora renderizzato** — dichiarato, ma oggi nulla nel pannello lo renderizza. |
+| `entity.field.after` | `EntityFieldSlotProps` | UI iniettata dopo un singolo campo del modulo. **Non ancora renderizzato** — dichiarato, ma oggi nulla nel pannello lo renderizza. |
 
 #### Dashboard
 
 | Slot | Tipo di Props | Descrizione |
 |------|-----------|-------------|
-| `dashboard.widget` | `DashboardWidgetProps` | Widget sulla dashboard/home page |
+| `dashboard.widget` | `DashboardWidgetProps` | Widget sulla dashboard/home page. **Non ancora renderizzato** — dichiarato, ma oggi nulla nel pannello lo renderizza. |
 
 #### Globale
 
 | Slot | Tipo di Props | Descrizione |
 |------|-----------|-------------|
-| `global.search` | `GlobalSearchProps` | Componente della barra di ricerca tra collezioni |
-| `shell.toolbar` | `ShellToolbarProps` | Azioni della toolbar di primo livello nella barra dell'app |
+| `global.search` | `GlobalSearchProps` | Componente della barra di ricerca tra collezioni. **Non ancora renderizzato** — dichiarato, ma oggi nulla nel pannello lo renderizza. |
+| `shell.toolbar` | `ShellToolbarProps` | Azioni della toolbar di primo livello nella barra dell'app. **Non ancora renderizzato** — dichiarato, ma oggi nulla nel pannello lo renderizza. |
 
 #### Kanban
 

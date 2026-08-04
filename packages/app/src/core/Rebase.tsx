@@ -6,7 +6,7 @@ import type { ComponentOverrideMap } from "@rebasepro/admin-types";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CenteredView, Typography } from "@rebasepro/ui";
 import { User, CollectionRegistryController, DataDriver, DataSourceDefinition, RebaseData, DEFAULT_DATA_SOURCE_KEY, StorageSource, StorageSourceDefinition, DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
-import { RebaseContext } from "@rebasepro/admin-types";
+import { RebaseContext, UNRENDERED_SLOTS } from "@rebasepro/admin-types";
 import { PluginProviderStack } from "./PluginProviderStack";
 import { PluginLifecycleManager } from "./PluginLifecycleManager";
 import { AuthControllerContext, CollectionResolverRegistrationContext, CollectionResolver } from "../contexts";
@@ -89,6 +89,24 @@ export function Rebase<USER extends User>(props: RebaseProps<USER>) {
         ...directSlots,
         ...((plugins ?? []).flatMap((p) => p.slots ?? []))
     ], [directSlots, plugins]);
+
+    // Seven of the twenty-nine declared slots are rendered nowhere. They have
+    // props interfaces and rows in the public slot reference, so registering
+    // for one looks exactly like registering for one that works — and then
+    // nothing happens, with no way to tell whether the fault is the plugin's.
+    // `UNRENDERED_SLOTS` is kept honest by `slot-render-sites.test.ts`, which
+    // derives the same set by scanning for render sites.
+    useEffect(() => {
+        const dead = new Set<string>(UNRENDERED_SLOTS);
+        const registered = new Set(resolvedSlots.map(s => s.slot).filter(slot => dead.has(slot)));
+        for (const slot of registered) {
+            console.warn(
+                `[Rebase] A component is registered for the "${slot}" slot, which this ` +
+                "build declares but renders nowhere — nothing will appear. This is a gap " +
+                "in Rebase, not in your plugin."
+            );
+        }
+    }, [resolvedSlots]);
 
 
     // Auth fallback logic

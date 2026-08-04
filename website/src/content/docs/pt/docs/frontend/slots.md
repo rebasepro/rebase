@@ -80,7 +80,7 @@ const myPlugin: RebasePlugin = {
 | `collection.toolbar` | `CollectionToolbarProps` | Widgets extras dentro da linha da barra de ferramentas da coleção |
 | `collection.empty-state` | `CollectionEmptyStateProps` | Estado vazio personalizado quando a coleção não tem dados |
 | `collection.insights` | `CollectionInsightsSlotProps` | Widgets de insight acima da tabela da coleção |
-| `collection.filter-panel` | `CollectionFilterPanelProps` | Barra lateral de filtros personalizada junto à tabela |
+| `collection.filter-panel` | `CollectionFilterPanelProps` | Barra lateral de filtros personalizada junto à tabela. **Ainda não renderizado** — declarado, mas hoje nada no painel o renderiza. |
 
 #### Entidade / Formulário
 
@@ -90,22 +90,22 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Ações acima da barra de ações do formulário |
 | `form.before` | `PluginFormActionProps` | Conteúdo antes do título/lista de campos do formulário |
 | `form.after` | `PluginFormActionProps` | Conteúdo após a lista de campos do formulário |
-| `entity.row.actions` | `EntityRowActionsProps` | Ações por linha nas tabelas de entidade |
-| `entity.field.before` | `EntityFieldSlotProps` | UI injetada antes de um campo de formulário individual |
-| `entity.field.after` | `EntityFieldSlotProps` | UI injetada após um campo de formulário individual |
+| `entity.row.actions` | `EntityRowActionsProps` | Ações por linha nas tabelas de entidade. **Ainda não renderizado** — declarado, mas hoje nada no painel o renderiza. |
+| `entity.field.before` | `EntityFieldSlotProps` | UI injetada antes de um campo de formulário individual. **Ainda não renderizado** — declarado, mas hoje nada no painel o renderiza. |
+| `entity.field.after` | `EntityFieldSlotProps` | UI injetada após um campo de formulário individual. **Ainda não renderizado** — declarado, mas hoje nada no painel o renderiza. |
 
 #### Dashboard
 
 | Slot | Tipo de Props | Descrição |
 |------|-----------|-------------|
-| `dashboard.widget` | `DashboardWidgetProps` | Widgets no dashboard/página inicial |
+| `dashboard.widget` | `DashboardWidgetProps` | Widgets no dashboard/página inicial. **Ainda não renderizado** — declarado, mas hoje nada no painel o renderiza. |
 
 #### Global
 
 | Slot | Tipo de Props | Descrição |
 |------|-----------|-------------|
-| `global.search` | `GlobalSearchProps` | Componente de barra de busca entre coleções |
-| `shell.toolbar` | `ShellToolbarProps` | Ações da barra de ferramentas de nível superior na barra do app |
+| `global.search` | `GlobalSearchProps` | Componente de barra de busca entre coleções. **Ainda não renderizado** — declarado, mas hoje nada no painel o renderiza. |
+| `shell.toolbar` | `ShellToolbarProps` | Ações da barra de ferramentas de nível superior na barra do app. **Ainda não renderizado** — declarado, mas hoje nada no painel o renderiza. |
 
 #### Kanban
 

@@ -82,6 +82,31 @@ export interface SlotRegistry {
  * Valid slot names for UI extension points.
  * @group Plugins
  */
+/**
+ * Slots this build declares but renders nowhere.
+ *
+ * Every name here appears in {@link SlotRegistry}, has a props interface, and
+ * is listed in the public slot reference alongside the ones that work — so a
+ * plugin author picks one off the table, registers a component, sees nothing,
+ * and has no way to tell whether the fault is theirs. Seven of twenty-nine were
+ * in that state.
+ *
+ * This is a statement of fact, not a wish list: `slot-render-sites.test.ts`
+ * derives the same set by scanning for render sites and fails when the two
+ * disagree. Implementing a slot therefore forces its removal from here, and
+ * declaring one without rendering it forces its addition — at which point
+ * `Rebase` warns anyone who registers for it, which is the whole point.
+ */
+export const UNRENDERED_SLOTS = [
+    "collection.filter-panel",
+    "dashboard.widget",
+    "entity.field.after",
+    "entity.field.before",
+    "entity.row.actions",
+    "global.search",
+    "shell.toolbar"
+] as const satisfies readonly (keyof SlotRegistry)[];
+
 export type SlotName = keyof SlotRegistry;
 
 /**
