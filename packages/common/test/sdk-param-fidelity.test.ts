@@ -96,6 +96,16 @@ describe("in-process SDK: every FindParams field reaches the driver", () => {
         expect(calls.fetch[0].offset).toBe(10);
     });
 
+    it("find()'s own total counts the rows find() returned", async () => {
+        const { driver, calls } = recordingDriver();
+        await sdk(buildSdkData(driver), "posts").find({ logical: GROUP, searchString: "widget" });
+
+        // `meta.total` comes from a `count` issued inside `find`. Narrowed
+        // rows with an unnarrowed total is worse than either alone: `hasMore`
+        // is derived from it, so the list offers a next page that is not there.
+        expect(calls.count[0]).toMatchObject({ logical: GROUP, searchString: "widget" });
+    });
+
     it("count() forwards a logical group", async () => {
         const { driver, calls } = recordingDriver();
         await sdk(buildSdkData(driver), "posts").count!({ logical: GROUP });

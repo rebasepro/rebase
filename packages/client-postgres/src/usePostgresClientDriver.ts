@@ -81,14 +81,10 @@ databaseId });
         },
 
         async count<M extends Record<string, any>>(props: FetchCollectionProps<M>): Promise<number> {
-            const { path, filter, limit, startAfter, orderBy, searchString, order } = props;
-            return client.count({ path,
-filter,
-limit,
-startAfter,
-orderBy,
-searchString,
-order });
+            // Forwarded whole. The hand-written list dropped `logical`, so a
+            // count beside an `or(...)` listing described a different query
+            // than the rows it was reported with.
+            return client.count(props);
         },
 
         listenCollection<M extends Record<string, any>>(props: ListenCollectionProps<M>): () => void {

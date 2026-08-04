@@ -203,7 +203,16 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             let total = rows.length + offset;
             let hasMore = rows.length >= limit;
             if (driver.count) {
-                total = await driver.count({ path: slug, filter });
+                // The same narrowing the rows were read with. Counting only by
+                // `filter` reported the whole collection beside a narrowed
+                // page, and `hasMore` is derived from it — so the list offered
+                // a next page that did not exist.
+                total = await driver.count({
+                    path: slug,
+                    filter,
+                    logical: params?.logical,
+                    searchString: params?.searchString
+                });
                 hasMore = offset + rows.length < total;
             }
 
