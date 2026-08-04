@@ -91,7 +91,6 @@
   "packages/app/src/components/Debug/crm-dashboard/CrmDashboardDemo.tsx::setRecentlyToggledIds": 1,
   "packages/app/src/components/UserSelectPopover.tsx::listHeight": 1,
   "packages/app/src/hooks/data/useFetch.tsx::context": 1,
-  "packages/app/src/hooks/useAuthSubscription.ts::setAuthError": 1,
   "packages/app/src/hooks/useAuthSubscription.ts::setLoginSkipped": 1,
   "packages/app/src/util/useStorageUploadController.tsx::authController": 1,
   "packages/cli/src/commands/cloud/databases.ts::projectRef": 1,

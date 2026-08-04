@@ -50,9 +50,25 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
                     if (user) {
                         setUser(user);
                     }
+                    setAuthError(undefined);
                 })
-                .catch(e => {
-                    // Ignore, user just isn't logged in
+                .catch((e: unknown) => {
+                    // A 401 or 403 is the ordinary first load of an anonymous
+                    // visitor: there is no session, which is not an error.
+                    //
+                    // Everything else is. This used to swallow the lot with
+                    // "Ignore, user just isn't logged in", leaving `authError`
+                    // — a field this controller declares and `Rebase` renders a
+                    // full-screen "Error loading auth" view for — permanently
+                    // undefined. So the view was unreachable, and a backend that
+                    // was down, misconfigured, or blocked by CORS looked exactly
+                    // like being signed out: the app showed the login form.
+                    const status = (e as { status?: number } | undefined)?.status;
+                    if (status === 401 || status === 403) {
+                        setAuthError(undefined);
+                        return;
+                    }
+                    setAuthError(e instanceof Error ? e : new Error(String(e)));
                 })
                 .finally(() => {
                     setInitialLoading(false);

@@ -100,7 +100,15 @@ export function useRebaseAuthController(
         // Fetch backend auth configuration
         auth.getAuthConfig().then((config: AuthConfigResponse) => {
             if (isMountedRef.current) setAuthConfig(config);
-        }).catch(() => {});
+        }).catch((e: unknown) => {
+            // Swallowed entirely before. This is what tells the login view which
+            // providers exist, so losing it renders a login form that is wrong
+            // rather than one that is broken — the hardest kind to report. Not
+            // promoted to `authError`, which blanks the whole app: a signed-in
+            // user is unaffected by this failing.
+            console.warn("[Rebase] Could not load the backend auth configuration; " +
+                "the login view will fall back to defaults.", e);
+        });
 
         const unsubscribe = auth.onAuthStateChange(syncState);
 
