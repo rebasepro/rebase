@@ -101,9 +101,13 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
     const customizationController: CustomizationController = useCustomizationController();
     const externalLink = customizationController?.entityLinkBuilder?.({ entity });
 
+    // Only *whether* there is a form context changes the field list, not which
+    // one it is — so the memo turns on the boolean rather than on the context
+    // object, which is rebuilt on every keystroke of the form above it.
+    const hasFormContext = Boolean(formContext);
     const fieldKeys = useMemo(
-        () => readOnlyFieldKeys(collection as AdminCollection, Boolean(formContext)),
-        [collection, Boolean(formContext)]
+        () => readOnlyFieldKeys(collection as AdminCollection, hasFormContext),
+        [collection, hasFormContext]
     );
 
     // `status: "existing"` — a record you are reading exists by definition, and
@@ -113,7 +117,7 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
         collection,
         fieldKeys,
         status: "existing"
-    }), [collection, fieldKeys.join(",")]);
+    }), [collection, fieldKeys]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     // Measured, not a breakpoint — see `useRailVisible`. The same reasoning as
