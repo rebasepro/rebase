@@ -498,6 +498,92 @@ rejecting.
 
 ---
 
+## 17. A parameter object re-listed by hand at every hop
+
+A request's parameters cross several boundaries — SDK to transport, transport to
+socket, socket to server, server to driver — and at each one somebody wrote out
+the fields to forward. Every list is a place a field can be missing, and the
+type system does not object: the *source* type still declares the field, the
+*destination* type still accepts it, and nothing checks that the value made the
+journey.
+
+The failure is silent by construction, and worse than an error. A dropped
+`limit` does not fail, it unbounds the read. A dropped `logical` does not fail,
+it **widens** the query — `where(or(…)).find()` came back with every row the
+caller's policies allowed. A dropped `offset` does not fail, it serves page one
+to a caller asking for page three, indefinitely.
+
+`FindParams` has eight fields. The in-process accessor forwarded four. The
+realtime chain forwarded six of them at hop one, five at hop two, and stored
+seven of nine at the server — losing `offset` and `logical` at every hop, so
+they were accepted by four consecutive type-checked boundaries and discarded.
+
+**Sweep:** for every type that describes a request, find each place it is
+destructured or rebuilt and diff the field list against the declaration. The
+tell is a literal list of names where a spread would do.
+
+**Fix the shape, not the instance.** Forward the object: `const { onUpdate,
+onError, ...query } = props`. Where a subset genuinely is required, derive it —
+the subscription de-duplication key was a hand-listed subset, so two queries
+differing only in `offset` collided and the second listener was handed the first
+one's rows. Name the shape once when several places need it
+(`StoredCollectionRequest` replaced five inline copies).
+
+**Gate it** by asserting the whole object arrived, not field by field: a test
+that checks the seven fields someone remembered will keep passing when the
+eighth is added and forgotten.
+
+---
+
+## 18. A predicate that discriminates nothing
+
+`isRebaseApiError(error)` — `return error instanceof Error`. Used to guard "is
+this operational enough to call a 400?", with a comment above it explaining the
+distinction it was drawing. It drew none, so an unreachable database was
+reported to callers as a bad request, and a 4xx tells both the SDK and whatever
+watches the logs that nobody should retry and the user is at fault.
+
+These survive because the name is read instead of the body. A guard called
+`isX(v)` is assumed to answer a question; when its body is `v instanceof Error`,
+`v != null`, or `true`, every call site is dead weight that reads as a check.
+
+**Sweep:** read the body of every `is*`/`has*`/`can*` function and ask what it
+rejects. Then look at the call sites — a guard that never rejects means the
+branch behind it always runs, which is often the bug rather than the guard.
+
+**Watch for the information it needed being thrown away lower down.** This
+predicate was crude because `toUserFriendlyError` had already flattened the
+Postgres error — SQLSTATE and all — into `new Error(message)` one layer below.
+The decision belonged where the evidence was. When a classifier looks
+impossible, check whether something upstream deleted what it needed.
+
+---
+
+## 19. Check-then-act, in the thing written to prevent a race
+
+The idempotency store recalled a key, and on a miss did the write and then
+remembered it. Two requests carrying one key both missed the recall, both wrote,
+and the duplicate the mechanism exists to prevent was inserted anyway. The
+`ON CONFLICT DO NOTHING` on the key table protected only its own second row —
+and the comment above that clause names the very case that defeats the design:
+"two tabs replaying the same key at once".
+
+The tell is a mechanism whose stated purpose is *mutual exclusion* implemented
+as a read followed by an unrelated write. Handling the secondary symptom of the
+race — here, avoiding a `23505` in the bookkeeping — reads as having handled
+the race.
+
+**Fix:** claim before acting, in one statement. `INSERT … ON CONFLICT DO UPDATE
+… WHERE <expired> RETURNING` claims a free or expired key and refuses a live
+one, so `RETURNING` yields a row exactly when this request owns it.
+
+**Watch for what claiming first introduces.** A claim taken and then not
+released strands the key: a write that throws would have every retry refused
+until the row aged out, turning one reset connection into a day of failures. A
+claim needs a release path on every exit.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -667,3 +753,46 @@ the reproduction walked through found two more.
 | `parseIdValues` for numeric keys | already threw, which made `GET /users/abc` a 500 rather than a 404. Both read paths answer "no such row" now, and the two tests that pinned the throw were rewritten to the new contract. |
 | whether the uuid check could reject a working app | it could, if taken from `isId: "uuid"` — `getPrimaryKeys` lets the config win over the schema. Read from the Drizzle column type instead (`idCanAddressTable`), and a key the schema does not carry stays addressable rather than 404-ing rows that exist. |
 | the gates | broken on purpose, all three times: reverting the identity key reddens 2 of 3 history tests; the id guard and the rethrow have their own. Writing the history test also found that `useHistory`'s fetch callback keys off `apiConfig` identity — a mock rebuilding it per render span 376 fetches before the assertion timed out. Stable in the app, fragile by construction. |
+
+### Last sweep — 2026-08-04, the data path end to end
+
+Started from "no matter where I look I find bugs, or absurd APIs". Followed one
+finding — a reactive read that could show stale rows — through every layer it
+touched, which turned out to be all of them.
+
+| checked | result |
+|---|---|
+| `observe()` ordering, without the offline layer | **BUG** — a one-shot `find()` and a socket subscription feed one callback with no ordering guard, so the fetch's older snapshot overwrote a live update that had already arrived. Not narrow: `listenCollection` replays cached rows synchronously to a second subscriber, so a second component watching the same query took that path every time. |
+| `observe()`'s documented de-duplication | **BUG** (class 2) — the offline layer de-duplicates, the plain path did not, so every socket tick re-rendered the list. Both key on rows + total now. |
+| `listen()`'s pagination metadata | **BUG** — `meta.limit` was `params.limit \|\| 20` against a REST layer that pages by 50; a failed `count()` set `total` to `rows.length`, reporting a 500k-row collection as holding two; and at an offset it claimed a total below the rows already paged past. |
+| every `FindParams` field vs. what the in-process accessor forwards | **BUG** (class 17) — `logical`, `page`, and `searchString`-on-count were dropped. `data.posts.where(or(…)).find()` returned every row policy allowed. |
+| `limit` reaching the Postgres driver as `undefined` | **BUG** — read as "no LIMIT clause", so an unbounded `find()` selected the whole table into memory while reporting `meta.limit: 20`. The bound the REST layer applies so no read is unbounded did not exist on this path. |
+| the four hops between `observe()` and the database | **BUG** (class 17) — `offset` and `logical` dropped at every one, including the server's own stored request, where `offset` was declared in the type and never read. A live list on page three served page one for as long as it stayed subscribed. |
+| `createCollectionSubscriptionKey` | **BUG** (class 17) — the de-duplication key was a hand-listed subset, so two subscriptions differing only in `offset` or `logical` collided and the second listener received the first's rows. Derived from the props now. |
+| `FetchService.fetchCollection` and `logical` | **BUG** — `fetchRowsWithConditions` below it had always applied the group; it was absent only from the signature, so the only callers who could pass one were those that bypassed the method. |
+| what a page is | **BUG** (class 2) — five answers: `DEFAULT_LIST_LIMIT` 50 (REST), `DEFAULT_PAGE_SIZE` 200 (the `iterate()` walk), a second `DEFAULT_PAGE_SIZE` 20 exported by `client`, `?? 20` in the offline manager, and "default: 20" in the published `FindParams` docs. With `offline` on, one `observe()` answered with 20 rows from cache and 50 from the network. One `resolveFindWindow` now. |
+| `deriveWebSocketUrl` | **BUG** (class 2) — kept the path of an absolute `baseUrl` and dropped it from a relative one, so one deployment dialled two different sockets depending on how its config was spelled. Off-browser it returned `""`, which the caller read as `realtime: false` — so `channel()` blamed an option the caller never passed (class 5). |
+| `baseUrl` already containing `apiPath` | **BUG** (class 5, inverted) — documented as "silently builds `/api/api/…` and every request 404s", and left to runtime. This package's own tests configured it that way twelve times. Warned now, `storageUrlOrigin` with it. |
+| `projectResponseFields` keeping the row key | **BUG** — kept the literal column `id`, not the key. `?fields=title` on a collection keyed on `slug` or on `user_id + role_id` returned the unusable row the function's own docblock exists to prevent. All nine of its tests used an `id`-keyed fixture. |
+| the rest of the REST layer for the same `id` assumption | clean — the only other literal `"id"`s are the `:id` route parameter, a URL segment name resolved to the real key downstream. |
+| `Idempotency-Key` under concurrency | **BUG** (class 19) — recall-then-write is not atomic; two tabs replaying one key both wrote. Claimed in one statement now, with 409 for the loser and a release path so a failed write does not strand the key for a day. |
+| `isRebaseApiError` | **BUG** (class 18) — `return error instanceof Error`. It guarded "classify as BAD_REQUEST", so an unreachable database was a 400. Deleted; the driver classifies from the SQLSTATE it already holds. |
+| `pnpm typecheck`, `pnpm -r test`, eslint | green throughout — 6,700 tests across 22 packages. |
+
+Two process notes worth as much as the findings.
+
+The first four commits of this sweep contained **only their new test files**.
+`core.fsmonitor` had gone stale in the worktree, so `git add -A` staged the
+untracked tests and silently skipped every modified source file; each commit
+reported a plausible `--stat`, `git status` said "working tree clean", and the
+tests kept passing because the code was in the working tree all along. Nothing
+looked wrong until `git show --stat` was read deliberately. See
+`git-status-lies-in-worktrees-fsmonitor`: set `core.fsmonitor false` in a
+worktree before the first commit, and read back what a commit contains.
+
+Several of these were pinned by tests that asserted the defect. Three
+`limit: 20`s in the client's own suite, and a `resolvePagination()` expecting
+`{ limit: 20 }`, were restating numbers the code had invented rather than
+checking them against the constant the server uses. A test that repeats the
+implementation's answer cannot fail with it.
+
