@@ -183,10 +183,14 @@ export function useEntityDisplay<T = unknown, M extends Record<string, unknown> 
         cache.resolve(key, () => resolver({
             entity,
             context
-        })).catch((error: unknown) => {
-            // `resolve` has already recorded the failure as "nothing"; this is
-            // the one line that says why, once, rather than per render.
-            console.warn(`[rebase] Could not resolve ${role} for ${key}:`, error);
+        })).catch(() => {
+            // Unreachable, and kept only so it stays that way: `resolve` records a
+            // failure as "nothing" and returns a RESOLVED promise, which is why
+            // the warning that used to live here could never run — see the note on
+            // `EntityDisplayCache.resolve`. The cache reports the failure itself
+            // now, once per key. This exists so that if `resolve` ever starts
+            // rejecting, it surfaces as a caught no-op rather than an unhandled
+            // rejection during render.
         });
     }, [cache, canResolve, key, resolver, entity, context, role]);
 
