@@ -24,7 +24,7 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     // Fire-and-forget, and a no-op unless the developer opted in. Never awaited:
     // the command is what the user is waiting for, and a slow collector must not
     // sit in front of it.
-    void recordEvent("cli.schema_generate", { subcommand: subcommand ?? "none" }, { projectRoot });
+    void recordEvent("cli.schema", { subcommand: subcommand ?? "none" }, { projectRoot });
     const backendDir = requireBackendDir(projectRoot);
 
     const activePlugin = getActiveBackendPlugin(backendDir);

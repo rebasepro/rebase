@@ -40,8 +40,13 @@ export type TelemetryEventName =
     | "cli.init"
     | "cli.dev"
     | "cli.deploy"
-    | "cli.schema_generate"
-    | "cli.db_push"
+    // Named for the command group, not for one of its subcommands. These were
+    // `cli.schema_generate` and `cli.db_push` and were sent for *every*
+    // subcommand of their group — so `rebase db restore` was recorded as a
+    // push, and anything counting pushes counted every database command. The
+    // subcommand travels as a property, where it can be read.
+    | "cli.schema"
+    | "cli.db"
     | "cli.error";
 
 /** A single non-free-text value. */
