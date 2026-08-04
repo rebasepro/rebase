@@ -6,10 +6,10 @@ import { DetailViewBinding } from "../components/DetailViewBinding";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { CollectionViewBinding } from "../components/CollectionViewBinding/CollectionViewBinding";
-import { NotFoundPage, useUserConfigurationPersistence, useComponentOverride, useNavigationBlocker } from "@rebasepro/app";
+import { ErrorView, NotFoundPage, useUserConfigurationPersistence, useComponentOverride, useNavigationBlocker } from "@rebasepro/app";
 import { resolveOpenEntityMode, resolveViewMode } from "../util/view_mode";
 import { UnsavedChangesDialog } from "@rebasepro/app";
-import { CircularProgressCenter } from "@rebasepro/ui";
+import { CenteredView, CircularProgressCenter } from "@rebasepro/ui";
 import { NavigationViewCollectionInternal, NavigationViewEntityCustomInternal, NavigationViewInternal } from "@rebasepro/app";
 import { getNavigationEntriesFromPath } from "@rebasepro/app";
 import { toArray } from "@rebasepro/utils";
@@ -94,7 +94,7 @@ export function RebaseRoute() {
             if (!collectionRegistry.initialised) {
                 return <CircularProgressCenter/>;
             }
-            return null;
+            return <UnresolvedCollectionView path={navigationEntries[0].slug}/>;
         }
         return <ResolvedCollectionView
             key={`collection_view_${collection.slug}`}
@@ -117,7 +117,7 @@ export function RebaseRoute() {
                 if (!collectionRegistry.initialised) {
                     return <CircularProgressCenter/>;
                 }
-                return null;
+                return <UnresolvedCollectionView path={firstEntry.slug}/>;
             }
             return <ResolvedCollectionView
                 key={`collection_view_${collection.slug}`}
@@ -441,4 +441,35 @@ function EntityFullScreenRoute({
             handleCancel={() => blocker?.reset?.()}
             body={"You have unsaved changes in this entity."}/>
     </>;
+}
+
+/**
+ * Shown when a URL names a collection the registry cannot resolve.
+ *
+ * This used to be `return null`, which renders an empty pane inside the app
+ * chrome: the sidebar, the nav highlight and the breadcrumb all still work,
+ * because those read the collections array directly, while the view itself is
+ * blank. Nothing is thrown, and the only trace is a `console.debug` — so the
+ * panel looks like it lost its data rather than like it failed to find the
+ * collection, and there is no string to search for.
+ *
+ * A slug containing slashes went unresolvable this way and cost an afternoon to
+ * find. The lookup is fixed; this is the part that made it expensive.
+ */
+function UnresolvedCollectionView({ path }: { path: string }) {
+    // Warn, not debug: this is a route that renders nothing useful, and it
+    // should be visible at the console's default level.
+    useEffect(() => {
+        console.warn(
+            `[rebase] No collection is registered for "${path}", so this route has nothing to render. ` +
+            "Check that the collection is in the collections array and that its slug matches the URL."
+        );
+    }, [path]);
+
+    return <CenteredView>
+        <ErrorView
+            title={"Collection not found"}
+            error={`Nothing is registered for "${path}".`}
+            tooltip={"The URL names a collection the panel does not know about. It may have been renamed or removed from the collections array, or the slug may not match the path."}/>
+    </CenteredView>;
 }

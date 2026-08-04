@@ -41,11 +41,35 @@ export function useBuildCollectionRegistryController(props: {
         if (!collectionPath) return undefined;
 
         let collection: AdminCollection | undefined;
-        try {
-            collection = registry.resolvePathToCollections(collectionPath).finalCollection;
-        } catch (e) {
-            console.debug(`Could not resolve path to collection: ${collectionPath}`, e);
-            return undefined;
+
+        // An exact slug match first, because a slug is allowed to contain
+        // slashes and several drivers need it to: a Firestore collection
+        // partitioned by locale is declared as `content/de-DE/podcasts`, and
+        // that string is its *name*, not a path to walk.
+        //
+        // Without this, such a slug went straight to `resolvePathToCollections`,
+        // which reads any `a/b/c` as collection/entity/subcollection, looked for
+        // a root collection called `content`, found none and threw — and the
+        // catch below turned that into `undefined`. `RebaseRoute` renders
+        // `null` for an unresolved collection, so the whole view came out blank
+        // with nothing in the console above `debug`. Thirty-five collections in
+        // one app were unreachable that way.
+        // `collectionPath`, not `cleanedPath`: an even segment count means the
+        // path ends at a record, and the id has already been trimmed off above.
+        // Matching the raw path instead would only ever hit for a collection
+        // route, leaving `content/de-DE/podcasts/abc123` back on the walker.
+        collection = registry.get(collectionPath) as AdminCollection | undefined;
+
+        if (!collection) {
+            try {
+                collection = registry.resolvePathToCollections(collectionPath).finalCollection;
+            } catch (e) {
+                // Warn, not debug. An unresolved collection ends as a route with
+                // nothing in it, and at `debug` there was no way to tell that
+                // from a collection that legitimately has no rows.
+                console.warn(`[rebase] Could not resolve a collection for "${collectionPath}"`, e);
+                return undefined;
+            }
         }
 
         if (!collection) {

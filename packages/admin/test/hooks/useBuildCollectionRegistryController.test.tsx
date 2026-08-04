@@ -28,6 +28,23 @@ name: "Title" }
     ]
 } as unknown as CollectionConfig;
 
+/**
+ * A collection whose slug *contains slashes*. Firestore apps partition content
+ * by locale this way — `content/de-DE/podcasts` is one collection's name, not a
+ * path to walk — and the registry has to tell that apart from an entity path.
+ */
+const localePodcasts = {
+    id: "content/de-DE/podcasts",
+    name: "Podcasts",
+    path: "content/de-DE/podcasts",
+    slug: "content/de-DE/podcasts",
+    table: "content/de-DE/podcasts",
+    properties: {
+        title: { type: "string",
+name: "Title" }
+    }
+} as unknown as CollectionConfig;
+
 const companies = {
     id: "companies",
     name: "Companies",
@@ -45,7 +62,7 @@ const companies = {
 function renderWithCollections(props: Parameters<typeof useBuildCollectionRegistryController>[0] = {}) {
     const rendered = renderHook(() => useBuildCollectionRegistryController(props));
     act(() => {
-        rendered.result.current.collectionRegistryRef.current.registerMultiple([jobs, companies]);
+        rendered.result.current.collectionRegistryRef.current.registerMultiple([jobs, companies, localePodcasts]);
     });
     rendered.rerender();
     return rendered;
@@ -72,6 +89,28 @@ describe("useBuildCollectionRegistryController", () => {
         const { result } = renderWithCollections();
 
         expect(result.current.getCollection("jobs/abc123/applications")?.slug).toBe("applications");
+    });
+
+    it("resolves a collection whose slug contains slashes", () => {
+        // This resolved to `undefined` for as long as the multi-segment form
+        // existed: three segments were read as collection/entity/subcollection,
+        // the lookup for a root collection called `content` threw, and the catch
+        // turned that into "no collection". `RebaseRoute` renders `null` for an
+        // unresolved collection, so every such route was a blank pane with
+        // nothing above `console.debug` to say why.
+        const { result } = renderWithCollections();
+
+        expect(result.current.getCollection("content/de-DE/podcasts")?.slug)
+            .toBe("content/de-DE/podcasts");
+    });
+
+    it("still reads an entity path under a slashed slug as its collection", () => {
+        // Four segments: the last one is a record id, so the collection is the
+        // three above it — the same rule as `jobs/abc123`, one level deeper.
+        const { result } = renderWithCollections();
+
+        expect(result.current.getCollection("content/de-DE/podcasts/abc123")?.slug)
+            .toBe("content/de-DE/podcasts");
     });
 
     it("returns undefined for a path that matches nothing", () => {
