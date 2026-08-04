@@ -63,8 +63,20 @@ steps:
       - 'docker/server.Dockerfile'
       - '.'
 
+  # The fleet tag is pushed HERE, explicitly, rather than through the `images:`
+  # list. Cloud Build pushes that list only after every step has succeeded, so
+  # while the private tag lived there a failure in the *optional* Docker Hub step
+  # below took the *mandatory* fleet push down with it — and did it silently: the
+  # build log still says "naming to <AR tag> done", which is local tagging, not a
+  # push. A missing `dockerhub-token` therefore looked like a self-hoster problem
+  # while it was actually blocking every managed release. Self-hosting is allowed
+  # to be broken by a missing secret; the fleet is not.
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-fleet
+    args: ['push', '$_REPO:$_TAG']
+
   # Cloud Build is not authenticated for Docker Hub, so the Hub tags cannot go in
-  # the `images:` list below — they are pushed here, after an explicit login.
+  # an `images:` list — they are pushed here, after an explicit login.
   - name: 'gcr.io/cloud-builders/docker'
     id: push-dockerhub
     entrypoint: 'bash'
@@ -83,10 +95,9 @@ availableSecrets:
     - versionName: projects/$PROJECT_ID/secrets/dockerhub-token/versions/latest
       env: 'DOCKERHUB_TOKEN'
 
-# Only the private tag belongs here. Cloud Build pushes this list itself and
-# reports its digest, which is what gets registered as the runtime release.
-images:
-  - '$_REPO:$_TAG'
+# No `images:` list. It is the more convenient way to push the private tag, and
+# it is the reason a Docker Hub outage could strand a fleet release — see the
+# `push-fleet` step. The digest to register comes from that step's push output.
 
 substitutions:
   _REPO: 'europe-west1-docker.pkg.dev/rebase-578f2/rebase-saas-images/rebasepro/server'

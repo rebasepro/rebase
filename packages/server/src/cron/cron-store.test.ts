@@ -32,6 +32,32 @@ describe("createCronStore", () => {
             expect(all).toContain("PRIMARY KEY (job_id, slot)");
             expect(all).toContain("DELETE FROM rebase.cron_claims");
         });
+
+        it("releases claims on slots that have not happened yet", async () => {
+            const statements: string[] = [];
+            const params: unknown[][] = [];
+            const store = createCronStore(makeDriver(async (sql, options) => {
+                statements.push(sql);
+                if (options?.params) params.push(options.params);
+                return [];
+            }))!;
+            await store.ensureTable();
+
+            const sweep = statements.find(s => s.includes("slot > now()"));
+            expect(sweep).toBeDefined();
+            expect(sweep).toContain("DELETE FROM rebase.cron_claims");
+            // A stranded claim is only recoverable if the sweep reports it.
+            expect(sweep).toContain("RETURNING job_id, slot");
+            // Minutes, not days — a stranded claim must not wait out the
+            // retention window before its job can run again.
+            expect(sweep).toContain("make_interval(mins =>");
+            expect(params).toContainEqual([2]);
+        });
+
+        it("survives a driver that returns no rows from the sweep", async () => {
+            const store = createCronStore(makeDriver(async () => undefined as never))!;
+            await expect(store.ensureTable()).resolves.toBeUndefined();
+        });
     });
 
     describe("tryClaimRun", () => {

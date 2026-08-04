@@ -60,6 +60,13 @@ const CLAIMS_TABLE = "rebase.cron_claims";
 const CLAIM_RETENTION_DAYS = 7;
 
 /**
+ * How far ahead a claim may legitimately sit. Slots are claimed as they fire,
+ * so anything beyond this is a clock-skewed peer at best and a stranded claim
+ * at worst; see the sweep in `ensureTable`.
+ */
+const FUTURE_CLAIM_SKEW_MINUTES = 2;
+
+/**
  * Detect a unique-constraint violation anywhere in an error's cause chain.
  * Drizzle wraps the PG error — match the SQLSTATE code, never message text.
  * Also covers SQLite ("UNIQUE constraint failed") and MySQL (ER_DUP_ENTRY 1062)
@@ -129,6 +136,28 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                     `DELETE FROM ${CLAIMS_TABLE} WHERE claimed_at < now() - make_interval(days => $1)`,
                     { params: [CLAIM_RETENTION_DAYS] }
                 );
+
+                // Drop claims for slots that have not happened yet. A slot is
+                // claimed at the moment it fires, so a future one can only come
+                // from a timer that woke early — and because claims are
+                // permanent, that claim would silently skip the real run when it
+                // finally came due. The margin keeps a legitimate claim made
+                // moments early by a clock-skewed peer.
+                const stranded = await exec(
+                    `DELETE FROM ${CLAIMS_TABLE}
+                     WHERE slot > now() + make_interval(mins => $1)
+                     RETURNING job_id, slot`,
+                    { params: [FUTURE_CLAIM_SKEW_MINUTES] }
+                );
+                // A driver that does not honour RETURNING gives back nothing;
+                // the rows are only used to report, so treat that as "none".
+                for (const row of (stranded ?? []) as { job_id: string; slot: string }[]) {
+                    logger.warn(
+                        `[cron-store] Released a claim on the future slot ${new Date(row.slot).toISOString()} ` +
+                        `for "${row.job_id}" — it was claimed by a timer that fired early, and would ` +
+                        "otherwise have skipped that run"
+                    );
+                }
 
                 logger.info("✅ Cron logs table ready");
             } catch (err) {
