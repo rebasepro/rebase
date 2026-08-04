@@ -851,6 +851,31 @@ touched, which turned out to be all of them.
 | every `is assigned a value but never used` in the workspace | **SYSTEMIC** — 155, reported by a correctly configured rule that no pipeline can show, because every lint invocation passes `--quiet`. Ratcheted by `check:unused`. |
 | the admin's other 86 discarded values | swept by hand: superseded leftovers, apart from the two above. |
 
+### Sweep continued — the 153 discarded values
+
+`check:unused` produced a list, and the list was worth reading end to end. 88
+were in `admin`, 65 elsewhere. The real ones, and — as importantly — what they
+were mixed in with:
+
+| checked | result |
+|---|---|
+| `VirtualTableInput` / `VirtualTableDateField` `disabled` | **BUG** (class 20) — `admin: { disabled: true }` is a public documented option with its own config interface, computed by the table cell, handed down, destructured, and applied to nothing. A `readOnly` property takes a different branch and renders a preview, so only the *disabled* case was live: the cell stayed typeable and the debounced write fired on blur. |
+| `CollectionView`'s `canCreate` | **BUG** (class 20) — documented as "shows the + button", destructured with a default of `true`, read nowhere. Not a live permission bypass — the admin gates creation on a different path — but a documented prop of an exported component that did nothing. |
+| `SCRYPT_PARAMS` | **BUG**, latent — declared as "recommended values for 2024+" and passed to neither `scrypt` call. Harmless only because they are also Node's defaults, so raising any of them would have read as strengthening password hashing and changed nothing. Passing them needs a cast, which is *why* they were unused. The new risk is the opposite one, so a hash written by the old defaults is now pinned. |
+| `useAuthSubscription`'s `authError` | **BUG** (class 20) — every `getUser()` failure caught with "Ignore, user just isn't logged in". True of a 401; not of a 500, a CORS rejection or `Failed to fetch`. `Rebase` renders a full-screen "Error loading auth" view for that field, which was therefore unreachable, and a backend that was down looked exactly like being signed out. |
+| `logoutSchema` / `updateProfileSchema` in `auth/routes.ts` | **BUG**, mild — dead duplicates of schemas that live *and are applied* in `session-routes.ts`. Two copies of a validation rule, one unreachable, is a rule that gets tightened in the wrong file. |
+| the studio's `SQLEditor` (6 findings) | clean — `setResults`/`setLoading`/`setError` are wrappers the file stopped using in favour of `updateActiveTab` directly, and `STORAGE_KEY_TABS`/`STORAGE_KEY_ACTIVE_TAB` are pre-prefix leftovers; persistence works through `rebase_sql_tabs_${projectPrefix}`. |
+| the studio's `StorageView` media detection | clean — shadowed fifty lines later by a version that also matches on file extension, which is strictly better. |
+| `useRebaseAuthController`'s `setAuthError` | clean, and worth stating why: `isInitialized()` is constructed with only a `resolve` and can never reject, so the `.catch` beside it is dead. Its `getAuthConfig()` failure *was* swallowed and now warns — not promoted to `authError`, which blanks the whole app and is the wrong response for a signed-in user. |
+| `dev-port`'s `attempt`, the admin's `isEntitySelected`, `kanbanEnabled`, `OVERSCAN_COUNT` | clean — superseded leftovers, each replaced by something better a few lines away. |
+| destructure-to-omit sites | **false positives** — `const { values, previousValues, ...rest } = props` drops a key on purpose. Marked with a reason rather than cleared by `ignoreRestSiblings: true`, which would have removed 3 findings out of 147 and blinded the rule to a rest-sibling that *should* have been forwarded. |
+
+The ratio is the point: two thirds of the list is dead code, and reading all of
+it is how the third that is not gets found. A gate whose output is mostly noise
+still earns its keep if the noise is *cheap to classify* — every entry here was
+resolved by reading five lines.
+
+
 Two process notes worth as much as the findings.
 
 The first four commits of this sweep contained **only their new test files**.
