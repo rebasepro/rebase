@@ -94,6 +94,29 @@ describe("RestApiGenerator - Count Endpoint", () => {
         expect(callArgs.searchString).toBe("widget");
     });
 
+    it("passes a logical group to the count driver", async () => {
+        const app = createApp([collection], driver);
+
+        const res = await app.request("/products/count?or=(status.eq.draft,status.eq.review)");
+        expect(res.status).toBe(200);
+
+        const callArgs = (driver.count as ReturnType<typeof jest.fn>).mock.calls[0][0] as FetchCollectionProps;
+        expect(callArgs.logical).toBeDefined();
+    });
+
+    it("passes a logical group on a nested count too", async () => {
+        // Three call sites issue a count in this file; two forwarded the group
+        // and this one did not, so `GET /authors/1/posts/count?or=(…)` reported
+        // the unnarrowed total beside a narrowed list.
+        const app = createApp([collection, createTestCollection("authors")], driver);
+
+        const res = await app.request("/authors/1/products/count?or=(status.eq.draft,status.eq.review)");
+        expect(res.status).toBe(200);
+
+        const callArgs = (driver.count as ReturnType<typeof jest.fn>).mock.calls[0][0] as FetchCollectionProps;
+        expect(callArgs.logical).toBeDefined();
+    });
+
     it("should return 0 when count is not available on driver", async () => {
         const driverWithoutCount = createMockDriver({ count: undefined });
         const app = createApp([collection], driverWithoutCount);

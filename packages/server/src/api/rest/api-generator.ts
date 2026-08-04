@@ -622,6 +622,10 @@ id };
                 const total = driver.count ? await driver.count({
                     path: parsed.collectionPath,
                     filter: queryOptions.where,
+                    // The two sibling counts in this file forward the group and
+                    // this one did not, so a nested `/count?or=(…)` answered
+                    // with the unnarrowed total beside a narrowed list.
+                    logical: queryOptions.logical,
                     searchString
                 }) : 0;
 
