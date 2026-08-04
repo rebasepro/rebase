@@ -238,35 +238,48 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
 /**
  * Derive a WebSocket URL from an HTTP base URL.
  * `http://` → `ws://`, `https://` → `wss://`.
+ *
+ * A backend mounted under a path is the reason `baseUrl` accepts one, so the
+ * path is kept. It used to be kept for an absolute `baseUrl` and dropped for a
+ * relative one — resolved through `.origin` — so one deployment dialled two
+ * different sockets depending on whether its config said `"/backend"` or
+ * `"https://app.example.com/backend"`.
+ *
+ * Returns `""` when there is nothing to resolve against: a relative `baseUrl`
+ * outside a browser has no origin, and inventing one would dial somewhere
+ * arbitrary. The caller warns rather than leaving that silent.
  */
 function deriveWebSocketUrl(baseUrl?: string): string {
+    const toWsProtocol = (url: string): string => {
+        const secure = /^(https|wss):/i.test(url);
+        return url
+            .replace(/^https?:\/\//i, secure ? "wss://" : "ws://")
+            .replace(/^wss?:\/\//i, secure ? "wss://" : "ws://")
+            .replace(/\/$/, "");
+    };
+
     if (typeof window !== "undefined") {
-        let absoluteUrl = "";
+        let absoluteUrl: string;
         if (!baseUrl) {
             absoluteUrl = window.location.origin;
         } else if (/^https?:\/\//i.test(baseUrl) || /^wss?:\/\//i.test(baseUrl)) {
             absoluteUrl = baseUrl;
         } else {
             try {
-                absoluteUrl = new URL(baseUrl, window.location.href).origin;
+                const resolved = new URL(baseUrl, window.location.href);
+                absoluteUrl = resolved.origin + resolved.pathname;
             } catch {
                 absoluteUrl = window.location.origin;
             }
         }
-        const protocol = absoluteUrl.startsWith("https:") || absoluteUrl.startsWith("wss:") ? "wss:" : "ws:";
-        return absoluteUrl
-            .replace(/^https?:\/\//i, `${protocol}//`)
-            .replace(/^wss?:\/\//i, `${protocol}//`)
-            .replace(/\/$/, "");
+        return toWsProtocol(absoluteUrl);
     }
 
     if (!baseUrl) return "";
     if (!/^https?:\/\//i.test(baseUrl) && !/^wss?:\/\//i.test(baseUrl)) {
         return "";
     }
-    return baseUrl
-        .replace(/^https?:\/\//i, (match) => match.toLowerCase() === "https://" ? "wss://" : "ws://")
-        .replace(/\/$/, "");
+    return toWsProtocol(baseUrl);
 }
 
 export function createRebaseClient<DB = Record<string, unknown>>(options: CreateRebaseClientOptions): CreateRebaseClientResult<DB> {
@@ -331,6 +344,24 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     const resolvedWsUrl = realtimeEnabled
         ? (options.websocketUrl ?? deriveWebSocketUrl(options.baseUrl))
         : undefined;
+
+    // Realtime is on unless it was switched off, so "on, but no URL could be
+    // derived" is a misconfiguration and not a choice. It used to be silent:
+    // the client simply had no socket, `observe()` quietly degraded to a
+    // one-shot fetch, and `realtime.channel()` blamed `realtime: false` — an
+    // option the caller had not passed.
+    const realtimeUnreachable = realtimeEnabled && !resolvedWsUrl;
+    const unreachableReason =
+        "no WebSocket URL could be derived from baseUrl " +
+        `${JSON.stringify(options.baseUrl ?? null)} — outside a browser there is no page origin ` +
+        "to resolve a relative URL against. Pass an absolute `baseUrl`, set `websocketUrl` " +
+        "explicitly, or pass `realtime: false` to say this was intended.";
+    if (realtimeUnreachable) {
+        console.warn(
+            `[Rebase] Realtime is enabled but ${unreachableReason} ` +
+            "Live queries will fall back to a single fetch and channels will throw."
+        );
+    }
 
     let ws: RebaseWebSocketClient | undefined;
     /** One channel object per name — see `realtime.channel`. */
@@ -529,13 +560,15 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
              * cut off the others.
              */
             channel: (name: string, options?: ChannelOptions): RebaseRealtimeChannel => {
-                // Only `realtime: false` gets here — a hard opt-out, so this
-                // stays an error. Being merely *unconnected* does not: the
-                // socket opens on the first channel operation, which is the
-                // whole point of asking for a channel before you use one.
+                // Being merely *unconnected* is not an error: the socket opens
+                // on the first channel operation, which is the whole point of
+                // asking for a channel before you use one. Having no socket at
+                // all is, and there are two reasons for it — say which.
                 if (!ws) {
                     throw new RebaseClientError(
-                        "Realtime is disabled on this client (realtime: false), so channels are unavailable."
+                        realtimeUnreachable
+                            ? `Realtime is enabled but ${unreachableReason}`
+                            : "Realtime is disabled on this client (realtime: false), so channels are unavailable."
                     );
                 }
                 let existing = realtimeChannels.get(name);
