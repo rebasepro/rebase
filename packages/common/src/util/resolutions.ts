@@ -261,11 +261,11 @@ export function resolveArrayProperties<M>({
                 ignoreMissingFields,
                 ...props
             });
-            const {
-                values,
-                previousValues,
-                ...rest
-            } = props;
+            // Destructured to be *excluded* from `...rest`, not to be used —
+            // see the comment below. Said explicitly so the discarded-value
+            // ratchet does not carry a finding that is working as intended.
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { values, previousValues, ...rest } = props;
             const ofProperty = resolveProperty({ // we don't want to pass the values of the parent entity
                 property: of,
                 ignoreMissingFields,

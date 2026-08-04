@@ -1288,6 +1288,9 @@ options }
 
             const obj = val as Record<string, unknown>;
             if (obj.__type === "relation") {
+                // `data` is dropped on purpose: a relation compares by the
+                // reference it holds, not by the row it happens to have loaded.
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { data, ...rest } = obj;
                 return rest;
             }
