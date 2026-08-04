@@ -927,6 +927,9 @@ resolved by reading five lines.
 | every key of `SlotRegistry`, for a render site | **BUG** (class 21) — 7 of 29 rendered nowhere, while documented in six locales beside the 22 that work. Named, warned on registration, marked in the docs, and gated in both directions. |
 | every field of `AdminPropertyOptions`, for a reader | clean, after the `admin.disabled` fix. `clearOnDisabled` is read by `useClearRestoreValue` and `disabled.hidden` by `useColumnsIds`; both looked dead to a naive grep because the access is nested. |
 | every field of the admin collection block, for a reader | clean. `formView` looked dead only because it is read through a cast. |
+| every query parameter the OpenAPI advertises, against the routes | **BUG** (class 21 + 17) — `limit` declared `default: 20, maximum: 100` against a server that defaults to 50 and clamps at 1000, so a generated client refuses a request the server accepts. The subcollection listing documented four parameters and honours nine. `?or=`/`?and=` are applied on both routes and documented on neither. The two parameter lists were hand-written in two places; there is one now. |
+| every flag the CLI's help text names, against what it parses | clean — `--create-db` and `--target-db` live in `backup-cli.ts`, and the rest of the apparent misses are flags inside suggested shell commands (`npm run build --workspace`, `tsx watch --include`, `tar --exclude-from`) or a comment about a flag that was removed. |
+| `plugin-insights`, the one shipped plugin | clean — it registers for `home.children.start`, `collection.insights` and `home.card.insight`, all of which render. Notably it does *not* use `dashboard.widget`, which would be its natural home and is one of the seven dead ones. |
 
 Two process notes worth as much as the findings.
 
