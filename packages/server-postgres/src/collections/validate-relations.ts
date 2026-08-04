@@ -287,9 +287,25 @@ export function assertRelationsResolve(
     );
 
     throw new Error(
-        `${defects.length} relation${defects.length === 1 ? "" : "s"} cannot resolve against the database schema.\n\n` +
+        `${defects.length} relation${defects.length === 1 ? "" : "s"} cannot resolve against ` +
+        "`backend/src/schema.generated.ts`.\n\n" +
         "Each of these would return no rows at query time rather than reporting an error, " +
         "so they are fatal at boot instead.\n\n" +
+        // This reads the *generated file*, not the database, and the difference
+        // is the whole diagnosis after an upgrade. Boot-ensure renames columns
+        // in the database — a 0.12 → 0.13 upgrade singularises a junction key,
+        // `categorie_id` → `category_id` — and the checked-in file still
+        // declares the old name. The config is then correct and the file is
+        // stale, so the per-defect advice below, which lists the columns this
+        // file has, names a column that no longer exists in the database.
+        // Following it turns a recoverable state into a broken config.
+        //
+        // Hence the ordering: regenerate first, and only then consider that the
+        // collection might be the thing that is wrong.
+        "If the database was migrated recently — an upgrade, a `db push`, a restore — this file is\n" +
+        "probably older than the schema it describes. Regenerate it before changing anything else:\n\n" +
+        "    rebase schema generate\n\n" +
+        "If it is already current, then the collection is what disagrees with it:\n\n" +
         lines.join("\n\n") + "\n"
     );
 }
