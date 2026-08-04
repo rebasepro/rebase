@@ -1,5 +1,5 @@
 import { CollectionConfig, type ResolvedBelongsTo } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import { resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
 import { ApiError } from "../errors";
 
 /**
@@ -84,11 +84,18 @@ export function assertKnownWriteFields(
  * This shapes the *response*, which is what the parameter says it does; it is
  * not a column pushdown, so it saves bandwidth rather than database work.
  *
- * `id` always survives. Rows are addressed by it everywhere above this layer —
- * the admin table, realtime reconciliation, the offline cache — and a row that
- * arrives without one is not a smaller row, it is an unusable one. Asking for
- * `fields=title` and being unable to open the record you clicked is a worse
- * answer than one extra key.
+ * The collection's key always survives. Rows are addressed by it everywhere
+ * above this layer — the admin table, realtime reconciliation, the offline
+ * cache — and a row that arrives without one is not a smaller row, it is an
+ * unusable one. Asking for `fields=title` and being unable to open the record
+ * you clicked is a worse answer than one extra key.
+ *
+ * That is a statement about the key, not about the name `id`: a collection
+ * keyed on `slug`, or on `user_id + role_id`, was projected down to the fields
+ * asked for and nothing else, which is the very outcome the paragraph above
+ * describes. `assertKnownWriteFields` one function up already has a dedicated
+ * error for collections with no `id` column, so this layer had no excuse for
+ * assuming one.
  */
 export function projectResponseFields<T extends Record<string, unknown>>(
     rows: T[],
@@ -129,7 +136,11 @@ export function projectResponseFields<T extends Record<string, unknown>>(
         }
     }
 
-    const keep = new Set<string>([...fields, "id"]);
+    // Whatever addresses a row here. `resolvePrimaryKeys` returns nothing when
+    // a collection declares no key at all; drivers other than Postgres still
+    // serve rows with a literal `id`, so that stays the fallback.
+    const primaryKeys = resolvePrimaryKeys(collection).map(key => key.fieldName);
+    const keep = new Set<string>([...fields, ...(primaryKeys.length > 0 ? primaryKeys : ["id"])]);
     return rows.map(row => {
         const projected: Record<string, unknown> = {};
         for (const key of Object.keys(row)) {

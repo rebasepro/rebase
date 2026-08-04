@@ -107,3 +107,69 @@ describe("response field selection", () => {
         expect(projected.map(r => Object.keys(r).sort())).toEqual([["id", "title"], ["id", "title"]]);
     });
 });
+
+/**
+ * Every fixture above is keyed on a column literally named `id`. The reason
+ * this function keeps the key — "a row that arrives without one is unusable" —
+ * is not a statement about the name `id`, it is a statement about the key, and
+ * the layer right beside this one already knows collections that have no `id`
+ * column at all: `assertKnownWriteFields` has a dedicated error for them.
+ */
+const memberships = {
+    slug: "memberships",
+    name: "Memberships",
+    table: "memberships",
+    properties: {
+        user_id: { name: "User", type: "string", isId: "uuid" },
+        role_id: { name: "Role", type: "string", isId: "uuid" },
+        granted_at: { name: "Granted", type: "date" },
+        note: { name: "Note", type: "string" }
+    }
+} as unknown as CollectionConfig;
+
+const articles = {
+    slug: "articles",
+    name: "Articles",
+    table: "articles",
+    properties: {
+        slug: { name: "Slug", type: "string", isId: "string" },
+        title: { name: "Title", type: "string" },
+        body: { name: "Body", type: "string" }
+    }
+} as unknown as CollectionConfig;
+
+describe("field selection on a collection not keyed on `id`", () => {
+    it("keeps a single primary key that is not called id", () => {
+        const [projected] = projectResponseFields(
+            [{ slug: "hello-world", title: "Hello", body: "…" }],
+            ["title"],
+            articles
+        );
+
+        // Without its key this row cannot be opened, cached or reconciled —
+        // the same reason the `id` case keeps one.
+        expect(projected.slug).toBe("hello-world");
+        expect(Object.keys(projected).sort()).toEqual(["slug", "title"]);
+    });
+
+    it("keeps every column of a composite key", () => {
+        const [projected] = projectResponseFields(
+            [{ user_id: "u1", role_id: "r1", granted_at: "2026-01-01", note: "n" }],
+            ["note"],
+            memberships
+        );
+
+        expect(projected.user_id).toBe("u1");
+        expect(projected.role_id).toBe("r1");
+    });
+
+    it("does not invent an `id` key on a row that has none", () => {
+        const [projected] = projectResponseFields(
+            [{ slug: "hello-world", title: "Hello", body: "…" }],
+            ["title"],
+            articles
+        );
+
+        expect("id" in projected).toBe(false);
+    });
+});
