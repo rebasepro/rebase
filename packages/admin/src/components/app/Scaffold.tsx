@@ -4,17 +4,24 @@ import { ChevronLeftIcon, ErrorBoundary, MenuIcon } from "@rebasepro/ui";
 import { deepEqual as equal } from "fast-equals"
 
 import { useLargeLayout, useAdminModeController, useTranslation } from "@rebasepro/app";
+import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { AppContext } from "./useApp";
 
 export const DRAWER_WIDTH = 280;
 
-const DRAWER_OPEN_STORAGE_KEY = "rebase-drawer-open";
+/**
+ * Namespaced by base path: two admins served from one origin are two different
+ * navigations, and a single key would have them overwrite each other's drawer.
+ */
+export function drawerOpenStorageKey(basePath: string | undefined) {
+    return `rebase-drawer-open:${basePath || "/"}`;
+}
 
 /** `null` when the user has never toggled the drawer, or storage is unavailable. */
-function readStoredDrawerOpen(): boolean | null {
+function readStoredDrawerOpen(key: string): boolean | null {
     if (typeof window === "undefined") return null;
     try {
-        const stored = window.localStorage.getItem(DRAWER_OPEN_STORAGE_KEY);
+        const stored = window.localStorage.getItem(key);
         return stored === null ? null : stored === "true";
     } catch (e) {
         // Storage can be blocked: private mode, sandboxed iframe, cookie policy.
@@ -22,10 +29,10 @@ function readStoredDrawerOpen(): boolean | null {
     }
 }
 
-function writeStoredDrawerOpen(open: boolean) {
+function writeStoredDrawerOpen(key: string, open: boolean) {
     if (typeof window === "undefined") return;
     try {
-        window.localStorage.setItem(DRAWER_OPEN_STORAGE_KEY, String(open));
+        window.localStorage.setItem(key, String(open));
     } catch (e) {
         // Same as above: a drawer that forgets is better than a crash.
     }
@@ -37,8 +44,8 @@ function writeStoredDrawerOpen(open: boolean) {
 export interface ScaffoldProps {
 
     /**
-     * Expand the collapsed drawer while the pointer is over it. Off by default:
-     * the rail stays a rail until the user clicks the toggle.
+     * Expand the collapsed drawer while the pointer is over it. On by default —
+     * pass `false` to keep the rail a rail until the user clicks the toggle.
      */
     autoOpenDrawer?: boolean;
 
@@ -86,7 +93,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
 
         const {
             children,
-            autoOpenDrawer,
+            autoOpenDrawer = true,
             defaultDrawerOpen = false,
             logo,
             className,
@@ -107,34 +114,88 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
         const includeDrawer = drawerChildren.length > 0;
         const largeLayout = useLargeLayout();
 
+        const storageKey = drawerOpenStorageKey(useUrlController().basePath);
+
         // Seeded once, deliberately: a `useEffect` syncing this to the prop would
         // re-expand the drawer under a user who had just collapsed it.
-        // The last toggle wins over `defaultDrawerOpen`, which only seeds the very
-        // first visit — after that the stored choice survives reloads.
-        const [drawerOpen, setDrawerOpenState] = React.useState(
-            () => (readStoredDrawerOpen() ?? defaultDrawerOpen) && largeLayout
-        );
+        const [drawerOpen, setDrawerOpenState] = React.useState(defaultDrawerOpen && largeLayout);
         const [onHover, setOnHover] = React.useState(false);
+
+        // The stored choice is a client-only fact, so it is applied after the first
+        // render rather than seeded into it: reading storage while rendering would
+        // make the client disagree with server-rendered HTML. A layout effect runs
+        // before paint, so the drawer still arrives in its remembered state.
+        // `defaultDrawerOpen` seeds the very first visit and is ignored after that.
+        React.useLayoutEffect(() => {
+            const stored = readStoredDrawerOpen(storageKey);
+            if (stored === null) return;
+            setDrawerOpenState(stored && largeLayout);
+            // Deliberately not re-run on `largeLayout`: crossing the breakpoint is
+            // the effect below, and re-running here would undo a user's toggle.
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [storageKey]);
+
+        // One piece of state drives two different things: the expanded rail on
+        // large layouts, and the modal sheet on small ones. Carrying an expanded
+        // rail across the breakpoint would drop that sheet, overlay and all, over
+        // the content — so the crossing resets it, and widening again restores
+        // whatever the user last chose.
+        const wasLargeLayout = React.useRef(largeLayout);
+        React.useEffect(() => {
+            if (wasLargeLayout.current === largeLayout) return;
+            wasLargeLayout.current = largeLayout;
+            setDrawerOpenState(largeLayout ? (readStoredDrawerOpen(storageKey) ?? defaultDrawerOpen) : false);
+        }, [largeLayout, defaultDrawerOpen, storageKey]);
 
         const setDrawerOpen = useCallback((open: boolean) => {
             setDrawerOpenState(open);
             // Small layouts render the drawer as a modal sheet. Remembering that
             // one would greet the next load with an overlay over the content.
             if (!largeLayout) return;
-            writeStoredDrawerOpen(open);
-        }, [largeLayout]);
+            writeStoredDrawerOpen(storageKey, open);
+        }, [largeLayout, storageKey]);
+
+        // The pointer has left, but a popover the drawer opened is still up, so the
+        // collapse is owed rather than cancelled. See `setOnHoverFalse`.
+        const collapseWhenPopoverCloses = React.useRef(false);
 
         const setOnHoverTrue = useCallback(() => {
-            // Hover expansion is opt-in. Without this the rail pops open whenever
-            // the pointer crosses it, which reads as "the drawer is open again".
+            // Hover expansion is the default; `autoOpenDrawer={false}` opts out for
+            // admins that want the rail to stay a rail until the toggle is clicked.
             if (!autoOpenDrawer) return;
+            collapseWhenPopoverCloses.current = false;
             setOnHover(true);
         }, [autoOpenDrawer]);
         const setOnHoverFalse = useCallback(() => {
-            // Don't collapse the drawer while a popover/dropdown is open
-            if (document.querySelector("[data-radix-popper-content-wrapper]")) return;
+            // Don't collapse the drawer out from under an open popover/dropdown —
+            // its content is portalled outside the drawer, so reaching for it reads
+            // as a mouseleave. The collapse is owed until that popover closes.
+            if (document.querySelector("[data-radix-popper-content-wrapper]")) {
+                collapseWhenPopoverCloses.current = true;
+                return;
+            }
+            collapseWhenPopoverCloses.current = false;
             setOnHover(false);
         }, []);
+
+        // Nothing fires a second mouseleave when the popover finally closes, so the
+        // owed collapse has to be noticed rather than waited for. Only mounted
+        // while the drawer is actually floating open.
+        React.useEffect(() => {
+            if (!onHover) return;
+            const collapseIfOwed = () => {
+                if (!collapseWhenPopoverCloses.current) return;
+                if (document.querySelector("[data-radix-popper-content-wrapper]")) return;
+                collapseWhenPopoverCloses.current = false;
+                setOnHover(false);
+            };
+            const observer = new MutationObserver(collapseIfOwed);
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            return () => observer.disconnect();
+        }, [onHover]);
 
         const handleDrawerOpen = useCallback(() => {
             setDrawerOpen(true);

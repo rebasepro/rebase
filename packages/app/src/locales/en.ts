@@ -994,6 +994,7 @@ export const en: RebaseTranslations = {
     inspect_record: "Inspect record",
     inspect: "Inspect",
     close_inspector: "Close inspector",
+    open_in_live_site: "Open in the live site",
 
     // ─── Revision history ───────────────────────────────────────
     history_revert: "Revert to this version",

@@ -13,12 +13,12 @@ import { isReadOnly } from "@rebasepro/app";
 
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
 import type { ResolvedFormField } from "@rebasepro/app";
-import { Alert, Button, cls, Dialog, DialogActions, DialogContent, DialogTitle, iconSize, paperMixin, Typography } from "@rebasepro/ui";
+import { Alert, Button, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, paperMixin, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 
-import { FieldBlock, isSelfLabellingProperty, spanClass } from "./components/FieldBlock";
+import { FieldBlock, isSelfLabellingProperty, LABEL_ICON_SIZE, spanClass } from "./components/FieldBlock";
 import { AdditionalFieldValue } from "../components/AdditionalFieldValue";
-import { FormRail } from "./components/FormRail";
+import { FormRail, RecordMeta } from "./components/FormRail";
 import { FormSections } from "./components/FormSections";
 import { useRailVisible } from "./components/useRailVisible";
 import { LabelWithIconAndTooltip } from "./components/LabelWithIconAndTooltip";
@@ -452,7 +452,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                     className={spanClass(field.span)}>
                     <LabelWithIconAndTooltip
                         propertyKey={field.key}
-                        icon={<AlignLeftIcon size={iconSize.small}/>}
+                        icon={<AlignLeftIcon size={LABEL_ICON_SIZE}/>}
                         title={additionalField.name}
                         className={"text-text-secondary dark:text-text-secondary-dark"}/>
                     <div className={cls(paperMixin, "w-full min-h-14 p-4 md:p-6 overflow-x-auto no-scrollbar")}>
@@ -538,12 +538,25 @@ export function EntityForm<M extends Record<string, unknown>>({
                 }
             ];
 
-        return <FormSections
-            sections={sections}
-            collapsed={collapsedSections}
-            onToggle={toggleSection}
-            errorKeys={errorKeys}
-            renderField={renderField}/>;
+        return <>
+            <FormSections
+                sections={sections}
+                collapsed={collapsedSections}
+                onToggle={toggleSection}
+                errorKeys={errorKeys}
+                renderField={renderField}/>
+
+            {/* Folded back with the rail's fields, and for the same reason. The
+                rail renders only where it has been measured to fit, so on the
+                split pane, the side panel and the dialog this block was dropped
+                outright and the record's id was nowhere on screen but the
+                truncated chip in the bar. */}
+            {!showRail && layout.showRecordMeta && status === "existing" && entity && (
+                <div className={cls("mt-8 pt-5 border-t max-w-sm", defaultBorderMixin)}>
+                    <RecordMeta entity={entity as Entity<Record<string, unknown>>}/>
+                </div>
+            )}
+        </>;
     };
 
     const formRef = useRef<HTMLDivElement>(null);

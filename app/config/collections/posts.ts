@@ -161,6 +161,15 @@ const postsCollection: PostgresCollectionConfig = {
         group: "Content",
         defaultViewMode: "cards",
         enabledViews: ["table", "cards", "kanban"],
+        // Everything about *publishing* the post to the rail; the column is then
+        // the post itself, ending in the body it exists for.
+        form: {
+            sidebar: ["status", "publish_date", "author", "tags"],
+            sections: [
+                { key: "post", properties: ["title", "slug", "hero_image", "excerpt"] },
+                { key: "body", title: "Content", properties: ["content"] }
+            ]
+        },
         kanban: {
             columnProperty: "status"
         },

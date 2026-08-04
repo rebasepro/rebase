@@ -14,7 +14,7 @@ export interface RebaseShellProps {
     /** Top bar. Only rendered if provided — pass `<AppBar/>` for the default one. */
     appBar?: React.ReactNode;
     drawer?: React.ReactNode;
-    /** Expand the drawer while the pointer is over it. Not a load-time default — that is `defaultDrawerOpen`. */
+    /** Expand the drawer while the pointer is over it. On by default; pass `false` to opt out. Not a load-time default — that is `defaultDrawerOpen`. */
     autoOpenDrawer?: boolean;
     /** Start with the drawer expanded instead of collapsed to icons. Ignored on small layouts. */
     defaultDrawerOpen?: boolean;
@@ -44,7 +44,7 @@ export function RebaseShell(props: RebaseShellProps) {
         title = "Rebase",
         appBar,
         drawer,
-        autoOpenDrawer = false,
+        autoOpenDrawer = true,
         defaultDrawerOpen = false,
         logo,
         children

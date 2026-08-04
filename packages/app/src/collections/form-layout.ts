@@ -54,6 +54,12 @@ export interface ResolvedFormSection {
     /** Initial state only; the form owns it after first interaction. */
     collapsed: boolean;
     fields: ResolvedFormField[];
+    /**
+     * Declared arrangement for the read-only view. Carried through untouched —
+     * the resolver decides *which* fields a section holds, not how the surface
+     * that renders it stacks them, and only the read view honours this.
+     */
+    readVariant?: "grid" | "summary";
 }
 
 export interface ResolvedFormLayout {
@@ -346,7 +352,8 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
                 title: section.title,
                 collapsible: section.collapsible ?? titled,
                 collapsed: titled ? Boolean(section.collapsed) : false,
-                fields
+                fields,
+                readVariant: section.readVariant
             });
         }
     }

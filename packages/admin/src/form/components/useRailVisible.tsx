@@ -3,10 +3,11 @@ import React, { useLayoutEffect, useState } from "react";
 /**
  * Below this the form is a single column and the rail is not shown.
  *
- * Roughly the 288px rail plus a content column still wide enough to hold a
- * four-up row. Above it the rail is worth having even in the split view; below
- * it — a narrow split pane, the side panel, the dialog, a phone — its fields
- * fold back into the column.
+ * Roughly the 320px rail plus a content column still wide enough to hold a
+ * four-up row — at the threshold that leaves ~680px, which is four columns of
+ * ~145px once the gutters are taken out. Above it the rail is worth having even
+ * in the split view; below it — a narrow split pane, the side panel, the dialog,
+ * a phone — its fields fold back into the column.
  */
 export const RAIL_MIN_WIDTH = 1000;
 

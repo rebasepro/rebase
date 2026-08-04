@@ -1053,6 +1053,8 @@ export interface RebaseTranslations {
     inspect?: string;
     /** Close button of that panel */
     close_inspector?: string;
+    /** Overflow menu entry opening this record on the live site */
+    open_in_live_site?: string;
 
     // ─── Revision history ───────────────────────────────────────
     /** Tooltip on the revert button of a revision */

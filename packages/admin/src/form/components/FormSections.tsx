@@ -14,6 +14,20 @@ export interface FormSectionsProps {
      */
     errorKeys: ReadonlySet<string>;
     renderField: (field: ResolvedFormField) => React.ReactNode;
+    /**
+     * Which rendering this is. `"read"` opens the gaps up rather than closing
+     * them: a control is a bordered 40px box that separates itself from the next
+     * one, and a value is bare text that does not. The form can also afford
+     * tighter rows because a description usually sits between them; with that
+     * gone, the same numbers ran a record's values together into one block.
+     */
+    mode?: "edit" | "read";
+    /**
+     * Renders one field as a summary row, for a section that asked for
+     * `readVariant: "summary"`. Only the read view supplies it; without it such
+     * a section falls back to the grid rather than to nothing.
+     */
+    renderSummaryField?: (field: ResolvedFormField, index: number, total: number) => React.ReactNode;
 }
 
 export function FormSections({
@@ -21,15 +35,22 @@ export function FormSections({
     collapsed,
     onToggle,
     errorKeys,
-    renderField
+    renderField,
+    mode = "edit",
+    renderSummaryField
 }: FormSectionsProps) {
 
+    const reading = mode === "read";
+
     return (
-        <div className={"flex flex-col gap-8"}>
+        <div className={cls("flex flex-col", reading ? "gap-10" : "gap-8")}>
             {sections.map((section) => {
 
                 const hasError = section.fields.some(f => errorKeys.has(f.key));
                 const isCollapsed = section.collapsible && collapsed.has(section.key) && !hasError;
+                const summary = reading
+                    && section.readVariant === "summary"
+                    && Boolean(renderSummaryField);
 
                 return (
                     <section key={section.key} className={"min-w-0"}>
@@ -43,15 +64,21 @@ export function FormSections({
                                 onToggle={() => onToggle(section.key)}/>
                         )}
 
-                        {!isCollapsed && (
+                        {!isCollapsed && (summary
+                            ? <div id={`form_section_${section.key}`}
+                                className={"flex flex-col min-w-0 @2xl:max-w-md @2xl:ml-auto"}>
+                                {section.fields.map((field, index) =>
+                                    renderSummaryField!(field, index, section.fields.length))}
+                            </div>
                             // A container query, not a media query: the form is
                             // rendered at four very different widths (full
                             // screen, side panel, split pane, dialog) inside the
                             // same viewport, so spans have to answer to the
                             // column they are in, not to the window.
-                            <div id={`form_section_${section.key}`}
+                            : <div id={`form_section_${section.key}`}
                                 className={cls(
-                                    "grid gap-x-4 gap-y-5 min-w-0",
+                                    "grid min-w-0",
+                                    reading ? "gap-x-8 gap-y-7" : "gap-x-4 gap-y-5",
                                     "grid-cols-1 @2xl:grid-cols-4"
                                 )}>
                                 {section.fields.map(renderField)}

@@ -10,6 +10,7 @@ import {
     CodeIcon,
     CopyIcon,
     defaultBorderMixin,
+    ExternalLinkIcon,
     HistoryIcon,
     IconButton,
     iconSize,
@@ -60,6 +61,17 @@ export interface EntityIdentityBarProps {
     onViewHistory?: () => void;
 
     /**
+     * Where this record appears on the live site, from `entityLinkBuilder`.
+     *
+     * Here rather than above the record, where it used to be a single unlabelled
+     * icon alone on its own right-aligned row — the only thing between the bar
+     * and the first field, and the only control in the view that did not say
+     * what it was. It is a thing you do *to* a record, so it belongs with the
+     * others.
+     */
+    externalLink?: string;
+
+    /**
      * Actions performed *on* the record — copy, delete, whatever the collection
      * adds — as menu items under the overflow button. They live here rather
      * than in a footer, which is what let the footer go away entirely.
@@ -105,6 +117,7 @@ export function EntityIdentityBar({
     onBack,
     onInspect,
     onViewHistory,
+    externalLink,
     recordActions,
     pluginActions,
     trailing,
@@ -119,7 +132,8 @@ export function EntityIdentityBar({
     const closeLabel = status === "existing"
         ? t("save_and_close")
         : status === "copy" ? t("create_copy_and_close") : t("create_and_close");
-    const hasMenu = Boolean(recordActions) || Boolean(onInspect) || Boolean(onViewHistory);
+    const hasMenu = Boolean(recordActions) || Boolean(onInspect) || Boolean(onViewHistory)
+        || Boolean(externalLink);
 
     return (
         <div className={cls(
@@ -211,6 +225,14 @@ export function EntityIdentityBar({
                             <MoreVerticalIcon size={iconSize.smallest}/>
                         </IconButton>
                     }>
+                    {externalLink && (
+                        <MenuItem onClick={() => window.open(externalLink, "_blank", "noopener,noreferrer")}>
+                            <ExternalLinkIcon size={iconSize.smallest}/>
+                            {t("open_in_live_site") ?? "Open in the live site"}
+                        </MenuItem>
+                    )}
+                    {externalLink && (recordActions || onInspect || onViewHistory) &&
+                        <Separator orientation={"horizontal"}/>}
                     {recordActions}
                     {recordActions && (onInspect || onViewHistory) && <Separator orientation={"horizontal"}/>}
                     {onViewHistory && (

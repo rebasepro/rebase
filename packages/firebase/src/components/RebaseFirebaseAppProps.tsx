@@ -147,7 +147,7 @@ export type RebaseFirebaseAppProps = {
     plugins?: RebasePlugin[];
 
     /**
-     * Open the drawer on hover. Defaults to `false`
+     * Open the drawer on hover. Defaults to `true`
      */
     autoOpenDrawer?: boolean;
 

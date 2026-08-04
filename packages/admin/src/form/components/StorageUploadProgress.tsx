@@ -87,9 +87,15 @@ export function StorageUploadProgress({
     }, [entry.file, entry.fileName, upload]);
 
     if (simple) {
-        return <div className={`w-${imageSize} h-${imageSize}`}>
+        // `imageSize` is a pixel count, so it has to be sized inline: `w-${n}`
+        // is neither a real Tailwind scale value nor a class the JIT can see.
+        return <div style={{
+            width: imageSize,
+            height: imageSize
+        }}>
 
-            {loading && <Skeleton className={`w-${imageSize} h-${imageSize}`}/>}
+            {loading && <Skeleton width={imageSize}
+                height={imageSize}/>}
 
         </div>
     }

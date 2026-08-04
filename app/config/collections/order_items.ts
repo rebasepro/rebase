@@ -119,6 +119,20 @@ const orderItemsCollection: PostgresCollectionConfig = {
         icon: "ReceiptText",
         group: "E-Commerce",
         hideFromNavigation: true,
+        form: {
+            sections: [
+                { key: "item", properties: ["order", "product", "product_name", "sku"] },
+                {
+                    key: "amounts",
+                    title: "Amounts",
+                    properties: ["quantity", "unit_price", "line_total"],
+                    // `line_total` is `quantity × unit_price`, and a line item is
+                    // read to check that arithmetic. Stacked as a receipt it can
+                    // be checked at a glance; on the grid it is three numbers.
+                    readVariant: "summary"
+                }
+            ]
+        },
         propertiesOrder: [
             "product",
             "product_name",

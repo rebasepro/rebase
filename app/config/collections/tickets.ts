@@ -189,6 +189,23 @@ const ticketsCollection: PostgresCollectionConfig = {
         group: "Support",
         defaultViewMode: "kanban",
         enabledViews: ["table", "kanban"],
+        // Triage — state, urgency, who owns it — to the rail, where it stays
+        // visible while you read the thing being triaged.
+        form: {
+            sidebar: ["status", "priority", "category", "assigned_to"],
+            sections: [
+                { key: "ticket", properties: ["ticket_number", "subject", "customer"] },
+                { key: "detail", title: "Description", properties: ["description"] },
+                {
+                    key: "resolution",
+                    title: "Resolution",
+                    properties: ["resolution_notes"],
+                    // Empty until the ticket is closed, so it starts folded
+                    // rather than sitting open under every open ticket.
+                    collapsed: true
+                }
+            ]
+        },
         kanban: {
             columnProperty: "status"
         },

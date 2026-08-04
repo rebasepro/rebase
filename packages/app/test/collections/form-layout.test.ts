@@ -322,6 +322,37 @@ describe("resolveFormLayout — explicit config", () => {
         expect(layout.sections[0].collapsed).toBe(false);
     });
 
+    it("carries a declared read variant through untouched", () => {
+        // The resolver decides which fields a section holds; how the read-only
+        // view stacks them is the surface's business, so this is passed along
+        // rather than acted on here.
+        const order = collection({
+            subtotal: { type: "number" },
+            tax: { type: "number" },
+            total: { type: "number" }
+        }, {
+            form: {
+                sections: [{
+                    key: "totals",
+                    title: "Totals",
+                    properties: ["subtotal", "tax", "total"],
+                    readVariant: "summary"
+                }]
+            }
+        });
+        const l = resolveFormLayout({
+            collection: order,
+            fieldKeys: ["subtotal", "tax", "total"],
+            status: "existing"
+        });
+        expect(l.sections[0].readVariant).toBe("summary");
+        expect(l.sections[0].fields.map(f => f.key)).toEqual(["subtotal", "tax", "total"]);
+    });
+
+    it("leaves the read variant undefined when none is declared", () => {
+        expect(layout.sections[0].readVariant).toBeUndefined();
+    });
+
     it("never drops a property no section claimed", () => {
         const partial = collection({
             a: { type: "string" },
