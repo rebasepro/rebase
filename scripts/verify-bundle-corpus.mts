@@ -157,6 +157,38 @@ const DRIVER_SKEW = ["0.10.0", "0.11.0", "0.12.0", "0.13.0"];
 const SKEW_FIXTURE = "format2-backend";
 
 /**
+ * The oldest driver that can still build its own collection tables at boot.
+ *
+ * Two different things break with an old driver, and only one of them is what a
+ * fleet rollout does. Serving tables that already exist is the rollout case, and
+ * every driver back to 0.10.0 manages it — that is what the pass below asserts.
+ * CREATING them is a different capability, and drivers before this floor simply
+ * do not expose it: the runtime logs "Collection schema: skipped … Collection
+ * tables will NOT be created" and every /api/data route 500s on a missing
+ * relation the moment a project adds a collection or deploys fresh.
+ *
+ * Pinned here so the number is measured rather than assumed. It is the value
+ * `minimumFrameworkVersion` on a runtime release should carry — the column that
+ * exists precisely to refuse a bundle whose driver is too old, and that is NULL
+ * on every release ever registered. Nothing enforces it today, so this constant
+ * is currently the only written-down statement of where the floor actually is.
+ *
+ * If a runtime change moves it, the assertion below fails in both directions:
+ * a driver that could provision and now cannot, and a floor that quietly slid.
+ */
+const PROVISIONING_FLOOR = "0.13.0";
+
+/** Numeric-segment compare, enough for the pinned `x.y.z` list above. */
+function gte(a: string, b: string): boolean {
+    const pa = a.split(".").map(Number);
+    const pb = b.split(".").map(Number);
+    for (let i = 0; i < 3; i++) {
+        if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0);
+    }
+    return true;
+}
+
+/**
  * Stage a fixture carrying a SPECIFIC published driver, stitched the way a
  * deployed pod is stitched.
  *
@@ -249,6 +281,29 @@ async function freshDatabase(baseUrl: string, driverVersion: string): Promise<st
 }
 
 /**
+ * Boot a staged bundle against the empty database and report whether its
+ * collection tables ended up there.
+ *
+ * Deliberately quiet: a driver that cannot provision is an expected outcome
+ * below the floor, not a failure, so this returns a boolean instead of calling
+ * `check`. The caller decides what the answer should have been.
+ */
+async function provisionsFromEmpty(bundleDir: string): Promise<boolean> {
+    let booted: any;
+    try {
+        booted = await bootFromBundle({ bundleDir, listen: false, handleSignals: false });
+        const res = await booted.app.fetch(
+            new Request("http://localhost/api/data/notes?limit=1", { headers: asService })
+        );
+        return res.status === 200;
+    } catch {
+        return false;
+    } finally {
+        await booted?.shutdown?.().catch(() => {});
+    }
+}
+
+/**
  * Boot the representative fixture once per historical driver.
  *
  * Needs the network. Skipped rather than failed when `CORPUS_SKIP_SKEW` is set,
@@ -326,6 +381,22 @@ async function runSkewPass(): Promise<void> {
             // measure the second.
             const seedDir = stage(fixtureDir, `${SKEW_FIXTURE}-seed`);
             staged.push(seedDir);
+            // Before seeding, while the database is still empty: can this driver
+            // stand a project up from nothing? That is the capability
+            // `minimumFrameworkVersion` is meant to gate, and asserting it here
+            // turns "we noticed once" into a fact CI re-derives every run.
+            const canProvision = await provisionsFromEmpty(bundleDir);
+            const shouldProvision = gte(driverVersion, PROVISIONING_FLOOR);
+            check(
+                `self-provisions from an empty database: ${shouldProvision ? "yes" : "no"} (floor ${PROVISIONING_FLOOR})`,
+                canProvision === shouldProvision,
+                canProvision === shouldProvision
+                    ? ""
+                    : canProvision
+                        ? `${driverVersion} provisioned but the floor says it cannot — the floor moved DOWN, lower PROVISIONING_FLOOR`
+                        : `${driverVersion} did NOT provision though the floor says it should — a runtime change removed the capability`
+            );
+
             const seed = await bootFromBundle({ bundleDir: seedDir, listen: false, handleSignals: false });
             await seed.shutdown?.().catch(() => {});
 
