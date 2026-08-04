@@ -1,7 +1,7 @@
 // Auth module exports
 export * from "./interfaces";
 
-export { configureJwt, generateAccessToken, verifyAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry, generateDownloadToken, verifyDownloadToken } from "./jwt";
+export { configureJwt, isJwtConfigured, generateAccessToken, verifyAccessToken, generateRefreshToken, hashRefreshToken, getRefreshTokenExpiry, getAccessTokenExpiry, generateDownloadToken, verifyDownloadToken } from "./jwt";
 export type { JwtConfig, AccessTokenPayload, DownloadTokenPayload } from "./jwt";
 
 export { hashPassword, verifyPassword, validatePasswordStrength } from "./password";

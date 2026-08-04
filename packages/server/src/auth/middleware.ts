@@ -1,6 +1,6 @@
 import { MiddlewareHandler, Context } from "hono";
 import { ANONYMOUS_USER_ID, DataDriver, isPublicStoragePath } from "@rebasepro/types";
-import { verifyAccessToken, AccessTokenPayload, verifyDownloadToken } from "./jwt";
+import { verifyAccessToken, AccessTokenPayload, isJwtConfigured, verifyDownloadToken } from "./jwt";
 import type { HonoEnv } from "../api/types";
 import { scopeDataDriver } from "./rls-scope";
 import { safeCompare } from "./crypto-utils";
@@ -217,7 +217,11 @@ export const optionalAuth: MiddlewareHandler<HonoEnv> = async (
 
     const token = extractBearerToken(c.req.header("authorization"));
 
-    if (token !== undefined) {
+    // A backend that authenticates through an adapter (Firebase, Clerk) never
+    // calls `configureJwt`, so verifying here would throw — turning a route
+    // that had already accepted anonymous callers into a 500 for every
+    // request that happens to carry a bearer token. Anonymous is the answer.
+    if (token !== undefined && isJwtConfigured()) {
         const payload = verifyAccessToken(token);
         if (payload) {
             c.set("user", payload);
@@ -231,6 +235,10 @@ export const optionalAuth: MiddlewareHandler<HonoEnv> = async (
  * Extract user from token - for WebSocket authentication
  */
 export function extractUserFromToken(token: string): AccessTokenPayload | null {
+    // Returns "nobody" rather than throwing on a backend with no JWT of its
+    // own — the socket then closes as unauthenticated, which is the outcome
+    // this function already describes.
+    if (!isJwtConfigured()) return null;
     return verifyAccessToken(token);
 }
 
@@ -408,7 +416,7 @@ export const queryTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
     }
 
     const queryToken = c.req.query("token");
-    if (queryToken) {
+    if (queryToken && isJwtConfigured()) {
         const payload = verifyAccessToken(queryToken);
         if (payload) {
             c.set("user", payload);

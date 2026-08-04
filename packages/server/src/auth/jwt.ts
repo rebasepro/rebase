@@ -89,6 +89,21 @@ export function configureJwt(config: JwtConfig): void {
 }
 
 /**
+ * Has this server been given a JWT secret?
+ *
+ * False on every backend that authenticates through an adapter — Firebase,
+ * Clerk, anything with its own tokens — because nothing calls
+ * {@link configureJwt} there. Signing paths still throw when it is false, since
+ * asking for a token from a server that cannot mint one is a mistake worth
+ * hearing about. Paths whose contract is *"tolerate the absence of auth"* must
+ * ask first: `optionalAuth` crashing a request because this backend does not do
+ * JWT is a 500 on a route that had already decided anonymous was acceptable.
+ */
+export function isJwtConfigured(): boolean {
+    return Boolean(jwtConfig.secret);
+}
+
+/**
  * Generate an access token (short-lived, 1 hour by default)
  */
 export function generateAccessToken(
