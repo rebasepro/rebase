@@ -1,64 +1,17 @@
 import type { Property } from "@rebasepro/types";
 import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
-import { AuthController } from "@rebasepro/admin-types";
-import { isPropertyBuilder } from "@rebasepro/common";
 import { getTitlePropertyKey, getTitlePropertyKeyForValues } from "@rebasepro/app";
-import { isReferenceProperty, isRelationProperty } from "./property_utils";
-
-function isHiddenProperty(property: Property | undefined): boolean {
-    if (!property) return false;
-    return Boolean(property.admin?.hideFromCollection);
-}
+import { isPropertyBuilder } from "@rebasepro/common";
 
 /**
- * Returns true when the property holds file-storage content (single image,
- * array of images, generic upload, …).  These properties are rendered by the
- * dedicated image-slot and should NOT appear as regular preview columns.
+ * Which properties fill a preview surface, best first.
+ *
+ * The implementation lives in `@rebasepro/app` so that the admin package and
+ * the app package cannot disagree about what a record looks like in a card —
+ * they had drifted, and only one of the two copies had learned to keep
+ * relations out of the list.
  */
-function isStorageProperty(property: Property | undefined): boolean {
-    if (!property) return false;
-    // Single string with storage config
-    if (property.type === "string" && property.storage) return true;
-    // String displayed as image URL
-    if (property.type === "string" && property.admin?.urlPreview === "image") return true;
-    // Array whose inner element has storage config or image URL
-    if (property.type === "array" && property.of && !Array.isArray(property.of)) {
-        const inner = property.of;
-        if (inner.type === "string" && (inner.storage || inner.admin?.urlPreview === "image")) return true;
-    }
-    return false;
-}
-
-export function getEntityPreviewKeys(
-    authController: AuthController,
-    targetCollection: AdminCollection<any>,
-    fields: Record<string, PropertyConfig>,
-    previewProperties?: string[],
-    limit = 3) {
-    const allProperties = Object.keys(targetCollection.properties);
-    let listProperties = previewProperties?.filter(p => allProperties.includes(p as string));
-    if (!listProperties && targetCollection.previewProperties) {
-        listProperties = targetCollection.previewProperties?.filter(p => allProperties.includes(p as string));
-    }
-    if (listProperties && listProperties.length > 0) {
-        return listProperties;
-    } else {
-        const hasExplicitOrder = !!(targetCollection.propertiesOrder as string[] | undefined);
-        listProperties = (targetCollection.propertiesOrder as string[]) || allProperties;
-        return listProperties
-            .filter(key => {
-                const prop = targetCollection.properties[key];
-                const isIdProp = prop && typeof prop === "object" && "isId" in prop && Boolean((prop as { isId?: boolean }).isId);
-                return !isIdProp && key !== "id";
-            })
-            .filter(key => {
-                const property = targetCollection.properties[key];
-                return property && !isPropertyBuilder(property) && !isReferenceProperty(property) && !isHiddenProperty(property)
-                    && !isStorageProperty(property as Property)
-                    && (hasExplicitOrder || !isRelationProperty(property));
-            }).slice(0, limit);
-    }
-}
+export { getEntityPreviewKeys } from "@rebasepro/app";
 
 /**
  * The property that fills the title slot for a collection.

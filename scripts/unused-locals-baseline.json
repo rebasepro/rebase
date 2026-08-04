@@ -55,7 +55,6 @@
   "packages/admin/src/components/CollectionViewBinding/ViewModeToggle.tsx::enabledViews": 1,
   "packages/admin/src/components/DefaultAppBar.tsx::adminModeController": 1,
   "packages/admin/src/components/DefaultDrawer.tsx::isFloating": 1,
-  "packages/admin/src/components/DefaultDrawer.tsx::setAdminMenuOpen": 1,
   "packages/admin/src/components/DeleteEntityDialog.tsx::authController": 1,
   "packages/admin/src/components/DeleteEntityDialog.tsx::customizationController": 1,
   "packages/admin/src/components/DetailViewBinding.tsx::collectionRegistryController": 1,

@@ -14,7 +14,8 @@ export function ArrayOneOfPreview({
     propertyKey,
     value,
     property: property,
-    size
+    size,
+    compact
     // entity
 }: PropertyPreviewProps<ArrayProperty>) {
 
@@ -36,6 +37,14 @@ export function ArrayOneOfPreview({
     const values = value as Record<string, unknown>[];
 
     if (!values) return null;
+
+    // As in {@link ArrayPropertyPreview}: blocks stacked vertically, so a
+    // single line can only report the count.
+    if (compact) {
+        return <span className={"text-sm truncate"}>
+            {values.length === 1 ? "1 block" : `${values.length} blocks`}
+        </span>;
+    }
 
     const childSize: PreviewSize = size === "medium" ? "medium" : "small";
 

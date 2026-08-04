@@ -327,6 +327,29 @@ const exercisesCollection: PostgresCollectionConfig = {
         defaultViewMode: "table",
         enabledViews: ["table", "cards"],
         display: { title: "name" },
+        // The widest collection in the demo, and the one that most needed this:
+        // nineteen properties in one run is a list, not a form.
+        form: {
+            sidebar: ["status", "difficulty", "category", "is_featured"],
+            sections: [
+                { key: "exercise", properties: ["name", "images", "video_url", "description"] },
+                {
+                    key: "classification",
+                    title: "Classification",
+                    properties: ["equipment", "body_parts", "is_compound"]
+                },
+                {
+                    key: "prescription",
+                    title: "Defaults",
+                    properties: ["default_reps", "default_sets", "rest_seconds", "calories_per_minute"]
+                },
+                {
+                    key: "howto",
+                    title: "Instructions",
+                    properties: ["instructions"]
+                }
+            ]
+        },
         propertiesOrder: [
             "name",
             "body_parts",

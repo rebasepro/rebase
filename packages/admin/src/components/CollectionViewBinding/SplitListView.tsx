@@ -79,6 +79,19 @@ function isListShortcutTarget(target: HTMLElement | null, detailPanel: HTMLEleme
     return !detailPanel?.contains(target);
 }
 
+/**
+ * The list's share of the split, as a percentage, before anyone drags it.
+ *
+ * The list only has to identify a record — a title, a subtitle and a status
+ * chip — while the detail beside it carries the whole record and its rail. At
+ * 30% the list was taking width from the side that had four columns of fields
+ * to lay out.
+ *
+ * A default, not a constraint: {@link savePanelSize} remembers the drag per
+ * collection, so anyone who has already sized this list keeps their size.
+ */
+const DEFAULT_PANEL_SIZE = 26;
+
 function getSavedPanelSize(path: string): number {
     try {
         const saved = localStorage.getItem(`${PANEL_SIZE_KEY}_${path}`);
@@ -87,7 +100,7 @@ function getSavedPanelSize(path: string): number {
             if (!isNaN(val) && val > 0 && val < 100) return val;
         }
     } catch { /* ignore */ }
-    return 30;
+    return DEFAULT_PANEL_SIZE;
 }
 
 function savePanelSize(path: string, size: number) {

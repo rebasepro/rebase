@@ -28,11 +28,12 @@ export interface DrawerNavigationGroupProps {
      */
     drawerOpen: boolean;
     /**
-     * Whether tooltips should be shown (drawer closed + hovered)
+     * @deprecated No longer read. Entry tooltips are uncontrolled — they follow the
+     * pointer and focus, and are suppressed wherever the label is already visible.
      */
-    tooltipsOpen: boolean;
+    tooltipsOpen?: boolean;
     /**
-     * Whether admin menu is open (used to control tooltip visibility)
+     * @deprecated No longer read. See {@link tooltipsOpen}.
      */
     adminMenuOpen?: boolean;
     /**
@@ -66,8 +67,6 @@ export function DrawerNavigationGroup({
     collapsed,
     onToggleCollapsed,
     drawerOpen,
-    tooltipsOpen,
-    adminMenuOpen,
     headerActions,
     onItemClick,
     hideHeader,
@@ -158,8 +157,6 @@ export function DrawerNavigationGroup({
                     <ResolvedDrawerNavigationItem
                         key={entry.id}
                         icon={<IconForView collectionOrView={entry.collection ?? entry.view} size={"small"}/>}
-                        tooltipsOpen={!collapsed && tooltipsOpen}
-                        adminMenuOpen={adminMenuOpen}
                         drawerOpen={drawerOpen}
                         onClick={() => onItemClick?.(entry)}
                         url={entry.url}

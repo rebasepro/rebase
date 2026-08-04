@@ -1,14 +1,18 @@
 name: Verify
 
 # The full gate — type checks, the headless/BaaS guards, the build, unit tests and
-# every end-to-end suite — defined once and called from two places:
+# every end-to-end suite — defined once and called from three places:
 #
 #   ci.yml            on every push to main and every PR
 #   publish.yml       before a STABLE release, which must not ship unless all of
 #                     this passed for the exact commit being released
+#   publish.yml       and before a CANARY, for the same reason
 #
-# Canary deliberately does not call it. A canary publishes if it compiles, which is
-# what makes it a canary; anything stricter belongs here.
+# Canary used to skip it, on the reasoning that a canary publishes if it compiles.
+# That made the canary channel one nobody had checked — 0.13.1-canary.gcd6689e
+# published with `check:hooks` red — so it gates now too. A push to main therefore
+# runs this twice, once for ci.yml and once for the canary publish; the duplicate
+# is compute, whereas copying the steps to avoid it would be drift.
 #
 # It exists as a reusable workflow rather than copied steps because the copy is the
 # failure mode: the release path is the one that runs rarely, so it is the one that
@@ -97,6 +101,16 @@ jobs:
       # collection shape stayed invisible until the very last gate.
       - name: Init template typecheck
         run: pnpm run check:templates
+
+      # The scaffold hands every new project a compose file naming a container
+      # image. 0.13.0 shipped with that image published nowhere, so the first
+      # command in the file failed with "repository does not exist" — and nothing
+      # noticed, because `verify-selfhost.mts` deliberately covers everything about
+      # self-hosting EXCEPT the container and the tag. Hermetic: it asserts an
+      # automatically-triggered workflow publishes the image, not that the registry
+      # currently answers. The live probe belongs to the release, and runs there.
+      - name: Shipped image references have a publisher
+        run: pnpm run check:runtime-image
 
       # Renames leak where a codemod cannot see them: a bare name in an array,
       # a .astro file, an extensionless .env.example, a Tailwind @source path.

@@ -15,7 +15,8 @@ export function ArrayPropertyPreview({
     propertyKey,
     value,
     property: property,
-    size
+    size,
+    compact
 }: PropertyPreviewProps<ArrayProperty>) {
 
     if (property.type !== "array")
@@ -37,6 +38,14 @@ export function ArrayPropertyPreview({
     const values = value as unknown[];
 
     if (!values) return null;
+
+    // Each entry is a block of its own — a bordered row, sometimes a whole
+    // sub-table. Stating how many there are is the only honest one-liner.
+    if (compact) {
+        return <span className={"text-sm truncate"}>
+            {values.length === 1 ? "1 item" : `${values.length} items`}
+        </span>;
+    }
 
     const childSize: PreviewSize = size === "medium" ? "medium" : "small";
 

@@ -70,28 +70,58 @@ export function isSelfLabellingProperty(property: Property | undefined): boolean
     }
 }
 
+/**
+ * The type icon in a field label, in px.
+ *
+ * Matched to the label's 13px rather than taken from `iconSize.smallest` (16),
+ * which is sized for buttons. Exported so the surfaces that draw a label
+ * themselves — the additional-field cards, the rail — can stay in step.
+ */
+export const LABEL_ICON_SIZE = 14;
+
 export interface FieldBlockProps {
     propertyKey: string;
     property?: Property;
     /** Rendered by the form rather than by the field, unless self-labelling. */
     showLabel: boolean;
+    /**
+     * Which of the two renderings this block frames.
+     *
+     * The **label is identical in both** — same size, same weight, same colour,
+     * same type icon, same required marker. A field is the same field whether or
+     * not you are editing it, and a record whose labels restyle themselves under
+     * Edit reads as two different screens.
+     *
+     * What `"read"` drops is the *description*, which is not part of the label:
+     * it is input help. "Sum of all line items before tax and shipping" under a
+     * number that is visibly a sum tells a reader nothing, and a line of it
+     * under every field is what a record has instead of room.
+     */
+    mode?: "edit" | "read";
     children: React.ReactNode;
 }
 
 /**
  * One field's worth of the form grid: label, control, description.
  *
- * The label carries a small type icon so a number reads differently from a
- * relation at a glance, and the description sits under the control where it
- * annotates what you just filled in.
+ * The same block frames the read-only rendering of a record, so a field sits in
+ * the same place, at the same width, under the same label whether or not you are
+ * editing it — see {@link EntityViewBinding}.
+ *
+ * The label is one size down from the control it names (13px against the body's
+ * 14) with its icon matched to it at 14px. Labels are scaffolding: you read them
+ * to find the value, then read the value. Setting them at body size made a
+ * column of records scan as a column of field names with data attached.
  */
 export function FieldBlock({
     propertyKey,
     property,
     showLabel,
+    mode = "edit",
     children
 }: FieldBlockProps) {
 
+    const reading = mode === "read";
     const description = property?.description?.trim();
     const required = Boolean(property?.validation?.required);
 
@@ -106,15 +136,18 @@ export function FieldBlock({
             {showLabel && (
                 <PropertyIdCopyTooltip propertyKey={propertyKey}>
                     <div className={cls(
-                        "flex items-center gap-1.5 text-sm font-medium leading-tight mb-1.5",
-                        "text-text-secondary dark:text-text-secondary-dark"
+                        "flex items-center gap-1.5 font-medium leading-tight mb-1.5",
+                        "text-[13px] text-text-secondary dark:text-text-secondary-dark"
                     )}>
                         {/* Small and quiet: enough to tell a number from a
                             relation at a glance, not enough to compete with the
-                            field name. */}
+                            field name. Matched to the label's 13px rather than
+                            left at the 16px `smallest` token, which put the
+                            heaviest mark on the row on the least important
+                            thing in it. */}
                         {property && (
                             <span className={"shrink-0 text-text-disabled dark:text-text-disabled-dark"}>
-                                {getIconForProperty(property, "smallest")}
+                                {getIconForProperty(property, LABEL_ICON_SIZE)}
                             </span>
                         )}
                         <span className={"truncate"}>{property?.name ?? propertyKey}</span>
@@ -131,7 +164,7 @@ export function FieldBlock({
 
             {/* Under the control, where it reads as a note about the thing you
                 just filled in rather than a subtitle of the next label. */}
-            {showLabel && description && (
+            {showLabel && description && !reading && (
                 <Typography variant={"caption"}
                     color={"disabled"}
                     className={"mt-1.5 ml-0.5 leading-snug"}>

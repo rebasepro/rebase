@@ -728,6 +728,9 @@ parentEntityIds,
             onDiscard={canEdit && formContext ? () => formContext.formex.resetForm() : undefined}
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
+            externalLink={usedEntity
+                ? customizationController?.entityLinkBuilder?.({ entity: usedEntity })
+                : undefined}
             recordActions={recordActionItems}
             pluginActions={formPluginActions}
             leading={<>

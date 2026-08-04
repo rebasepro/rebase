@@ -274,7 +274,13 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // ── Health ───────────────────────────────────────────────────────────────
     // Not part of `initializeRebaseBackend` because it sits outside `basePath`:
     // orchestrators probe `/health`, not `/api/health`.
-    app.get("/health", async (c) => {
+    //
+    // Registered under `basePath` as well, because every other route a developer
+    // touches is there and `/api/health` answering 404 reads as "the server is
+    // broken" rather than "that is not where health lives". An orchestrator keeps
+    // probing the bare path; a person gets an answer wherever they look first.
+    const healthPaths = ["/health", `${(env.REBASE_BASE_PATH || "/api").replace(/\/$/, "")}/health`];
+    for (const healthPath of [...new Set(healthPaths)]) app.get(healthPath, async (c) => {
         const result = await backend.healthCheck();
 
         // `backend.healthCheck()` probes the default driver only. With several
@@ -451,7 +457,11 @@ async function bootStaticApp(
     // Liveness and readiness are the same for a static app: it is ready the
     // moment it can serve, and there is no database to make readiness lie.
     app.get("/livez", (c) => c.json({ status: "ok" }));
-    app.get("/health", (c) => c.json({ status: "ok", latencyMs: 0 }));
+    // `/api/health` too — same reason as the backend path: a static app served by
+    // this runtime still answers on the prefix a developer will try first.
+    for (const healthPath of [...new Set(["/health", `${basePath.replace(/\/$/, "")}/health`])]) {
+        app.get(healthPath, (c) => c.json({ status: "ok", latencyMs: 0 }));
+    }
 
     if (metrics) {
         app.route("/metrics", createMetricsRoutes(metrics.registry, metricsToken));

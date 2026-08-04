@@ -551,6 +551,9 @@ entityId }
             onBack={backToCollection}
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
+            externalLink={usedEntity
+                ? customizationController?.entityLinkBuilder?.({ entity: usedEntity })
+                : undefined}
             leading={<>
                 {barActionsStart}
                 {/* Split view: closing the list is opening this record

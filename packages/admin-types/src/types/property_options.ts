@@ -92,10 +92,48 @@ export interface AdminStringOptions extends AdminPropertyOptions {
 }
 
 /**
+ * How a number is written out for reading.
+ *
+ * A thin, explicit subset of `Intl.NumberFormatOptions`. Explicit is the whole
+ * point: nothing here is inferred. A collection that happens to carry a
+ * `currency` column alongside a `total` column has not told us that one formats
+ * the other — that is a relationship only the author knows, and guessing it
+ * would put a euro sign on the one number that was never money.
+ *
+ * Presentation only. It changes what {@link PropertyPreview} renders — the
+ * detail view, the table cell, a reference card — and never what the number
+ * input holds, because a formatted string is not a number you can type into.
+ */
+export interface NumberFormatOptions {
+    /** Defaults to `"decimal"`. `"currency"` requires {@link currency}. */
+    style?: "decimal" | "currency" | "percent";
+    /**
+     * ISO 4217 code — `"EUR"`, `"USD"`. Setting it implies `style: "currency"`,
+     * so the common case is one key.
+     */
+    currency?: string;
+    /**
+     * BCP 47 tag. Defaults to the panel's locale, which is what makes the same
+     * amount read `1,234.50` for one user and `1.234,50` for another.
+     */
+    locale?: string;
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+    /** `"compact"` renders `12000` as `12K`. Useful in narrow table columns. */
+    notation?: "standard" | "compact";
+}
+
+/**
  * @group Entity properties
  */
 export interface AdminNumberOptions extends AdminPropertyOptions {
     clearable?: boolean;
+    /**
+     * Write this number out as currency, a percentage, or with fixed decimals.
+     * Omit and the raw value renders, which stays the default: a number in the
+     * database is shown as the number in the database.
+     */
+    format?: NumberFormatOptions;
 }
 
 /**

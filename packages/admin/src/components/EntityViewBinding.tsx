@@ -1,6 +1,6 @@
 import type { Property } from "@rebasepro/types";
 
-import type { AdditionalFieldDelegateProps, AdminCollection, CustomizationController } from "@rebasepro/admin-types";
+import type { AdditionalFieldDelegateProps, AdminCollection } from "@rebasepro/admin-types";
 import type { ResolvedFormField, ResolvedFormSection } from "@rebasepro/app";
 import type { FormContext } from "../types/fields";
 import React, { useCallback, useMemo, useRef, useState } from "react";
@@ -8,20 +8,19 @@ import { Entity } from "@rebasepro/types";
 import {
     AlignLeftIcon,
     cls,
+    defaultBorderMixin,
     ErrorBoundary,
-    ExternalLinkIcon,
-    IconButton,
-    iconSize,
-    paperMixin,
-    Tooltip
+    paperMixin
 } from "@rebasepro/ui";
-import { getFormFieldKeys, resolveFormLayout, useCustomizationController } from "@rebasepro/app";
+import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 
-import { FieldBlock, spanClass } from "../form/components/FieldBlock";
+import { FieldBlock, LABEL_ICON_SIZE, spanClass } from "../form/components/FieldBlock";
 import { AdditionalFieldValue } from "./AdditionalFieldValue";
+import { EntityDisplayHeader, HEADER_DISPLAY_ROLES } from "./EntityDisplayHeader";
 import { FormSections } from "../form/components/FormSections";
-import { FormRail } from "../form/components/FormRail";
+import { FormRail, RecordMeta } from "../form/components/FormRail";
+import { useEntityDisplayValues } from "../hooks/useEntityDisplay";
 import { useRailVisible } from "../form/components/useRailVisible";
 import { LabelWithIconAndTooltip } from "../form/components/LabelWithIconAndTooltip";
 import { PropertyPreview } from "../preview";
@@ -32,18 +31,38 @@ const NO_ERRORS: ReadonlySet<string> = new Set<string>();
 /**
  * The fields the read-only view lays out, in render order.
  *
- * The same set the form uses, minus the `additionalFields` when there is no
- * form context to hand them: those entries are arbitrary components, not
- * values, and one rendered against no context is nothing at all. They are
- * dropped *before* the layout resolves rather than skipped while rendering,
- * because the resolver has by then given each of them a full row — skipping
- * later leaves that row as a hole in the grid.
+ * The same set the form uses, minus two groups. Both are dropped *before* the
+ * layout resolves rather than skipped while rendering, because the resolver has
+ * by then given each one a place on the grid — skipping later leaves that place
+ * as a hole.
+ *
+ * - The `additionalFields` when there is no form context to hand them: those
+ *   entries are arbitrary components, not values, and one rendered against no
+ *   context is nothing at all.
+ * - `headerKeys` — the properties {@link EntityDisplayHeader} has already
+ *   rendered as the record's picture, subtitle, state and labels. Leaving one in
+ *   prints its value twice on one screen.
+ *
+ * The record's **title property is not among them**, deliberately. It names the
+ * page in the identity bar, but a heading and a labelled field are different
+ * things: `Order #` is a column with a name and a description that someone opens
+ * the record to read, and dropping it because its text also appears in the
+ * breadcrumb removes a value from the record on the grounds that it is legible
+ * somewhere else. See {@link HEADER_DISPLAY_ROLES}.
  */
-export function readOnlyFieldKeys(collection: AdminCollection, hasFormContext: boolean): string[] {
+export function readOnlyFieldKeys(
+    collection: AdminCollection,
+    hasFormContext: boolean,
+    headerKeys?: ReadonlySet<string>
+): string[] {
     const keys = getFormFieldKeys(collection);
-    if (hasFormContext) return keys;
-    const additional = new Set((collection.additionalFields ?? []).map(field => field.key));
-    return keys.filter(key => !additional.has(key));
+    const additional = hasFormContext
+        ? undefined
+        : new Set((collection.additionalFields ?? []).map(field => field.key));
+
+    return keys.filter(key =>
+        !additional?.has(key)
+        && !headerKeys?.has(key));
 }
 
 /**
@@ -87,6 +106,13 @@ export interface EntityViewBindingProps<M extends Record<string, unknown>> {
  * form applies: between that row, the collection's own id property and the
  * `path/id` chip above them, one UUID appeared three times. The id is a
  * copyable chip in the identity bar, and the rail's record block, once each.
+ *
+ * The labels are the form's labels, icon and all: a field is the same field
+ * whether or not you are editing it. What `mode: "read"` drops is the per-field
+ * *description*, which is input help rather than part of the label — and what it
+ * adds is room. A control is a bordered box that separates itself from the next
+ * one; a value is bare text, so the rows and sections are opened up rather than
+ * inheriting spacing sized for inputs.
  */
 export function EntityViewBinding<M extends Record<string, unknown>>(
     {
@@ -98,16 +124,32 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
         formContext
     }: EntityViewBindingProps<M>) {
 
-    const customizationController: CustomizationController = useCustomizationController();
-    const externalLink = customizationController?.entityLinkBuilder?.({ entity });
+    // The record's name, picture, state and labels, lifted out of the grid and
+    // into a header. Resolved here rather than inside it because the fields it
+    // renders have to come *out* of the layout, and the layout is resolved here.
+    const display = useEntityDisplayValues<M>({
+        collection,
+        entity
+    });
+
+    const headerKeys = useMemo(() => {
+        const keys = new Set<string>();
+        for (const role of HEADER_DISPLAY_ROLES) {
+            // Set only for a role filled by a property of this collection. A
+            // role filled by a resolver has no field on the grid to remove.
+            const key = display[role].source?.key;
+            if (key) keys.add(key);
+        }
+        return keys;
+    }, [display]);
 
     // Only *whether* there is a form context changes the field list, not which
     // one it is — so the memo turns on the boolean rather than on the context
     // object, which is rebuilt on every keystroke of the form above it.
     const hasFormContext = Boolean(formContext);
     const fieldKeys = useMemo(
-        () => readOnlyFieldKeys(collection as AdminCollection, hasFormContext),
-        [collection, hasFormContext]
+        () => readOnlyFieldKeys(collection as AdminCollection, hasFormContext, headerKeys),
+        [collection, hasFormContext, headerKeys]
     );
 
     // `status: "existing"` — a record you are reading exists by definition, and
@@ -158,7 +200,7 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
                 <div key={`additional_${field.key}`} className={spanClass(field.span)}>
                     <LabelWithIconAndTooltip
                         propertyKey={field.key}
-                        icon={<AlignLeftIcon size={iconSize.small}/>}
+                        icon={<AlignLeftIcon size={LABEL_ICON_SIZE}/>}
                         title={additionalField.name}
                         className={"text-text-secondary dark:text-text-secondary-dark"}/>
                     <div className={cls(paperMixin, "w-full min-h-14 p-4 md:p-6 overflow-x-auto no-scrollbar")}>
@@ -181,10 +223,13 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
                     so leaving the label to them would leave them unlabelled. */}
                 <FieldBlock propertyKey={field.key}
                     property={property}
-                    showLabel={true}>
-                    {/* One row's height for a single-line value, so a row of
+                    showLabel={true}
+                    mode={"read"}>
+                    {/* One control's height for a single-line value, so a row of
                         short fields lines up with the taller ones beside it, and
-                        anything longer simply grows. */}
+                        anything longer simply grows. Matched to the form's row
+                        rather than shrunk to the text: it is what keeps a value
+                        from sitting directly on the label of the row below. */}
                     <div className={"min-h-8 flex flex-col justify-center min-w-0 text-text-primary dark:text-text-primary-dark"}>
                         <PropertyPreview propertyKey={field.key}
                             value={getValueInPath(entity.values, field.key)}
@@ -196,6 +241,53 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
             </div>
         );
     }, [collection, entity, formContext]);
+
+    /**
+     * One field of a `readVariant: "summary"` section: a label/value row rather
+     * than a grid cell, with the last one emphasised.
+     *
+     * The last row is the one a summary exists for — a run of figures is read to
+     * arrive at its final line — so it is separated by a rule and set at the
+     * weight the grid gave every cell equally.
+     */
+    const renderSummaryField = useCallback((
+        field: ResolvedFormField,
+        index: number,
+        total: number
+    ): React.ReactNode => {
+
+        const property = collection.properties?.[field.key] as Property | undefined;
+        if (!property) return null;
+
+        const last = index === total - 1;
+
+        return (
+            <div key={`summary_${field.key}`}
+                className={cls(
+                    "flex items-baseline justify-between gap-4 min-w-0 py-2",
+                    last && total > 1 && cls("mt-1.5 pt-3 border-t", defaultBorderMixin)
+                )}>
+                <span className={cls(
+                    "min-w-0 truncate",
+                    last
+                        ? "text-sm font-semibold text-text-primary dark:text-text-primary-dark"
+                        : "text-sm text-text-secondary dark:text-text-secondary-dark"
+                )}>
+                    {property.name ?? field.key}
+                </span>
+                <span className={cls(
+                    "shrink-0 text-right text-text-primary dark:text-text-primary-dark",
+                    last ? "text-base font-semibold" : "text-sm"
+                )}>
+                    <PropertyPreview propertyKey={field.key}
+                        value={getValueInPath(entity.values, field.key)}
+                        property={property}
+                        hideLabel
+                        size={"medium"}/>
+                </span>
+            </div>
+        );
+    }, [collection, entity]);
 
     // Same fold-back as the form: with no room for the rail its fields become a
     // trailing group rather than disappearing.
@@ -213,23 +305,33 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
         ];
 
     const content = <>
-        {externalLink && (
-            <div className={"flex justify-end mb-2"}>
-                <Tooltip title={"Open in the live site"}>
-                    <a href={externalLink} rel={"noopener noreferrer"} target={"_blank"}>
-                        <IconButton size={"small"}>
-                            <ExternalLinkIcon/>
-                        </IconButton>
-                    </a>
-                </Tooltip>
-            </div>
-        )}
+        {/* The title only when nothing above is already showing it. Every
+            full-page use sits under an identity bar that carries it; the
+            inline ones — the delete dialog — have no bar. */}
+        <EntityDisplayHeader entity={entity}
+            collection={collection}
+            showTitle={!asPage}
+            className={"mb-10"}/>
 
         <FormSections sections={sections}
             collapsed={collapsedSections}
             onToggle={toggleSection}
             errorKeys={NO_ERRORS}
-            renderField={renderField}/>
+            renderField={renderField}
+            renderSummaryField={renderSummaryField}
+            mode={"read"}/>
+
+        {/* Folded back with the rail's fields, and for the same reason. The rail
+            renders only where it has been measured to fit, so on the split pane,
+            the side panel and the dialog this block was dropped outright and the
+            record's id was nowhere on screen but the truncated chip in the bar.
+            An id you cannot read or copy is the one piece of a record you most
+            often opened it for. */}
+        {!showRail && layout.showRecordMeta && (
+            <div className={cls("mt-10 pt-6 border-t max-w-sm", defaultBorderMixin)}>
+                <RecordMeta entity={entity as Entity<Record<string, unknown>>}/>
+            </div>
+        )}
     </>;
 
     if (!asPage) {

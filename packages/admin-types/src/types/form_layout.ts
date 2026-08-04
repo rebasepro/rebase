@@ -69,6 +69,23 @@ export interface FormSection<M extends Record<string, unknown> = Record<string, 
      * never hide.
      */
     collapsible?: boolean;
+
+    /**
+     * How this section arranges itself in the **read-only** view of a record.
+     * Defaults to `"grid"` — the same grid the form uses.
+     *
+     * `"summary"` stacks the fields as right-aligned label/value rows with the
+     * last one emphasised, which is what a run of related figures wants: a
+     * subtotal, a tax, a discount and a total are one calculation, and four
+     * equal cells on a four-column grid is the one arrangement that says they
+     * are unrelated. Opt in per section — nothing about a group of numbers tells
+     * us it adds up, so this is never derived.
+     *
+     * Read-only only, and named for it. The form goes on rendering the grid:
+     * a summary row is a reading arrangement, and shrinking a control to fit one
+     * would make the fields harder to edit to make them prettier to skim.
+     */
+    readVariant?: "grid" | "summary";
 }
 
 /**

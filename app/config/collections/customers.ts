@@ -118,6 +118,26 @@ const customersCollection: PostgresCollectionConfig = {
         icon: "Users",
         group: "E-Commerce",
         defaultEntityAction: "view",
+        // The three derived stats are read-only and rarely the reason you opened
+        // the record, so they sit in the rail rather than between the person's
+        // phone number and their address.
+        form: {
+            sidebar: ["is_vip", "lifetime_value", "total_orders"],
+            sections: [
+                { key: "person", properties: ["avatar", "first_name", "last_name", "email", "phone", "company"] },
+                {
+                    key: "addresses",
+                    title: "Addresses",
+                    properties: ["shipping_address", "billing_address"]
+                },
+                {
+                    key: "internal",
+                    title: "Internal",
+                    properties: ["notes"],
+                    collapsed: true
+                }
+            ]
+        },
         propertiesOrder: [
             "first_name",
             "last_name",

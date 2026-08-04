@@ -25,7 +25,7 @@ import {
 import { useAnalyticsController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { getPropertyInPath } from "../util/property_utils";
-import { getEntityPreviewKeys } from "../util/previews";
+import { resolveCollectionSlotKeys } from "./CollectionViewBinding/usePreviewSlots";
 import { useEntityTitle } from "../hooks/useEntityDisplay";
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
@@ -95,10 +95,26 @@ export function EntityPreviewBindingData({
         entity
     });
 
+    // What the card says under the title.
+    //
+    // A stated list wins outright — `previewProperties` is the one place a
+    // developer says "show these", and nothing here is allowed to second-guess
+    // it. Failing that, the card fills the same slots as every other surface
+    // that renders one record in a row: a supporting line and a status. It used
+    // to take the first few properties in declaration order instead, which is
+    // how an author card ended up rendering an entire Markdown biography.
+    const statedKeys = previewKeys ?? (collection?.previewProperties as string[] | undefined);
     const listProperties = useMemo(() => {
         if (!collection) return [];
-        return previewKeys ?? getEntityPreviewKeys(authController, collection, customizationController.propertyConfigs, previewKeys, size === "medium" || size === "large" ? 3 : 2);
-    }, [previewKeys, collection, size, authController, customizationController.propertyConfigs]);
+        if (statedKeys && statedKeys.length > 0) {
+            return statedKeys.filter(key => getPropertyInPath(collection.properties, key));
+        }
+        const slotKeys = resolveCollectionSlotKeys(
+            collection as AdminCollection<Record<string, unknown>>,
+            authController,
+            customizationController.propertyConfigs);
+        return [slotKeys.subtitleKey, slotKeys.statusKey].filter(Boolean) as string[];
+    }, [statedKeys, collection, authController, customizationController.propertyConfigs]);
 
     if (!collection) {
         return (
@@ -127,7 +143,10 @@ export function EntityPreviewBindingData({
         // relation among the preview properties collapses to one line instead
         // of nesting another bordered card with its own id and action button.
         <NestedEntityPreviewBoundary>
-            <div className={cls("flex  shrink-0", {
+            {/* `overflow-hidden`: the image slot is a fixed box, and a thumbnail
+                that fails to load renders a "file not found" message sized for a
+                full preview — which spilled across the title beside it. */}
+            <div className={cls("flex shrink-0 overflow-hidden", {
                 "w-6 h-6 mx-1 my-0.5": size === "small" || size === "smallest",
                 "w-8 h-8 ml-1 mr-2 m-2 self-start": size === "medium",
                 "w-10 h-10 ml-2 mr-2 m-2 self-start": size === "large"
@@ -183,8 +202,14 @@ export function EntityPreviewBindingData({
 
                     const valueInPath = getValueInPath(entity.values, key);
                     return (
+                        // `truncate` clamps a line of text; it does nothing to a
+                        // preview that renders blocks. Custom `admin.Preview`
+                        // components can render anything at all, so the height
+                        // is capped here as well — a card that loses the tail of
+                        // an unusual value beats a card the size of a document.
                         <div key={"ref_prev_" + key}
-                            className={cls("truncate", restProperties.length > 1 ? "my-0.5" : "my-0")}>
+                            className={cls("truncate min-w-0 max-h-8 overflow-hidden",
+                                restProperties.length > 1 ? "my-0.5" : "my-0")}>
                             {
                                 entity
                                     ? <PropertyPreview
@@ -376,7 +401,7 @@ export const EntityPreviewContainer = React.forwardRef<HTMLDivElement, EntityPre
             "bg-white dark:bg-surface-900",
             size === "small" ? "min-h-[32px]" : "min-h-[44px]",
             fullwidth ? "w-full" : "",
-            "items-center",
+            "items-center overflow-hidden",
             hover ? "hover:bg-surface-accent-50 dark:hover:bg-surface-800 group-hover:bg-surface-accent-50 dark:group-hover:bg-surface-800" : "",
             size === "small" ? "p-1" : "px-2 py-1",
             "flex border rounded-lg",

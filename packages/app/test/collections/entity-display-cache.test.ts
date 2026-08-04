@@ -75,15 +75,19 @@ describe("EntityDisplayCache", () => {
     });
 
     it("records a rejection as nothing rather than retrying it forever", async () => {
+        // Muted: the failure is reported now, and the report is asserted below.
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         const cache = new EntityDisplayCache();
         const resolver = jest.fn(() => Promise.reject(new Error("offline")));
 
         expect(await cache.resolve(key, resolver)).toBeNull();
         expect(await cache.resolve(key, resolver)).toBeNull();
         expect(resolver).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
     });
 
     it("records a throw the same way", async () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         const cache = new EntityDisplayCache();
         const resolver = jest.fn(() => {
             throw new Error("boom");
@@ -92,6 +96,80 @@ describe("EntityDisplayCache", () => {
         expect(await cache.resolve(key, resolver)).toBeNull();
         expect(cache.peek(key)).toBeNull();
         expect(resolver).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
+    });
+
+    /**
+     * Recording the failure and reporting it are two obligations, and the tests
+     * above only ever covered the first. `EntityDisplayResolver`'s contract says a
+     * resolver that throws "is treated as `undefined` and logged once" — and the
+     * one `console.warn` that said why lived in `useEntityDisplay`, attached as a
+     * `.catch()` on this method. But both failure paths here swallow and return a
+     * RESOLVED promise, so that catch could never run: a resolver that blew up
+     * produced a blank chip and complete silence, in the browser and in the tests.
+     *
+     * Verified in the panel before fixing: a `tags` resolver that threw, and one
+     * that rejected, each left the row rendering and logged nothing at all.
+     *
+     * So the cache reports it. It is the one place that knows the failure
+     * happened, holds the key that identifies which role of which record it was,
+     * and runs exactly once per key — which is what makes "once" true rather than
+     * hopeful.
+     */
+    it("says why, once, when a resolver rejects", async () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const cache = new EntityDisplayCache();
+        const resolver = jest.fn(() => Promise.reject(new Error("offline")));
+
+        expect(await cache.resolve(key, resolver)).toBeNull();
+        expect(await cache.resolve(key, resolver)).toBeNull();
+
+        // Once per key, not once per ask — the second caller reads the cache.
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
+    });
+
+    it("says why when a resolver throws synchronously", async () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const cache = new EntityDisplayCache();
+        const resolver = jest.fn(() => {
+            throw new Error("boom");
+        });
+
+        expect(await cache.resolve(key, resolver)).toBeNull();
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
+    });
+
+    it("names the role and the record, and carries the cause", async () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const cache = new EntityDisplayCache();
+        const cause = new Error("offline");
+
+        await cache.resolve(entityDisplayKey("exercises", "e1", "tags"), () => Promise.reject(cause));
+
+        const [message, reported] = warn.mock.calls[0];
+        // Without the key the reader has a warning and no way to find the
+        // resolver that produced it.
+        expect(String(message)).toContain("tags");
+        expect(String(message)).toContain("exercises");
+        expect(String(message)).toContain("e1");
+        expect(reported).toBe(cause);
+        warn.mockRestore();
+    });
+
+    it("stays silent when a resolver legitimately answers nothing", async () => {
+        // `undefined` is the documented way to say "this record has nothing for
+        // this role". Warning about it would make the log useless for finding
+        // real failures.
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const cache = new EntityDisplayCache();
+
+        expect(await cache.resolve(key, () => undefined)).toBeNull();
+        expect(await cache.resolve(entityDisplayKey("exercises", "e2", "title"), async () => undefined)).toBeNull();
+
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
     });
 
     it("keys by role, so one record's title and image do not collide", async () => {

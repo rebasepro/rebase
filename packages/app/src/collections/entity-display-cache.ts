@@ -61,8 +61,21 @@ export class EntityDisplayCache {
      * call's promise; later callers get the cached value with no promise at all.
      *
      * A resolver that throws is recorded as "nothing" rather than retried: the
-     * alternative is every render re-running a call that just failed. The caller
-     * that saw the rejection is the one that logs it.
+     * alternative is every render re-running a call that just failed. And it is
+     * reported here, which is a correction.
+     *
+     * It used to say "the caller that saw the rejection is the one that logs
+     * it", and `useEntityDisplay` duly attached a `.catch()` that warned. But
+     * both failure paths below swallow and return a *resolved* promise, so that
+     * catch could never run — the two halves each did the reasonable thing and
+     * between them the log was unreachable. A resolver that blew up produced a
+     * blank chip and total silence, which is the failure mode
+     * `EntityDisplayResolver`'s own contract ("treated as `undefined` and logged
+     * once") exists to rule out.
+     *
+     * Reporting belongs here for the reason the caller could not do it: this is
+     * the one place that runs exactly once per key, so "once" is a property of
+     * the code rather than a hope about how many components mount.
      */
     resolve(key: EntityDisplayKey, resolver: () => unknown): Promise<unknown> {
         const entry = this.entries.get(key);
@@ -73,8 +86,8 @@ export class EntityDisplayCache {
         let produced: unknown;
         try {
             produced = resolver();
-        } catch {
-            this.set(key, null);
+        } catch (error: unknown) {
+            this.fail(key, error);
             return Promise.resolve(null);
         }
 
@@ -93,8 +106,8 @@ export class EntityDisplayCache {
                 this.set(key, value);
                 return value;
             })
-            .catch(() => {
-                this.set(key, null);
+            .catch((error: unknown) => {
+                this.fail(key, error);
                 return null;
             });
 
@@ -140,6 +153,22 @@ export class EntityDisplayCache {
     private set(key: EntityDisplayKey, value: unknown): void {
         this.entries.set(key, { value });
         this.emit();
+    }
+
+    /**
+     * Record a failed resolution as "nothing", and say so once.
+     *
+     * The key is the message: it is `<role> <path> <id>`, which is exactly what a
+     * reader needs to find the resolver that blew up. A warning with no key would
+     * tell them a display resolver failed somewhere in a list of fifty rows.
+     *
+     * `console.warn` rather than a thrown error, because this runs while a row is
+     * rendering: the contract is that a title which cannot be fetched must not
+     * take down the row that shows it.
+     */
+    private fail(key: EntityDisplayKey, error: unknown): void {
+        console.warn(`[rebase] Could not resolve display value for ${key}:`, error);
+        this.set(key, null);
     }
 
     private emit(): void {

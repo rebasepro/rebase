@@ -90,6 +90,16 @@ const authorsCollection: PostgresCollectionConfig = {
     admin: {
         icon: "User",
         group: "Content",
+        form: {
+            sections: [
+                { key: "author", properties: ["picture", "name", "email", "bio"] },
+                {
+                    key: "links",
+                    title: "Links",
+                    properties: ["twitter", "github", "website"]
+                }
+            ]
+        },
         propertiesOrder: [
             "id",
             "name",

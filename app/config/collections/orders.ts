@@ -223,6 +223,36 @@ const ordersCollection: PostgresCollectionConfig = {
         kanban: {
             columnProperty: "status"
         },
+        // The state of an order is what you check first and change least, so it
+        // goes to the rail; the rest reads top to bottom as the order's life —
+        // who placed it, what it came to, where it went.
+        form: {
+            sidebar: ["status", "payment_status", "currency"],
+            sections: [
+                { key: "order", properties: ["order_number", "customer", "order_date"] },
+                {
+                    key: "totals",
+                    title: "Totals",
+                    properties: ["subtotal", "tax_amount", "shipping_cost", "discount_amount", "total"],
+                    // Five figures that add up to the last one. On the grid they
+                    // are five equal cells, which is the one arrangement that
+                    // says they are unrelated; read as a receipt they are one
+                    // calculation. Read-only — the form still gets real inputs.
+                    readVariant: "summary"
+                },
+                {
+                    key: "fulfilment",
+                    title: "Fulfilment",
+                    properties: ["shipping_address", "tracking_number", "shipped_date", "delivered_date"]
+                },
+                {
+                    key: "internal",
+                    title: "Internal",
+                    properties: ["notes"],
+                    collapsed: true
+                }
+            ]
+        },
         propertiesOrder: [
             "order_number",
             "status",

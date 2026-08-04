@@ -828,7 +828,86 @@ async function generatePostgresDdlCommand(rawArgs: string[]): Promise<void> {
     }
 }
 
+/**
+ * `schema stale [--fix]` — is the generated Drizzle schema older than the rule
+ * that derives its foreign-key names?
+ *
+ * This exists for one upgrade path and is worth the command. 0.13 derives
+ * `category_id` where 0.12 derived `categorie_id`; boot-ensure renames the
+ * database column to match, and the project's checked-in
+ * `backend/src/schema.generated.ts` is then wrong in a way nothing the developer
+ * did would explain. Relation validation refuses to boot on it, permanently,
+ * because the rename has already been applied and will not run again.
+ *
+ * `rebase dev` calls this with `--fix` before starting the backend, so the
+ * upgrade behaves the way the release note says it does: the column moves and the
+ * project keeps working. Without `--fix` it reports and exits non-zero, which is
+ * what a build or a CI step wants.
+ */
+async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
+    const argsList = arg(
+        {
+            "--collections": String,
+            "--output": String,
+            "--fix": Boolean,
+            "-c": "--collections",
+            "-o": "--output"
+        },
+        { argv: rawArgs.slice(2), permissive: true }
+    );
+
+    const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
+    const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
+    const schemaFile = path.resolve(process.cwd(), outputPath);
+
+    // No generated schema yet is not staleness — a fresh project has not run the
+    // generator, and saying "stale" about a file that does not exist would send
+    // the reader looking for something to fix.
+    if (!fs.existsSync(schemaFile)) return;
+
+    const { loadCollections } = await import("./schema/doctor");
+    const { findLegacyForeignKeyNames, describeLegacyForeignKeyNames } =
+        await import("./schema/generated-schema-staleness");
+
+    let stale;
+    try {
+        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        stale = findLegacyForeignKeyNames(fs.readFileSync(schemaFile, "utf8"), collections);
+    } catch (err) {
+        // Best-effort by design: a collections directory that will not load is a
+        // real error, but it is one the boot reports far better than this does.
+        logger.debug(`schema stale: skipped (${err instanceof Error ? err.message : String(err)})`);
+        return;
+    }
+
+    if (stale.length === 0) return;
+
+    logger.info("");
+    logger.warn(chalk.yellow(
+        `  ⚠️  ${outputPath} names ${stale.length} foreign key(s) the way an earlier release did:`
+    ));
+    logger.info(chalk.gray(describeLegacyForeignKeyNames(stale)));
+    logger.info("");
+
+    if (!argsList["--fix"]) {
+        logger.error(chalk.red(
+            "  The database column has already been renamed at boot, so the generated schema no " +
+            "longer matches it and the server will refuse to start."
+        ));
+        logger.error(chalk.red("  Run `rebase schema generate` to regenerate it."));
+        process.exit(1);
+    }
+
+    logger.info(chalk.gray("  Regenerating the Drizzle schema so it matches..."));
+    await schemaCommand("generate", ["schema", "generate", `--collections=${collectionsPath}`, `--output=${outputPath}`]);
+}
+
 async function schemaCommand(subcommand: string, rawArgs: string[]): Promise<void> {
+    if (subcommand === "stale") {
+        await schemaStaleCommand(rawArgs);
+        return;
+    }
+
     if (subcommand === "generate") {
         const argsList = arg(
             {

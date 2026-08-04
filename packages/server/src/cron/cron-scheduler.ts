@@ -204,6 +204,13 @@ const MAX_LOGS_PER_JOB = 50;
  */
 const MIN_SCHEDULE_INTERVAL_MS = 5_000; // 5 seconds
 
+/**
+ * Largest delay setTimeout can hold. Node stores it in a 32-bit signed int;
+ * anything larger silently clamps to 1ms and fires immediately, so a slot
+ * further out than this must be reached in hops rather than one timer.
+ */
+const MAX_TIMER_DELAY_MS = 2_147_483_647; // 2^31 - 1, ~24.8 days
+
 // ─── CronScheduler ───────────────────────────────────────────────────
 
 interface RegisteredJob {
@@ -486,6 +493,23 @@ reason: "already_executing" },
             // from event loop jitter or near-zero setTimeout drift
             const delay = Math.max(rawDelay, MIN_SCHEDULE_INTERVAL_MS);
 
+            // A slot past the 32-bit timer ceiling cannot be armed directly:
+            // setTimeout would clamp it to 1ms and fire at once, and since the
+            // slot is already claimed by then, every wake re-schedules the same
+            // overflowing delay — a permanent hot loop, not a late job. Sleep
+            // to the ceiling and re-derive the delay on waking instead; the
+            // cron expression stays the source of truth across the hops.
+            if (delay > MAX_TIMER_DELAY_MS) {
+                const hop = setTimeout(() => {
+                    if (this.started && job.enabled) this.scheduleNext(id);
+                }, MAX_TIMER_DELAY_MS);
+                if (hop && typeof hop === "object" && "unref" in hop) {
+                    hop.unref();
+                }
+                job.timerId = hop;
+                return;
+            }
+
             const timer = setTimeout(async () => {
                 // Re-check state: scheduler may have been stopped or job disabled
                 // between when we scheduled and when we fire
@@ -495,6 +519,18 @@ reason: "already_executing" },
                 if (job.executing) {
                     logger.warn(`[cron] Skipping scheduled run of "${id}" — still executing from previous run`);
                     // Re-schedule to try again later
+                    this.scheduleNext(id);
+                    return;
+                }
+
+                // A timer can wake before its slot: a delay past the 32-bit
+                // ceiling, a clock stepped backwards by NTP, a VM resuming from
+                // suspend. Claiming on an early wake is unrecoverable — claims
+                // are permanent, so the slot would be burned and the real run
+                // silently skipped when it came due. Re-derive from the wall
+                // clock and re-arm instead; only the fire that is genuinely due
+                // may claim.
+                if (Date.now() < nextRun.getTime()) {
                     this.scheduleNext(id);
                     return;
                 }

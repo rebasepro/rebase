@@ -146,7 +146,8 @@ export async function skillsCommand(subcommand: string | undefined, rawArgs: str
 
 /**
  * Agents named explicitly on the command line, e.g. `--agent claude --agent cursor`
- * (also accepts a comma-separated list). Returns null when none were given.
+ * (also accepts a comma-separated list, and `all`). Returns null when none were
+ * given.
  */
 function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
     const requested: string[] = [];
@@ -158,6 +159,14 @@ function parseAgentFlags(rawArgs: string[]): AgentKey[] | null {
         }
     }
     if (requested.length === 0) return null;
+
+    // `all` exists for the non-interactive case. Detection cannot help there: a
+    // scaffolded project ships `.cursorrules`, `CLAUDE.md`, `.windsurfrules` and
+    // `AGENTS.md` all at once, so every marker file is present and none of them
+    // says which assistant the developer actually uses. Guessing from them would
+    // install four agents' skills unasked; refusing leaves a scripted setup with
+    // no way through. Naming `all` is the developer saying it out loud.
+    if (requested.includes("all")) return Object.keys(AGENTS) as AgentKey[];
 
     const valid = Object.keys(AGENTS);
     const unknown = requested.filter(a => !valid.includes(a));
@@ -205,6 +214,7 @@ async function skillsInstall(rawArgs: string[] = []) {
         if (!process.stdin.isTTY) {
             console.error(chalk.red("Cannot prompt: this is a non-interactive terminal (no TTY)."));
             console.error(chalk.yellow(`  Name the agents explicitly, e.g. rebase skills install --agent ${Object.keys(AGENTS)[0]}`));
+            console.error(chalk.yellow("  Or install for every supported agent:  rebase skills install --agent all"));
             console.error(chalk.gray(`  Available: ${Object.keys(AGENTS).join(", ")}`));
             process.exit(1);
         }
@@ -263,12 +273,15 @@ ${chalk.green.bold("Subcommands")}
 
 ${chalk.green.bold("Options")}
   ${chalk.blue("--agent, -a")}   Agent(s) to install for, skipping detection and the prompt.
-                Repeat the flag or pass a comma-separated list.
-                Available: ${Object.keys(AGENTS).join(", ")}
+                Repeat the flag or pass a comma-separated list, or ${chalk.bold("all")}.
+                Required without a TTY: a scaffolded project carries a marker
+                file for every agent, so detection cannot pick one for you.
+                Available: ${Object.keys(AGENTS).join(", ")}, all
 
 ${chalk.green.bold("Examples")}
   ${chalk.cyan("rebase skills install")}
   ${chalk.cyan("rebase skills install --agent claude")}
   ${chalk.cyan("rebase skills install --agent claude,cursor")}
+  ${chalk.cyan("rebase skills install --agent all")}   ${chalk.gray("# scripted / CI")}
 `);
 }

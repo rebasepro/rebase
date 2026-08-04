@@ -700,7 +700,7 @@ interface RebaseShellProps {
     title?: string;              // App title (default: "Rebase")
     appBar?: React.ReactNode;    // Custom app bar
     drawer?: React.ReactNode;    // Custom drawer
-    autoOpenDrawer?: boolean;    // Auto-open drawer on mount (default: false)
+    autoOpenDrawer?: boolean;    // Expand the drawer on hover (default: true)
     children?: React.ReactNode;  // Additional route content
 }
 ```

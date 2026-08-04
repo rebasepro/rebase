@@ -14,7 +14,8 @@ export function MapPropertyPreview({
     propertyKey,
     value,
     property,
-    size
+    size,
+    compact
 }: PropertyPreviewProps<MapProperty>) {
 
     if (property.type !== "map") {
@@ -22,6 +23,13 @@ export function MapPropertyPreview({
     }
 
     const mapProperty = property as MapProperty;
+
+    // A map is a table — a row per sub-property — and a card line has room for
+    // neither the rows nor the borders between them.
+    if (compact) {
+        return <CompactMapPreview property={mapProperty}
+            value={value as Record<string, unknown> | undefined}/>;
+    }
 
     if (!mapProperty.properties || Object.keys(mapProperty.properties ?? {}).length === 0) {
         return (
@@ -103,6 +111,49 @@ export function MapPropertyPreview({
         </div>
     );
 
+}
+
+/** How many leaf values a one-line map summary shows before it gives up. */
+const COMPACT_MAP_ENTRIES = 3;
+
+/**
+ * A map in one line: its first few leaf values, labelled, joined by dots.
+ *
+ * Nested maps and arrays are skipped rather than flattened — a line that says
+ * `[object Object]` is worse than a line that says nothing about that field —
+ * and a map with no leaves at all falls back to stating its size, which is at
+ * least true.
+ */
+function CompactMapPreview({
+    property,
+    value
+}: { property: MapProperty, value: Record<string, unknown> | undefined }) {
+
+    if (!value || typeof value !== "object") return <EmptyValue/>;
+
+    const declared = property.properties;
+    const keys = declared ? Object.keys(declared) : Object.keys(value);
+
+    const parts: string[] = [];
+    for (const key of keys) {
+        if (parts.length >= COMPACT_MAP_ENTRIES) break;
+        const childValue = value[key];
+        if (childValue === undefined || childValue === null || childValue === "") continue;
+        if (typeof childValue === "object") continue;
+        const label = declared?.[key]?.name ?? key;
+        parts.push(`${label}: ${String(childValue)}`);
+    }
+
+    if (parts.length === 0) {
+        const count = Object.keys(value).length;
+        return <Typography variant={"caption"}
+            color={"secondary"}
+            className={"truncate"}>
+            {count === 1 ? "1 field" : `${count} fields`}
+        </Typography>;
+    }
+
+    return <span className={"truncate text-sm"}>{parts.join(" · ")}</span>;
 }
 
 export function KeyValuePreview({ value }: { value: any }) {

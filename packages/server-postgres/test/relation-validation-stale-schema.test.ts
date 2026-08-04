@@ -82,20 +82,36 @@ describe("relation validation against a stale generated schema", () => {
         expect(bootMessage()).toMatch(/schema\.generated\.ts/);
     });
 
-    it("offers regeneration before it offers editing the collection", () => {
+    it("offers regeneration before the per-relation detail", () => {
         // The ordering is the fix. After a rename the config is right and the
-        // file is stale, so "regenerate" resolves the state while "set the
-        // column to one of these" destroys it.
+        // file is stale, so "regenerate" resolves the state while advice to
+        // edit the collection destroys it.
+        //
+        // Anchored on the bullet that opens the per-defect list rather than on
+        // the old "set `targetColumn` to one of …" wording: this release also
+        // *detects* the stale-codegen case and replaces that generic advice
+        // with a targeted explanation, so the phrase it used to check for is
+        // correctly gone.
         const message = bootMessage();
         const regenerate = message.indexOf("rebase schema generate");
-        const editConfig = message.indexOf("targetColumn");
+        const perDefect = message.indexOf("•");
 
         expect(regenerate).toBeGreaterThan(-1);
-        expect(editConfig).toBeGreaterThan(-1);
-        expect(regenerate).toBeLessThan(editConfig);
+        expect(perDefect).toBeGreaterThan(-1);
+        expect(regenerate).toBeLessThan(perDefect);
     });
 
-    it("still lists the columns it did find, for a config that really is wrong", () => {
+    it("names the legacy and the derived column when it can tell them apart", () => {
+        // The targeted half, which arrived on main while this branch was
+        // fixing the generic half. Together they say what happened and what to
+        // do; neither alone did.
+        const message = bootMessage();
+
+        expect(message).toMatch(/still declares `categorie_id`/);
+        expect(message).toMatch(/derives `category_id`/);
+    });
+
+    it("still names the column the generated schema actually has", () => {
         expect(bootMessage()).toMatch(/categorie_id/);
     });
 });

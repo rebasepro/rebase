@@ -12,7 +12,8 @@ export function ArrayOfStringsPreview({
     value,
     property: property,
     // entity,
-    size
+    size,
+    compact
 }: PropertyPreviewProps<ArrayProperty>) {
 
     if (Array.isArray(property.of)) {
@@ -26,6 +27,30 @@ export function ArrayOfStringsPreview({
     }
     const stringProperty = property.of as StringProperty;
     const arrayValues = value as string[];
+
+    // One line, so the items run along it separated by a dot rather than
+    // stacking. Each still renders through the string preview: a value that is
+    // a tag stays a tag, it just sits beside its neighbours.
+    if (compact) {
+        return (
+            <span className="inline-flex items-center gap-1 min-w-0 truncate">
+                {arrayValues &&
+                    arrayValues.map((v, index: number) =>
+                        <React.Fragment key={`preview_array_strings_${propertyKey}_${index}`}>
+                            {index > 0 && <span className="opacity-40"
+                                aria-hidden={true}>·</span>}
+                            <ErrorBoundary>
+                                <StringPropertyPreview propertyKey={propertyKey}
+                                    property={stringProperty}
+                                    value={v}
+                                    compact={true}
+                                    size={size}/>
+                            </ErrorBoundary>
+                        </React.Fragment>
+                    )}
+            </span>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-2">

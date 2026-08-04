@@ -32,7 +32,14 @@ export function FormRail({
             // No responsive hiding here. The caller decides whether the rail is
             // shown, by measuring; a CSS `hidden` would leave the fields the
             // resolver moved in here unreachable rather than folding them back.
-            "flex flex-col gap-6 shrink-0 w-72 border-l overflow-y-auto",
+            //
+            // `w-76` (304px), between the old 288 and a full `w-80`. The rail
+            // holds real controls — a status select, a date picker — plus a
+            // record block whose id is a 36-character UUID, so 288 left the
+            // select tighter than the identical select in the column. 320 took
+            // more than it gave back: past about 300px the extra goes to the
+            // gap beside a chip, not to anything that needed it.
+            "flex flex-col gap-6 shrink-0 w-76 border-l overflow-y-auto",
             "px-5 py-6 bg-surface-50 dark:bg-surface-900",
             defaultBorderMixin
         )}>
@@ -47,7 +54,17 @@ export function FormRail({
     );
 }
 
-function RecordMeta({ entity }: { entity: Entity<Record<string, unknown>> }) {
+/**
+ * The record's id and audit timestamps.
+ *
+ * Exported because the rail is not the only place it renders. The rail is shown
+ * only when it has been *measured* to fit, and every layout narrower than that —
+ * the split pane, the side panel, the dialog — folds its contents back into the
+ * column. The fields folded back but this block did not, so on three of the four
+ * layouts a record simply had no id on screen: the only copy of it was the
+ * truncated `e166a394…b422` chip in the identity bar.
+ */
+export function RecordMeta({ entity }: { entity: Entity<Record<string, unknown>> }) {
 
     const createdAt = pickDate(entity.values, ["created_at", "createdAt", "created_on"]);
     const updatedAt = pickDate(entity.values, ["updated_at", "updatedAt", "modified_at"]);

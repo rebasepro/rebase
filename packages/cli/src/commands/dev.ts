@@ -394,6 +394,37 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         /** Whether the frontend has been launched (we only launch it once). */
         let frontendLaunched = false;
 
+        // A generated schema that a *library upgrade* invalidated, repaired before
+        // the backend sees it.
+        //
+        // Distinct from the drift warning further down, which watches
+        // `config/collections` and so only fires when the developer edits
+        // something. This case has no edit: 0.13 derives `category_id` where 0.12
+        // derived `categorie_id`, from an unchanged collection. Boot-ensure renames
+        // the database column, relation validation reads the stale generated module
+        // and refuses to start — on this boot and every boot after, since the
+        // rename does not run twice. Regenerating is the whole fix, and the release
+        // note promises the rename is handled, so do it rather than announce it.
+        //
+        // Runs regardless of `--generate`: this is not "keep my schema fresh", it
+        // is "do not hand the runtime a file that cannot boot".
+        try {
+            const activePlugin = getActiveBackendPlugin(backendDir);
+            const pluginCli = activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
+            if (pluginCli) {
+                await execa(tsxBin, [pluginCli, "schema", "stale", "--fix"], {
+                    cwd: backendDir,
+                    stdio: "inherit",
+                    env
+                });
+            }
+        } catch {
+            // Never block `dev` on this. A project with no generated schema, a
+            // driver too old to know the subcommand, or a collections directory
+            // that will not load all land here, and the boot itself reports each
+            // of them better than a preflight can.
+        }
+
         // Initial schema and SDK generation (disabled by default, enabled via --generate or env var)
         if (shouldGenerate) {
             console.log(chalk.gray("  → Ensuring schema and SDK are generated on start..."));

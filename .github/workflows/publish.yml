@@ -36,8 +36,24 @@ jobs:
   # ══════════════════════════════════════════════════════════════
   # Canary — every push to main, and manual runs with channel=canary
   # ══════════════════════════════════════════════════════════════
+
+  # The same gate a stable release runs, before a canary publishes.
+  #
+  # Canary used to skip this on the reasoning that "a canary publishes if it
+  # compiles, which is what makes it a canary". What that bought in practice was
+  # a channel people install from that had passed nothing: canary
+  # 0.13.1-canary.gcd6689e went to npm while `check:hooks` was red, and would
+  # equally have published with a failing test suite, a broken template or a
+  # compose file naming an image nothing publishes. A prerelease is still the
+  # place to find problems — but by testing the release, not by shipping one
+  # nobody checked.
+  verify-canary:
+    if: ${{ github.event_name == 'push' || inputs.channel == 'canary' }}
+    uses: ./.github/workflows/verify.yml
+
   publish-canary:
     if: ${{ github.event_name == 'push' || inputs.channel == 'canary' }}
+    needs: verify-canary
     runs-on: ubuntu-latest
     concurrency:
       group: canary-publish-${{ github.ref }}
@@ -377,6 +393,65 @@ jobs:
 
           # Push both the commit and the tag
           git push origin main --follow-tags
+
+      # ── Self-host runtime image ─────────────────────────────
+      #
+      # `rebasepro/server` is the image the scaffolded `docker-compose.yml` tells
+      # every new project to pull, with `REBASE_VERSION` pinned to the version
+      # released just above. Until this step existed nothing published it on a
+      # release: `cloudbuild-runtime.yaml` has had a Docker Hub push for months,
+      # but it runs only when a human types `gcloud builds submit`, and nobody did.
+      # So 0.13.0 shipped a compose file whose first command ends at
+      # `pull access denied for rebasepro/server, repository does not exist`.
+      #
+      # It publishes AFTER npm and the tag on purpose. The image installs the
+      # framework from a bundle's own `deps.declared` at boot, so a self-hoster's
+      # first boot resolves `@rebasepro/*` from npm — building the image before
+      # those versions exist would produce one that cannot boot the release it is
+      # named after.
+      #
+      # Note what this is NOT: the managed fleet is pinned by digest to the private
+      # Artifact Registry image that `cloudbuild-runtime.yaml` builds, and this job
+      # builds its own from the same commit and Dockerfile. Same source, different
+      # digest. That is a deliberate narrowing of the "one artifact everywhere"
+      # property, taken because a self-host path that works beats a digest that
+      # matches. Replace this with a federated `gcloud builds submit` if the single
+      # digest is wanted back — the check in `scripts/check-runtime-image.mjs` only
+      # asks that *something* automatic publishes it.
+      - name: Set up Docker Buildx
+        if: ${{ !inputs.dry_run }}
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: ${{ !inputs.dry_run }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push the runtime image
+        if: ${{ !inputs.dry_run }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/server.Dockerfile
+          # linux/arm64 as well as amd64: a self-hoster on Apple silicon running
+          # `docker compose up` gets qemu emulation without it, which is slow
+          # enough to read as a hang on first boot.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            rebasepro/server:${{ steps.version.outputs.version }}
+            rebasepro/server:latest
+          # The compose file resolves `${REBASE_VERSION:-latest}`, so `latest`
+          # has to keep moving or a project that clears the variable pulls
+          # whatever the first release ever pushed.
+
+      # Publishing is not the same as being pullable. Ask the registry, from
+      # outside, with no credentials — the way a self-hoster's daemon will.
+      - name: Verify the image is pullable
+        if: ${{ !inputs.dry_run }}
+        run: node scripts/check-runtime-image.mjs --live --version "${{ steps.version.outputs.version }}"
 
       # ── GitHub Release ──────────────────────────────────────
       - name: Create GitHub Release (with CHANGELOG notes)

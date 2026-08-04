@@ -151,13 +151,10 @@ function AdminNavigationContent() {
         closeHover
     } = useApp();
 
-    const [adminMenuOpen, setAdminMenuOpen] = React.useState(false);
-
     const analyticsController = useAnalyticsController();
     const navigationState = useNavigationStateController();
     const context = useRebaseContext();
 
-    const tooltipsOpen = drawerHovered && !drawerOpen && !adminMenuOpen;
     const largeLayout = useLargeLayout();
     const adminModeController = useAdminModeController();
     const registry = useRebaseRegistry();
@@ -251,8 +248,6 @@ context });
                         collapsed={isGroupCollapsed(group)}
                         onToggleCollapsed={() => toggleGroupCollapsed(group)}
                         drawerOpen={drawerVisuallyOpen}
-                        tooltipsOpen={tooltipsOpen}
-                        adminMenuOpen={adminMenuOpen}
                         onItemClick={onItemClick}
                         icon={groupIcons.get(group)}
                     />
@@ -278,7 +273,7 @@ export function DrawerLogo({
     drawerHovered: boolean;
 }) {
 
-    const showFullContent = drawerOpen || (drawerHovered && !drawerOpen);
+    const showFullContent = drawerOpen || drawerHovered;
 
     return (
         <div className="flex flex-row items-center shrink-0 pt-4 pb-0 px-2">
@@ -333,8 +328,12 @@ export function DrawerToggle({
 }) {
     const isExpanded = drawerOpen;
     const isHovered = drawerHovered && !drawerOpen;
-    const isFloating = isHovered;
     const showFullContent = isExpanded || isHovered;
+
+    const [wantsTooltip, setWantsTooltip] = React.useState(false);
+    // See {@link DrawerNavigationItem}: a masked tooltip never hears the pointer
+    // leave, so the stale state is dropped as the mask goes on.
+    if (showFullContent && wantsTooltip) setWantsTooltip(false);
 
     const { t } = useTranslation();
 
@@ -342,33 +341,30 @@ export function DrawerToggle({
         <div className="shrink-0 mt-auto px-4 pt-0.5 pb-2">
             <Tooltip
                 title={isExpanded ? t("collapse") : t("expand")}
+                // The row spells out "Collapse"/"Expand" itself whenever it is wide
+                // enough to show the label — expanded, or floating open under the
+                // pointer. A tooltip repeating that word is noise; it earns its
+                // place only on a bare rail, where the chevron stands alone.
+                //
+                // Masked, not withheld: see {@link DrawerNavigationItem} for why
+                // this stays controlled in both states.
+                open={!showFullContent && wantsTooltip}
+                onOpenChange={setWantsTooltip}
                 side="right"
                 sideOffset={12}
                 asChild={true}
-                open={isFloating ? false : undefined}
             >
-                <div
+                <button
+                    type="button"
                     className={cls(
-                        "flex flex-row items-center rounded-lg cursor-pointer",
+                        "flex flex-row items-center rounded-lg cursor-pointer w-full",
                         "hover:bg-surface-accent-100 dark:hover:bg-surface-800",
                         "transition-colors duration-150",
                         "py-2"
                     )}
-                    role="button"
-                    tabIndex={0}
                     aria-expanded={isExpanded}
                     aria-label={isExpanded ? t("collapse") : t("expand")}
                     onClick={() => isExpanded ? closeDrawer() : openDrawer()}
-                    onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            if (isExpanded) {
-                                closeDrawer();
-                            } else {
-                                openDrawer();
-                            }
-                        }
-                    }}
                 >
                     <div className="shrink-0 flex items-center justify-center w-[44px] h-[24px] text-surface-500 dark:text-surface-400">
                         {isExpanded
@@ -387,7 +383,7 @@ export function DrawerToggle({
                             {isExpanded ? t("collapse") : t("expand")}
                         </Typography>
                     </div>
-                </div>
+                </button>
             </Tooltip>
         </div>
     );

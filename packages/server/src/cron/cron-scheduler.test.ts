@@ -472,6 +472,84 @@ reason: "already_executing" });
         });
     });
 
+    // ── Waking before the slot is due ───────────────────────────────
+
+    describe("early wake-ups", () => {
+        it("does not claim a slot when the clock steps back before the timer fires", async () => {
+            // Claims are permanent, so claiming early is unrecoverable: the slot
+            // is burned and the real run is skipped when it comes due.
+            jest.setSystemTime(new Date("2026-08-04T00:00:00.000Z"));
+            const tryClaimRun = jest.fn<(jobId: string, slot: string) => Promise<boolean>>()
+                .mockResolvedValue(true);
+            scheduler.setStore({
+                ensureTable: async () => {},
+                insertLog: async () => {},
+                fetchLogs: async () => [],
+                fetchJobStats: async () => new Map(),
+                tryClaimRun
+            } as never);
+            scheduler.registerJobs([makeJob("hourly-claim", { schedule: "0 * * * *" })]);
+            scheduler.start();
+
+            // NTP steps the clock back half an hour. The pending timer keeps its
+            // original delay, so it now wakes 30 minutes before its slot.
+            jest.setSystemTime(new Date(Date.now() - 30 * 60 * 1000));
+            await jest.advanceTimersByTimeAsync(61 * 60 * 1000);
+
+            expect(tryClaimRun).not.toHaveBeenCalled();
+        });
+    });
+
+    // ── Slots beyond the 32-bit setTimeout ceiling ──────────────────
+
+    describe("far-future slots", () => {
+        // "0 4 3 * *" from Aug 4 lands on Sep 3 — ~29.3 days, past the ~24.8-day
+        // ceiling. Monthly jobs sit here for most of the month, so an overflow
+        // that fires immediately is the common case, not an exotic one.
+        const MONTHLY = "0 4 3 * *";
+        const START = new Date("2026-08-04T00:00:00.000Z");
+
+        beforeEach(() => { jest.setSystemTime(START); });
+
+        it("does not fire a slot that overflows the timer ceiling", async () => {
+            let runs = 0;
+            scheduler.registerJobs([makeJob("monthly", {
+                schedule: MONTHLY,
+                handler: async () => { runs++; }
+            })]);
+            scheduler.start();
+
+            await jest.advanceTimersByTimeAsync(60 * 1000);
+            expect(runs).toBe(0);
+        });
+
+        it("reports the true next run while hopping toward it", () => {
+            scheduler.registerJobs([makeJob("monthly-next", { schedule: MONTHLY })]);
+            scheduler.start();
+
+            // The schedule resolves in local time, so assert the property that
+            // matters rather than a wall-clock instant: the slot is genuinely
+            // past the ceiling, and the job still advertises it while hopping.
+            const nextRunAt = scheduler.getJob("monthly-next")?.nextRunAt;
+            expect(nextRunAt).toBeDefined();
+            expect(new Date(nextRunAt!).getTime() - START.getTime())
+                .toBeGreaterThan(2_147_483_647);
+        });
+
+        it("fires once the far-future slot actually arrives", async () => {
+            let runs = 0;
+            scheduler.registerJobs([makeJob("monthly-fires", {
+                schedule: MONTHLY,
+                handler: async () => { runs++; }
+            })]);
+            scheduler.start();
+
+            // Past the 24.8-day hop, then past the slot itself.
+            await jest.advanceTimersByTimeAsync(31 * 24 * 60 * 60 * 1000);
+            expect(runs).toBe(1);
+        });
+    });
+
     // ── CronStore integration ───────────────────────────────────────
 
     describe("store integration", () => {

@@ -1,6 +1,9 @@
 export type { EntityViewBindingProps } from "./EntityViewBinding";
 export { EntityViewBinding } from "./EntityViewBinding";
 
+export type { EntityDisplayHeaderProps } from "./EntityDisplayHeader";
+export { EntityDisplayHeader, HEADER_DISPLAY_ROLES } from "./EntityDisplayHeader";
+
 export * from "./DetailViewBinding";
 
 export type { SelectionProps } from "./ReferenceTable/SelectionTableBinding";

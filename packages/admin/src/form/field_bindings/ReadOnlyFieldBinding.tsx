@@ -53,7 +53,13 @@ export function ReadOnlyFieldBinding({
                     "w-full overflow-x-scroll no-scrollbar flex items-center",
                     skipCardWrapper
                         ? ""
-                        : "rounded-lg border border-surface-200 dark:border-surface-700 px-4 md:px-6 min-h-10 opacity-80"
+                        // `min-h-12` is `TextField`'s own `large` height, which is
+                        // what every editable field in the form is. At 40px a
+                        // read-only field sat 8px short of the input beside it,
+                        // so a row holding one of each had its two boxes'
+                        // baselines and bottom edges disagree — the field looked
+                        // misaligned rather than uneditable.
+                        : "rounded-lg border border-surface-200 dark:border-surface-700 px-4 md:px-6 min-h-12 opacity-80"
                 )}>
 
                 <ErrorBoundary>

@@ -590,10 +590,15 @@ export type RebaseData<DB = unknown> = {
              * Dynamic collection accessor.
              * Access any collection by its slug as a property.
              *
+             * The index signature is `CollectionAccessor` alone, for the reason
+             * spelled out on {@link RebaseSdkData}: unioning in the `collection`
+             * method's own signature is unnecessary across an intersection, and it
+             * costs `data.products.find()` — the access this `@example` documents.
+             *
              * @example
              * data.products.find({ where: { status: ["==", "published"] } })
              */
-            [collectionSlug: string]: CollectionAccessor | ((slug: string) => CollectionAccessor);
+            [collectionSlug: string]: CollectionAccessor;
         }
 );
 
@@ -645,6 +650,26 @@ export type InsertOf<T> = T extends { Insert: infer I extends Record<string, unk
  */
 export type UpdateOf<T> = T extends { Update: infer U extends Record<string, unknown> } ? U : Partial<RowOf<T>>;
 
+/**
+ * Note on the untyped branch below: its index signature is
+ * `SDKCollectionClient`, NOT `SDKCollectionClient | ((slug: string) => …)`.
+ *
+ * The union looks like it is needed so `collection` — a method on this same
+ * object — satisfies the index signature. It is not, because `collection` is
+ * declared in a *separate* member of the intersection, and TypeScript only
+ * requires named properties to be assignable to an index signature declared
+ * alongside them. Including the function arm cost the documented accessor:
+ *
+ *     rebase.dataAsAdmin.projects.find()
+ *     //                          ^ Property 'find' does not exist on type
+ *     //                            'SDKCollectionClient | ((slug: string) => …)'
+ *
+ * Every project without a generated `Database` type lands on this branch, so
+ * property-style access — the form used by the `@example` below, by the
+ * scaffolded function template, and by the 0.13 migration note — did not
+ * compile for any of them. Do not restore the arm; use `collection(slug)` if a
+ * caller genuinely needs the by-slug function.
+ */
 export type RebaseSdkData<DB = unknown> = {
     /**
      * Get a flat collection accessor by slug.
@@ -665,6 +690,6 @@ export type RebaseSdkData<DB = unknown> = {
              * @example
              * data.products.find({ where: { status: ["==", "published"] } })
              */
-            [collectionSlug: string]: SDKCollectionClient | ((slug: string) => SDKCollectionClient);
+            [collectionSlug: string]: SDKCollectionClient;
         }
 );

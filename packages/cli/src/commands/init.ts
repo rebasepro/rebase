@@ -694,9 +694,16 @@ GIT_COMMITTER_EMAIL: "noreply@rebase.pro"
     }
 
     console.log("");
+    // `--headless --introspect` had these two claims fighting: the step above
+    // announced "collections generated!" and this line then said there are none.
+    // Both were reachable at once, and the reader has to believe one of them.
     console.log(isBaas
-        ? chalk.gray("This starts a headless API (Hono + PostgreSQL). There are no collection files: ")
-            + chalk.gray("the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.")
+        ? introspected
+            ? chalk.gray("This starts a headless API (Hono + PostgreSQL) over the collections just ")
+                + chalk.gray("generated from your database in config/collections. Edit them to change what the ")
+                + chalk.gray("API exposes; docs are at /api/swagger.")
+            : chalk.gray("This starts a headless API (Hono + PostgreSQL). There are no collection files: ")
+                + chalk.gray("the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.")
         : chalk.gray("This starts both the backend (Hono + PostgreSQL)")
             + chalk.gray(" and the frontend (Vite + React) concurrently."));
     console.log("");
@@ -995,6 +1002,37 @@ function readCliVersion(): string {
     return "latest";
 }
 
+/**
+ * The runtime image tag to pin, given the version of the CLI doing the scaffolding.
+ *
+ * Only a stable release publishes `rebasepro/server` — a multi-arch build on
+ * every push to main would cost minutes per commit for an image nobody pulls.
+ * So pinning a prerelease CLI's own version writes a tag that cannot exist, and
+ * `docker compose up` fails on `manifest unknown`, which is the same dead end
+ * as the missing-repository bug this pinning was added to prevent.
+ *
+ * A prerelease therefore falls back to `latest`, which is correct rather than
+ * merely available: a bundle's manifest declares the runtime range it needs
+ * (`^1`), the image supplies only `@rebasepro/server`, and the framework a
+ * bundle runs is installed from its own `deps.declared` at boot. The current
+ * stable runtime boots a canary bundle by design.
+ *
+ * A floating tag is a real cost — it is what pinning exists to avoid — so say
+ * so in the file rather than leaving a reader to discover it.
+ */
+export function resolveRuntimeImageTag(cliVersion: string): { tag: string; note?: string } {
+    // Semver prerelease: everything after the first `-`. `0.13.1-canary.gcd6689e`.
+    if (/^\d+\.\d+\.\d+-/.test(cliVersion)) {
+        return {
+            tag: "latest",
+            note: `# Scaffolded by a prerelease CLI (${cliVersion}), which publishes no runtime image,\n` +
+                "# so this floats to the newest stable runtime. Pin an exact version once you\n" +
+                "# deploy: a moving tag changes what you are running with no version changing."
+        };
+    }
+    return { tag: cliVersion };
+}
+
 export async function configureEnvFile(targetDirectory: string, databaseUrl?: string) {
     const envExamplePath = path.join(targetDirectory, ".env.example");
     const envPath = path.join(targetDirectory, ".env");
@@ -1076,10 +1114,11 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
         // It also makes the compose header's upgrade instruction true: "To
         // upgrade Rebase, change REBASE_VERSION and restart" is a no-op while
         // the value is unset and the tag floats.
-        const runtimeVersion = readCliVersion();
+        const { tag: runtimeVersion, note } = resolveRuntimeImageTag(readCliVersion());
+        const pinned = `${note ? `${note}\n` : ""}REBASE_VERSION=${runtimeVersion}`;
         envContent = /^#?\s*REBASE_VERSION=.*$/m.test(envContent)
-            ? envContent.replace(/^#?\s*REBASE_VERSION=.*$/m, `REBASE_VERSION=${runtimeVersion}`)
-            : `${envContent.trimEnd()}\n\n# The Rebase runtime image tag docker-compose.yml pulls.\n# Change this and restart to upgrade; your project bundle is untouched.\nREBASE_VERSION=${runtimeVersion}\n`;
+            ? envContent.replace(/^#?\s*REBASE_VERSION=.*$/m, pinned)
+            : `${envContent.trimEnd()}\n\n# The Rebase runtime image tag docker-compose.yml pulls.\n# Change this and restart to upgrade; your project bundle is untouched.\n${pinned}\n`;
 
         if (databaseUrl) {
             if (/[\r\n]/.test(databaseUrl)) {

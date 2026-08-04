@@ -734,6 +734,43 @@ function already performs when the value has not changed.
 **Close the read too.** `getIn(x, "constructor.prototype")` returning
 `Object.prototype` is how a polluted value is read back out and rendered, and it
 is the half that survived in the copy whose write was safe.
+---
+
+## 23. A platform limit that clamps instead of rejecting
+
+`setTimeout` stores its delay in a 32-bit signed integer. Hand it more than
+2,147,483,647 ms — about 24.8 days — and Node does not throw and does not wait:
+it clamps the delay to **1 ms** and fires immediately. The only signal is a
+`TimeoutOverflowWarning` on stderr, which in GKE is scraped as `ERROR` severity,
+so the first thing anyone hears is an alert about "application errors" from a pod
+whose own logs say `INFO`.
+
+The cron scheduler had a floor on its delay — `Math.max(rawDelay,
+MIN_SCHEDULE_INTERVAL_MS)`, added to stop tight loops — and no ceiling. A monthly
+job (`0 4 3 * *`) computes its next slot ~30 days out for most of the month, so
+it overflowed, fired at once, lost the claim race against the row it had itself
+just inserted, logged *claimed by another instance*, rescheduled, and overflowed
+again: **112 iterations a second, indefinitely**, 1.9 GB of logs a day and a
+`cron_claims` INSERT per iteration. It survived pod restarts, because the claim
+that made it skip is a persistent row. A monthly cron is not an edge case; the
+overflow window covers most of every month.
+
+The tell is **arithmetic reaching an API with an undocumented range**. A floor
+without a ceiling is the specific smell: someone already knew the input was
+untrusted and bounded one side of it.
+
+**Sweep:** grep for `setTimeout`/`setInterval` whose delay is an expression
+rather than a literal — `grep -rn "set\(Timeout\|Interval\)(" --include=*.ts |
+grep -v "[0-9]_\?[0-9]*)"`. For each, ask what the largest value the expression
+can produce is, not what it usually produces. Same question for `setSeconds`,
+array pre-allocation, and anything typed `int` on the far side of a driver.
+
+**Watch for:** the clamp being only half the damage. Firing early is recoverable;
+what made this permanent is that the early fire **claimed the slot**, and claims
+are forever, so the real run would have been skipped when it finally came due —
+a silent data-staleness bug outliving the noisy one. Any guard that records
+"this was handled" must be reached only on the path that genuinely handled it,
+and a wall-clock check is cheap next to a timer you cannot trust.
 
 ---
 

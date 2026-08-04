@@ -7,16 +7,16 @@ export function DrawerNavigationItem({
     name,
     icon,
     drawerOpen,
-    adminMenuOpen,
-    tooltipsOpen,
     url,
     onClick,
     indented = false
 }: {
     icon: React.ReactElement,
     name: string,
-    tooltipsOpen: boolean,
+    /** @deprecated No longer read: the tooltip is uncontrolled. */
+    tooltipsOpen?: boolean,
     drawerOpen: boolean,
+    /** @deprecated No longer read: the tooltip is uncontrolled. */
     adminMenuOpen?: boolean,
     url: string,
     onClick?: () => void,
@@ -39,6 +39,15 @@ export function DrawerNavigationItem({
             className={"shrink-0 flex items-center justify-center w-[44px] h-[30px] text-surface-500 dark:text-text-secondary-dark [&>svg]:size-4 group-hover/nav:text-primary transition-colors duration-150"}>
             {icon}
         </div>;
+
+    const [wantsTooltip, setWantsTooltip] = React.useState(false);
+
+    // Radix will not report a close it never noticed: while the tooltip is masked
+    // the pointer can leave the row without `onOpenChange(false)` ever firing. So
+    // the stale `true` is dropped on the way *into* the masked state — otherwise
+    // it surfaces the moment the mask lifts, as a tooltip hanging over a rail the
+    // pointer left long ago.
+    if (drawerOpen && wantsTooltip) setWantsTooltip(false);
 
     const listItem = <div>
         <NavLink
@@ -70,8 +79,18 @@ export function DrawerNavigationItem({
         </NavLink>
     </div>;
 
+    // Per row, and always controlled. The old shared flag could only say "every
+    // tooltip" or "none", and the state it needed was unreachable, so no entry
+    // tooltip ever opened — leaving a bare rail of unlabelled icons. Radix decides
+    // when this one wants to be open, from the pointer and from focus; the drawer
+    // only masks it once the label says the same thing.
+    //
+    // Masked rather than withheld: dropping `open`, or the title, would move the
+    // tooltip between controlled and uncontrolled as the drawer opens, which
+    // strands the old state — a tooltip left up over a pointer nowhere near it.
     return <Tooltip
-        open={drawerOpen || adminMenuOpen ? false : tooltipsOpen}
+        open={!drawerOpen && wantsTooltip}
+        onOpenChange={setWantsTooltip}
         side="right"
         title={name}>
         {listItem}
