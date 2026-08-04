@@ -8,13 +8,37 @@ import { AppContext } from "./useApp";
 
 export const DRAWER_WIDTH = 280;
 
+const DRAWER_OPEN_STORAGE_KEY = "rebase-drawer-open";
+
+/** `null` when the user has never toggled the drawer, or storage is unavailable. */
+function readStoredDrawerOpen(): boolean | null {
+    if (typeof window === "undefined") return null;
+    try {
+        const stored = window.localStorage.getItem(DRAWER_OPEN_STORAGE_KEY);
+        return stored === null ? null : stored === "true";
+    } catch (e) {
+        // Storage can be blocked: private mode, sandboxed iframe, cookie policy.
+        return null;
+    }
+}
+
+function writeStoredDrawerOpen(open: boolean) {
+    if (typeof window === "undefined") return;
+    try {
+        window.localStorage.setItem(DRAWER_OPEN_STORAGE_KEY, String(open));
+    } catch (e) {
+        // Same as above: a drawer that forgets is better than a crash.
+    }
+}
+
 /**
  * @group Core
  */
 export interface ScaffoldProps {
 
     /**
-     * Open the drawer on hover
+     * Expand the collapsed drawer while the pointer is over it. Off by default:
+     * the rail stays a rail until the user clicks the toggle.
      */
     autoOpenDrawer?: boolean;
 
@@ -22,8 +46,8 @@ export interface ScaffoldProps {
      * Start with the drawer expanded rather than collapsed to icons.
      *
      * Distinct from {@link autoOpenDrawer}, which is a hover behaviour: this one
-     * only seeds the initial state, so the user's own toggle still wins for the
-     * rest of the session.
+     * only seeds the very first visit. Once the user toggles the drawer, that
+     * choice is stored in `localStorage` and wins over this prop on every load.
      *
      * Ignored on small layouts, where an expanded drawer covers the content it is
      * meant to navigate.
@@ -85,10 +109,27 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
 
         // Seeded once, deliberately: a `useEffect` syncing this to the prop would
         // re-expand the drawer under a user who had just collapsed it.
-        const [drawerOpen, setDrawerOpen] = React.useState(defaultDrawerOpen && largeLayout);
+        // The last toggle wins over `defaultDrawerOpen`, which only seeds the very
+        // first visit — after that the stored choice survives reloads.
+        const [drawerOpen, setDrawerOpenState] = React.useState(
+            () => (readStoredDrawerOpen() ?? defaultDrawerOpen) && largeLayout
+        );
         const [onHover, setOnHover] = React.useState(false);
 
-        const setOnHoverTrue = useCallback(() => setOnHover(true), []);
+        const setDrawerOpen = useCallback((open: boolean) => {
+            setDrawerOpenState(open);
+            // Small layouts render the drawer as a modal sheet. Remembering that
+            // one would greet the next load with an overlay over the content.
+            if (!largeLayout) return;
+            writeStoredDrawerOpen(open);
+        }, [largeLayout]);
+
+        const setOnHoverTrue = useCallback(() => {
+            // Hover expansion is opt-in. Without this the rail pops open whenever
+            // the pointer crosses it, which reads as "the drawer is open again".
+            if (!autoOpenDrawer) return;
+            setOnHover(true);
+        }, [autoOpenDrawer]);
         const setOnHoverFalse = useCallback(() => {
             // Don't collapse the drawer while a popover/dropdown is open
             if (document.querySelector("[data-radix-popper-content-wrapper]")) return;
@@ -97,11 +138,11 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
 
         const handleDrawerOpen = useCallback(() => {
             setDrawerOpen(true);
-        }, []);
+        }, [setDrawerOpen]);
 
         const handleDrawerClose = useCallback(() => {
             setDrawerOpen(false);
-        }, []);
+        }, [setDrawerOpen]);
 
         const computedDrawerOpen: boolean = drawerOpen;
         const computedDrawerHovered = Boolean(largeLayout && onHover);
