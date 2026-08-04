@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/server-postgres",
   "type": "module",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "PostgreSQL data source backend implementation for Rebase with Drizzle ORM",
   "funding": {
     "url": "https://github.com/sponsors/rebaseco"

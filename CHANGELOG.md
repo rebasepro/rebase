@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-03
+
 ### Breaking
 
 - **`rebase.data` is gone — use `rebase.dataAsAdmin`.** The server singleton had two names for one accessor, and the shorter one gave no hint of what it does: `rebase.data` and `rebase.dataAsAdmin` were the same admin-scoped, **RLS-bypassing** driver. `data` is the name a browser client uses for its *user-scoped* accessor, so the same expression meant "whatever this user may read" on the client and "everything, no policies" on the server. That is a bad thing to have to remember at a call site that reads fine either way.
