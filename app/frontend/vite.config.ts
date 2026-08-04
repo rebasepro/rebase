@@ -1,3 +1,4 @@
+import fs from "fs";
 import path from "path";
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
@@ -5,6 +6,35 @@ import svgr from "vite-plugin-svgr";
 import tailwindcss from "@tailwindcss/vite";
 import { rebaseCollectionsPlugin } from "@rebasepro/app/vitePlugin";
 import { visualizer } from "rollup-plugin-visualizer";
+
+const PACKAGES_DIR = path.resolve(__dirname, "../../packages");
+
+/**
+ * Point every workspace package at its source, derived rather than listed.
+ *
+ * This was a hand-written list of fourteen, and it carried a comment about the
+ * one it had already been caught missing: "without this one `utils` alone came
+ * from its built `dist`, so edits to it did nothing in dev until the package
+ * was rebuilt." It was still missing `@rebasepro/admin-types`, with exactly
+ * that consequence — an edit there does nothing, and what runs is whatever
+ * `dist` was last built, which is worse than nothing happening because it looks
+ * like the edit was wrong.
+ *
+ * A list of packages that must contain every package is a list that should not
+ * be written by hand, so this reads the directory.
+ */
+function workspaceSourceAliases(): Record<string, string> {
+    const aliases: Record<string, string> = {};
+    for (const entry of fs.readdirSync(PACKAGES_DIR, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const manifest = path.join(PACKAGES_DIR, entry.name, "package.json");
+        const src = path.join(PACKAGES_DIR, entry.name, "src");
+        if (!fs.existsSync(manifest) || !fs.existsSync(src)) continue;
+        const { name } = JSON.parse(fs.readFileSync(manifest, "utf-8")) as { name?: string };
+        if (name) aliases[name] = src;
+    }
+    return aliases;
+}
 
 export default defineConfig({
     envDir: path.resolve(__dirname, ".."),
@@ -95,24 +125,9 @@ template: "raw-data" })
         alias: {
             "react": path.resolve(__dirname, "./node_modules/react"),
             "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
-            "@rebasepro/app": path.resolve(__dirname, "../../packages/app/src"),
-            "@rebasepro/types": path.resolve(__dirname, "../../packages/types/src"),
-            "@rebasepro/common": path.resolve(__dirname, "../../packages/common/src"),
-            // Every other workspace package resolves to source; without this one
-            // `utils` alone came from its built `dist`, so edits to it did nothing
-            // in dev until the package was rebuilt.
-            "@rebasepro/utils": path.resolve(__dirname, "../../packages/utils/src"),
-            "@rebasepro/client": path.resolve(__dirname, "../../packages/client/src"),
-            "@rebasepro/ui": path.resolve(__dirname, "../../packages/ui/src"),
+            ...workspaceSourceAliases(),
+            // Subpath exports are not covered by the package-name aliases above.
             "@rebasepro/ui/index.css": path.resolve(__dirname, "../../packages/ui/index.css"),
-            "@rebasepro/forms": path.resolve(__dirname, "../../packages/forms/src"),
-            "@rebasepro/client-postgres": path.resolve(__dirname, "../../packages/client-postgres/src"),
-            "@rebasepro/firebase": path.resolve(__dirname, "../../packages/firebase/src"),
-            "@rebasepro/plugin-ai": path.resolve(__dirname, "../../packages/plugin-ai/src"),
-            "@rebasepro/plugin-insights": path.resolve(__dirname, "../../packages/plugin-insights/src"),
-            "@rebasepro/inference": path.resolve(__dirname, "../../packages/inference/src"),
-            "@rebasepro/admin": path.resolve(__dirname, "../../packages/admin/src"),
-            "@rebasepro/studio": path.resolve(__dirname, "../../packages/studio/src"),
             "config": path.resolve(__dirname, "../config")
         }
     }
