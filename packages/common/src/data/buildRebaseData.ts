@@ -18,7 +18,7 @@ import {
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
-import { collectAllPages, paginateFind } from "./paginate";
+import { collectAllPages, paginateFind, resolveFindWindow } from "./paginate";
 import { deserializeFilter } from "./filter-dialect";
 import { buildCompositeId, resolvePrimaryKeys, PrimaryKeyInfo } from "../util/identity";
 
@@ -153,8 +153,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
             // Ensure filters are in canonical [op, value] format even if passed as PostgREST strings
             const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
-            const limit = params?.limit ?? 20;
-            const offset = params?.offset ?? 0;
+            const { limit, offset, driverOffset } = resolveFindWindow(params);
 
             // One relation shape, whatever the call looks like.
             //
@@ -177,8 +176,12 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                     slug,
                     {
                         filter,
-                        limit: params?.limit,
-                        offset: params?.offset,
+                        // Without this the group was dropped and the read ran
+                        // unfiltered — every row the caller's policies allow,
+                        // in place of the ones they asked for.
+                        logical: params?.logical,
+                        limit,
+                        offset: driverOffset,
                         orderBy: params?.orderBy?.[0],
                         order: params?.orderBy?.[1],
                         searchString: params?.searchString
@@ -187,9 +190,10 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
                 )
                 : await driver.fetchCollection<M>({
                     path: slug,
-                    limit: params?.limit,
-                    offset: params?.offset,
+                    limit,
+                    offset: driverOffset,
                     filter,
+                    logical: params?.logical,
                     orderBy: params?.orderBy?.[0],
                     order: params?.orderBy?.[1],
                     searchString: params?.searchString
@@ -261,26 +265,31 @@ values: {} as Record<string, unknown> }
         count: driver.count
             ? async (params?: FindParams<M>): Promise<number> => {
                 const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
+                // Every narrowing `find()` applies has to apply here too, or
+                // the count describes a different query than the one it is
+                // reported against.
                 return driver.count!({
                     path: slug,
-                    filter
+                    filter,
+                    logical: params?.logical,
+                    searchString: params?.searchString
                 });
             }
             : undefined,
 
         listen: driver.listenCollection
             ? (params: FindParams<M> | undefined, onUpdate: (response: FindResponse<M>) => void, onError?: (error: Error) => void) => {
-                const limit = params?.limit ?? 20;
-                const offset = params?.offset ?? 0;
+                const { limit, offset, driverOffset } = resolveFindWindow(params);
                 // Realtime has no REST-pipeline equivalent, so the rows arrive
                 // admin-shaped. Flatten them to the one shape the rest of this
                 // accessor serves.
                 const normalize = driver.restFetchService ? inlineRelationRefs : (row: Record<string, unknown>) => row;
                 return driver.listenCollection!<M>({
                     path: slug,
-                    limit: params?.limit,
-                    offset: params?.offset,
+                    limit,
+                    offset: driverOffset,
                     filter: params?.where,
+                    logical: params?.logical,
                     orderBy: params?.orderBy?.[0],
                     order: params?.orderBy?.[1],
                     searchString: params?.searchString,
@@ -288,7 +297,12 @@ values: {} as Record<string, unknown> }
                         onUpdate({
                             data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(normalize(row), slug, getPks())),
                             meta: {
-                                total: entities.length,
+                                // No count is issued on this path, so the total
+                                // is unknown; the lower bound is the rows in
+                                // hand plus the ones paged past to reach them.
+                                // Reporting `entities.length` claimed a read at
+                                // offset 100 had found a collection of two.
+                                total: offset + entities.length,
                                 limit,
                                 offset,
                                 hasMore: entities.length >= limit

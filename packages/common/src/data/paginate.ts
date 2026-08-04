@@ -1,4 +1,5 @@
 import {
+    DEFAULT_LIST_LIMIT,
     FilterValues,
     FieldPath,
     FindAllParams,
@@ -69,6 +70,35 @@ export class RebasePaginationError extends Error {
 /** The one thing a transport has to provide to be paginated. */
 export type PageFinder<M extends Record<string, unknown> = Record<string, unknown>> =
     (params: FindParams<M>) => Promise<FindResult<M>>;
+
+/**
+ * Resolve `limit`/`offset`/`page` into the window a read will actually use.
+ *
+ * Lives here, next to the walk, for the reason at the top of this file: every
+ * transport has to mean the same thing by "page two". Four of them did not —
+ * the REST layer strode by {@link DEFAULT_LIST_LIMIT}, the local-first
+ * evaluator by {@link DEFAULT_PAGE_SIZE}, the in-process accessor by 20, and
+ * the published type documented a fourth number. Pages that overlap or skip
+ * rows are the mildest of those outcomes.
+ *
+ * `page` wins over `offset`, as {@link FindParams} documents. `driverOffset`
+ * is the value to hand a driver: it stays `undefined` when the caller named no
+ * offset, because keyset pagination seeks with a `where` clause and must not
+ * look like it is paging by offset.
+ */
+export function resolveFindWindow(
+    params?: Pick<FindParams, "limit" | "offset" | "page">
+): { limit: number; offset: number; driverOffset: number | undefined } {
+    const limit = params?.limit ?? DEFAULT_LIST_LIMIT;
+    const offset = params?.page != null
+        ? Math.max(0, (params.page - 1) * limit)
+        : (params?.offset ?? 0);
+    return {
+        limit,
+        offset,
+        driverOffset: params?.page != null ? offset : params?.offset
+    };
+}
 
 function normalizePageSize(raw: number | undefined): number {
     if (raw === undefined || !Number.isFinite(raw)) return DEFAULT_PAGE_SIZE;
