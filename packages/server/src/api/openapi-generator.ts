@@ -1,4 +1,4 @@
-import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, VectorProperty } from "@rebasepro/types";
+import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, VectorProperty, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 
 /**
@@ -15,6 +15,17 @@ export interface OpenApiGeneratorOptions {
     basePath?: string;
     /** Whether auth is enabled on data routes. Defaults to true. */
     requireAuth?: boolean;
+    /**
+     * The list-pagination bounds the REST layer applies, so the spec states the
+     * ones a request will actually meet.
+     *
+     * These were hardcoded as `default: 20, maximum: 100` — neither of which
+     * the server has ever used. The spec drives the API Explorer and is what a
+     * generated client is built from, so an understated ceiling is a request
+     * the client refuses to make, and an overstated one is a 400 nobody
+     * predicted.
+     */
+    listLimits?: { defaultLimit?: number; maxLimit?: number };
 }
 
 export function generateOpenApiSpec(
@@ -23,6 +34,75 @@ export function generateOpenApiSpec(
 ): Record<string, unknown> {
     const basePath = options.basePath ?? "/api";
     const requireAuth = options.requireAuth ?? true;
+    const defaultLimit = options.listLimits?.defaultLimit ?? DEFAULT_LIST_LIMIT;
+    const maxLimit = options.listLimits?.maxLimit ?? MAX_LIST_LIMIT;
+
+    /**
+     * The query parameters every list endpoint honours.
+     *
+     * Written once because it was written twice: the root listing named eight
+     * and the subcollection listing named four, though both go through the same
+     * `parseQueryOptions` and the same fetch. Four capabilities were therefore
+     * unreachable from a generated client on nested routes, and `or`/`and` were
+     * undocumented on both.
+     */
+    const listQueryParameters = () => [
+        { name: "limit", in: "query", schema: { type: "integer", default: defaultLimit, maximum: maxLimit },
+            description: "Maximum number of records to return" },
+        { name: "offset", in: "query", schema: { type: "integer", default: 0 },
+            description: "Number of records to skip" },
+        { name: "page", in: "query", schema: { type: "integer", minimum: 1 },
+            description: "Page number (alternative to offset). Calculates offset as (page-1)*limit" },
+        {
+            name: "orderBy",
+            in: "query",
+            schema: { type: "string" },
+            description: "Sort field and direction. Accepts `field:asc` or `field:desc`, or a JSON array `[{\"field\":\"name\",\"direction\":\"asc\"}]`",
+            example: "created_at:desc"
+        },
+        {
+            name: "where",
+            in: "query",
+            schema: { type: "string" },
+            description: "JSON object filter, mapping each field to a `[operator, value]` tuple. "
+                + "Combines with the per-field `?field=op.value` parameters below; on the same field, the per-field parameter wins.",
+            example: "{\"status\":[\"==\",\"active\"]}"
+        },
+        {
+            name: "or",
+            in: "query",
+            schema: { type: "string" },
+            description: "Disjunction of conditions, AND-ed with `where` and `searchString`.",
+            example: "(status.eq.draft,status.eq.review)"
+        },
+        {
+            name: "and",
+            in: "query",
+            schema: { type: "string" },
+            description: "Conjunction of conditions, AND-ed with `where` and `searchString`. Ignored when `or` is also present.",
+            example: "(views.gte.10,status.eq.draft)"
+        },
+        {
+            name: "include",
+            in: "query",
+            schema: { type: "string" },
+            description: "Comma-separated list of relations to include (eager-load). Use `*` for all relations.",
+            example: "author,tags"
+        },
+        {
+            name: "fields",
+            in: "query",
+            schema: { type: "string" },
+            description: "Comma-separated list of fields to return (field selection)",
+            example: "id,name,created_at"
+        },
+        {
+            name: "searchString",
+            in: "query",
+            schema: { type: "string" },
+            description: "Full-text search query"
+        }
+    ];
 
     const spec: Record<string, unknown> = {
         openapi: "3.0.3",
@@ -128,57 +208,7 @@ description: "Whether more records exist beyond this page" }
                 summary: `List ${collection.name}`,
                 operationId: `list${schemaName}`,
                 parameters: [
-                    { name: "limit",
-in: "query",
-schema: { type: "integer",
-default: 20,
-maximum: 100 },
-description: "Maximum number of records to return" },
-                    { name: "offset",
-in: "query",
-schema: { type: "integer",
-default: 0 },
-description: "Number of records to skip" },
-                    { name: "page",
-in: "query",
-schema: { type: "integer",
-minimum: 1 },
-description: "Page number (alternative to offset). Calculates offset as (page-1)*limit" },
-                    {
-                        name: "orderBy",
-                        in: "query",
-                        schema: { type: "string" },
-                        description: "Sort field and direction. Accepts `field:asc` or `field:desc`, or a JSON array `[{\"field\":\"name\",\"direction\":\"asc\"}]`",
-                        example: "created_at:desc"
-                    },
-                    {
-                        name: "where",
-                        in: "query",
-                        schema: { type: "string" },
-                        description: "JSON object filter, mapping each field to a `[operator, value]` tuple. "
-                            + "Combines with the per-field `?field=op.value` parameters below; on the same field, the per-field parameter wins.",
-                        example: "{\"status\":[\"==\",\"active\"]}"
-                    },
-                    {
-                        name: "include",
-                        in: "query",
-                        schema: { type: "string" },
-                        description: "Comma-separated list of relations to include (eager-load). Use `*` for all relations.",
-                        example: "author,tags"
-                    },
-                    {
-                        name: "fields",
-                        in: "query",
-                        schema: { type: "string" },
-                        description: "Comma-separated list of fields to return (field selection)",
-                        example: "id,name,created_at"
-                    },
-                    {
-                        name: "searchString",
-                        in: "query",
-                        schema: { type: "string" },
-                        description: "Full-text search query"
-                    },
+                    ...listQueryParameters(),
                     ...buildFilterParameters(collection)
                 ],
                 responses: {
@@ -361,20 +391,11 @@ in: "path",
 required: true,
 schema: { type: "string" },
 description: `${collection.singularName || collection.name} ID` },
-                        { name: "limit",
-in: "query",
-schema: { type: "integer",
-default: 20 } },
-                        { name: "offset",
-in: "query",
-schema: { type: "integer",
-default: 0 } },
-                        { name: "orderBy",
-in: "query",
-schema: { type: "string" } },
-                        { name: "searchString",
-in: "query",
-schema: { type: "string" } }
+                        // The nested list handler goes through the same
+                        // `parseQueryOptions` and the same fetch as the root
+                        // one, so it honours the same parameters. It documented
+                        // four of them.
+                        ...listQueryParameters()
                     ],
                     responses: {
                         200: {
