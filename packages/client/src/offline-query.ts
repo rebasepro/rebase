@@ -145,17 +145,31 @@ export function looseEquals(a: unknown, b: unknown): boolean {
  */
 function likeToRegExp(pattern: string, caseInsensitive: boolean): RegExp {
     let source = "^";
+    // Runs of `%` collapse to one. `%%%%X` means exactly what `%X` means, but
+    // as a regular expression it is four adjacent unbounded quantifiers, and on
+    // a subject that does not match the engine tries every way of splitting the
+    // subject between them. Fourteen of them against a forty-eight character
+    // value took eighty-seven seconds to answer `false`.
+    //
+    // The pattern is user input — `?title=like.%25%25%25…` over HTTP — so that
+    // is a request that pins a CPU. Collapsing is semantics-preserving and
+    // removes the ambiguity the backtracking feeds on.
+    let lastWasWildcard = false;
     for (let i = 0; i < pattern.length; i++) {
         const char = pattern[i];
         if (char === "\\" && i + 1 < pattern.length) {
             source += pattern[i + 1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
             i++;
+            lastWasWildcard = false;
         } else if (char === "%") {
-            source += "[\\s\\S]*";
+            if (!lastWasWildcard) source += "[\\s\\S]*";
+            lastWasWildcard = true;
         } else if (char === "_") {
             source += "[\\s\\S]";
+            lastWasWildcard = false;
         } else {
             source += char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            lastWasWildcard = false;
         }
     }
     return new RegExp(source + "$", caseInsensitive ? "i" : "");

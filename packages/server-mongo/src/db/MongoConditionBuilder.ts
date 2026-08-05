@@ -35,10 +35,22 @@ function escapeRegExp(str: string): string {
  */
 function likePatternToRegExp(pattern: string, caseInsensitive: boolean): RegExp {
     let body = "";
+    // Runs of `%` collapse to one. `%%%%X` means exactly what `%X` means, but as
+    // a regular expression it is four adjacent unbounded quantifiers, and on a
+    // subject that does not match, the engine tries every way of splitting the
+    // subject between them — exponential time. The pattern comes from a public
+    // filter operator over HTTP (`?title=like.%25%25%25…`), and this expression
+    // is handed to MongoDB as `$regex`, so the time is spent on a database
+    // thread rather than the caller's.
+    let lastWasWildcard = false;
     for (const ch of String(pattern)) {
-        if (ch === "%") body += ".*";
-        else if (ch === "_") body += ".";
-        else body += escapeRegExp(ch);
+        if (ch === "%") {
+            if (!lastWasWildcard) body += ".*";
+            lastWasWildcard = true;
+            continue;
+        }
+        body += ch === "_" ? "." : escapeRegExp(ch);
+        lastWasWildcard = false;
     }
     return new RegExp(`^${body}$`, caseInsensitive ? "i" : "");
 }
