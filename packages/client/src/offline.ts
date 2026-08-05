@@ -1,5 +1,5 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
-import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValue } from "@rebasepro/types";
+import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValue, WriteOptions } from "@rebasepro/types";
 import { collectAllPages, paginateFind } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
@@ -544,6 +544,83 @@ export class OfflineManager {
                 for (const row of rows) this.setLocalRow(slug, row.id as string | number, row);
                 this.notifyCollection(slug);
                 return rows;
+            },
+
+            updateMany: async (updates: { id: string | number; data: Partial<M> }[], options?: WriteOptions) => {
+                await this.ensureCollection(slug);
+                if (!Array.isArray(updates)) {
+                    throw new TypeError("updateMany expects an array of { id, data } entries.");
+                }
+                if (updates.length === 0) return [];
+                // Any row in the batch with a write already queued sends the
+                // whole batch to the queue. Splitting it — some rows now, some
+                // later — would break the one guarantee a batch makes, that its
+                // rows land together, and would reorder writes against a row
+                // whose own create has not landed yet.
+                const anyPending = updates.some((u) => this.hasPending(slug, u.id));
+                if (this.connectivity.shouldAttempt() && !anyPending) {
+                    try {
+                        const rows = await inner.updateMany(updates, options);
+                        this.connectivity.markSuccess();
+                        await this.ingest(slug, rows);
+                        this.notifyCollection(slug);
+                        return rows;
+                    } catch (error) {
+                        if (!isNetworkError(error)) throw error;
+                        this.connectivity.markFailure();
+                    }
+                }
+                const rollback: Record<string, AnyRow | null> = {};
+                const optimistic: M[] = [];
+                for (const { id, data } of updates) {
+                    const base = this.rawLocalRow(slug, id);
+                    rollback[String(id)] = base ?? null;
+                    optimistic.push({ ...(base ?? {}), ...(data as AnyRow), id } as unknown as M);
+                }
+                await this.enqueue({
+                    collection: slug,
+                    type: "updateMany",
+                    updates: updates.map((u) => ({ id: u.id,
+data: u.data as AnyRow })),
+                    rollback: { rows: rollback }
+                });
+                for (const row of optimistic) this.setLocalRow(slug, row.id as string | number, row);
+                this.notifyCollection(slug);
+                return optimistic;
+            },
+
+            deleteMany: async (ids: (string | number)[], options?: WriteOptions) => {
+                await this.ensureCollection(slug);
+                if (!Array.isArray(ids)) {
+                    throw new TypeError("deleteMany expects an array of ids.");
+                }
+                if (ids.length === 0) return;
+                const anyPending = ids.some((id) => this.hasPending(slug, id));
+                if (this.connectivity.shouldAttempt() && !anyPending) {
+                    try {
+                        await inner.deleteMany(ids, options);
+                        this.connectivity.markSuccess();
+                        for (const id of ids) this.removeLocalRow(slug, id, true);
+                        this.notifyCollection(slug);
+                        this.scheduleRefresh(slug);
+                        return;
+                    } catch (error) {
+                        if (!isNetworkError(error)) throw error;
+                        this.connectivity.markFailure();
+                    }
+                }
+                const rollback: Record<string, AnyRow | null> = {};
+                for (const id of ids) {
+                    rollback[String(id)] = this.rawLocalRow(slug, id) ?? null;
+                }
+                await this.enqueue({
+                    collection: slug,
+                    type: "deleteMany",
+                    ids,
+                    rollback: { rows: rollback }
+                });
+                for (const id of ids) this.removeLocalRow(slug, id, false);
+                this.notifyCollection(slug);
             },
 
             update: async (id: string | number, data: Partial<M>) => {
@@ -1480,9 +1557,27 @@ export class OfflineManager {
             for (let i = 0; i < rows.length; i++) {
                 await this.adoptServerRow(op, queued[i]?.id as string | number | undefined, rows[i]);
             }
+        } else if (op.type === "updateMany") {
+            const queued = op.updates ?? [];
+            // Keyed like every other replay: an update re-applied in full is
+            // naturally idempotent, but one interleaved with another writer's is
+            // not, and a lost ACK would otherwise re-apply a stale batch over
+            // newer data.
+            const rows = await inner.updateMany(
+                queued.map(u => ({ id: u.id,
+data: u.data as AnyRow })),
+                { idempotencyKey: op.mutationId }
+            );
+            for (let i = 0; i < rows.length; i++) {
+                await this.ingestReplaced(op, queued[i].id, rows[i]);
+            }
         } else if (op.type === "update") {
             const row = await inner.update(op.id!, op.data as AnyRow);
             await this.ingestReplaced(op, op.id!, row);
+        } else if (op.type === "deleteMany") {
+            const ids = op.ids ?? [];
+            await inner.deleteMany(ids, { idempotencyKey: op.mutationId });
+            for (const id of ids) this.removeLocalRow(op.collection, id, true);
         } else if (op.type === "delete") {
             await inner.delete(op.id!);
             this.removeLocalRow(op.collection, op.id!, true);

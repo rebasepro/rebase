@@ -27,6 +27,9 @@ For each collection, the following endpoints are generated:
 | `PATCH` | `/api/data/:slug/:id` | Update a entity (partial — only the properties you send are written) |
 | `PUT` | `/api/data/:slug/:id` | Same handler as `PATCH`, kept because every shipped SDK sends it |
 | `DELETE` | `/api/data/:slug/:id` | Delete a entity |
+| `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
+| `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
+| `POST` | `/api/data/:slug/bulk/delete` | Delete many entities in one transaction |
 
 ### Subcollection Routes
 

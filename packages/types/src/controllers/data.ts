@@ -188,6 +188,20 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>>;
 
     /**
+     * Update many records in a single transaction.
+     *
+     * See {@link SDKCollectionClient.updateMany}. Optional, as `createMany` is.
+     */
+    updateMany?(updates: { id: string | number; data: Partial<EntityValues<M>> }[]): Promise<Entity<M>[]>;
+
+    /**
+     * Delete many records in a single transaction.
+     *
+     * See {@link SDKCollectionClient.deleteMany}. Optional, as `createMany` is.
+     */
+    deleteMany?(ids: (string | number)[]): Promise<void>;
+
+    /**
      * Delete a record by ID.
      */
     delete(id: string | number): Promise<void>;
@@ -539,10 +553,76 @@ export interface SDKCollectionClient<
     update(id: string | number, data: U): Promise<M>;
 
     /**
+     * Update many records in a single request and a single transaction.
+     *
+     * The counterpart to {@link createMany}, and the reason it exists is the
+     * same: one call per row means one HTTP round trip and one transaction per
+     * row. Every record still runs the normal pipeline — callbacks, relations,
+     * row-level security — and the batch is all-or-nothing, so a rejected
+     * record leaves none of them written and the error names the offending
+     * index.
+     *
+     * Each entry is `{ id, data }` rather than a flat row carrying its own key.
+     * That is deliberate: on a table keyed on something other than `id` — a
+     * `sku`, a composite key — a flat row cannot say whether a column is the
+     * address or a value to write. Naming the address separately mirrors
+     * single-row `update(id, data)` exactly and leaves nothing to infer.
+     *
+     * An id that matches no row fails the batch with a 404 rather than being
+     * skipped, for the same reason `update()` does: silently updating four of
+     * five rows is worse than updating none.
+     *
+     * Batches share `createMany`'s server-side cap (1000 rows by default),
+     * because one batch holds its locks for the whole transaction.
+     *
+     * Pass {@link WriteOptions.idempotencyKey} on anything that may be retried.
+     * An update replayed in full is naturally idempotent, but one interleaved
+     * with another writer's is not — the key is what stops a lost ACK from
+     * re-applying a stale batch over newer data.
+     *
+     * @returns The updated rows, in the order given.
+     *
+     * @example
+     * ```ts
+     * await client.data.orders.updateMany([
+     *     { id: "o-1", data: { status: "shipped" } },
+     *     { id: "o-2", data: { status: "shipped" } }
+     * ]);
+     * ```
+     */
+    updateMany(updates: { id: string | number; data: U }[], options?: WriteOptions): Promise<M[]>;
+
+    /**
      * Delete a record by ID.
      * @throws {RebaseApiError} with status 404 when the record does not exist.
      */
     delete(id: string | number): Promise<void>;
+
+    /**
+     * Delete many records in a single request and a single transaction.
+     *
+     * Takes ids, not a filter. A filter-shaped bulk delete is a different and
+     * far more dangerous operation — the failure mode is an omitted or
+     * mistyped condition emptying a table, and it cannot be reviewed at the
+     * call site the way an explicit list can. Read first, then pass the ids you
+     * meant.
+     *
+     * `beforeDelete` and `afterDelete` fire per row, exactly as they do for
+     * single deletes, and returning `false` from `beforeDelete` fails the batch
+     * rather than quietly dropping one row from it. All-or-nothing, so an id
+     * that matches no row 404s the whole call.
+     *
+     * Shares `createMany`'s row cap.
+     *
+     * @example
+     * ```ts
+     * const stale = await client.data.sessions.findAll({
+     *     where: { expires_at: ["<", cutoff] }
+     * });
+     * await client.data.sessions.deleteMany(stale.map(s => s.id as string));
+     * ```
+     */
+    deleteMany(ids: (string | number)[], options?: WriteOptions): Promise<void>;
 
     /**
      * The low-level realtime subscription: raw server pushes, nothing else.

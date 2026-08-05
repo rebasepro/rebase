@@ -20,6 +20,9 @@ import {
     SaveManyProps,
     SaveProps,
     StorageSource,
+    UpdateManyProps,
+    DeleteManyProps,
+    EntityValues,
     TableColumnInfo,
     TableForeignKeyInfo,
     TableJunctionInfo,
@@ -880,6 +883,145 @@ export class PostgresBackendDriver implements DataDriver {
             }
 
             return saved;
+        });
+    }
+
+    /**
+     * Update many rows through the same pipeline as {@link save}, in one
+     * transaction.
+     *
+     * Structurally the mirror of {@link saveMany} — same tx-bound sub-driver,
+     * same deferred notifications, same per-row error labelling — but it calls
+     * `save` with an explicit `id` and `status: "existing"`, which is precisely
+     * what `saveMany` cannot do: that one passes `status: "new"` and keeps the
+     * key inside `values`, so it inserts or upserts and can never target a
+     * particular row.
+     *
+     * All-or-nothing, so an id matching no row aborts the batch. A partial
+     * update is the outcome with no good recovery: the caller cannot tell which
+     * half landed without re-reading everything.
+     */
+    async updateMany<M extends Record<string, unknown>>({
+        path,
+        updates,
+        collection
+    }: UpdateManyProps<M>): Promise<Record<string, unknown>[]> {
+        return this.db.transaction(async (tx) => {
+            const txDriver = new PostgresBackendDriver(
+                tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
+            );
+            txDriver.dataService = new DataService(tx, this.registry);
+            txDriver.client = this.client;
+            txDriver._deferNotifications = this._deferNotifications;
+            txDriver._pendingNotifications = this._pendingNotifications;
+
+            const saved: Record<string, unknown>[] = [];
+
+            for (let i = 0; i < updates.length; i++) {
+                const { id, values } = updates[i];
+                try {
+                    // Read first so a missing row is a 404 rather than a silent
+                    // no-op. `save` with status "existing" would otherwise write
+                    // an UPDATE that matches nothing and report success.
+                    const existing = await txDriver.fetchOne({
+                        path,
+                        id: String(id),
+                        collection: collection as CollectionConfig
+                    });
+                    if (!existing) {
+                        throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
+                            statusCode: 404,
+                            code: "NOT_FOUND"
+                        });
+                    }
+
+                    saved.push(await txDriver.save<M>({
+                        path,
+                        id: String(id),
+                        values,
+                        collection,
+                        status: "existing"
+                    }));
+                } catch (error) {
+                    // Say which entry, as saveMany does: "the batch failed" is
+                    // unactionable at a thousand rows.
+                    throw Object.assign(
+                        new Error(`Update ${i} of ${updates.length} (id ${JSON.stringify(id)}) failed: ${(error as Error)?.message ?? error}`, { cause: error }),
+                        {
+                            statusCode: (error as { statusCode?: number })?.statusCode,
+                            code: (error as { code?: string })?.code,
+                            name: (error as Error)?.name
+                        }
+                    );
+                }
+            }
+
+            return saved;
+        });
+    }
+
+    /**
+     * Delete many rows in one transaction, running the full delete pipeline —
+     * `beforeDelete`, the delete, `afterDelete` — for each.
+     *
+     * Looping the single-row {@link delete} rather than emitting one
+     * `DELETE ... WHERE id = ANY($1)` is the deliberate choice: a single
+     * statement would be faster and would skip every callback, so a collection
+     * relying on `beforeDelete` to veto or on `afterDelete` to clean up
+     * dependents would behave differently depending on how many rows the caller
+     * happened to delete at once. Same pipeline, one transaction.
+     */
+    async deleteMany<M extends Record<string, unknown>>({
+        path,
+        ids,
+        collection
+    }: DeleteManyProps<M>): Promise<void> {
+        await this.db.transaction(async (tx) => {
+            const txDriver = new PostgresBackendDriver(
+                tx, this.realtimeService, this.registry, this.user, this.poolManager, this.historyService
+            );
+            txDriver.dataService = new DataService(tx, this.registry);
+            txDriver.client = this.client;
+            txDriver._deferNotifications = this._deferNotifications;
+            txDriver._pendingNotifications = this._pendingNotifications;
+
+            for (let i = 0; i < ids.length; i++) {
+                const id = ids[i];
+                try {
+                    const existing = await txDriver.fetchOne({
+                        path,
+                        id: String(id),
+                        collection: collection as CollectionConfig
+                    });
+                    if (!existing) {
+                        throw Object.assign(new Error(`No row with id ${JSON.stringify(id)}`), {
+                            statusCode: 404,
+                            code: "NOT_FOUND"
+                        });
+                    }
+
+                    await txDriver.delete<M>({
+                        row: {
+                            // The address from the caller, not read back off the
+                            // row: a row is only its columns, so `existing.id` is
+                            // undefined for any table not keyed on `id`.
+                            id: String(id),
+                            path,
+                            values: existing as Partial<EntityValues<M>>
+                        },
+                        collection
+                    });
+                } catch (error) {
+                    throw Object.assign(
+                        new Error(`Delete ${i} of ${ids.length} (id ${JSON.stringify(id)}) failed: ${(error as Error)?.message ?? error}`, { cause: error }),
+                        {
+                            statusCode: (error as { statusCode?: number })?.statusCode,
+                            code: (error as { code?: string })?.code,
+                            name: (error as Error)?.name
+                        }
+                    );
+                }
+            }
         });
     }
 

@@ -27,6 +27,9 @@ Für jede Collection werden die folgenden Endpunkte generiert:
 | `PATCH` | `/api/data/:slug/:id` | Eine Entität aktualisieren |
 | `PUT` | `/api/data/:slug/:id` | Eine Entität aktualisieren |
 | `DELETE` | `/api/data/:slug/:id` | Eine Entität löschen |
+| `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
+| `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
+| `POST` | `/api/data/:slug/bulk/delete` | Delete many entities in one transaction |
 
 ### Subcollection-Routen
 

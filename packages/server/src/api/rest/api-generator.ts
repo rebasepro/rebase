@@ -270,82 +270,30 @@ export class RestApiGenerator {
             )[0]);
         });
 
-        // POST /collection/bulk - Write many rows as one transaction.
-        //
-        // Registered before POST /collection/:id-shaped routes so "bulk" is never
-        // read as an id.
-        this.router.post(`${basePath}/bulk`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug);
-            const driver = this.getScopedDriver(c);
-            const path = collection.slug;
-
-            const body = await parseJsonBody(c) as { rows?: unknown; upsert?: unknown };
-
-            if (!Array.isArray(body?.rows)) {
-                throw ApiError.badRequest(
-                    "Expected a JSON body of { rows: [...] }.",
-                    "INVALID_BULK_BODY"
-                );
-            }
-            if (body.rows.length === 0) {
-                return c.json({ data: [], meta: { written: 0 } });
-            }
-            if (body.rows.some((row) => typeof row !== "object" || row === null || Array.isArray(row))) {
-                throw ApiError.badRequest(
-                    "Every entry in `rows` must be an object.",
-                    "INVALID_BULK_BODY"
-                );
-            }
-            if (body.upsert !== undefined && typeof body.upsert !== "boolean") {
-                throw ApiError.badRequest("`upsert` must be a boolean.", "INVALID_BULK_BODY");
-            }
-
-            const maxRows = this.maxBulkRows;
-            if (body.rows.length > maxRows) {
-                // A batch is one transaction, which holds locks for its whole
-                // duration; an unbounded one is a self-inflicted outage. Say the
-                // limit and the actual count so the caller can chunk to it.
-                throw ApiError.badRequest(
-                    `Too many rows: ${body.rows.length} exceeds the ${maxRows}-row limit for a single bulk write. ` +
-                    `Send it in chunks of ${maxRows} or fewer.`,
-                    "BULK_TOO_LARGE"
-                );
-            }
-
-            if (!driver.saveMany) {
-                throw ApiError.badRequest(
-                    "This collection's data source does not support bulk writes.",
-                    "BULK_UNSUPPORTED"
-                );
-            }
-
-            // Checked before the transaction opens, and named by row index: a
-            // batch is all-or-nothing, so one bad field in ten thousand rows
-            // should not be found by rolling the other 9,999 back.
-            (body.rows as Record<string, unknown>[]).forEach((row, rowIndex) =>
-                assertKnownWriteFields(row, resolvedCollection, { rowIndex }));
-
-            // Idempotency matters more here than on the single-row create, and
-            // this route did not have it.
-            //
-            // A client that never sees the response cannot know whether the
-            // batch committed, so it retries — and without a key the server
-            // cannot tell that retry from a second genuine import and performs
-            // it again. On a single `create` that duplicates one row. Here it
-            // duplicates the whole batch, up to `maxBulkRows` of them, and the
-            // offline queue replays `createMany` on exactly this path.
-            //
-            // Same claim-before-write shape as the create above, for the same
-            // reason: recall-then-write lets two concurrent replays of one key
-            // both through, which is the duplicate the key exists to prevent.
+        /**
+         * Run a bulk handler under an idempotency key.
+         *
+         * All three bulk routes need the identical claim-before-write dance —
+         * claim, replay on a repeat, 409 while one is in flight, release on
+         * failure, complete on success — and getting one of those steps wrong
+         * is exactly the bug the key exists to prevent. Written once so the
+         * three cannot drift into three different notions of "already done".
+         */
+        const withIdempotency = async (
+            c: Context<HonoEnv>,
+            run: () => Promise<unknown>,
+            respond: (body: unknown) => Response
+        ): Promise<Response> => {
             const idempotencyKey = c.req.header(IDEMPOTENCY_HEADER);
             const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
             const store = this.idempotency();
+            // Claimed before the write, not after: the two-step
+            // recall-then-write let concurrent replays of one key both through.
             const claimed = idempotencyKey && store
                 ? await store.claim(idempotencyKey, uid)
                 : undefined;
             if (claimed?.status === "replay") {
-                return c.json(claimed.response as never);
+                return respond(claimed.response);
             }
             if (claimed?.status === "in-flight") {
                 throw ApiError.conflict(
@@ -357,16 +305,7 @@ export class RestApiGenerator {
 
             let response: unknown;
             try {
-                const rows = await driver.saveMany({
-                    path,
-                    rows: body.rows as Record<string, unknown>[],
-                    collection: resolvedCollection,
-                    upsert: body.upsert === true
-                });
-                response = {
-                    data: rows.map((row) => this.formatResponse(row)),
-                    meta: { written: rows.length }
-                };
+                response = await run();
             } catch (error) {
                 // Hand the key back, or one transient failure would refuse every
                 // retry of it until the row aged out.
@@ -379,8 +318,195 @@ export class RestApiGenerator {
             if (claimed?.status === "claimed" && idempotencyKey && store) {
                 await store.complete(idempotencyKey, uid, response);
             }
+            return respond(response);
+        };
 
-            return c.json(response as never);
+        /**
+         * Validate the envelope every bulk route shares: an array, non-empty,
+         * of objects, within the row cap.
+         *
+         * The cap is the load-bearing one. A batch is a single transaction that
+         * holds its locks for its whole duration, so an unbounded one is a
+         * self-inflicted outage — and the message names both the limit and the
+         * actual count so the caller can chunk to it rather than guess.
+         */
+        const assertBulkShape = (
+            items: unknown,
+            field: string,
+            requireObjects: boolean
+        ): void => {
+            if (!Array.isArray(items)) {
+                throw ApiError.badRequest(
+                    `Expected a JSON body of { ${field}: [...] }.`,
+                    "INVALID_BULK_BODY"
+                );
+            }
+            if (requireObjects && items.some((it) => typeof it !== "object" || it === null || Array.isArray(it))) {
+                throw ApiError.badRequest(
+                    `Every entry in \`${field}\` must be an object.`,
+                    "INVALID_BULK_BODY"
+                );
+            }
+            if (items.length > this.maxBulkRows) {
+                throw ApiError.badRequest(
+                    `Too many rows: ${items.length} exceeds the ${this.maxBulkRows}-row limit for a single bulk write. ` +
+                    `Send it in chunks of ${this.maxBulkRows} or fewer.`,
+                    "BULK_TOO_LARGE"
+                );
+            }
+        };
+
+        // POST /collection/bulk - Write many rows as one transaction.
+        //
+        // Registered before POST /collection/:id-shaped routes so "bulk" is never
+        // read as an id.
+        this.router.post(`${basePath}/bulk`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug);
+            const driver = this.getScopedDriver(c);
+            const path = collection.slug;
+
+            const body = await parseJsonBody(c) as { rows?: unknown; upsert?: unknown };
+
+            assertBulkShape(body?.rows, "rows", true);
+            const rows = body.rows as Record<string, unknown>[];
+            if (rows.length === 0) {
+                return c.json({ data: [], meta: { written: 0 } });
+            }
+            if (body.upsert !== undefined && typeof body.upsert !== "boolean") {
+                throw ApiError.badRequest("`upsert` must be a boolean.", "INVALID_BULK_BODY");
+            }
+            if (!driver.saveMany) {
+                throw ApiError.badRequest(
+                    "This collection's data source does not support bulk writes.",
+                    "BULK_UNSUPPORTED"
+                );
+            }
+
+            // Checked before the transaction opens, and named by row index: a
+            // batch is all-or-nothing, so one bad field in ten thousand rows
+            // should not be found by rolling the other 9,999 back.
+            rows.forEach((row, rowIndex) =>
+                assertKnownWriteFields(row, resolvedCollection, { rowIndex }));
+
+            // A client that never sees the response cannot know whether the
+            // batch committed, so it retries — and without a key the server
+            // cannot tell that retry from a second genuine import. On a single
+            // create that duplicates one row; here it duplicates the batch.
+            return withIdempotency(c, async () => {
+                const written = await driver.saveMany!({
+                    path,
+                    rows,
+                    collection: resolvedCollection,
+                    upsert: body.upsert === true
+                });
+                return {
+                    data: written.map((row) => this.formatResponse(row)),
+                    meta: { written: written.length }
+                };
+            }, (result) => c.json(result as never));
+        });
+
+        // PATCH /collection/bulk — update many rows as one transaction.
+        //
+        // Entries are `{ id, data }` rather than flat rows carrying their own
+        // key: on a table keyed on a `sku` or a composite key, a flat row cannot
+        // say whether a column is the address or a value to write. This mirrors
+        // single-row `update(id, data)` and leaves nothing to infer.
+        this.router.patch(`${basePath}/bulk`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug);
+            const driver = this.getScopedDriver(c);
+            const path = collection.slug;
+
+            const body = await parseJsonBody(c) as { updates?: unknown };
+
+            assertBulkShape(body?.updates, "updates", true);
+            const updates = body.updates as { id?: unknown; data?: unknown }[];
+            if (updates.length === 0) {
+                return c.json({ data: [], meta: { written: 0 } });
+            }
+            if (!driver.updateMany) {
+                throw ApiError.badRequest(
+                    "This collection's data source does not support bulk updates.",
+                    "BULK_UNSUPPORTED"
+                );
+            }
+
+            updates.forEach((entry, rowIndex) => {
+                if (entry.id === undefined || entry.id === null || entry.id === "") {
+                    throw ApiError.badRequest(
+                        `Entry ${rowIndex} of \`updates\` is missing \`id\`. ` +
+                        "Each entry must be { id, data }.",
+                        "INVALID_BULK_BODY"
+                    );
+                }
+                if (typeof entry.data !== "object" || entry.data === null || Array.isArray(entry.data)) {
+                    throw ApiError.badRequest(
+                        `Entry ${rowIndex} of \`updates\` is missing \`data\`, or it is not an object.`,
+                        "INVALID_BULK_BODY"
+                    );
+                }
+                assertKnownWriteFields(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
+            });
+
+            return withIdempotency(c, async () => {
+                const written = await driver.updateMany!({
+                    path,
+                    updates: updates.map((entry) => ({
+                        id: entry.id as string | number,
+                        values: entry.data as Record<string, unknown>
+                    })),
+                    collection: resolvedCollection
+                });
+                return {
+                    data: written.map((row) => this.formatResponse(row)),
+                    meta: { written: written.length }
+                };
+            }, (result) => c.json(result as never));
+        });
+
+        // POST /collection/bulk/delete — delete many rows as one transaction.
+        //
+        // A POST rather than `DELETE /bulk` with the ids in the body. That would
+        // be the honest verb, and it is the one request shape the HTTP ecosystem
+        // handles unreliably: bodies on DELETE are permitted but widely dropped
+        // by proxies and CDNs, and several OpenAPI generators ignore
+        // `requestBody` on a DELETE operation — so a generated client would send
+        // the request with no ids at all, and "delete nothing" is the *good*
+        // outcome of that bet. Registered before `/bulk` cannot shadow it because
+        // the path is longer and more specific.
+        this.router.post(`${basePath}/bulk/delete`, async (c) => {
+            this.enforceApiKeyPermission(c, collection.slug);
+            const driver = this.getScopedDriver(c);
+            const path = collection.slug;
+
+            const body = await parseJsonBody(c) as { ids?: unknown };
+
+            assertBulkShape(body?.ids, "ids", false);
+            const ids = body.ids as unknown[];
+            if (ids.length === 0) {
+                return c.json({ meta: { deleted: 0 } });
+            }
+            if (ids.some((id) => typeof id !== "string" && typeof id !== "number")) {
+                throw ApiError.badRequest(
+                    "Every entry in `ids` must be a string or a number.",
+                    "INVALID_BULK_BODY"
+                );
+            }
+            if (!driver.deleteMany) {
+                throw ApiError.badRequest(
+                    "This collection's data source does not support bulk deletes.",
+                    "BULK_UNSUPPORTED"
+                );
+            }
+
+            return withIdempotency(c, async () => {
+                await driver.deleteMany!({
+                    path,
+                    ids: ids as (string | number)[],
+                    collection: resolvedCollection
+                });
+                return { meta: { deleted: ids.length } };
+            }, (result) => c.json(result as never));
         });
 
         // POST /collection - Create entity

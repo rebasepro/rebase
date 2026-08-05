@@ -271,6 +271,28 @@ values: {} as Record<string, unknown> }
             });
         },
 
+        // Present only when the driver is: exposing these unconditionally and
+        // looping single writes underneath would give a caller neither the
+        // atomicity nor the single round trip they reached for a batch to get,
+        // while looking exactly like it had.
+        updateMany: driver.updateMany
+            ? async (updates: { id: string | number; data: Partial<EntityValues<M>> }[]): Promise<Entity<M>[]> => {
+                const rows = await driver.updateMany!<M>({
+                    path: slug,
+                    updates: updates.map(u => ({ id: u.id,
+values: u.data })),
+                });
+                return rows.map(row => rowToEntity<M>(row, slug, getPks()));
+            }
+            : undefined,
+
+        deleteMany: driver.deleteMany
+            ? async (ids: (string | number)[]): Promise<void> => {
+                await driver.deleteMany!<M>({ path: slug,
+ids });
+            }
+            : undefined,
+
         count: driver.count
             ? async (params?: FindParams<M>): Promise<number> => {
                 const filter = params?.where ? deserializeFilter(params.where as Record<string, unknown>) : undefined;
@@ -529,8 +551,38 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
         async update(id: string | number, data: Partial<M>): Promise<M> {
             return entityToRow(await snap.update(id, data as Partial<EntityValues<M>>));
         },
+        async updateMany(updates: { id: string | number; data: Partial<M> }[]): Promise<M[]> {
+            if (!Array.isArray(updates)) {
+                throw new TypeError("updateMany expects an array of { id, data } entries.");
+            }
+            if (updates.length === 0) return [];
+            if (!snap.updateMany) {
+                throw new Error(
+                    "Bulk updates are not supported by this collection's data source. " +
+                    "Fall back to update() per record."
+                );
+            }
+            const rows = await snap.updateMany(
+                updates.map(u => ({ id: u.id,
+data: u.data as Partial<EntityValues<M>> }))
+            );
+            return rows.map(entityToRow);
+        },
         delete(id: string | number): Promise<void> {
             return snap.delete(id);
+        },
+        async deleteMany(ids: (string | number)[]): Promise<void> {
+            if (!Array.isArray(ids)) {
+                throw new TypeError("deleteMany expects an array of ids.");
+            }
+            if (ids.length === 0) return;
+            if (!snap.deleteMany) {
+                throw new Error(
+                    "Bulk deletes are not supported by this collection's data source. " +
+                    "Fall back to delete() per record."
+                );
+            }
+            await snap.deleteMany(ids);
         },
         count: snap.count ? (params?: FindParams<M>) => snap.count!(params) : undefined,
         listen: snap.listen

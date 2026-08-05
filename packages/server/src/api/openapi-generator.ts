@@ -262,6 +262,192 @@ description: "Whether more records exist beyond this page" }
             }
         };
 
+        // ── Bulk: one transaction, all-or-nothing ─────────────────────
+        //
+        // These went undocumented while they existed, which is the same defect
+        // the update verb had: an endpoint the server serves and the spec does
+        // not mention cannot be reached by a generated client at all.
+        const idempotencyHeader = {
+            name: "Idempotency-Key",
+            in: "header",
+            required: false,
+            schema: { type: "string" },
+            description:
+                "Names this write so a retry is recognised instead of repeated. Without it a " +
+                "client that lost the response cannot distinguish a replay from a second " +
+                "genuine batch, and the whole batch is written twice."
+        };
+
+        const bulkErrors = {
+            400: {
+                description: "Malformed body, an unknown field, or more rows than the per-batch limit",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            409: {
+                description: "A request with the same Idempotency-Key is still in flight",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            ...errorResponses(requireAuth)
+        };
+
+        paths[`/data/${slug}/bulk`] = {
+            post: {
+                tags: [collection.name],
+                summary: `Create many ${collection.name} in one transaction`,
+                description:
+                    "All-or-nothing: if any row is rejected none of them land, and the error names " +
+                    "the offending index. Every row still runs callbacks, relations and row-level " +
+                    "security. Capped server-side because one batch holds its locks for its whole " +
+                    "duration.",
+                operationId: `createMany${schemaName}`,
+                parameters: [idempotencyHeader],
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                required: ["rows"],
+                                properties: {
+                                    rows: { type: "array", items: { $ref: `#/components/schemas/${schemaName}Input` } },
+                                    upsert: {
+                                        type: "boolean",
+                                        description: "Write each row as INSERT ... ON CONFLICT DO UPDATE on the primary key."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: {
+                        description: "The written rows, in the order given",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        data: { type: "array", items: { $ref: `#/components/schemas/${schemaName}` } },
+                                        meta: { type: "object", properties: { written: { type: "integer" } } }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    ...bulkErrors
+                }
+            },
+            patch: {
+                tags: [collection.name],
+                summary: `Update many ${collection.name} in one transaction`,
+                description:
+                    "Each entry names its row and the fields to change. `{ id, data }` rather than " +
+                    "flat rows carrying their own key, because on a table keyed on something other " +
+                    "than `id` a flat row cannot say whether a column is the address or a value to " +
+                    "write. An id matching no row fails the batch.",
+                operationId: `updateMany${schemaName}`,
+                parameters: [idempotencyHeader],
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                required: ["updates"],
+                                properties: {
+                                    updates: {
+                                        type: "array",
+                                        items: {
+                                            type: "object",
+                                            required: ["id", "data"],
+                                            properties: {
+                                                id: { type: "string", description: "The row to update" },
+                                                data: { $ref: `#/components/schemas/${schemaName}Update` }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: {
+                        description: "The updated rows, in the order given",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        data: { type: "array", items: { $ref: `#/components/schemas/${schemaName}` } },
+                                        meta: { type: "object", properties: { written: { type: "integer" } } }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    404: {
+                        description: "One of the ids matches no row; nothing was written",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    ...bulkErrors
+                }
+            }
+        };
+
+        paths[`/data/${slug}/bulk/delete`] = {
+            post: {
+                tags: [collection.name],
+                summary: `Delete many ${collection.name} in one transaction`,
+                description:
+                    "A POST, not `DELETE /bulk` with a body. Bodies on DELETE are permitted but " +
+                    "widely dropped by proxies and CDNs, and several generators ignore " +
+                    "`requestBody` on a DELETE operation — a generated client would send the " +
+                    "request with no ids at all. Takes ids rather than a filter: a mistyped " +
+                    "condition that empties a table cannot be reviewed at the call site the way " +
+                    "an explicit list can. `beforeDelete`/`afterDelete` fire per row.",
+                operationId: `deleteMany${schemaName}`,
+                parameters: [idempotencyHeader],
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                required: ["ids"],
+                                properties: {
+                                    ids: {
+                                        type: "array",
+                                        items: { oneOf: [{ type: "string" }, { type: "integer" }] }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: {
+                        description: "How many rows were deleted",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        meta: { type: "object", properties: { deleted: { type: "integer" } } }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    404: {
+                        description: "One of the ids matches no row; nothing was deleted",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    ...bulkErrors
+                }
+            }
+        };
+
         // ── GET/PUT/DELETE /data/{slug}/{id} ──────────────────────────
         const entityPath = `/data/${slug}/{id}`;
         paths[entityPath] = {

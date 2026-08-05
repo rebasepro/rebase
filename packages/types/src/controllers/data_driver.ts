@@ -172,8 +172,34 @@ export interface SaveManyProps<M extends Record<string, unknown> = Record<string
 /**
  * @internal
  */
+export interface UpdateManyProps<M extends Record<string, unknown> = Record<string, unknown>> {
+    path: string;
+    /**
+     * The rows to update, each named by its address.
+     *
+     * Distinct from {@link SaveManyProps.rows}, which carries keys *inside* the
+     * values and is insert-shaped — `saveMany` passes `status: "new"` and no
+     * `id`, so it cannot express "update exactly this row". This can, and it is
+     * why bulk update is a separate driver method rather than a flag on that one.
+     */
+    updates: { id: string | number; values: Partial<EntityValues<M>> }[];
+    collection?: CollectionConfig<M>;
+}
+
+/**
+ * @internal
+ */
 export interface DeleteProps<M extends Record<string, unknown> = Record<string, unknown>> {
     row: { id: string | number; path: string; values?: Partial<EntityValues<M>> };
+    collection?: CollectionConfig<M>;
+}
+
+/**
+ * @internal
+ */
+export interface DeleteManyProps<M extends Record<string, unknown> = Record<string, unknown>> {
+    path: string;
+    ids: (string | number)[];
     collection?: CollectionConfig<M>;
 }
 
@@ -259,6 +285,17 @@ export interface DataDriver {
     saveMany?<M extends Record<string, unknown> = Record<string, unknown>>(props: SaveManyProps<M>): Promise<Record<string, unknown>[]>;
 
     /**
+     * Update many rows in one transaction, each addressed by id.
+     *
+     * Optional for the same reason `saveMany` is: a driver that cannot make the
+     * batch atomic should not pretend to. The REST layer reports
+     * `BULK_UNSUPPORTED` rather than silently falling back to a loop of single
+     * writes, which would be neither atomic nor one round trip — the two things
+     * a caller reaches for a batch to get.
+     */
+    updateMany?<M extends Record<string, unknown> = Record<string, unknown>>(props: UpdateManyProps<M>): Promise<Record<string, unknown>[]>;
+
+    /**
      * Delete a entity
      * @param props
      * @return was the whole deletion flow successful
@@ -270,6 +307,14 @@ export interface DataDriver {
      * @param path Collection path
      */
     deleteAll?(path: string): Promise<void>;
+
+    /**
+     * Delete many rows in one transaction, addressed by id.
+     *
+     * Ids rather than a filter, deliberately — see
+     * {@link SDKCollectionClient.deleteMany}. Optional, as `saveMany` is.
+     */
+    deleteMany?<M extends Record<string, unknown> = Record<string, unknown>>(props: DeleteManyProps<M>): Promise<void>;
 
     /**
      * Check if the given property is unique in the given collection

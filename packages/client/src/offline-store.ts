@@ -52,9 +52,13 @@ export interface PendingMutation {
     /** Unique, lexicographically sortable identity — also the queue key suffix. */
     mutationId: string;
     collection: string;
-    type: "create" | "createMany" | "update" | "delete";
+    type: "create" | "createMany" | "update" | "updateMany" | "delete" | "deleteMany";
     /** Target row id for update/delete, and the (client-generated) id of an offline create. */
     id?: string | number;
+    /** Target row ids for `deleteMany`. */
+    ids?: (string | number)[];
+    /** `{ id, data }` entries for `updateMany`. */
+    updates?: { id: string | number; data: Record<string, unknown> }[];
     /**
      * True when the SDK minted this create's id itself. Only such creates may
      * cancel out against a later offline delete: a freshly generated UUID
