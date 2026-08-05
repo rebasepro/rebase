@@ -203,3 +203,150 @@ describe("create with an Idempotency-Key", () => {
         expect(saved).toHaveLength(1);
     });
 });
+
+/**
+ * A replayed **batch** must not insert the batch again.
+ *
+ * `POST /<collection>/bulk` had no idempotency handling at all, and it is the
+ * route where the consequence is largest: the same lost ACK that duplicates one
+ * row through `create` duplicates every row in the batch here — up to
+ * `maxBulkRows`, 1000 by default. The offline queue replays `createMany` on
+ * exactly this path.
+ *
+ * `upsert: true` hid it for the callers who set it, since a conflicting insert
+ * became an update. Nothing covered the callers who did not, and the docs
+ * recommend `upsert` for re-runnable imports rather than for crash recovery.
+ */
+describe("createMany with an Idempotency-Key", () => {
+    function createStore() {
+        const PENDING = Symbol("pending");
+        const rows = new Map<string, { response: unknown | typeof PENDING }>();
+        const at = (uid: unknown, key: unknown) => `${String(uid)}::${String(key)}`;
+
+        return {
+            rows,
+            async executeSql(sql: string, options?: { params?: unknown[] }) {
+                const params = options?.params ?? [];
+                if (/^\s*INSERT INTO/i.test(sql)) {
+                    const composite = at(params[1], params[0]);
+                    if (rows.has(composite)) return [];
+                    rows.set(composite, { response: PENDING });
+                    return [{ claimed: 1 }];
+                }
+                if (/^\s*SELECT response/i.test(sql)) {
+                    const row = rows.get(at(params[0], params[1]));
+                    if (!row) return [];
+                    return [{
+                        response: row.response === PENDING ? null : row.response,
+                        pending: row.response === PENDING
+                    }];
+                }
+                if (/^\s*UPDATE/i.test(sql)) {
+                    const composite = at(params[0], params[1]);
+                    if (rows.has(composite)) rows.set(composite, { response: JSON.parse(String(params[2])) });
+                    return [];
+                }
+                if (/^\s*DELETE FROM/i.test(sql) && /response IS NULL/i.test(sql)) {
+                    const composite = at(params[0], params[1]);
+                    if (rows.get(composite)?.response === PENDING) rows.delete(composite);
+                    return [];
+                }
+                return [];
+            }
+        };
+    }
+
+    function createHarness(options?: { failFirstSave?: boolean }) {
+        let nextId = 1;
+        let saveManyAttempts = 0;
+        const saved: Record<string, unknown>[] = [];
+        const admin = createStore();
+
+        const driver = {
+            key: "postgres",
+            initialised: true,
+            admin,
+            async saveMany({ rows }: { rows: Record<string, unknown>[] }) {
+                saveManyAttempts += 1;
+                if (options?.failFirstSave && saveManyAttempts === 1) {
+                    throw new Error("connection reset");
+                }
+                // Server-assigned ids, as with `save` above: this is what makes
+                // a replay indistinguishable from a fresh import without a key.
+                const written = rows.map(values => ({ ...values, id: nextId++ }));
+                saved.push(...written);
+                return written;
+            }
+        } as unknown as DataDriver;
+
+        const collections = [{
+            slug: "posts", name: "Posts", singularName: "Post", properties: {}
+        }] as unknown as CollectionConfig[];
+
+        const app = new Hono();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => {
+            c.set("driver", driver);
+            c.set("user", { uid: "user-1" });
+            await next();
+        });
+        app.route("/", new RestApiGenerator(collections, driver).generateRoutes());
+        return { app, saved, attempts: () => saveManyAttempts };
+    }
+
+    const bulk = (app: Hono, rows: unknown[], key?: string) =>
+        app.request("/posts/bulk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...(key ? { "Idempotency-Key": key } : {}) },
+            body: JSON.stringify({ rows })
+        });
+
+    const twoRows = [{ title: "a" }, { title: "b" }];
+
+    it("replays the first result instead of writing the batch again", async () => {
+        const { app, saved, attempts } = createHarness();
+
+        const first = await bulk(app, twoRows, "batch-1");
+        const second = await bulk(app, twoRows, "batch-1");
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+        expect(await second.json()).toEqual(await first.json());
+        // The assertion that matters: two rows total, not four.
+        expect(saved).toHaveLength(2);
+        expect(attempts()).toBe(1);
+    });
+
+    it("writes the batch twice without a key — the behaviour the key exists to fix", async () => {
+        const { app, saved } = createHarness();
+
+        await bulk(app, twoRows);
+        await bulk(app, twoRows);
+
+        expect(saved).toHaveLength(4);
+    });
+
+    it("treats a different key as a different batch", async () => {
+        const { app, saved } = createHarness();
+
+        await bulk(app, twoRows, "batch-1");
+        await bulk(app, twoRows, "batch-2");
+
+        expect(saved).toHaveLength(4);
+    });
+
+    it("releases the key when the write fails, so the retry is allowed through", async () => {
+        // A transient failure must not burn the key: refusing every retry of it
+        // until the row ages out would turn one dropped connection into a batch
+        // that can never be sent.
+        const { app, saved } = createHarness({ failFirstSave: true });
+
+        const failed = await bulk(app, twoRows, "batch-1");
+        expect(failed.status).toBe(500);
+        expect(saved).toHaveLength(0);
+
+        const retried = await bulk(app, twoRows, "batch-1");
+        expect(retried.status).toBe(200);
+        expect(saved).toHaveLength(2);
+    });
+});

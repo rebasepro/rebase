@@ -507,6 +507,12 @@ export interface SDKCollectionClient<
      * Batches are capped server-side (1000 rows by default) because one batch
      * holds its locks for the whole transaction — chunk larger jobs.
      *
+     * Pass {@link WriteOptions.idempotencyKey} on anything that may be retried.
+     * A client that never sees the response cannot know whether the batch
+     * committed, and without a key the server cannot tell the retry from a
+     * second genuine import — so it performs it again, duplicating every row in
+     * the batch rather than just one.
+     *
      * @returns The written rows, in the order given.
      *
      * @example
@@ -516,7 +522,7 @@ export interface SDKCollectionClient<
      * }
      * ```
      */
-    createMany(data: I[], options?: { upsert?: boolean }): Promise<M[]>;
+    createMany(data: I[], options?: { upsert?: boolean } & WriteOptions): Promise<M[]>;
 
     /**
      * Update an existing record by ID.

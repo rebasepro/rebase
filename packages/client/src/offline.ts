@@ -1468,7 +1468,15 @@ export class OfflineManager {
             await this.adoptServerRow(op, op.id, row);
         } else if (op.type === "createMany") {
             const queued = (op.data as AnyRow[]) ?? [];
-            const rows = await inner.createMany(queued, op.upsert ? { upsert: true } : undefined);
+            // The mutation id names this batch, exactly as it names a single
+            // `create` above — and it matters more here. Without it, a batch
+            // whose ACK went missing replays as a second genuine import and
+            // duplicates every row it holds, not one. `upsert` masked that for
+            // the callers who set it; nothing covered the ones who did not.
+            const rows = await inner.createMany(queued, {
+                ...(op.upsert ? { upsert: true } : {}),
+                idempotencyKey: op.mutationId
+            });
             for (let i = 0; i < rows.length; i++) {
                 await this.adoptServerRow(op, queued[i]?.id as string | number | undefined, rows[i]);
             }

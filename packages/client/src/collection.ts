@@ -155,7 +155,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             return raw as M;
         },
 
-        async createMany(data: Partial<M>[], options?: { upsert?: boolean }) {
+        async createMany(data: Partial<M>[], options?: { upsert?: boolean } & WriteOptions) {
             if (!Array.isArray(data)) {
                 throw new TypeError("createMany expects an array of records.");
             }
@@ -166,7 +166,10 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 body: JSON.stringify({
                     rows: data,
                     ...(options?.upsert ? { upsert: true } : {})
-                })
+                }),
+                ...(options?.idempotencyKey
+                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
+                    : {})
             });
             return (raw.data || []) as M[];
         },

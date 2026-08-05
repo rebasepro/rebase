@@ -325,17 +325,62 @@ export class RestApiGenerator {
             (body.rows as Record<string, unknown>[]).forEach((row, rowIndex) =>
                 assertKnownWriteFields(row, resolvedCollection, { rowIndex }));
 
-            const rows = await driver.saveMany({
-                path,
-                rows: body.rows as Record<string, unknown>[],
-                collection: resolvedCollection,
-                upsert: body.upsert === true
-            });
+            // Idempotency matters more here than on the single-row create, and
+            // this route did not have it.
+            //
+            // A client that never sees the response cannot know whether the
+            // batch committed, so it retries — and without a key the server
+            // cannot tell that retry from a second genuine import and performs
+            // it again. On a single `create` that duplicates one row. Here it
+            // duplicates the whole batch, up to `maxBulkRows` of them, and the
+            // offline queue replays `createMany` on exactly this path.
+            //
+            // Same claim-before-write shape as the create above, for the same
+            // reason: recall-then-write lets two concurrent replays of one key
+            // both through, which is the duplicate the key exists to prevent.
+            const idempotencyKey = c.req.header(IDEMPOTENCY_HEADER);
+            const uid = (c.get("user") as { uid?: string } | undefined)?.uid;
+            const store = this.idempotency();
+            const claimed = idempotencyKey && store
+                ? await store.claim(idempotencyKey, uid)
+                : undefined;
+            if (claimed?.status === "replay") {
+                return c.json(claimed.response as never);
+            }
+            if (claimed?.status === "in-flight") {
+                throw ApiError.conflict(
+                    `A request with Idempotency-Key '${idempotencyKey}' is already in progress. ` +
+                    "Retry once it has answered; its result will be replayed.",
+                    "IDEMPOTENCY_KEY_IN_PROGRESS"
+                );
+            }
 
-            return c.json({
-                data: rows.map((row) => this.formatResponse(row)),
-                meta: { written: rows.length }
-            });
+            let response: unknown;
+            try {
+                const rows = await driver.saveMany({
+                    path,
+                    rows: body.rows as Record<string, unknown>[],
+                    collection: resolvedCollection,
+                    upsert: body.upsert === true
+                });
+                response = {
+                    data: rows.map((row) => this.formatResponse(row)),
+                    meta: { written: rows.length }
+                };
+            } catch (error) {
+                // Hand the key back, or one transient failure would refuse every
+                // retry of it until the row aged out.
+                if (claimed?.status === "claimed" && idempotencyKey && store) {
+                    await store.release(idempotencyKey, uid);
+                }
+                throw error;
+            }
+
+            if (claimed?.status === "claimed" && idempotencyKey && store) {
+                await store.complete(idempotencyKey, uid, response);
+            }
+
+            return c.json(response as never);
         });
 
         // POST /collection - Create entity
