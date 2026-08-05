@@ -354,9 +354,34 @@ export function serializeLogicalCondition(
  * deserializeLogicalCondition("or(status.eq.active,age.gte.18)")
  * // → { type: "or", conditions: [...] }
  */
+/**
+ * How deeply `or(...)`/`and(...)` groups may nest.
+ *
+ * This parser recurses once per level, on a value that arrives in a query
+ * string. Unbounded, twenty thousand levels reached `RangeError: Maximum call
+ * stack size exceeded`, which a caller sees as a 500 about the call stack
+ * rather than a 400 about their filter. Node's 16 KB header cap keeps a GET
+ * below that in practice, but "the HTTP layer happens to stop it" is not a
+ * bound this parser should rely on.
+ *
+ * Thirty-two is far past anything a real filter expresses; the deepest in this
+ * repository's own tests is three.
+ */
+export const MAX_LOGICAL_NESTING_DEPTH = 32;
+
 export function deserializeLogicalCondition(
-    str: string
+    str: string,
+    // Not `depth`: the body already uses that name for paren tracking, inside a
+    // block that shadows a parameter of the same name — so the recursion
+    // counter silently became the paren counter and never grew.
+    nesting = 0
 ): LogicalCondition | FilterCondition {
+    if (nesting > MAX_LOGICAL_NESTING_DEPTH) {
+        throw new Error(
+            `Filter groups nest more than ${MAX_LOGICAL_NESTING_DEPTH} levels deep. ` +
+            "Flatten the condition — `or(a,or(b,c))` is `or(a,b,c)`."
+        );
+    }
     // Check for logical group: "and(...)" or "or(...)"
     const logicalMatch = str.match(/^(and|or)\((.+)\)$/);
     if (logicalMatch) {
@@ -371,11 +396,11 @@ export function deserializeLogicalCondition(
             if (innerStr[i] === "(") depth++;
             else if (innerStr[i] === ")") depth--;
             else if (innerStr[i] === "," && depth === 0) {
-                conditions.push(deserializeLogicalCondition(innerStr.slice(start, i)));
+                conditions.push(deserializeLogicalCondition(innerStr.slice(start, i), nesting + 1));
                 start = i + 1;
             }
         }
-        conditions.push(deserializeLogicalCondition(innerStr.slice(start)));
+        conditions.push(deserializeLogicalCondition(innerStr.slice(start), nesting + 1));
 
         return { type, conditions };
     }

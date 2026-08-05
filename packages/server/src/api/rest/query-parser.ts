@@ -30,7 +30,19 @@ function parseLogicalGroup(type: "or" | "and", raw: unknown): LogicalCondition |
     }
     inner = inner.trim();
     if (!inner) return undefined;
-    const parsed = deserializeLogicalCondition(`${type}(${inner})`);
+    let parsed;
+    try {
+        parsed = deserializeLogicalCondition(`${type}(${inner})`);
+    } catch (e) {
+        // The parser refuses a nesting depth no real filter reaches. That is a
+        // request problem, and without this it surfaced as a 500 — the
+        // unbounded version reached `RangeError: Maximum call stack size
+        // exceeded`, which tells the caller nothing about their filter.
+        throw ApiError.badRequest(
+            `Invalid \`${type}\` parameter: ${e instanceof Error ? e.message : String(e)}`,
+            "INVALID_LOGICAL_GROUP"
+        );
+    }
     return "type" in parsed ? parsed : undefined;
 }
 

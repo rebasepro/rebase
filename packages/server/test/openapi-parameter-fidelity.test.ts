@@ -73,3 +73,31 @@ describe("OpenAPI query parameters", () => {
         expect(limit.schema?.maximum).toBe(MAX_LIST_LIMIT);
     });
 });
+
+/**
+ * A `?or=` group nested past what the parser accepts is a request problem.
+ * Unbounded, it reached `RangeError: Maximum call stack size exceeded` and
+ * surfaced as a 500 that said nothing about the filter.
+ */
+describe("deeply nested logical groups", () => {
+    it("is refused as a bad request, naming the filter", async () => {
+        const { Hono } = await import("hono");
+        const { RestApiGenerator } = await import("../src/api/rest/api-generator");
+        const { errorHandler } = await import("../src/api/errors");
+
+        const driver = {
+            fetchCollection: async () => [], fetchOne: async () => undefined,
+            save: async () => ({}), delete: async () => undefined, count: async () => 0
+        } as never;
+        const app = new Hono();
+        app.onError(errorHandler);
+        app.use("/*", async (c, next) => { c.set("driver", driver); await next(); });
+        app.route("/", new RestApiGenerator([posts, tags], driver).generateRoutes());
+
+        const deep = "or(".repeat(200) + "a.eq.1" + ")".repeat(200);
+        const res = await app.request(`/posts?or=${encodeURIComponent(deep)}`);
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ error: expect.objectContaining({ code: "INVALID_LOGICAL_GROUP" }) });
+    });
+});
