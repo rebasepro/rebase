@@ -50,7 +50,7 @@
     "@types/node": "^26.1.2",
     "@types/object-hash": "^3.0.6",
     "@types/react-measure": "^2.0.12",
-    "hono": "^4.12.27",
+    "hono": "^4.13.0",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.12",
     "typescript": "^6.0.3",
