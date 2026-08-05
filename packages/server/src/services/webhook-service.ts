@@ -73,7 +73,13 @@ export class WebhookDispatcher {
             if (result.success) return result;
 
             if (attempt < this.maxRetries) {
-                await new Promise(r => setTimeout(r, this.retryDelays[attempt - 1]));
+                // `maxRetries` and `retryDelays.length` have to agree, and
+                // nothing makes them. Raising the first without extending the
+                // second indexes past the end, and `setTimeout(r, undefined)`
+                // is not a pause — it is an immediate retry, against an
+                // endpoint that has just failed.
+                const backoff = this.retryDelays[attempt - 1] ?? this.retryDelays[this.retryDelays.length - 1];
+                await new Promise(r => setTimeout(r, backoff));
             } else {
                 return result; // Final failure
             }

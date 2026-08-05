@@ -89,6 +89,11 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
 
     const STORAGE_KEY = "rebase_auth";
     const REFRESH_BUFFER_MS = 120000;
+    /**
+     * The largest delay `setTimeout` can hold — 2^31 - 1 ms, about 24.8 days.
+     * Anything larger is silently clamped to 1ms by Node and every browser.
+     */
+    const MAX_TIMER_DELAY_MS = 2_147_483_647;
     // Auto-refresh resilience: retry transient failures with exponential backoff
     // (1s, 2s, 4s, … capped) before giving up and signing out.
     const MAX_REFRESH_RETRIES = 5;
@@ -266,6 +271,21 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
 
         if (delay <= 0) {
             void attemptScheduledRefresh(0);
+            return;
+        }
+
+        // `setTimeout` holds its delay in a 32-bit signed integer. Past
+        // ~24.8 days it does not wait — it clamps to 1ms and fires at once. The
+        // refresh would then land, receive a token expiring just as far out,
+        // schedule again and overflow again: a hot loop against
+        // `/auth/refresh`, one per open tab.
+        //
+        // `auth.accessExpiresIn` is configurable and defaults to "1h", so this
+        // is dormant on a default deployment and immediate on `"30d"` — an
+        // ordinary setting for an internal tool. Re-arm instead of refreshing:
+        // sleep the maximum, then work out again how long is left.
+        if (delay > MAX_TIMER_DELAY_MS) {
+            refreshTimeout = setTimeout(() => scheduleRefresh(expiresAt), MAX_TIMER_DELAY_MS);
             return;
         }
 
