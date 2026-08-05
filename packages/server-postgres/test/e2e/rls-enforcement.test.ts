@@ -264,6 +264,65 @@ describe("Unified RLS enforcement (E2E)", () => {
         expect(rowsB.map(r => r.id)).toEqual(["t-b"]);
     });
 
+    /**
+     * `context.data` inside a collection callback inherits the privilege of
+     * whatever triggered the callback. It is not a fixed trust level.
+     *
+     * This is pinned because the documentation asserted the opposite — that
+     * callbacks "run through the base `PostgresBackendDriver` — not the
+     * authenticated wrapper" and so have "full database access regardless of
+     * the triggering user's permissions", in all six locales — and nothing
+     * tested it either way.
+     *
+     * The code says otherwise, and so does this. `AuthenticatedPostgresBackendDriver
+     * .withTransaction` builds a *fresh base driver bound to the RLS-scoped
+     * transaction* (`new PostgresBackendDriver(tx, …)`) after `applyAuthContext`
+     * has downgraded the role, then runs the operation on it. `buildCallContext`
+     * therefore closes over a `this.data` that speaks through `tx`, so a callback
+     * on a user request is user-scoped. A callback triggered by `dataAsAdmin`
+     * runs on the owner connection and is not.
+     *
+     * The distinction matters in the unsafe direction: a developer told
+     * "callbacks see everything" writes one that reads a row it cannot actually
+     * see, and gets silence rather than an error.
+     */
+    it("scopes context.data to the caller when a callback runs on a user request", async () => {
+        const seen: Array<{ trigger: string; visible: string[] }> = [];
+
+        const withCallback = {
+            ...tasksCollection,
+            callbacks: {
+                afterSave: async ({ context }: { context: { data: Record<string, { findAll(): Promise<Array<{ id: string }>> }> } }) => {
+                    const rows = await context.data.tasks.findAll();
+                    seen.push({ trigger: "pending", visible: rows.map(r => r.id).sort() });
+                }
+            }
+        } as unknown as CollectionConfig;
+
+        // user-a's own write. The callback must see only user-a's rows.
+        const a = await userDriver("user-a");
+        await a.save({
+            path: "tasks", collection: withCallback,
+            values: { id: "t-a-cb", title: "cb", owner_id: "user-a" }
+        } as never);
+
+        expect(seen).toHaveLength(1);
+        expect(seen[0].visible).not.toContain("t-b");
+        expect(seen[0].visible).toContain("t-a-cb");
+
+        // The same callback on a server-context write sees everything, because
+        // the base driver never switches role.
+        seen.length = 0;
+        await driver.save({
+            path: "tasks", collection: withCallback,
+            values: { id: "t-server-cb", title: "cb", owner_id: "user-b" }
+        } as never);
+
+        expect(seen).toHaveLength(1);
+        expect(seen[0].visible).toContain("t-b");
+        expect(seen[0].visible).toContain("t-a-cb");
+    });
+
     it("fails closed when the user role is broken", async () => {
         driver.rlsUserRole = "role_that_does_not_exist";
         await expect(countAs("user-a")).rejects.toBeTruthy();

@@ -39,6 +39,10 @@
                 "description": "Source key. Referenced by a property's storageSource, and uppercased into environment variable names."
             },
             "additionalProperties": { "$ref": "#/$defs/storageSource" }
+        },
+        "telemetry": {
+            "type": "boolean",
+            "description": "Repository-wide opt-out from anonymous CLI usage sharing. Only `false` does anything: it suppresses sharing for everyone who clones this repository, overriding each developer's own opt-in. `true` is deliberately ignored — this file is committed, so a `true` here would answer a privacy question on behalf of every colleague who later clones the repo. Individuals opt in with `rebase telemetry enable`."
         }
     },
     "$defs": {

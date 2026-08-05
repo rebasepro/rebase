@@ -71,6 +71,7 @@
     "check:hooks": "node scripts/check-hooks-baseline.mjs",
     "check:unused": "node scripts/check-unused-locals.mjs",
     "check:test-scripts": "node scripts/check-test-scripts.mjs",
+    "check:control-chars": "node scripts/check-control-chars.mjs",
     "check:untranslated": "node scripts/check-untranslated.mjs",
     "harness": "node scripts/harness/harness.mjs",
     "harness:preflight": "node scripts/harness/harness.mjs preflight",

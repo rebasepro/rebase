@@ -150,3 +150,62 @@ describe("the scaffolded project references only files it contains", () => {
         expect(source).toContain("./dist-bundle:/bundle");
     });
 });
+
+/**
+ * The published JSON Schema and the TypeScript type describe the same file.
+ *
+ * `rebase.json` has two contracts and they are maintained by hand in two places:
+ * `RebaseProjectManifest` in `@rebasepro/types`, which decides what compiles,
+ * and `website/public/schemas/rebase.json`, which decides what a developer's
+ * editor accepts. Nothing connected them, and they drifted — the schema declared
+ * `additionalProperties: false` while omitting `telemetry`, the repository-wide
+ * usage-sharing opt-out. That key is implemented, surfaced in `rebase telemetry`
+ * output, and unit-tested; a project that used it got
+ * `Property telemetry is not allowed` in VS Code. Neither artifact was wrong on
+ * its own, which is exactly why no other test caught it.
+ *
+ * Key parity is asserted rather than the full shape: types and JSON Schema
+ * cannot express the same things, so demanding more would mean encoding
+ * translation rules that themselves drift. A key appearing on one side and not
+ * the other is the failure that actually happened.
+ */
+describe("rebase.json — the schema and the type agree", () => {
+    const schemaPath = path.join(repoRoot, "website/public/schemas/rebase.json");
+    const typePath = path.join(repoRoot, "packages/types/src/types/project_manifest.ts");
+
+    /**
+     * Top-level property names declared on `RebaseProjectManifest`.
+     *
+     * Read from source rather than imported: the interface is erased at runtime,
+     * so there is nothing to reflect over. Scoped to that one interface's body —
+     * the file declares a dozen others — and matches only single-indented
+     * members, so nested object literals cannot leak in.
+     */
+    function typeKeys(): string[] {
+        const source = fs.readFileSync(typePath, "utf8");
+        const start = source.indexOf("export interface RebaseProjectManifest {");
+        expect(start).toBeGreaterThan(-1);
+        const body = source.slice(start, source.indexOf("\n}", start));
+        // `[\w$]` rather than `\w`: the first member is `$schema`, and a `\w`
+        // class silently drops it — which is a false pass, not a false failure.
+        return [...body.matchAll(/^ {4}([\w$]+)\??:/gm)].map(m => m[1]).sort();
+    }
+
+    function schemaKeys(): string[] {
+        const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+        return Object.keys(schema.properties).sort();
+    }
+
+    it("declares the same top-level keys on both sides", () => {
+        expect(schemaKeys()).toEqual(typeKeys());
+    });
+
+    it("still refuses unknown keys", () => {
+        // The parity check above is only meaningful while the schema is closed.
+        // If `additionalProperties` were relaxed to silence a drift, a missing
+        // key would stop being an editor error and this suite would be guarding
+        // nothing.
+        const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+        expect(schema.additionalProperties).toBe(false);
+    });
+});

@@ -264,7 +264,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 if (closed) return;
                 if (fromLive) liveDelivered = true;
                 else if (liveDelivered) return;
-                const next = row === undefined ? " missing" : JSON.stringify(row);
+                const next = row === undefined ? "\0missing" : JSON.stringify(row);
                 if (signature !== undefined && next === signature) return;
                 signature = next;
                 onResult(row, { fromCache: false, hasPendingWrites: false });

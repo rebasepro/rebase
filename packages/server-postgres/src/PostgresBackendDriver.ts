@@ -19,6 +19,7 @@ import {
     RestFetchService,
     SaveManyProps,
     SaveProps,
+    StorageSource,
     TableColumnInfo,
     TableForeignKeyInfo,
     TableJunctionInfo,
@@ -148,14 +149,33 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
+    /**
+     * Build the context handed to every collection callback.
+     *
+     * Note `data: this.data` — `this` is whichever driver is running the
+     * operation, so the callback's data plane inherits that driver's privilege.
+     * On a user request `AuthenticatedPostgresBackendDriver.withTransaction`
+     * constructs a fresh base driver bound to the RLS-scoped transaction and
+     * runs the operation on it, so `this.data` speaks through that connection
+     * and policies apply. On server-context work `this` is the base driver on
+     * the owner connection, and they do not. Pinned by the
+     * `"scopes context.data to the caller"` case in the `rls-enforcement` e2e
+     * suite, because it is the kind of property that is easy to break from a
+     * distance and impossible to notice.
+     *
+     * Previously returned through `as unknown as RebaseCallContext`, which
+     * disabled checking for the whole object and let `driver` — documented in
+     * the callbacks guide — sit on the runtime context while absent from the
+     * contract. Both are declared now, so this is a plain typed return.
+     */
     private buildCallContext(): RebaseCallContext {
         return {
             user: this.user,
             driver: this,
             data: this.data,
-            client: this.client,
-            storageSource: this.client?.storage
-        } as unknown as RebaseCallContext;
+            client: this.client as RebaseCallContext["client"],
+            storageSource: this.client?.storage as StorageSource
+        };
     }
 
     private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: CollectionConfig<M> | undefined, path: string) {

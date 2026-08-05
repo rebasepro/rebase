@@ -162,6 +162,13 @@ jobs:
       - name: Test-script coverage
         run: pnpm run check:test-scripts
 
+      # A literal NUL inside a sentinel string in `packages/client/src/collection.ts`
+      # made grep and ripgrep classify the file as binary and skip it in silence:
+      # 418 lines of the client's core collection API returned nothing for every
+      # search anyone ran, and an empty result reads exactly like "no matches".
+      - name: Control characters in sources
+        run: pnpm run check:control-chars
+
       # The admin ships seven non-English locales and 200-odd strings that have
       # a translation key are also written out as English literals, where no
       # translation reaches them. Found by looking at the running panel: a

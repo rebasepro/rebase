@@ -5,7 +5,7 @@ import type {
     CronJobRunState,
     CronJobContext
 } from "@rebasepro/types";
-import type { RebaseClient } from "@rebasepro/types";
+import type { RebaseServerClient } from "@rebasepro/types";
 import type { LoadedCronJob } from "./cron-loader";
 import type { CronStore } from "./cron-store";
 import { logger } from "../utils/logger.js";
@@ -234,12 +234,17 @@ export class CronScheduler {
     private jobs = new Map<string, RegisteredJob>();
     private started = false;
     private store?: CronStore;
-    private client?: RebaseClient;
+    private client?: RebaseServerClient;
 
     /**
-     * Set the RebaseClient instance to make it available to cron job handlers.
+     * Set the server singleton to make it available to cron job handlers.
+     *
+     * `RebaseServerClient`, not `RebaseClient`: the object `init.ts` passes is
+     * the same one it registers as the singleton, so this was always the true
+     * type — and the wider annotation is what let `ctx.client.data` look like a
+     * user-scoped plane inside a cron, when it is the RLS-bypassing one.
      */
-    setClient(client: RebaseClient): void {
+    setClient(client: RebaseServerClient): void {
         this.client = client;
     }
 
@@ -698,7 +703,17 @@ reason: "already_executing" },
                 ).join(" ");
                 capturedLogs.push(line);
             },
-            client: this.client!
+            // Both names, one object. `rebase` is canonical — it matches the
+            // singleton import and `defineFunction`'s context — and `client` is
+            // the deprecated alias kept so existing cron files keep running.
+            //
+            // The assertion covers only `client`'s extra `data`: the singleton
+            // carries that alias at runtime (`init.ts` assigns `data` and
+            // `dataAsAdmin` to the same plane) but `RebaseServerClient` omits it
+            // by design, so the deprecated name has to be re-stated here rather
+            // than leaking back into the canonical type.
+            rebase: this.client!,
+            client: this.client! as CronJobContext["client"]
         };
 
         job.state = "running";

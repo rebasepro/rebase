@@ -1,4 +1,5 @@
-import type { RebaseClient } from "../controllers/client";
+import type { RebaseServerClient } from "../controllers/client";
+import type { RebaseSdkData } from "../controllers/data";
 
 /**
  * Cron Job type definitions for Rebase.
@@ -93,16 +94,57 @@ export interface CronJobContext {
     log: (...args: unknown[]) => void;
 
     /**
-     * The server-side {@link RebaseClient}. This is the **same singleton**
-     * exposed as `rebase` (imported from `@rebasepro/server`) and as
-     * `context` in collection callbacks — it is only named `client` here.
+     * The server-side Rebase singleton — the **same object** `import { rebase }
+     * from "@rebasepro/server"` returns, and the same one `defineFunction`
+     * hands its callback. Spelled the same way here so that one thing has one
+     * name across every server-side authoring surface.
      *
-     * Its data plane (`client.data`) runs with **admin privileges and bypasses
-     * RLS** (`{ uid: "service", roles: ["admin"] }`). There is no per-request
-     * user in a cron, so treat every query as fully trusted and scope your own
-     * filters explicitly.
+     * Its data plane is {@link RebaseServerClient.dataAsAdmin}, which runs with
+     * **admin privileges and bypasses RLS** (`{ uid: "service", roles:
+     * ["admin"] }`). A cron has no per-request user, so there is no user-scoped
+     * alternative here and no policy to fall back on: scope every query's
+     * filters yourself.
+     *
+     * @example
+     * export default defineCron({
+     *     name: "Nightly cleanup",
+     *     schedule: "0 3 * * *",
+     *     async handler({ rebase, log }) {
+     *         const expired = await rebase.dataAsAdmin.sessions.findAll({
+     *             where: { expired: ["==", true] }
+     *         });
+     *         for (const session of expired) {
+     *             await rebase.dataAsAdmin.sessions.delete(session.id as string);
+     *         }
+     *         log(`Deleted ${expired.length} expired sessions`);
+     *     }
+     * });
      */
-    client: RebaseClient;
+    rebase: RebaseServerClient;
+
+    /**
+     * The same object as {@link rebase}, under the name this context used
+     * before.
+     *
+     * @deprecated Use `rebase` instead. Two things made the old name a problem,
+     * and neither was cosmetic. It contradicted every other server surface,
+     * where the singleton is `rebase` — the previous docstring had to end with
+     * *"it is only named `client` here"*. And typing it as `RebaseClient`
+     * re-exposed `client.data`, the alias that {@link RebaseServerClient}
+     * deliberately `Omit`s so the RLS-bypassing plane has exactly one name and
+     * the privilege is visible at the call site. A reader who learned
+     * `client.data` here carried it to a collection callback, where
+     * `context.data` is the *user-scoped* plane — same spelling, opposite
+     * privilege.
+     *
+     * Still the full server client at runtime, and `data` still resolves, so
+     * existing cron files keep working and keep compiling. It will be removed
+     * in the next major.
+     */
+    client: RebaseServerClient & {
+        /** @deprecated Use `rebase.dataAsAdmin` — the name states the privilege. */
+        data: RebaseSdkData;
+    };
 }
 
 // =============================================================================
