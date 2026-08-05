@@ -242,6 +242,20 @@ idempotent, so the gap that bites is `createMany`.
 replay pass `op.mutationId`. Add `updateMany`/`deleteMany` (or document the
 omission).
 
+**Done.** Both, plus the idempotency gap. `updateMany` takes `{ id, data }`
+entries rather than flat rows — on a table keyed on a `sku` or a composite key a
+flat row cannot say whether a column is the address or a value — and
+`deleteMany` takes ids rather than a filter, because a mistyped condition that
+empties a table cannot be reviewed at the call site the way an explicit list
+can. Served at `POST /<collection>/bulk/delete` rather than `DELETE
+/<collection>/bulk`: bodies on DELETE are permitted but widely dropped by
+proxies, and several OpenAPI generators ignore `requestBody` on a DELETE
+operation, so a generated client would send no ids at all.
+
+The bulk endpoints turned out to be missing from the generated OpenAPI spec
+altogether — the same defect as finding 3, and adding two more routes would have
+widened it, so all three are described now.
+
 ### 10. Two realtime entry points with no stated precedence
 
 `SDKCollectionClient` declares `listen?` / `listenById?`; `CollectionClient`
