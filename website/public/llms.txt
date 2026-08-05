@@ -8350,7 +8350,7 @@ const myPlugin: RebasePlugin = {
 | `collection.toolbar` | `CollectionToolbarProps` | Extra widgets inside the collection toolbar row |
 | `collection.empty-state` | `CollectionEmptyStateProps` | Custom empty-state when collection has no data |
 | `collection.insights` | `CollectionInsightsSlotProps` | Insight widgets above the collection table |
-| `collection.filter-panel` | `CollectionFilterPanelProps` | Custom filter sidebar alongside the table |
+| `collection.filter-panel` | `CollectionFilterPanelProps` | Custom filter sidebar alongside the table. **Not yet rendered** — declared, but nothing in the admin renders it today. |
 
 ##### Entity / Form
 
@@ -8360,22 +8360,22 @@ const myPlugin: RebasePlugin = {
 | `form.actions.top` | `PluginFormActionProps` | Actions above the form action bar |
 | `form.before` | `PluginFormActionProps` | Content before the form title/field list |
 | `form.after` | `PluginFormActionProps` | Content after the form field list |
-| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in entity tables |
-| `entity.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field |
-| `entity.field.after` | `EntityFieldSlotProps` | UI injected after an individual form field |
+| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in entity tables. **Not yet rendered** — declared, but nothing in the admin renders it today. |
+| `entity.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field. **Not yet rendered** — declared, but nothing in the admin renders it today. |
+| `entity.field.after` | `EntityFieldSlotProps` | UI injected after an individual form field. **Not yet rendered** — declared, but nothing in the admin renders it today. |
 
 ##### Dashboard
 
 | Slot | Props Type | Description |
 |------|-----------|-------------|
-| `dashboard.widget` | `DashboardWidgetProps` | Widgets on the dashboard/home page |
+| `dashboard.widget` | `DashboardWidgetProps` | Widgets on the dashboard/home page. **Not yet rendered** — declared, but nothing in the admin renders it today. |
 
 ##### Global
 
 | Slot | Props Type | Description |
 |------|-----------|-------------|
-| `global.search` | `GlobalSearchProps` | Cross-collection search bar component |
-| `shell.toolbar` | `ShellToolbarProps` | Top-level toolbar actions in the app bar |
+| `global.search` | `GlobalSearchProps` | Cross-collection search bar component. **Not yet rendered** — declared, but nothing in the admin renders it today. |
+| `shell.toolbar` | `ShellToolbarProps` | Top-level toolbar actions in the app bar. **Not yet rendered** — declared, but nothing in the admin renders it today. |
 
 ##### Kanban
 
