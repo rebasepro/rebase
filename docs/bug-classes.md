@@ -774,6 +774,48 @@ and a wall-clock check is cheap next to a timer you cannot trust.
 
 ---
 
+## 24. Work that grows faster than the input
+
+A caller sends a few hundred bytes and the process spends a minute on it. Three
+in one sweep, all reachable from a query string:
+
+* **`?title=like.%25%25%25…`** — `%` becomes an unbounded quantifier, so a run
+  of them is adjacent quantifiers, and on a subject that does not match the
+  engine tries every way of splitting the subject between them. Fourteen `%`
+  against a forty-eight character value: **87 seconds**. In the browser that
+  freezes the tab; in the Mongo driver the expression goes to the database as
+  `$regex`, so it is a database thread.
+* **`?or=(or(or(…)))`** — a recursive descent parser with no depth limit,
+  reaching `RangeError: Maximum call stack size exceeded`, and quadratic below
+  that because each level rescans the string it was handed.
+* **a token lifetime past 24.8 days** — not superlinear but the same family: a
+  value from outside decides how much work happens, and nothing bounds it.
+  (That one is class 23.)
+
+**The question is not "how long does this take?" but "what is the worst input
+of this size?"** Every one of these is instant on the inputs anyone tries by
+hand. The tell is a *transformation from user input into a program* — a regex, a
+parse tree, a query — where the input controls the program's shape rather than
+just its values.
+
+**Sweep:** `new RegExp(` with a non-literal argument, then ask whether the
+argument can contain two adjacent quantifiers. Every recursive function whose
+input is a request field. Then any loop whose bound is a length rather than a
+constant.
+
+**Do not accept "the HTTP layer stops it" as the bound.** Node's 16 KB header
+cap is what keeps the nesting parser below a stack overflow today. That is a
+default on a different component, changed by one flag, and it is not a fact
+this parser knows.
+
+**Prefer normalising the input to rejecting it, where the semantics allow.** A
+run of `%` means exactly what one `%` means, so collapsing it is free and
+nothing is refused. Nesting depth has no such collapse, so it is a 400 — and
+the message says which parameter, because a `RangeError` about the call stack
+tells the caller nothing about their filter.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -1042,6 +1084,29 @@ the panel added, which is the argument for doing both.
 
 The two verified rows are the point of the exercise as much as the bugs: both
 fixes were written blind against unit tests, and neither had been seen working.
+
+
+### Sweep — starting again from main
+
+Everything above had landed; this began from a clean tree and asked what a
+*fresh* pass would find. It went straight to the family nothing had looked at:
+what a caller can make the process do with a few hundred bytes.
+
+| checked | result |
+|---|---|
+| class 23's own sweep instruction, run over every timer with a computed delay | **BUG** — `scheduleRefresh` derives its delay from the token's `expiresAt`, with a floor for the past and no ceiling. `auth.accessExpiresIn` is configurable, defaults to `"1h"`, and `"30d"` asks `setTimeout` for 2,591,880,000 ms — past the 32-bit ceiling, so it clamps to 1 ms, refreshes, gets another far-future token and loops. One hot loop per open tab. |
+| the webhook retry backoff | **BUG**, latent — `retryDelays[attempt - 1]` where `maxRetries` and `retryDelays.length` must agree and nothing makes them. Out of range is `undefined`, and `setTimeout(r, undefined)` is an immediate retry against an endpoint that just failed. |
+| every `new RegExp(` built from a non-literal | **BUG** ×2 (class 24) — the `LIKE` translators in the offline evaluator and the Mongo driver. 87 seconds from a query string. The rest take escaped or developer-controlled input: `hydrateRegExp` reads `validation.matches` out of a collection config, and Mongo's `searchString` is escaped before it becomes a pattern. |
+| `deserializeLogicalCondition`, a recursive parser on a query field | **BUG** (class 24) — no depth limit, `RangeError` at twenty thousand levels, quadratic below that. Capped at 32 with a 400. |
+| `?include=` repeated ten thousand times | clean — it is a membership test against the collection's own relations, so duplicates cost a longer `includes()` scan and nothing else. |
+| the cron scheduler's `timeoutSeconds` | clean in practice — it would need a job timeout over 24.8 days to overflow. |
+
+One of these is worth keeping for how the *fix* failed. The depth counter was
+named `depth`, and the function body already used `depth` for paren tracking
+inside a block that shadows a parameter of the same name — so the new counter
+silently became the paren counter and never grew. A hundred levels still
+parsed. Reading the diff would not have caught it; the test did, by refusing to
+go green.
 
 
 Two process notes worth as much as the findings.
