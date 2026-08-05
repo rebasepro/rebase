@@ -379,6 +379,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                         parentEntityIds={usedParentEntityIds}
                         selectedTab={selectedTab}
                         layout="split"
+                        onCloseRequest={handleCloseDetail}
                         onEditClick={() => {
                             navigate(buildUrl(`${path}/${renderedEntityId}/edit`));
                         }}
@@ -400,6 +401,11 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                         parentEntityIds={usedParentEntityIds}
                         selectedTab={selectedTab}
                         layout="split"
+                        // The ✕, and where "save and close" lands. A plain
+                        // navigation: `useNavigationBlocker` above already
+                        // stands between it and an unsaved edit, so the ✕ asks
+                        // exactly what Escape and the browser's Back ask.
+                        onCloseRequest={handleCloseDetail}
                         onValuesModified={setDirty}
                         onSaved={() => {
                             setDirty(false);

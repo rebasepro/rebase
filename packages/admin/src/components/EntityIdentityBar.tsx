@@ -6,6 +6,7 @@ import { useTranslation } from "@rebasepro/app";
 import {
     Button,
     CheckIcon,
+    ChevronDownIcon,
     cls,
     CodeIcon,
     CopyIcon,
@@ -21,7 +22,8 @@ import {
     MoreVerticalIcon,
     Separator,
     Tooltip,
-    Typography
+    Typography,
+    XIcon
 } from "@rebasepro/ui";
 
 export interface EntityIdentityBarProps {
@@ -54,6 +56,31 @@ export interface EntityIdentityBarProps {
      * action is "done with this record" rather than "keep editing".
      */
     onSaveAndClose?: () => void;
+
+    /**
+     * Where {@link onSaveAndClose} is offered.
+     *
+     * `"button"` — its own filled button, and Save demotes to text. For the
+     * overlays, where you opened the record to do one thing to it and closing is
+     * the dominant intent.
+     *
+     * `"menu"` — a `▾` welded to the Save button. For the split, where the list
+     * is right there and `j`/`k` walk from record to record: there, saving and
+     * *staying* is the common case, so it keeps the filled button and dismissing
+     * is one step further in. The gesture still exists, so muscle memory carried
+     * over from the side panel finds it.
+     */
+    saveAndClosePlacement?: "button" | "menu";
+
+    /**
+     * Dismiss this record, from the ✕ at the bar's trailing edge.
+     *
+     * Fenced off from Save by a separator: it is chrome, not the last item in
+     * the action row. The panel that supplies it decides what dismissing means —
+     * in the split it is a navigation, which the layout's unsaved-changes
+     * blocker already guards, so the ✕ cannot drop an edit without asking.
+     */
+    onClose?: () => void;
 
     onBack?: () => void;
     onInspect?: () => void;
@@ -114,6 +141,8 @@ export function EntityIdentityBar({
     saveDisabled,
     hasErrors,
     onSaveAndClose,
+    saveAndClosePlacement = "button",
+    onClose,
     onBack,
     onInspect,
     onViewHistory,
@@ -134,6 +163,15 @@ export function EntityIdentityBar({
         : status === "copy" ? t("create_copy_and_close") : t("create_and_close");
     const hasMenu = Boolean(recordActions) || Boolean(onInspect) || Boolean(onViewHistory)
         || Boolean(externalLink);
+
+    // The two shapes "save and close" takes, so the Save button next to it knows
+    // whether it is still the primary action.
+    const saveAndCloseButton = Boolean(onSaveAndClose) && saveAndClosePlacement === "button";
+    const saveAndCloseMenu = Boolean(onSaveAndClose) && saveAndClosePlacement === "menu";
+
+    const saveTooltip = hasErrors
+        ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving")
+        : undefined;
 
     return (
         <div className={cls(
@@ -190,24 +228,52 @@ export function EntityIdentityBar({
             )}
 
             {onSave && (
-                <Tooltip title={hasErrors
-                    ? (t("fix_errors_before_saving") ?? "Fix highlighted errors before saving")
-                    : undefined}>
-                    <LoadingButton
-                        // Where there is something to close, closing is the
-                        // dominant intent and takes the filled treatment.
-                        variant={onSaveAndClose ? "text" : "filled"}
-                        color={"primary"}
-                        size={"small"}
-                        loading={saving && !onSaveAndClose}
-                        disabled={saveDisabled}
-                        onClick={onSave}>
-                        {saveLabel}
-                    </LoadingButton>
-                </Tooltip>
+                // `rounded-lg overflow-hidden`: the two halves of the split
+                // button are square inside and the group carries the radius, so
+                // there is one control with a seam rather than two buttons that
+                // happen to touch. Their borders are `border-primary` over
+                // `bg-primary` — the same colour — so the seam has to be drawn.
+                <div className={"flex items-stretch rounded-lg overflow-hidden"}>
+                    <Tooltip title={saveTooltip}>
+                        <LoadingButton
+                            // Where a separate close button carries it, closing
+                            // is the dominant intent and takes the filled
+                            // treatment. Under the `▾` the record is staying
+                            // open, so Save keeps it.
+                            variant={saveAndCloseButton ? "text" : "filled"}
+                            color={"primary"}
+                            size={"small"}
+                            loading={saving && !saveAndCloseButton}
+                            disabled={saveDisabled}
+                            onClick={onSave}
+                            className={saveAndCloseMenu ? "rounded-none" : undefined}>
+                            {saveLabel}
+                        </LoadingButton>
+                    </Tooltip>
+
+                    {saveAndCloseMenu && <>
+                        <span className={"w-px self-stretch bg-white/25 z-10"} aria-hidden={true}/>
+                        <Menu align={"end"}
+                            trigger={
+                                <Button variant={"filled"}
+                                    color={"primary"}
+                                    size={"small"}
+                                    disabled={saveDisabled}
+                                    aria-label={closeLabel}
+                                    className={"rounded-none px-1.5"}>
+                                    <ChevronDownIcon size={iconSize.smallest}/>
+                                </Button>
+                            }>
+                            <MenuItem onClick={onSaveAndClose}>
+                                <CheckIcon size={iconSize.smallest}/>
+                                {closeLabel}
+                            </MenuItem>
+                        </Menu>
+                    </>}
+                </div>
             )}
 
-            {onSaveAndClose && (
+            {saveAndCloseButton && (
                 <LoadingButton variant={"filled"}
                     color={"primary"}
                     size={"small"}
@@ -251,6 +317,18 @@ export function EntityIdentityBar({
             )}
 
             {trailing}
+
+            {/* Last, and behind a rule. A ✕ that sits flush against Save reads
+                as the next item in the action row, and the two adjacent controls
+                are then "commit this edit" and "abandon it". */}
+            {onClose && <>
+                <Separator orientation={"vertical"} className={"h-5 mx-1 shrink-0"}/>
+                <Tooltip title={`${t("close")} · Esc`}>
+                    <IconButton size={"small"} onClick={onClose} aria-label={t("close")}>
+                        <XIcon size={iconSize.smallest}/>
+                    </IconButton>
+                </Tooltip>
+            </>}
         </div>
     );
 }

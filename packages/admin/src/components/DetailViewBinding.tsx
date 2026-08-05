@@ -76,6 +76,13 @@ export interface DetailViewBindingProps<M extends Record<string, unknown> = Reco
     parentEntityIds: string[];
     onTabChange?: (props: OnTabChangeParams<M>) => void;
     onEditClick?: () => void;
+    /**
+     * Dismiss this record — the ✕ at the identity bar's trailing edge.
+     *
+     * Set by the layouts that own the record's place on screen but are not side
+     * dialogs: the split, where dismissing is navigating back to the collection.
+     */
+    onCloseRequest?: () => void;
     layout?: "side_panel" | "full_screen" | "split" | "dialog";
     barActions?: (params: BarActionsParams) => React.ReactNode;
     /**
@@ -144,6 +151,7 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
     parentEntityIds,
     onTabChange,
     onEditClick,
+    onCloseRequest,
     entity,
     dataLoading,
     layout = "full_screen",
@@ -551,6 +559,7 @@ entityId }
             dirty={false}
             saving={false}
             onBack={backToCollection}
+            onClose={onCloseRequest}
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
             externalLink={usedEntity

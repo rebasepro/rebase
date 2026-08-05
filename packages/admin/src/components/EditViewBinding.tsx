@@ -98,6 +98,16 @@ export interface EditViewBindingProps<M extends Record<string, unknown> = Record
     onSaved?: (params: OnUpdateParams) => void;
     onTabChange?: (props: OnTabChangeParams<M>) => void;
     navigateBack?: () => void;
+    /**
+     * Dismiss this record — the ✕ at the identity bar's trailing edge, and what
+     * "save and close" reaches once the save lands.
+     *
+     * Set by the layouts that own the record's place on screen but are not side
+     * dialogs: the split, where dismissing is navigating back to the collection.
+     * The side panel and the dialog close through {@link useSideDialogContext}
+     * instead, which is what runs their unsaved-changes prompt.
+     */
+    onCloseRequest?: () => void;
     layout?: "side_panel" | "full_screen" | "split" | "dialog";
     barActions?: (params: BarActionsParams) => React.ReactNode;
     /**
@@ -201,6 +211,7 @@ export function EditViewBindingInner<M extends Record<string, unknown>>({
     onSaved,
     onTabChange,
     navigateBack,
+    onCloseRequest,
     entity,
     initialDirtyValues,
     dataLoading,
@@ -445,7 +456,26 @@ parentEntityIds,
     /* ---- record actions, in the bar's overflow menu ---------------------- */
 
     const sideDialogContext = useSideDialogContext();
-    const canCloseAfterSave = layout === "side_panel" || layout === "dialog";
+
+    /**
+     * Whether the save in flight was asked to dismiss the record afterwards.
+     *
+     * A ref, and for the reason {@link SideDialogs} keeps its own as one: the
+     * flag is raised and the form submitted in a single click handler, and the
+     * `onSaved` that has to act on it was captured before React could re-render.
+     * As state it read one save late — the first "save and close" saved and
+     * stayed open, and the *next* save closed the record.
+     *
+     * The side panel and the dialog use the side-dialog controller's flag,
+     * which their own close path consumes; this one covers the layouts that
+     * close by calling {@link onCloseRequest} instead.
+     */
+    const pendingCloseRef = useRef(false);
+
+    // The split can close after a save the same way the overlays do — through
+    // the callback its layout supplies. Without one there is nothing to close.
+    const canCloseAfterSave = layout === "side_panel" || layout === "dialog"
+        || (layout === "split" && Boolean(onCloseRequest));
 
     const recordActions = useRecordActions({
         collection,
@@ -631,6 +661,24 @@ parentEntityIds,
                 };
                 onSaved?.(res);
                 formProps?.onSaved?.(res);
+
+                // After `onSaved`, never instead of it: the layout's own handler
+                // is what lowers its dirty flag, and closing is a navigation the
+                // unsaved-changes blocker would otherwise stop on values that
+                // are already stored.
+                //
+                // And after this handler returns, not inside it. The layouts
+                // that close this way close by navigating, and they have just
+                // navigated themselves — the split leaves `…/edit` for the
+                // record's own URL. Two navigations raised in one handler leave
+                // only the first: the router is still settling the replace when
+                // the push arrives, and drops it. The record saved and stayed
+                // open, which is the exact defect "save and close" was fixed for
+                // in the side panel.
+                if (pendingCloseRef.current) {
+                    pendingCloseRef.current = false;
+                    setTimeout(() => onCloseRequest?.(), 0);
+                }
             }}
             Builder={resolveComponentRef(selectedSecondaryForm?.Builder as ComponentRef<EntityCustomViewParams<M>> | undefined) as React.ComponentType<EntityCustomViewParams<M>> | undefined}
         />
@@ -727,18 +775,28 @@ parentEntityIds,
                 : undefined}
             onSave={canEdit && formContext ? () => {
                 sideDialogContext.setPendingClose?.(false);
+                pendingCloseRef.current = false;
                 formContext.submit();
             } : undefined}
             onSaveAndClose={canEdit && formContext && canCloseAfterSave ? () => {
-                sideDialogContext.setPendingClose?.(true);
                 // Lowered again once the submit settles. A submit the form
                 // rejects never reaches `onSaved`, so nothing would consume the
                 // flag and the *next* save — a keyboard ⌘S, say — would close
                 // the panel out from under an edit nobody asked to finish. A
                 // save that succeeds has already closed by the time this runs.
+                if (layout === "split") {
+                    pendingCloseRef.current = true;
+                    Promise.resolve(formContext.submit())
+                        .finally(() => { pendingCloseRef.current = false; });
+                    return;
+                }
+                sideDialogContext.setPendingClose?.(true);
                 Promise.resolve(formContext.submit())
                     .finally(() => sideDialogContext.setPendingClose?.(false));
             } : undefined}
+            // Welded to Save in the split, its own button in the overlays.
+            saveAndClosePlacement={layout === "split" ? "menu" : "button"}
+            onClose={onCloseRequest}
             onDiscard={canEdit && formContext ? () => formContext.formex.resetForm() : undefined}
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
             onViewHistory={includeHistoryView ? () => setInspectorTab("history") : undefined}
