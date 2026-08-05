@@ -518,7 +518,7 @@ acknowledgeNoCutover: true },
     }
 }
 
-function printDbHelp(): void {
+export function printDbHelp(): void {
     console.log(`
 ${chalk.bold("rebase cloud db")} — Database & backups
 

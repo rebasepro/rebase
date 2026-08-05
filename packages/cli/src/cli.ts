@@ -79,8 +79,17 @@ export async function entry(args: string[]) {
         return;
     }
 
-    // For namespaced commands with --help, pass it through as subcommand
-    const effectiveSubcommand = parsedArgs["--help"] ? "--help" : subcommand;
+    // For a namespaced command, `--help` becomes the subcommand *only when the
+    // user did not name one*. `rebase db --help` wants the db help; `rebase
+    // cloud env --help` wants env's, and overwriting "env" with "--help" was
+    // what made every `rebase cloud <group> --help` print the same index page —
+    // the group never reached the dispatcher. Seven cloud modules declare their
+    // own `"--help": Boolean` and none of it could run, so ~44 flags had no way
+    // to be listed.
+    //
+    // A group still gets its `--help` in `rawArgs` either way, so a handler that
+    // parses its own flags sees the request whichever branch this takes.
+    const effectiveSubcommand = parsedArgs["--help"] && !subcommand ? "--help" : subcommand;
 
     switch (command) {
         case "init":
@@ -228,8 +237,10 @@ ${chalk.green.bold("API Keys")}
   ${chalk.blue.bold("api-keys list")}           List all service API keys
   ${chalk.blue.bold("api-keys create")}         Create a new scoped API key
   ${chalk.blue.bold("api-keys revoke")}         Revoke an existing API key
-  ${chalk.blue.bold("telemetry")}               Anonymous usage sharing (opt-in, off by default)
   ${chalk.blue.bold("api-keys")} ${chalk.gray("--help")}         Show API key command help
+
+${chalk.green.bold("Usage sharing")}
+  ${chalk.blue.bold("telemetry")}               Anonymous usage sharing (opt-in, off by default)
 
 ${chalk.green.bold("Rebase Cloud")}
   ${chalk.blue.bold("cloud login")}             Sign in to the hosted control plane

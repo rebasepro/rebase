@@ -139,7 +139,7 @@ function slugify(s: string): string {
         .replace(/^-+|-+$/g, "");
 }
 
-function printOrgsHelp(): void {
+export function printOrgsHelp(): void {
     console.log(`
 ${chalk.bold("rebase cloud orgs")} — Manage organizations
 

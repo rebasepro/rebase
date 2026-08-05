@@ -12,22 +12,23 @@ import { loginCommand, logoutCommand, whoamiCommand } from "./auth";
 import { linkCommand, unlinkCommand, selectOrgCommand, openCommand } from "./link";
 import { listProjects, createProject, projectInfo, deleteProject } from "./projects";
 import { deployCommand, logsCommand } from "./deploy";
-import { orgsCommand } from "./orgs";
-import { dbCommand } from "./databases";
-import { envCommand } from "./env";
-import { domainsCommand } from "./domains";
-import { extensionsCommand } from "./extensions";
-import { settingsCommand } from "./settings";
+import { orgsCommand, printOrgsHelp } from "./orgs";
+import { dbCommand, printDbHelp } from "./databases";
+import { envCommand, printEnvHelp } from "./env";
+import { domainsCommand, printDomainsHelp } from "./domains";
+import { extensionsCommand, printExtensionsHelp } from "./extensions";
+import { settingsCommand, printSettingsHelp } from "./settings";
 import { deploymentsListCommand, rollbackCommand, cancelCommand } from "./deployments";
 import { powerCommand } from "./power";
-import { debugCommand } from "./debug";
+import { debugCommand, printDebugHelp } from "./debug";
 import {
     statusCommand,
     metricsCommand,
     webhooksCommand,
     storageCommand,
     clustersCommand,
-    billingCommand
+    billingCommand,
+    printStorageHelp
 } from "./resources";
 import { requireProjectRef, initOutputMode, GLOBAL_CLOUD_FLAGS } from "./context";
 
@@ -61,6 +62,30 @@ permissive: true })._;
     return rest.slice(i);
 }
 
+/**
+ * The help page for each group, keyed by every alias the dispatch below accepts.
+ *
+ * Aliases are listed explicitly rather than normalised first, so a group that
+ * gains one and forgets it here degrades to the index page — wrong, but a page.
+ * `cloud-help.test.ts` asserts the two stay in step.
+ *
+ * A group absent from this map has no page of its own; the index lists it.
+ */
+const GROUP_HELP: Record<string, () => void> = {
+    env: printEnvHelp,
+    domains: printDomainsHelp,
+    domain: printDomainsHelp,
+    extensions: printExtensionsHelp,
+    extension: printExtensionsHelp,
+    settings: printSettingsHelp,
+    orgs: printOrgsHelp,
+    org: printOrgsHelp,
+    db: printDbHelp,
+    database: printDbHelp,
+    debug: printDebugHelp,
+    storage: printStorageHelp
+};
+
 export async function cloudCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
     // Latch the output mode FIRST — before anything can print or `fail` — so the
     // whole command family agrees on human vs. machine-readable output.
@@ -74,10 +99,41 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
     // subcommand as `"--json"`. Falling back to it keeps the parameter useful
     // when a caller passes a group that is not in `rawArgs` at all.
     const group = pos[0] ?? (subcommand !== "--help" ? subcommand : undefined);
+
+    // `--help` has to be recovered from `rawArgs` rather than read off `pos`.
+    // `positionals()` resolves against `GLOBAL_CLOUD_FLAGS`, which declares
+    // `--help`, so `arg` *consumes* it — correct for `--project` and `--json`,
+    // which modify a command, but wrong for `--help`, which replaces it.
+    const wantsHelp = rawArgs.includes("--help") || rawArgs.includes("-h");
     const action = pos[1];
 
-    if (!group || subcommand === "--help") {
+    // The index help is for `rebase cloud` and `rebase cloud --help` — that is,
+    // when no group was named. It used to also fire whenever `subcommand` was
+    // the literal `"--help"`, which `cli.ts` set for *any* `--help` anywhere in
+    // the line, so `rebase cloud env --help` printed this page instead of env's
+    // and the per-group help in seven modules was unreachable. Keyed on the
+    // group now, which is the thing that actually decides whose help this is.
+    if (!group) {
         printCloudHelp();
+        return;
+    }
+
+    // `--help` is answered here, before dispatch, and never by the command.
+    //
+    // Routing it as an action instead only worked for the groups that happened
+    // to have a `case "--help"`. The others took `rawArgs` and ignored the
+    // action entirely, so the flag did nothing and the command ran: `rebase
+    // cloud env --help` tried to list variables and failed on "No project
+    // specified", `rebase cloud deploy --help` started resolving a project, and
+    // `rebase cloud link --help` opened an *interactive project picker* — a
+    // prompt, from a flag whose entire job is to print text and exit.
+    //
+    // Answering centrally makes that structurally impossible: `--help` cannot
+    // reach a handler, so it cannot prompt, call the API, or need a linked
+    // project. A group without its own page falls back to the index rather than
+    // to running something.
+    if (wantsHelp) {
+        (GROUP_HELP[group] ?? printCloudHelp)();
         return;
     }
 

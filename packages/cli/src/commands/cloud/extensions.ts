@@ -246,7 +246,7 @@ extensionName: name }, { path: "disable" });
     }
 }
 
-function printExtensionsHelp(): void {
+export function printExtensionsHelp(): void {
     console.log(`
 ${chalk.bold("rebase cloud extensions")} — Postgres extensions
 

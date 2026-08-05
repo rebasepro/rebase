@@ -22,8 +22,7 @@ export async function loginCommand(rawArgs: string[]): Promise<void> {
     const args = arg(
         { "--email": String,
 "--password": String,
-"-e": "--email",
-"-p": "--password" },
+"-e": "--email" },
         { argv: rawArgs.slice(3),
 permissive: true }
     );

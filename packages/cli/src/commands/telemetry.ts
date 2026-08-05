@@ -14,6 +14,15 @@ import { configPath, endpoint, previewEvent, readConfig, readProjectPolicy, setC
 export async function telemetryCommand(rawArgs: string[]): Promise<void> {
     const subcommand = rawArgs.slice(3).filter((a) => !a.startsWith("-"))[0];
 
+    // Checked before the switch because the line above strips flags, so
+    // `rebase telemetry --help` reached `case undefined` and printed the status
+    // page — an answer to a question nobody asked, with the flag ignored in
+    // silence. `printHelp` already existed; nothing routed to it.
+    if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+        printHelp();
+        return;
+    }
+
     switch (subcommand) {
         case "status":
         case undefined:

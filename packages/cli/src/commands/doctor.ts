@@ -15,7 +15,36 @@ import {
     findEnvFile
 } from "../utils/project";
 
+/**
+ * `--help` is answered before the project guard, not after.
+ *
+ * `doctor` declared no `--help` at all, so the flag fell through to the command
+ * body and hit `requireProjectRoot()` — and `rebase doctor --help` outside a
+ * project answered "✗ Could not find a Rebase project root." Asking a command
+ * what it does is the one question that cannot require being somewhere
+ * particular to ask.
+ */
+function printDoctorHelp(): void {
+    console.log(`
+${chalk.bold("rebase doctor")} — Detect drift between collections, schema and database
+
+${chalk.green.bold("Usage")}
+  rebase doctor
+
+Compares the collections you declare, the generated Drizzle schema, and the
+tables that actually exist, then reports what disagrees and how to reconcile it.
+
+Run from inside a Rebase project — it reads the project's collections and
+connects to its database.
+`);
+}
+
 export async function doctorCommand(rawArgs: string[]): Promise<void> {
+    if (rawArgs.includes("--help") || rawArgs.includes("-h")) {
+        printDoctorHelp();
+        return;
+    }
+
     const projectRoot = requireProjectRoot();
     const backendDir = requireBackendDir(projectRoot);
 

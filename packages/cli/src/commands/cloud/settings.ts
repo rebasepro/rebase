@@ -144,7 +144,7 @@ updated: patch }
     }
 }
 
-function printSettingsHelp(): void {
+export function printSettingsHelp(): void {
     console.log(`
 ${chalk.bold("rebase cloud settings")} — Project configuration
 
