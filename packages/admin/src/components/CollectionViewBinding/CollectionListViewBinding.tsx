@@ -79,7 +79,29 @@ type ListColumnDef = {
     isDate?: boolean;
     align: "left" | "center" | "right";
     width: string;
+    /**
+     * What {@link width} costs in pixels, so the fit calculation can budget in
+     * the same units the row lays out in. A flat per-column estimate treated a
+     * relation (w-64) as costing the same as a date (w-28), which is where a row
+     * ran out of width for the title while still claiming everything fit.
+     */
+    widthPx: number;
 };
+
+/**
+ * How wide a column of this property wants to be — the Tailwind class the cell
+ * gets, and the pixel cost of that class. The two are returned together because
+ * they must not drift: the budget is only meaningful if it describes the widths
+ * actually rendered. `lg:` variants key off the viewport, not this panel, so a
+ * narrow split on a wide screen gets the larger of the two — the cost we budget.
+ */
+function getIdealColumnWidth(prop: Property): { width: string, widthPx: number } {
+    if (prop.type === "string" && "enum" in prop) return { width: "flex-shrink-0 w-32", widthPx: 128 };
+    if (prop.type === "date" || prop.type === "number" || prop.type === "boolean") return { width: "flex-shrink-0 w-28", widthPx: 112 };
+    if (prop.type === "reference" || prop.type === "relation") return { width: "flex-shrink-0 w-56 lg:w-64", widthPx: 256 };
+    if (prop.type === "string") return { width: "flex-shrink-0 w-40 lg:w-48", widthPx: 192 };
+    return { width: "flex-shrink-0 w-40", widthPx: 160 };
+}
 
 /**
  * Get row padding/spacing classes based on size
@@ -108,6 +130,30 @@ function getEstimatedRowHeight(size: CollectionSize): number {
         default: return 64;
     }
 }
+
+// ── Row layout budget ─────────────────────────────────────────────────
+// What the row spends before a single column is placed. These mirror the
+// classes on the row itself (`px-5`, `gap-4`, `w-8` checkbox, `w-10` image);
+// they are the same layout described twice, so a change to one is a change to
+// the other.
+
+/** `px-5` on both sides. */
+const ROW_PADDING_WIDTH = 40;
+/** The checkbox cell (`w-8`). */
+const CHECKBOX_WIDTH = 32;
+/** The thumbnail / icon square (`w-10`). */
+const IMAGE_WIDTH = 40;
+/** `gap-4` between every cell of the row. */
+const COLUMN_GAP = 16;
+
+/**
+ * The title's share of a row, taken before any column bids for width.
+ *
+ * A title is a name, and a name truncated to "Lider Sr. en…" has stopped being
+ * one. Columns are a scanner's convenience; the title is the row's identity, so
+ * a narrow list spends its width on the title and simply shows fewer columns.
+ */
+const TITLE_COMFORTABLE_WIDTH = 320;
 
 /** Number of extra rows rendered above/below the viewport. */
 const OVERSCAN_COUNT = 8;
@@ -294,14 +340,21 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
     const context = useAdminContext();
 
     const containerRef = useRef<HTMLDivElement>(null);
-    const [containerWidth, setContainerWidth] = useState(1200);
+    // `undefined` is "not measured yet", and it renders the title alone. The
+    // seed used to be a 1200px guess, which is a claim about a list that may be
+    // a 300px column of a split — and, because the ref below was never attached
+    // to anything, a guess nothing ever corrected.
+    const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
 
     // Track container width for responsive column visibility
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
+        const measure = (width: number) => setContainerWidth(width > 0 ? width : undefined);
+        measure(el.getBoundingClientRect().width);
+        if (typeof ResizeObserver === "undefined") return;
         const ro = new ResizeObserver(([entry]) => {
-            if (entry) setContainerWidth(entry.contentRect.width);
+            if (entry) measure(entry.contentRect.width);
         });
         ro.observe(el);
         return () => ro.disconnect();
@@ -344,14 +397,6 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
     const columns = useMemo(() => {
         const cols: ListColumnDef[] = [];
 
-        const getIdealColumnWidth = (prop: Property) => {
-            if (prop.type === "string" && "enum" in prop) return "flex-shrink-0 w-32";
-            if (prop.type === "date" || prop.type === "number" || prop.type === "boolean") return "flex-shrink-0 w-28";
-            if (prop.type === "reference" || prop.type === "relation") return "flex-shrink-0 w-56 lg:w-64";
-            if (prop.type === "string") return "flex-shrink-0 w-40 lg:w-48";
-            return "flex-shrink-0 w-40";
-        };
-
         if (resolvedCollection.listProperties && resolvedCollection.listProperties.length > 0) {
             resolvedCollection.listProperties.forEach((key, index) => {
                 const prop = resolvedCollection.properties[key] as Property;
@@ -363,7 +408,9 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
                     property: prop,
                     isTitle: index === 0,
                     align: prop.type === "number" || prop.type === "date" ? "right" : "left",
-                    width: index === 0 ? "flex-1 min-w-[200px]" : getIdealColumnWidth(prop)
+                    ...(index === 0
+                        ? { width: "flex-1 min-w-0", widthPx: TITLE_COMFORTABLE_WIDTH }
+                        : getIdealColumnWidth(prop))
                 });
             });
             return cols;
@@ -379,7 +426,8 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
                     property: prop,
                     isTitle: true,
                     align: "left",
-                    width: "flex-1 min-w-[200px]"
+                    width: "flex-1 min-w-0",
+                    widthPx: TITLE_COMFORTABLE_WIDTH
                 });
             }
         }
@@ -422,7 +470,7 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
                 label: prop.name || key,
                 property: prop,
                 align: prop.type === "number" || prop.type === "date" ? "right" : "left",
-                width: getIdealColumnWidth(prop)
+                ...getIdealColumnWidth(prop)
             });
         });
 
@@ -435,7 +483,8 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
                     property: prop,
                     isStatus: true,
                     align: "center",
-                    width: "flex-shrink-0 w-32"
+                    width: "flex-shrink-0 w-32",
+                    widthPx: 128
                 });
             }
         }
@@ -449,7 +498,8 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
                     property: prop,
                     isDate: true,
                     align: "right",
-                    width: "flex-shrink-0 w-28"
+                    width: "flex-shrink-0 w-28",
+                    widthPx: 112
                 });
             }
         }
@@ -459,33 +509,39 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
 
     const showImage = size !== "xs";
 
-    // Responsive: determine visible columns based on container width.
-    // The first extra column requires significantly more available space (600px)
-    // to ensure the title area has generous room before columns appear.
-    // Each subsequent column needs 160px.
+    // Responsive: keep only the columns the row can actually pay for.
+    //
+    // The title is what a row is *for* — it is the one cell that identifies the
+    // record — so it is not one competitor among the columns: it takes its
+    // comfortable share off the top, and the columns divide what is left. Each
+    // one is charged its own rendered width, and the first that cannot be
+    // afforded ends the row: dropping a column and keeping the narrower one
+    // after it would reorder the row as it resizes.
     const visibleColumns = useMemo(() => {
         if (columns.length <= 1) return columns;
 
         const titleCol = columns.find(c => c.isTitle);
         const extraCols = columns.filter(c => !c.isTitle);
+        const withTitle = (kept: ListColumnDef[]) => [...(titleCol ? [titleCol] : []), ...kept];
 
-        // Base width consumed by fixed-width elements (padding + checkbox + image + min title)
-        const baseWidth = 40 + (selectionEnabled ? 40 : 0) + (showImage ? 56 : 0) + 200;
-        const availableForExtra = Math.max(0, containerWidth - baseWidth);
+        // Unmeasured: the title alone, which is the answer we would rather flash
+        // than a row of columns squeezing it down to an ellipsis.
+        if (containerWidth === undefined) return withTitle([]);
 
-        // First extra column needs 500px; each additional needs 160px
-        const FIRST_COL_THRESHOLD = 500;
-        const EXTRA_COL_WIDTH = 160;
+        const chrome = ROW_PADDING_WIDTH
+            + (selectionEnabled ? CHECKBOX_WIDTH + COLUMN_GAP : 0)
+            + (showImage ? IMAGE_WIDTH + COLUMN_GAP : 0);
+        let remaining = containerWidth - chrome - TITLE_COMFORTABLE_WIDTH;
 
-        let maxExtraCols = 0;
-        if (availableForExtra >= FIRST_COL_THRESHOLD) {
-            maxExtraCols = 1 + Math.floor((availableForExtra - FIRST_COL_THRESHOLD) / EXTRA_COL_WIDTH);
+        const kept: ListColumnDef[] = [];
+        for (const col of extraCols) {
+            const cost = col.widthPx + COLUMN_GAP;
+            if (cost > remaining) break;
+            remaining -= cost;
+            kept.push(col);
         }
 
-        return [
-            ...(titleCol ? [titleCol] : []),
-            ...extraCols.slice(0, maxExtraCols)
-        ];
+        return withTitle(kept);
     }, [columns, containerWidth, selectionEnabled, showImage]);
 
     const handleEntityClick = useCallback((entity: Entity<M>) => {
@@ -529,54 +585,56 @@ customEntityActions });
     }, [handleSelectionChange]);
 
     return (
-        <ListView<Entity<M>>
-            data={data}
-            dataLoading={dataLoading}
-            noMoreToLoad={noMoreToLoad}
-            dataLoadingError={dataLoadingError}
-            itemCount={itemCount}
-            setItemCount={setItemCount}
-            pageSize={pageSize}
-            paginationEnabled={paginationEnabled}
-            onItemClick={handleEntityClick}
-            selectedIds={selectedIds}
-            highlightedIds={highlightedIds}
-            selectionEnabled={selectionEnabled}
-            emptyComponent={emptyComponent}
-            size={size}
-            selectedEntityId={selectedEntityId}
-            renderRow={useCallback(({ item: entity, style, className, selected, highlighted, isLast, onClick, onSelectionChange }) => {
-                return (
-                    <div
-                        key={entity.id}
-                        style={style}
-                        className={className}
-                    >
-                        <ListRow
-                            entity={entity}
-                            collection={resolvedCollection}
-                            onClick={handleEntityClick}
-                            selected={selected}
-                            highlighted={highlighted}
-                            onSelectionChange={handleRowSelectionChange}
-                            selectionEnabled={selectionEnabled}
-                            columns={visibleColumns}
-                            slotKeys={slotKeys}
-                            rowClasses={rowClasses}
-                            showImage={showImage}
-                            size={size}
-                            isLast={isLast}
-                            isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
-                            listViewActions={getListViewActions(entity)}
-                            context={context}
-                            path={path}
-                            selectionController={selectionController}
-                            openEntityMode={openEntityMode}
-                        />
-                    </div>
-                );
-            }, [resolvedCollection, selectionEnabled, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick])}
-        />
+        <div ref={containerRef} className="w-full">
+            <ListView<Entity<M>>
+                data={data}
+                dataLoading={dataLoading}
+                noMoreToLoad={noMoreToLoad}
+                dataLoadingError={dataLoadingError}
+                itemCount={itemCount}
+                setItemCount={setItemCount}
+                pageSize={pageSize}
+                paginationEnabled={paginationEnabled}
+                onItemClick={handleEntityClick}
+                selectedIds={selectedIds}
+                highlightedIds={highlightedIds}
+                selectionEnabled={selectionEnabled}
+                emptyComponent={emptyComponent}
+                size={size}
+                selectedEntityId={selectedEntityId}
+                renderRow={useCallback(({ item: entity, style, className, selected, highlighted, isLast, onClick, onSelectionChange }) => {
+                    return (
+                        <div
+                            key={entity.id}
+                            style={style}
+                            className={className}
+                        >
+                            <ListRow
+                                entity={entity}
+                                collection={resolvedCollection}
+                                onClick={handleEntityClick}
+                                selected={selected}
+                                highlighted={highlighted}
+                                onSelectionChange={handleRowSelectionChange}
+                                selectionEnabled={selectionEnabled}
+                                columns={visibleColumns}
+                                slotKeys={slotKeys}
+                                rowClasses={rowClasses}
+                                showImage={showImage}
+                                size={size}
+                                isLast={isLast}
+                                isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
+                                listViewActions={getListViewActions(entity)}
+                                context={context}
+                                path={path}
+                                selectionController={selectionController}
+                                openEntityMode={openEntityMode}
+                            />
+                        </div>
+                    );
+                }, [resolvedCollection, selectionEnabled, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick])}
+            />
+        </div>
     );
 }
 
@@ -812,27 +870,33 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                     })}
                 </>
             ) : (
-                /* ── SLOT MODE (editorial scanner layout) ── */
+                /* ── SLOT MODE (editorial scanner layout) ──
+                   The slots give up the row from the right inwards, the same
+                   rule the columns follow above: whatever sits furthest from
+                   the title is furthest from what the row is about, so it is
+                   the first thing a narrowing row can afford to lose. Reading
+                   the thresholds in source order gives the reverse of the
+                   order they vanish in — they are written left to right, and
+                   they disappear right to left. */
                 <div className="flex items-center gap-4 flex-shrink-0 ml-auto">
                     {/* TAGS slot — "free chips beside the status", so beside it.
-                        First to go when the row narrows: the status is the one a
-                        scanner is reading down the column. */}
+                        Leftmost of the three, so the last to go. */}
                     {slots.tags && (
-                        <div className="flex items-center gap-1 flex-shrink-0 @max-[560px]:hidden">
+                        <div className="flex items-center gap-1 flex-shrink-0 @max-[360px]:hidden">
                             <TagChips slot={slots.tags} max={3}/>
                         </div>
                     )}
 
-                    {/* STATUS slot — hidden when row is narrow */}
+                    {/* STATUS slot */}
                     {slots.status && (
-                        <div className="flex-shrink-0 @max-[400px]:hidden">
+                        <div className="flex-shrink-0 @max-[460px]:hidden">
                             <SlotValue slot={slots.status} size="small"/>
                         </div>
                     )}
 
-                    {/* DATE slot */}
+                    {/* DATE slot — rightmost, so the first to go. */}
                     {slots.date && (
-                        <div className="flex-shrink-0 text-right w-[80px] @max-[500px]:hidden">
+                        <div className="flex-shrink-0 text-right w-[80px] @max-[560px]:hidden">
                             <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
                                 {slots.date.formatted ?? "—"}
                             </Typography>
