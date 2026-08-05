@@ -1,5 +1,5 @@
 import { CollectionConfig } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, relationalCollections } from "@rebasepro/common";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 
 /**
@@ -111,7 +111,12 @@ export function findLegacyForeignKeyNames(
         found.push({ table, legacy, current, relation });
     };
 
-    for (const collection of collections) {
+    // Same rule as the generator whose output this reads: a collection that
+    // gets no table cannot have named a column in it. Inert in practice today —
+    // the finding also requires the generated file to declare the table — but
+    // the guard is what keeps that true when a non-SQL collection's slug happens
+    // to match a SQL one's table.
+    for (const collection of relationalCollections(collections)) {
         const sourceTable = getTableName(collection);
 
         for (const [name, relation] of Object.entries(resolveCollectionRelations(collection))) {
