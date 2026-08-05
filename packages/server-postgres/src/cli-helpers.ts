@@ -86,10 +86,16 @@ export function resolveLocalBin(binName: string): string | null {
     return null;
 }
 
-export async function getTableIncludesFromCollections(collections: CollectionConfig[]): Promise<string[]> {
-    const { getTableName, resolveCollectionRelations } = await import("@rebasepro/common");
+export async function getTableIncludesFromCollections(allCollections: CollectionConfig[]): Promise<string[]> {
+    const { getTableName, resolveCollectionRelations, relationalCollections } = await import("@rebasepro/common");
     const { isPostgresCollectionConfig } = await import("@rebasepro/types");
 
+    // The include list is the inverse of {@link getTableExcludes}: a name on it
+    // is a name Atlas is allowed to drop. A Firestore collection called
+    // `exercises` must not put `public.exercises` here — a real, unrelated table
+    // of that name would lose its protection and be dropped by the next
+    // auto-approved `db push`.
+    const collections = relationalCollections(allCollections);
     const includes: string[] = [];
     for (const col of collections) {
         const tableName = getTableName(col);

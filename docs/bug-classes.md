@@ -879,6 +879,46 @@ actually fires. Lower it where the operation settles, not only where it succeeds
 
 ---
 
+## 27. One list, two meanings — a toolchain that reads "everything declared" as "everything I own"
+
+A directory holds every collection a project declares, whatever engine serves
+it: that is what `dataSource` routing is *for*. Every stage of the SQL toolchain
+read that directory as "the tables". So a Firestore collection declared next to
+the Postgres ones got a `pgTable` in the generated schema, a `CREATE TABLE` and
+RLS policies at boot, and an entry in the `db push` include list — while the app
+went on reading its documents from Firestore, and `rebase doctor` reported the
+untouched store as drift.
+
+The symptom that surfaced it was the mildest one: `rebase dev` printing "your
+schema may be out of sync, run `rebase schema generate` / `rebase db push`" every
+time a `collections/firestore/exercises.ts` was saved. Advice that is wrong on
+every edit is worse than none — the same box is the only warning for the Postgres
+collection next to it, where it is real.
+
+**Sweep:** for each generator, ask what subset of its input it is entitled to.
+`grep -n "for (const collection of collections)"` across the engine-specific
+package, and check each entry point takes the filter rather than trusting its
+caller. The filter belongs at the exported boundary, not in the caller: these
+functions have four callers each (generate, push, boot, doctor) and a rule
+applied in three of them is a rule that does not exist.
+
+**Watch for:** the include list. Most of the outputs here were inert — an empty
+table nobody writes to. The exclude list `db push` builds is the inverse of the
+include list, so a name wrongly *included* is a name Atlas is allowed to **drop**:
+a Firestore collection called `exercises` removed a real, unrelated
+`public.exercises` table's protection from the next auto-approved push. When a
+filter is wrong in one direction the blast radius is waste, and in the other it
+is data loss — find out which one you have before deciding it is cosmetic.
+
+**Watch for, too:** the fallback direction, and it is not the same at build time
+and at run time. Boot can resolve a collection's engine exactly, because it holds
+the initialized data sources; the CLI cannot evaluate the project's backend and
+has to read the declaration. Unknown there means "assume SQL": generating a table
+nobody writes to is recoverable, silently not generating one the app serves from
+is not.
+
+---
+
 ## The discipline
 
 When you find a bug:

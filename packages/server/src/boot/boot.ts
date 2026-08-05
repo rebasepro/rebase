@@ -7,10 +7,12 @@ import { getRequestListener } from "@hono/node-server";
 import {
     DEFAULT_DATA_SOURCE_KEY,
     normalizeStorageSources,
+    type CollectionConfig,
     type DataSourceDefinition,
     type InitializedDriver,
     type StorageSourceDefinition
 } from "@rebasepro/types";
+import { createDataSourceRegistry, resolveDataSource } from "@rebasepro/common";
 
 import { initializeRebaseBackend, type RebaseBackendInstance } from "../init";
 import { loadCollectionsFromDirectory } from "../collections/loader";
@@ -605,6 +607,59 @@ export function warnOnDriverSkew(
 }
 
 /**
+ * The collections a data source's engine is the store for.
+ *
+ * A bundle's collections directory holds *every* collection the project
+ * declares, whatever engine serves it — that is the point of `dataSource`
+ * routing. What it is not is a list of tables to create: handing the whole
+ * directory to the primary source's bootstrapper made a Firestore collection
+ * declared alongside the Postgres ones arrive as an empty Postgres table, with
+ * RLS policies, while the app went on reading its documents from Firestore.
+ *
+ * Excluding is deliberately conservative. A collection that names neither an
+ * `engine` nor a `dataSource` belongs to whichever source is primary — the
+ * "postgres" that `resolveDataSource` falls back to there is a default, not a
+ * declaration, and must not exclude anything on its own. Only a collection that
+ * explicitly routes to a *different* engine is dropped, so a project running two
+ * sources on the same engine is unaffected.
+ */
+export function collectionsStoredBy(
+    collections: CollectionConfig[],
+    primary: InitializedDataSource,
+    dataSources: InitializedDataSource[]
+): CollectionConfig[] {
+    const registry = createDataSourceRegistry(
+        dataSources.map(source => ({ key: source.key, engine: source.engine }))
+    );
+    return collections.filter(collection => {
+        // The collection's own `engine` is read first, and `resolveDataSource`
+        // is not asked to settle it: that function lets a registered definition
+        // override the collection's engine, which is the right precedence for
+        // *routing* and the wrong one here — a collection declaring
+        // `engine: "firestore"` and no `dataSource` would come back as the
+        // default source's "postgres" and be provisioned as a table.
+        const declared = collection.engine
+            ?? (collection.dataSource ? resolveDataSource(collection, registry).engine : undefined);
+        if (!declared) return true;
+        return declared === primary.engine;
+    });
+}
+
+/** Say what was routed elsewhere, so a missing table is never a silent one. */
+function logForeignCollections(
+    all: CollectionConfig[],
+    stored: CollectionConfig[],
+    primary: InitializedDataSource
+): void {
+    if (stored.length === all.length) return;
+    const foreign = all.filter(c => !stored.includes(c)).map(c => c.slug);
+    logger.info(
+        `Skipping ${foreign.length} collection(s) served by another engine, not "${primary.engine}": ${foreign.join(", ")}. ` +
+            "Their storage is not managed by this data source."
+    );
+}
+
+/**
  * Bring the database's collection tables up to date before serving.
  *
  * Delegates to whichever driver bootstrapped the default data source; a driver
@@ -693,9 +748,16 @@ export async function ensureCollectionSchema(
         return;
     }
 
-    const collections = await loadCollectionsFromDirectory(bundle.collectionsDir);
-    if (collections.length === 0) {
+    const loaded = await loadCollectionsFromDirectory(bundle.collectionsDir);
+    if (loaded.length === 0) {
         skip(`no collections were loaded from "${bundle.collectionsDir}".`, "warn");
+        return;
+    }
+
+    const collections = collectionsStoredBy(loaded, primary, dataSources);
+    logForeignCollections(loaded, collections, primary);
+    if (collections.length === 0) {
+        skip(`none of the ${loaded.length} declared collection(s) are stored by the "${primary.engine}" data source.`);
         return;
     }
 
@@ -774,7 +836,12 @@ export async function ensureCollectionPolicies(
         return;
     }
 
-    const collections = await loadCollectionsFromDirectory(bundle.collectionsDir);
+    const loaded = await loadCollectionsFromDirectory(bundle.collectionsDir);
+    if (loaded.length === 0) return;
+
+    // Quiet here: `ensureCollectionSchema` already listed what it routed
+    // elsewhere on this same boot.
+    const collections = collectionsStoredBy(loaded, primary, dataSources);
     if (collections.length === 0) return;
 
     const { applied } = await primary.bootstrapper.ensureCollectionPolicies(

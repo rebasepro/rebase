@@ -77,3 +77,59 @@ export function resolveDataSource(
         capabilities: getDataSourceCapabilities(engine)
     };
 }
+
+/**
+ * Does a SQL toolchain own this collection's storage?
+ *
+ * "Owns the storage" means: something generates a table for it, pushes that
+ * table to a database, plans its RLS policies, and reports it as drifted when
+ * the two disagree. That is true of a Postgres collection and false of a
+ * Firestore or MongoDB one, whose documents live in a store Rebase never
+ * migrates — and the two were never told apart. Every stage of the SQL
+ * toolchain took "the collections" to mean *all* of them, so a Firestore
+ * collection declared next to the Postgres ones got a `pgTable` in the
+ * generated schema, a `CREATE TABLE` at boot, RLS policies, and a place in the
+ * `db push` include list — where its name shielding a same-named real table
+ * from Atlas's exclude list is the one that can lose data.
+ *
+ * The answer is the resolved engine's {@link DataSourceCapabilities}, not a
+ * name check: an engine registered through `registerDataSourceCapabilities`
+ * gets the same treatment as the built-in ones.
+ *
+ * Deliberately answers **true** for an engine nobody has heard of. Build-time
+ * tooling (the CLI, the schema generator) has no data-source registry to
+ * resolve a `dataSource` key against, so an unknown key resolves to an unknown
+ * engine — and the cost of the two mistakes is not symmetric. Wrongly
+ * including a collection generates a table nothing writes to; wrongly excluding
+ * one silently stops generating a table the app is serving from. Declare
+ * `engine` on a collection that is not SQL-backed and this is exact.
+ */
+export function isRelationalCollection(
+    collection: DataSourceResolvable | undefined,
+    registry?: DataSourceRegistry
+): boolean {
+    // The collection's own `engine` wins over a registered definition's. That
+    // is the opposite of {@link resolveDataSource}'s precedence, deliberately:
+    // there a definition describes where the data *goes*, so it should override;
+    // here the question is what the author said this collection is, and a
+    // collection declaring `engine: "firestore"` with no `dataSource` must not
+    // come back as the default source's engine and be handed a table.
+    const engine = collection?.engine
+        ?? (collection?.dataSource ? resolveDataSource(collection, registry).engine : undefined);
+    return getDataSourceCapabilities(engine).supportsRelations;
+}
+
+/**
+ * The subset of `collections` a SQL toolchain owns — see
+ * {@link isRelationalCollection}.
+ *
+ * Every stage that generates SQL from collections starts by calling this, so
+ * the rule lives in one place rather than being re-decided per generator. It
+ * keeps the input order.
+ */
+export function relationalCollections<C extends DataSourceResolvable>(
+    collections: readonly C[],
+    registry?: DataSourceRegistry
+): C[] {
+    return collections.filter(collection => isRelationalCollection(collection, registry));
+}

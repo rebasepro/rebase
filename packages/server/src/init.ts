@@ -11,7 +11,6 @@ import {
     HealthCheckResult,
     HistoryConfig,
     InitializedDriver,
-    isPostgresCollectionConfig,
     isSQLAdmin,
     RealtimeProvider,
     SecurityRule

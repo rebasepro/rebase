@@ -148,6 +148,36 @@ const { key, engine, transport, databaseId, capabilities } =
     resolveDataSource(collection, createDataSourceRegistry(definitions));
 ```
 
+## The schema toolchain only owns SQL collections
+
+`config/collections` holds *every* collection the project declares, whatever
+engine serves it. The SQL toolchain reads only the ones a SQL engine stores —
+`isRelationalCollection` / `relationalCollections` in `@rebasepro/common` are
+the single rule, and it is the resolved engine's `supportsRelations`
+capability, not a name check.
+
+Skipped for a Firestore or MongoDB collection:
+
+- the generated Drizzle schema and the Postgres DDL (`rebase schema generate`)
+- boot-time table creation and RLS policies (`REBASE_MIGRATE_ON_BOOT`)
+- the `db push` include list — and this one matters beyond tidiness: a name on
+  that list is a name Atlas is allowed to drop, so a Firestore collection called
+  `exercises` used to remove a real, unrelated `public.exercises` table's
+  protection from the next auto-approved push
+- `rebase doctor`'s drift report, and the schema-drift warning `rebase dev`
+  prints when a collection file changes
+
+**Declare `engine` on a collection that is not SQL-backed.** Build-time tooling
+has no data-source registry to resolve a `dataSource` key against — the CLI
+cannot evaluate your backend's `initializeRebaseBackend` call — so it falls back
+to reading the key as the engine name, and an engine it does not recognise is
+treated as SQL. That fallback is deliberate: generating a table nobody writes to
+is recoverable, and silently *not* generating one the app serves from is not.
+
+At runtime the same question has an exact answer, because boot knows the
+initialized sources: it hands each bootstrapper only the collections its engine
+stores, and logs the ones it routed elsewhere.
+
 ## Back-compat
 
 - `<Rebase client>` / `driver` / `data` are unchanged; a plain app needs no

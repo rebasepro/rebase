@@ -15,7 +15,7 @@ import chalk from "chalk";
 import { CollectionConfig, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { generateTypedefs } from "@rebasepro/codegen";
-import { getTableName, resolveCollectionRelations, findRelation } from "@rebasepro/common";
+import { getTableName, resolveCollectionRelations, findRelation, relationalCollections } from "@rebasepro/common";
 import { toSnakeCase } from "@rebasepro/utils";
 import { logger, loadCollectionsFromDirectory } from "@rebasepro/server";
 
@@ -164,8 +164,10 @@ export async function checkCollectionsVsSchema(
 issues };
     }
 
-    // Re-generate schema in-memory and compare with file on disk
-    const postgresCollections = collections.filter(isPostgresCollectionConfig);
+    // Re-generate schema in-memory and compare with file on disk. Only the
+    // collections the generator itself will emit — a Firestore collection has
+    // no table in the generated file and must not be reported as missing one.
+    const postgresCollections = relationalCollections(collections);
     if (postgresCollections.length === 0) {
         return { passed: true,
 issues };
@@ -292,7 +294,7 @@ export async function checkCollectionsVsDatabase(
     const schemas = Array.from(new Set([
         "public",
         "rebase",
-        ...collections
+        ...relationalCollections(collections)
             .filter(isPostgresCollectionConfig)
             .map(c => c.schema)
             .filter((s): s is string => !!s)
@@ -383,7 +385,7 @@ export async function checkCollectionsVsDatabase(
 
         // ── Compare each collection against the database ─────────────────
 
-        const postgresCollections = collections.filter(isPostgresCollectionConfig);
+        const postgresCollections = relationalCollections(collections);
 
         for (const collection of postgresCollections) {
             const tableName = getTableName(collection);

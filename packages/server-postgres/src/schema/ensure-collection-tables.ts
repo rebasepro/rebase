@@ -26,7 +26,7 @@
  * no-op.
  */
 import { type CollectionConfig, type Property, isPostgresCollectionConfig } from "@rebasepro/types";
-import { getTableName } from "@rebasepro/common";
+import { getTableName, relationalCollections } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 import {
     getSqlColumnType,
@@ -167,9 +167,15 @@ function requiredEnums(collection: CollectionConfig): { name: string; values: st
  * table may be the target of a relation), and nothing is emitted twice.
  */
 export function planCollectionSchemaEnsure(
-    collections: CollectionConfig[],
+    allCollections: CollectionConfig[],
     existing: ExistingSchema
 ): EnsurePlan {
+    // Boot receives every collection the bundle declares, including the ones
+    // served by another engine entirely. Creating a Postgres table for a
+    // Firestore collection is not a harmless extra: the app keeps reading
+    // documents from Firestore while an empty table with the same name accretes
+    // policies and shows up in every drift report.
+    const collections = relationalCollections(allCollections);
     const actions: EnsureAction[] = [];
     const plannedEnums = new Set<string>();
 

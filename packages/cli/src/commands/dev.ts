@@ -32,6 +32,7 @@ import {
     resolvePluginCliScript
 } from "../utils/project";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
+import { affectsSqlSchema } from "../utils/collection-drift";
 import { recordEvent } from "../telemetry";
 
 /**
@@ -453,15 +454,28 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const collectionsDir = path.join(projectRoot, "config", "collections");
             if (fs.existsSync(collectionsDir)) {
                 let watchDebounce: NodeJS.Timeout | null = null;
+                // The SQL schema and the SDK do not answer to the same edits.
+                // The SDK is generated from the collections `index` module, which
+                // can re-export anything the project puts under this directory,
+                // so every change is a reason to rebuild it. The Drizzle schema
+                // covers only the SQL-backed collections the loader reads — see
+                // `affectsSqlSchema`. Tracked across the debounce window because
+                // one burst can touch both kinds of file.
+                let sqlSchemaAffected = false;
                 fs.watch(collectionsDir, { recursive: true }, (eventType, filename) => {
                     if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
 
+                    sqlSchemaAffected = sqlSchemaAffected || affectsSqlSchema(collectionsDir, filename);
                     if (watchDebounce) clearTimeout(watchDebounce);
                     watchDebounce = setTimeout(async () => {
-                        console.log(chalk.yellow(`\n  🔄 Collection change detected (${filename}). Regenerating schema & SDK...`));
+                        const regenerateSchema = sqlSchemaAffected;
+                        sqlSchemaAffected = false;
+                        console.log(chalk.yellow(
+                            `\n  🔄 Collection change detected (${filename}). Regenerating ${regenerateSchema ? "schema & SDK" : "SDK"}...`
+                        ));
                         try {
                             const activePlugin = getActiveBackendPlugin(backendDir);
-                            const pluginCli = activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
+                            const pluginCli = regenerateSchema && activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
                             if (pluginCli) {
                                 await execa(tsxBin, [pluginCli, "schema", "generate"], {
                                     cwd: backendDir,
@@ -475,7 +489,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                                 stdio: "inherit",
                                 env
                             });
-                            console.log(chalk.green("  ✓ Schema & SDK regenerated successfully. Hono will reload."));
+                            console.log(chalk.green(
+                                `  ✓ ${regenerateSchema ? "Schema & SDK" : "SDK"} regenerated successfully. Hono will reload.`
+                            ));
                         } catch (err: unknown) {
                             console.error(chalk.red(`  ✗ Failed to regenerate schema/SDK: ${err instanceof Error ? err.message : err}`));
                         }
@@ -509,12 +525,19 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 let driftDebounce: NodeJS.Timeout | null = null;
                 fs.watch(collectionsDir, { recursive: true }, (_eventType, filename) => {
                     if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
+                    // Only a change to a SQL-backed collection can put the
+                    // generated schema out of sync — a Firestore collection has
+                    // nothing to generate, push or check for drift.
+                    if (!affectsSqlSchema(collectionsDir, filename)) return;
                     if (driftDebounce) clearTimeout(driftDebounce);
                     driftDebounce = setTimeout(() => {
+                        // The box is drawn at a fixed width, so a name longer
+                        // than the cell would push the right border off.
+                        const shown = filename!.length > 31 ? `…${filename!.slice(-30)}` : filename!.padEnd(31);
                         console.log([
                             "",
                             chalk.yellow("  ┌──────────────────────────────────────────────────────────────┐"),
-                            chalk.yellow("  │  ⚠️  Collection file changed: ") + chalk.white(filename!.padEnd(31)) + chalk.yellow("│"),
+                            chalk.yellow("  │  ⚠️  Collection file changed: ") + chalk.white(shown) + chalk.yellow("│"),
                             chalk.yellow("  │                                                              │"),
                             chalk.yellow("  │  Your schema may be out of sync. Run:                        │"),
                             chalk.yellow("  │    ") + chalk.cyan("rebase schema generate") + chalk.yellow("   regenerate Drizzle schema        │"),
