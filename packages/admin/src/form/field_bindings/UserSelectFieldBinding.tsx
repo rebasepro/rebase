@@ -34,7 +34,10 @@ export function UserSelectFieldBinding({
                                            size = "large"
                                        }: UserSelectProps) {
 
-    const selectorSize: "small" | "medium" | undefined = size === "large" ? "medium" : size;
+    // Passed straight through. Mapping the form's `large` onto the selector's
+    // `medium` produced a 56px box next to 48px text fields — the labels lined
+    // up and the boxes did not.
+    const selectorSize = size;
 
     return (
         <>

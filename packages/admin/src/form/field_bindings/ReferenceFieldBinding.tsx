@@ -121,7 +121,7 @@ function ReferenceFieldBindingInternal({
                 />}
 
                 {!refValue && <div className="justify-center text-left">
-                    <EntityPreviewContainer className={cls("px-6 h-16 text-sm font-medium flex items-center gap-6",
+                    <EntityPreviewContainer className={cls("px-6 h-12 text-sm font-medium flex items-center gap-6",
                         disabled || isSubmitting
                             ? "text-surface-accent-500"
                             : "cursor-pointer text-surface-accent-700 dark:text-surface-accent-300 hover:bg-surface-accent-50 dark:hover:bg-surface-800 group-hover:bg-surface-accent-50 dark:group-hover:bg-surface-800")}

@@ -87,7 +87,13 @@ export function MultiSelectFieldBinding({
     return (
         <>
             <MultiSelect
-                className={"w-full mt-2"}
+                // No top margin: `className` lands on the box itself, not on
+                // the label above it, so `mt-2` was 8px of gap between the
+                // form's label and this control and none between the label and
+                // the text field beside it. A binding renders a control, not a
+                // labelled control — the top of what it renders is the top of
+                // the box, or it will not line up with its neighbour.
+                className={"w-full"}
                 size={size}
                 value={validValue ? value.map((v) => v?.toString()) : []}
                 disabled={disabled}

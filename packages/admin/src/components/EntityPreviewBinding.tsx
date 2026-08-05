@@ -399,7 +399,10 @@ export const EntityPreviewContainer = React.forwardRef<HTMLDivElement, EntityPre
         style={style}
         className={cls(
             "bg-white dark:bg-surface-900",
-            size === "small" ? "min-h-[32px]" : "min-h-[44px]",
+            // On the shared 28/32/40/48 control scale. `44px` was between two
+            // steps of it, so a reference in a form was 4px short of the field
+            // next to it and their boxes never quite agreed.
+            size === "small" ? "min-h-[32px]" : "min-h-[48px]",
             fullwidth ? "w-full" : "",
             "items-center overflow-hidden",
             hover ? "hover:bg-surface-accent-50 dark:hover:bg-surface-800 group-hover:bg-surface-accent-50 dark:group-hover:bg-surface-800" : "",

@@ -72,7 +72,10 @@ function RelationSelectorBinding({
     const singleValue = normalizedSingle ?? null;
     const multipleValue = (manyRelation && Array.isArray(value)) ? value : [];
 
-    const selectorSize: "small" | "medium" | undefined = size === "large" ? "medium" : size;
+    // Passed straight through. Mapping the form's `large` onto the selector's
+    // `medium` produced a 56px box next to 48px text fields — the labels lined
+    // up and the boxes did not.
+    const selectorSize = size;
 
     return (
         <div className="">
@@ -176,7 +179,7 @@ function SingleRelationFieldBinding({
                 />}
 
                 {!value && <div className="justify-center text-left">
-                    <EntityPreviewContainer className={cls("px-6 h-16 text-sm font-medium flex items-center gap-6",
+                    <EntityPreviewContainer className={cls("px-6 h-12 text-sm font-medium flex items-center gap-6",
                         disabled || isSubmitting
                             ? "text-surface-accent-500"
                             : "cursor-pointer text-surface-accent-700 dark:text-surface-accent-300 hover:bg-surface-accent-50 dark:hover:bg-surface-800 group-hover:bg-surface-accent-50 dark:group-hover:bg-surface-800")}

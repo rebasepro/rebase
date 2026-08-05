@@ -58,7 +58,14 @@ export interface RelationSelectorProps {
 
     onValueChange?: (updatedValue: EntityRelation | EntityRelation[] | undefined) => void;
     placeholder?: React.ReactNode;
-    size?: "small" | "medium";
+    /**
+     * `large` is the form's size and is on the shared 28/32/40/48 control
+     * scale, so a relation picker lines up with the text field beside it.
+     *
+     * `small` and `medium` predate that scale (42 and 56) and are kept as they
+     * are because the table cells and the filter row are built around them.
+     */
+    size?: "small" | "medium" | "large";
     useChips?: boolean;
     disabled?: boolean;
     error?: boolean; // kept for backwards compatibility (could be used for styling later)
@@ -488,9 +495,13 @@ relation } as RelationItem;
                             className={cls(
                                 {
                                     "min-h-[42px] py-1 px-2": size === "small",
-                                    "min-h-[56px] py-2 px-4": size === "medium"
+                                    "min-h-[56px] py-2 px-4": size === "medium",
+                                    "min-h-[48px] py-1 px-4": size === "large"
                                 },
-                                "w-full select-none rounded-md text-sm relative flex items-center",
+                                // `rounded-lg` like every other field box —
+                                // `rounded-md` made this the one control in a
+                                // row with a different corner.
+                                "w-full select-none rounded-lg text-sm relative flex items-center",
                                 invisible ? fieldBackgroundInvisibleMixin : fieldBackgroundMixin,
                                 disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin,
                                 className
@@ -580,7 +591,7 @@ relation } as RelationItem;
                                         </Tooltip>
                                     )}
                                     <ChevronDownIcon
-                                        size={size === "medium" ? iconSize.medium : iconSize.small}
+                                        size={size === "small" ? iconSize.small : iconSize.medium}
                                         className={cls("transition", isPopoverOpen ? "rotate-180" : "")}
                                     />
                                 </div>

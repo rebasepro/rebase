@@ -22,7 +22,6 @@ import { FormSections } from "../form/components/FormSections";
 import { FormRail, RecordMeta } from "../form/components/FormRail";
 import { useEntityDisplayValues } from "../hooks/useEntityDisplay";
 import { useRailVisible } from "../form/components/useRailVisible";
-import { LabelWithIconAndTooltip } from "../form/components/LabelWithIconAndTooltip";
 import { PropertyPreview } from "../preview";
 
 /** Nothing can be in error in a view that cannot be submitted. */
@@ -197,17 +196,19 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
                 </div>;
 
             return (
+                // Through FieldBlock like every other cell, so a computed
+                // column is labelled at the same size, with the same gap to its
+                // box, as the property next to it on the grid.
                 <div key={`additional_${field.key}`} className={spanClass(field.span)}>
-                    <LabelWithIconAndTooltip
-                        propertyKey={field.key}
-                        icon={<AlignLeftIcon size={LABEL_ICON_SIZE}/>}
-                        title={additionalField.name}
-                        className={"text-text-secondary dark:text-text-secondary-dark"}/>
-                    <div className={cls(paperMixin, "w-full min-h-14 p-4 md:p-6 overflow-x-auto no-scrollbar")}>
-                        <ErrorBoundary>
+                    <FieldBlock propertyKey={field.key}
+                        showLabel={true}
+                        mode={"read"}
+                        label={additionalField.name}
+                        icon={<AlignLeftIcon size={LABEL_ICON_SIZE}/>}>
+                        <div className={cls(paperMixin, "w-full min-h-12 p-4 md:p-6 overflow-x-auto no-scrollbar")}>
                             {child}
-                        </ErrorBoundary>
-                    </div>
+                        </div>
+                    </FieldBlock>
                 </div>
             );
         }

@@ -216,17 +216,26 @@ export function MarkdownEditorFieldBinding({
 
     return (
         <>
-            <div className="flex items-center w-full">
-                {!hideLabel && <LabelWithIconAndTooltip
+            {!hideLabel && <div className="flex items-center w-full">
+                <LabelWithIconAndTooltip
                     propertyKey={propertyKey}
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name ?? propertyKey}
-                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>}
-                <div className="flex-grow"/>
+                    className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3.5"}/>
+            </div>}
+            {/* `relative` so Clear can float inside the box. It used to sit in
+                the label row, which meant a clearable field with its label
+                lifted out by the form still drew a row of chrome above the box
+                and started lower than the field beside it.
+                Bottom-right, not top: the editor puts its own mode toggle at
+                `top-2 right-2` and the two would sit on each other. */}
+            <div
+                className={cls("relative rounded-md", fieldBackgroundMixin, disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin)}>
                 {property.admin?.clearable && !disabled && (
                     <IconButton
                         size="small"
+                        className="absolute bottom-1 right-1 z-10"
                         onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
@@ -236,9 +245,6 @@ export function MarkdownEditorFieldBinding({
                         <XIcon/>
                     </IconButton>
                 )}
-            </div>
-            <div
-                className={cls("rounded-md", fieldBackgroundMixin, disabled ? fieldBackgroundDisabledMixin : fieldBackgroundHoverMixin)}>
                 {editor}
             </div>
             <FieldHelperText includeDescription={includeDescription}

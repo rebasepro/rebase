@@ -98,6 +98,17 @@ export interface FieldBlockProps {
      * under every field is what a record has instead of room.
      */
     mode?: "edit" | "read";
+    /**
+     * Label text, when there is no property to take it from.
+     *
+     * For additional fields, which are columns a collection computes rather
+     * than stores. They go on the same grid as the properties and so have to
+     * carry the same label — drawing their own is how they ended up a size out
+     * and a couple of pixels off from the field beside them.
+     */
+    label?: string;
+    /** Type icon, when there is no property to derive one from. */
+    icon?: React.ReactNode;
     children: React.ReactNode;
 }
 
@@ -118,6 +129,8 @@ export function FieldBlock({
     property,
     showLabel,
     mode = "edit",
+    label,
+    icon,
     children
 }: FieldBlockProps) {
 
@@ -145,12 +158,12 @@ export function FieldBlock({
                             left at the 16px `smallest` token, which put the
                             heaviest mark on the row on the least important
                             thing in it. */}
-                        {property && (
+                        {(property || icon) && (
                             <span className={"shrink-0 text-text-disabled dark:text-text-disabled-dark"}>
-                                {getIconForProperty(property, LABEL_ICON_SIZE)}
+                                {property ? getIconForProperty(property, LABEL_ICON_SIZE) : icon}
                             </span>
                         )}
-                        <span className={"truncate"}>{property?.name ?? propertyKey}</span>
+                        <span className={"truncate"}>{property?.name ?? label ?? propertyKey}</span>
                         {required && <span className={"text-red-500 dark:text-red-500 -ml-1"}>*</span>}
                     </div>
                 </PropertyIdCopyTooltip>

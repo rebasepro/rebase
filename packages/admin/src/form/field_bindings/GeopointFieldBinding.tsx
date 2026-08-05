@@ -128,27 +128,24 @@ export function GeopointFieldBinding({
                 : undefined;
 
     return (
-        <div className="flex flex-col gap-2 w-full mt-2">
-            <div className="flex items-center justify-between mb-1">
-                {!hideLabel && <LabelWithIcon
+        <div className="flex flex-col gap-2 w-full">
+            {/* Label only, and only when there is one: a row that survives
+                `hideLabel` still spends its `mb-1` and the column's `gap-2`, so
+                the pair of inputs sat below the control next to them even
+                though the two labels were level. */}
+            {!hideLabel && <div className="flex items-center justify-between mb-1">
+                <LabelWithIcon
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name ?? propertyKey}
-                />}
-                {!disabled && (latText || lngText) && (
-                    <IconButton
-                        size="small"
-                        onClick={handleClear}
-                        className="text-text-secondary hover:text-red-500"
-                        aria-label="Clear location"
-                    >
-                        <Trash2Icon size={14}/>
-                    </IconButton>
-                )}
-            </div>
+                />
+            </div>}
 
             <PropertyIdCopyTooltip propertyKey={propertyKey}>
-                <div className="flex gap-4 w-full">
+                {/* Clear sits beside the inputs rather than above them, so
+                    entering a location does not grow the field by a row and
+                    knock it out of line with its neighbour. */}
+                <div className="flex gap-4 w-full items-center">
                     <TextField
                         className="flex-1"
                         size={size}
@@ -178,6 +175,16 @@ export function GeopointFieldBinding({
                         placeholder="e.g. 2.1686"
                         inputClassName="font-mono"
                     />
+                    {!disabled && (latText || lngText) && (
+                        <IconButton
+                            size="small"
+                            onClick={handleClear}
+                            className="shrink-0 text-text-secondary hover:text-red-500"
+                            aria-label="Clear location"
+                        >
+                            <Trash2Icon size={14}/>
+                        </IconButton>
+                    )}
                 </div>
             </PropertyIdCopyTooltip>
 

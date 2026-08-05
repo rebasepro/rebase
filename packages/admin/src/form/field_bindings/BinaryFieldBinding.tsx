@@ -86,14 +86,19 @@ export function BinaryFieldBinding({
     const localError = malformed ? "Not valid base64" : undefined;
 
     return (
-        <div className="flex flex-col gap-2 w-full mt-2">
-            <div className="flex items-center justify-between mb-1">
-                {!hideLabel && <LabelWithIcon
+        <div className="flex flex-col gap-2 w-full">
+            {/* The row goes away with the label rather than emptying out. Left
+                unconditional it still contributed its `mb-1` and the column's
+                `gap-2`, which — on top of the `mt-2` that used to sit on the
+                wrapper — pushed this control 20px below the one next to it
+                while the two labels stayed level. */}
+            {!hideLabel && <div className="flex items-center justify-between mb-1">
+                <LabelWithIcon
                     icon={getIconForProperty(property, "small")}
                     required={property.validation?.required}
                     title={property.name ?? propertyKey}
-                />}
-            </div>
+                />
+            </div>}
 
             <PropertyIdCopyTooltip propertyKey={propertyKey}>
                 <div className="w-full">

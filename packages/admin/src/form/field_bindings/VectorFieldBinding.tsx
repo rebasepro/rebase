@@ -98,11 +98,13 @@ export function VectorFieldBinding({
     const isPopulated = arrayValue.length > 0;
 
     return (
-        <div className="flex flex-col gap-2 w-full mt-2">
-            {/* Field Label */}
-            <div className="flex items-center justify-between mb-1">
+        <div className="flex flex-col gap-2 w-full">
+            {/* Only when there is a label to put in it — an empty row still
+                spends its `mb-1` and the column's `gap-2`, and the control ends
+                up below the one beside it under a label at the same height. */}
+            {label && <div className="flex items-center justify-between mb-1">
                 {label}
-            </div>
+            </div>}
 
             <PropertyIdCopyTooltip propertyKey={propertyKey}>
                 <div className="w-full">
