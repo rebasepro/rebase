@@ -275,6 +275,16 @@ export type OnVirtualTableColumnResizeParams = {
 };
 
 /**
+ * The filter operators this table can express.
+ *
+ * A deliberate copy of `WhereFilterOp` in `@rebasepro/types`, not an import:
+ * `@rebasepro/ui` has no dependency on the core types and is meant to stay
+ * usable on its own. The cost is that two published packages export the same
+ * name, so the two must be kept identical by hand —
+ * `packages/types/test/filter-operators-duplication.test.ts` fails if they
+ * diverge, because a table that cannot express an operator the query layer
+ * supports is a silent gap: the filter simply is not offered.
+ *
  * @see Table
  * @group Components
  */
@@ -312,8 +322,13 @@ export type VirtualTableSort = "asc" | "desc" | undefined;
 export type VirtualTableFilterValues<Key extends string> = FilterValues<Key>;
 
 /**
- * Filter conditions in a `Query.where()` clause are specified using the
- * strings `<`, `<=`, `==`, `>=`, `>`, `array-contains`, `in`, and `array-contains-any`.
+ * Filter conditions in a `Query.where()` clause, named by {@link WhereFilterOp}.
+ *
+ * The list is not repeated here: this comment used to name eight operators when
+ * the type had sixteen, having been written before the SQL pattern and null
+ * checks (`like`, `ilike`, `not-like`, `not-ilike`, `is-null`, `is-not-null`)
+ * were added. A prose copy of a union drifts from it silently.
+ *
  * @see Table
  * @group Models
  */

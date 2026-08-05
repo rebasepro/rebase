@@ -560,7 +560,7 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
 /**
  * Wrap a flat {@link SDKCollectionClient} into a Entity-shaped
  * {@link CollectionAccessor}. Every returned row is re-wrapped into the
- * `{ id, path, values }` view-model the admin admin renders.
+ * `{ id, path, values }` view-model the admin panel renders.
  */
 function toEntityAccessor<M extends Record<string, unknown>>(
     sdk: SDKCollectionClient<M>,

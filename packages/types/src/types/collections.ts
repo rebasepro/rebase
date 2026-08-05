@@ -19,9 +19,27 @@ import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operato
 export interface BaseCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> {
 
     /**
-     * You can set an alias that will be used internally instead of the collection name.
-     * The `slug` value will be used to determine the URL of the collection.
-     * Note that you can use this value in reference properties too.
+     * The collection's identity. Required, and the value nearly everything else
+     * keys on:
+     *
+     * - the REST path — `/api/data/<slug>`
+     * - the SDK accessor — `client.data.<slug>` / `client.data.collection("<slug>")`
+     * - the admin panel's URL
+     * - the target of a `reference` or `relation` property
+     *
+     * Conventionally kebab-case and plural (`blog-posts`). It is independent of
+     * {@link table}: the slug is what callers say, the table is where the rows
+     * live, and renaming one does not rename the other.
+     *
+     * Treat it as frozen once anything has shipped against it — changing a slug
+     * changes every URL and every generated accessor at once.
+     *
+     * @example
+     * defineCollection({
+     *     slug: "blog-posts",   // /api/data/blog-posts, client.data.blogPosts
+     *     table: "posts",
+     *     properties: { … }
+     * })
      */
     slug: string;
 

@@ -76,8 +76,24 @@ user-scoped (`buildCallContext` passes the request driver's own `this.data`,
 answer — but a reader who learned `client.data` from the cron docs and carries
 that to a callback has inverted the meaning without any signal.
 
-`context.client.data` is the sharp edge: inside a user-scoped callback, one extra
-hop reaches the admin plane under a name the type system no longer flags.
+`context.client.dataAsAdmin` is the sharp edge: inside a user-scoped callback,
+one extra hop reaches the admin plane under a name the type system no longer
+flags.
+
+**A bigger find came out of checking this.** The callbacks guide asserted, in all
+six locales, that `context.data` *bypasses* RLS and has "full database access
+regardless of the triggering user's permissions" — the opposite of the table
+above. Reading `AuthenticatedPostgresBackendDriver.withTransaction` settles it:
+it builds a fresh base driver bound to the RLS-scoped transaction
+(`new PostgresBackendDriver(tx, …)`) after `applyAuthContext` has downgraded the
+role, then runs the operation on it, so `buildCallContext` closes over a
+`this.data` that speaks through `tx`. A callback on a user request is
+user-scoped; only server-context work bypasses.
+
+Nothing tested it either way, which is how it stayed wrong. It is also wrong in
+the unsafe direction: RLS filters rather than raises, so a callback written on
+the "sees everything" promise finds its sibling row when an admin task saves and
+silently finds nothing when an end user does.
 
 **Recommend.** Make `CronJobContext.client` a `RebaseServerClient` so `data` is
 `Omit`ted there too, and rename it to `rebase` for consistency with
@@ -185,20 +201,28 @@ of drift on long flags.
 4 and 7); move `dev` to `-P` for port and drop the short form for `--password`,
 which should not be on a command line anyway. Standardise on `--output`.
 
-### 8. `@rebasepro/ui` publishes a second, stale `WhereFilterOp`
+### 8. ~~`@rebasepro/ui` publishes a second, stale `WhereFilterOp`~~ — WITHDRAWN
 
-`packages/types/src/types/filter-operators.ts:61` defines 16 operators.
-`packages/ui/src/components/VirtualTable/VirtualTableProps.tsx:281` defines its
-own with **10** — missing `like`, `ilike`, `not-like`, `not-ilike`, `is-null`,
-`is-not-null`.
+**This finding was wrong.** `VirtualTableProps.tsx` declares all 16 operators,
+the built `dist/**.d.ts` ships all 16, and
+`packages/types/test/filter-operators-duplication.test.ts` already guards the
+two copies against drift — thoroughly, including a non-vacuity check.
 
-Both are exported publicly under the same name from two published packages. The
-duplication itself is defensible (`@rebasepro/ui` deliberately does not depend on
-`@rebasepro/types`), but the drift means the table's filter UI cannot express
-half the operators the query layer supports.
+The claimed drift came from reading
+`packages/ui/src/components/VirtualTable/VirtualTableProps.d.ts` — a **stale,
+gitignored build artifact** sitting next to its own `.tsx` source in a
+long-lived checkout. It had 10 operators because it was generated before the SQL
+pattern and null checks were added. A fresh clone does not contain it, and it is
+excluded from the npm tarball.
 
-**Recommend.** Keep the decoupling; sync the union and add a type-level test in
-`ui` asserting it is assignable to core's.
+Which makes it a live demonstration of the "smaller note" further down rather
+than a finding of its own: a generated `.d.ts` beside its source is a file that
+looks authoritative, answers greps first, and can be arbitrarily old.
+
+**Done anyway.** The prose above `VirtualTableWhereFilterOp` did list only eight
+operators — a comment enumerating a union it had fallen behind — so it now
+points at the type instead of copying it, and the deliberate duplication carries
+a note naming the guard that holds it together.
 
 ### 9. Bulk and idempotency support is asymmetric
 
@@ -324,9 +348,17 @@ construction.
 - **`telemetry` is filed under "API Keys"** in `rebase --help`
   (`cli.ts:231`).
 - **No `afterDeleteError`** to match `afterSaveError` in `CollectionCallbacks`.
-- **126 stale generated `.d.ts` files** sit beside their sources in
-  `packages/ui` (109), `packages/utils` (11), `packages/forms` (6). Gitignored,
-  so they do not ship, but they shadow nothing and confuse local navigation.
+- **Stale generated `.d.ts` files beside their sources.** A long-lived checkout
+  accumulated 126 of them — `packages/ui` (109), `packages/utils` (11),
+  `packages/forms` (6). Gitignored, absent from a fresh clone, and excluded from
+  the published tarball, so nothing ships wrong. They are still worth clearing:
+  one of them (`VirtualTableProps.d.ts`, six operators out of date) is what
+  produced finding 8, which was withdrawn. A generated declaration next to its
+  own source answers searches first and carries no indication of its age.
+
+      find packages/*/src -name '*.d.ts' | while read f; do
+        [ -f "${f%.d.ts}.ts" ] || [ -f "${f%.d.ts}.tsx" ] && rm "$f"
+      done
 
 ## What is already right
 

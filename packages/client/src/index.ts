@@ -42,6 +42,9 @@ import { toSnakeCase } from "@rebasepro/utils";
 // data-proxy's unknown-collection error.
 export { RebaseApiError } from "./transport";
 export { RebaseClientError } from "./errors";
+// The codes `RebaseApiError.code` carries. An open union — routes add their own
+// — so it gives completion on the common ones without pretending to be closed.
+export type { RebaseErrorCode } from "@rebasepro/types";
 
 // Query + collection types (annotate SDK results; construct via the fluent API).
 export type { RebaseClientConfig, FindParams, FindResponse } from "./transport";

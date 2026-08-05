@@ -44,7 +44,7 @@ export interface RebaseFunctionContext {
  * export default defineFunction((app, { rebase }) => {
  *     app.use("/*", requireAuth);
  *     app.get("/home", async (c) => {
- *         const [stats] = await rebase.sql!(`SELECT count(*) AS n FROM orders`);
+ *         const [stats] = await rebase.sql(`SELECT count(*) AS n FROM orders`);
  *         return c.json({ orders: Number(stats.n) });
  *     });
  * });

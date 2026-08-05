@@ -122,12 +122,12 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
 
 
 /**
- * Fluent query builder for the **admin admin** — resolves to `FindResponse<M>`
+ * Fluent query builder for the **admin panel** — resolves to `FindResponse<M>`
  * (Snapshot-wrapped rows).
  *
  * @internal App developers should use {@link SDKQueryBuilderInterface}
  * (flat rows, returned by `client.data.*` / `context.data.*`). This
- * Snapshot-flavored variant backs the admin admin internals only.
+ * Snapshot-flavored variant backs the admin panel internals only.
  *
  * @group Data
  */
@@ -144,13 +144,13 @@ export interface QueryBuilderInterface<M extends Record<string, unknown> = Recor
 }
 
 /**
- * A single collection's CRUD accessor for the **admin admin** — every method
+ * A single collection's CRUD accessor for the **admin panel** — every method
  * resolves to `Snapshot`-wrapped rows (`FindResponse<M>` / `Snapshot<M>`).
  *
  * @internal App developers do **not** use this. The public, symmetric surface
  * is {@link SDKCollectionClient} (flat rows), exposed as `client.data.products`
  * in the SDK and `context.data.products` in framework callbacks. This
- * Snapshot-flavored accessor backs the admin admin view-model only.
+ * Snapshot-flavored accessor backs the admin panel view-model only.
  *
  * @group Data
  */
@@ -206,6 +206,12 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
 
     /**
      * Count the number of records matching the given filter.
+     *
+     * Optional on this contract because a data source need not support it, and
+     * required on `CollectionClient` — the HTTP implementation always has it.
+     * So `client.data.posts.count()` compiles in the browser while the same
+     * call through a `context.data` accessor needs `count?.()`, which is the
+     * one place the two halves of this API are not interchangeable.
      */
     count?(params?: FindParams<M>): Promise<number>;
 
@@ -539,13 +545,22 @@ export interface SDKCollectionClient<
     delete(id: string | number): Promise<void>;
 
     /**
-     * Subscribe to a collection for real-time updates.
+     * The low-level realtime subscription: raw server pushes, nothing else.
+     *
+     * **Prefer `observe()`** on a client from `@rebasepro/client`, which wraps
+     * this one and is what a UI actually wants — it emits from the local
+     * database first when offline is enabled, re-emits on local writes and
+     * rollbacks, and de-duplicates emissions so a refresh that changes nothing
+     * does not call back. `listen` does none of that; it forwards what the
+     * socket sends.
+     *
+     * Optional because it is only present when realtime is enabled. `observe()`
+     * is not — it degrades to a single fetch — which is the other reason to
+     * reach for it instead.
      */
     listen?(params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
 
-    /**
-     * Subscribe to a single record for real-time updates.
-     */
+    /** {@link listen} for a single row. Prefer `observeById()`. */
     listenById?(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void): () => void;
 
     /**
@@ -564,7 +579,7 @@ export interface SDKCollectionClient<
 }
 
 /**
- * The unified data access object for the **admin admin** (Entity-shaped).
+ * The unified data access object for the **admin panel** (Entity-shaped).
  *
  * Access collections as dynamic properties: `data.products.find(...)`. Each
  * accessor returns `Entity`-wrapped records (`{ id, path, values }`) — the
@@ -573,7 +588,7 @@ export interface SDKCollectionClient<
  *
  * @internal App developers do **not** use this — they use
  * {@link RebaseSdkData} (flat rows), which is what the SDK client and backend
- * `context.data` expose. This Entity-shaped map backs the admin admin only.
+ * `context.data` expose. This Entity-shaped map backs the admin panel only.
  *
  * @group Data
  */
