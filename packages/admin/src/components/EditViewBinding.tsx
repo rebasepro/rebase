@@ -65,6 +65,14 @@ export type BarActionsParams = {
     status: EntityStatus,
     path: string,
     entityId?: string | number;
+    /**
+     * Whether `values` differ from what is stored. The side panel's "open full
+     * screen" hands the in-flight edit to the full-screen route through the
+     * memory cache, and a record loaded from that cache opens *dirty*: without
+     * this it stashed the values unconditionally, so expanding a record you had
+     * only looked at arrived saying "Unsaved changes" with Save enabled.
+     */
+    dirty: boolean;
 };
 
 export type OnTabChangeParams<M extends Record<string, unknown>> = {
@@ -723,7 +731,13 @@ parentEntityIds,
             } : undefined}
             onSaveAndClose={canEdit && formContext && canCloseAfterSave ? () => {
                 sideDialogContext.setPendingClose?.(true);
-                formContext.submit();
+                // Lowered again once the submit settles. A submit the form
+                // rejects never reaches `onSaved`, so nothing would consume the
+                // flag and the *next* save — a keyboard ⌘S, say — would close
+                // the panel out from under an edit nobody asked to finish. A
+                // save that succeeds has already closed by the time this runs.
+                Promise.resolve(formContext.submit())
+                    .finally(() => sideDialogContext.setPendingClose?.(false));
             } : undefined}
             onDiscard={canEdit && formContext ? () => formContext.formex.resetForm() : undefined}
             onInspect={includeJsonView ? () => setInspectorTab("json") : undefined}
@@ -748,7 +762,8 @@ parentEntityIds,
                     path,
                     entityId,
                     values: formContext?.values ?? usedEntity?.values ?? {},
-                    status
+                    status,
+                    dirty: Boolean(formContext?.formex?.dirty)
                 })}
             </>}
         />

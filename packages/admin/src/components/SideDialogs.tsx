@@ -91,7 +91,17 @@ function SideDialogView({
     const [blocked, setBlocked] = useState(false);
     const [blockedNavigationMessage, setBlockedNavigationMessage] = useState<React.ReactNode | undefined>();
 
-    const [pendingClose, setPendingClose] = useState(false);
+    // Held in a ref, read through a getter, because of *when* it is written and
+    // read. "Save and close" raises it and submits the form in one click
+    // handler, and the callback that acts on it — the form's `onSaved` — was
+    // captured before React could re-render with the new value. As state the
+    // flag was therefore always read one save late: the first "save and close"
+    // saved and left the panel open, and the *next* save closed it.
+    // Nothing renders from it, so a ref loses nothing.
+    const pendingCloseRef = React.useRef(false);
+    const setPendingClose = useCallback((value: boolean) => {
+        pendingCloseRef.current = value;
+    }, []);
 
     const widthRef = React.useRef<string | undefined>(panel?.width);
     const width = widthRef.current;
@@ -142,9 +152,11 @@ function SideDialogView({
         setBlockedNavigationMessage,
         width,
         close: onCloseRequest,
-        pendingClose,
+        get pendingClose() {
+            return pendingCloseRef.current;
+        },
         setPendingClose
-    }), [blocked, setBlockedNavigationMessage, width, onCloseRequest, pendingClose]);
+    }), [blocked, setBlockedNavigationMessage, width, onCloseRequest, setPendingClose]);
 
     const additionalProps = panel?.additional as SidePanelBindingProps | undefined;
     const isDialogMode = additionalProps?.collection?.openEntityMode === "dialog";

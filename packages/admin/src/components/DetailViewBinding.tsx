@@ -56,6 +56,8 @@ export type BarActionsParams = {
     status: EntityStatus,
     path: string,
     entityId?: string | number;
+    /** Always false here — this view reads a record, it does not edit one. */
+    dirty: boolean;
 };
 
 export type OnTabChangeParams<M extends Record<string, unknown>> = {
@@ -570,7 +572,8 @@ entityId }
                     path,
                     entityId,
                     values: usedEntity?.values ?? {},
-                    status: "existing"
+                    status: "existing",
+                    dirty: false
                 })}
             </>}
         />

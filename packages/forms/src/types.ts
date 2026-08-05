@@ -24,7 +24,9 @@ export type FormexController<T = any> = {
     isValidating: boolean;
     /**
      * The version of the form. This is incremented every time the form is reset
-     * or the form is submitted.
+     * or the form is submitted, and whenever the `initialValues` it was created
+     * with are replaced — a container reading `values` off the controller needs
+     * to hear about a re-seed the same way it hears about a reset.
      */
     version: number;
 

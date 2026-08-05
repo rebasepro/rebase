@@ -49,11 +49,29 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
     const sideDialogsController = useSideDialogContext();
     const urlController = useUrlController();
 
+    /**
+     * The X in the identity bar.
+     *
+     * Unforced, so it stops at the same unsaved-changes prompt that Escape and
+     * a click outside already do. It used to clear `blocked` and force the
+     * close, which made the one control actually labelled "close" the only way
+     * out of the panel that dropped an edit without asking.
+     *
+     * `props.onClose` is not called here: the panel carries the same callback
+     * (see `propsToSidePanel`) and {@link SideDialogs} fires it once the panel
+     * really closes — which is after the prompt, not before it.
+     */
     const onClose = () => {
-        if (props.onClose) {
-            props.onClose();
-        }
+        close();
+    }
 
+    /**
+     * Closing because the record was just saved, which is the one case that has
+     * to force. `blocked` is driven by an effect on the form's dirty flag and is
+     * still true for a tick after a save; prompting about unsaved changes here
+     * would be asking about values that are already on the server.
+     */
+    const closeAfterSave = () => {
         setBlocked(false);
         close(true);
     }
@@ -79,7 +97,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
 
         if (sideDialogsController.pendingClose) {
             sideDialogsController.setPendingClose(false);
-            onClose();
+            closeAfterSave();
         }
 
     }
@@ -181,6 +199,43 @@ entityId }
         return <div className={"w-full"}/>;
     }
 
+    const closeButton = (
+        <IconButton
+            className="self-center"
+            size={"small"}
+            onClick={onClose}>
+            <XIcon/>
+        </IconButton>
+    );
+
+    /**
+     * Where the panel's own two controls sit, which is not the same question in
+     * the two layouts that have them.
+     *
+     * A **side panel** slides in over the list from the right, and its leading
+     * edge is the seam between the two. Close belongs on that seam — it points
+     * back at the thing still visible behind it — and it is where the eye
+     * already is, because the breadcrumb starts there.
+     *
+     * A **dialog** has no seam and nothing behind it to point at. It is a box
+     * centred on a dimmed screen, and every box like it on every platform is
+     * dismissed from its top-right corner. Close was sitting at the far left
+     * of the bar, a full dialog's width from the expand button it belongs
+     * beside, in the one corner that means "back" in a layout with no back.
+     *
+     * So in a dialog the two travel together at the trailing edge, expand then
+     * close: the window controls, after the record's actions and its overflow
+     * menu, in the corner a dialog is closed from.
+     */
+    const barActionsStart = isDialogMode ? undefined : closeButton;
+
+    const windowControls = (expandButton: React.ReactNode) => (
+        <div className="flex gap-1 items-center">
+            {expandButton}
+            {isDialogMode && closeButton}
+        </div>
+    );
+
     return (
         <>
             <ErrorBoundary>
@@ -193,31 +248,20 @@ entityId }
                         parentCollectionSlugs={parentCollectionSlugs}
                         parentEntityIds={parentEntityIds}
                         onEditClick={openEditView}
-                        barActionsStart={
-                            // At the bar's leading edge, where the breadcrumb
-                            // starts: the corner of the panel it closes.
-                            <IconButton
+                        barActionsStart={barActionsStart}
+                        barActions={() => windowControls(
+                            allowFullScreen && <IconButton
                                 className="self-center"
                                 size={"small"}
-                                onClick={onClose}>
-                                <XIcon/>
-                            </IconButton>}
-                        barActions={({
-                            status,
-                            values
-                        }) => <div className="flex gap-1">
-                                {allowFullScreen && <IconButton
-                                    className="self-center"
-                                    size={"small"}
-                                    onClick={() => {
-                                        if (entityId) {
-                                            const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
-                                            navigate(fullScreenUrl, { state: null });
-                                        }
-                                    }}>
-                                    <Maximize2Icon/>
-                                </IconButton>}
-                            </div>}
+                                onClick={() => {
+                                    if (entityId) {
+                                        const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
+                                        navigate(fullScreenUrl, { state: null });
+                                    }
+                                }}>
+                                <Maximize2Icon/>
+                            </IconButton>
+                        )}
                         onTabChange={({
                             entityId: tabEntityId,
                             selectedTab,
@@ -245,38 +289,39 @@ entityId }
                         onValuesModified={onValuesModified}
                         onSaved={onUpdate}
                         navigateBack={closeEditView}
-                        barActionsStart={
-                            // At the bar's leading edge, where the breadcrumb
-                            // starts: the corner of the panel it closes.
-                            <IconButton
-                                className="self-center"
-                                size={"small"}
-                                onClick={onClose}>
-                                <XIcon/>
-                            </IconButton>}
+                        barActionsStart={barActionsStart}
                         barActions={({
                             status,
-                            values
-                        }) => <div className="flex gap-1">
-                                {allowFullScreen && <IconButton
-                                    className="self-center"
-                                    size={"small"}
-                                    onClick={() => {
+                            values,
+                            dirty
+                        }) => windowControls(
+                            allowFullScreen && <IconButton
+                                className="self-center"
+                                size={"small"}
+                                onClick={() => {
+                                    // Only an edit in progress is worth carrying across.
+                                    // A record loaded from this cache opens dirty, so
+                                    // stashing a clean one made the full-screen view
+                                    // announce unsaved changes to someone who had only
+                                    // looked at it. A new record always carries: there
+                                    // is nothing on the server to fall back to.
+                                    if (dirty || status === "new" || status === "copy") {
                                         const key = (status === "new" || status === "copy") ? path + "#new" : path + "/" + entityId;
                                         saveEntityToMemoryCache(key, values);
-                                        setBlocked(false);
-                                        setBlockedNavigationMessage(undefined);
-                                        if (entityId) {
-                                            const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
-                                            navigate(fullScreenUrl, { state: null });
-                                        } else {
-                                            const fullScreenUrl = urlController.buildUrlCollectionPath(path);
-                                            navigate(fullScreenUrl + "#new", { state: null });
-                                        }
-                                    }}>
-                                    <Maximize2Icon/>
-                                </IconButton>}
-                            </div>}
+                                    }
+                                    setBlocked(false);
+                                    setBlockedNavigationMessage(undefined);
+                                    if (entityId) {
+                                        const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
+                                        navigate(fullScreenUrl, { state: null });
+                                    } else {
+                                        const fullScreenUrl = urlController.buildUrlCollectionPath(path);
+                                        navigate(fullScreenUrl + "#new", { state: null });
+                                    }
+                                }}>
+                                <Maximize2Icon/>
+                            </IconButton>
+                        )}
                         onTabChange={({
                             entityId: tabEntityId,
                             selectedTab,

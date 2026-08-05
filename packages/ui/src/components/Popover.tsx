@@ -73,8 +73,11 @@ export function Popover({
 
         <PopoverPrimitive.Portal container={finalContainer}>
             <PopoverPrimitive.Content
+                // `z-50`, the floating layer — see the note in `Menu`. Below it
+                // a popover opened from inside a dialog or a side panel is
+                // painted under the thing that owns its trigger.
                 className={cls(paperMixin,
-                    "PopoverContent z-40", className)}
+                    "PopoverContent z-50", className)}
                 side={side}
                 sideOffset={sideOffset}
                 align={align}

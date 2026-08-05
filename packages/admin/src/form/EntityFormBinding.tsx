@@ -127,22 +127,39 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
 
     const [localChangesCleared, setLocalChangesCleared] = useState<boolean>(false);
 
+    // `initialDirtyValues` is deliberately *not* merged in here any more. This
+    // value is the form's baseline, and an edit folded into the baseline is
+    // indistinguishable from saved data — which is how an edit carried over
+    // from the side panel arrived reading "Saved". {@link EntityForm} applies
+    // it as an overlay on the values instead, so the difference survives.
+    //
+    // The auto-applied local-changes backup is still folded in, unchanged, and
+    // has the same shape of problem: a restored draft opens undirty and cannot
+    // be saved until a field is touched. Left as it is rather than changed
+    // blind, since nothing here exercises that path.
     const computedInitialValues = useMemo(() => {
-        const withLocalChanges = autoApplyLocalChanges && localChangesDataRaw
+        return autoApplyLocalChanges && localChangesDataRaw
             ? mergeDeep(baseInitialValues, localChangesDataRaw as Partial<M>)
             : baseInitialValues;
-        return initialDirtyValues ? mergeDeep(withLocalChanges, initialDirtyValues) : withLocalChanges;
-    }, [autoApplyLocalChanges, localChangesDataRaw, baseInitialValues, initialDirtyValues]);
+    }, [autoApplyLocalChanges, localChangesDataRaw, baseInitialValues]);
 
     const localChangesData = useMemo(() => {
         if (!localChangesDataRaw) return undefined;
-        const changes = getChanges(localChangesDataRaw, computedInitialValues);
+        // Against what the form *opens showing*, not against the baseline. The
+        // banner exists to offer a draft the form is not already displaying;
+        // an edit carried over from the side panel is in both the backup and
+        // the form, so measuring it against the baseline alone offered to
+        // restore the values already on screen.
+        const openingValues = initialDirtyValues
+            ? mergeDeep(computedInitialValues, initialDirtyValues)
+            : computedInitialValues;
+        const changes = getChanges(localChangesDataRaw, openingValues);
         const cleaned = removeEmptyContainers(changes);
         if (cleaned && typeof cleaned === "object" && Object.keys(cleaned).length === 0) {
             return undefined;
         }
         return cleaned;
-    }, [localChangesDataRaw, computedInitialValues]);
+    }, [localChangesDataRaw, computedInitialValues, initialDirtyValues]);
 
     const hasLocalChanges = !localChangesCleared && !!localChangesData && Object.keys(localChangesData as object).length > 0;
 

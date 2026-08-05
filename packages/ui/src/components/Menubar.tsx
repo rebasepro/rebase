@@ -109,7 +109,11 @@ export function MenubarContent({
     return (
         <MenubarPrimitive.Content
             onSelect={onSelect}
-            className={cls("min-w-[220px] bg-white dark:bg-surface-900 rounded-md p-[6px] shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)] [animation-duration:_400ms] [animation-timing-function:_cubic-bezier(0.16,_1,_0.3,_1)] will-change-[transform,opacity]", className)}
+            // `z-50`, the floating layer — see the note in `Menu`. This carried
+            // no z-index at all, so the wrapper Radix portals out to the body
+            // got `auto` and the menu opened underneath any dialog or panel it
+            // was hosted in.
+            className={cls("z-50 min-w-[220px] bg-white dark:bg-surface-900 rounded-md p-[6px] shadow-[0px_10px_38px_-10px_rgba(22,_23,_24,_0.35),_0px_10px_20px_-15px_rgba(22,_23,_24,_0.2)] [animation-duration:_400ms] [animation-timing-function:_cubic-bezier(0.16,_1,_0.3,_1)] will-change-[transform,opacity]", className)}
             align={align ?? "start"}
             sideOffset={sideOffset ?? 5}
             alignOffset={alignOffset ?? -3}

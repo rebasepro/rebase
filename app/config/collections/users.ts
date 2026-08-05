@@ -21,12 +21,16 @@ const usersCollection: PostgresCollectionConfig = {
             validation: {
                 required: true,
                 unique: true
-            }
+            },
+            // Four short fields split into a 2×2 grid, which is a square of
+            // unrelated values rather than a form. Full width, one column.
+            admin: { span: 4 }
         },
         displayName: {
             name: "Name",
             type: "string",
-            columnName: "display_name"
+            columnName: "display_name",
+            admin: { span: 4 }
         },
         photoURL: {
             name: "Photo URL",
@@ -39,6 +43,7 @@ const usersCollection: PostgresCollectionConfig = {
             name: "Roles",
             type: "array",
             columnType: "text[]",
+            admin: { span: 4 },
             of: {
                 name: "Role",
                 type: "string",
@@ -100,7 +105,8 @@ const usersCollection: PostgresCollectionConfig = {
             name: "Created At",
             type: "date",
             columnName: "created_at",
-            admin: { readOnly: true }
+            admin: { readOnly: true,
+span: 4 }
         },
         updatedAt: {
             name: "Updated At",
@@ -140,6 +146,11 @@ const usersCollection: PostgresCollectionConfig = {
         openEntityMode: "dialog",
         disableDefaultActions: ["copy"],
         sort: ["createdAt", "desc"],
+        // A user is called by their name. Without this the title is derived,
+        // and `propertiesOrder` starting `["id", "email", …]` makes the
+        // derivation take the email address — so every record was titled by
+        // the address with the person's name sitting in the next field.
+        display: { title: "displayName" },
         listProperties: ["displayName", "email", "roles", "createdAt"],
         propertiesOrder: ["id", "email", "displayName", "roles", "createdAt"]
     }

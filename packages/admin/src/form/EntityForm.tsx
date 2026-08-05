@@ -173,15 +173,30 @@ export function EntityForm<M extends Record<string, unknown>>({
             });
     };
 
-    const [initialValues, initialDirty] = useMemo(() => {
-        const initialValues = initialDirtyValues ? mergeDeep(baseInitialValues, initialDirtyValues) : baseInitialValues;
-        const initialDirty = Boolean(initialDirtyValues) && initialDirtyValues && Object.keys(initialDirtyValues).length > 0;
-        return [initialValues, initialDirty];
-    }, [baseInitialValues, initialDirtyValues]);
+    /**
+     * What the form opens showing, when that is not what is stored — an edit
+     * carried over from the side panel's "open full screen", or a draft
+     * restored from the local-changes backup.
+     *
+     * The merge is deliberately *not* folded into the baseline. `mergeDeep`
+     * used to produce a single `initialValues` that served as both, with a
+     * `initialDirty: true` bolted on beside it to say what the baseline could
+     * no longer show — and that flag survived exactly one render, because the
+     * record's data arriving replaced the baseline and the form recomputed
+     * dirty as false against a baseline that already contained the edit.
+     *
+     * Read once, at mount: this is a handoff, and re-reading it every render
+     * tied the form to a cache that is cleared as soon as it has been consumed.
+     */
+    const initialModifiedValues = useRef(
+        initialDirtyValues && Object.keys(initialDirtyValues).length > 0
+            ? mergeDeep(baseInitialValues, initialDirtyValues)
+            : undefined
+    ).current;
 
     const internalFormex = useCreateFormex<M>({
-        initialValues: initialValues as M,
-        initialDirty,
+        initialValues: baseInitialValues as M,
+        initialModifiedValues: initialModifiedValues as M | undefined,
         debugId: `EntityForm:${path}/${entityIdProp}`,
         initialTouched: initialDirtyValues ?
             flattenKeys(initialDirtyValues!)
@@ -193,7 +208,9 @@ export function EntityForm<M extends Record<string, unknown>>({
         onSubmit,
         onReset: () => {
             onResetProp?.();
-            onValuesModified?.(false, initialValues as M);
+            // The stored values — a reset returns the form to them, and by now
+            // that is the baseline whether or not it was at mount.
+            onValuesModified?.(false, baseInitialValues as M);
         },
         onValuesChangeDeferred: onValuesChangeDeferredProp,
         validation: async (values): Promise<Record<string, string>> => {

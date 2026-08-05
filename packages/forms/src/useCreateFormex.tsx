@@ -6,6 +6,7 @@ import { FormexController, FormexResetProps } from "./types";
 
 export function useCreateFormex<T = any>({
     initialValues,
+    initialModifiedValues,
     initialErrors,
     initialDirty,
     initialTouched,
@@ -17,8 +18,27 @@ export function useCreateFormex<T = any>({
     onValuesChangeDeferred,
     debugId
 }: {
+    /**
+     * The **baseline**: what the values are stored as. Everything the form
+     * calls "dirty" is a difference from this, so it has to be the stored
+     * record and nothing else. To open a form already carrying an edit, pass
+     * that edit as {@link initialModifiedValues} — folding it into
+     * `initialValues` instead makes the baseline agree with the edit, and then
+     * nothing can tell that the edit is unsaved.
+     */
     initialValues: T;
+    /**
+     * What the form should *show* on its first render, when that is not the
+     * baseline — an edit handed over from somewhere else, a draft restored
+     * from a cache. Dirty is computed from the difference.
+     */
+    initialModifiedValues?: T;
     initialErrors?: Record<string, string>;
+    /**
+     * Force the starting dirty state. Only for callers that know the form
+     * opens modified but cannot supply the modified values; prefer
+     * {@link initialModifiedValues}, which lets it be derived.
+     */
     initialDirty?: boolean;
     initialTouched?: Record<string, boolean>;
     validateOnChange?: boolean;
@@ -35,14 +55,20 @@ export function useCreateFormex<T = any>({
     onReset?: (controller: FormexController<T>) => void | Promise<void>;
     debugId?: string;
 }): FormexController<T> {
+    // The baseline and the current values start apart when the form opens
+    // already carrying an edit. Keeping them separate is what lets the dirty
+    // flag be *derived* rather than asserted, and what lets the baseline be
+    // replaced later without touching what the user is looking at.
+    const startValues = initialModifiedValues ?? initialValues;
+
     const initialValuesRef = useRef<T>(initialValues);
-    const valuesRef = useRef<T>(initialValues);
+    const valuesRef = useRef<T>(startValues);
     const debugIdRef = useRef<string | undefined>(debugId);
 
-    const [values, setValuesInner] = useState<T>(initialValues);
+    const [values, setValuesInner] = useState<T>(startValues);
     const [touchedState, setTouchedState] = useState<Record<string, boolean>>(initialTouched ?? {});
     const [errors, setErrors] = useState<Record<string, string>>(initialErrors ?? {});
-    const [dirty, setDirty] = useState(initialDirty ?? false);
+    const [dirty, setDirty] = useState(initialDirty ?? !equal(initialValues, startValues));
     const [submitCount, setSubmitCount] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isValidating, setIsValidating] = useState(false);
@@ -64,7 +90,7 @@ export function useCreateFormex<T = any>({
     }, []);
 
     // Replace state for history with refs
-    const historyRef = useRef<T[]>([initialValues]);
+    const historyRef = useRef<T[]>([startValues]);
     const historyIndexRef = useRef<number>(0);
 
     useEffect(() => {
@@ -203,11 +229,44 @@ export function useCreateFormex<T = any>({
         historyIndexRef.current = 0;
     }, [onReset, initialTouched]);
 
+    /**
+     * The `initialValues` prop moved: the record this form edits finished
+     * loading, or was replaced. That is a **re-baseline**, not a reset.
+     *
+     * It used to call `resetForm({ values: initialValues })`, which is a reset
+     * in both of the ways that matter, and both were wrong here:
+     *
+     * - it fired `onReset`, which callers reasonably read as "the user
+     *   discarded their changes". The admin clears the cache that seeds an
+     *   in-flight edit handed over from the side panel there, so a record's own
+     *   data arriving deleted the edit the form had just been opened with, and
+     *   the form then re-seeded itself from the server — an expanded record
+     *   silently lost whatever had been typed into it.
+     * - it overwrote `values`, so anything typed while the record was still
+     *   loading was thrown away without a word.
+     *
+     * So: move the baseline, leave the edit alone, and re-judge one against
+     * the other. Only an untouched form follows the baseline to its new value.
+     */
     useEffect(() => {
-        if (!equal(initialValuesRef.current, initialValues)) {
-            resetForm({ values: initialValues });
+        if (equal(initialValuesRef.current, initialValues)) return;
+
+        const modified = !equal(initialValuesRef.current, valuesRef.current);
+        initialValuesRef.current = initialValues;
+
+        if (modified) {
+            setDirty(!equal(initialValues, valuesRef.current));
+        } else {
+            valuesRef.current = initialValues;
+            setValuesInner(initialValues);
+            historyRef.current = [initialValues];
+            historyIndexRef.current = 0;
+            setDirty(false);
         }
-    }, [initialValues, resetForm]);
+        // Containers that read `values` off the controller key on `version`;
+        // a re-seed changes what they are holding just as a reset does.
+        setVersion((prev: number) => prev + 1);
+    }, [initialValues]);
 
     const undo = useCallback(() => {
         if (historyIndexRef.current > 0) {

@@ -816,6 +816,69 @@ tells the caller nothing about their filter.
 
 ---
 
+## 25. A floating layer painted under the thing that opened it
+
+A dropdown, popover or tooltip is portalled out of the DOM subtree it belongs to
+and re-attached at the document root, where it is a *sibling* of every dialog and
+sheet rather than a child of one. Its stacking is then decided by `z-index`
+against those siblings, and any value below theirs puts it behind the overlay.
+The element is in the DOM, `visibility: visible`, correctly positioned, and
+completely invisible and unclickable.
+
+The overflow menu in the entity identity bar carried `z-30`; `Dialog`'s container
+is `z-50` and `Sheet` is `z-45`+. So the three-dot menu did nothing in dialog mode
+and in the side panel, while working in full screen — where there is no overlay to
+lose to. Radix compounds it: `PopperContent` reads the computed `z-index` off the
+content and copies it onto the wrapper it portals, so the one class governs both.
+
+**Sweep:** for every portalled floating component, compare its `z-index` with the
+overlays it can be opened from. `grep -ln "Portal" packages/ui/src/components/*.tsx`
+then read the z-index out of each. The survey found `Menu` at 30, `Popover` at 40
+and `MenubarContent` with **none at all** (so, `auto`), against `Select`,
+`Tooltip`, `MultiSelect`, `Dialog` and `Sheet` already on 50. The three low ones
+were the three that were broken.
+
+**Watch for:** the absent case being the worst one. A missing `z-index` reads as
+"no opinion" and is easy to skip while auditing numbers, but it resolves to `auto`
+and loses to *everything* positioned. And prefer one shared tier over a ladder:
+peers on the same `z-index` stack by mount order, which is already the right
+answer — a menu opened from a dialog mounts after it, and a dialog that menu opens
+mounts after them both. A ladder has to be re-derived every time a layer is added,
+and the stacked-sheet case (`45 + index * 10`) climbs past any fixed value chosen
+for the menus.
+
+---
+
+## 26. A flag written and read in one event, through a closure older than the write
+
+`setState` during an event handler does not change anything the handlers already
+captured. If the same event then invokes a callback that was built in an earlier
+render, that callback reads the **previous** value — and if the flag is written
+only from the same button that triggers the read, it is never observed on the
+click that set it. It is observed on the *next* one, which is what makes this look
+like an intermittent bug rather than a deterministic one.
+
+"Save and close" set `pendingClose = true` and called `formContext.submit()` in
+one handler. The form's `onSaved` — captured before that render — read
+`pendingClose` as `false`, so the record saved and the panel stayed open. The flag
+stayed raised, so the *following* save closed the panel. Both halves are the same
+defect, and the second half is worse: the panel closed on a save nobody asked to
+close it on.
+
+**Sweep:** find state whose only reads are inside callbacks rather than in JSX.
+For each `useState` in a controller or context, ask whether any consumer reads it
+outside a render — an `onSaved`, an `onSubmit`, a promise `.then`. Those are refs
+misspelled as state. Rendering from the value is what makes it state; nothing
+rendered `pendingClose`.
+
+**Watch for:** the flag left raised when the action it was set for never completes.
+Once the read is fixed the leak becomes reachable, because a stale `true` now
+actually fires. Lower it where the operation settles, not only where it succeeds —
+`Promise.resolve(submit()).finally(...)` — or a rejected validation leaves a
+"close after save" armed for whatever saves next, including a keyboard ⌘S.
+
+---
+
 ## The discipline
 
 When you find a bug:

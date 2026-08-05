@@ -319,7 +319,11 @@ function IdChip({ value }: { value: string }) {
                 onClick={copy}
                 aria-label={`${t("copy_id")} ${value}`}
                 className={cls(
-                    "hidden md:inline-flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-md",
+                    // `whitespace-nowrap`: the middle of the id is elided with a
+                    // `…`, and a line break is allowed after one. In the dialog,
+                    // where the bar is narrow and every button is on it, the
+                    // chip broke across two lines inside a 52px row.
+                    "hidden md:inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2 py-0.5 rounded-md",
                     "font-mono text-[11px] text-text-secondary dark:text-text-secondary-dark",
                     "bg-surface-accent-200/50 dark:bg-white/[0.055]",
                     "hover:bg-surface-accent-200/75 dark:hover:bg-white/[0.09] transition-colors"

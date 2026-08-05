@@ -57,7 +57,15 @@ const Menu = React.forwardRef<
                     side={side}
                     sideOffset={sideOffset}
                     align={align}
-                    className={cls(paperMixin, focusedDisabled, "py-2 z-30", className)}>
+                    // `z-50` is the floating layer — the tier `Dialog`, `Sheet`,
+                    // `Select` and `Tooltip` all sit on. Radix copies this value
+                    // onto the popper wrapper it portals next to them, so at any
+                    // lower value the menu opens *behind* the dialog or sheet it
+                    // was opened from: visible in the DOM, painted under the
+                    // overlay, and unclickable. Peers on this tier stack by mount
+                    // order, which is what puts a menu above the dialog holding
+                    // its trigger, and a dialog that menu opens above them both.
+                    className={cls(paperMixin, focusedDisabled, "py-2 z-50", className)}>
                     {children}
                 </DropdownMenu.Content>
             </DropdownMenu.Portal>
