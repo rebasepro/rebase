@@ -464,8 +464,9 @@ values: entity as Record<string, unknown> },
             return c.json(response as never, 201);
         });
 
-        // PUT /collection/:id - Update entity
-        this.router.put(`${basePath}/:id`, async (c) => {
+        // PATCH /collection/:id — partial update. PUT is mounted on the same
+        // handler for compatibility; see the note on `updateEntity` below.
+        const updateEntity = async (c: Context<HonoEnv>) => {
             // Errors from here are deliberately not re-classified. This layer
             // cannot tell a constraint violation from an unreachable database, and
             // it used to call both `BAD_REQUEST` — a claim that the caller sent
@@ -503,7 +504,30 @@ values: entity as Record<string, unknown> },
 
 
             return c.json(response);
-        });
+        };
+
+        /**
+         * The verb that matches what this actually does.
+         *
+         * The handler merges: it writes the columns in the body and leaves the
+         * rest alone, which is what the SDK's `update(id, data: Partial<M>)`
+         * sends. PUT was the only route, and PUT means replace — so the
+         * generated OpenAPI spec described a full replacement while the server
+         * performed a merge, and it reused the *create* input schema for it,
+         * `required` fields and all. A client generated from that spec was
+         * given a contract the server does not implement, and a spec-validating
+         * gateway in front of this API would reject partial updates the server
+         * would have accepted.
+         *
+         * PUT stays mounted on the same handler rather than being changed or
+         * removed: every published SDK sends it, and altering its semantics to
+         * be a true replace would silently start nulling columns that callers
+         * had simply omitted for years — a data-loss change disguised as a
+         * standards fix. So PATCH is the honest name, PUT is the compatible one,
+         * and both do the documented thing.
+         */
+        this.router.patch(`${basePath}/:id`, updateEntity);
+        this.router.put(`${basePath}/:id`, updateEntity);
 
         // DELETE /collection/:id - Delete entity
         this.router.delete(`${basePath}/:id`, async (c) => {
@@ -738,8 +762,9 @@ id: parsed.id });
             return c.json(response, 201);
         });
 
-        // PUT /<subcollection-path>/:id — update entity
-        this.router.put("/:parent/:parentId/:rest{.+}", async (c, next) => {
+        // PATCH /<subcollection-path>/:id — update entity. PUT is mounted on the
+        // same handler for compatibility; see `updateEntity` above for why both.
+        const updateNested = async (c: Context<HonoEnv>, next: () => Promise<void>) => {
             const rest = c.req.param("rest");
             if (!rest || rest === "undefined") return next();
             const rawPath = `${c.req.param("parent")}/${c.req.param("parentId")}/${rest}`;
@@ -768,7 +793,10 @@ id: parsed.id });
 
 
             return c.json(response);
-        });
+        };
+
+        this.router.patch("/:parent/:parentId/:rest{.+}", updateNested);
+        this.router.put("/:parent/:parentId/:rest{.+}", updateNested);
 
         // DELETE /<subcollection-path>/:id — delete entity
         this.router.delete("/:parent/:parentId/:rest{.+}", async (c, next) => {

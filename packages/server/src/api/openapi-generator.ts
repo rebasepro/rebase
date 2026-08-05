@@ -199,6 +199,10 @@ description: "Whether more records exist beyond this page" }
         // Build an "input" schema (no read-only/auto fields like autoValue dates)
         schemas[`${schemaName}Input`] = buildCollectionInputSchema(collection);
 
+        // The update body — same columns, no `required`. PATCH and PUT both
+        // merge, so a field left out means "unchanged", not "omitted by mistake".
+        schemas[`${schemaName}Update`] = buildCollectionUpdateSchema(collection);
+
         const dataPath = `/data/${slug}`;
 
         // ── GET /data/{slug} — List entities ──────────────────────────
@@ -293,38 +297,14 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
                     ...errorResponses(requireAuth)
                 }
             },
+            patch: updateOperation(collection, schemaName, requireAuth),
+            // Same operation under the verb every published SDK already sends.
+            // Kept so existing clients keep validating; `patch` is the one to
+            // generate against.
             put: {
-                tags: [collection.name],
-                summary: `Update ${collection.singularName || collection.name}`,
-                operationId: `update${schemaName}`,
-                parameters: [
-                    { name: "id",
-in: "path",
-required: true,
-schema: { type: "string" },
-description: "Entity ID" }
-                ],
-                requestBody: {
-                    required: true,
-                    content: {
-                        "application/json": {
-                            schema: { $ref: `#/components/schemas/${schemaName}Input` }
-                        }
-                    }
-                },
-                responses: {
-                    200: {
-                        description: "Updated entity",
-                        content: {
-                            "application/json": {
-                                schema: { $ref: `#/components/schemas/${schemaName}` }
-                            }
-                        }
-                    },
-                    404: { description: "Entity not found",
-content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
-                    ...errorResponses(requireAuth)
-                }
+                ...updateOperation(collection, schemaName, requireAuth),
+                operationId: `update${schemaName}ViaPut`,
+                deprecated: true
             },
             delete: {
                 tags: [collection.name],
@@ -456,6 +436,68 @@ description: "Unique identifier" }
         required: required.length > 0 ? required : undefined,
         properties
     };
+}
+
+/**
+ * The PATCH/PUT operation for `/data/{slug}/{id}`.
+ *
+ * Split out because both verbs serve it and they must not drift: the update
+ * body is a **partial**, and describing it with the create schema was the bug
+ * this replaces. `<Name>Input` marks every `validation.required` property as
+ * required — correct for POST, wrong for an update, where omitting a field
+ * means "leave it alone" rather than "I forgot it". A client generated from
+ * that spec demanded fields the server does not, and a spec-validating gateway
+ * would have rejected partial updates the server accepts.
+ */
+function updateOperation(
+    collection: CollectionConfig,
+    schemaName: string,
+    requireAuth: boolean
+): Record<string, unknown> {
+    return {
+        tags: [collection.name],
+        summary: `Update ${collection.singularName || collection.name}`,
+        description: "Partial update: only the properties present in the body are written; the rest are left unchanged.",
+        operationId: `update${schemaName}`,
+        parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" }
+        ],
+        requestBody: {
+            required: true,
+            content: {
+                "application/json": {
+                    schema: { $ref: `#/components/schemas/${schemaName}Update` }
+                }
+            }
+        },
+        responses: {
+            200: {
+                description: "Updated entity",
+                content: {
+                    "application/json": {
+                        schema: { $ref: `#/components/schemas/${schemaName}` }
+                    }
+                }
+            },
+            404: {
+                description: "Entity not found",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            ...errorResponses(requireAuth)
+        }
+    };
+}
+
+/**
+ * The update body: the create schema with `required` dropped.
+ *
+ * Derived rather than rebuilt so the two cannot describe different columns —
+ * the only difference between creating and updating is which fields you must
+ * supply, and that is exactly the one thing removed here.
+ */
+function buildCollectionUpdateSchema(collection: CollectionConfig): Record<string, unknown> {
+    const { required: _required, ...rest } = buildCollectionInputSchema(collection);
+    return rest;
 }
 
 /**

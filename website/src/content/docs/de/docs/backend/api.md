@@ -24,6 +24,7 @@ Für jede Collection werden die folgenden Endpunkte generiert:
 | `GET` | `/api/data/:slug/count` | Entitäten zählen |
 | `GET` | `/api/data/:slug/:id` | Eine einzelne Entität abrufen |
 | `POST` | `/api/data/:slug` | Eine Entität erstellen |
+| `PATCH` | `/api/data/:slug/:id` | Eine Entität aktualisieren |
 | `PUT` | `/api/data/:slug/:id` | Eine Entität aktualisieren |
 | `DELETE` | `/api/data/:slug/:id` | Eine Entität löschen |
 
@@ -35,7 +36,7 @@ Verschachtelte Relationen sind über URL-Pfade zugänglich:
 GET    /api/data/authors/42/posts         → list author's posts
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
-PUT    /api/data/authors/42/posts/7       → update the post
+PATCH  /api/data/authors/42/posts/7       → update the post (PUT also accepted)
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 

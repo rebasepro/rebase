@@ -24,6 +24,7 @@ Para cada coleção, os seguintes endpoints são gerados:
 | `GET` | `/api/data/:slug/count` | Contar entidades |
 | `GET` | `/api/data/:slug/:id` | Obter uma única entidade |
 | `POST` | `/api/data/:slug` | Criar uma entidade |
+| `PATCH` | `/api/data/:slug/:id` | Atualizar uma entidade |
 | `PUT` | `/api/data/:slug/:id` | Atualizar uma entidade |
 | `DELETE` | `/api/data/:slug/:id` | Excluir uma entidade |
 
@@ -35,7 +36,7 @@ As relações aninhadas são acessíveis via caminhos de URL:
 GET    /api/data/authors/42/posts         → list author's posts
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
-PUT    /api/data/authors/42/posts/7       → update the post
+PATCH  /api/data/authors/42/posts/7       → update the post (PUT also accepted)
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 

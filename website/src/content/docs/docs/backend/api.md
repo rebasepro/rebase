@@ -24,7 +24,8 @@ For each collection, the following endpoints are generated:
 | `GET` | `/api/data/:slug/count` | Count entities |
 | `GET` | `/api/data/:slug/:id` | Get a single entity |
 | `POST` | `/api/data/:slug` | Create a entity |
-| `PUT` | `/api/data/:slug/:id` | Update a entity |
+| `PATCH` | `/api/data/:slug/:id` | Update a entity (partial — only the properties you send are written) |
+| `PUT` | `/api/data/:slug/:id` | Same handler as `PATCH`, kept because every shipped SDK sends it |
 | `DELETE` | `/api/data/:slug/:id` | Delete a entity |
 
 ### Subcollection Routes
@@ -35,7 +36,7 @@ Nested relations are accessible via URL paths:
 GET    /api/data/authors/42/posts         → list author's posts
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
-PUT    /api/data/authors/42/posts/7       → update the post
+PATCH  /api/data/authors/42/posts/7       → update the post (PUT also accepted)
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 

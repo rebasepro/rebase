@@ -171,6 +171,21 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             return (raw.data || []) as M[];
         },
 
+        /**
+         * Still `PUT`, deliberately, even though the server now serves `PATCH`
+         * on the same handler and `PATCH` is the honest verb for a merge.
+         *
+         * The two are interchangeable server-side, so switching buys nothing at
+         * runtime — and it costs compatibility in the direction that fails
+         * quietly. A 0.14 client talking to a 0.13 server would send `PATCH` to
+         * a route that does not exist and get a **404**, which is
+         * indistinguishable from "that row is gone". Every write would look like
+         * a missing record.
+         *
+         * `PATCH` is what the OpenAPI spec advertises, so anyone generating a
+         * client gets the correct verb; this stays on `PUT` until the oldest
+         * supported server is one that serves both.
+         */
         async update(id: string | number, data: Partial<M>) {
             const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "PUT",

@@ -643,3 +643,84 @@ values: savedRow },
         });
     });
 });
+
+/**
+ * PATCH is the verb that matches what the handler does; PUT is the one every
+ * shipped SDK sends.
+ *
+ * The handler merges — it writes the columns in the body and leaves the rest —
+ * which is what `update(id, data: Partial<M>)` means. PUT was the only route,
+ * and PUT means replace, so the generated OpenAPI spec described a full
+ * replacement (reusing the *create* input schema, `required` fields and all)
+ * for an endpoint that performs a partial one. A client generated from that
+ * spec demanded fields the server does not.
+ *
+ * Both verbs are asserted against the same driver call because the risk in this
+ * change is drift, not absence: mounting PATCH and later editing "the PUT
+ * handler" would leave two endpoints claiming one behaviour and having two.
+ */
+describe("RestApiGenerator — update verbs", () => {
+    let mockDriver: jest.Mocked<DataDriver>;
+
+    function app() {
+        const a = new Hono();
+        a.onError(errorHandler);
+        a.use("/api/*", async (c, next) => {
+            c.set("driver", mockDriver);
+            await next();
+        });
+        const collections = [{ slug: "users", name: "Users", singularName: "User", properties: {} } as any];
+        a.route("/api", new RestApiGenerator(collections, mockDriver).generateRoutes());
+        return a;
+    }
+
+    beforeEach(() => {
+        mockDriver = {
+            key: "postgres",
+            initialised: true,
+            fetchOne: jest.fn().mockResolvedValue({ id: "123", name: "Bob", email: "b@x.com" }),
+            save: jest.fn().mockResolvedValue({ id: "123", name: "Bob Jr", email: "b@x.com" }),
+            fetchCollection: jest.fn(),
+            listenCollection: jest.fn(),
+            listenOne: jest.fn(),
+            delete: jest.fn(),
+            checkUniqueField: jest.fn(),
+            count: jest.fn(),
+            withAuth: jest.fn(),
+            admin: {} as any
+        } as unknown as jest.Mocked<DataDriver>;
+    });
+
+    it.each(["PATCH", "PUT"])("%s /api/users/123 performs the same partial write", async (method) => {
+        const res = await app().request("/api/users/123", {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "Bob Jr" })
+        });
+
+        expect(res.status).toBe(200);
+        expect(mockDriver.save).toHaveBeenCalledWith(
+            expect.objectContaining({
+                path: "users",
+                id: "123",
+                // Only what was sent. `email` is untouched rather than nulled —
+                // the property that makes this a merge and not a replace.
+                values: { name: "Bob Jr" },
+                status: "existing"
+            })
+        );
+    });
+
+    it.each(["PATCH", "PUT"])("%s on a missing row is a 404", async (method) => {
+        mockDriver.fetchOne.mockResolvedValue(undefined as any);
+
+        const res = await app().request("/api/users/nope", {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "x" })
+        });
+
+        expect(res.status).toBe(404);
+        expect(mockDriver.save).not.toHaveBeenCalled();
+    });
+});
