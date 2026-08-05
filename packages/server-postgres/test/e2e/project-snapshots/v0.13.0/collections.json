@@ -1,0 +1,284 @@
+[
+  {
+    "slug": "products",
+    "table": "products",
+    "name": "Products",
+    "securityRules": [
+      {
+        "operation": "select",
+        "access": "public"
+      },
+      {
+        "operation": "insert",
+        "access": "authenticated"
+      },
+      {
+        "operation": "update",
+        "access": "authenticated"
+      },
+      {
+        "operation": "delete",
+        "access": "authenticated"
+      }
+    ],
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "string",
+        "isId": "uuid"
+      },
+      "title": {
+        "type": "string"
+      },
+      "createdBy": {
+        "type": "string"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "published",
+          "archived"
+        ]
+      },
+      "primaryCategory": {
+        "type": "relation",
+        "relation": {
+          "kind": "belongsTo",
+          "relationName": "primaryCategory",
+          "targetSlug": "categories"
+        }
+      },
+      "categories": {
+        "type": "relation",
+        "relation": {
+          "kind": "manyToMany",
+          "relationName": "categories",
+          "targetSlug": "categories"
+        }
+      },
+      "tags": {
+        "type": "relation",
+        "relation": {
+          "kind": "manyToMany",
+          "relationName": "tags",
+          "targetSlug": "tags"
+        }
+      },
+      "statuses": {
+        "type": "relation",
+        "relation": {
+          "kind": "manyToMany",
+          "relationName": "statuses",
+          "targetSlug": "statuses"
+        }
+      },
+      "supplier": {
+        "type": "reference",
+        "path": "suppliers"
+      }
+    }
+  },
+  {
+    "slug": "categories",
+    "table": "categories",
+    "name": "Categories",
+    "securityRules": [
+      {
+        "operation": "select",
+        "access": "public"
+      },
+      {
+        "operation": "insert",
+        "access": "authenticated"
+      },
+      {
+        "operation": "update",
+        "access": "authenticated"
+      },
+      {
+        "operation": "delete",
+        "access": "authenticated"
+      }
+    ],
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "string",
+        "isId": "uuid"
+      },
+      "name": {
+        "type": "string"
+      }
+    }
+  },
+  {
+    "slug": "addresses",
+    "table": "addresses",
+    "name": "Addresses",
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "string",
+        "isId": "uuid"
+      },
+      "street": {
+        "type": "string"
+      }
+    }
+  },
+  {
+    "slug": "children",
+    "table": "children",
+    "name": "Children",
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "string",
+        "isId": "uuid"
+      },
+      "nickname": {
+        "type": "string"
+      }
+    }
+  },
+  {
+    "slug": "URLs",
+    "table": "urls",
+    "name": "URLs",
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "string",
+        "isId": "uuid"
+      },
+      "href": {
+        "type": "string"
+      }
+    }
+  },
+  {
+    "slug": "statuses",
+    "table": "statuses",
+    "name": "Statuses",
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "number",
+        "isId": "increment"
+      },
+      "label": {
+        "type": "string"
+      }
+    }
+  },
+  {
+    "slug": "tags",
+    "table": "tags",
+    "name": "Tags",
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "number",
+        "isId": "increment"
+      },
+      "label": {
+        "type": "string"
+      }
+    }
+  },
+  {
+    "slug": "pinned_names",
+    "table": "pinned_names",
+    "name": "Pinned",
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "string",
+        "isId": "uuid"
+      },
+      "renamedColumn": {
+        "type": "string",
+        "columnName": "explicit_column_name"
+      },
+      "category": {
+        "type": "relation",
+        "relation": {
+          "kind": "belongsTo",
+          "relationName": "category",
+          "localKey": "explicit_category_key",
+          "targetSlug": "categories"
+        }
+      }
+    }
+  },
+  {
+    "slug": "inventory_items",
+    "table": "inventory_items",
+    "name": "Inventory",
+    "schema": "shop",
+    "securityRules": [
+      {
+        "operation": "select",
+        "access": "public"
+      },
+      {
+        "operation": "insert",
+        "access": "authenticated"
+      },
+      {
+        "operation": "update",
+        "access": "authenticated"
+      },
+      {
+        "operation": "delete",
+        "access": "authenticated"
+      }
+    ],
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "string",
+        "isId": "uuid"
+      },
+      "sku": {
+        "type": "string"
+      }
+    }
+  },
+  {
+    "slug": "extremely_long_collection_slug_for_identifier_truncation",
+    "table": "extremely_long_collection_slug_for_identifier_truncation",
+    "name": "Long",
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "string",
+        "isId": "uuid"
+      },
+      "correspondingOrganizationalUnit": {
+        "type": "relation",
+        "relation": {
+          "kind": "belongsTo",
+          "relationName": "correspondingOrganizationalUnit",
+          "targetSlug": "categories"
+        }
+      }
+    }
+  },
+  {
+    "slug": "suppliers",
+    "table": "suppliers",
+    "name": "Suppliers",
+    "properties": {
+      "id": {
+        "name": "ID",
+        "type": "string",
+        "isId": "uuid"
+      },
+      "name": {
+        "type": "string"
+      }
+    }
+  }
+]

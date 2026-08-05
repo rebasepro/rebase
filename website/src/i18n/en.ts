@@ -3,7 +3,7 @@ export const en = {
   "hero.title.part1": "The Postgres you already have.",
   "hero.title.part2": "The backend you always wanted.",
   "hero.subtitle":
-    "Connect your database and get REST, auth, storage and realtime — with every access rule enforced by Postgres itself, not by middleware.",
+    "Point it at the database you already run. Nothing to provision, nothing copied, nothing migrated — your schema is the only input.",
   "hero.cta.demo": "See the live demo",
   "hero.cli.label": "No signup for the demo. Yours is one command away:",
   "hero.cta.github": "View on GitHub",
@@ -17,23 +17,23 @@ export const en = {
   "rlscheck.note":
     "Read-only by construction: it opens a read-only transaction and runs catalog queries. It writes nothing, and no data ever leaves your machine.",
   "rlscheck.cta": "See all 14 checks",
-  "demo.badge": "Three commands. Zero boilerplate.",
-  "demo.title": "Schema In · Platform Out",
+  "demo.badge": "The first five minutes",
+  "demo.title": "Init. Push. Run.",
   "demo.init": "✔ Initialized Rebase in current directory.",
   "demo.pull": "✔ Schema pushed to database. Tables created.",
   "demo.dev": "✔ Admin panel, API, and WebSocket server running.",
   "social.title": "Teams shipping products on our tools — Rebase and FireCMS",
-  "see.badge": "Generated, not built",
-  "see.title": "From connection string to control panel",
+  "see.badge": "The back office",
+  "see.title": "Where the rest of your team works.",
   "see.subtitle":
-    "Everything above runs without a line of UI. Add one dependency and the same collections become a back office your team can live in — every view, relation and upload derived from the definition you already wrote.",
-  "engine.badge": "The backend underneath",
-  "engine.title": "A full backend. Not just a pretty face.",
+    "Tables, forms, relations, media, roles and workflows — every screen already laid out, and usable by the people on your team who will never open your repo.",
+  "engine.badge": "What your app talks to",
+  "engine.title": "Everything your app calls, already running.",
   "engine.subtitle":
-    "The admin panel is the layer you see. Underneath it: a typed SDK, instant REST, and realtime over WebSocket — running against your database from minute one.",
+    "A typed SDK for your collections, REST over every table, and realtime on a WebSocket — plus auth, storage and backups, running against your database from minute one.",
   "engine.link": "Explore the backend",
   "see.caption":
-    "A tour of the generated panel. It ships as one dependency and reads the same public API your app does — which is why taking it out changes nothing your code can see.",
+    "A tour of the panel: filtering, inline editing, relations and uploads — running against the same API your app calls.",
   "see.link": "Everything the admin panel adds",
   "agentera.badge": "Built for the agent era",
   "agentera.title": 'The backend an agent <span class="text-primary">can\'t screw up</span>',
@@ -46,25 +46,25 @@ export const en = {
   "agentera.card.desc":
     "Agents made day-one code cheap. What stayed expensive are the day-30 problems: RLS correctness, backups, migrations, realtime consistency. Rebase isn't the boilerplate your agent would have written anyway — it's the operational guarantees it can't.",
   "agentera.link": "Explore all AI & Agent features",
-  "modes.badge": "Two products, one definition",
-  "modes.title": 'Take the half you <span class="text-primary">actually need.</span>',
+  "modes.badge": "One definition, all the way up",
+  "modes.title": 'Everything sits on <span class="text-primary">one definition.</span>',
   "modes.subtitle":
-    "The backend and the panel are separate products that share a schema. Ship headless today, add the panel the day a human needs to touch the data — or never. Whatever you leave out, the API answers exactly the same.",
+    "Postgres at the bottom, your collections above it, then the API your app calls, the back office your team works in, and the tools you debug with — every layer reading the same definition. Don't need one? Leave it out; the API answers exactly the same.",
   "modes.baas.title":
     "Backend",
   "modes.baas.desc":
-    "REST, auth, storage, realtime and backups over your database — served straight from your schema. No config files, no UI, no React in the dependency tree.",
-  "modes.baas.tag": "Runs on its own — nothing else installed",
+    "REST, auth, storage, realtime and backups over your database. No UI, no React anywhere in the dependency tree.",
+  "modes.baas.tag": "What your app talks to",
   "modes.cms.title":
     "Admin panel",
   "modes.cms.desc":
-    "A back office generated from the same collections: spreadsheet editing, media, roles and workflows — with your own React components dropped in wherever the generated field isn't enough.",
-  "modes.cms.tag": "One dependency. No second data model.",
+    "Spreadsheet editing, media, relations, roles and workflows — with your own React components dropped in wherever the default field isn't enough.",
+  "modes.cms.tag": "Where your team works",
   "modes.full.title":
     "Studio",
   "modes.full.desc":
-    "SQL editor, schema visualizer, RLS policy editor, logs and API explorer — the tooling half, on top of everything else.",
-  "modes.full.tag": "SQL and schema tooling, same app",
+    "SQL editor, schema visualizer, RLS policy editor, logs and API explorer — registered as extra views inside the panel.",
+  "modes.full.tag": "Developer tools, inside the panel",
   "modes.link": "Why we built it this way",
   "stack.deps": "Your dependencies",
   "stack.capabilities": "What you get",
@@ -72,16 +72,16 @@ export const en = {
   "stack.optional": "off",
   "stack.unchanged": "unchanged",
   "stack.api.note": "Identical in every configuration above. The layers change what a human can see — never what your app can call.",
-  "stack.hint": "Click a layer to add or remove it.",
+  "stack.hint": "Click a layer to see what it adds.",
   "paths.title": 'Two ways in. <span class="text-primary">Same schema.</span>',
   "paths.subtitle": "Pick the half you need today. The other one is one dependency away.",
-  "paths.backend.title": "Rebase Backend",
+  "paths.backend.title": "The backend",
   "paths.backend.desc":
-    "REST, auth, storage, realtime and RLS over your Postgres. Headless, React-free, consumed from any client.",
+    "Property types, auth providers, storage, realtime and backups — the full reference.",
   "paths.backend.cta": "Explore the backend",
-  "paths.admin.title": "Rebase Admin",
+  "paths.admin.title": "The admin panel",
   "paths.admin.desc":
-    "A generated back office on top of any Rebase backend — spreadsheet editing, media, roles, extensible with your own React.",
+    "Views, fields, custom React components, roles and workflows — the full reference.",
   "paths.admin.cta": "Explore the admin panel",
   "howitworks.badge": "Time reclaimed",
   "howitworks.title":
@@ -101,7 +101,7 @@ export const en = {
   "showcase.title.part1": "Teams ship faster with",
   "showcase.title.part2": "Rebase",
   "showcase.subtitle":
-    "From <b>marketplaces</b> to <b>SaaS platforms</b> and <b>internal tools</b>, Rebase eliminates the glue code between database, API, and UI.",
+    "From <b>marketplaces</b> to <b>SaaS platforms</b> and <b>internal tools</b> — three very different products, the same definition underneath.",
   "showcase.case0.badge": "Vector Design Tool · Built by the Rebase team",
   "showcase.case0.title": "Dadaki",
   "showcase.case0.desc":
@@ -109,9 +109,9 @@ export const en = {
   "showcase.case0.feat1.title": "Cloud-synced design files",
   "showcase.case0.feat1.desc":
     "Documents live in Postgres and assets in Rebase storage. Sign in on any device and your artwork is there — no sync service was written.",
-  "showcase.case0.feat2.title": "Auth without an auth project",
+  "showcase.case0.feat2.title": "A pure frontend",
   "showcase.case0.feat2.desc":
-    "Sign-in and sessions come straight from Rebase auth. The editor stays a pure frontend talking to generated, typed APIs.",
+    "Sign-in, sessions and every read go through the Rebase client. The editor ships as a static frontend with no server of its own.",
   "showcase.case0.feat3.title": "Dogfooding Rebase Cloud",
   "showcase.case0.feat3.desc":
     "Rebase Cloud — our managed hosting — has not launched yet. We run our own products on it first. Join the waitlist below for early access.",
@@ -137,10 +137,10 @@ export const en = {
     "Profiles, therapy plans, and health records are isolated with Postgres RLS defined in the Rebase schema — compliance-grade access control without custom middleware.",
   "showcase.case2.feat2.title": "Content Via Generated APIs",
   "showcase.case2.feat2.desc":
-    "Daily therapy plans and the full physiotherapy video library are served through Rebase's generated, typed APIs — no hand-written endpoints.",
+    "Daily therapy plans and the full physiotherapy video library are served through the same typed APIs the clinical dashboards read from.",
   "showcase.case2.feat3.title": "Clinical Operations in the Admin",
   "showcase.case2.feat3.desc":
-    "Clinicians and content teams monitor engagement, manage the exercise library, and produce reports in the generated admin panel — no internal tools were built.",
+    "Clinicians and content teams monitor engagement, manage the exercise library, and produce reports — in the same panel the engineers use to inspect the data.",
   "features.title": "Everything your schema generates",
   "features.subtitle":
     "Production-grade features, all driven by your TypeScript schema. Every view updates in real time.",
@@ -163,7 +163,7 @@ export const en = {
   "features.api.title": "Instant REST API",
   "features.api.badge": "Auto-gen",
   "features.api.desc":
-    "Your schema generates secure REST APIs — auto-generated, zero boilerplate.",
+    "Filtering, sorting, pagination and relation expansion on every collection, over plain REST.",
   "features.sdk.title": "TypeScript SDK",
   "features.sdk.badge": "Type-safe",
   "features.sdk.desc":
@@ -186,7 +186,7 @@ export const en = {
     '<strong class="text-white font-medium">PostgreSQL</strong> is the primary focus — Rebase goes deep on Postgres so every feature (RLS, enums, constraints, relations) works natively. That said, the architecture is database-agnostic and can be adapted to other databases. You bring your own database instance; self-hosted Rebase never sees or copies your data.',
   "faq.q2": "How is Rebase different from Retool or Supabase?",
   "faq.a2":
-    "Unlike <a class=\"text-primary hover:underline\" href=\"/rebase-vs-retool\">Retool</a>, Rebase is open-source with no per-seat pricing lock-in, and it's a real React framework you can extend with your own code. Unlike <a class=\"text-primary hover:underline\" href=\"/rebase-vs-supabase\">Supabase</a>, Rebase connects directly to your <em class=\"text-white\">existing</em> Postgres database — no new infrastructure to manage, no vendor-managed instance. Your schema, your data, your rules.",
+    "Unlike <a class=\"text-primary hover:underline\" href=\"/rebase-vs-retool\">Retool</a>, Rebase is open-source with no per-seat pricing lock-in, and it's a real React framework you can extend with your own code. Unlike <a class=\"text-primary hover:underline\" href=\"/rebase-vs-supabase\">Supabase</a>, Rebase connects directly to your <em class=\"text-white\">existing</em> Postgres database — no new infrastructure to manage, no vendor-managed instance. You keep the database; Rebase is what runs in front of it.",
   "faq.q3": "Can I use Rebase with an existing database?",
   "faq.a3":
     "Absolutely. Point Rebase at any Postgres connection string and it will read your tables, columns, foreign keys, enums, and constraints to generate a complete admin panel. Existing data appears instantly — no migration, no duplication, no schema re-definition needed.",
@@ -202,9 +202,9 @@ export const en = {
   "faq.q7": "Can I embed Rebase inside my existing React app?",
   "faq.a7":
     "Yes. Rebase is distributed as npm packages. You can mount the entire admin panel inside your existing React application, or deploy it as a standalone SPA. It's designed to be embeddable.",
-  "cta.title": "Stop writing glue code.",
+  "cta.title": "Point it at your database.",
   "cta.subtitle":
-    'Define your schema. Get your platform.<br class="hidden sm:block"/>Open-source, self-hosted, no per-seat pricing.',
+    'Three ways to run it.<br class="hidden sm:block"/>Pick the one that matches how you already deploy.',
   // The close is a fork, not a fourth copy of the hero's install command. Cloud
   // has not launched — its lane offers the waitlist and says so, rather than a
   // deploy button that would go nowhere.
@@ -227,12 +227,12 @@ export const en = {
   "security.badge": "Security-first",
   "security.title": "Your schema, your rules.",
   "security.desc":
-    "Row-level security defined right in your TypeScript schema. Granular permissions per collection, per field, per role. No hand-written SQL policies — just clean code that lives in version control.",
+    "Row-level security written in the same TypeScript file as the collection, compiled into real Postgres policies. Granular per collection, per field, per role — and enforced by the database itself, not by middleware someone has to remember to call.",
   "security.link": "Explore Rebase Studio",
   "opensource.badge": "Open source",
   "opensource.title": "Your code. Your infra.<br/>Zero lock-in.",
   "opensource.desc":
-    "MIT-licensed. Self-host on Docker, Railway, Fly, or bare metal. Your data stays in your Postgres — no vendor dependency, no surprises, no per-seat pricing.",
+    "MIT-licensed, end to end — the schema editor, the generated APIs, the typed SDK, all of it. Your data stays in your Postgres: no vendor dependency, no per-seat pricing, no surprises.",
   "opensource.link1": "For developers",
   "opensource.link2": "How it compares",
   "showcase.sync.badge": "Your workflow",
@@ -251,7 +251,7 @@ export const en = {
   "power.title":
     'One collection.<br/><span class="text-primary">Everything generated.</span>',
   "power.subtitle":
-    "Define your data model once in TypeScript. Rebase automatically creates your admin UI, forms, database schema, REST APIs, and TypeScript types.",
+    "One TypeScript file per collection is the entire input. The database schema, the REST API, the typed SDK, the forms and every admin view come out of it — and change with it.",
   "power.badge": "Code as Truth",
   "power.appcode": "App Code",
   "power.generates": "→ generates all of the following",

@@ -357,8 +357,8 @@ export const generatePostgresDdl = async (
             ddl += `  PRIMARY KEY ("${sourceColumn}", "${targetColumn}")\n`;
             ddl += `);\n\n`;
 
-            fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${baseTableName}_${sourceColumn}_fkey" FOREIGN KEY ("${sourceColumn}") REFERENCES "${sourceSchema}"."${sourceTable}" ("${sourceId}") ON DELETE ${onDelete.toUpperCase()};`);
-            fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${baseTableName}_${targetColumn}_fkey" FOREIGN KEY ("${targetColumn}") REFERENCES "${targetSchema}"."${targetTable}" ("${targetId}") ON DELETE ${onDelete.toUpperCase()};`);
+            fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${toPostgresIdentifier(`${baseTableName}_${sourceColumn}_fkey`)}" FOREIGN KEY ("${sourceColumn}") REFERENCES "${sourceSchema}"."${sourceTable}" ("${sourceId}") ON DELETE ${onDelete.toUpperCase()};`);
+            fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${toPostgresIdentifier(`${baseTableName}_${targetColumn}_fkey`)}" FOREIGN KEY ("${targetColumn}") REFERENCES "${targetSchema}"."${targetTable}" ("${targetId}") ON DELETE ${onDelete.toUpperCase()};`);
 
             if (options.includePolicies) {
                 // Junction tables are generated tables like any other: locked by
@@ -416,7 +416,7 @@ export const generatePostgresDdl = async (
                     if (required) colDef += " NOT NULL";
                     columns.push(colDef);
 
-                    fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${baseTableName}_${relInfo.localKey}_fkey" FOREIGN KEY ("${relInfo.localKey}") REFERENCES "${targetSchema}"."${targetTable}" ("${targetId}") ON DELETE ${onDeleteVal.toUpperCase()}${onUpdate};`);
+                    fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${toPostgresIdentifier(`${baseTableName}_${relInfo.localKey}_fkey`)}" FOREIGN KEY ("${relInfo.localKey}") REFERENCES "${targetSchema}"."${targetTable}" ("${targetId}") ON DELETE ${onDeleteVal.toUpperCase()}${onUpdate};`);
                 } else if (prop.type === "reference") {
                     const refProp = prop as ReferenceProperty;
                     const targetCollection = collections.find(c => c.slug === refProp.path || getTableName(c) === refProp.path);
@@ -438,7 +438,7 @@ export const generatePostgresDdl = async (
                         if (required) colDef += " NOT NULL";
                         columns.push(colDef);
 
-                        fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${baseTableName}_${colName}_fkey" FOREIGN KEY ("${colName}") REFERENCES "${targetSchema}"."${targetTable}" ("${targetId}") ON DELETE ${onDelete.toUpperCase()};`);
+                        fkStatements.push(`ALTER TABLE "${schema}"."${baseTableName}" ADD CONSTRAINT "${toPostgresIdentifier(`${baseTableName}_${colName}_fkey`)}" FOREIGN KEY ("${colName}") REFERENCES "${targetSchema}"."${targetTable}" ("${targetId}") ON DELETE ${onDelete.toUpperCase()};`);
                     }
                 } else {
                     const colName = resolveColumnName(propName, prop);
@@ -577,10 +577,35 @@ const schemaOfCollection = (collection: CollectionConfig): string =>
 
 const bareTableName = (name: string): string => (name.includes(".") ? name.split(".").pop()! : name);
 
+/**
+ * Truncate a derived identifier the way Postgres does: to 63 bytes, silently.
+ *
+ * This is not cosmetic, and not really a naming choice at all — it is agreeing
+ * with the name the database ALREADY stored. `ADD CONSTRAINT` on a longer name
+ * succeeds and records the truncated form, so the untruncated name this used to
+ * derive matched nothing in the catalogue. Boot-ensure compares its planned
+ * constraints against `readExistingSchema`, which reads catalogue names, so the
+ * comparison could never hit: every boot re-issued `ADD CONSTRAINT` for the same
+ * constraint, forever, and got "already exists" every time. Non-fatal (foreign
+ * keys are the one action allowed to fail) and therefore permanent — an error in
+ * the log on every restart of a project whose table and column names happened to
+ * be long.
+ *
+ * Byte length, not string length: NAMEDATALEN is 64 bytes, and a multi-byte
+ * character straddling the boundary would be cut mid-sequence by `slice(0, 63)`.
+ */
+const toPostgresIdentifier = (name: string): string => {
+    const bytes = Buffer.from(name, "utf8");
+    if (bytes.byteLength <= 63) return name;
+    // `toString` on a slice that ends mid-character yields U+FFFD; dropping it
+    // lands on the last whole character that fits, which is what Postgres does.
+    return bytes.subarray(0, 63).toString("utf8").replace(/�+$/, "");
+};
+
 const foreignKeyPlan = (
     args: Omit<ForeignKeyPlan, "constraintName" | "sql"> & { onDelete: string; onUpdate?: string }
 ): ForeignKeyPlan => {
-    const constraintName = `${args.table}_${args.column}_fkey`;
+    const constraintName = toPostgresIdentifier(`${args.table}_${args.column}_fkey`);
     const onUpdate = args.onUpdate ? ` ON UPDATE ${args.onUpdate.toUpperCase()}` : "";
     return {
         constraintName,

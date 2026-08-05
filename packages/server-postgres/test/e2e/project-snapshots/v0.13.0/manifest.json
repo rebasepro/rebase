@@ -1,0 +1,21 @@
+{
+  "frameworkVersion": "0.13.0",
+  "authSchemaVersion": 2,
+  "collections": 11,
+  "seededRows": {
+    "public.products": 2,
+    "public.categories": 2,
+    "public.addresses": 2,
+    "public.children": 2,
+    "public.urls": 2,
+    "public.statuses": 2,
+    "public.tags": 2,
+    "public.pinned_names": 2,
+    "shop.inventory_items": 2,
+    "public.extremely_long_collection_slug_for_identifier_truncation": 2,
+    "public.suppliers": 2,
+    "public.categories_products": 1,
+    "public.products_tags": 1,
+    "public.products_statuses": 1
+  }
+}

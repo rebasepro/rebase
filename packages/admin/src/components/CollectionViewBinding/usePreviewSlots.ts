@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { Property, RelationProperty } from "@rebasepro/types";
 import type { Entity, EntityRelation } from "@rebasepro/types";
-import type { PropertyConfig, AdminCollection } from "@rebasepro/admin-types";
+import type { PropertyConfig, AdminCollection, EntityDisplayRole } from "@rebasepro/admin-types";
 import { getEntityImagePreviewPropertyKey } from "@rebasepro/app";
 import { getDisplayPropertyKey } from "@rebasepro/app";
 import { getLeadingRelationTitleKey, getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/app";
@@ -38,6 +38,16 @@ export interface PreviewSlot {
     property?: Property;
     propertyKey?: string;
     value: unknown;
+    /**
+     * Which display role this slot fills.
+     *
+     * Load-bearing for the computed case. Without a property there is nothing to
+     * infer from, and "render it as text" is right for a title and wrong for an
+     * image: a resolver that returned a URL had that URL printed inside the card's
+     * image frame. The role is the one thing that distinguishes them, so it
+     * travels with the slot rather than being re-derived at each call site.
+     */
+    role?: EntityDisplayRole;
 }
 
 /**
@@ -97,6 +107,19 @@ export interface EntityPreviewSlots {
     status: PreviewSlot | undefined;
     /** META — date / timestamp */
     date: DatePreviewSlot | undefined;
+    /**
+     * TAGS — free chips beside the status.
+     *
+     * Declared only. Every other role has an inference ladder behind it, and
+     * this one deliberately does not: there is no "first enum" or "looks like a
+     * timestamp" that means *labels*, so guessing would scatter arbitrary chips
+     * across every row of every panel that never asked for them.
+     *
+     * The role existed on `EntityDisplay` and in `useEntityDisplay` before this
+     * field did, which is why a declared `display.tags` resolved correctly and
+     * then had nowhere to go.
+     */
+    tags: PreviewSlot | undefined;
     /** Entity ID (always available) */
     entityId: string | number;
 }
@@ -116,6 +139,8 @@ export interface CollectionSlotKeys {
     relationKeys: string[];
     statusKey: string | undefined;
     dateKey: string | undefined;
+    /** Declared only — see {@link EntityPreviewSlots.tags}. */
+    tagsKey: string | undefined;
 }
 
 /**
@@ -250,7 +275,8 @@ imageKey,
 subtitleKey,
 relationKeys,
 statusKey,
-dateKey };
+dateKey,
+tagsKey: getDisplayPropertyKey(collection, "tags") };
 }
 
 // ── Image unwrapping helper ───────────────────────────────────────────
@@ -281,6 +307,7 @@ function resolveImageSlot(
     if (resolvedValue === undefined || resolvedValue === null) return undefined;
 
     return {
+        role: "image",
         property: resolvedProperty as Property,
         propertyKey: imageKey,
         value: resolvedValue
@@ -368,7 +395,7 @@ export function resolveEntitySlots(
     collection: AdminCollection<Record<string, unknown>>,
     slotKeys: CollectionSlotKeys
 ): EntityPreviewSlots {
-    const { titleKey, titleKeyCandidates, imageKey, subtitleKey, relationKeys, statusKey, dateKey } = slotKeys;
+    const { titleKey, titleKeyCandidates, imageKey, subtitleKey, relationKeys, statusKey, dateKey, tagsKey } = slotKeys;
 
     // Image
     const image = imageKey ? resolveImageSlot(collection, imageKey, entity) : undefined;
@@ -381,7 +408,8 @@ export function resolveEntitySlots(
     if (resolvedTitleKey) {
         const prop = collection.properties[resolvedTitleKey] as Property | undefined;
         const val = getValueInPath(entity.values, resolvedTitleKey);
-        if (prop) title = { property: prop,
+        if (prop) title = { role: "title",
+property: prop,
 propertyKey: resolvedTitleKey,
 value: val };
     }
@@ -392,7 +420,8 @@ value: val };
         const prop = collection.properties[subtitleKey] as Property | undefined;
         const val = getValueInPath(entity.values, subtitleKey);
         if (prop && val !== undefined && val !== null && val !== "") {
-            subtitle = { property: prop,
+            subtitle = { role: "subtitle",
+property: prop,
 propertyKey: subtitleKey,
 value: val };
         }
@@ -468,7 +497,8 @@ id: relation.id });
         const prop = collection.properties[statusKey] as Property | undefined;
         const val = getValueInPath(entity.values, statusKey);
         if (prop && val !== undefined && val !== null) {
-            status = { property: prop,
+            status = { role: "status",
+property: prop,
 propertyKey: statusKey,
 value: val };
         }
@@ -481,11 +511,29 @@ value: val };
         const val = getValueInPath(entity.values, dateKey);
         if (prop && val !== undefined && val !== null) {
             date = {
+                role: "date",
                 property: prop,
                 propertyKey: dateKey,
                 value: val,
                 formatted: formatDateValue(val)
             };
+        }
+    }
+
+    // Tags — declared only, and empty means absent: an empty array is "this
+    // record has no labels", which must render as nothing rather than as an
+    // empty chip row that shifts every other slot down.
+    let tags: PreviewSlot | undefined;
+    if (tagsKey) {
+        const prop = collection.properties[tagsKey] as Property | undefined;
+        const val = getValueInPath(entity.values, tagsKey);
+        const empty = val === undefined || val === null || val === ""
+            || (Array.isArray(val) && val.length === 0);
+        if (prop && !empty) {
+            tags = { role: "tags",
+property: prop,
+propertyKey: tagsKey,
+value: val };
         }
     }
 
@@ -496,6 +544,7 @@ value: val };
         relations,
         status,
         date,
+        tags,
         entityId: entity.id
     };
 }
@@ -622,30 +671,37 @@ entity };
     const image = useEntityDisplay<string>("image", params);
     const status = useEntityDisplay<string>("status", params);
     const date = useEntityDisplay<Date | string | number>("date", params);
+    const tags = useEntityDisplay<string[] | string>("tags", params);
 
     return useMemo(() => {
         // `source` is set only when the value came from a property, so its
         // absence is exactly the "this was computed" signal — no second flag to
         // keep in step with the first.
+        // The role travels with the computed slot too. It is the only thing left
+        // to say about a value with no property behind it, and `SlotValue` needs
+        // it to tell a computed image from a computed title.
         const computed = (
+            role: EntityDisplayRole,
             resolved: { value: unknown, source?: unknown }
         ): PreviewSlot | undefined =>
             resolved.value !== undefined && resolved.source === undefined
-                ? { value: resolved.value }
+                ? { role,
+value: resolved.value }
                 : undefined;
 
-        const computedDate = computed(date);
+        const computedDate = computed("date", date);
 
         return {
             ...derived,
-            title: computed(title) ?? derived.title,
-            subtitle: computed(subtitle) ?? derived.subtitle,
-            image: computed(image) ?? derived.image,
-            status: computed(status) ?? derived.status,
+            title: computed("title", title) ?? derived.title,
+            subtitle: computed("subtitle", subtitle) ?? derived.subtitle,
+            image: computed("image", image) ?? derived.image,
+            status: computed("status", status) ?? derived.status,
             date: computedDate
                 ? { ...computedDate,
 formatted: formatDateValue(computedDate.value) }
-                : derived.date
+                : derived.date,
+            tags: computed("tags", tags) ?? derived.tags
         };
-    }, [derived, title, subtitle, image, status, date]);
+    }, [derived, title, subtitle, image, status, date, tags]);
 }

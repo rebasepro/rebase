@@ -25,7 +25,7 @@ import { IconForView } from "@rebasepro/app";
 import { getIcon } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 import { useCollectionSlotKeys, useEntitySlots, type CollectionSlotKeys } from "./usePreviewSlots";
-import { SlotValue } from "./SlotValue";
+import { SlotValue, TagChips } from "./SlotValue";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { resolveEntityAction } from "../../util/resolutions";
 
@@ -814,6 +814,15 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             ) : (
                 /* ── SLOT MODE (editorial scanner layout) ── */
                 <div className="flex items-center gap-4 flex-shrink-0 ml-auto">
+                    {/* TAGS slot — "free chips beside the status", so beside it.
+                        First to go when the row narrows: the status is the one a
+                        scanner is reading down the column. */}
+                    {slots.tags && (
+                        <div className="flex items-center gap-1 flex-shrink-0 @max-[560px]:hidden">
+                            <TagChips slot={slots.tags} max={3}/>
+                        </div>
+                    )}
+
                     {/* STATUS slot — hidden when row is narrow */}
                     {slots.status && (
                         <div className="flex-shrink-0 @max-[400px]:hidden">

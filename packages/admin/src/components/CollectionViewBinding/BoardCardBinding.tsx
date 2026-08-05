@@ -7,7 +7,7 @@ import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { BoardItemViewProps } from "@rebasepro/ui";
 import { useCollectionSlotKeys, useEntitySlots } from "./usePreviewSlots";
-import { SlotValue } from "./SlotValue";
+import { SlotValue, TagChips } from "./SlotValue";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
 export type BoardCardBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = BoardItemViewProps<Entity<M>> & {
@@ -208,6 +208,23 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
                                     +{slots.relations.reduce((acc, r) => acc + Math.max(0, r.totalCount - r.items.length), 0)}
                                 </span>
                             )}
+                        </div>
+                    )}
+
+                    {/* Tags slot */}
+                    {slots.tags && (
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            <TagChips slot={slots.tags} max={3}/>
+                        </div>
+                    )}
+
+                    {/* Date slot — a board card is a list row without the image, and
+                        the row shows it. The status is deliberately not repeated
+                        here: on a board grouped by it, the column header is already
+                        saying it. */}
+                    {slots.date && (
+                        <div className="text-[10px] text-surface-500 dark:text-surface-400 mt-1">
+                            {slots.date.formatted}
                         </div>
                     )}
                 </div>

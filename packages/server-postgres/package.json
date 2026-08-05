@@ -37,7 +37,8 @@
     "test": "jest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "clean": "rm -rf dist && find ./src -name '*.js' -type f | xargs rm -f",
-    "smoke:baas": "tsx scripts/smoke-baas.ts"
+    "smoke:baas": "tsx scripts/smoke-baas.ts",
+    "record:project-snapshot": "TSX_TSCONFIG_PATH=../../tsconfig.typecheck.json tsx scripts/record-project-snapshot.mts"
   },
   "exports": {
     ".": {

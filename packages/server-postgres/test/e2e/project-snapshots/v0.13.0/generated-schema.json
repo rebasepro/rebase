@@ -1,0 +1,63 @@
+{
+  "addresses": [
+    "id",
+    "street"
+  ],
+  "categories": [
+    "id",
+    "name"
+  ],
+  "categories_products": [
+    "product_id",
+    "category_id"
+  ],
+  "children": [
+    "id",
+    "nickname"
+  ],
+  "extremely_long_collection_slug_for_identifier_truncation": [
+    "id",
+    "corresponding_organizational_unit_id"
+  ],
+  "pinned_names": [
+    "id",
+    "explicit_column_name",
+    "explicit_category_key"
+  ],
+  "products": [
+    "id",
+    "title",
+    "created_by",
+    "status",
+    "primary_category_id",
+    "supplier"
+  ],
+  "products_statuses": [
+    "product_id",
+    "status_id"
+  ],
+  "products_tags": [
+    "product_id",
+    "tag_id"
+  ],
+  "statuses": [
+    "id",
+    "label"
+  ],
+  "suppliers": [
+    "id",
+    "name"
+  ],
+  "tags": [
+    "id",
+    "label"
+  ],
+  "urls": [
+    "id",
+    "href"
+  ],
+  "shop.inventory_items": [
+    "id",
+    "sku"
+  ]
+}

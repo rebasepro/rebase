@@ -177,6 +177,16 @@ jobs:
       - name: Docs API drift
         run: pnpm run verify:docs:strict
 
+      # Column names, constraint names, policy names, junction tables: the
+      # identifiers this framework DERIVES and writes into a customer's database,
+      # where they then outlive every release that follows. 0.13 improved the
+      # foreign-key derivation and every aged database in the field disagreed with
+      # the code the moment it upgraded. Runs before the build on purpose — it
+      # reads source (TSX_TSCONFIG_PATH maps @rebasepro/* onto src), so a stale
+      # dist cannot make it pass.
+      - name: Derived database identifiers
+        run: pnpm run check:derived-names
+
       - name: Build packages
         run: pnpm run build
         env:

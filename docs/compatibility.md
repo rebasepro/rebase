@@ -39,6 +39,7 @@ grep -n "AUTH_SCHEMA_VERSION =" packages/server-postgres/src/auth/schema-version
 | 3 | `RUNTIME_CONTRACT_VERSION` | same file | same file | **exact match, both directions** |
 | 4 | `AUTH_SCHEMA_VERSION` | `packages/server-postgres/src/auth/schema-version.ts` | at boot, against `rebase.schema_meta` | **forward only** — new runtime migrates old databases |
 | 5 | `manifest.schemaVersion` | emitted by `rebase build` | sent by the SDK as `x-rebase-schema` | advisory — identifies which schema a client was built against |
+| 6 | Derived database identifiers | `contracts/derived-names.txt` | `pnpm check:derived-names` | **frozen** — a name a release emitted is never re-derived |
 
 ### 1 — `rebase` in `rebase.json`
 
@@ -105,6 +106,65 @@ against an older schema" instead of failing mysteriously at the first request.
 It covers **collections only**. A hook or function edit does not change a
 client's contract and must not invalidate every generated SDK.
 
+### 6 — Derived database identifiers
+
+Every name this framework works out for itself rather than being told: a foreign
+key column, a foreign key constraint, a junction table and its two key columns, an
+enum type, a policy name, a `camelCase` property's `snake_case` column.
+
+> **A derived identifier is frozen the moment a release emits it.**
+
+Not "frozen until the next major" — frozen. The reasoning is different from the
+other five contracts, and stronger. Those are versioned, so a mismatch can be
+*detected* and refused. This one cannot: the name is written into a customer's
+database on the day they deploy, and there is no version stamp on a column. Every
+database provisioned by every release that ever shipped carries whatever it
+derived, and no code in this repository can reach in and rename them all.
+
+0.13 is the worked example. `generateForeignKeyName` learned to singularize
+properly — `categorie_id` → `category_id`, `addres_id` → `address_id` — which is
+unambiguously the better derivation, and it broke every aged database that had an
+irregular plural. Boot-ensure migrated the column, so the data survived; the
+project's checked-in `schema.generated.ts` did not, and the boot died on a column
+that existed. Three commits, a new seam test, and a permanent entry in the upgrade
+notes, in exchange for a nicer-looking column name nobody had asked about.
+
+**If a derivation is genuinely wrong**, it changes for collections created
+*afterwards*, behind a naming strategy recorded in the project — never
+retroactively, and never as a side effect of improving the function underneath.
+
+**The one legitimate override** is a change that makes the code agree with a name
+the database *already has*. The worked example is identifier truncation: Postgres
+silently cuts an identifier to 63 bytes, so a longer derived constraint name was
+never the name in the catalogue — the derivation was describing an object that
+did not exist under that spelling, and boot-ensure re-issued `ADD CONSTRAINT` on
+every single boot because its comparison could never match. Truncating at
+construction changes what this repo *derives* and changes nothing about what any
+deployed database *contains*. That is the test to apply: not "is the new name
+better", but "does any existing database have to change".
+The one thing that is always safe is to *recognise* an old name in order to
+migrate it: `legacyForeignKeyName` exists to be detected, never to be generated,
+and the baseline pins those detections too. Dropping one silently un-migrates
+every database still carrying that spelling.
+
+**The gate.** `scripts/derived-names.mts` runs a naming-stress fixture — irregular
+plurals, an `ss` ending, an acronym, a junction off a plural slug, explicit
+overrides, a slug long enough to truncate — through both producers of schema DDL,
+and renders every identifier either one names:
+
+```bash
+pnpm check:derived-names
+```
+
+A changed or removed line fails as a contract break, with the old and new spelling
+side by side. A purely additive change also fails, but with "regenerate" — so the
+baseline cannot drift underneath anyone.
+
+It also pins that `rebase db push` and the managed runtime's boot-ensure derive
+the *same* names, which is a second contract hiding inside the first: they compile
+the same collections through different code, and a project pushed once and booted
+later must not end up with two schemas.
+
 ## What is *not* frozen
 
 Said plainly, so nobody infers a promise that was never made:
@@ -131,6 +191,7 @@ None of the above is a convention — each has a test that fails when it breaks:
 | `upgrade-e2e.test.ts` | old database schemas (`schema-snapshots/`) met by the current runtime |
 | `e2e/tests/cli-init-e2e.ts` | a scaffolded project installed from **real tarballs**, not workspace links |
 | `e2e/tests/client-sdk-e2e.ts` | the end-user path: register → sign in → RLS-scoped reads → refresh → storage → realtime |
+| `pnpm check:derived-names` | every column, constraint, junction, enum and policy name the framework derives — and that boot and `db push` derive them identically |
 | `pnpm rls:check` | the generated schema's policies |
 | saas CI | the control plane built against this repo's `main`, on its own pushes and nightly |
 
@@ -140,9 +201,13 @@ backfilled after the fact.
 
 ## Changing a contract
 
-1. Decide which of the five it is. Most changes are none of them.
+1. Decide which of the six it is. Most changes are none of them.
 2. Add a fixture or snapshot for the **old** shape first, and watch it pass.
 3. Make the change and bump the constant.
 4. Confirm the old fixture still passes, or that it now fails *with the message
    a user would need*. Both are valid outcomes; silence is not.
 5. For contract 3, plan the rebuild of every deployed bundle before merging.
+6. Contract 6 is the exception to steps 3 and 4: there is no constant to bump and
+   no version to refuse on, because a column carries no version stamp. The step
+   that replaces them is deciding not to make the change — see the section above
+   for what the alternative looks like.

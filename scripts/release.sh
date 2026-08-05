@@ -181,12 +181,13 @@ echo ""
 echo -e "${BOLD}Ready to release ${GREEN}v${NEW_VERSION}${RESET}${BOLD}. This will:${RESET}"
 echo "  1. Stamp CHANGELOG (promote [Unreleased] → [$NEW_VERSION]) + sync docs mirror"
 echo "  2. Bump versions in all packages (packages/* + rebase-agent-skills)"
-echo "  3. Commit, tag v$NEW_VERSION, and push to origin"
-echo "  4. Publish all packages to npm"
+echo "  3. Record the project upgrade snapshot (needs Docker)"
+echo "  4. Commit, tag v$NEW_VERSION, and push to origin"
+echo "  5. Publish all packages to npm"
 if $USE_AUTO_NOTES; then
-  echo "  5. Create a GitHub Release (auto-generated notes)"
+  echo "  6. Create a GitHub Release (auto-generated notes)"
 else
-  echo "  5. Create a GitHub Release (from CHANGELOG.md)"
+  echo "  6. Create a GitHub Release (from CHANGELOG.md)"
 fi
 echo ""
 read -rp "Continue? (y/N) " CONFIRM
@@ -225,6 +226,32 @@ ok "Build complete"
 
 step "Running tests"
 pnpm test || warn "Some tests failed — continuing release (review output above)"
+
+# ── Record the upgrade corpus ───────────────────────────────
+#
+# One project snapshot per release: the database this release provisions, plus
+# the artifacts a project keeps beside it. `project-upgrade-e2e.test.ts` replays
+# every one of them through whatever the code becomes next, which is the only
+# gate that sees an aged project meeting a newer runtime.
+#
+# Timing is the easy thing to get wrong, and this is the right moment: after the
+# version bump, so the snapshot is stamped with the version it records, and
+# before the commit, so it lands in the release commit. Recorded BEFORE the next
+# migration is written — a snapshot taken afterwards records the shape you were
+# trying to test against, and the upgrade test then proves a schema can be
+# migrated to itself.
+#
+# The corpus is only as good as how far back its oldest entry goes, and a skipped
+# release is a hole that cannot be backfilled afterwards — so this warns loudly
+# rather than passing quietly. It does not block the release: a Docker daemon
+# that is not running is not a reason to stop shipping.
+step "Recording the project upgrade snapshot"
+if pnpm run record:project-snapshot; then
+  ok "Snapshot recorded for v$NEW_VERSION"
+else
+  warn "NO SNAPSHOT RECORDED for v$NEW_VERSION — the upgrade corpus has a permanent hole here."
+  warn "Needs Docker. Record it before the next release with: pnpm record:project-snapshot"
+fi
 
 # ── Commit & Tag ────────────────────────────────────────────
 step "Committing and tagging"

@@ -17,7 +17,7 @@ import {
 import { useAnalyticsController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { useCollectionSlotKeys, useEntitySlots } from "./usePreviewSlots";
-import { SlotValue } from "./SlotValue";
+import { SlotValue, TagChips } from "./SlotValue";
 
 export type EntityCardBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     entity: Entity<M>;
@@ -190,10 +190,20 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                     </div>
                 )}
 
-                {/* Status slot */}
-                {slots.status && (
-                    <div className="mt-1">
-                        <SlotValue slot={slots.status} size="small"/>
+                {/* Status + tags slot — "free chips beside the status" */}
+                {(slots.status || slots.tags) && (
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        {slots.status && <SlotValue slot={slots.status} size="small"/>}
+                        {slots.tags && <TagChips slot={slots.tags}/>}
+                    </div>
+                )}
+
+                {/* Date slot — a card is a list row with the image on top, and the
+                    row has always shown it. It was the one slot the card resolved
+                    and never rendered. */}
+                {slots.date && (
+                    <div className="mt-1 text-[10px] text-surface-500 dark:text-surface-400">
+                        {slots.date.formatted}
                     </div>
                 )}
             </div>
