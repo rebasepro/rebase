@@ -117,10 +117,25 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
             if (accessor.listenById) {
                 return accessor.listenById(entityId, (entity) => onEntityUpdate(entity as Entity<M> | undefined), onError);
             } else {
+                // The one-shot fallback, taken whenever the client has no
+                // socket. `listenById` above cancels on cleanup; a promise
+                // cannot, so the cleanup disowns its result instead. `entityId`
+                // is an effect dependency, and where this hook's caller is not
+                // remounted per record — the side panel replaces its contents
+                // in place — a slow response for the record just left would
+                // otherwise land on top of the one now showing.
+                let cancelled = false;
                 accessor.findById(entityId)
-                    .then((entity) => onEntityUpdate(entity as Entity<M> | undefined))
-                    .catch(onError);
+                    .then((entity) => {
+                        if (cancelled) return;
+                        onEntityUpdate(entity as Entity<M> | undefined);
+                    })
+                    .catch((e) => {
+                        if (cancelled) return;
+                        onError(e);
+                    });
                 return () => {
+                    cancelled = true;
                 };
             }
         }

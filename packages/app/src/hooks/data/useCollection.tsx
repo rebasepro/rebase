@@ -147,6 +147,16 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
             }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }), onError);
         } else {
+            // The one-shot fallback, taken whenever the client has no socket.
+            // `listen` above cancels on cleanup, and every dependency of this
+            // effect — the search string, the filters, the sort, the page —
+            // changes while a request is in flight. A promise cannot be
+            // unsubscribed, so the cleanup has to disown its result instead:
+            // without this, whichever response arrives last wins, and responses
+            // do not arrive in request order. Typing into search would settle
+            // on the results for whichever query the server happened to finish
+            // last.
+            let cancelled = false;
             accessor.find({
                 where: whereParams,
                 limit: itemCount,
@@ -156,10 +166,17 @@ meta: res.meta }), onError);
                 searchString,
                 include: includeParams
             })
-                .then((res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
-meta: res.meta }))
-                .catch(onError);
+                .then((res) => {
+                    if (cancelled) return;
+                    onEntitiesUpdate({ data: res.data as Entity<M>[],
+meta: res.meta });
+                })
+                .catch((e) => {
+                    if (cancelled) return;
+                    onError(e);
+                });
             return () => {
+                cancelled = true;
             };
         }
     }, [path, itemCount, offset, page, currentSort, sortByProperty, filterValues, searchString, dataClient, collection]);

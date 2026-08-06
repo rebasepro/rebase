@@ -174,6 +174,14 @@ export function useRelationSelector<M extends Record<string, any> = any>(
             }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }), onErrorUpdate);
         } else {
+            // The one-shot fallback, taken whenever the client has no socket.
+            // `cleanupSubscription` is what keeps this hook's results matching
+            // the query that asked for them, and it can only do that if the
+            // fallback hands back something that actually cancels. A promise
+            // cannot be unsubscribed, so this disowns its result instead —
+            // otherwise the debounce is the only thing between a slow response
+            // for "ab" and its landing on top of the results for "abc".
+            let cancelled = false;
             accessor.find({
                 where: whereParams,
                 limit: limit,
@@ -182,10 +190,18 @@ meta: res.meta }), onErrorUpdate);
                 searchString: currentSearch,
                 include: includeParams
             })
-                .then((res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
-meta: res.meta }))
-                .catch(onErrorUpdate);
-            unsubscribe = () => {};
+                .then((res) => {
+                    if (cancelled) return;
+                    onEntitiesUpdate({ data: res.data as Entity<M>[],
+meta: res.meta });
+                })
+                .catch((e) => {
+                    if (cancelled) return;
+                    onErrorUpdate(e);
+                });
+            unsubscribe = () => {
+                cancelled = true;
+            };
         }
 
         unsubscribeRef.current = unsubscribe || null;
