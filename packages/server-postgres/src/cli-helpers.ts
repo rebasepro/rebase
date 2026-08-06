@@ -255,13 +255,20 @@ export async function getTableExcludes(
     const queryTables = deps.queryExistingTables ?? queryExistingTables;
 
     const includes = await getIncludes(collectionsPath);
-    // Framework-owned schemas Rebase manages itself — the declarative apply
-    // must never touch them. `auth` holds the helper functions; `rebase` holds
-    // the auth tables (users, refresh_tokens, …) and Atlas's own revision
-    // table. Excluding both the schema object AND its contents keeps Atlas
-    // from planning a `DROP SCHEMA … CASCADE` — which on a live database would
-    // take the user/auth tables with it. `atlas_schema_revisions.*` is kept
-    // for backwards-compatibility with any external revision schema.
+    // Schemas the declarative apply must never touch. `rebase` holds the auth
+    // tables (users, refresh_tokens, …), the RLS helper functions and Atlas's
+    // own revision table. Excluding both the schema object AND its contents
+    // keeps Atlas from planning a `DROP SCHEMA … CASCADE` — which on a live
+    // database would take the user/auth tables with it.
+    // `atlas_schema_revisions.*` is kept for backwards-compatibility with any
+    // external revision schema.
+    //
+    // `auth` stays on this list even though Rebase no longer creates it, and
+    // that is the point: on a database still holding the pre-1.0 schema it must
+    // survive until the guarded cleanup retires it, and on a Supabase database
+    // it is somebody else's and must never be in scope at all. Removing it here
+    // would let a `db push` plan `DROP SCHEMA auth CASCADE` against a live
+    // Supabase installation.
     const excludes: string[] = ["atlas_schema_revisions.*", "auth", "auth.*", "rebase", "rebase.*"];
 
     let existingTables: string[];

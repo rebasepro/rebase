@@ -37,7 +37,7 @@ import { ensureHistoryTableExists } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
 import { buildDrizzleTablesFromSchema, buildDrizzleRelationsFromSchema } from "./schema/dynamic-tables";
-import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, warnOnAnonymousGrants, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { detectConnectionPosture, ensureAppRole, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
@@ -372,12 +372,22 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     const res = await schemaAwareDb.execute(sql.raw(text));
                     return (res.rows ?? []) as Record<string, unknown>[];
                 };
+                // Said before anything else touches the schema: if the role and
+                // a schema share a name, unqualified SQL from any tool that does
+                // not pin `search_path` has been landing in the wrong place, and
+                // that is worth knowing before reading the drift report below.
+                await warnOnRoleSchemaCollision(runSql);
+
                 const posture = await detectConnectionPosture(runSql);
                 if (posture.privileged) {
                     const collectionSchemas = registry.getCollections()
                         .map((c) => (c as { schema?: string }).schema)
                         .filter((s): s is string => typeof s === "string");
-                    await ensureAppRole(runSql, ["public", "rebase", "auth", ...collectionSchemas]);
+                    // `auth` is deliberately absent: the RLS helpers moved into
+                    // `rebase`, and granting USAGE on a schema Rebase does not
+                    // own would, on a Supabase database, hand the end-user role
+                    // access to theirs.
+                    await ensureAppRole(runSql, ["public", "rebase", ...collectionSchemas]);
                     driver.rlsUserRole = REBASE_USER_ROLE;
                     realtimeService.rlsUserRole = REBASE_USER_ROLE;
                     logger.info(`🔐 RLS enforcement active: authenticated requests run as "${REBASE_USER_ROLE}" (connection "${posture.role}" bypasses RLS: ${posture.superuser ? "superuser" : posture.bypassRLS ? "BYPASSRLS" : "table owner"})`);
@@ -406,6 +416,11 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 // a rule that reads as "signed in only" but is true for every
                 // caller grants the data away rather than hiding it.
                 warnOnAnonymousGrants(registry.getCollections() as never);
+
+                // Raw policy SQL written against the pre-1.0 helper schema. It
+                // is rewritten on compile, so this is the only place the project
+                // is ever told the spelling moved.
+                warnOnLegacyRlsFunctions(registry.getCollections() as never);
             }
 
             // Ensure branch metadata table exists when branching is available
@@ -870,6 +885,30 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
                     `🔐 [rls] Could not fully apply policies to "${failure.table}" — it stays locked (denies) until this is resolved: ${failure.error}`
                 );
             }
+
+            // Retire the pre-1.0 `auth` schema now that the policies above no
+            // longer call into it. Deliberately after, and deliberately quiet:
+            // Postgres refuses to drop a function an RLS policy still
+            // references, so on a database where some table has not been
+            // recompiled yet this is expected to fail and succeed on a later
+            // boot. See DROP_LEGACY_AUTH_SCHEMA_SQL for the guards that keep it
+            // off a Supabase `auth` schema.
+            try {
+                const { dropLegacyAuthSchema } = await import("./schema/rls-bootstrap-sql");
+                await dropLegacyAuthSchema(
+                    async (text) => {
+                        const res = await internals.db.execute(sql.raw(text));
+                        return (res.rows ?? []) as Record<string, unknown>[];
+                    },
+                    { info: (m) => logger.info(m), warn: (m) => logger.warn(m) }
+                );
+            } catch (err) {
+                logger.info(
+                    "Left the legacy `auth` schema in place: " +
+                    (err instanceof Error ? err.message : String(err))
+                );
+            }
+
             return { applied: outcome.policiesApplied };
         },
 

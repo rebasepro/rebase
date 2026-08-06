@@ -1,7 +1,7 @@
 import type { Check, DbPolicy, DbSnapshot, Finding, PolicyCommand } from "../types";
 
 import { isUnconditionalTrue } from "./sql";
-import {
+import { callerIdCall,
     ANONYMOUS_ROLES,
     WRITE_PRIVILEGES,
     effectivePrivileges,
@@ -50,6 +50,7 @@ export const anonymousWriteAllowed: Check = {
         "expression accepts any row, backed by a matching grant.",
 
     run(snapshot: DbSnapshot): Finding[] {
+        const uidCall = callerIdCall(snapshot);
         const findings: Finding[] = [];
 
         for (const policy of snapshot.policies) {
@@ -105,7 +106,7 @@ export const anonymousWriteAllowed: Check = {
                     fix:
                         `-- Scope the write to the caller, or take the privilege away entirely:\n` +
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
-                        `    WITH CHECK (user_id = auth.uid());\n` +
+                        `    WITH CHECK (user_id = ${uidCall});\n` +
                         `-- and if anonymous writes are never intended:\n` +
                         `REVOKE ${commands.join(", ")} ON ${qrel(policy.schema, policy.table)} FROM ${grantedTo
                             .map((r) => (r === "PUBLIC" ? "PUBLIC" : `"${r}"`))

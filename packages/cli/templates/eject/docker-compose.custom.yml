@@ -25,7 +25,7 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: rebase
+      POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-changeme}
       POSTGRES_DB: rebase
     ports:
@@ -48,8 +48,8 @@ services:
       - "${PORT:-3001}:3001"
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
-      ADMIN_CONNECTION_STRING: postgresql://rebase:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
+      DATABASE_URL: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
+      ADMIN_CONNECTION_STRING: postgresql://rebase_app:${DATABASE_PASSWORD:-changeme}@db:5432/rebase?options=-c%20search_path=public
       NODE_ENV: production
       PORT: "3001"
       # Your entrypoint serves the built frontend itself (see the `serveSPA`

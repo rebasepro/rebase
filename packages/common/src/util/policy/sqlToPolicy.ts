@@ -1,4 +1,4 @@
-import { ANONYMOUS_USER_ID, ANONYMOUS_USER_IDS, LiteralPolicyOperand, PolicyExpression, policy } from "@rebasepro/types";
+import { ANONYMOUS_USER_ID, ANONYMOUS_USER_IDS, LiteralPolicyOperand, PolicyExpression, policy, rewriteLegacyRlsFunctions } from "@rebasepro/types";
 
 /**
  * A tiny, regex-based SQL "parser" for security rules.
@@ -38,9 +38,9 @@ function isKeywordAt(upper: string, i: number, keyword: string): boolean {
  *
  * This used to be `sql.split(/ AND /i)`, which tore subqueries in half: the
  * `AND` inside
- *   `EXISTS (SELECT 1 FROM organization_members m WHERE m.org = t.org AND m.user_id = auth.uid())`
+ *   `EXISTS (SELECT 1 FROM organization_members m WHERE m.org = t.org AND m.user_id = rebase.uid())`
  * split the expression, and re-emitting the halves produced
- *   `(EXISTS (...) AND m.user_id = auth.uid())`
+ *   `(EXISTS (...) AND m.user_id = rebase.uid())`
  * where `m` is no longer in scope — SQL that Postgres rejects outright with
  * "missing FROM-clause entry for table". Returning null instead keeps such a
  * clause as a `raw` expression, which round-trips verbatim.
@@ -107,22 +107,32 @@ function stripOuterParens(sql: string): string {
 }
 
 export function sqlToPolicy(sql: string): PolicyExpression {
-    const trimmed = stripOuterParens(sql.trim());
+    // Normalised before anything else looks at it, so every pattern below only
+    // has to know the current spelling. A database migrated by a pre-1.0 release
+    // still holds `auth.uid()` in its policy bodies until the next push or boot
+    // recompiles them — and until then the admin UI reads those bodies back
+    // through here. Without this they parse as opaque `raw`, and the framework's
+    // own policies get badged as hand-written drift.
+    //
+    // Normalising rather than accepting both spellings throughout is deliberate:
+    // it also means a legacy policy that falls through to `raw` is stored in the
+    // new spelling, so editing and saving one in the Studio migrates it.
+    const trimmed = stripOuterParens(rewriteLegacyRlsFunctions(sql).trim());
 
     if (trimmed.toLowerCase() === "true") return policy.true();
     if (trimmed.toLowerCase() === "false") return policy.false();
 
     // Handle roles overlap (&&)
-    // Matches: string_to_array(auth.roles(), ',') && ARRAY['admin', 'editor']
-    const overlapMatch = trimmed.match(/^string_to_array\s*\(\s*auth\.roles\(\)\s*,\s*','\s*\)\s*&&\s*ARRAY\s*\[(.+)\]$/i);
+    // Matches: string_to_array(rebase.roles(), ',') && ARRAY['admin', 'editor']
+    const overlapMatch = trimmed.match(/^string_to_array\s*\(\s*rebase\.roles\(\)\s*,\s*','\s*\)\s*&&\s*ARRAY\s*\[(.+)\]$/i);
     if (overlapMatch) {
         const roles = overlapMatch[1].split(",").map(s => s.trim().replace(/^'|'$/g, ""));
         return policy.rolesOverlap(roles);
     }
 
     // Handle roles containment (@>)
-    // Matches: string_to_array(auth.roles(), ',') @> ARRAY['admin']
-    const containMatch = trimmed.match(/^string_to_array\s*\(\s*auth\.roles\(\)\s*,\s*','\s*\)\s*@>\s*ARRAY\s*\[(.+)\]$/i);
+    // Matches: string_to_array(rebase.roles(), ',') @> ARRAY['admin']
+    const containMatch = trimmed.match(/^string_to_array\s*\(\s*rebase\.roles\(\)\s*,\s*','\s*\)\s*@>\s*ARRAY\s*\[(.+)\]$/i);
     if (containMatch) {
         const roles = containMatch[1].split(",").map(s => s.trim().replace(/^'|'$/g, ""));
         return policy.rolesContain(roles);
@@ -146,12 +156,15 @@ export function sqlToPolicy(sql: string): PolicyExpression {
         }
     }
 
-    // Fallback to raw
-    return policy.raw(sql);
+    // Fallback to raw — the NORMALISED text, not the input. Storing the input
+    // verbatim would mean a legacy policy read out of a database, edited in the
+    // Studio and saved, writes `auth.uid()` back into the project's config: a
+    // call to a function 1.0 no longer creates.
+    return policy.raw(trimmed);
 }
 
 /**
- * Literals from other BaaS platforms that people compare `auth.uid()` against
+ * Literals from other BaaS platforms that people compare `rebase.uid()` against
  * out of habit. Mirrors the driver's `FOREIGN_CONVENTION_ROLES` guard on
  * `pgRoles`, one surface over: the same muscle memory inside a `using:` string
  * is the more dangerous spelling, because it inverts a rule instead of
@@ -173,19 +186,26 @@ export interface AnonymousGrantRisk {
     explanation: string;
 }
 
-/** `auth.uid() IS NOT NULL` in raw SQL, the clause that is always true. */
-const UID_NOT_NULL = /auth\.uid\(\)\s+IS\s+NOT\s+NULL/i;
+/**
+ * `rebase.uid() IS NOT NULL` in raw SQL, the clause that is always true.
+ *
+ * Both schema spellings, because this runs over policy bodies read back from a
+ * database, and one migrated by a pre-1.0 release still holds `auth.uid()`.
+ * A security check that stops recognising a dangerous clause because the
+ * framework renamed a function is a check that silently turns off.
+ */
+const UID_NOT_NULL = /\b(?:rebase|auth)\.uid\(\)\s+IS\s+NOT\s+NULL/i;
 
 /**
  * Find clauses that read as "signed-in users only" but admit anonymous callers.
  *
- * Both spellings come from the same place — Supabase, where `auth.uid()` really
- * is NULL for an anonymous request. Rebase substitutes
+ * Both spellings come from the same place — Supabase, where its own `auth.uid()`
+ * really is NULL for an anonymous request. Rebase substitutes
  * {@link ANONYMOUS_USER_ID} instead (a blank id would read back as NULL, which
  * is how the trusted *server* context is recognised), so:
  *
- *  - `auth.uid() IS NOT NULL` is a tautology on the user path, and
- *  - `auth.uid() != 'anon'` excludes one spelling of anonymous and admits the
+ *  - `rebase.uid() IS NOT NULL` is a tautology on the user path, and
+ *  - `rebase.uid() != 'anon'` excludes one spelling of anonymous and admits the
  *    other. This one is not hypothetical and was not only a foreign habit:
  *    rebase's own request path reported `'anon'` while everything that compiled
  *    or checked a policy used `'anonymous'`, so whichever literal an author
@@ -219,7 +239,7 @@ export function findAnonymousGrants(expr: PolicyExpression): AnonymousGrantRisk[
                     found.push({
                         pattern: "uid-not-null",
                         detail: e.sql,
-                        explanation: "`auth.uid() IS NOT NULL` is true for every request that came from a client, " +
+                        explanation: "`rebase.uid() IS NOT NULL` is true for every request that came from a client, " +
                             `including anonymous ones — they carry '${ANONYMOUS_USER_ID}', not NULL. ` +
                             "Use `condition: policy.authenticated()` to mean \"signed in\"."
                     });
@@ -252,11 +272,11 @@ export function findAnonymousGrants(expr: PolicyExpression): AnonymousGrantRisk[
 }
 
 function parseOperand(str: string) {
-    // current_setting('app.uid') or auth.uid(). `app.user_id` is the
+    // current_setting('app.uid') or rebase.uid(). `app.user_id` is the
     // pre-rename spelling and stays parseable: policies are data, so a
     // database provisioned before the rename still holds rules written
     // against it, and round-tripping one must not silently drop the operand.
-    if (/current_setting\s*\(\s*'app\.(uid|user_id)'\s*\)/i.test(str) || /auth\.uid\(\)/i.test(str)) {
+    if (/current_setting\s*\(\s*'app\.(uid|user_id)'\s*\)/i.test(str) || /rebase\.uid\(\)/i.test(str)) {
         return policy.authUid();
     }
 

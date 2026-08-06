@@ -41,7 +41,7 @@ describe("policyToPostgres — existsIn (membership)", () => {
         expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."team_members" "_ex0" WHERE`);
         // inner `field` binds to the aliased join table
         expect(sql).toContain(`"_ex0".team_id`);
-        expect(sql).toContain(`("_ex0".user_id)::text = auth.uid()`);
+        expect(sql).toContain(`("_ex0".user_id)::text = rebase.uid()`);
         // `outerField` binds to the outer RLS row, table-qualified
         expect(sql).toContain(`"public"."documents".team_id`);
     });
@@ -53,12 +53,12 @@ describe("policyToPostgres — existsIn (membership)", () => {
         });
         const sql = policyToPostgres(expr, documents);
         expect(sql).toContain(`FROM "public"."team_members" "_ex0"`);
-        expect(sql).toContain(`("_ex0".user_id)::text = auth.uid()`);
+        expect(sql).toContain(`("_ex0".user_id)::text = rebase.uid()`);
     });
 
     it("does not regress non-existsIn compilation (bare columns at top level)", () => {
         const expr = policy.compare(policy.field("team_id"), "eq", policy.authUid());
-        expect(policyToPostgres(expr, documents)).toBe("(team_id)::text = auth.uid()");
+        expect(policyToPostgres(expr, documents)).toBe("(team_id)::text = rebase.uid()");
     });
 
     it("is treated as server-authoritative (unknown) by the JS evaluator", () => {
@@ -79,7 +79,7 @@ describe("policyToPostgres — raw escape hatch", () => {
         // into `m.team_id = m.team_id`, a tautology that matched every row and
         // leaked other tenants' data.
         const expr = policy.raw(
-            "EXISTS (SELECT 1 FROM team_members m WHERE m.team_id = {team_id} AND m.user_id = auth.uid())"
+            "EXISTS (SELECT 1 FROM team_members m WHERE m.team_id = {team_id} AND m.user_id = rebase.uid())"
         );
         const sql = policyToPostgres(expr, documents);
         expect(sql).toContain(`m.team_id = "public"."documents".team_id`);
@@ -92,8 +92,8 @@ describe("policyToPostgres — raw escape hatch", () => {
     });
 
     it("leaves raw SQL without placeholders untouched", () => {
-        const expr = policy.raw("auth.uid() IS NOT NULL");
-        expect(policyToPostgres(expr, documents)).toBe("auth.uid() IS NOT NULL");
+        const expr = policy.raw("rebase.uid() IS NOT NULL");
+        expect(policyToPostgres(expr, documents)).toBe("rebase.uid() IS NOT NULL");
     });
 });
 
@@ -107,7 +107,7 @@ describe("policy.authenticated()", () => {
         // a server still reporting the legacy `'anon'`. Excluding one spelling
         // is exactly how this helper became a grant.
         expect(policyToPostgres(policy.authenticated()))
-            .toBe("auth.uid() IS NOT NULL AND auth.uid() NOT IN ('anonymous', 'anon')");
+            .toBe("rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')");
     });
 
     it("is false for an anonymous caller, in either spelling", () => {
@@ -123,17 +123,17 @@ describe("policy.authenticated()", () => {
     });
 
     it("negates honestly — no special case rewriting it to the server context", () => {
-        // `not(authenticated())` used to compile to `auth.uid() IS NULL`, i.e.
+        // `not(authenticated())` used to compile to `rebase.uid() IS NULL`, i.e.
         // "is the server context". It means "anonymous or server" now, and
         // `serverContext()` is how you ask the narrower question.
         expect(policyToPostgres(policy.not(policy.authenticated())))
-            .toBe("NOT (auth.uid() IS NOT NULL AND auth.uid() NOT IN ('anonymous', 'anon'))");
+            .toBe("NOT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))");
     });
 });
 
 describe("policy.serverContext()", () => {
     it("compiles to the only state a user request cannot reach", () => {
-        expect(policyToPostgres(policy.serverContext())).toBe("auth.uid() IS NULL");
+        expect(policyToPostgres(policy.serverContext())).toBe("rebase.uid() IS NULL");
     });
 
     it("is false client-side for every caller — a client is never the server", () => {
@@ -151,7 +151,7 @@ describe("policy.serverContext()", () => {
 });
 
 describe("authUid operand", () => {
-    it("resolves to the sentinel for an anonymous caller, matching auth.uid()", () => {
+    it("resolves to the sentinel for an anonymous caller, matching rebase.uid()", () => {
         // Postgres compares against 'anonymous'; resolving to null here would
         // make the two disagree on exactly the rules that test for it.
         const notAnon = policy.compare(policy.authUid(), "neq", policy.literal(ANONYMOUS_USER_ID));
@@ -213,21 +213,21 @@ describe("findAnonymousGrants", () => {
     const patterns = (sql: string) => findAnonymousGrants(sqlToPolicy(sql)).map(r => r.pattern);
 
     it("catches the bare tautology, which has no literal to give it away", () => {
-        // `auth.uid() IS NOT NULL` is the most natural way to write "logged in",
+        // `rebase.uid() IS NOT NULL` is the most natural way to write "logged in",
         // and it is true for every caller including anonymous ones.
-        expect(patterns("auth.uid() IS NOT NULL")).toEqual(["uid-not-null"]);
+        expect(patterns("rebase.uid() IS NOT NULL")).toEqual(["uid-not-null"]);
     });
 
     it("catches the Supabase habit that inverts a rule", () => {
-        // `auth.uid() != 'anon'` compares against a string no caller ever has.
-        expect(findAnonymousGrants(sqlToPolicy("auth.uid() != 'anon'")))
+        // `rebase.uid() != 'anon'` compares against a string no caller ever has.
+        expect(findAnonymousGrants(sqlToPolicy("rebase.uid() != 'anon'")))
             .toEqual([expect.objectContaining({ pattern: "foreign-uid-literal", detail: "anon" })]);
     });
 
     it("catches both halves of the rule from the wild", () => {
         // The exact `using:` string found across 8 collections of PII, which
         // reads as a lockdown and grants everything to anonymous visitors.
-        expect(patterns("auth.uid() IS NOT NULL AND auth.uid() != 'anon'").sort())
+        expect(patterns("rebase.uid() IS NOT NULL AND rebase.uid() != 'anon'").sort())
             .toEqual(["foreign-uid-literal", "uid-not-null"]);
     });
 
@@ -245,9 +245,9 @@ describe("findAnonymousGrants", () => {
 
     it("says nothing about correct rules", () => {
         // The sentinel itself is the right thing to compare against.
-        expect(patterns(`auth.uid() != '${ANONYMOUS_USER_ID}'`)).toEqual([]);
-        expect(patterns("owner_id = auth.uid()")).toEqual([]);
-        // A literal not compared against auth.uid() is just a value.
+        expect(patterns(`rebase.uid() != '${ANONYMOUS_USER_ID}'`)).toEqual([]);
+        expect(patterns("owner_id = rebase.uid()")).toEqual([]);
+        // A literal not compared against rebase.uid() is just a value.
         expect(patterns("role = 'anon'")).toEqual([]);
         // And the primitive that exists precisely to get this right.
         expect(findAnonymousGrants(policy.authenticated())).toEqual([]);
@@ -263,9 +263,9 @@ describe("sqlToPolicy → policyToPostgres round-trip", () => {
 
     it("keeps AND inside an EXISTS subquery where it belongs", () => {
         const sql =
-            "EXISTS (SELECT 1 FROM organizations JOIN organization_members ON organizations.id = organization_members.organization_id WHERE organizations.billing_account_id = billing_accounts.id AND organization_members.user_id = auth.uid())";
+            "EXISTS (SELECT 1 FROM organizations JOIN organization_members ON organizations.id = organization_members.organization_id WHERE organizations.billing_account_id = billing_accounts.id AND organization_members.user_id = rebase.uid())";
         const out = roundTrip(sql);
-        expect(out).toContain("billing_accounts.id AND organization_members.user_id = auth.uid()");
+        expect(out).toContain("billing_accounts.id AND organization_members.user_id = rebase.uid()");
         // The correlated column must not escape the subquery.
         expect(out).not.toMatch(/\)\s*AND\s*\(?organization_members\.user_id/);
     });

@@ -4,6 +4,7 @@ import { logger } from "@rebasepro/server";
 import { revokeInternalTableAccess } from "@rebasepro/common";
 import type { CollectionConfig } from "@rebasepro/types";
 import { AUTH_USERS_COLUMNS, authUsersColumnSql } from "../schema/auth-users-columns";
+import { RLS_BOOTSTRAP_STATEMENTS } from "../schema/rls-bootstrap-sql";
 import {
     AuthSchemaVersionError,
     assertAuthSchemaCompatible,
@@ -374,39 +375,21 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             )
         `);
 
-        // Create the `auth` schema with PostgreSQL RLS helper functions.
-        await db.execute(sql`CREATE SCHEMA IF NOT EXISTS auth`);
-
-        // Use an advisory transaction lock to serialize function recreation during HMR
+        // The RLS helper functions every generated policy calls. They live in
+        // `rebase`, alongside the tables above — Rebase creates exactly one
+        // schema in a user's database. Advisory-locked so concurrent HMR
+        // reloads cannot race on `CREATE OR REPLACE`.
+        //
+        // The same statements the migration preamble carries, from the same
+        // constant — these definitions being identical across the boot path and
+        // the migration stream is the whole point of having them in one place.
+        // One call per statement: this handle speaks the extended query
+        // protocol, which rejects multi-command strings.
         await db.transaction(async (tx) => {
             await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'))`);
-
-            // Falls back to the pre-rename `app.user_id` so a database that has
-            // taken the new schema but is still served by an older backend keeps
-            // resolving the principal. Keep in sync with AUTH_BOOTSTRAP_SQL.
-            await tx.execute(sql`
-                CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
-                    SELECT COALESCE(
-                        NULLIF(current_setting('app.uid', true), ''),
-                        NULLIF(current_setting('app.user_id', true), '')
-                    );
-                $$ LANGUAGE sql STABLE
-            `);
-
-            await tx.execute(sql`
-                CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS $$
-                    SELECT COALESCE(
-                        NULLIF(current_setting('app.jwt', true), ''),
-                        '{}'
-                    )::jsonb;
-                $$ LANGUAGE sql STABLE
-            `);
-
-            await tx.execute(sql`
-                CREATE OR REPLACE FUNCTION auth.roles() RETURNS text AS $$
-                    SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
-                $$ LANGUAGE sql STABLE
-            `);
+            for (const statement of RLS_BOOTSTRAP_STATEMENTS) {
+                await tx.execute(sql.raw(statement));
+            }
         });
 
         // Seed default roles if none exist

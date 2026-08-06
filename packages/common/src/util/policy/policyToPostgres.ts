@@ -1,4 +1,4 @@
-import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression } from "@rebasepro/types";
+import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ExistsInPolicyExpression, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { getTableName } from "../relations";
 
@@ -70,7 +70,7 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
         case "not":
             return `NOT (${compile(expr.operand, scope)})`;
         case "compare": {
-            // `auth.uid()` returns text; cast the column side so uuid / integer
+            // `rebase.uid()` returns text; cast the column side so uuid / integer
             // id columns compare cleanly instead of failing with
             // "operator does not exist: uuid = text" at CREATE POLICY time.
             const castForAuthUid = (operand: PolicyOperand, sqlText: string, other: PolicyOperand): string =>
@@ -82,9 +82,9 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
             return `${leftSql} ${COMPARE_SQL[expr.op]} ${rightSql}`;
         }
         case "rolesOverlap":
-            return `string_to_array(auth.roles(), ',') && ${rolesArraySql(expr.roles)}`;
+            return `string_to_array(${RLS_ROLES_SQL}, ',') && ${rolesArraySql(expr.roles)}`;
         case "rolesContain":
-            return `string_to_array(auth.roles(), ',') @> ${rolesArraySql(expr.roles)}`;
+            return `string_to_array(${RLS_ROLES_SQL}, ',') @> ${rolesArraySql(expr.roles)}`;
         case "authenticated":
             // `IS NOT NULL` alone is a tautology on the user path: every
             // user-context request sets `app.uid`, and an anonymous one sets
@@ -96,19 +96,32 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
             // policy compiled here may be enforced against an older server that
             // still reports `'anon'`, which is exactly how excluding one
             // spelling turned this helper into a grant. See ANONYMOUS_USER_IDS.
-            return `auth.uid() IS NOT NULL AND auth.uid() NOT IN (${ANONYMOUS_USER_IDS.map(quoteLiteral).join(", ")})`;
+            return `${RLS_UID_SQL} IS NOT NULL AND ${RLS_UID_SQL} NOT IN (${ANONYMOUS_USER_IDS.map(quoteLiteral).join(", ")})`;
         case "serverContext":
             // Only the built-in server flows leave `app.uid` unset.
-            return "auth.uid() IS NULL";
+            return `${RLS_UID_SQL} IS NULL`;
         case "existsIn":
             return compileExistsIn(expr, scope);
-        case "raw":
+        case "raw": {
+            // A project written against a pre-1.0 release may still spell the
+            // helpers `auth.uid()`. Rewritten rather than rejected: the rule
+            // means exactly the same thing, the developer cannot be expected to
+            // have read a changelog mid-deploy, and the alternative is a policy
+            // that compiles cleanly and then denies every row at runtime because
+            // it calls a function that no longer exists.
+            //
+            // The counterpart is `warnOnLegacyRlsFunctions`, which says so once
+            // at boot with the file to edit — silence here would leave the old
+            // spelling working forever and make the migration permanent.
+            const sqlText = rewriteLegacyRlsFunctions(expr.sql);
+
             // Full-power escape hatch: `{column}` denotes a column of the outer
             // RLS row. It must be table-qualified, not bare: raw SQL may open its
             // own subquery over the same table, and there a bare name binds to the
             // inner scope, collapsing `m.x = {x}` into the tautology `m.x = m.x`.
-            return expr.sql.replace(/\{(\w+)\}/g, (_, col) =>
+            return sqlText.replace(/\{(\w+)\}/g, (_, col) =>
                 `${outerQualifier(scope)}${resolveColumnName(col, scope.outerCollection)}`);
+        }
     }
 }
 
@@ -156,9 +169,9 @@ function operandToSql(operand: PolicyOperand, scope: CompileScope): string {
         case "literal":
             return quoteLiteral(operand.value);
         case "authUid":
-            return "auth.uid()";
+            return RLS_UID_SQL;
         case "authRoles":
-            return "string_to_array(auth.roles(), ',')";
+            return `string_to_array(${RLS_ROLES_SQL}, ',')`;
     }
 }
 

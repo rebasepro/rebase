@@ -323,7 +323,7 @@ describe("generatePostgresDdl edge cases", () => {
             expect(cleanResult).toContain("USING (true)");
             expect(cleanResult).toContain("FOR SELECT");
             expect(cleanResult).toContain("FOR DELETE");
-            expect(cleanResult).toContain("(author_id)::text = auth.uid()");
+            expect(cleanResult).toContain("(author_id)::text = rebase.uid()");
         });
 
         it("locks collections without security rules to server/admin read + write defaults", () => {
@@ -514,8 +514,8 @@ describe("generatePostgresDdl edge cases", () => {
             const cleanResult = cleanDdl(result);
 
             expect(cleanResult).toContain("FOR UPDATE");
-            expect(cleanResult).toContain("USING ((owner_id)::text = auth.uid())");
-            expect(cleanResult).toContain("WITH CHECK ((owner_id)::text = auth.uid())");
+            expect(cleanResult).toContain("USING ((owner_id)::text = rebase.uid())");
+            expect(cleanResult).toContain("WITH CHECK ((owner_id)::text = rebase.uid())");
         });
 
         it("should include DROP POLICY IF EXISTS before CREATE POLICY", () => {

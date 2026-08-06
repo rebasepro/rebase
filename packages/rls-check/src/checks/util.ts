@@ -152,3 +152,20 @@ export const listAnd = (items: string[]): string =>
     items.length <= 1
         ? (items[0] ?? "")
         : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+
+/**
+ * How to spell "the id of the current caller" in a fix suggestion, for the
+ * platform this database actually is.
+ *
+ * Every remediation in this tool prints example SQL, and example SQL that calls
+ * a function the reader's database does not have is worse than no example — it
+ * looks authoritative and fails on paste. Rebase's helpers live in `rebase`
+ * (they were in `auth` before 1.0, which is Supabase's schema and the reason
+ * they moved); Supabase and PostgREST stacks have `auth.uid()`.
+ *
+ * `unknown` falls back to the Supabase spelling: this scanner is pointed at
+ * plenty of databases Rebase did not create, and that is the wider convention.
+ */
+export function callerIdCall(snapshot: DbSnapshot): string {
+    return snapshot.platform === "rebase" ? "rebase.uid()" : "auth.uid()";
+}

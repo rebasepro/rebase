@@ -1,6 +1,6 @@
 import type { Check, DbSnapshot, Finding, Severity } from "../types";
 
-import { finding, listAnd, policyTargetsExposedRole, qi, qrel } from "./util";
+import { callerIdCall, finding, listAnd, policyTargetsExposedRole, qi, qrel } from "./util";
 
 const ID = "policy-anonymous-tautology";
 
@@ -33,6 +33,7 @@ export const policyAnonymousTautology: Check = {
         "from signed-out callers but scopes no rows.",
 
     run(snapshot: DbSnapshot): Finding[] {
+        const uidCall = callerIdCall(snapshot);
         const findings: Finding[] = [];
         const { severity, meaning, impactSuffix } = platformReading(snapshot.platform);
 
@@ -72,10 +73,10 @@ export const policyAnonymousTautology: Check = {
                     fix:
                         `-- Scope the policy to the row's owner rather than to the existence of an id:\n` +
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
-                        `    USING (user_id = auth.uid());\n` +
+                        `    USING (user_id = ${uidCall});\n` +
                         `-- If the intent really is "any signed-in user", make that explicit and make it\n` +
                         `-- reject the anonymous sentinel your stack may use:\n` +
-                        `--     USING (auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous');`
+                        `--     USING (${uidCall} IS NOT NULL AND ${uidCall} <> 'anonymous');`
                 })
             );
         }
@@ -128,10 +129,20 @@ function platformReading(platform: DbSnapshot["platform"]): {
     }
 }
 
+/**
+ * Both schema spellings, deliberately.
+ *
+ * This runs over policy bodies read back from a live database, and those outlive
+ * the release that wrote them: Rebase moved its helpers from `auth` to `rebase`
+ * at 1.0, so a database mid-migration holds both, and a Supabase database holds
+ * `auth.*` for good. A security check that stops recognising a dangerous clause
+ * because a schema was renamed is a check that silently turned itself off.
+ */
 const CALLER_ID_CALLS: { re: RegExp; label: (m: RegExpExecArray) => string }[] = [
-    { re: /auth\.uid\s*\(\s*\)/g, label: () => "auth.uid()" },
+    { re: /(?:rebase|auth)\.uid\s*\(\s*\)/g, label: (m) => m[0].replace(/\s+/g, "") },
     { re: /auth\.role\s*\(\s*\)/g, label: () => "auth.role()" },
-    { re: /auth\.jwt\s*\(\s*\)/g, label: () => "auth.jwt()" },
+    { re: /(?:rebase|auth)\.roles\s*\(\s*\)/g, label: (m) => m[0].replace(/\s+/g, "") },
+    { re: /(?:rebase|auth)\.jwt\s*\(\s*\)/g, label: (m) => m[0].replace(/\s+/g, "") },
     { re: /current_setting\s*\(\s*('[^']*')\s*(?:,\s*[a-z]+\s*)?\)/g, label: (m) => `current_setting(${m[1]})` }
 ];
 
@@ -161,7 +172,7 @@ function matchTautology(clause: string | null | undefined): string | null {
             .replace(new RegExp(re.source, "g"), "callerid")
             .replace(/::[a-z0-9_[\]]+/g, "")
             .replace(/\bselect\b/g, "")
-            // Postgres renders a wrapped call as `( SELECT auth.uid() AS uid)`.
+            // Postgres renders a wrapped call as `( SELECT rebase.uid() AS uid)`.
             .replace(/\bas [a-z0-9_]+/g, "")
             .replace(/[()\s]/g, "");
 

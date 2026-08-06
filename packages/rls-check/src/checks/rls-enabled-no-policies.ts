@@ -1,6 +1,6 @@
 import type { Check, DbSnapshot, Finding } from "../types";
 
-import { finding, policiesFor, qrel, scannedTables } from "./util";
+import { callerIdCall, finding, policiesFor, qrel, scannedTables } from "./util";
 
 const ID = "rls-enabled-no-policies";
 
@@ -18,6 +18,7 @@ export const rlsEnabledNoPolicies: Check = {
     description: "A table with row-level security enabled but not a single policy defined.",
 
     run(snapshot: DbSnapshot): Finding[] {
+        const uidCall = callerIdCall(snapshot);
         const findings: Finding[] = [];
 
         for (const rel of scannedTables(snapshot)) {
@@ -47,7 +48,7 @@ export const rlsEnabledNoPolicies: Check = {
                     fix:
                         `-- Either define the policy you intended:\n` +
                         `CREATE POLICY ${JSON.stringify(`${rel.name}_select`)} ON ${qrel(rel.schema, rel.name)}\n` +
-                        `    FOR SELECT TO authenticated USING (user_id = auth.uid());\n` +
+                        `    FOR SELECT TO authenticated USING (user_id = ${uidCall});\n` +
                         `-- or, if this table is genuinely meant to be unreadable, drop the grants\n` +
                         `-- instead of relying on an empty policy set:\n` +
                         `-- REVOKE ALL ON ${qrel(rel.schema, rel.name)} FROM PUBLIC;`

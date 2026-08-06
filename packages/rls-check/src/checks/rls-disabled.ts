@@ -1,6 +1,6 @@
 import type { Check, DbSnapshot, Finding } from "../types";
 
-import { DML, exposedGrantees, finding, listAnd, qrel, qrole, rowsPhrase, scannedTables } from "./util";
+import { callerIdCall, DML, exposedGrantees, finding, listAnd, qrel, qrole, rowsPhrase, scannedTables } from "./util";
 
 const ID = "rls-disabled";
 
@@ -21,6 +21,7 @@ export const rlsDisabled: Check = {
         "an unauthenticated or untrusted caller can reach.",
 
     run(snapshot: DbSnapshot): Finding[] {
+        const uidCall = callerIdCall(snapshot);
         const findings: Finding[] = [];
 
         for (const rel of scannedTables(snapshot)) {
@@ -58,7 +59,7 @@ export const rlsDisabled: Check = {
                         `-- Enabling RLS with no policies denies every row to everyone but the owner,\n` +
                         `-- so add the policy you intend in the same migration, for example:\n` +
                         `-- CREATE POLICY ${JSON.stringify(`${rel.name}_owner_select`)} ON ${qrel(rel.schema, rel.name)}\n` +
-                        `--     FOR SELECT TO ${qrole(roles[0])} USING (user_id = auth.uid());`
+                        `--     FOR SELECT TO ${qrole(roles[0])} USING (user_id = ${uidCall});`
                 })
             );
         }

@@ -7,6 +7,7 @@ export * from "./admin_block";
 export * from "./collections";
 export * from "./relations";
 export * from "./policy";
+export * from "./rls-functions";
 export * from "./security_rules";
 
 export * from "./entity_callbacks";

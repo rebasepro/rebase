@@ -719,12 +719,16 @@ describe(".env.example", () => {
         // Verify local default DB url
         const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);
         expect(dbMatch).toBeTruthy();
-        expect(dbMatch![1]).toContain("postgresql://rebase:");
+        // `rebase_app`, not `rebase`: a role named the same as a schema puts
+        // that schema ahead of `public` in the default `search_path` ("$user",
+        // public), so unqualified SQL from any tool that does not pin the path
+        // lands in the wrong place. Rebase creates a schema called `rebase`.
+        expect(dbMatch![1]).toContain("postgresql://rebase_app:");
 
         // Verify DATABASE_PASSWORD matches the one in DATABASE_URL
         const dbPasswordMatch = envContent.match(/^DATABASE_PASSWORD=(.*)$/m);
         expect(dbPasswordMatch).toBeTruthy();
-        expect(dbMatch![1]).toContain(`postgresql://rebase:${dbPasswordMatch![1]}@`);
+        expect(dbMatch![1]).toContain(`postgresql://rebase_app:${dbPasswordMatch![1]}@`);
     });
 
     it("configureEnvFile writes a stable REBASE_SERVICE_KEY", async () => {

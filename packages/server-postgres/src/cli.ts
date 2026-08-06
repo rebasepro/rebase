@@ -17,7 +17,7 @@ import {
 } from "./cli-helpers";
 import { checkDatabaseConnectivity, diagnoseDbError } from "./cli-errors";
 import { forLibpq } from "./utils/connection-string";
-import { AUTH_BOOTSTRAP_SQL } from "./schema/auth-bootstrap-sql";
+import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
 import { detectDestructiveStatements, decidePushSafety } from "./schema/destructive-sql";
 
 const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
@@ -138,14 +138,14 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     );
                     fs.writeFileSync(newestMigrationFile, migrationContent, "utf-8");
 
-                    // Append RLS policies, preceded by the auth bootstrap so the
+                    // Append RLS policies, preceded by the RLS bootstrap so the
                     // migration is self-contained: Atlas replays migrations
-                    // against a clean dev database where `auth.uid()` would not
-                    // otherwise exist.
+                    // against a clean dev database where `rebase.uid()` would
+                    // not otherwise exist.
                     const policiesFile = path.resolve(process.cwd(), "drizzle", "policies.sql");
                     if (fs.existsSync(policiesFile)) {
                         const policiesContent = fs.readFileSync(policiesFile, "utf-8");
-                        fs.appendFileSync(newestMigrationFile, "\n\n" + AUTH_BOOTSTRAP_SQL + "\n" + policiesContent);
+                        fs.appendFileSync(newestMigrationFile, "\n\n" + RLS_BOOTSTRAP_SQL + "\n" + policiesContent);
                         logger.info(chalk.gray(`  ✓ Appended RLS policies to migration file: ${path.basename(newestMigrationFile)}`));
                         
                         // Re-hash the migration directory
@@ -236,6 +236,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 await applyPolicies(databaseUrl);
                 await reconcilePolicies(databaseUrl, collectionsPath);
                 await ensureRlsUserRole(databaseUrl);
+                await retireLegacyAuthSchema(databaseUrl);
             } else {
                 logger.warn(chalk.yellow("  ⚠️  DATABASE_URL not found in environment, skipping RLS policies application."));
             }
@@ -248,6 +249,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             await runAtlas("migrate", ["apply", "--dir", "file://drizzle/migrations", ...extraArgs], collectionsPath);
             if (databaseUrl) {
                 await ensureRlsUserRole(databaseUrl);
+                await retireLegacyAuthSchema(databaseUrl);
             }
         }
 
@@ -263,16 +265,20 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
         const client = new Client({ connectionString: databaseUrl });
         await client.connect();
         try {
-            await client.query(AUTH_BOOTSTRAP_SQL);
-            // Runtime-only: pre-create the schema Atlas uses for its revision
-            // table (`--revisions-schema rebase`). Kept out of
-            // AUTH_BOOTSTRAP_SQL so it never enters the migration stream.
-            await client.query("CREATE SCHEMA IF NOT EXISTS rebase");
+            // Creates the `rebase` schema as its first statement, which also
+            // covers the schema Atlas puts its revision table in
+            // (`--revisions-schema rebase`). That used to need a separate,
+            // deliberately migration-stream-excluded statement here, because the
+            // helper functions lived in `auth` and creating `rebase` from the
+            // preamble would have made Atlas plan a DROP for it. The generator
+            // now always declares `rebase` in the desired schema, so there is
+            // nothing to keep out.
+            await client.query(RLS_BOOTSTRAP_SQL);
         } finally {
             await client.end();
         }
     } catch (err) {
-        logger.warn(chalk.yellow(`  ⚠️  Failed to bootstrap auth schema and helper functions: ${err instanceof Error ? err.message : String(err)}`));
+        logger.warn(chalk.yellow(`  ⚠️  Failed to bootstrap the RLS helper functions: ${err instanceof Error ? err.message : String(err)}`));
     }
 }
 
@@ -330,7 +336,10 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
     // change has already landed at this point, so failing the command implies a
     // rollback that did not happen. What is actually lost is the role
     // provisioning, and the message says so and how to finish it by hand.
-    const schemas = ["public", "rebase", "auth"];
+    // No `auth`: the RLS helpers live in `rebase` now, and a schema the
+    // framework no longer creates must not be granted on — on a Supabase
+    // database that would hand the end-user role USAGE on their auth schema.
+    const schemas = ["public", "rebase"];
     let rls: typeof import("./security/rls-enforcement");
     try {
         rls = await import("./security/rls-enforcement");
@@ -363,6 +372,36 @@ async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
             `provisioned: ${err instanceof Error ? err.message : String(err)}`
         ));
         logger.error(chalk.gray(rls.appRoleSetupInstructions("your database user", schemas)));
+    }
+}
+
+/**
+ * Retire the pre-1.0 `auth` schema, once nothing depends on it any more.
+ *
+ * Runs last on purpose. Postgres refuses to drop a function an RLS policy still
+ * calls, so this only succeeds after the policies above have been rewritten to
+ * `rebase.uid()`. See `dropLegacyAuthSchema` for what it reports when something
+ * hand-written is still holding the schema open, and DROP_LEGACY_AUTH_SCHEMA_SQL
+ * for the guards that keep it off a Supabase `auth` schema.
+ */
+async function retireLegacyAuthSchema(databaseUrl: string): Promise<void> {
+    try {
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: databaseUrl });
+        await client.connect();
+        try {
+            await dropLegacyAuthSchema(
+                async (text) => (await client.query(text)).rows as Record<string, unknown>[],
+                {
+                    info: (m) => logger.info(chalk.gray(`  ${m}`)),
+                    warn: (m) => logger.warn(chalk.yellow(`  ⚠️  ${m}`))
+                }
+            );
+        } finally {
+            await client.end();
+        }
+    } catch {
+        // Connection-level failure only; the schema is inert either way.
     }
 }
 

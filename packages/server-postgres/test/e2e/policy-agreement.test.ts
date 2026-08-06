@@ -25,7 +25,7 @@ import { sql as drizzleSql } from "drizzle-orm";
 import { ANONYMOUS_USER_ID, policy, type PolicyExpression } from "@rebasepro/types";
 import { evaluatePolicy, policyToPostgres } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { AUTH_BOOTSTRAP_SQL } from "../../src/schema/auth-bootstrap-sql.js";
+import { RLS_BOOTSTRAP_SQL } from "../../src/schema/rls-bootstrap-sql.js";
 import { applyAuthContext } from "../../src/security/rls-enforcement.js";
 
 let container: PgContainer;
@@ -88,7 +88,7 @@ async function evalAsServerContext(expr: PolicyExpression): Promise<boolean | nu
 beforeAll(async () => {
     container = await startPgContainer();
     pool = new pg.Pool({ connectionString: container.connectionString });
-    await pool.query(AUTH_BOOTSTRAP_SQL);
+    await pool.query(RLS_BOOTSTRAP_SQL);
 }, 120_000);
 
 afterAll(async () => {

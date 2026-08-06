@@ -3,7 +3,7 @@ import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl
 import { getEffectiveSecurityRules } from "@rebasepro/common";
 
 describe("auth collection default RLS policies", () => {
-    const adminWrite = "string_to_array(auth.roles(), ',') && ARRAY['admin']";
+    const adminWrite = "string_to_array(rebase.roles(), ',') && ARRAY['admin']";
 
     it("injects admin write policies (permissive grant + restrictive gate) when an auth collection has no security rules", () => {
         const collection: PostgresCollectionConfig = {
@@ -66,7 +66,7 @@ describe("auth collection default RLS policies", () => {
         expect(ddl).toContain("AS RESTRICTIVE FOR UPDATE");
     });
 
-    it("injects a self-read policy on auth collections (id = auth.uid())", () => {
+    it("injects a self-read policy on auth collections (id = rebase.uid())", () => {
         const collection: PostgresCollectionConfig = {
             slug: "users",
             table: "users",
@@ -79,9 +79,9 @@ describe("auth collection default RLS policies", () => {
         expect(selfRead).toBeDefined();
         expect(selfRead?.operations).toEqual(["select"]);
 
-        // uuid id column must compare against text auth.uid() via a cast.
+        // uuid id column must compare against text rebase.uid() via a cast.
         const ddl = generatePostgresPoliciesDdl([collection]);
-        expect(ddl).toContain("(id)::text = auth.uid()");
+        expect(ddl).toContain("(id)::text = rebase.uid()");
     });
 
     it("can be opted out with disableDefaultPolicies", () => {

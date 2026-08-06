@@ -1,7 +1,7 @@
 import type { Check, DbPolicy, DbSnapshot, Finding, Severity } from "../types";
 
 import { isUnconditionalTrue } from "./sql";
-import { finding, listAnd, policyTargetsExposedRole, qi, qrel, relationAt, rowsPhrase } from "./util";
+import { callerIdCall, finding, listAnd, policyTargetsExposedRole, qi, qrel, relationAt, rowsPhrase } from "./util";
 
 const ID = "policy-always-true";
 
@@ -26,6 +26,7 @@ export const policyAlwaysTrue: Check = {
     description: "A permissive policy whose USING or WITH CHECK expression is always true.",
 
     run(snapshot: DbSnapshot): Finding[] {
+        const uidCall = callerIdCall(snapshot);
         const findings: Finding[] = [];
 
         for (const policy of snapshot.policies) {
@@ -72,7 +73,7 @@ export const policyAlwaysTrue: Check = {
                     fix:
                         `-- Replace the constant with the scoping you intended, e.g.:\n` +
                         `ALTER POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)}\n` +
-                        `    ${clauses.includes("USING") ? "USING (user_id = auth.uid())" : "WITH CHECK (user_id = auth.uid())"};\n` +
+                        `    ${clauses.includes("USING") ? `USING (user_id = ${uidCall})` : `WITH CHECK (user_id = ${uidCall})`};\n` +
                         `-- or, if unconditional access really is intended, drop the policy and say so\n` +
                         `-- with an explicit grant instead:\n` +
                         `-- DROP POLICY ${qi(policy.name)} ON ${qrel(policy.schema, policy.table)};`

@@ -165,7 +165,7 @@ describe("getJunctionSecurityRules — write inheritance", () => {
         expect(sql).toContain(`"public"."posts_tags".post_id`);
         // …and constrained by the author's own update condition, rebound to the
         // parent inside the subquery.
-        expect(sql).toContain("auth.uid()");
+        expect(sql).toContain("rebase.uid()");
         expect(sql).toContain("author_id");
     });
 
@@ -188,7 +188,7 @@ describe("getJunctionSecurityRules — write inheritance", () => {
         // not run — so a regression that started granting an *unconstrained*
         // edge write here would have passed too.
         const { posts, tags } = makeCollections({
-            postsRules: [{ operation: "update", using: "author_id = auth.uid() OR is_shared" }]
+            postsRules: [{ operation: "update", using: "author_id = rebase.uid() OR is_shared" }]
         });
         const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
 
@@ -200,7 +200,7 @@ describe("getJunctionSecurityRules — write inheritance", () => {
         // The other half of the invariant: a grant exists only when the parent's
         // own condition travels with it.
         const { posts, tags } = makeCollections({
-            postsRules: [{ operation: "update", using: "author_id = auth.uid()" }]
+            postsRules: [{ operation: "update", using: "author_id = rebase.uid()" }]
         });
         const spec = resolveJunctionSpecs([posts, tags]).get("posts_tags")!;
         const junction = getJunctionCollectionConfig(spec);
@@ -211,7 +211,7 @@ describe("getJunctionSecurityRules — write inheritance", () => {
         expect(sql).toContain(`EXISTS (SELECT 1 FROM "public"."posts"`);
         expect(sql).toContain(`"public"."posts_tags".post_id`);
         expect(sql).toContain("author_id");
-        expect(sql).toContain("auth.uid()");
+        expect(sql).toContain("rebase.uid()");
     });
 
     it("suppresses a side's whole grant when a restrictive update rule cannot be embedded", () => {
@@ -286,7 +286,7 @@ describe("embedParentExpression", () => {
     });
 
     it("rejects raw SQL at any depth", () => {
-        expect(embedParentExpression(policy.raw("{author_id} = auth.uid()"))).toBeNull();
+        expect(embedParentExpression(policy.raw("{author_id} = rebase.uid()"))).toBeNull();
         expect(embedParentExpression(
             policy.and(policy.true(), policy.raw("1=1"))
         )).toBeNull();

@@ -7,6 +7,7 @@ import {
     revokeInternalTableAccess,
     securityRuleToConditions
 } from "@rebasepro/common";
+import { REBASE_SCHEMA, usesLegacyRlsFunctions } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 
 /**
@@ -80,6 +81,57 @@ const quoteIdent = (name: string): string => `"${name.replace(/"/g, "\"\"")}"`;
 
 /** DML the user role holds on managed tables (RLS still filters per row). */
 const USER_TABLE_PRIVILEGES = "SELECT, INSERT, UPDATE, DELETE";
+
+/**
+ * Warn when the connection role shares its name with an existing schema.
+ *
+ * Postgres resolves unqualified names through `search_path`, which defaults to
+ * `"$user", public` — and `$user` is the connection ROLE. When a schema of that
+ * name exists it sits ahead of `public`, so every unqualified statement
+ * silently operates on it instead:
+ *
+ *     CREATE TABLE posts (...);   -- you meant public.posts; you got <role>.posts
+ *
+ * Nothing errors. You get a second table of the same name in the wrong schema,
+ * and reads that pin `public` cannot see it — which reads as "missing table" and
+ * sends people to re-run a push that creates a *third* copy. The bootstrapper
+ * has a whole branch dedicated to recognising the symptom after the fact.
+ *
+ * Rebase shipped straight into this: it creates a schema named `rebase` while
+ * every template named the database role `rebase` too. The scaffold uses
+ * `rebase_app` now, and every pool Rebase opens pins `search_path=public`
+ * (`pinSearchPath`), which covers the paths the framework controls. This covers
+ * the ones it does not — `psql`, `pg_dump`, drizzle-kit, a colleague's script,
+ * a hand-written migration — because the hazard is a property of the two NAMES,
+ * not of any one connection.
+ *
+ * A warning rather than a boot failure: the database works, the framework's own
+ * traffic is pinned, and refusing to start over a naming choice a user may have
+ * inherited would be worse than the risk.
+ */
+export async function warnOnRoleSchemaCollision(run: RawSqlRunner): Promise<void> {
+    try {
+        const rows = await run(`
+            SELECT current_user AS role,
+                   EXISTS (
+                       SELECT 1 FROM pg_namespace n WHERE n.nspname = current_user
+                   ) AS collides
+        `);
+        if (rows[0]?.collides !== true) return;
+        const role = String(rows[0]?.role ?? "the connection role");
+        logger.warn(
+            `⚠️  The database role "${role}" has the same name as a schema. Postgres resolves unqualified ` +
+            `names through \`search_path\`, which defaults to \`"$user", public\` — so "${role}" is searched ` +
+            `BEFORE public, and any unqualified \`CREATE TABLE\`/\`SELECT\` from a tool that does not pin the ` +
+            `path (psql, pg_dump, drizzle-kit, a hand-written migration) silently lands in "${role}" instead. ` +
+            `Rebase's own connections pin \`search_path=public\`, so the server is unaffected. To remove the ` +
+            `hazard entirely, connect as a role whose name is not also a schema — the scaffold uses ` +
+            `"rebase_app".`
+        );
+    } catch {
+        // A diagnostic must never be the reason a boot fails.
+    }
+}
 
 export async function detectConnectionPosture(run: RawSqlRunner): Promise<ConnectionPosture> {
     const rows = await run(`
@@ -318,6 +370,65 @@ export function warnOnAnonymousGrants(
         `true for everyone:\n\n` +
         problems.join("\n\n") + "\n"
     );
+}
+
+/**
+ * Name the collections whose raw policy SQL still calls the pre-1.0 helpers.
+ *
+ * The compiler rewrites `auth.uid()` to `rebase.uid()` on the way into the
+ * database, so nothing is broken and no policy is wrong — which is exactly why
+ * this has to be said out loud. A silent rewrite that works forever is not a
+ * migration, it is a second supported spelling nobody wrote down, and the next
+ * person to read those rules will copy the old one.
+ *
+ * Only `raw` expressions can carry it. Structured rules (`policy.authUid()`,
+ * `policy.rolesOverlap(...)`) compile from the model and were never affected.
+ */
+export function warnOnLegacyRlsFunctions(
+    collections: { slug?: string; securityRules?: readonly SecurityRule[] }[]
+): void {
+    const sites: string[] = [];
+
+    for (const collection of collections) {
+        for (const rule of collection.securityRules ?? []) {
+            const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
+            const carriesLegacy = [usingExpr, withCheckExpr]
+                .filter((e): e is PolicyExpression => e !== null)
+                .some(containsLegacyRlsCall);
+            if (!carriesLegacy) continue;
+
+            const site = `${collection.slug ?? "(unnamed)"} → "${rule.name ?? "(unnamed rule)"}"`;
+            if (!sites.includes(site)) sites.push(site);
+        }
+    }
+
+    if (sites.length === 0) return;
+
+    logger.warn(
+        `These security rules call the pre-1.0 RLS helpers (\`auth.uid()\`, \`auth.roles()\`, \`auth.jwt()\`). ` +
+        `They still work — the compiler rewrites them — but the functions now live in the \`rebase\` schema, ` +
+        `and the \`auth\` one is Supabase's. Update the raw SQL in these rules to \`${REBASE_SCHEMA}.uid()\` ` +
+        `and friends, or switch them to the structured helpers (\`policy.authUid()\`, \`policy.rolesOverlap()\`), ` +
+        `which never had to be spelled by hand:\n\n` +
+        sites.map(s => `  • ${s}`).join("\n") + "\n"
+    );
+}
+
+/** Whether any `raw` expression in the tree calls a pre-1.0 helper. */
+function containsLegacyRlsCall(expr: PolicyExpression): boolean {
+    switch (expr.kind) {
+        case "raw":
+            return usesLegacyRlsFunctions(expr.sql);
+        case "and":
+        case "or":
+            return expr.operands.some(containsLegacyRlsCall);
+        case "not":
+            return containsLegacyRlsCall(expr.operand);
+        case "existsIn":
+            return containsLegacyRlsCall(expr.where);
+        default:
+            return false;
+    }
 }
 
 /**

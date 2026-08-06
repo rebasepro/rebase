@@ -29,7 +29,9 @@ describe("warnOnAnonymousGrants", () => {
     it("reports both mistakes in the rule from the wild", () => {
         const warning = captureWarning(() => warnOnAnonymousGrants([collectionWith("talents", FROM_THE_WILD)]));
 
-        expect(warning).toContain("auth.uid() IS NOT NULL");
+        // The rule is written in the pre-1.0 spelling and must still be
+        // detected; the advice is printed in the current one.
+        expect(warning).toContain("rebase.uid() IS NOT NULL");
         expect(warning).toContain("'anon' is a Supabase convention");
         expect(warning).toContain("policy.authenticated()");
     });
@@ -51,7 +53,7 @@ describe("warnOnAnonymousGrants", () => {
     it("catches the bare tautology, which carries no literal to notice", () => {
         const warning = captureWarning(() => warnOnAnonymousGrants([collectionWith("talents", "auth.uid() IS NOT NULL")]));
 
-        expect(warning).toContain("auth.uid() IS NOT NULL");
+        expect(warning).toContain("rebase.uid() IS NOT NULL");
         expect(warning).not.toContain("Supabase convention");
     });
 

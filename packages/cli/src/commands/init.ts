@@ -1155,7 +1155,7 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
                 // sslmode=disable: the paired docker-compose Postgres has no TLS,
                 // and Go-based tooling (atlas, via `rebase db push`) defaults to
                 // requiring SSL when the URL doesn't say otherwise.
-                `DATABASE_URL=postgresql://rebase:${dbPassword}@localhost:${dbPort}/rebase?options=-c%20search_path=public&sslmode=disable\nDATABASE_PASSWORD=${dbPassword}`
+                `DATABASE_URL=postgresql://rebase_app:${dbPassword}@localhost:${dbPort}/rebase?options=-c%20search_path=public&sslmode=disable\nDATABASE_PASSWORD=${dbPassword}`
             );
 
             // Also update docker-compose.yml with the dynamic host port if it has the default 5432 port mapping
