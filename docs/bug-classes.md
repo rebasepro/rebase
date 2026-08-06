@@ -987,6 +987,99 @@ they pop two panels, because each reads a ref the previous one already wrote.
 
 ---
 
+## 29. The fallback branch that stubs out the contract the primary one honours
+
+One operation, two implementations chosen at runtime: a live one and a one-shot
+one. The live implementation returns a real teardown, and everything downstream
+is written against that — a `useEffect` cleanup, a `cleanupSubscription()`, a
+ref holding "the current unsubscribe". The one-shot implementation returns
+`() => {}`, and every one of those mechanisms goes on calling it, getting
+nothing, and reporting success.
+
+The contract is satisfied by the type and not by the behaviour, which is why it
+survives review: the signatures match, both branches return a function, and the
+call sites are identical. What differs is that one of them can actually stop
+something.
+
+`useCollection`, `useFetch` and `useRelationSelector` each had this pair. The
+live branch (`accessor.listen` / `listenById`) unsubscribes on cleanup; the
+fallback fired a promise and returned an empty function. The effects' own
+dependencies — the search string, the filters, the sort, the page, the entity
+id — all change while a request is in flight, so the surviving result was
+whichever response the server happened to finish last, and responses do not
+come back in the order they were asked for. Typing into a collection search
+could settle on the results for a prefix of what you typed, with the spinner
+already cleared and nothing to indicate it.
+
+**Sweep:** grep the stub, not the concept — `return () => {}` and
+`= () => {}` in any position where a caller will hold the result as a
+cancellation. Four in the workspace, three of them this bug. Then read *both*
+sides of every branch that returns a teardown and ask what the empty one was
+supposed to stop.
+
+**Watch for:** which branch the deployment actually takes. Both live methods
+here are assigned under `if (ws)` — the client defines them only when it has a
+websocket — so the guarded path is the one that runs in development and the
+stubbed path is the one that runs anywhere realtime is off. The safer-looking
+half of the code is the half that gets exercised; the fallback is reached by
+the configurations least likely to be tested, which is the same reason it was
+written more carelessly.
+
+**Watch for, too:** a promise is not a subscription and cannot be made into
+one. The fix is not to find a cancel method — it is for the cleanup to *disown*
+the result (`let cancelled = false` … `if (cancelled) return`). The request
+still completes and its answer is still paid for; what changes is that it is no
+longer allowed to write into a slot that has moved on.
+
+---
+
+## 30. A claim on a shared input that the mechanism cannot actually make
+
+A component knows it is sharing something global — a key, a scroll container, a
+drag — and writes the line that claims it. The line is real, the API exists, and
+in the position it was written from it does nothing at all. Nothing throws,
+because the call is valid; it simply governs a different axis than the one the
+author needed.
+
+Escape in the panel: `EntityInspector` claimed the key with `stopPropagation()`
+from a `window` listener, while the split view held its own `window` listener
+that closes the record. `stopPropagation` governs an event's travel *between*
+elements and says nothing about the other listeners on the element it is called
+from, so both ran — and pressing Escape to dismiss the inspector navigated the
+whole record panel away with it.
+
+The sibling half is worse: `stopImmediatePropagation` *would* have stopped it,
+and would still have been wrong, because same-element listeners run in
+registration order and the layer that opens later registers later. A component
+that only exists while it is open can never claim a key from a component that
+has been mounted since the route loaded. Precedence that depends on mount order
+is not precedence.
+
+**Sweep:** for every global listener, write down the *element* and the *phase*,
+not just the event. `grep -n 'addEventListener("keydown"' -r` gave nine in the
+panel across `window` and `document`, capture and bubble. Owners on the same
+element in the same phase cannot arbitrate between themselves at all; a capture
+listener on `document` runs before every bubble listener on `window`, and there
+`stopPropagation` is sufficient and mount-order-independent. That is the idiom
+the relation and user selectors already used, so the fix was to stop inventing
+a second one. Pinned in `escape_key_ownership.test.tsx`.
+
+**Watch for:** the ad-hoc precedence rule that is already there. The split view
+skips its Escape handling when `document.querySelector('[role="dialog"][data-state="open"]')`
+matches — a real rule, hard-coded, and silent about every overlay that is not a
+Radix dialog. The inspector is `role="complementary"`, so it was invisible to
+the one guard written to protect it. A precedence rule expressed as a selector
+against someone else's markup only covers the cases its author could enumerate.
+
+**Watch for, too:** proving the mechanism before fixing the instance. The first
+harness written for this dispatched the event on `window`, where the event's
+path is one element long and never reaches `document` — every capture listener
+in the app looks dead under it, and the "fix" it endorses is the wrong one. A
+keystroke targets the focused element. Test the propagation path you actually
+have.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -1329,3 +1422,28 @@ for `navigate(` and came back with a clean-looking picture, because the one
 broken handler in the package does not contain the string. A sweep is only as
 good as its recipe naming every *spelling* of the thing it hunts.
 
+
+
+### Last sweep — 2026-08-06, more of class 28's family
+
+Class 28 is one shape of a wider family: **a single-slot resource with more
+than one owner, and nothing expressing which write should survive**. One URL,
+one visible list of rows, one focused element, one keystroke. This pass went
+looking for the other slots rather than for more navigations.
+
+| checked | result |
+|---|---|
+| every global keydown listener in the panel (nine, across `window`/`document` × capture/bubble) | **BUG** (class 30) — `EntityInspector` claimed Escape with `stopPropagation` from a `window` bubble listener, against the split view's `window` bubble listener that closes the record. Same element, same phase: both ran, and Escape aimed at the inspector navigated the record panel away. Moved to `document` capture, the idiom the relation and user selectors already used. |
+| the mechanism, before fixing the instance | **the first harness was wrong and endorsed the wrong fix** — it dispatched keydown on `window`, giving the event a one-element path that never reaches `document`, so the working idiom looked dead. Four mechanics now pinned in `escape_key_ownership.test.tsx`, including that `stopImmediatePropagation` would also have failed here, because same-element listeners run in registration order and the layer that opens later registers later. |
+| `return () => {}` as a cancellation, workspace-wide | **BUG** ×3 (class 29) — `useCollection`, `useFetch`, `useRelationSelector`. Live branch unsubscribes, one-shot branch returns an empty function, and the effect dependencies that change mid-flight are the search string, the filters, the sort, the page and the entity id. Guarded; the gate was verified by breaking it. |
+| which branch actually runs | the stubbed one, wherever realtime is off — both live methods are assigned under `if (ws)` in the SDK. This is what moved the three from latent to reachable. |
+| `useResolvedUsers`, `useAsyncResolver`, the two collection-config controllers, `Rebase.tsx`'s storage sources | clean — all five already carry a `cancelled`/`active` guard. The idiom existed; the data hooks were the ones that had missed it. |
+| the client SDK's own single-row read | clean, and worth reading as the reference: it tracks `closed`, `liveDelivered` and a payload `signature`, so a `findById` that resolves after live data has arrived is dropped rather than replayed. The transport got this right and the hooks above it did not. |
+| two `snackbarController.open` / `dialogsController.open` in one handler | clean — 31 snackbar call sites, none paired within a handler. |
+
+The reusable half of this sweep is the grep. Class 28's recipe had to be
+corrected because `navigate(` did not name the controller wrappers; this one
+worked first time because `return () => {}` is the *stub itself* rather than a
+description of it. Prefer hunting the artifact a defect leaves behind over
+hunting the situation that produces it — one is a string, the other is a
+judgement call.
