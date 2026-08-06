@@ -28,6 +28,7 @@ import { ReferencePreview } from "../../preview";
 import {
     CollectionScopeProvider,
     OnColumnResizeParams,
+    getRedundantChildViewColumnIds,
     useAnalyticsController,
     useAuthController,
     useColumnIds,
@@ -687,7 +688,16 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             // Each child view gets a column that jumps to its tab. Keyed by the
             // view's collection slug, which is the relation key — two relations
             // to the same target used to collapse onto one column id here.
-            const subcollectionsList = getEntityChildViews(collection).map(v => v.collection as AdminCollection);
+            //
+            // Except where the relation was declared as a property and so already
+            // has a column showing the child rows: the button then repeated that
+            // column's heading verbatim. Filtered here as well as in
+            // `useColumnIds` so no id is displayed without a delegate to build it,
+            // and so the column picker does not offer the one back.
+            const redundant = getRedundantChildViewColumnIds(collectionWithLocalOrder);
+            const subcollectionsList = getEntityChildViews(collection)
+                .map(v => v.collection as AdminCollection)
+                .filter(child => !redundant.has(getSubcollectionColumnId(child)));
             const subcollectionColumns: AdditionalFieldDelegate<M, any>[] = subcollectionsList.map((subcollection: AdminCollection) => {
                 return {
                     key: getSubcollectionColumnId(subcollection),
@@ -720,7 +730,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 ...(collection.additionalFields ?? EMPTY_ARRAY),
                 ...subcollectionColumns
             ];
-        }, [collection, path, sidePanelController]);
+        }, [collection, collectionWithLocalOrder, path, sidePanelController]);
 
         const updateLastDeleteTimestamp = useCallback(() => {
             setLastDeleteTimestamp(Date.now());

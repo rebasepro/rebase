@@ -1,7 +1,7 @@
 import type { Property, MapProperty, Properties, RelationProperty } from "@rebasepro/types";
 import { useMemo } from "react";
 ;
-import { getChildViewRelationPropertyKeys, getSubcollections } from "@rebasepro/common";
+import { getChildViewDeclaringProperties, getChildViewRelationPropertyKeys, getSubcollections } from "@rebasepro/common";
 import type { AdminCollection } from "@rebasepro/admin-types";
 import { getPropertyInPath } from "../../collections/property-path";
 import { isDisabled } from "../../collections/property_presentation";
@@ -14,6 +14,43 @@ export type PropertyColumnConfig = {
 export function getSubcollectionColumnId(collection: AdminCollection<any>) {
     return `subcollection:${collection.slug}`;
 }
+
+/**
+ * The jump-to-tab columns a collection table does not need, because the relation
+ * behind them already has a column of its own.
+ *
+ * Every child view gets a 200px button column that opens its tab. For a relation
+ * declared in `relations` that button is the relation's only presence in the
+ * table. For one declared as a property it is the second: the property's own
+ * column is already there, hydrated by the list fetch's `include: ["*"]`, showing
+ * the child rows themselves — and carrying the *same heading*, because the tab
+ * takes its name from the declaring property. Two columns called "Applications",
+ * one of them a button, and nothing in the header to tell them apart.
+ *
+ * The property column wins: it shows what the children are, and each chip in it
+ * opens one. The tab stays reachable by opening the record, which is what the
+ * rest of the table's rows do anyway.
+ *
+ * Unless the author hid that column — `hideFromCollection` on the property, or a
+ * `propertiesOrder` that omits it, is a statement about the column and not about
+ * the relation, so the button comes back rather than the relation dropping out
+ * of the table altogether.
+ */
+export function getRedundantChildViewColumnIds<M extends Record<string, any>>(collection: AdminCollection<M>): Set<string> {
+    const redundant = new Set<string>();
+    const properties = collection.properties ?? {};
+    const order = collection.propertiesOrder as string[] | undefined;
+
+    for (const [viewKey, propertyKey] of getChildViewDeclaringProperties(collection)) {
+        const property = properties[propertyKey] as Property | undefined;
+        if (!property || property.admin?.hideFromCollection) continue;
+        if (order && !order.includes(propertyKey)) continue;
+        redundant.add(`subcollection:${viewKey}`);
+    }
+
+    return redundant;
+}
+
 export function useColumnIds<M extends Record<string, any>>(collection: AdminCollection<M>, includeSubcollections: boolean): PropertyColumnConfig[] {
     return useMemo(() => {
         if (collection.propertiesOrder) {
@@ -41,9 +78,14 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: AdminColle
     // Track processed keys to avoid duplicates
     const processedPropertyKeys = new Set<string>();
 
+    // Both column paths funnel through here, including a `propertiesOrder` that
+    // was saved back with the button column in it.
+    const redundantChildViewColumns = getRedundantChildViewColumnIds(collection);
+
     const result = keys.flatMap((key) => {
         // Skip if already processed (handles duplicates in propertiesOrder)
         if (processedPropertyKeys.has(key)) return [null];
+        if (redundantChildViewColumns.has(key)) return [null];
 
         // Check if it's a top-level property
         const property = collection.properties[key];

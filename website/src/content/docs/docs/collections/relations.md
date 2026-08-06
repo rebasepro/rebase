@@ -211,8 +211,16 @@ The cardinality decides the surface, and only one surface is used:
   dropdown is not something the form can meaningfully offer.
 
 Declaring a many-relation as a property is still worth doing — it is what names
-the tab, and what gives the relation a key a table column and an `include` can
-address. Only the form field is dropped.
+the tab, and what gives the relation a column in the collection table, which the
+list fetch hydrates so the child rows show up as chips on the row. Only the form
+field is dropped.
+
+In the table, a relation with a property of its own gets **one** column: its own.
+Every tab also has a jump-to-tab button column, but for a property-declared
+relation that button repeated the same heading beside a column already showing
+the children, so it is dropped. Hide the relation's column
+(`admin: { hideFromCollection: true }`) and the button comes back, so the
+relation never falls out of the table entirely.
 
 If you want the inline picker anyway, ask for it:
 

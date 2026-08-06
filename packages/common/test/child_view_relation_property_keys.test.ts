@@ -1,5 +1,5 @@
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
-import { getChildViewRelationPropertyKeys, getEntityChildViews } from "../src/util";
+import { getChildViewDeclaringProperties, getChildViewRelationPropertyKeys, getEntityChildViews } from "../src/util";
 import type { CollectionConfig } from "@rebasepro/types";
 
 /**
@@ -61,6 +61,23 @@ describe("getChildViewRelationPropertyKeys", () => {
         expect(getChildViewRelationPropertyKeys(resolved).size).toBe(0);
     });
 
+    it("pairs the tab with the property, in both directions", () => {
+        // The table needs the view key (to name the button column it drops) and
+        // the property key (to check whether that property yields a column at
+        // all), so the answer has to be a pairing rather than either set alone.
+        const talents = collection({
+            id: { type: "string" },
+            "talent-applications": {
+                type: "relation",
+                relation: { kind: "hasMany", target: () => applications, foreignKeyOnTarget: "talent_id" }
+            }
+        });
+        const registry = new CollectionRegistry([talents, applications]);
+
+        expect([...getChildViewDeclaringProperties(registry.get("talents")!)])
+            .toEqual([["talent-applications", "talent-applications"]]);
+    });
+
     it("matches on the relation name, not the property key", () => {
         // The relation is declared in `relations` under one name and pointed at
         // by a property under another. The tab is keyed by the relation; the form
@@ -78,6 +95,8 @@ describe("getChildViewRelationPropertyKeys", () => {
 
         expect(getEntityChildViews(resolved).map(v => v.key)).toEqual(["sent_applications"]);
         expect([...getChildViewRelationPropertyKeys(resolved)]).toEqual(["applications_field"]);
+        expect([...getChildViewDeclaringProperties(resolved)])
+            .toEqual([["sent_applications", "applications_field"]]);
     });
 
     it("keeps a relation nested in a map, which gets no tab of its own", () => {

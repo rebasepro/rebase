@@ -450,53 +450,75 @@ singularName: customName } : {})
 }
 
 /**
- * The property keys of `collection` whose relation is already one of its tabs.
+ * Each of `collection`'s tabs paired with the property that declared it, when a
+ * property declared it: child view key → property key.
  *
  * A many-relation can only be declared as a property — that is the documented
- * and only mechanism — and {@link getEntityChildViews} promotes it to a tab.
- * Nothing marked it as consumed, so the form went on rendering the same
- * relation a second time as a picker: one declaration, two surfaces, and the
- * picker is not a usable input for a collection's children.
+ * and only mechanism — and {@link getEntityChildViews} promotes it to a tab. So
+ * one declaration reaches the panel twice, and neither surface knew about the
+ * other. The form rendered a relation picker beside the tab, and the collection
+ * table rendered *two* columns under one heading: the relation's own column,
+ * showing the child rows, and a jump-to-tab button carrying the same name.
  *
- * Keyed by property key rather than by relation key because that is what a form
- * addresses a field by, and the two differ whenever a relation is named. The
- * match is on the resolved `relationName` — the identity `getEntityChildViews`
- * itself dedupes on — so a relation declared in `relations` and pointed at by a
- * differently-named property is still recognised as already surfaced.
+ * The pairing is what lets each surface decide which half is redundant, and it
+ * has to be a pairing rather than two sets because the two keys differ whenever
+ * a relation is named. The match is on the resolved `relationName` — the
+ * identity `getEntityChildViews` itself dedupes on — so a relation declared in
+ * `relations` and pointed at by a differently-named property is recognised too.
  *
- * Only top-level properties: a relation nested inside a `map` gets no tab, so
- * its picker is the only surface it has and must stay.
+ * A relation with no property of its own is absent here, which is the point: it
+ * has exactly one surface already, and nothing to weigh it against.
+ *
+ * Only top-level properties: a relation nested inside a `map` gets no tab.
  */
-export function getChildViewRelationPropertyKeys<M extends Record<string, unknown> = Record<string, unknown>>(
+export function getChildViewDeclaringProperties<M extends Record<string, unknown> = Record<string, unknown>>(
     collection: CollectionConfig<M>
-): Set<string> {
-    const keys = new Set<string>();
+): Map<string, string> {
+    const pairs = new Map<string, string>();
 
     const relationProperties = Object.entries((collection.properties ?? {}) as Record<string, Property>)
         .filter(([, property]) => property?.type === "relation");
-    if (relationProperties.length === 0) return keys;
+    if (relationProperties.length === 0) return pairs;
 
     const relationViews = getEntityChildViews(collection)
         .filter(view => view.source.kind === "relation");
-    if (relationViews.length === 0) return keys;
+    if (relationViews.length === 0) return pairs;
 
     const resolvedRelations = resolveCollectionRelations(collection);
     const identityOf = (relationKey: string): string =>
         resolvedRelations[relationKey]?.relationName ?? relationKey;
 
-    const surfaced = new Set(relationViews.map(view =>
-        identityOf((view.source as { relationKey: string }).relationKey)));
-
+    const declaringPropertyByIdentity = new Map<string, string>();
     for (const [propertyKey, property] of relationProperties) {
         const relation = (property as RelationProperty).resolvedRelation ?? resolvedRelations[propertyKey];
-        // A to-one relation is a foreign key the author edits, never a tab. It
-        // cannot reach `surfaced` — that set is built from many-relations only —
-        // but reading the cardinality says so at the call site.
+        // A to-one relation is a foreign key the author edits, never a tab. No
+        // view will match it — the views here are many-relations only — but
+        // reading the cardinality says so where someone is looking.
         if (relation?.cardinality !== "many") continue;
-        if (surfaced.has(relation.relationName ?? propertyKey)) keys.add(propertyKey);
+        const identity = relation.relationName ?? propertyKey;
+        if (!declaringPropertyByIdentity.has(identity)) declaringPropertyByIdentity.set(identity, propertyKey);
     }
 
-    return keys;
+    for (const view of relationViews) {
+        const propertyKey = declaringPropertyByIdentity.get(
+            identityOf((view.source as { relationKey: string }).relationKey));
+        if (propertyKey) pairs.set(view.key, propertyKey);
+    }
+
+    return pairs;
+}
+
+/**
+ * The property keys of `collection` whose relation is already one of its tabs.
+ *
+ * What a form asks: the tab is the treatment for a list of child rows, so the
+ * picker beside it is the redundant half. See
+ * {@link getChildViewDeclaringProperties}.
+ */
+export function getChildViewRelationPropertyKeys<M extends Record<string, unknown> = Record<string, unknown>>(
+    collection: CollectionConfig<M>
+): Set<string> {
+    return new Set(getChildViewDeclaringProperties(collection).values());
 }
 
 /**
