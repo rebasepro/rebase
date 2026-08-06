@@ -1575,8 +1575,16 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
     // The server client is assembled dynamically above (native data plane,
     // dataAsAdmin, email, sql attached via Object.assign), so TS can't see the
-    // full RebaseServerClient shape statically — cast at the boundary.
-    _initRebase(serverClient as unknown as import("@rebasepro/types").RebaseServerClient);
+    // full RebaseServerClient shape statically — assert once, here.
+    //
+    // Named rather than cast inline because there are two consumers, and while
+    // each cast separately they could disagree about what they were receiving:
+    // the cron scheduler took a `RebaseClient`, which re-exposed the `data`
+    // alias that `RebaseServerClient` deliberately omits so the RLS-bypassing
+    // plane has exactly one name. Both now take this value, so "the singleton"
+    // means one type in one place.
+    const serverSingleton = serverClient as unknown as import("@rebasepro/types").RebaseServerClient;
+    _initRebase(serverSingleton);
     logger.info("Rebase singleton initialized");
 
     // Retroactively inject the server client into the driver so that
@@ -1665,9 +1673,10 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
 
         cronScheduler = new CronScheduler();
 
-        // The cron scheduler uses the same serverClient as the singleton.
-        // ctx.client inside cron handlers IS the same `rebase` instance.
-        cronScheduler.setClient(serverClient);
+        // The cron scheduler gets the singleton itself, so `ctx.rebase` inside a
+        // cron handler IS the `rebase` you would import — same object, same type,
+        // same `dataAsAdmin` spelling for the RLS-bypassing plane.
+        cronScheduler.setClient(serverSingleton);
 
         if (loadedCronJobs.length > 0) {
             cronScheduler.registerJobs(loadedCronJobs);

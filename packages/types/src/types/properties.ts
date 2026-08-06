@@ -225,7 +225,7 @@ export interface BaseProperty<CustomProps = unknown> {
      * written and queryable server-side; it is stripped from every row the API
      * serves, for every caller, including admins and service keys.
      *
-     * This is a server-side guarantee, unlike `ui.hideFromCollection`, which
+     * This is a server-side guarantee, unlike `admin.hideFromCollection`, which
      * only stops the admin panel from *rendering* a field and leaves it in the
      * JSON payload.
      */

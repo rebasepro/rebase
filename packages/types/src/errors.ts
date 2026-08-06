@@ -1,4 +1,43 @@
 /**
+ * The error codes every route can produce, as `RebaseApiError.code`.
+ *
+ * These are the defaults on `ApiError`'s static constructors server-side, so
+ * any endpoint can answer with one. They are **not** the complete set: routes
+ * pass their own more specific codes too (`EMAIL_EXISTS`, `TOKEN_EXPIRED`,
+ * `INVALID_BULK_BODY`, …), and auth alone defines a couple of dozen.
+ *
+ * Hence the union is deliberately open rather than closed. It exists to give
+ * autocomplete and to catch a typo in the common cases — `code` was a bare
+ * `string`, so `e.code === "NOT_FOUND"` and `e.code === "NOTFOUND"` were
+ * equally valid and only one of them worked. Closing it would be a lie that
+ * broke the moment a route added a code.
+ *
+ * @example
+ * if (e instanceof RebaseApiError) {
+ *   switch (e.code) {
+ *     case "NOT_FOUND": return null;          // completed
+ *     case "FORBIDDEN": return redirect();
+ *     default: throw e;                       // routes' own codes land here
+ *   }
+ * }
+ *
+ * @group Errors
+ */
+export type RebaseErrorCode =
+    | "BAD_REQUEST"
+    | "UNAUTHORIZED"
+    | "FORBIDDEN"
+    | "NOT_FOUND"
+    | "CONFLICT"
+    | "INTERNAL_ERROR"
+    | "SERVICE_UNAVAILABLE"
+    | "DB_PERMISSION_DENIED"
+    | "SCHEMA_DRIFT"
+    // `string & {}` keeps the union open while preserving completion on the
+    // literals above — a bare `| string` would collapse them and offer nothing.
+    | (string & {});
+
+/**
  * Structured initializer for {@link RebaseApiError}.
  *
  * @group Errors
@@ -10,8 +49,8 @@ export interface RebaseErrorInit {
      * logic errors that have no HTTP status.
      */
     status?: number;
-    /** Stable, machine-readable error code (e.g. `"NOT_FOUND"`, `"BAD_REQUEST"`). */
-    code?: string;
+    /** Stable, machine-readable error code. See {@link RebaseErrorCode}. */
+    code?: RebaseErrorCode;
     /** Structured error payload returned by the server, when present. */
     details?: unknown;
     /** The underlying error this one wraps, if any. */
@@ -45,8 +84,8 @@ export interface RebaseErrorInit {
 export class RebaseApiError extends Error {
     /** HTTP status code, or `undefined` for non-HTTP errors. */
     readonly status?: number;
-    /** Stable machine-readable error code, when the server supplied one. */
-    readonly code?: string;
+    /** Stable machine-readable error code, when the server supplied one. See {@link RebaseErrorCode}. */
+    readonly code?: RebaseErrorCode;
     /** Structured error payload from the server, when present. */
     readonly details?: unknown;
 

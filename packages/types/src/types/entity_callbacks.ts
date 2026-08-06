@@ -8,7 +8,8 @@ import type { RebaseCallContext } from "../call_context";
  *
  * Register per-collection on the collection's `callbacks` field, or globally
  * via `initializeRebaseBackend({ callbacks })`. Fires on **every** data path — REST API,
- * WebSocket / realtime subscriptions, and server-side `rebase.data`.
+ * WebSocket / realtime subscriptions, and server-side writes through
+ * `rebase.dataAsAdmin`.
  *
  * When both global and per-collection callbacks are registered, execution
  * order is: **global → collection → property callbacks**.

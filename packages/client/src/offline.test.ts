@@ -16,7 +16,7 @@ type Row = Record<string, unknown>;
 function createFakeServer() {
     const state = { online: true };
     const tables = new Map<string, Map<string, Row>>();
-    const log: { collection: string; op: string; id?: unknown; upsert?: boolean }[] = [];
+    const log: { collection: string; op: string; id?: unknown; ids?: unknown[]; upsert?: boolean }[] = [];
 
     function table(slug: string): Map<string, Row> {
         if (!tables.has(slug)) tables.set(slug, new Map());
@@ -67,10 +67,29 @@ function createFakeServer() {
                 table(slug).set(String(id), row);
                 return row;
             },
+            async updateMany(updates: { id: string | number; data: Partial<Row> }[]) {
+                assertOnline();
+                log.push({ collection: slug, op: "updateMany", ids: updates.map(u => u.id) });
+                return updates.map(({ id, data }) => {
+                    const existing = table(slug).get(String(id));
+                    if (!existing) throw new RebaseApiError("Not found", { status: 404 });
+                    const row = { ...existing, ...data };
+                    table(slug).set(String(id), row);
+                    return row;
+                });
+            },
             async delete(id: string | number) {
                 assertOnline();
                 log.push({ collection: slug, op: "delete", id });
                 table(slug).delete(String(id));
+            },
+            async deleteMany(ids: (string | number)[]) {
+                assertOnline();
+                log.push({ collection: slug, op: "deleteMany", ids });
+                for (const id of ids) {
+                    if (!table(slug).has(String(id))) throw new RebaseApiError("Not found", { status: 404 });
+                }
+                for (const id of ids) table(slug).delete(String(id));
             },
             async count(_params?: FindParams) {
                 assertOnline();
@@ -500,6 +519,100 @@ describe("OfflineManager", () => {
             await manager.sync();
             expect(server.log).toEqual([{ collection: "posts", op: "createMany", upsert: true }]);
             expect(server.table("posts").size).toBe(2);
+        });
+    });
+
+    describe("updateMany / deleteMany", () => {
+        it("queues a bulk update offline, overlays it, and replays it once", async () => {
+            const server = createFakeServer();
+            const { manager, wrap } = createManager(server);
+            const posts = wrap("posts");
+            await posts.create({ title: "a" });
+            await posts.create({ title: "b" });
+            const seeded = (await posts.find()).data;
+
+            server.state.online = false;
+            const updated = await posts.updateMany(
+                seeded.map((r) => ({ id: r.id as string, data: { title: `${r.title}!` } }))
+            );
+            expect(updated.map((r) => r.title)).toEqual(["a!", "b!"]);
+
+            // The overlay is what a UI renders while the write is queued.
+            const overlaid = await posts.find();
+            expect(overlaid.data.map((r) => r.title).sort()).toEqual(["a!", "b!"]);
+
+            server.state.online = true;
+            await manager.sync();
+            const bulk = server.log.filter((e) => e.op === "updateMany");
+            expect(bulk).toHaveLength(1);
+            expect([...server.table("posts").values()].map((r) => r.title).sort()).toEqual(["a!", "b!"]);
+        });
+
+        it("queues a bulk delete offline, hides the rows, and replays it once", async () => {
+            const server = createFakeServer();
+            const { manager, wrap } = createManager(server);
+            const posts = wrap("posts");
+            await posts.create({ title: "a" });
+            await posts.create({ title: "b" });
+            await posts.create({ title: "c" });
+            const seeded = (await posts.find()).data;
+
+            server.state.online = false;
+            await posts.deleteMany(seeded.slice(0, 2).map((r) => r.id as string));
+
+            const overlaid = await posts.find();
+            expect(overlaid.data.map((r) => r.title)).toEqual(["c"]);
+
+            server.state.online = true;
+            await manager.sync();
+            const bulk = server.log.filter((e) => e.op === "deleteMany");
+            expect(bulk).toHaveLength(1);
+            expect([...server.table("posts").values()].map((r) => r.title)).toEqual(["c"]);
+        });
+
+        it("queues a bulk update whose rows have writes still pending", async () => {
+            // Splitting the batch — some rows now, some later — would break the
+            // one guarantee a batch makes, and would reorder a write against a
+            // row whose own create has not landed yet.
+            const server = createFakeServer();
+            const { manager, wrap } = createManager(server);
+            const posts = wrap("posts");
+            await posts.find();
+
+            server.state.online = false;
+            const created = await posts.create({ title: "fresh" });
+            await posts.updateMany([{ id: created.id as string, data: { title: "edited" } }]);
+
+            server.state.online = true;
+            await manager.sync();
+
+            // The create ran first, then the batch — order preserved.
+            expect(server.log.map((e) => e.op)).toEqual(["create", "updateMany"]);
+            expect([...server.table("posts").values()][0].title).toBe("edited");
+        });
+
+        it("goes straight to the server when online", async () => {
+            const server = createFakeServer();
+            const { wrap } = createManager(server);
+            const posts = wrap("posts");
+            const a = await posts.create({ title: "a" });
+
+            await posts.updateMany([{ id: a.id as string, data: { title: "A" } }]);
+            expect(server.table("posts").get(String(a.id))!.title).toBe("A");
+
+            await posts.deleteMany([a.id as string]);
+            expect(server.table("posts").size).toBe(0);
+        });
+
+        it("treats empty input as a no-op that touches neither queue nor server", async () => {
+            const server = createFakeServer();
+            const { wrap } = createManager(server);
+            const posts = wrap("posts");
+            await posts.find();
+
+            expect(await posts.updateMany([])).toEqual([]);
+            await posts.deleteMany([]);
+            expect(server.log.filter((e) => e.op.endsWith("Many"))).toHaveLength(0);
         });
     });
 

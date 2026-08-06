@@ -362,7 +362,22 @@ export interface RebaseClient<DB = unknown> {
     /** Resolve the current auth token */
     resolveToken?(): Promise<string | null>;
 
-    /** Make a raw HTTP call to the backend */
+    /**
+     * POST to an arbitrary path on the backend — the escape hatch, not the way
+     * to call a function.
+     *
+     * For a custom function use {@link functions}`.invoke(name, payload)`: it
+     * targets `/functions/<name>`, takes a method and sub-path, and returns the
+     * response body as sent. This posts wherever you point it and **unwraps**:
+     * it returns `res.data` when the response has a `data` property and the
+     * whole envelope otherwise — so an endpoint that legitimately answers
+     * `{ data: null }` hands back the envelope rather than `null`. Two ways to
+     * reach a function with two different response contracts is a trap; this is
+     * the one that exists for paths `invoke` cannot express.
+     *
+     * @internal Prefer `functions.invoke()`. Kept public because a backend can
+     * mount routes outside `/functions`, and nothing else reaches those.
+     */
     call?<T = unknown>(endpoint: string, payload?: unknown): Promise<T>;
 
     /**
@@ -408,85 +423,6 @@ export interface RebaseServerClient<DB = unknown> extends Omit<RebaseClient<DB>,
      * `params`, referenced as `$1`, `$2`, … placeholders in the query text.
      */
     sql(query: string, options?: { database?: string; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
-}
-
-// ─── RebaseBrowserClient ─────────────────────────────────────────────────────
-
-/**
- * The browser-side Rebase surface — the shape produced by
- * `createRebaseClient()` in `@rebasepro/client`.
- *
- * Its {@link data} accessor is **user-scoped**: every call carries the signed-in
- * user's token, so backend RLS policies apply. It deliberately omits the
- * server-only members — there is no `sql`, no `email`, and no
- * `dataAsAdmin`, so the RLS-bypassing accessor can never be reached from
- * browser code.
- */
-export interface RebaseBrowserClient<DB = unknown> {
-    /** User-scoped data access layer (carries the signed-in user's token). */
-    data: RebaseSdkData<DB>;
-
-    /** Unified Authentication layer */
-    auth: AuthClient;
-
-    /** Unified Storage layer (default storage source, backward-compatible) */
-    storage?: StorageSource;
-
-    /** Registry of all named storage sources for multi-backend support */
-    storageRegistry?: StorageSourceRegistry;
-
-    /** Build a server-backed {@link StorageSource} for a named storage source. */
-    createStorageSource?(storageId: string): StorageSource;
-
-    /** Discover the storage sources declared on the backend. */
-    fetchStorageSources?(): Promise<StorageSourceDefinition[]>;
-
-    /** Admin API for user management */
-    admin?: AdminAPI;
-
-    /** Cron job management API */
-    cron?: CronAPI;
-
-    /** Database backup management API */
-    backups?: BackupsAPI;
-
-    /** Custom backend functions API */
-    functions?: FunctionsAPI;
-
-    /** Service API keys management API */
-    apiKeys?: ApiKeysAPI;
-
-    /** Base HTTP URL of the backend server */
-    baseUrl?: string;
-
-    /**
-     * The path every API route is mounted under, appended to {@link baseUrl}.
-     *
-     * `"/api"` unless the backend was configured with a different `basePath`
-     * and the client told to match. Exposed because code that builds a URL by
-     * hand — rather than going through the client's own methods — otherwise has
-     * to guess, and guessing `/api` is wrong for exactly the projects that set
-     * the option.
-     */
-    apiPath?: string;
-
-    /** WebSocket client for realtime subscriptions */
-    ws?: RebaseWebSocket;
-
-    /** Set the auth token for subsequent requests */
-    setToken?(token: string | null): void;
-
-    /** Set a function that lazily resolves the auth token */
-    setAuthTokenGetter?(getter: () => Promise<string | null>): void;
-
-    /** Set handler called when a request returns 401 */
-    setOnUnauthorized?(handler: () => Promise<boolean>): void;
-
-    /** Resolve the current auth token */
-    resolveToken?(): Promise<string | null>;
-
-    /** Make a raw HTTP call to the backend */
-    call?<T = unknown>(endpoint: string, payload?: unknown): Promise<T>;
 }
 
 /**

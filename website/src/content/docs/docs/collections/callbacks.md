@@ -294,28 +294,33 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
 }
 ```
 
-### Security: RLS Bypass Behavior
+### Security: which privileges `context.data` runs with
 
 :::important
-**`context.data` operations in callbacks bypass Row Level Security (RLS).**
+**`context.data` inherits the privileges of whatever triggered the callback.** It is not a fixed trust level.
 
-When callbacks execute on the backend, they run through the base `PostgresBackendDriver` — not the authenticated wrapper. This means `context.data` has **full database access** regardless of the triggering user's permissions.
-
-This is intentional: server-side lifecycle hooks are trusted code that often needs to write to collections the end-user doesn't have direct access to (e.g., creating an audit log entry, updating a counter on a parent record).
+- Triggered by a **user request** (REST, realtime, an admin-panel edit) → **user-scoped**. The callback runs inside the RLS-bound transaction opened for that request, so policies apply to reads *and* writes. A callback cannot see a row its caller could not.
+- Triggered by **server-context work** (`rebase.dataAsAdmin`, a cron job) → **unscoped**. It runs on the owner connection and bypasses RLS.
 :::
 
-If you need RLS-scoped operations within a callback, use the authenticated driver directly:
+This matters most in the direction that fails quietly. RLS *filters*, it does not raise — so a callback that reads a sibling row will find it when an admin task saves and may find nothing when an end user saves, with no error either way. Write callbacks that tolerate an empty result, or reach for the admin plane deliberately:
 
 ```typescript
 afterSave: async ({ context }) => {
-    // This bypasses RLS (normal for callbacks):
+    // User-scoped when a user triggered this save: RLS applies.
     await context.data.audit_logs.create({ action: "approved" });
 
-    // To enforce RLS, access the driver and call withAuth():
-    const authDriver = await context.driver.withAuth(context.user);
-    // authDriver.data operations respect RLS
+    // Deliberately bypass RLS — for work the caller genuinely may not see,
+    // such as an audit trail they must not be able to read or edit.
+    await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```
+
+:::caution[This page used to say the opposite]
+Earlier versions of this page stated that callbacks always bypass RLS and have "full database access regardless of the triggering user's permissions". That was wrong, and wrong in the unsafe direction — it invited callbacks written on the assumption that they could always see everything.
+
+The behaviour above is verified end-to-end against Postgres by the `"scopes context.data to the caller when a callback runs on a user request"` case in `@rebasepro/server-postgres`' RLS-enforcement suite.
+:::
 
 ### Transaction Semantics
 

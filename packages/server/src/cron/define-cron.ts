@@ -14,12 +14,14 @@ import type { CronJobDefinition } from "@rebasepro/types";
  * export default defineCron({
  *     name: "Nightly cleanup",
  *     schedule: "0 3 * * *",
- *     async handler({ client, log }) {
- *         const { data: expired } = await client.data.sessions.find({
+ *     async handler({ rebase, log }) {
+ *         // `dataAsAdmin` bypasses RLS. A cron has no per-request user, so
+ *         // there is no policy to fall back on — scope the filters yourself.
+ *         const { data: expired } = await rebase.dataAsAdmin.sessions.find({
  *             where: { expired: ["==", true] },
  *         });
  *         for (const session of expired) {
- *             await client.data.sessions.delete(session.id);
+ *             await rebase.dataAsAdmin.sessions.delete(session.id as string);
  *         }
  *         log(`Deleted ${expired.length} expired sessions`);
  *     },

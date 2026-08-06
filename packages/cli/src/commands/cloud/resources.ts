@@ -339,7 +339,7 @@ export async function storageCommand(action: string | undefined, rawArgs: string
     }
 }
 
-function printStorageHelp(): void {
+export function printStorageHelp(): void {
     console.log("");
     console.log(chalk.bold("  rebase cloud storage"));
     console.log("");

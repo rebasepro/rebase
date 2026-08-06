@@ -24,8 +24,12 @@ Para cada colección se generan los siguientes endpoints:
 | `GET` | `/api/data/:slug/count` | Contar entidades |
 | `GET` | `/api/data/:slug/:id` | Obtener una sola entidad |
 | `POST` | `/api/data/:slug` | Crear una entidad |
+| `PATCH` | `/api/data/:slug/:id` | Actualizar una entidad |
 | `PUT` | `/api/data/:slug/:id` | Actualizar una entidad |
 | `DELETE` | `/api/data/:slug/:id` | Eliminar una entidad |
+| `POST` | `/api/data/:slug/bulk` | Create many entities in one transaction |
+| `PATCH` | `/api/data/:slug/bulk` | Update many entities in one transaction |
+| `POST` | `/api/data/:slug/bulk/delete` | Delete many entities in one transaction |
 
 ### Rutas de Subcolecciones
 
@@ -35,7 +39,7 @@ Las relaciones anidadas son accesibles mediante rutas de URL:
 GET    /api/data/authors/42/posts         → list author's posts
 GET    /api/data/authors/42/posts/7       → get a specific post by author
 POST   /api/data/authors/42/posts         → create a post for author
-PUT    /api/data/authors/42/posts/7       → update the post
+PATCH  /api/data/authors/42/posts/7       → update the post (PUT also accepted)
 DELETE /api/data/authors/42/posts/7       → delete the post
 ```
 

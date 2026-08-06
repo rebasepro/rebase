@@ -199,6 +199,10 @@ description: "Whether more records exist beyond this page" }
         // Build an "input" schema (no read-only/auto fields like autoValue dates)
         schemas[`${schemaName}Input`] = buildCollectionInputSchema(collection);
 
+        // The update body — same columns, no `required`. PATCH and PUT both
+        // merge, so a field left out means "unchanged", not "omitted by mistake".
+        schemas[`${schemaName}Update`] = buildCollectionUpdateSchema(collection);
+
         const dataPath = `/data/${slug}`;
 
         // ── GET /data/{slug} — List entities ──────────────────────────
@@ -258,6 +262,192 @@ description: "Whether more records exist beyond this page" }
             }
         };
 
+        // ── Bulk: one transaction, all-or-nothing ─────────────────────
+        //
+        // These went undocumented while they existed, which is the same defect
+        // the update verb had: an endpoint the server serves and the spec does
+        // not mention cannot be reached by a generated client at all.
+        const idempotencyHeader = {
+            name: "Idempotency-Key",
+            in: "header",
+            required: false,
+            schema: { type: "string" },
+            description:
+                "Names this write so a retry is recognised instead of repeated. Without it a " +
+                "client that lost the response cannot distinguish a replay from a second " +
+                "genuine batch, and the whole batch is written twice."
+        };
+
+        const bulkErrors = {
+            400: {
+                description: "Malformed body, an unknown field, or more rows than the per-batch limit",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            409: {
+                description: "A request with the same Idempotency-Key is still in flight",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            ...errorResponses(requireAuth)
+        };
+
+        paths[`/data/${slug}/bulk`] = {
+            post: {
+                tags: [collection.name],
+                summary: `Create many ${collection.name} in one transaction`,
+                description:
+                    "All-or-nothing: if any row is rejected none of them land, and the error names " +
+                    "the offending index. Every row still runs callbacks, relations and row-level " +
+                    "security. Capped server-side because one batch holds its locks for its whole " +
+                    "duration.",
+                operationId: `createMany${schemaName}`,
+                parameters: [idempotencyHeader],
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                required: ["rows"],
+                                properties: {
+                                    rows: { type: "array", items: { $ref: `#/components/schemas/${schemaName}Input` } },
+                                    upsert: {
+                                        type: "boolean",
+                                        description: "Write each row as INSERT ... ON CONFLICT DO UPDATE on the primary key."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: {
+                        description: "The written rows, in the order given",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        data: { type: "array", items: { $ref: `#/components/schemas/${schemaName}` } },
+                                        meta: { type: "object", properties: { written: { type: "integer" } } }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    ...bulkErrors
+                }
+            },
+            patch: {
+                tags: [collection.name],
+                summary: `Update many ${collection.name} in one transaction`,
+                description:
+                    "Each entry names its row and the fields to change. `{ id, data }` rather than " +
+                    "flat rows carrying their own key, because on a table keyed on something other " +
+                    "than `id` a flat row cannot say whether a column is the address or a value to " +
+                    "write. An id matching no row fails the batch.",
+                operationId: `updateMany${schemaName}`,
+                parameters: [idempotencyHeader],
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                required: ["updates"],
+                                properties: {
+                                    updates: {
+                                        type: "array",
+                                        items: {
+                                            type: "object",
+                                            required: ["id", "data"],
+                                            properties: {
+                                                id: { type: "string", description: "The row to update" },
+                                                data: { $ref: `#/components/schemas/${schemaName}Update` }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: {
+                        description: "The updated rows, in the order given",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        data: { type: "array", items: { $ref: `#/components/schemas/${schemaName}` } },
+                                        meta: { type: "object", properties: { written: { type: "integer" } } }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    404: {
+                        description: "One of the ids matches no row; nothing was written",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    ...bulkErrors
+                }
+            }
+        };
+
+        paths[`/data/${slug}/bulk/delete`] = {
+            post: {
+                tags: [collection.name],
+                summary: `Delete many ${collection.name} in one transaction`,
+                description:
+                    "A POST, not `DELETE /bulk` with a body. Bodies on DELETE are permitted but " +
+                    "widely dropped by proxies and CDNs, and several generators ignore " +
+                    "`requestBody` on a DELETE operation — a generated client would send the " +
+                    "request with no ids at all. Takes ids rather than a filter: a mistyped " +
+                    "condition that empties a table cannot be reviewed at the call site the way " +
+                    "an explicit list can. `beforeDelete`/`afterDelete` fire per row.",
+                operationId: `deleteMany${schemaName}`,
+                parameters: [idempotencyHeader],
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: {
+                                type: "object",
+                                required: ["ids"],
+                                properties: {
+                                    ids: {
+                                        type: "array",
+                                        items: { oneOf: [{ type: "string" }, { type: "integer" }] }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                responses: {
+                    200: {
+                        description: "How many rows were deleted",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        meta: { type: "object", properties: { deleted: { type: "integer" } } }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    404: {
+                        description: "One of the ids matches no row; nothing was deleted",
+                        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+                    },
+                    ...bulkErrors
+                }
+            }
+        };
+
         // ── GET/PUT/DELETE /data/{slug}/{id} ──────────────────────────
         const entityPath = `/data/${slug}/{id}`;
         paths[entityPath] = {
@@ -293,38 +483,14 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
                     ...errorResponses(requireAuth)
                 }
             },
+            patch: updateOperation(collection, schemaName, requireAuth),
+            // Same operation under the verb every published SDK already sends.
+            // Kept so existing clients keep validating; `patch` is the one to
+            // generate against.
             put: {
-                tags: [collection.name],
-                summary: `Update ${collection.singularName || collection.name}`,
-                operationId: `update${schemaName}`,
-                parameters: [
-                    { name: "id",
-in: "path",
-required: true,
-schema: { type: "string" },
-description: "Entity ID" }
-                ],
-                requestBody: {
-                    required: true,
-                    content: {
-                        "application/json": {
-                            schema: { $ref: `#/components/schemas/${schemaName}Input` }
-                        }
-                    }
-                },
-                responses: {
-                    200: {
-                        description: "Updated entity",
-                        content: {
-                            "application/json": {
-                                schema: { $ref: `#/components/schemas/${schemaName}` }
-                            }
-                        }
-                    },
-                    404: { description: "Entity not found",
-content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } } },
-                    ...errorResponses(requireAuth)
-                }
+                ...updateOperation(collection, schemaName, requireAuth),
+                operationId: `update${schemaName}ViaPut`,
+                deprecated: true
             },
             delete: {
                 tags: [collection.name],
@@ -456,6 +622,68 @@ description: "Unique identifier" }
         required: required.length > 0 ? required : undefined,
         properties
     };
+}
+
+/**
+ * The PATCH/PUT operation for `/data/{slug}/{id}`.
+ *
+ * Split out because both verbs serve it and they must not drift: the update
+ * body is a **partial**, and describing it with the create schema was the bug
+ * this replaces. `<Name>Input` marks every `validation.required` property as
+ * required — correct for POST, wrong for an update, where omitting a field
+ * means "leave it alone" rather than "I forgot it". A client generated from
+ * that spec demanded fields the server does not, and a spec-validating gateway
+ * would have rejected partial updates the server accepts.
+ */
+function updateOperation(
+    collection: CollectionConfig,
+    schemaName: string,
+    requireAuth: boolean
+): Record<string, unknown> {
+    return {
+        tags: [collection.name],
+        summary: `Update ${collection.singularName || collection.name}`,
+        description: "Partial update: only the properties present in the body are written; the rest are left unchanged.",
+        operationId: `update${schemaName}`,
+        parameters: [
+            { name: "id", in: "path", required: true, schema: { type: "string" }, description: "Entity ID" }
+        ],
+        requestBody: {
+            required: true,
+            content: {
+                "application/json": {
+                    schema: { $ref: `#/components/schemas/${schemaName}Update` }
+                }
+            }
+        },
+        responses: {
+            200: {
+                description: "Updated entity",
+                content: {
+                    "application/json": {
+                        schema: { $ref: `#/components/schemas/${schemaName}` }
+                    }
+                }
+            },
+            404: {
+                description: "Entity not found",
+                content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResponse" } } }
+            },
+            ...errorResponses(requireAuth)
+        }
+    };
+}
+
+/**
+ * The update body: the create schema with `required` dropped.
+ *
+ * Derived rather than rebuilt so the two cannot describe different columns —
+ * the only difference between creating and updating is which fields you must
+ * supply, and that is exactly the one thing removed here.
+ */
+function buildCollectionUpdateSchema(collection: CollectionConfig): Record<string, unknown> {
+    const { required: _required, ...rest } = buildCollectionInputSchema(collection);
+    return rest;
 }
 
 /**

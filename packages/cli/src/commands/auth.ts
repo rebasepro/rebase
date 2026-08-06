@@ -98,8 +98,7 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
         {
             "--email": String,
             "--password": String,
-            "-e": "--email",
-            "-p": "--password"
+            "-e": "--email"
         },
         {
             argv: rawArgs.slice(4), // skip "node rebase auth reset-password"

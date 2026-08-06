@@ -1019,7 +1019,7 @@ title: "📄 Logs" });
     }
 }
 
-function printDebugHelp(): void {
+export function printDebugHelp(): void {
     console.log(`
 ${chalk.bold("rebase cloud debug")} — Find out why a deployed project is misbehaving
 

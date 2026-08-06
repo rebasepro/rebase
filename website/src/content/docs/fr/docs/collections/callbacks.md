@@ -297,28 +297,34 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
 }
 ```
 
-### Sécurité : Comportement de contournement du RLS
+### Sécurité : avec quels privilèges `context.data` s'exécute
 
 :::important
-**Les opérations `context.data` dans les rappels contournent la sécurité au niveau des lignes (RLS).**
+**`context.data` hérite des privilèges de ce qui a déclenché le rappel.** Ce n'est pas un niveau de confiance fixe.
 
-Lorsque les rappels s'exécutent sur le backend, ils passent par le `PostgresBackendDriver` de base — et non par le wrapper authentifié. Cela signifie que `context.data` a **un accès complet à la base de données** quelles que soient les permissions de l'utilisateur déclencheur.
-
-C'est intentionnel : les hooks de cycle de vie côté serveur sont du code de confiance qui doit souvent écrire dans des collections auxquelles l'utilisateur final n'a pas un accès direct (par exemple, créer une entrée de journal d'audit, mettre à jour un compteur sur un enregistrement parent).
+- Déclenché par une **requête utilisateur** (REST, temps réel, une modification dans le panneau d'administration) → **limité à l'utilisateur**. Le rappel s'exécute dans la transaction soumise au RLS ouverte pour cette requête ; les politiques s'appliquent donc aux lectures *et* aux écritures. Un rappel ne peut pas voir une ligne que son appelant ne pouvait pas voir.
+- Déclenché par un **travail en contexte serveur** (`rebase.dataAsAdmin`, une tâche cron) → **non limité**. Il s'exécute sur la connexion propriétaire et contourne le RLS.
 :::
 
-Si vous avez besoin d'opérations soumises au RLS au sein d'un rappel, utilisez directement le pilote authentifié :
+C'est surtout important dans la direction qui échoue en silence. Le RLS *filtre*, il ne lève pas d'erreur — un rappel qui lit une ligne voisine la trouvera lorsqu'une tâche d'administration enregistre, et peut ne rien trouver lorsqu'un utilisateur final enregistre, sans erreur dans les deux cas. Écrivez des rappels qui tolèrent un résultat vide, ou passez délibérément par le plan d'administration :
 
 ```typescript
 afterSave: async ({ context }) => {
-    // This bypasses RLS (normal for callbacks):
+    // Limité à l'utilisateur quand c'est un utilisateur qui a déclenché cet
+    // enregistrement : le RLS s'applique.
     await context.data.audit_logs.create({ action: "approved" });
 
-    // To enforce RLS, access the driver and call withAuth():
-    const authDriver = await context.driver.withAuth(context.user);
-    // authDriver.data operations respect RLS
+    // Contourner délibérément le RLS — pour un travail que l'appelant ne doit
+    // réellement pas voir, comme un journal d'audit qu'il ne peut ni lire ni modifier.
+    await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```
+
+:::caution[Cette page affirmait le contraire]
+Les versions précédentes de cette page indiquaient que les rappels contournent toujours le RLS et disposent d'un « accès complet à la base de données quelles que soient les permissions de l'utilisateur déclencheur ». C'était faux, et faux dans la direction dangereuse — cela incitait à écrire des rappels en supposant qu'ils voyaient toujours tout.
+
+Le comportement décrit ci-dessus est vérifié de bout en bout sur Postgres par le cas `"scopes context.data to the caller when a callback runs on a user request"` de la suite d'application du RLS de `@rebasepro/server-postgres`.
+:::
 
 ### Sémantique des Transactions
 

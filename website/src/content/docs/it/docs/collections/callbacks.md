@@ -297,28 +297,34 @@ afterSave: async ({ values, entityId, previousValues, context }) => {
 }
 ```
 
-### Sicurezza: Comportamento di Bypass RLS
+### Sicurezza: con quali privilegi viene eseguito `context.data`
 
 :::important
-**Le operazioni `context.data` nei callback bypassano la Sicurezza a Livello di Riga (RLS).**
+**`context.data` eredita i privilegi di ciò che ha attivato il callback.** Non è un livello di fiducia fisso.
 
-Quando i callback vengono eseguiti nel backend, passano attraverso il `PostgresBackendDriver` di base — non il wrapper autenticato. Ciò significa che `context.data` ha **accesso completo al database** indipendentemente dai permessi dell'utente che ha attivato l'operazione.
-
-Questo è intenzionale: i hook del ciclo di vita lato server sono codice fidato che spesso necessita di scrivere in collezioni a cui l'utente finale non ha accesso diretto (ad esempio, creando una voce di log di audit, aggiornando un contatore su un record padre).
+- Attivato da una **richiesta utente** (REST, realtime, una modifica nel pannello di amministrazione) → **con ambito utente**. Il callback viene eseguito all'interno della transazione vincolata da RLS aperta per quella richiesta, quindi le policy si applicano sia alle letture *sia* alle scritture. Un callback non può vedere una riga che il suo chiamante non poteva vedere.
+- Attivato da **lavoro in contesto server** (`rebase.dataAsAdmin`, un job cron) → **senza ambito**. Viene eseguito sulla connessione proprietaria e bypassa RLS.
 :::
 
-Se hai bisogno di operazioni con ambito RLS all'interno di un callback, usa direttamente il driver autenticato:
+Questo conta soprattutto nella direzione che fallisce in silenzio. RLS *filtra*, non solleva errori — quindi un callback che legge una riga adiacente la troverà quando salva un'attività amministrativa e potrebbe non trovare nulla quando salva un utente finale, senza errori in nessuno dei due casi. Scrivi callback che tollerino un risultato vuoto, oppure ricorri deliberatamente al piano di amministrazione:
 
 ```typescript
 afterSave: async ({ context }) => {
-    // This bypasses RLS (normal for callbacks):
+    // Con ambito utente quando è un utente ad aver attivato questo salvataggio:
+    // RLS si applica.
     await context.data.audit_logs.create({ action: "approved" });
 
-    // To enforce RLS, access the driver and call withAuth():
-    const authDriver = await context.driver.withAuth(context.user);
-    // authDriver.data operations respect RLS
+    // Bypassare RLS deliberatamente — per lavoro che il chiamante davvero non
+    // deve vedere, come un log di audit che non può leggere né modificare.
+    await context.client.dataAsAdmin.audit_logs.create({ action: "approved" });
 }
 ```
+
+:::caution[Questa pagina affermava il contrario]
+Le versioni precedenti di questa pagina sostenevano che i callback bypassano sempre RLS e hanno «accesso completo al database indipendentemente dai permessi dell'utente che li attiva». Era sbagliato, e sbagliato nella direzione non sicura — induceva a scrivere callback presumendo che potessero sempre vedere tutto.
+
+Il comportamento descritto sopra è verificato end-to-end su Postgres dal caso `"scopes context.data to the caller when a callback runs on a user request"` nella suite di enforcement RLS di `@rebasepro/server-postgres`.
+:::
 
 ### Semantica delle Transazioni
 

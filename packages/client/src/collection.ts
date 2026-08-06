@@ -161,7 +161,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             return raw as M;
         },
 
-        async createMany(data: Partial<M>[], options?: { upsert?: boolean }) {
+        async createMany(data: Partial<M>[], options?: { upsert?: boolean } & WriteOptions) {
             if (!Array.isArray(data)) {
                 throw new TypeError("createMany expects an array of records.");
             }
@@ -172,11 +172,29 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 body: JSON.stringify({
                     rows: data,
                     ...(options?.upsert ? { upsert: true } : {})
-                })
+                }),
+                ...(options?.idempotencyKey
+                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
+                    : {})
             });
             return (raw.data || []) as M[];
         },
 
+        /**
+         * Still `PUT`, deliberately, even though the server now serves `PATCH`
+         * on the same handler and `PATCH` is the honest verb for a merge.
+         *
+         * The two are interchangeable server-side, so switching buys nothing at
+         * runtime — and it costs compatibility in the direction that fails
+         * quietly. A 0.14 client talking to a 0.13 server would send `PATCH` to
+         * a route that does not exist and get a **404**, which is
+         * indistinguishable from "that row is gone". Every write would look like
+         * a missing record.
+         *
+         * `PATCH` is what the OpenAPI spec advertises, so anyone generating a
+         * client gets the correct verb; this stays on `PUT` until the oldest
+         * supported server is one that serves both.
+         */
         async update(id: string | number, data: Partial<M>) {
             const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "PUT",
@@ -185,9 +203,51 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             return raw as M;
         },
 
+        async updateMany(updates: { id: string | number; data: Partial<M> }[], options?: WriteOptions) {
+            if (!Array.isArray(updates)) {
+                throw new TypeError("updateMany expects an array of { id, data } entries.");
+            }
+            if (updates.length === 0) return [];
+
+            const raw = await transport.request<{ data: Record<string, unknown>[] }>(`${basePath}/bulk`, {
+                method: "PATCH",
+                body: JSON.stringify({ updates }),
+                ...(options?.idempotencyKey
+                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
+                    : {})
+            });
+            return (raw.data || []) as M[];
+        },
+
         async delete(id: string | number) {
             await transport.request<void>(`${basePath}/${encodeURIComponent(String(id))}`, {
                 method: "DELETE"
+            });
+        },
+
+        /**
+         * `POST .../bulk/delete`, not `DELETE .../bulk`.
+         *
+         * The honest verb would take the ids in a DELETE body, and that is the
+         * one request shape the HTTP ecosystem handles unreliably: bodies on
+         * DELETE are permitted but widely dropped by proxies and CDNs, and
+         * several OpenAPI generators ignore `requestBody` on a DELETE
+         * operation, so a generated client would send the request without its
+         * ids. A backend deployed behind arbitrary ingress cannot take that
+         * bet. Same reason `:batchDelete` exists in Google's API guidelines.
+         */
+        async deleteMany(ids: (string | number)[], options?: WriteOptions) {
+            if (!Array.isArray(ids)) {
+                throw new TypeError("deleteMany expects an array of ids.");
+            }
+            if (ids.length === 0) return;
+
+            await transport.request<void>(`${basePath}/bulk/delete`, {
+                method: "POST",
+                body: JSON.stringify({ ids }),
+                ...(options?.idempotencyKey
+                    ? { headers: { "Idempotency-Key": options.idempotencyKey } }
+                    : {})
             });
         },
 

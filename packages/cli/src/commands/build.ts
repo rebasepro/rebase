@@ -54,7 +54,12 @@ ${chalk.bold("Examples")}
 export async function buildCommand(rawArgs: string[] = []): Promise<void> {
     const args = arg(
         {
-            "--out": String,
+            "--output": String,
+            // `--out` kept as an accepted alias. `generate-sdk` has always
+            // spelled this `--output`, and two names for one concept across one
+            // CLI is a thing you have to remember rather than know. `--output`
+            // is canonical now; `--out` still works so no script breaks.
+            "--out": "--output",
             "--skip-type-check": Boolean,
             "--skip-schema": Boolean,
             /* Do not fold the frontend into the backend bundle. For a project
@@ -150,7 +155,7 @@ permissive: true }
                 projectRoot,
                 appName: name,
                 app,
-                outDir: args["--out"],
+                outDir: args["--output"],
                 runtimeRange: manifest.rebase,
                 storage: manifest.storage,
                 skipTypeCheck: args["--skip-type-check"],
@@ -224,7 +229,7 @@ permissive: true }
                 }
             }
         } else if (app.type === "static") {
-            await buildAssetApp(projectRoot, name, app, manifest.rebase, args["--out"]);
+            await buildAssetApp(projectRoot, name, app, manifest.rebase, args["--output"]);
         }
 
         console.log("");

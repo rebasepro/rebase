@@ -230,7 +230,7 @@ projectId }
     }
 }
 
-function printDomainsHelp(): void {
+export function printDomainsHelp(): void {
     console.log(`
 ${chalk.bold("rebase cloud domains")} — Custom domain
 

@@ -324,7 +324,8 @@ value: res.value }
 }
 
 async function pullEnv(rawArgs: string[]): Promise<void> {
-    const args = arg({ "--out": String,
+    const args = arg({ "--output": String,
+"--out": "--output",
 "--yes": Boolean,
 "-y": "--yes",
 "--project": String,
@@ -333,7 +334,7 @@ permissive: true });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
-    const outPath = path.resolve(args["--out"] || ".env");
+    const outPath = path.resolve(args["--output"] || ".env");
 
     try {
         const list = await fetchEnvVars(client, projectId);
@@ -392,7 +393,7 @@ skipped }
     }
 }
 
-function printEnvHelp(): void {
+export function printEnvHelp(): void {
     if (isJsonMode()) {
         printEnvHelpJson();
         return;

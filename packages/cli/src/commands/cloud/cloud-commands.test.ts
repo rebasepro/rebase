@@ -78,7 +78,10 @@ vi.mock("./resources", () => ({
     webhooksCommand: vi.fn(async () => undefined),
     storageCommand: vi.fn(async () => undefined),
     clustersCommand: vi.fn(async () => undefined),
-    billingCommand: vi.fn(async () => undefined)
+    billingCommand: vi.fn(async () => undefined),
+    // The dispatcher's GROUP_HELP map holds this at module scope, so omitting it
+    // from the mock makes importing `./index` throw before any test runs.
+    printStorageHelp: vi.fn()
 }));
 
 import * as context from "./context";

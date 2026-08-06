@@ -88,6 +88,83 @@ const activeCount = await client.data.products.count({
 });
 ```
 
+## Batch Writes
+
+Three operations write many rows in a **single request and a single
+transaction**. Every row still runs the normal pipeline — callbacks, relations,
+row-level security — so a batch is not a shortcut past your own rules; the win
+is one round trip and one transaction instead of N of each.
+
+All three are **all-or-nothing**. If any row is rejected, none of them land and
+the error names the offending index.
+
+```typescript
+// Create
+await client.data.products.createMany([
+    { name: "Widget", price: 9.99 },
+    { name: "Gadget", price: 19.99 }
+]);
+
+// Update — each entry names its row and the fields to change
+await client.data.orders.updateMany([
+    { id: "o-1", data: { status: "shipped" } },
+    { id: "o-2", data: { status: "shipped" } }
+]);
+
+// Delete — by id
+await client.data.sessions.deleteMany(["s-1", "s-2"]);
+```
+
+### Why `{ id, data }` rather than flat rows
+
+`createMany` takes flat rows because a row being created *is* its columns.
+`updateMany` names the address separately, because on a table keyed on something
+other than `id` — a `sku`, a composite key — a flat row cannot say whether a
+column is the address or a value to write. This mirrors single-row
+`update(id, data)` exactly.
+
+### Why `deleteMany` takes ids, not a filter
+
+A filter-shaped bulk delete is a different and far more dangerous operation: the
+failure mode is an omitted or mistyped condition emptying a table, and it cannot
+be reviewed at the call site the way an explicit list can. Read first, then pass
+the ids you meant:
+
+```typescript
+const stale = await client.data.sessions.findAll({
+    where: { expires_at: ["<", cutoff] }
+});
+await client.data.sessions.deleteMany(stale.map(s => s.id as string));
+```
+
+### Retries and duplicates
+
+A client that never sees the response cannot know whether the batch committed,
+so it retries — and without a key the server cannot tell that retry from a
+second genuine batch. Pass an idempotency key on anything that may be resent:
+
+```typescript
+await client.data.products.createMany(rows, { idempotencyKey: importId });
+```
+
+The offline queue sets one automatically on every replay.
+
+### Limits
+
+Batches are capped server-side (1000 rows by default), because one batch holds
+its locks for the whole transaction. Going over is a `BULK_TOO_LARGE` error that
+names both the limit and your row count, so chunk to it:
+
+```typescript
+for (const chunk of chunks(rows, 1000)) {
+    await client.data.products.createMany(chunk, { upsert: true });
+}
+```
+
+A data source that cannot write atomically reports `BULK_UNSUPPORTED` rather
+than quietly looping single writes — which would give you neither the atomicity
+nor the single round trip you reached for a batch to get.
+
 ## Fluent Query Builder
 
 Chain methods for more expressive queries:

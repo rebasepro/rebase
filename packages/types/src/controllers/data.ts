@@ -122,12 +122,12 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
 
 
 /**
- * Fluent query builder for the **admin admin** — resolves to `FindResponse<M>`
+ * Fluent query builder for the **admin panel** — resolves to `FindResponse<M>`
  * (Snapshot-wrapped rows).
  *
  * @internal App developers should use {@link SDKQueryBuilderInterface}
  * (flat rows, returned by `client.data.*` / `context.data.*`). This
- * Snapshot-flavored variant backs the admin admin internals only.
+ * Snapshot-flavored variant backs the admin panel internals only.
  *
  * @group Data
  */
@@ -144,13 +144,13 @@ export interface QueryBuilderInterface<M extends Record<string, unknown> = Recor
 }
 
 /**
- * A single collection's CRUD accessor for the **admin admin** — every method
+ * A single collection's CRUD accessor for the **admin panel** — every method
  * resolves to `Snapshot`-wrapped rows (`FindResponse<M>` / `Snapshot<M>`).
  *
  * @internal App developers do **not** use this. The public, symmetric surface
  * is {@link SDKCollectionClient} (flat rows), exposed as `client.data.products`
  * in the SDK and `context.data.products` in framework callbacks. This
- * Snapshot-flavored accessor backs the admin admin view-model only.
+ * Snapshot-flavored accessor backs the admin panel view-model only.
  *
  * @group Data
  */
@@ -188,6 +188,20 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>>;
 
     /**
+     * Update many records in a single transaction.
+     *
+     * See {@link SDKCollectionClient.updateMany}. Optional, as `createMany` is.
+     */
+    updateMany?(updates: { id: string | number; data: Partial<EntityValues<M>> }[]): Promise<Entity<M>[]>;
+
+    /**
+     * Delete many records in a single transaction.
+     *
+     * See {@link SDKCollectionClient.deleteMany}. Optional, as `createMany` is.
+     */
+    deleteMany?(ids: (string | number)[]): Promise<void>;
+
+    /**
      * Delete a record by ID.
      */
     delete(id: string | number): Promise<void>;
@@ -206,6 +220,12 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
 
     /**
      * Count the number of records matching the given filter.
+     *
+     * Optional on this contract because a data source need not support it, and
+     * required on `CollectionClient` — the HTTP implementation always has it.
+     * So `client.data.posts.count()` compiles in the browser while the same
+     * call through a `context.data` accessor needs `count?.()`, which is the
+     * one place the two halves of this API are not interchangeable.
      */
     count?(params?: FindParams<M>): Promise<number>;
 
@@ -507,6 +527,12 @@ export interface SDKCollectionClient<
      * Batches are capped server-side (1000 rows by default) because one batch
      * holds its locks for the whole transaction — chunk larger jobs.
      *
+     * Pass {@link WriteOptions.idempotencyKey} on anything that may be retried.
+     * A client that never sees the response cannot know whether the batch
+     * committed, and without a key the server cannot tell the retry from a
+     * second genuine import — so it performs it again, duplicating every row in
+     * the batch rather than just one.
+     *
      * @returns The written rows, in the order given.
      *
      * @example
@@ -516,7 +542,7 @@ export interface SDKCollectionClient<
      * }
      * ```
      */
-    createMany(data: I[], options?: { upsert?: boolean }): Promise<M[]>;
+    createMany(data: I[], options?: { upsert?: boolean } & WriteOptions): Promise<M[]>;
 
     /**
      * Update an existing record by ID.
@@ -527,19 +553,94 @@ export interface SDKCollectionClient<
     update(id: string | number, data: U): Promise<M>;
 
     /**
+     * Update many records in a single request and a single transaction.
+     *
+     * The counterpart to {@link createMany}, and the reason it exists is the
+     * same: one call per row means one HTTP round trip and one transaction per
+     * row. Every record still runs the normal pipeline — callbacks, relations,
+     * row-level security — and the batch is all-or-nothing, so a rejected
+     * record leaves none of them written and the error names the offending
+     * index.
+     *
+     * Each entry is `{ id, data }` rather than a flat row carrying its own key.
+     * That is deliberate: on a table keyed on something other than `id` — a
+     * `sku`, a composite key — a flat row cannot say whether a column is the
+     * address or a value to write. Naming the address separately mirrors
+     * single-row `update(id, data)` exactly and leaves nothing to infer.
+     *
+     * An id that matches no row fails the batch with a 404 rather than being
+     * skipped, for the same reason `update()` does: silently updating four of
+     * five rows is worse than updating none.
+     *
+     * Batches share `createMany`'s server-side cap (1000 rows by default),
+     * because one batch holds its locks for the whole transaction.
+     *
+     * Pass {@link WriteOptions.idempotencyKey} on anything that may be retried.
+     * An update replayed in full is naturally idempotent, but one interleaved
+     * with another writer's is not — the key is what stops a lost ACK from
+     * re-applying a stale batch over newer data.
+     *
+     * @returns The updated rows, in the order given.
+     *
+     * @example
+     * ```ts
+     * await client.data.orders.updateMany([
+     *     { id: "o-1", data: { status: "shipped" } },
+     *     { id: "o-2", data: { status: "shipped" } }
+     * ]);
+     * ```
+     */
+    updateMany(updates: { id: string | number; data: U }[], options?: WriteOptions): Promise<M[]>;
+
+    /**
      * Delete a record by ID.
      * @throws {RebaseApiError} with status 404 when the record does not exist.
      */
     delete(id: string | number): Promise<void>;
 
     /**
-     * Subscribe to a collection for real-time updates.
+     * Delete many records in a single request and a single transaction.
+     *
+     * Takes ids, not a filter. A filter-shaped bulk delete is a different and
+     * far more dangerous operation — the failure mode is an omitted or
+     * mistyped condition emptying a table, and it cannot be reviewed at the
+     * call site the way an explicit list can. Read first, then pass the ids you
+     * meant.
+     *
+     * `beforeDelete` and `afterDelete` fire per row, exactly as they do for
+     * single deletes, and returning `false` from `beforeDelete` fails the batch
+     * rather than quietly dropping one row from it. All-or-nothing, so an id
+     * that matches no row 404s the whole call.
+     *
+     * Shares `createMany`'s row cap.
+     *
+     * @example
+     * ```ts
+     * const stale = await client.data.sessions.findAll({
+     *     where: { expires_at: ["<", cutoff] }
+     * });
+     * await client.data.sessions.deleteMany(stale.map(s => s.id as string));
+     * ```
+     */
+    deleteMany(ids: (string | number)[], options?: WriteOptions): Promise<void>;
+
+    /**
+     * The low-level realtime subscription: raw server pushes, nothing else.
+     *
+     * **Prefer `observe()`** on a client from `@rebasepro/client`, which wraps
+     * this one and is what a UI actually wants — it emits from the local
+     * database first when offline is enabled, re-emits on local writes and
+     * rollbacks, and de-duplicates emissions so a refresh that changes nothing
+     * does not call back. `listen` does none of that; it forwards what the
+     * socket sends.
+     *
+     * Optional because it is only present when realtime is enabled. `observe()`
+     * is not — it degrades to a single fetch — which is the other reason to
+     * reach for it instead.
      */
     listen?(params: FindParams<M> | undefined, onUpdate: (response: FindResult<M>) => void, onError?: (error: Error) => void): () => void;
 
-    /**
-     * Subscribe to a single record for real-time updates.
-     */
+    /** {@link listen} for a single row. Prefer `observeById()`. */
     listenById?(id: string | number, onUpdate: (row: M | undefined) => void, onError?: (error: Error) => void): () => void;
 
     /**
@@ -558,7 +659,7 @@ export interface SDKCollectionClient<
 }
 
 /**
- * The unified data access object for the **admin admin** (Entity-shaped).
+ * The unified data access object for the **admin panel** (Entity-shaped).
  *
  * Access collections as dynamic properties: `data.products.find(...)`. Each
  * accessor returns `Entity`-wrapped records (`{ id, path, values }`) — the
@@ -567,7 +668,7 @@ export interface SDKCollectionClient<
  *
  * @internal App developers do **not** use this — they use
  * {@link RebaseSdkData} (flat rows), which is what the SDK client and backend
- * `context.data` expose. This Entity-shaped map backs the admin admin only.
+ * `context.data` expose. This Entity-shaped map backs the admin panel only.
  *
  * @group Data
  */

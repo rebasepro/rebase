@@ -165,7 +165,14 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             "--help": Boolean,
             "-b": "--backend-only",
             "-f": "--frontend-only",
-            "-p": "--port",
+            // `-P` for port, not `-p`. `-p` is `--project` across all ~20 cloud
+            // commands — by a wide margin the most-typed short flag in the CLI —
+            // and it also meant `--password` in `auth`. One letter with three
+            // meanings is a flag you have to look up every time, which is the
+            // opposite of what a short flag is for. `--project` keeps `-p`;
+            // `--password` loses its short form (a password does not belong in
+            // a command line anyway); port moves here.
+            "-P": "--port",
             "-g": "--generate",
             "-h": "--help"
         },
