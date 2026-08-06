@@ -997,8 +997,17 @@ export class OfflineManager {
                 rows.push(entry.row as M);
                 added++;
             }
-            if (added > 0 && params?.orderBy) sortRows(rows, params.orderBy);
         }
+
+        // Order is part of the query, not a detail of how the rows were
+        // obtained. This used to sort only when a locally-created row had been
+        // injected — every other read handed back cache order, which is
+        // insertion order, and a caller that asked for `orderBy` got whatever
+        // the store happened to hold. In the admin that is the collection's
+        // `sort` being silently ignored on every list backed by this overlay:
+        // the query carries it, the server honours it, and the answer served
+        // from here did not.
+        if (params?.orderBy) sortRows(rows, params.orderBy);
 
         const total = Math.max(rows.length, snapshot.total - removed + added);
         return {
