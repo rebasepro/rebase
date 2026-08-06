@@ -334,7 +334,9 @@ parentEntityIds,
         }
     }, [selectedTabProp, defaultSelectedView]);
 
-    const childViews = getAdminEntityChildViews(collection).filter(v => !v.collection.hideFromNavigation);
+    // See DetailViewBinding: tabs are governed by `hideFromEntityViews`, the
+    // drawer by `hideFromNavigation`. They are separate roles.
+    const childViews = getAdminEntityChildViews(collection).filter(v => !v.collection.hideFromEntityViews);
     const subcollections = childViews.map(v => v.collection);
     const subcollectionsCount = subcollections?.length ?? 0;
     const customViews = collection.entityViews ?? [];

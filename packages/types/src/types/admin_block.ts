@@ -52,6 +52,7 @@ export const ADMIN_COLLECTION_KEYS = [
     "formAutoSave",
     "formView",
     "group",
+    "hideFromEntityViews",
     "hideFromNavigation",
     "hideIdFromCollection",
     "hideIdFromForm",
