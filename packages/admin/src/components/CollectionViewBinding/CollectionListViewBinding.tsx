@@ -1,12 +1,13 @@
 
-import type { Property } from "@rebasepro/types";
+import type { Properties, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity } from "@rebasepro/types";
 import { CollectionSize, EntityAction, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/admin-types";
 import {
+    ArrowDownIcon,
+    ArrowUpIcon,
     Checkbox,
     Chip,
-    CircularProgress,
     cls,
     defaultBorderMixin,
     IconButton,
@@ -20,14 +21,16 @@ import {
     useCustomizationController
 } from "@rebasepro/app";
 import { useAnalyticsController } from "@rebasepro/app";
-import { getEntityPreviewKeys } from "../../util/previews";
 import { IconForView } from "@rebasepro/app";
 import { getIcon } from "@rebasepro/app";
+import { hasDeclaredDisplay } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
-import { useCollectionSlotKeys, useEntitySlots, type CollectionSlotKeys } from "./usePreviewSlots";
+import { useCollectionSlotKeys, useEntitySlots, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
 import { SlotValue, TagChips } from "./SlotValue";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { resolveEntityAction } from "../../util/resolutions";
+import { getSortablePropertyOptions } from "../CollectionTableBinding/column_utils";
+import { getResolvedPropertyInPath } from "../../util/property_utils";
 
 export type CollectionListViewBindingProps<M extends Record<string, unknown> = Record<string, unknown>> = {
     collection: AdminCollection<M>;
@@ -70,13 +73,27 @@ export type CollectionListViewBindingProps<M extends Record<string, unknown> = R
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 };
 
-type ListColumnDef = {
+/**
+ * Which display slot fills a column, when a slot does rather than a property.
+ * A status is an enum chip and a date a relative timestamp wherever they come
+ * from, so the cell renders the slot; the column exists either way, because a
+ * header needs something to sit over.
+ */
+type ListColumnSlot = "tags" | "status" | "date";
+
+/**
+ * One column of the list, in the header and in every row.
+ *
+ * The header and the cells read the same definition — the same width, the same
+ * alignment, the same decision about being shown at this container width — so a
+ * label cannot end up over a column that is not there, or over the wrong one.
+ */
+type ListColumn = {
     key: string;
     label: string;
-    property: Property;
-    isTitle?: boolean;
-    isStatus?: boolean;
-    isDate?: boolean;
+    /** Set when a display slot fills the cell; absent when the record does. */
+    slot?: ListColumnSlot;
+    property?: Property;
     align: "left" | "center" | "right";
     width: string;
     /**
@@ -86,7 +103,33 @@ type ListColumnDef = {
      * ran out of width for the title while still claiming everything fit.
      */
     widthPx: number;
+    /** Whether clicking this header can order the collection by it. */
+    sortable: boolean;
+    /**
+     * What survives when the row runs out of width: the lowest goes first.
+     */
+    priority: number;
 };
+
+// ── Column priorities ─────────────────────────────────────────────────
+// Read as "what a narrowing row gives up first".
+//
+// Three bands. The sort or filter *in force* comes first: it is the reason the
+// rows are in the order they are in, and hiding the column it names leaves that
+// order unexplained. The collection's own columns come next — its `listProperties`,
+// or the status and date it was read as having. A column left over from a
+// request since cleared comes last: it is worth keeping while there is room for
+// it, and it is not worth the collection's own status.
+
+/** A column left over from a sort or filter that is no longer applied. */
+const PRIORITY_STALE_REQUEST = 1000;
+/** The collection's own columns. Slots sit just above it, in give-way order. */
+const PRIORITY_DECLARED = 2000;
+const PRIORITY_DATE = PRIORITY_DECLARED;
+const PRIORITY_STATUS = PRIORITY_DECLARED + 1;
+const PRIORITY_TAGS = PRIORITY_DECLARED + 2;
+/** The sort or filter currently in force. */
+const PRIORITY_ACTIVE_REQUEST = 3000;
 
 /**
  * How wide a column of this property wants to be — the Tailwind class the cell
@@ -117,20 +160,6 @@ function getRowClasses(size: CollectionSize): string {
     }
 }
 
-/**
- * Estimated row height in pixels for virtualization, based on size.
- */
-function getEstimatedRowHeight(size: CollectionSize): number {
-    switch (size) {
-        case "xs": return 44;
-        case "s": return 52;
-        case "m": return 64;
-        case "l": return 76;
-        case "xl": return 88;
-        default: return 64;
-    }
-}
-
 // ── Row layout budget ─────────────────────────────────────────────────
 // What the row spends before a single column is placed. These mirror the
 // classes on the row itself (`px-5`, `gap-4`, `w-8` checkbox, `w-10` image);
@@ -155,32 +184,22 @@ const COLUMN_GAP = 16;
  */
 const TITLE_COMFORTABLE_WIDTH = 320;
 
-/** Number of extra rows rendered above/below the viewport. */
-const OVERSCAN_COUNT = 8;
-
-/** Threshold in pixels from the bottom of the scroll area to trigger loading more. */
-const LOAD_MORE_THRESHOLD = 400;
+/** An `IconButton size="small"` (`w-8`), which is what a row action renders as. */
+const ACTION_BUTTON_WIDTH = 32;
+/** `gap-0.5` between row actions. */
+const ACTION_BUTTON_GAP = 2;
+/**
+ * How many rows are read to size the actions cell.
+ *
+ * Actions are resolved per record, so the width they need is only knowable by
+ * asking — and asking every loaded row would mean re-resolving thousands of
+ * them on every page. The first rows are representative: a collection whose
+ * actions vary at all varies within its first screenful.
+ */
+const ACTIONS_SAMPLE_SIZE = 20;
 
 /** Stable empty array for when no list-view actions are available. */
 const EMPTY_LIST_VIEW_ACTIONS: EntityAction[] = [];
-
-/**
- * Walk up the DOM from `element` to find the nearest scrollable ancestor.
- */
-function getScrollParent(element: HTMLElement | null): HTMLElement | null {
-    let parent = element?.parentElement ?? null;
-    while (parent) {
-        const style = getComputedStyle(parent);
-        if (
-            style.overflowY === "auto" || style.overflowY === "scroll" ||
-            style.overflow === "auto" || style.overflow === "scroll"
-        ) {
-            return parent;
-        }
-        parent = parent.parentElement;
-    }
-    return document.documentElement;
-}
 
 /**
  * Returns true if a property type should NOT be rendered via
@@ -368,15 +387,12 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         itemCount,
         setItemCount,
         pageSize = 50,
-        paginationEnabled
+        paginationEnabled,
+        sortBy,
+        setSortBy,
+        filterValues,
+        checkFilterCombination
     } = tableController;
-
-    const isLoadingMore = useRef(false);
-
-    // Reset the loading-more gate when new data arrives
-    useEffect(() => {
-        if (!dataLoading) isLoadingMore.current = false;
-    }, [dataLoading]);
 
     const resolvedCollection = collection;
 
@@ -388,161 +404,278 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
     );
     const { titleKey: titlePropertyKey, imageKey: imagePropertyKey, subtitleKey, statusKey: statusPropertyKey, dateKey: datePropertyKey } = slotKeys;
 
-    const previewKeys = useMemo(
-        () => getEntityPreviewKeys(authController, resolvedCollection, customizationController.propertyConfigs, undefined, 10)
-            .filter(key => key !== titlePropertyKey && key !== imagePropertyKey && key !== statusPropertyKey && key !== datePropertyKey),
-        [authController, resolvedCollection, customizationController.propertyConfigs, titlePropertyKey, imagePropertyKey, statusPropertyKey, datePropertyKey]
+    const columnMode = !!resolvedCollection.listProperties && resolvedCollection.listProperties.length > 0;
+
+    /**
+     * The properties an `ORDER BY` can be written for, under the same authority
+     * the table headers and the sort menu ask — so a header that offers a sort
+     * here offers it there, and none of the three invents one the driver would
+     * silently drop.
+     */
+    const sortableKeys = useMemo(
+        () => new Set(getSortablePropertyOptions(resolvedCollection.properties as Properties).map(option => option.key)),
+        [resolvedCollection.properties]
     );
 
-    const columns = useMemo(() => {
-        const cols: ListColumnDef[] = [];
+    /** The row's identity cell: the leading column, or the title slot. */
+    const titleColumn = useMemo<ListColumn | undefined>(() => {
+        const key = columnMode ? resolvedCollection.listProperties?.[0] : titlePropertyKey;
+        if (!key) return undefined;
+        const property = resolvedCollection.properties[key] as Property | undefined;
+        return {
+            key,
+            label: property?.name || (columnMode ? key : "Name"),
+            property,
+            align: "left",
+            width: "flex-1 min-w-0",
+            widthPx: TITLE_COMFORTABLE_WIDTH,
+            sortable: sortableKeys.has(key),
+            priority: Number.MAX_SAFE_INTEGER
+        };
+    }, [columnMode, resolvedCollection, titlePropertyKey, sortableKeys]);
 
-        if (resolvedCollection.listProperties && resolvedCollection.listProperties.length > 0) {
-            resolvedCollection.listProperties.forEach((key, index) => {
-                const prop = resolvedCollection.properties[key] as Property;
-                if (!prop) return;
-
-                cols.push({
+    /**
+     * The trailing columns the collection itself implies: the developer's
+     * `listProperties` when there are any, otherwise the display slots the row
+     * has always shown to the right of the title.
+     */
+    const declaredColumns = useMemo<ListColumn[]>(() => {
+        if (columnMode) {
+            const keys = resolvedCollection.listProperties!.slice(1);
+            return keys.flatMap((key, index) => {
+                const property = resolvedCollection.properties[key] as Property | undefined;
+                if (!property) return [];
+                return [{
                     key,
-                    label: prop.name || key,
-                    property: prop,
-                    isTitle: index === 0,
-                    align: prop.type === "number" || prop.type === "date" ? "right" : "left",
-                    ...(index === 0
-                        ? { width: "flex-1 min-w-0", widthPx: TITLE_COMFORTABLE_WIDTH }
-                        : getIdealColumnWidth(prop))
-                });
+                    label: property.name || key,
+                    property,
+                    align: (property.type === "number" || property.type === "date" ? "right" : "left") as ListColumn["align"],
+                    ...getIdealColumnWidth(property),
+                    sortable: sortableKeys.has(key),
+                    // Declared order is a statement of importance: the first
+                    // column after the title outlives the last one.
+                    priority: PRIORITY_DECLARED + (keys.length - index)
+                }];
             });
-            return cols;
         }
 
-        // Smart default
-        if (titlePropertyKey) {
-            const prop = resolvedCollection.properties[titlePropertyKey] as Property;
-            if (prop) {
-                cols.push({
-                    key: titlePropertyKey,
-                    label: prop.name || "Name",
-                    property: prop,
-                    isTitle: true,
-                    align: "left",
-                    width: "flex-1 min-w-0",
-                    widthPx: TITLE_COMFORTABLE_WIDTH
-                });
-            }
-        }
+        const cols: ListColumn[] = [];
 
-        // Collect all candidate columns — visible count determined later by container width
-        const showDate = datePropertyKey && size !== "xs";
-        const showStatus = statusPropertyKey && size !== "xs" && size !== "s";
+        // A slot column exists when the collection has something to put in it —
+        // a property to read, or a resolver that computes one. Whether a given
+        // record fills it is a per-row question, and the wrong one to ask here:
+        // a column that came and went with the values under it would leave its
+        // header over a different cell on every row.
+        const slotColumn = (
+            slot: ListColumnSlot,
+            key: string | undefined,
+            fallbackLabel: string,
+            layout: { align: ListColumn["align"], width: string, widthPx: number },
+            priority: number
+        ): ListColumn | undefined => {
+            const declared = hasDeclaredDisplay(resolvedCollection, slot);
+            if (!key && !declared) return undefined;
+            const property = key ? resolvedCollection.properties[key] as Property | undefined : undefined;
+            return {
+                key: key ?? `display:${slot}`,
+                label: property?.name || fallbackLabel,
+                slot,
+                property,
+                ...layout,
+                // A computed slot has no column to order by, whatever it renders.
+                sortable: !!key && sortableKeys.has(key),
+                priority
+            };
+        };
 
-        // The first previewKey makes a great subtitle (strict rules: no relations, no large blocks).
-        const subtitleKey = previewKeys.length > 0 ? previewKeys[0] : undefined;
+        const tags = slotColumn(
+            "tags",
+            slotKeys.tagsKey,
+            "Tags",
+            { align: "left", width: "flex-shrink-0 w-40", widthPx: 160 },
+            PRIORITY_TAGS
+        );
+        if (tags) cols.push(tags);
 
-        // For the additional columns, we can use any unused property (including relations!).
-        const allKeys = resolvedCollection.propertiesOrder || Object.keys(resolvedCollection.properties);
-        const usedKeys = new Set([
-            titlePropertyKey,
-            imagePropertyKey,
+        const status = slotColumn(
+            "status",
             statusPropertyKey,
+            "Status",
+            { align: "left", width: "flex-shrink-0 w-32", widthPx: 128 },
+            PRIORITY_STATUS
+        );
+        if (status) cols.push(status);
+
+        const date = slotColumn(
+            "date",
             datePropertyKey,
-            subtitleKey,
-            "id"
-        ]);
-
-        const availableExtraKeys = allKeys.filter(k => {
-            if (usedKeys.has(k)) return false;
-            const prop = resolvedCollection.properties[k] as Property | undefined;
-            if (!prop) return false;
-            // Exclude storage/image properties — they are already rendered in the image slot
-            if (prop.type === "string" && (prop.storage || prop.admin?.urlPreview === "image")) return false;
-            if (prop.type === "array" && prop.of && !Array.isArray(prop.of)) {
-                const inner = prop.of;
-                if (inner.type === "string" && (inner.storage || inner.admin?.urlPreview === "image")) return false;
-            }
-            return true;
-        });
-
-        availableExtraKeys.forEach(key => {
-            const prop = resolvedCollection.properties[key] as Property;
-            cols.push({
-                key,
-                label: prop.name || key,
-                property: prop,
-                align: prop.type === "number" || prop.type === "date" ? "right" : "left",
-                ...getIdealColumnWidth(prop)
-            });
-        });
-
-        if (showStatus && statusPropertyKey) {
-            const prop = resolvedCollection.properties[statusPropertyKey] as Property;
-            if (prop) {
-                cols.push({
-                    key: statusPropertyKey,
-                    label: prop.name || "Status",
-                    property: prop,
-                    isStatus: true,
-                    align: "center",
-                    width: "flex-shrink-0 w-32",
-                    widthPx: 128
-                });
-            }
-        }
-
-        if (showDate && datePropertyKey) {
-            const prop = resolvedCollection.properties[datePropertyKey] as Property;
-            if (prop) {
-                cols.push({
-                    key: datePropertyKey,
-                    label: prop.name || "Modified",
-                    property: prop,
-                    isDate: true,
-                    align: "right",
-                    width: "flex-shrink-0 w-28",
-                    widthPx: 112
-                });
-            }
-        }
+            "Modified",
+            { align: "right", width: "flex-shrink-0 w-20", widthPx: 80 },
+            PRIORITY_DATE
+        );
+        if (date) cols.push(date);
 
         return cols;
-    }, [resolvedCollection, titlePropertyKey, statusPropertyKey, datePropertyKey, imagePropertyKey, previewKeys, size]);
+    }, [columnMode, resolvedCollection, slotKeys.tagsKey, statusPropertyKey, datePropertyKey, sortableKeys]);
+
+    /** What the row already shows without a column of its own. */
+    const shownKeys = useMemo(() => new Set<string | undefined>([
+        titleColumn?.key,
+        imagePropertyKey,
+        subtitleKey,
+        ...declaredColumns.map(col => col.key),
+        // The relation chips under the title are as visible as any column.
+        ...(columnMode ? [] : slotKeys.relationKeys)
+    ]), [titleColumn, imagePropertyKey, subtitleKey, declaredColumns, columnMode, slotKeys.relationKeys]);
+
+    /** The property the sort names, when no cell already shows it. */
+    const sortedKey = useMemo(() => {
+        const key = sortBy?.[0];
+        return key && !shownKeys.has(key) ? key : undefined;
+    }, [sortBy, shownKeys]);
+
+    /** The properties the filters name, minus the ones a cell already shows. */
+    const filteredKeys = useMemo(
+        () => Object.keys(filterValues ?? {}).filter(key => !shownKeys.has(key)),
+        [filterValues, shownKeys]
+    );
+
+    /**
+     * The last property the sort named, and the last set the filters named.
+     *
+     * A column earns its place when a sort or a filter names it, and keeps it
+     * once that sort or filter is cleared: taking it back would move every
+     * column right of it at the moment the user is comparing values across rows,
+     * and clearing a sort says nothing about wanting to stop seeing the property
+     * it sorted on.
+     *
+     * What it does *not* do is accumulate. There is only ever one sort, so
+     * ordering by four properties in turn is changing one's mind four times, not
+     * asking for four columns — and asking for four is how the row lost its
+     * status and its date to a wall of numbers. A new sort therefore replaces
+     * the property the last one left behind, and a new set of filters replaces
+     * the set before it. At most one sort column and one set of filter columns
+     * outlive their request.
+     *
+     * The list remounts per collection (it is keyed by path), so this is the
+     * memory of one visit to one collection, not a preference.
+     */
+    const [lastSortedKey, setLastSortedKey] = useState<string | undefined>(undefined);
+    const [lastFilteredKeys, setLastFilteredKeys] = useState<string[]>([]);
+
+    useEffect(() => {
+        if (sortedKey) setLastSortedKey(sortedKey);
+    }, [sortedKey]);
+
+    useEffect(() => {
+        if (filteredKeys.length === 0) return;
+        // Same members, same array: `filteredKeys` is rebuilt every render, and
+        // storing an equal copy would re-render every consumer of the columns.
+        setLastFilteredKeys(previous =>
+            previous.length === filteredKeys.length && previous.every((key, i) => key === filteredKeys[i])
+                ? previous
+                : filteredKeys);
+    }, [filteredKeys]);
+
+    /**
+     * Columns for what the user asked to sort or filter by and cannot see.
+     *
+     * Ordering a list by a property no cell shows produces a shuffle with no
+     * explanation in it — the rows move and nothing on screen says why. So the
+     * property joins the row as its own column, last: the filters' first, in
+     * their own order, then the sort's.
+     */
+    const requestedColumns = useMemo<ListColumn[]>(() => {
+        // The live request where there is one, the remembered one otherwise —
+        // read in that order rather than from state alone, because the effects
+        // above have not run yet on the render that first sees a request, and
+        // waiting a frame would flash the row without its new column.
+        const active = new Set([...filteredKeys, ...(sortedKey ? [sortedKey] : [])]);
+        const keys: string[] = [];
+        const request = (key: string | undefined) => {
+            if (!key || keys.includes(key) || shownKeys.has(key)) return;
+            keys.push(key);
+        };
+        (filteredKeys.length > 0 ? filteredKeys : lastFilteredKeys).forEach(request);
+        request(sortedKey ?? lastSortedKey);
+
+        return keys.flatMap((key, index) => {
+            const property = getResolvedPropertyInPath(resolvedCollection.properties, key) as Property | undefined;
+            if (!property) return [];
+            return [{
+                key,
+                label: property.name || key,
+                property,
+                align: (property.type === "number" || property.type === "date" ? "right" : "left") as ListColumn["align"],
+                ...getIdealColumnWidth(property),
+                sortable: sortableKeys.has(key),
+                priority: (active.has(key) ? PRIORITY_ACTIVE_REQUEST : PRIORITY_STALE_REQUEST) - index
+            }];
+        });
+    }, [filteredKeys, sortedKey, lastFilteredKeys, lastSortedKey, shownKeys, resolvedCollection, sortableKeys]);
+
+    // ── Compute list-view-visible actions per entity ──
+    const getListViewActions = useCallback((entity: Entity<M>): EntityAction[] => {
+        if (!getActionsForEntity) return EMPTY_LIST_VIEW_ACTIONS;
+        const customEntityActions = (collection.entityActions ?? [])
+            .map(action => resolveEntityAction(action, customizationController.entityActions))
+            .filter(Boolean) as EntityAction<M>[];
+        const allActions = getActionsForEntity({ entity,
+customEntityActions });
+        return allActions.filter(a => a.showActionsInListView);
+    }, [getActionsForEntity, collection.entityActions, customizationController.entityActions]);
 
     const showImage = size !== "xs";
+
+    /**
+     * How much room the action buttons take, reserved identically in the header
+     * and in every row so the columns line up above one another whether or not a
+     * given record has actions.
+     */
+    const actionsWidth = useMemo(() => {
+        if (!getActionsForEntity) return 0;
+        let most = 0;
+        for (const entity of data.slice(0, ACTIONS_SAMPLE_SIZE)) {
+            most = Math.max(most, getListViewActions(entity).length);
+        }
+        return most === 0 ? 0 : most * ACTION_BUTTON_WIDTH + (most - 1) * ACTION_BUTTON_GAP;
+    }, [data, getActionsForEntity, getListViewActions]);
 
     // Responsive: keep only the columns the row can actually pay for.
     //
     // The title is what a row is *for* — it is the one cell that identifies the
     // record — so it is not one competitor among the columns: it takes its
-    // comfortable share off the top, and the columns divide what is left. Each
-    // one is charged its own rendered width, and the first that cannot be
-    // afforded ends the row: dropping a column and keeping the narrower one
-    // after it would reorder the row as it resizes.
+    // comfortable share off the top, and the columns divide what is left. What
+    // gives way when there is not enough is decided by `priority` rather than by
+    // position, so the column the user just sorted by outlives the inferred
+    // ones; the survivors keep their declared order, because a row that
+    // reordered itself as it resized would be unreadable.
     const visibleColumns = useMemo(() => {
-        if (columns.length <= 1) return columns;
-
-        const titleCol = columns.find(c => c.isTitle);
-        const extraCols = columns.filter(c => !c.isTitle);
-        const withTitle = (kept: ListColumnDef[]) => [...(titleCol ? [titleCol] : []), ...kept];
+        const columns = [...declaredColumns, ...requestedColumns];
+        if (columns.length === 0) return columns;
 
         // Unmeasured: the title alone, which is the answer we would rather flash
         // than a row of columns squeezing it down to an ellipsis.
-        if (containerWidth === undefined) return withTitle([]);
+        if (containerWidth === undefined) return [];
 
         const chrome = ROW_PADDING_WIDTH
             + (selectionEnabled ? CHECKBOX_WIDTH + COLUMN_GAP : 0)
-            + (showImage ? IMAGE_WIDTH + COLUMN_GAP : 0);
-        let remaining = containerWidth - chrome - TITLE_COMFORTABLE_WIDTH;
+            + (showImage ? IMAGE_WIDTH + COLUMN_GAP : 0)
+            + (actionsWidth > 0 ? actionsWidth + COLUMN_GAP : 0);
+        const available = containerWidth - chrome - TITLE_COMFORTABLE_WIDTH;
 
-        const kept: ListColumnDef[] = [];
-        for (const col of extraCols) {
-            const cost = col.widthPx + COLUMN_GAP;
-            if (cost > remaining) break;
-            remaining -= cost;
-            kept.push(col);
+        const cost = (col: ListColumn) => col.widthPx + COLUMN_GAP;
+        let total = columns.reduce((acc, col) => acc + cost(col), 0);
+        if (total <= available) return columns;
+
+        const dropped = new Set<string>();
+        for (const col of [...columns].sort((a, b) => a.priority - b.priority)) {
+            if (total <= available) break;
+            dropped.add(col.key);
+            total -= cost(col);
         }
-
-        return withTitle(kept);
-    }, [columns, containerWidth, selectionEnabled, showImage]);
+        return columns.filter(col => !dropped.has(col.key));
+    }, [declaredColumns, requestedColumns, containerWidth, selectionEnabled, showImage, actionsWidth]);
 
     const handleEntityClick = useCallback((entity: Entity<M>) => {
         analyticsController.onAnalyticsEvent?.("entity_click", {
@@ -564,16 +697,6 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         return highlightedEntities?.some(e => e.id === entity.id && e.path === entity.path) ?? false;
     }, [highlightedEntities]);
 
-    // ── Compute list-view-visible actions per entity ──
-    const getListViewActions = useCallback((entity: Entity<M>): EntityAction[] => {
-        if (!getActionsForEntity) return EMPTY_LIST_VIEW_ACTIONS;
-        const customEntityActions = (collection.entityActions ?? [])
-            .map(action => resolveEntityAction(action, customizationController.entityActions))
-            .filter(Boolean) as EntityAction<M>[];
-        const allActions = getActionsForEntity({ entity,
-customEntityActions });
-        return allActions.filter(a => a.showActionsInListView);
-    }, [getActionsForEntity, collection.entityActions, customizationController.entityActions]);
 
     const rowClasses = getRowClasses(size);
 
@@ -583,6 +706,55 @@ customEntityActions });
     const handleRowSelectionChange = useCallback((entity: Entity<M>, selected: boolean) => {
         handleSelectionChange(entity, selected);
     }, [handleSelectionChange]);
+
+    /**
+     * Order by a column, on the same cycle a table header runs: unordered →
+     * ascending → descending → unordered. Clicking a header here and clicking it
+     * in the table view have to mean the same thing, because they are the same
+     * collection under the same controller.
+     */
+    const onColumnSort = useCallback((key: string) => {
+        if (!setSortBy) return;
+        const active = sortBy?.[0] === key ? sortBy[1] : undefined;
+        const next: [string, "asc" | "desc"] | undefined = active === "asc"
+            ? [key, "desc"]
+            : active === "desc"
+                ? undefined
+                : [key, "asc"];
+        setSortBy(next);
+        // Re-ordering a partially loaded collection invalidates the pages
+        // already fetched — they are no longer the rows the query answers with —
+        // so pagination starts over, as it does for the table and the sort menu.
+        setItemCount?.(pageSize);
+    }, [setSortBy, sortBy, setItemCount, pageSize]);
+
+    /**
+     * Whether a sort can be offered at all next to the filter already applied.
+     * A driver may refuse the combination; the table clears the filter to make
+     * room, which is a heavier answer than a header click asks for, so the
+     * header simply stops offering it — the same choice the sort menu makes.
+     */
+    const sortIsAvailable = useCallback((key: string) => {
+        if (!setSortBy) return false;
+        if (!checkFilterCombination) return true;
+        const active = sortBy?.[0] === key ? sortBy[1] : undefined;
+        // Clearing the sort is always available: it asks nothing of the driver.
+        if (active === "desc") return true;
+        return checkFilterCombination(filterValues ?? {}, [key, active === "asc" ? "desc" : "asc"]);
+    }, [setSortBy, checkFilterCombination, filterValues, sortBy]);
+
+    const header = (titleColumn || visibleColumns.length > 0) && (
+        <ListHeader
+            titleColumn={titleColumn}
+            columns={visibleColumns}
+            selectionEnabled={selectionEnabled}
+            showImage={showImage}
+            actionsWidth={actionsWidth}
+            sortBy={sortBy as [string, "asc" | "desc"] | undefined}
+            onColumnSort={onColumnSort}
+            sortIsAvailable={sortIsAvailable}
+        />
+    );
 
     return (
         <div ref={containerRef} className="w-full">
@@ -602,6 +774,7 @@ customEntityActions });
                 emptyComponent={emptyComponent}
                 size={size}
                 selectedEntityId={selectedEntityId}
+                header={header}
                 renderRow={useCallback(({ item: entity, style, className, selected, highlighted, isLast, onClick, onSelectionChange }) => {
                     return (
                         <div
@@ -625,6 +798,7 @@ customEntityActions });
                                 isLast={isLast}
                                 isActive={selectedEntityId !== undefined && entity.id === selectedEntityId}
                                 listViewActions={getListViewActions(entity)}
+                                actionsWidth={actionsWidth}
                                 context={context}
                                 path={path}
                                 selectionController={selectionController}
@@ -632,7 +806,7 @@ customEntityActions });
                             />
                         </div>
                     );
-                }, [resolvedCollection, selectionEnabled, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick])}
+                }, [resolvedCollection, selectionEnabled, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, actionsWidth, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick])}
             />
         </div>
     );
@@ -662,6 +836,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     isLast,
     isActive = false,
     listViewActions = [],
+    actionsWidth = 0,
     context,
     path,
     selectionController,
@@ -674,7 +849,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     highlighted?: boolean;
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
-    columns: ListColumnDef[];
+    columns: ListColumn[];
     slotKeys: CollectionSlotKeys;
     rowClasses: string;
     showImage: boolean;
@@ -682,6 +857,8 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     isLast: boolean;
     isActive?: boolean;
     listViewActions?: EntityAction[];
+    /** Reserved width of the actions cell, shared with the header. */
+    actionsWidth?: number;
     context?: ReturnType<typeof useAdminContext>;
     path?: string;
     selectionController?: SelectionController<M>;
@@ -717,7 +894,6 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
 
     // Developer-defined column mode (listProperties is explicitly set)
     const useColumnMode = !!collection.listProperties && collection.listProperties.length > 0;
-    const extraColumns = useColumnMode ? columns.filter(c => !c.isTitle) : [];
 
     return (
         <div
@@ -773,7 +949,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
             )}
 
             {/* PRIMARY slot → Title + subtitle + byline */}
-            <div className={cls("min-w-0 overflow-hidden", useColumnMode ? "flex-1" : "flex-1")}>
+            <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="truncate">
                     {slots.title?.value !== undefined ? (
                         <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
@@ -819,95 +995,34 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 )}
             </div>
 
-            {useColumnMode ? (
-                /* ── COLUMN MODE (developer-defined listProperties) ── */
-                <>
-                    {extraColumns.map((col) => {
-                        const value = getValueInPath(entity.values, col.key);
-
-                        if (col.isStatus || (col.property.type === "string" && "enum" in col.property)) {
-                            return (
-                                <div key={col.key} className={cls(col.width, "flex", col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start")}>
-                                    {value ? (
-                                        <PropertyPreview propertyKey={col.key} value={value} property={col.property} size="small"/>
-                                    ) : <span className="text-surface-400">—</span>}
-                                </div>
-                            );
-                        }
-
-                        if (col.isDate || col.property.type === "date") {
-                            return (
-                                <div key={col.key} className={cls(col.width, col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left")}>
-                                    <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
-                                        {formatDateValue(value) ?? "—"}
-                                    </Typography>
-                                </div>
-                            );
-                        }
-
-                        // Complex types → compact single-line summary
-                        if (isComplexPropertyType(col.property)) {
-                            const summary = compactValueSummary(value, col.property);
-                            return (
-                                <div key={col.key} className={cls(col.width, "truncate", col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left")}>
-                                    <Typography variant="caption" className="text-surface-500 dark:text-surface-400 truncate">
-                                        {summary ?? "—"}
-                                    </Typography>
-                                </div>
-                            );
-                        }
-
-                        // Simple scalar → PropertyPreview (single-line)
-                        return (
-                            <div key={col.key} className={cls(col.width, "truncate", col.align === "center" ? "text-center" : col.align === "right" ? "text-right" : "text-left")}>
-                                <Typography component="div" variant="body2" className="text-surface-600 dark:text-surface-300 truncate">
-                                    {value !== undefined ? (
-                                        <PropertyPreview propertyKey={col.key} value={value} property={col.property} size="small"/>
-                                    ) : "—"}
-                                </Typography>
-                            </div>
-                        );
-                    })}
-                </>
-            ) : (
-                /* ── SLOT MODE (editorial scanner layout) ──
-                   The slots give up the row from the right inwards, the same
-                   rule the columns follow above: whatever sits furthest from
-                   the title is furthest from what the row is about, so it is
-                   the first thing a narrowing row can afford to lose. Reading
-                   the thresholds in source order gives the reverse of the
-                   order they vanish in — they are written left to right, and
-                   they disappear right to left. */
+            {/* TRAILING COLUMNS — the same definitions the header labels, in the
+                same order and at the same widths, so a label and the values
+                under it cannot come apart. */}
+            {columns.length > 0 && (
                 <div className="flex items-center gap-4 flex-shrink-0 ml-auto">
-                    {/* TAGS slot — "free chips beside the status", so beside it.
-                        Leftmost of the three, so the last to go. */}
-                    {slots.tags && (
-                        <div className="flex items-center gap-1 flex-shrink-0 @max-[360px]:hidden">
-                            <TagChips slot={slots.tags} max={3}/>
+                    {columns.map((col) => (
+                        <div
+                            key={col.key}
+                            className={cls(
+                                col.width,
+                                "flex items-center overflow-hidden",
+                                col.align === "center" ? "justify-center" : col.align === "right" ? "justify-end" : "justify-start"
+                            )}
+                        >
+                            <ListCell column={col} entity={entity} slots={slots}/>
                         </div>
-                    )}
-
-                    {/* STATUS slot */}
-                    {slots.status && (
-                        <div className="flex-shrink-0 @max-[460px]:hidden">
-                            <SlotValue slot={slots.status} size="small"/>
-                        </div>
-                    )}
-
-                    {/* DATE slot — rightmost, so the first to go. */}
-                    {slots.date && (
-                        <div className="flex-shrink-0 text-right w-[80px] @max-[560px]:hidden">
-                            <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
-                                {slots.date.formatted ?? "—"}
-                            </Typography>
-                        </div>
-                    )}
+                    ))}
                 </div>
             )}
 
-            {/* LIST VIEW ACTIONS — always visible on each row */}
-            {listViewActions.length > 0 && (
-                <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+            {/* LIST VIEW ACTIONS — always visible on each row.
+                Width is reserved from the widest row rather than taken from
+                this one, so a record with fewer actions does not slide its
+                columns out from under the header. */}
+            {actionsWidth > 0 && (
+                <div className="flex items-center justify-end gap-0.5 flex-shrink-0 ml-auto"
+                    style={{ minWidth: actionsWidth }}
+                    onClick={(e) => e.stopPropagation()}>
                     {listViewActions.map((action, index) => (
                         <Tooltip key={action.key ?? index} title={action.name} asChild>
                             <IconButton
@@ -941,7 +1056,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     highlighted?: boolean;
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
-    columns: ListColumnDef[];
+    columns: ListColumn[];
     slotKeys: CollectionSlotKeys;
     rowClasses: string;
     showImage: boolean;
@@ -949,9 +1064,200 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     isLast: boolean;
     isActive?: boolean;
     listViewActions?: EntityAction[];
+    /** Reserved width of the actions cell, shared with the header. */
+    actionsWidth?: number;
     context?: ReturnType<typeof useAdminContext>;
     path?: string;
     selectionController?: SelectionController<M>;
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 }) => React.ReactElement;
 
+/**
+ * One cell of one row: whatever the column says fills it.
+ *
+ * A slot column renders the slot — a status keeps its coloured chip and a date
+ * its relative wording wherever the value came from — and a property column
+ * reads the record. Both go through here so the header above them is labelling
+ * one thing, not two that happen to line up.
+ */
+function ListCell<M extends Record<string, unknown>>({
+    column,
+    entity,
+    slots
+}: {
+    column: ListColumn;
+    entity: Entity<M>;
+    slots: EntityPreviewSlots;
+}) {
+    if (column.slot === "tags") {
+        if (!slots.tags) return null;
+        return (
+            <div className="flex items-center gap-1 overflow-hidden">
+                <TagChips slot={slots.tags} max={3}/>
+            </div>
+        );
+    }
+
+    if (column.slot === "status") {
+        if (!slots.status) return <EmptyCell/>;
+        return <SlotValue slot={slots.status} size="small"/>;
+    }
+
+    if (column.slot === "date") {
+        return (
+            <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
+                {slots.date?.formatted ?? "—"}
+            </Typography>
+        );
+    }
+
+    const property = column.property;
+    if (!property) return null;
+
+    const value = getValueInPath(entity.values, column.key);
+
+    if (property.type === "date") {
+        return (
+            <Typography variant="caption" className="whitespace-nowrap text-surface-400 dark:text-surface-500 font-medium">
+                {formatDateValue(value) ?? "—"}
+            </Typography>
+        );
+    }
+
+    // Complex types → compact single-line summary, so a row keeps its height.
+    if (isComplexPropertyType(property)) {
+        const summary = compactValueSummary(value, property);
+        return (
+            <Typography variant="caption" className="text-surface-500 dark:text-surface-400 truncate">
+                {summary ?? "—"}
+            </Typography>
+        );
+    }
+
+    if (value === undefined || value === null) return <EmptyCell/>;
+
+    return (
+        <Typography component="div" variant="body2" className="text-surface-600 dark:text-surface-300 truncate">
+            <PropertyPreview propertyKey={column.key} value={value} property={property} size="small"/>
+        </Typography>
+    );
+}
+
+/** What a column shows for a record that has nothing in it. */
+function EmptyCell() {
+    return <span className="text-surface-400 dark:text-surface-600">—</span>;
+}
+
+/**
+ * The list's column header.
+ *
+ * Quiet by design: a list is read row by row, and the header is there to name
+ * the columns and to be clicked, not to compete with the rows. It lays out
+ * against the same widths the rows do, and skips the checkbox and the image —
+ * neither is a column, and neither has anything to be called.
+ */
+function ListHeader({
+    titleColumn,
+    columns,
+    selectionEnabled,
+    showImage,
+    actionsWidth,
+    sortBy,
+    onColumnSort,
+    sortIsAvailable
+}: {
+    titleColumn?: ListColumn;
+    columns: ListColumn[];
+    selectionEnabled?: boolean;
+    showImage: boolean;
+    actionsWidth: number;
+    sortBy?: [string, "asc" | "desc"];
+    onColumnSort: (key: string) => void;
+    sortIsAvailable: (key: string) => boolean;
+}) {
+    const headerCell = (column: ListColumn) => (
+        <ListHeaderLabel
+            column={column}
+            direction={sortBy?.[0] === column.key ? sortBy[1] : undefined}
+            onSort={column.sortable && sortIsAvailable(column.key) ? () => onColumnSort(column.key) : undefined}
+        />
+    );
+
+    return (
+        <div className={cls(
+            "flex items-center gap-4 px-5 py-1.5 select-none border-b bg-surface-50 dark:bg-surface-900",
+            defaultBorderMixin
+        )}>
+            {selectionEnabled && <div className="flex-shrink-0 w-8"/>}
+            {showImage && <div className="flex-shrink-0 w-10"/>}
+
+            <div className="flex-1 min-w-0 flex items-center">
+                {titleColumn && headerCell(titleColumn)}
+            </div>
+
+            {columns.length > 0 && (
+                <div className="flex items-center gap-4 flex-shrink-0 ml-auto">
+                    {columns.map(column => (
+                        <div
+                            key={column.key}
+                            className={cls(
+                                column.width,
+                                "flex items-center overflow-hidden",
+                                column.align === "center" ? "justify-center" : column.align === "right" ? "justify-end" : "justify-start"
+                            )}
+                        >
+                            {headerCell(column)}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {actionsWidth > 0 && <div className="flex-shrink-0 ml-auto" style={{ minWidth: actionsWidth }}/>}
+        </div>
+    );
+}
+
+/**
+ * One header label, clickable when the collection can be ordered by it.
+ *
+ * The arrow shows only on the column currently ordering the list: three arrows
+ * in a header row are three invitations, and only one of them is ever the
+ * answer to "how is this sorted".
+ */
+function ListHeaderLabel({
+    column,
+    direction,
+    onSort
+}: {
+    column: ListColumn;
+    direction?: "asc" | "desc";
+    onSort?: () => void;
+}) {
+    const content = (
+        <>
+            <span className="truncate">{column.label}</span>
+            {direction === "asc" && <ArrowUpIcon size={12} className="flex-shrink-0"/>}
+            {direction === "desc" && <ArrowDownIcon size={12} className="flex-shrink-0"/>}
+        </>
+    );
+
+    const base = "inline-flex items-center gap-1 max-w-full text-[11px] leading-none uppercase tracking-wider font-medium";
+    const tone = direction
+        ? "text-surface-600 dark:text-surface-300"
+        : "text-surface-400 dark:text-surface-500";
+
+    if (!onSort) {
+        return <span className={cls(base, tone)}>{content}</span>;
+    }
+
+    return (
+        <button
+            type="button"
+            title={`Sort by ${column.label}`}
+            onClick={onSort}
+            className={cls(base, tone, "cursor-pointer hover:text-surface-700 dark:hover:text-surface-200 transition-colors")}
+        >
+            {content}
+        </button>
+    );
+}

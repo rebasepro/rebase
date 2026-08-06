@@ -36,6 +36,13 @@ export type ListViewProps<T> = {
     size?: CollectionSize;
     selectedEntityId?: string | number;
 
+    /**
+     * Rendered above the rows, inside the list's own frame, and only when there
+     * are rows to head. A column header over an empty state or a spinner labels
+     * nothing.
+     */
+    header?: React.ReactNode;
+
     renderRow: (params: {
         item: T;
         index: number;
@@ -97,9 +104,14 @@ export function ListView<T>({
 
     size = "m",
     selectedEntityId,
+    header,
     renderRow
 }: ListViewProps<T>) {
     const containerRef = useRef<HTMLDivElement>(null);
+    // The rows' own box, which a header shifts down from the container's top.
+    // Virtualization measures against it rather than against the container, so
+    // the window of rendered rows stays the one the viewport is actually over.
+    const rowsRef = useRef<HTMLDivElement>(null);
     const isLoadingMore = useRef(false);
 
     // Reset loading gate when loading stops
@@ -128,7 +140,7 @@ export function ListView<T>({
         const update = () => {
             rafId = null;
             const scrollRect = scrollEl.getBoundingClientRect();
-            const listRect = el.getBoundingClientRect();
+            const listRect = (rowsRef.current ?? el).getBoundingClientRect();
 
             const listTopRelative = listRect.top - scrollRect.top;
             setEffectiveScrollTop(Math.max(0, -listTopRelative));
@@ -213,68 +225,71 @@ export function ListView<T>({
                     )}
                 </div>
             ) : (
-                <div style={{ height: totalHeight + footerHeight, position: "relative" }}>
-                    <div style={{ position: "absolute", top: offsetY, left: 0, right: 0 }}>
-                        {visibleData.map((item, i) => {
-                            const actualIndex = startIndex + i;
-                            const isLast = actualIndex === data.length - 1;
-                            const id = getItemId(item);
-                            const selected = selectedIds?.has(id) ?? false;
-                            const highlighted = highlightedIds?.has(id) ?? false;
+                <>
+                    {header}
+                    <div ref={rowsRef} style={{ height: totalHeight + footerHeight, position: "relative" }}>
+                        <div style={{ position: "absolute", top: offsetY, left: 0, right: 0 }}>
+                            {visibleData.map((item, i) => {
+                                const actualIndex = startIndex + i;
+                                const isLast = actualIndex === data.length - 1;
+                                const id = getItemId(item);
+                                const selected = selectedIds?.has(id) ?? false;
+                                const highlighted = highlightedIds?.has(id) ?? false;
 
-                            const handleClick = (e: React.MouseEvent) => {
-                                if ((e.metaKey || e.ctrlKey) && selectionEnabled) {
-                                    e.preventDefault();
-                                    onSelectionChange?.(item, !selected);
-                                    return;
-                                }
-                                onItemClick?.(item);
-                            };
+                                const handleClick = (e: React.MouseEvent) => {
+                                    if ((e.metaKey || e.ctrlKey) && selectionEnabled) {
+                                        e.preventDefault();
+                                        onSelectionChange?.(item, !selected);
+                                        return;
+                                    }
+                                    onItemClick?.(item);
+                                };
 
-                            const handleSelectionChange = (val: boolean) => {
-                                onSelectionChange?.(item, val);
-                            };
+                                const handleSelectionChange = (val: boolean) => {
+                                    onSelectionChange?.(item, val);
+                                };
 
-                            return (
-                                <React.Fragment key={id || actualIndex}>
-                                    {renderRow({
-                                        item,
-                                        index: actualIndex,
-                                        style: { height: estimatedRowHeight, overflow: "hidden" },
-                                        className: cls(
-                                            !isLast && "border-b",
-                                            !isLast && borderMixinClass
-                                        ),
-                                        selected,
-                                        highlighted,
-                                        isLast,
-                                        onClick: handleClick,
-                                        onSelectionChange: handleSelectionChange
-                                    })}
-                                </React.Fragment>
-                            );
-                        })}
+                                return (
+                                    <React.Fragment key={id || actualIndex}>
+                                        {renderRow({
+                                            item,
+                                            index: actualIndex,
+                                            style: { height: estimatedRowHeight, overflow: "hidden" },
+                                            className: cls(
+                                                !isLast && "border-b",
+                                                !isLast && borderMixinClass
+                                            ),
+                                            selected,
+                                            highlighted,
+                                            isLast,
+                                            onClick: handleClick,
+                                            onSelectionChange: handleSelectionChange
+                                        })}
+                                    </React.Fragment>
+                                );
+                            })}
+                        </div>
+
+                        {dataLoading && (
+                            <div
+                                className="flex items-center justify-center py-3"
+                                style={{ position: "absolute", top: totalHeight, left: 0, right: 0 }}
+                            >
+                                <CircularProgress size="small" />
+                            </div>
+                        )}
+                        {!dataLoading && noMoreToLoad && data.length > 0 && (
+                            <div
+                                className="flex items-center justify-center py-2 dark:bg-surface-900"
+                                style={{ position: "absolute", top: totalHeight, left: 0, right: 0 }}
+                            >
+                                <Typography variant="caption" color="secondary">
+                                    All {data.length} entries loaded
+                                </Typography>
+                            </div>
+                        )}
                     </div>
-
-                    {dataLoading && (
-                        <div
-                            className="flex items-center justify-center py-3"
-                            style={{ position: "absolute", top: totalHeight, left: 0, right: 0 }}
-                        >
-                            <CircularProgress size="small" />
-                        </div>
-                    )}
-                    {!dataLoading && noMoreToLoad && data.length > 0 && (
-                        <div
-                            className="flex items-center justify-center py-2 dark:bg-surface-900"
-                            style={{ position: "absolute", top: totalHeight, left: 0, right: 0 }}
-                        >
-                            <Typography variant="caption" color="secondary">
-                                All {data.length} entries loaded
-                            </Typography>
-                        </div>
-                    )}
-                </div>
+                </>
             )}
         </div>
     );
