@@ -11,7 +11,7 @@ import { getIconForProperty } from "../../util/property_utils";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { ExpandablePanel, Typography } from "@rebasepro/ui";
 import { useClearRestoreValue } from "../useClearRestoreValue";
-import { useAuthController, useTranslation } from "@rebasepro/app";
+import { isDisabled, useAuthController, useTranslation } from "@rebasepro/app";
 import { mergeDeep } from "@rebasepro/utils";
 
 /**
@@ -96,14 +96,14 @@ export function RepeatFieldBinding({
         </ErrorBoundary>;
     };
 
-    const canAddElements = !property.admin?.disabled && !isSubmitting && !disabled && (property.admin?.canAddElements || property.admin?.canAddElements === undefined);
+    const canAddElements = !isDisabled(property) && !isSubmitting && !disabled && (property.admin?.canAddElements || property.admin?.canAddElements === undefined);
     const sortable = property.admin?.sortable === undefined ? true : property.admin.sortable;
     const arrayContainer = <ArrayContainer droppableId={propertyKey}
         addLabel={property.name ? t("add_to_field", { fieldName: property.name }) : t("add_entry")}
         value={(value as unknown[]) ?? []}
         buildEntry={buildEntry}
         onInternalIdAdded={setLastAddedId}
-        disabled={isSubmitting || Boolean(property.admin?.disabled)}
+        disabled={isSubmitting || isDisabled(property)}
         canAddElements={canAddElements}
         sortable={sortable}
         newDefaultEntry={getDefaultValueFor(property.of)}

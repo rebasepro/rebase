@@ -7,7 +7,7 @@ import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { ExpandablePanel, Typography } from "@rebasepro/ui";
 import { getArrayResolvedProperties } from "@rebasepro/common";
-import { isReadOnly } from "@rebasepro/app";
+import { isDisabled, isReadOnly } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { useAuthController } from "@rebasepro/app";
@@ -65,7 +65,7 @@ export function ArrayCustomShapedFieldBinding({
     </>);
 
     const body = (resolvedProperties ?? []).map((childProperty, index) => {
-        const thisDisabled = isReadOnly(childProperty) || Boolean(childProperty.admin?.disabled);
+        const thisDisabled = isReadOnly(childProperty) || isDisabled(childProperty);
         const fieldProps = {
             propertyKey: `${propertyKey}[${index}]`,
             disabled: disabled || thisDisabled,

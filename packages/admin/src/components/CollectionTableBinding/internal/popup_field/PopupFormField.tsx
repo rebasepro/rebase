@@ -16,7 +16,7 @@ import { getPropertyInPath } from "../../../../util/property_utils";
 import { PropertyFieldBinding, zodToFormErrors } from "../../../../form";
 import { useAuthController, useCustomizationController, useData, useRebaseContext } from "@rebasepro/app";
 import type { OnCellValueChangeParams } from "@rebasepro/app";
-import { isReadOnly } from "@rebasepro/app";
+import { isDisabled, isReadOnly } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
 interface PopupFormFieldProps<M extends Record<string, unknown>> {
@@ -295,7 +295,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     const fieldProps: PropertyFieldBindingProps<M> | undefined = propertyKey && property
         ? {
             propertyKey: propertyKey as string,
-            disabled: isSubmitting || isReadOnly(property) || !!property.admin?.disabled,
+            disabled: isSubmitting || isReadOnly(property) || isDisabled(property),
             property,
             includeDescription: false,
             underlyingValueHasChanged: false,

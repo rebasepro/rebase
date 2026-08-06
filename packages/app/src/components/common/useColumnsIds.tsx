@@ -1,9 +1,10 @@
-import type { Property, MapProperty, Properties } from "@rebasepro/types";
+import type { Property, MapProperty, Properties, RelationProperty } from "@rebasepro/types";
 import { useMemo } from "react";
 ;
-import { getSubcollections } from "@rebasepro/common";
+import { getChildViewRelationPropertyKeys, getSubcollections } from "@rebasepro/common";
 import type { AdminCollection } from "@rebasepro/admin-types";
 import { getPropertyInPath } from "../../collections/property-path";
+import { isDisabled } from "../../collections/property_presentation";
 
 export type PropertyColumnConfig = {
     key: string;
@@ -66,7 +67,7 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: AdminColle
             }
             return [{
                 key,
-                disabled: Boolean(property.admin?.disabled) || Boolean(property.admin?.readOnly)
+                disabled: isDisabled(property) || Boolean(property.admin?.readOnly)
             }];
         }
 
@@ -89,8 +90,8 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: AdminColle
 
                     return [{
                         key,
-                        disabled: Boolean(rootProperty.admin?.disabled) || Boolean(rootProperty.admin?.readOnly) ||
-                            Boolean(nestedProperty.admin?.disabled) || Boolean(nestedProperty.admin?.readOnly)
+                        disabled: isDisabled(rootProperty) || Boolean(rootProperty.admin?.readOnly) ||
+                            isDisabled(nestedProperty) || Boolean(nestedProperty.admin?.readOnly)
                     }];
                 }
             }
@@ -144,7 +145,7 @@ function hideAndExpandKeys<M extends Record<string, any>>(collection: AdminColle
         } else {
             result.push({
                 key: propKey,
-                disabled: Boolean(property.admin?.disabled) || Boolean(property.admin?.readOnly)
+                disabled: isDisabled(property) || Boolean(property.admin?.readOnly)
             });
             processedPropertyKeys.add(propKey);
         }
@@ -184,17 +185,27 @@ export function getColumnKeysForProperty(property: Property, key: string, disabl
             .flatMap(([childKey, childProperty]) => getColumnKeysForProperty(
                 childProperty as Readonly<Property>,
                 `${key}.${childKey}`,
-                disabled || Boolean(property.admin?.disabled) || Boolean(property.admin?.readOnly))
+                disabled || isDisabled(property) || Boolean(property.admin?.readOnly))
             );
     }
     return [{
         key,
-        disabled: disabled || Boolean(property.admin?.disabled) || Boolean(property.admin?.readOnly)
+        disabled: disabled || isDisabled(property) || Boolean(property.admin?.readOnly)
     }];
 }
 
 export function getFormFieldKeys(collection: AdminCollection): string[] {
-    const propertyKeys = collection.properties ? Object.keys(collection.properties) : [];
+    const properties = collection.properties ?? {};
+    // A many-relation the entity view already lists as a tab is not an input:
+    // the tab is the treatment, and rendering the same declaration again as a
+    // picker asked the author to select a collection's own children from a
+    // dropdown. `renderInForm` is how a project that wants the picker asks for
+    // it back — opt in, because the tab is the default.
+    const consumedByChildView = getChildViewRelationPropertyKeys(collection);
+    const propertyKeys = Object.keys(properties).filter(key => {
+        if (!consumedByChildView.has(key)) return true;
+        return (properties[key] as RelationProperty).admin?.renderInForm === true;
+    });
     const additionalFields = collection.additionalFields ?? [];
     const allKeys = [
         ...propertyKeys,

@@ -6,7 +6,7 @@ import { useTranslation } from "@rebasepro/app";
 
 import { ErrorBoundary } from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";
-import { isHidden, isReadOnly } from "@rebasepro/app";
+import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
@@ -50,7 +50,7 @@ export function MapFieldBinding({
             {Object.entries(mapProperties)
                 .filter(([_, property]) => !isHidden(property))
                 .map(([entryKey, childProperty], index) => {
-                    const thisDisabled = isReadOnly(childProperty) || Boolean(childProperty.admin?.disabled);
+                    const thisDisabled = isReadOnly(childProperty) || isDisabled(childProperty);
                     const fieldBindingProps: PropertyFieldBindingProps<Record<string, unknown>> = {
                         propertyKey: `${propertyKey}.${entryKey}`,
                         disabled: disabled || thisDisabled,

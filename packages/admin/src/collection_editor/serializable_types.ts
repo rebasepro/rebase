@@ -155,6 +155,7 @@ export interface SerializableAdminRelationOptions extends SerializableAdminBaseO
     fixedFilter?: FilterValues<string>;
     includeId?: boolean;
     includeEntityLink?: boolean;
+    renderInForm?: boolean;
 }
 
 /** JSON-serializable version of `AdminArrayOptions`. */

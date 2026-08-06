@@ -450,6 +450,56 @@ singularName: customName } : {})
 }
 
 /**
+ * The property keys of `collection` whose relation is already one of its tabs.
+ *
+ * A many-relation can only be declared as a property — that is the documented
+ * and only mechanism — and {@link getEntityChildViews} promotes it to a tab.
+ * Nothing marked it as consumed, so the form went on rendering the same
+ * relation a second time as a picker: one declaration, two surfaces, and the
+ * picker is not a usable input for a collection's children.
+ *
+ * Keyed by property key rather than by relation key because that is what a form
+ * addresses a field by, and the two differ whenever a relation is named. The
+ * match is on the resolved `relationName` — the identity `getEntityChildViews`
+ * itself dedupes on — so a relation declared in `relations` and pointed at by a
+ * differently-named property is still recognised as already surfaced.
+ *
+ * Only top-level properties: a relation nested inside a `map` gets no tab, so
+ * its picker is the only surface it has and must stay.
+ */
+export function getChildViewRelationPropertyKeys<M extends Record<string, unknown> = Record<string, unknown>>(
+    collection: CollectionConfig<M>
+): Set<string> {
+    const keys = new Set<string>();
+
+    const relationProperties = Object.entries((collection.properties ?? {}) as Record<string, Property>)
+        .filter(([, property]) => property?.type === "relation");
+    if (relationProperties.length === 0) return keys;
+
+    const relationViews = getEntityChildViews(collection)
+        .filter(view => view.source.kind === "relation");
+    if (relationViews.length === 0) return keys;
+
+    const resolvedRelations = resolveCollectionRelations(collection);
+    const identityOf = (relationKey: string): string =>
+        resolvedRelations[relationKey]?.relationName ?? relationKey;
+
+    const surfaced = new Set(relationViews.map(view =>
+        identityOf((view.source as { relationKey: string }).relationKey)));
+
+    for (const [propertyKey, property] of relationProperties) {
+        const relation = (property as RelationProperty).resolvedRelation ?? resolvedRelations[propertyKey];
+        // A to-one relation is a foreign key the author edits, never a tab. It
+        // cannot reach `surfaced` — that set is built from many-relations only —
+        // but reading the cardinality says so at the call site.
+        if (relation?.cardinality !== "many") continue;
+        if (surfaced.has(relation.relationName ?? propertyKey)) keys.add(propertyKey);
+    }
+
+    return keys;
+}
+
+/**
  * The child views of `collection` as bare collections.
  *
  * The flattened view of {@link getEntityChildViews}, for navigation code that

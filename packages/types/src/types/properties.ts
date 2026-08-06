@@ -1036,6 +1036,18 @@ export interface ImageResize {
 export type JsonLogicRule = Record<string, any>;
 
 /**
+ * A condition that is either a JSON Logic rule or a literal answer.
+ *
+ * The unconditional case is the common one — "this field is never editable",
+ * "this field is never shown" — and with only a rule accepted it had to be
+ * spelled `{ "==": [1, 1] }`, which reads as a puzzle at the call site. A plain
+ * `true` says the same thing.
+ *
+ * @group Entity properties
+ */
+export type ConditionRule = JsonLogicRule | boolean;
+
+/**
  * Conditions for individual enum values within a property.
  * @group Entity properties
  */
@@ -1084,8 +1096,10 @@ export interface PropertyConditions {
      * \`\`\`json
      * { "==": [{ "var": "values.status" }, "archived"] }
      * \`\`\`
+     *
+     * A literal `true` disables it unconditionally.
      */
-    disabled?: JsonLogicRule;
+    disabled?: ConditionRule;
 
     /**
      * Message to display when the field is disabled by a condition.
@@ -1101,14 +1115,19 @@ export interface PropertyConditions {
     /**
      * Hide the field completely when this condition evaluates to true.
      * The field is removed from the form (not just visually hidden).
+     *
+     * A literal `true` hides it unconditionally. This is the way to keep a
+     * property out of the form without keeping it out of the collection.
      */
-    hidden?: JsonLogicRule;
+    hidden?: ConditionRule;
 
     /**
      * Make the field read-only when this condition evaluates to true.
      * Renders as a preview instead of an input.
+     *
+     * A literal `true` makes it read-only unconditionally.
      */
-    readOnly?: JsonLogicRule;
+    readOnly?: ConditionRule;
 
     // ═══════════════════════════════════════════════════════════════════════
     // VALIDATION CONDITIONS

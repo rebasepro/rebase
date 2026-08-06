@@ -8,7 +8,7 @@ import { useDropzone } from "react-dropzone";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIconAndTooltip } from "../components/LabelWithIconAndTooltip";
 
-import { isReadOnly } from "@rebasepro/app";
+import { isDisabled, isReadOnly } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { useAuthController, useSnackbarController, useStorageSource, useTranslation } from "@rebasepro/app";
 import { StorageSourceContext } from "@rebasepro/app";
@@ -74,7 +74,7 @@ export function StorageUploadFieldBinding({
     const authController = useAuthController();
 
     const storageSource = useStorageSource();
-    const disabled = isReadOnly(property) || !!property.admin?.disabled || isSubmitting || context.disabled;
+    const disabled = isReadOnly(property) || isDisabled(property) || isSubmitting || context.disabled;
 
     const {
         internalValue,

@@ -194,6 +194,20 @@ export interface AdminRelationOptions extends AdminPropertyOptions {
 
     /** Show a link that opens the related entity. Defaults to `true`. */
     includeEntityLink?: boolean;
+
+    /**
+     * Render a **many**-relation as a picker inside the entity form as well as
+     * the tab it already gets. Defaults to `false`.
+     *
+     * The entity view lists a many-relation's rows as a tab, which is the whole
+     * treatment: the child rows are a list, not a value the form holds. This
+     * flag exists for the project that wants the inline picker anyway — it is
+     * off by default because the two surfaces are redundant by construction.
+     *
+     * No effect on a to-one relation: a foreign key gets no tab, so its picker
+     * is always rendered.
+     */
+    renderInForm?: boolean;
 }
 
 /**

@@ -1,10 +1,21 @@
-import { applyPropertyConditions } from "../../src/collections/property_presentation";
+import { applyPropertyConditions, isDisabled, isHidden, isReadOnly } from "../../src/collections/property_presentation";
 import { registerConditionOperations } from "@rebasepro/common";
 import type { ConditionContext, Property } from "@rebasepro/types";
 
 // applyPropertyConditions moved here with the function: it writes into a property's
 // admin block, so it has no business in a package the backend depends on.
 registerConditionOperations();
+
+const baseContextForLiterals: ConditionContext = {
+    values: {},
+    previousValues: {},
+    propertyValue: undefined,
+    path: "products",
+    entityId: "123",
+    isNew: false,
+    user: { uid: "user1", email: null, displayName: null, photoURL: null, roles: [] },
+    now: 0
+};
 
 describe("applyPropertyConditions", () => {
 
@@ -488,5 +499,60 @@ label: "Viewer" }
         expect(enums.map(e => e.id)).not.toContain("admin");
         expect(enums.map(e => e.id)).toContain("editor");
         expect(enums.map(e => e.id)).toContain("viewer");
+    });
+});
+
+/**
+ * A condition stated as a literal rather than as a rule.
+ *
+ * The unconditional case — "never editable", "never shown" — had to be spelled
+ * `{ "==": [1, 1] }`, which is a puzzle at the call site and reads as a mistake
+ * to the next person. A plain `true` says it, and because a literal needs no
+ * context it is answered by the same three gates that lay every field out,
+ * without waiting for the rule evaluator to be wired up.
+ */
+describe("literal conditions", () => {
+
+    const p = (conditions: Record<string, unknown>, rest: Record<string, unknown> = {}) =>
+        ({ type: "string", name: "Field", conditions, ...rest } as unknown as Property);
+
+    it("hides a field declared `hidden: true`", () => {
+        expect(isHidden(p({ hidden: true }))).toBe(true);
+        expect(isHidden(p({ hidden: false }))).toBe(false);
+        expect(isHidden(p({}))).toBe(false);
+    });
+
+    it("keeps honouring the admin block it used to be the only reader of", () => {
+        expect(isHidden({ type: "string", admin: { disabled: { hidden: true } } } as unknown as Property)).toBe(true);
+    });
+
+    it("does not read a rule as an answer", () => {
+        // A rule is truthy as an object. Evaluating it needs an entity to
+        // evaluate against, which a gate this shallow does not have — so it must
+        // decline rather than guess, and `hidden: {...}` is not `hidden: true`.
+        expect(isHidden(p({ hidden: { "==": [1, 1] } }))).toBe(false);
+        expect(isReadOnly(p({ readOnly: { "==": [1, 1] } }))).toBe(false);
+        expect(isDisabled(p({ disabled: { "==": [1, 1] } }))).toBe(false);
+    });
+
+    it("freezes a field declared `readOnly: true`", () => {
+        expect(isReadOnly(p({ readOnly: true }))).toBe(true);
+        expect(isReadOnly(p({ readOnly: false }))).toBe(false);
+    });
+
+    it("disables a field declared `disabled: true`", () => {
+        expect(isDisabled(p({ disabled: true }))).toBe(true);
+        expect(isDisabled(p({ disabled: false }))).toBe(false);
+        // The other way of saying it, unchanged.
+        expect(isDisabled({ type: "string", admin: { disabled: true } } as unknown as Property)).toBe(true);
+    });
+
+    it("takes a literal through the rule evaluator unchanged", () => {
+        // `applyPropertyConditions` is not wired up in production, but when it is
+        // it must not hand a boolean to json-logic and get a rule's answer.
+        const result = applyPropertyConditions(p({ hidden: true }), baseContextForLiterals);
+        expect(result.admin?.disabled).toMatchObject({ hidden: true });
+        expect(applyPropertyConditions(p({ hidden: false }), baseContextForLiterals).admin?.disabled)
+            .toBeUndefined();
     });
 });

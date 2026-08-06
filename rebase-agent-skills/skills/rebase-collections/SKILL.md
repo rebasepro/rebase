@@ -1520,6 +1520,18 @@ discount_percentage: {
 
 Available condition fields: `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`, `required`, `requiredMessage`, `min`, `max`, `defaultValue`, `enumConditions`, `allowedEnumValues`, `excludedEnumValues`, `referencePath`, `referenceFilter`, `canAddElements`, `sortable`, `acceptedFiles`, `maxFileSize`.
 
+`hidden`, `readOnly` and `disabled` also take a plain `true` for the
+unconditional case — the field is never shown, never editable — instead of a
+rule that is always true:
+
+```typescript
+internal_note: {
+    name: "Internal note",
+    type: "string",
+    conditions: { hidden: true }   // keep it in the collection, out of the form
+}
+```
+
 ## Schema Migration Workflow
 
 After modifying collections, apply changes to the database:

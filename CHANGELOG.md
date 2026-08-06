@@ -31,6 +31,23 @@
 
 ### Fixed
 
+- **A `hasMany` was declared once and rendered twice.** A many-cardinality relation becomes an entity tab, which is the whole treatment for a list of child rows. It was *also* still a member of `properties` — the only place a relation can be declared — so the form rendered it a second time as a relation picker: a dropdown offering to select a collection's own children, one card per child row. Nothing marked the relation as already consumed, so every `hasMany` and `manyToMany` property in every project grew a stray field.
+
+  `getChildViewRelationPropertyKeys` is the missing half of `getEntityChildViews`: given a collection, it names the property keys the entity view has already taken, and the form's field list (`getFormFieldKeys`, which both the editable form and the read-only entity view build from) drops them. The match is on the resolved `relationName` rather than on the key, so a relation declared in `relations` and pointed at by a differently-named property is recognised too. A relation nested inside a `map` gets no tab, so it keeps its picker; a `belongsTo`/`hasOne` is a foreign key the author edits, and never had a tab to be redundant with.
+
+  Declaring a many-relation as a property is still worth doing — it names the tab and gives the relation a key that a table column and an `include` can address. If you want the inline picker anyway, `admin: { renderInForm: true }` asks for it back.
+
+  ```diff ts
+   "talent-applications": {
+       name: "Vacantes a las que postuló",
+       type: "relation",
+       relation: { kind: "hasMany", target: () => talentApplications, foreignKeyOnTarget: "talent_id" }
+  -    // …and a second, unusable copy of this relation at the bottom of the form
+   }
+  ```
+
+- **`conditions: { hidden: true }` did not typecheck.** `hidden`, `readOnly` and `disabled` took a `JsonLogicRule`, which is `Record<string, any>`, so the unconditional case — a field that is simply never shown, never editable — had to be spelled `{ "==": [1, 1] }`. That reads as a puzzle at the call site and as a mistake to the next person. They take a plain boolean now (`ConditionRule`), and because a literal needs no context to evaluate, `isHidden`/`isReadOnly`/`isDisabled` answer it directly — so it is honoured everywhere a field is laid out, not only where a condition context happens to exist. A *rule* is still not evaluated in production; that gap is unchanged and is about needing an entity to evaluate against.
+
 - **A relation preview rendered the target's whole document.** An author card printed the entire Markdown biography — headings, bullet list and all — inside a box built for two lines of text, because three layers each assumed one of the others was keeping the value to a line.
 
   Selection was positional. `getEntityPreviewKeys` took the first few properties from `propertiesOrder` and read that as a claim that they summarise a record; `propertiesOrder` states the *column* order of a collection table, which is how the third column of an author ended up on the card. Properties are ranked now by whether the value has a one-line form at all (`rankSummaryProperty`): a map renders as a key/value table and an array of maps as a stack of them, so neither takes a slot from a value that fits; long text is an excerpt and sorts behind everything that does fit, but is still used when it is all there is, because an opening line beats a card with nothing under the title. A stated `previewProperties` is returned verbatim, ranking and limit included — asking for the biography still gets the biography. The two diverged copies of the picker are one implementation, in `@rebasepro/app`.

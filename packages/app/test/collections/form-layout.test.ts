@@ -156,6 +156,16 @@ describe("resolveFormLayout — derived defaults", () => {
         expect(keysOf(l)).toEqual(["name"]);
     });
 
+    it("drops a field declared `conditions: { hidden: true }`", () => {
+        // The unconditional case, said with a boolean instead of `{ "==": [1, 1] }`.
+        const withHidden = collection({
+            name: { type: "string" },
+            secret: { type: "string", conditions: { hidden: true } }
+        });
+        const l = resolveFormLayout({ collection: withHidden, fieldKeys: ["name", "secret"], status: "existing" });
+        expect(keysOf(l)).toEqual(["name"]);
+    });
+
     it("routes audit timestamps to the record block instead of the column", () => {
         // They were rendering as disabled inputs mid-form while the record block
         // showed the same two dates — each timestamp twice on one screen.

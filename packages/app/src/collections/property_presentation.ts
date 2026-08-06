@@ -10,16 +10,39 @@
  * That last one is worth knowing about rather than assuming: the collection editor
  * has a whole Conditions UI, `serializable_utils` persists what it writes, and
  * `BaseProperty.conditions` documents itself as "evaluated at runtime like property
- * builders" — but the evaluator below is reached only from its own tests. The
- * declarative conditions feature is authored and stored, never applied. It lives
- * here now because here is where it would be called from once it is wired up.
+ * builders" — but the evaluator below is reached only from its own tests. It lives
+ * here because here is where it would be called from once it is wired up.
+ *
+ * The one part of `conditions` that *is* applied is the literal case:
+ * `hidden`/`readOnly`/`disabled` stated as a plain boolean rather than as a rule.
+ * A literal needs no context, so `isHidden`/`isReadOnly`/`isDisabled` can answer
+ * it directly, and those three gates are consulted everywhere a field is laid
+ * out. A *rule* still is not evaluated anywhere in production — the split is
+ * deliberate, not an oversight: it is the difference between a condition that
+ * needs an entity to be evaluated against and one that does not.
  */
-import type { ConditionContext, EnumValueConfig, Property, PropertyConditions, ReferenceProperty } from "@rebasepro/types";
+import type { ConditionContext, ConditionRule, EnumValueConfig, Property, PropertyConditions, ReferenceProperty } from "@rebasepro/types";
 import type { AdminArrayOptions, AdminReferenceOptions } from "@rebasepro/admin-types";
 import { evaluateCondition } from "@rebasepro/common";
 
+/**
+ * A condition stated as a literal rather than as a rule.
+ *
+ * `PropertyConditions` accepts either, and the two are answered in different
+ * places: a rule needs a context and so can only be evaluated while rendering a
+ * particular entity, but a literal is already the answer. Reading it here is
+ * what makes `hidden: true` work without every gate below having to build a
+ * condition context first — and without the caller reaching for
+ * `{ "==": [1, 1] }` to say something it can say with a boolean.
+ */
+function literalCondition(condition: ConditionRule | undefined): boolean {
+    return condition === true;
+}
+
 export function isReadOnly(property: Property): boolean {
     if (property.admin?.readOnly)
+        return true;
+    if (literalCondition(property.conditions?.readOnly))
         return true;
     if (property.type === "date") {
         if (property.autoValue)
@@ -32,7 +55,19 @@ export function isReadOnly(property: Property): boolean {
 }
 
 export function isHidden(property: Property): boolean {
+    if (literalCondition(property.conditions?.hidden)) return true;
     return typeof property.admin?.disabled === "object" && Boolean(property.admin?.disabled.hidden);
+}
+
+/**
+ * Whether the field is disabled by its own declaration, ignoring form state.
+ *
+ * The `admin.disabled` block and `conditions.disabled: true` say the same thing
+ * two ways, so every caller that gated on the first now asks here instead of
+ * growing a second check of its own.
+ */
+export function isDisabled(property: Property): boolean {
+    return Boolean(property.admin?.disabled) || literalCondition(property.conditions?.disabled);
 }
 
 export function applyPropertyConditions(

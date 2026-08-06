@@ -13,7 +13,7 @@ import { EnumValuesChip } from "../../preview";
 import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE, getDefaultValueFor } from "@rebasepro/common";
 import { getIconForProperty } from "../../util/property_utils";
 import { cls, ExpandablePanel, paperMixin, Select, SelectItem, Typography } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/app";
+import { isDisabled, useTranslation } from "@rebasepro/app";
 import { useClearRestoreValue } from "../useClearRestoreValue";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { mergeDeep } from "@rebasepro/utils";
@@ -94,8 +94,8 @@ export function BlockFieldBinding({
                                  addLabel={property.name ? t("add_to_field", { fieldName: property.name }) : t("add_entry")}
                                  buildEntry={buildEntry}
                                  onInternalIdAdded={setLastAddedId}
-                                 disabled={isSubmitting || Boolean(property.admin?.disabled)}
-                                 canAddElements={!property.admin?.disabled}
+                                 disabled={isSubmitting || isDisabled(property)}
+                                 canAddElements={!isDisabled(property)}
                                  onValueChange={(value) => setFieldValue(propertyKey, value)}
                                  newDefaultEntry={{
                                      [property.oneOf!.typeField ?? DEFAULT_ONE_OF_TYPE]: firstOneOfKey,

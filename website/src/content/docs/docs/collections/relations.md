@@ -43,8 +43,8 @@ const postsCollection = defineCollection({
 
 ### 2. Explicit Relations Array
 
-For a link with no form field of its own — a list you only want as a tab —
-declare it in `relations`:
+For a link with no property of its own — nothing to name it by in the form or in
+a table column — declare it in `relations`:
 
 ```typescript
 import { defineCollection } from "@rebasepro/admin-types";
@@ -198,6 +198,34 @@ properties: {
 When rendering a preview (like in a table cell or a reference chip), Rebase handles hydration automatically:
 
 ![Relation preview in table](/img/features/relation-table-preview.png)
+
+### To-one gets a picker, many gets a tab
+
+The cardinality decides the surface, and only one surface is used:
+
+- **`belongsTo` / `hasOne`** — one row, so the property is a foreign key the
+  author edits. It renders as the picker above.
+- **`hasMany` / `manyToMany`** — many rows, so the entity view lists them as a
+  **tab** of their own. The property is not rendered in the form: a collection's
+  children are a list, not a value the record holds, and selecting them from a
+  dropdown is not something the form can meaningfully offer.
+
+Declaring a many-relation as a property is still worth doing — it is what names
+the tab, and what gives the relation a key a table column and an `include` can
+address. Only the form field is dropped.
+
+If you want the inline picker anyway, ask for it:
+
+```typescript
+properties: {
+    tags: {
+        type: "relation",
+        name: "Tags",
+        relation: { kind: "manyToMany", target: () => tagsCollection },
+        admin: { renderInForm: true }   // off by default; the tab is the default treatment
+    }
+}
+```
 
 ## Multi-Hop Joins
 

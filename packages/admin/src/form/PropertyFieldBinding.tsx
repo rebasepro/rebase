@@ -14,7 +14,7 @@ import { Field, FormexFieldProps, getIn } from "@rebasepro/forms";
 import { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";
 
 import { isPropertyBuilder, resolveProperty } from "@rebasepro/common";
-import { isHidden, isReadOnly } from "@rebasepro/app";
+import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
 import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { Typography } from "@rebasepro/ui";
 import { getFieldConfig, getFieldId } from "../components/field_configs";
@@ -113,7 +113,7 @@ function PropertyFieldBindingInternal<M extends Record<string, unknown> = Record
                 }) as Property | null;
 
                 const readOnly = resolvedProperty ? isReadOnly(resolvedProperty) : true;
-                const disabled = disabledProp || readOnly || Boolean(resolvedProperty?.admin?.disabled) || context.disabled;
+                const disabled = disabledProp || readOnly || (resolvedProperty ? isDisabled(resolvedProperty) : false) || context.disabled;
 
                 if (resolvedProperty === null || isHidden(resolvedProperty)) {
                     return <></>;

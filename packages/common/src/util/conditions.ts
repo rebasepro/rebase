@@ -3,8 +3,8 @@ import {
     ArrayProperty,
     AuthState,
     ConditionContext,
+    ConditionRule,
     EnumValueConfig,
-    JsonLogicRule,
     NumberProperty,
     PropertyConditions,
     Property,
@@ -66,9 +66,14 @@ export function registerConditionOperations(): void {
 }
 
 /**
- * Evaluate a JSON Logic rule against the given context.
+ * Evaluate a condition against the given context.
+ *
+ * A condition may be stated as a literal instead of a rule — `hidden: true`
+ * rather than `hidden: { "==": [1, 1] }` — and a literal is already its own
+ * answer, so it is returned rather than handed to the evaluator.
  */
-export function evaluateCondition(rule: JsonLogicRule, context: ConditionContext): unknown {
+export function evaluateCondition(rule: ConditionRule, context: ConditionContext): unknown {
+    if (typeof rule === "boolean") return rule;
     // Ensure operations are registered
     registerConditionOperations();
     return jsonLogic.apply(rule, context);

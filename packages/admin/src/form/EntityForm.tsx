@@ -9,7 +9,7 @@ import { deepEqual as equal } from "fast-equals";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
 import { getDefaultValuesFor } from "@rebasepro/common";
-import { isReadOnly } from "@rebasepro/app";
+import { isDisabled, isReadOnly } from "@rebasepro/app";
 
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
 import type { ResolvedFormField } from "@rebasepro/app";
@@ -437,7 +437,7 @@ export function EntityForm<M extends Record<string, unknown>>({
             disabledProp
             || (!autoSave && formex.isSubmitting)
             || isReadOnly(property)
-            || Boolean(property.admin?.disabled)
+            || isDisabled(property)
             || (!isNew && "isId" in property && Boolean(property.isId))
             || (isNew && isIdAndAuto)
         );

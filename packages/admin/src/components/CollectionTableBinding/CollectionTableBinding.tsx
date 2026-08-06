@@ -17,7 +17,7 @@ import { propertiesToColumns } from "./column_utils";
 import { ErrorView } from "@rebasepro/app";
 import { SelectableTable } from "../SelectableTable/SelectableTable";
 import { cls } from "@rebasepro/ui";
-import { getRowHeight } from "@rebasepro/app";
+import { getRowHeight, isDisabled } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 
 /**
@@ -147,7 +147,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
             propertyKey,
             entity
         }) ?? columnCustom?.resolvedProperty;
-        if (!property?.admin?.disabled) {
+        if (!property || !isDisabled(property)) {
             disabled = false;
         }
 

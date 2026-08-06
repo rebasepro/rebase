@@ -18,7 +18,7 @@ import { EntityTableCellActions } from "./internal/EntityTableCellActions";
 import { useSelectableTableController } from "../SelectableTable/SelectableTableContext";
 import { useClearRestoreValue } from "../../form/useClearRestoreValue";
 import { getRowHeight } from "@rebasepro/app";
-import { isReadOnly } from "@rebasepro/app";
+import { isDisabled, isReadOnly } from "@rebasepro/app";
 import { TableRelationField } from "./fields/TableRelationField";
 import { TableRelationSelectorField } from "./fields/TableRelationSelectorField";
 
@@ -95,7 +95,7 @@ export const PropertyTableCell = React.memo<PropertyTableCellProps<any>>(
         const customPreview = Boolean(property.admin?.Preview);
         const readOnlyProperty = isReadOnly(property);
         const disabledTooltip: string | undefined = typeof property.admin?.disabled === "object" ? property.admin?.disabled.disabledMessage : undefined;
-        const disabled = readonly || disabledProp || Boolean(property.admin?.disabled);
+        const disabled = readonly || disabledProp || isDisabled(property);
 
         const validation = useMemo(() => mapPropertyToZod({
             property,
