@@ -4,7 +4,7 @@ import { deepEqual as equal } from "fast-equals"
 
 import { EntityReference, EntityRelation } from "@rebasepro/types";
 import type { PropertyPreviewProps } from "../types/components/PropertyPreviewProps";
-import { resolveProperty, normalizeToEntityRelation } from "@rebasepro/common";
+import { resolveProperty, normalizeToEntityRelation, getRelationTargetPath } from "@rebasepro/common";
 import { useAuthController, useCustomizationController, resolveComponentRef } from "@rebasepro/app";
 import { EmptyValue } from "./components/EmptyValue";
 import { UrlComponentPreview } from "./components/UrlComponentPreview";
@@ -234,12 +234,16 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
         }
 
     } else if (property.type === "relation") {
+        // A relation column arrives either hydrated or as the bare foreign key,
+        // depending on the fetch path. The declared target resolves the latter;
+        // see `normalizeToEntityRelation`.
+        const relationTargetPath = getRelationTargetPath(property);
         if (!value) {
             content = <EmptyValue/>;
         } else if (Array.isArray(value)) {
             // Many-cardinality relation: value is an array of EntityRelation (or plain objects)
             const relations = (value as unknown[])
-                .map(item => normalizeToEntityRelation(item, "relation"))
+                .map(item => normalizeToEntityRelation(item, "relation", relationTargetPath))
                 .filter(Boolean) as EntityRelation[];
             const renderRelation = (entityRelation: EntityRelation, index: number) => <RelationPreview
                 key={`preview_rel_${propertyKey}_${index}`}
@@ -268,7 +272,7 @@ export const PropertyPreview = React.memo(function PropertyPreview<P extends Pro
                 );
         } else {
             // Single-cardinality relation
-            const relationValue = normalizeToEntityRelation(value, "relation");
+            const relationValue = normalizeToEntityRelation(value, "relation", relationTargetPath);
             if (relationValue) {
                 content = <RelationPreview
                     disabled={!property.relation}

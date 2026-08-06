@@ -70,6 +70,42 @@ path: "users" };
         expect(normalizeToEntityRelation(obj)).toBeNull();
     });
 
+    // A relation column is a foreign key, and the REST layer returns it as the
+    // scalar it is. Without a target path there is nothing to resolve it
+    // against, so it stays a type error; with one, it is a relation not yet
+    // fetched. See `getRelationTargetPath`.
+    describe("with a declared target path", () => {
+        it("coerces a bare string id", () => {
+            const result = normalizeToEntityRelation("91093fb9", "relation", "companies");
+            expect(result).toBeInstanceOf(EntityRelation);
+            expect(result!.id).toBe("91093fb9");
+            expect(result!.path).toBe("companies");
+            expect(result!.data).toBeUndefined();
+        });
+
+        it("coerces a bare number id", () => {
+            const result = normalizeToEntityRelation(42, "relation", "companies");
+            expect(result!.id).toBe(42);
+            expect(result!.path).toBe("companies");
+        });
+
+        it("still returns null for an empty string, which is an unset key", () => {
+            expect(normalizeToEntityRelation("", "relation", "companies")).toBeNull();
+        });
+
+        it("prefers an already-hydrated object over the declared target", () => {
+            const obj = { __type: "relation",
+id: "abc",
+path: "posts" };
+            const result = normalizeToEntityRelation(obj, "relation", "companies");
+            expect(result!.path).toBe("posts");
+        });
+
+        it("leaves a scalar unresolved when no target is declared", () => {
+            expect(normalizeToEntityRelation("91093fb9", "relation")).toBeNull();
+        });
+    });
+
     it("includes data from the source object", () => {
         const data = { id: "ent-1",
 path: "users",

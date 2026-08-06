@@ -1,7 +1,7 @@
 import type { ArrayProperty, RelationProperty } from "@rebasepro/types";
 import { EntityRelation } from "@rebasepro/types";
 import type { PropertyPreviewProps } from "../../types/components/PropertyPreviewProps";
-import { normalizeToEntityRelation } from "@rebasepro/common";
+import { normalizeToEntityRelation, getRelationTargetPath } from "@rebasepro/common";
 import { RelationPreview } from "../components/RelationPreview";
 import { useIsNestedEntityPreview } from "../../components/EntityPreviewNesting";
 import { InlineEntityListPreview } from "../components/InlineEntityListPreview";
@@ -27,11 +27,14 @@ export function ArrayOfRelationsPreview({
         throw Error("Picked wrong preview component ArrayOfRelationsPreview");
 
     const ofProperty = property.of as RelationProperty;
+    // Elements arrive hydrated or as bare foreign keys depending on the fetch
+    // path; the declared target resolves the latter rather than dropping them.
+    const relationTargetPath = getRelationTargetPath(ofProperty);
 
     // See ArrayOfReferencesPreview: nested lists stay on one wrapping line.
     if (nested || textOnly) {
         const relations = ((value ?? []) as unknown[])
-            .map(relation => normalizeToEntityRelation(relation))
+            .map(relation => normalizeToEntityRelation(relation, "relation", relationTargetPath))
             .filter((relation): relation is EntityRelation => Boolean(relation));
         return <InlineEntityListPreview
             items={relations}
@@ -51,7 +54,7 @@ export function ArrayOfRelationsPreview({
         <div className="flex flex-col w-full gap-0.5">
             {value ?
                 (value as unknown[]).map((relation: unknown, index: number) => {
-                    const entityRelation = normalizeToEntityRelation(relation);
+                    const entityRelation = normalizeToEntityRelation(relation, "relation", relationTargetPath);
 
                     if (!entityRelation) return null;
 
