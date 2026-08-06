@@ -292,6 +292,66 @@ title: "Updated" });
     // -----------------------------------------------------------------------
     // listen (with WebSocket)
     // -----------------------------------------------------------------------
+    /**
+     * A count is a property of the query, not of the caller.
+     *
+     * `listenCollection` collapses identical queries onto one socket
+     * subscription but keeps one callback per subscriber, and every subscriber
+     * re-counts on each push. A table with one relation column mounts one
+     * selector per visible cell, so a single `collection_update` fanned out
+     * into one identical count request per row.
+     */
+    describe("count request de-duplication", () => {
+        it("issues one request for concurrent identical counts", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            let resolveCount: (v: { count: number }) => void = () => {};
+            mockRequest.mockReturnValue(new Promise<{ count: number }>(r => { resolveCount = r; }) as never);
+
+            const results = Promise.all([client.count(), client.count(), client.count()]);
+            resolveCount({ count: 7 });
+
+            expect(await results).toEqual([7, 7, 7]);
+            expect(mockRequest).toHaveBeenCalledTimes(1);
+        });
+
+        it("keeps different queries apart", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValue({ count: 1 } as never);
+
+            await Promise.all([
+                client.count({ where: { status: ["==", "draft"] } }),
+                client.count({ where: { status: ["==", "published"] } })
+            ]);
+
+            expect(mockRequest).toHaveBeenCalledTimes(2);
+        });
+
+        // Merging concurrent callers must not turn into a cache: a later count
+        // is a fresh question about a collection that may have changed.
+        it("does not serve a settled count to a later caller", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockResolvedValue({ count: 3 } as never);
+
+            await client.count();
+            await client.count();
+
+            expect(mockRequest).toHaveBeenCalledTimes(2);
+        });
+
+        it("propagates a failure to every sharing caller and clears the entry", async () => {
+            const client = createCollectionClient<PostModel>(transport, "posts");
+            mockRequest.mockRejectedValueOnce(new Error("boom") as never);
+
+            const both = Promise.allSettled([client.count(), client.count()]);
+            expect((await both).map(r => r.status)).toEqual(["rejected", "rejected"]);
+            expect(mockRequest).toHaveBeenCalledTimes(1);
+
+            // The failed entry must not be left behind to poison later counts.
+            mockRequest.mockResolvedValue({ count: 5 } as never);
+            expect(await client.count()).toBe(5);
+        });
+    });
+
     describe("listen / listenById", () => {
         it("does not expose listen/listenById when no websocket is provided", () => {
             const client = createCollectionClient<PostModel>(transport, "posts");

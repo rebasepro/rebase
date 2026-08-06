@@ -16,6 +16,12 @@ import { collectAllPages, paginateFind, resolveFindWindow } from "@rebasepro/com
 import { SDKQueryBuilder } from "./sdk_query_builder";
 
 /**
+ * Counts currently in flight, keyed by the exact request they issue. Entries
+ * live only for the duration of the request — see `count()` for why.
+ */
+const inflightCounts = new Map<string, Promise<number>>();
+
+/**
  * A live query result: a normal {@link FindResult} plus what an interface
  * needs to decide whether to show a "saving…" or "offline" affordance over it.
  *
@@ -198,8 +204,34 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 include: undefined
             };
             const qs = buildQueryString(countParams);
-            const raw = await transport.request<{ count: number }>(basePath + "/count" + qs, { method: "GET" });
-            return raw.count ?? 0;
+
+            // One count per query in flight, not one per caller.
+            //
+            // A count is a property of the query, and every concurrent caller
+            // asking the same question wants the same answer — so they can
+            // share the one request. This is not a micro-optimisation: a live
+            // subscription re-counts on every push (see `listen` below), and
+            // `listenCollection` deliberately collapses identical queries onto
+            // a single socket subscription while keeping one callback per
+            // subscriber. Each push therefore woke N subscribers, and each of
+            // them issued its own identical count. A table showing one relation
+            // column fired one count per visible cell, on every update.
+            //
+            // The entry is dropped as soon as it settles, so this merges
+            // concurrent calls only and never serves a cached total.
+            const key = basePath + "/count" + qs;
+            const inflight = inflightCounts.get(key);
+            if (inflight) return inflight;
+
+            const request = transport
+                .request<{ count: number }>(key, { method: "GET" })
+                .then((raw) => raw.count ?? 0);
+            inflightCounts.set(key, request);
+            try {
+                return await request;
+            } finally {
+                inflightCounts.delete(key);
+            }
         },
 
         // Reactive reads. Without the offline layer there is no local database
@@ -264,7 +296,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 if (closed) return;
                 if (fromLive) liveDelivered = true;
                 else if (liveDelivered) return;
-                const next = row === undefined ? " missing" : JSON.stringify(row);
+                const next = row === undefined ? "\u0000missing" : JSON.stringify(row);
                 if (signature !== undefined && next === signature) return;
                 signature = next;
                 onResult(row, { fromCache: false, hasPendingWrites: false });
