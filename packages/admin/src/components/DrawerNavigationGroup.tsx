@@ -51,8 +51,10 @@ export interface DrawerNavigationGroupProps {
     /**
      * Lucide icon name for the group header, from `NavigationGroupMapping.icon`.
      *
-     * Supplying one moves the visual anchor from the rows to the group: the header
-     * gets the icon, and the entries below trade theirs for an indent.
+     * It decorates the header and nothing else: the entries below are untouched and
+     * keep their own icons. An app that wants the categorised look — rows giving up
+     * their icons to indent under the group — builds it in its own drawer, by
+     * overriding `Shell.DrawerNavigationItem` and passing `indented`.
      */
     icon?: string;
 }
@@ -75,17 +77,13 @@ export function DrawerNavigationGroup({
     const { t } = useTranslation();
     const ResolvedDrawerNavigationItem = useComponentOverride("Shell.DrawerNavigationItem", DrawerNavigationItem);
 
-    // Opt-in, per group: declaring `icon` on a `NavigationGroupMapping` switches
-    // this group to the categorised treatment — icon on the header, entries
-    // indented beneath it without their own. A group that declares no icon renders
-    // exactly as it did before, so an existing project sees no change at all.
-    //
-    // Two cases stay on the flat rendering regardless: with no header there is
-    // nothing to indent under, and collapsed to a rail the entry icons are the only
-    // affordance left to click.
+    // The icon decorates the header, and stops there. It used to also strip the
+    // entries of theirs and indent them, which made a per-app styling choice into
+    // framework behaviour: every project that labelled a group with an icon lost the
+    // icons on its rows, with nothing to turn it off. An app that wants that look
+    // now opts into it in its own drawer — see `indented` on
+    // {@link DrawerNavigationItem}.
     const groupIcon = !hideHeader && drawerOpen ? getIcon(icon, undefined, undefined, "small") : undefined;
-    const categorised = Boolean(groupIcon);
-    const indentEntries = categorised;
     return (
         <div
             className={"my-2 mx-2 flex flex-col"}
@@ -102,10 +100,7 @@ export function DrawerNavigationGroup({
                     <ChevronDownIcon
                         size={iconSize.small}
                         className={cls(
-                            categorised
-                                ? "text-surface-500 dark:text-surface-400"
-                                : "text-surface-400 dark:text-surface-400",
-                            "transition-transform duration-200 mr-1",
+                            "text-surface-400 dark:text-surface-400 transition-transform duration-200 mr-1",
                             collapsed ? "-rotate-90" : "rotate-0"
                         )}
                     />
@@ -117,21 +112,7 @@ export function DrawerNavigationGroup({
                     <Typography
                         variant={"caption"}
                         color={"secondary"}
-                        // Two treatments, and which one applies is decided by the group
-                        // itself. Without an icon this is byte-for-byte the original: the
-                        // drawer is a flat list of same-weight rows, and a louder header
-                        // would just compete with them.
-                        //
-                        // With one, the group becomes the thing you scan — its rows have
-                        // given up their icons to indent beneath it — so the label steps up
-                        // to match. At 11px in surface-400 it sat *below* the contrast of
-                        // the rows it labels, which is backwards once it is the anchor.
-                        className={cls(
-                            "font-semibold uppercase flex-grow line-clamp-1",
-                            categorised
-                                ? "text-[12px] tracking-wide text-surface-600 dark:text-surface-300"
-                                : "text-[11px] tracking-wider text-surface-400 dark:text-surface-400"
-                        )}
+                        className="font-semibold text-[11px] uppercase tracking-wider flex-grow line-clamp-1 text-surface-400 dark:text-surface-400"
                     >
                         {(group || t("views_group"))}
                     </Typography>
@@ -161,7 +142,6 @@ export function DrawerNavigationGroup({
                         onClick={() => onItemClick?.(entry)}
                         url={entry.url}
                         name={entry.name}
-                        indented={indentEntries}
                     />
                 ))}
             </div>

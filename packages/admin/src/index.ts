@@ -44,6 +44,12 @@ export {
     Drawer,
     DefaultDrawer,
     DrawerFooterActions,
+    // The two rows the `Shell.DrawerNavigation*` overrides replace. Public so an
+    // app can wrap the stock ones — pass different props, add a context — instead of
+    // reimplementing a nav row and drifting from the framework's hover, active and
+    // tooltip behaviour on the next release.
+    DrawerNavigationItem,
+    DrawerNavigationGroup,
     AdminModeSyncer,
     // ContentHomePage is lazy-loaded — not re-exported here
     RebaseAdmin,
@@ -60,7 +66,9 @@ export type {
     EntityViewBindingProps,
     SelectionProps,
     SelectableTableProps,
-    CollectionPanelProps
+    CollectionPanelProps,
+    DrawerNavigationGroupProps,
+    DrawerNavigationItemProps
 } from "./components";
 
 export * from "./hooks";

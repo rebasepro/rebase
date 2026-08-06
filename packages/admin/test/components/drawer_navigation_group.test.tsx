@@ -53,46 +53,38 @@ function labelClasses(container: HTMLElement): string[] {
     return String((el as HTMLElement)?.className ?? "").split(/\s+/).filter(Boolean);
 }
 
-describe("DrawerNavigationGroup — categorised rendering is opt-in", () => {
+describe("DrawerNavigationGroup — a group icon decorates the header only", () => {
 
-    // The regression this exists for: the categorised treatment was briefly applied
-    // to every group, which silently restyled the drawer of every project using the
-    // framework. A group that declares no icon must render exactly as it always has.
-    test("a group with no icon keeps the original label styling", () => {
-        const classes = labelClasses(renderGroup());
-
-        expect(classes).toEqual(expect.arrayContaining([
-            "font-semibold", "text-[11px]", "uppercase", "tracking-wider",
-            "flex-grow", "line-clamp-1", "text-surface-400", "dark:text-surface-400"
-        ]));
-        // The categorised-only values must not leak in.
-        expect(classes).not.toContain("text-[12px]");
-        expect(classes).not.toContain("tracking-wide");
-        expect(classes).not.toContain("text-surface-600");
-    });
+    // The regression this exists for: a group icon used to also restyle the header
+    // and strip every entry beneath it of its own icon. That made one app's styling
+    // choice into framework behaviour — every project that labelled a group with an
+    // icon lost the icons on its rows, with no way to turn it off. An app that wants
+    // that look builds it in its own drawer, by overriding
+    // `Shell.DrawerNavigationItem` and passing `indented`.
+    const ORIGINAL_LABEL = [
+        "font-semibold", "text-[11px]", "uppercase", "tracking-wider",
+        "flex-grow", "line-clamp-1", "text-surface-400", "dark:text-surface-400"
+    ];
 
     test("a group with no icon renders no group icon, and its entries keep theirs", () => {
         const container = renderGroup();
 
+        expect(labelClasses(container)).toEqual(expect.arrayContaining(ORIGINAL_LABEL));
         expect(container.querySelectorAll("[data-testid='group-icon']")).toHaveLength(0);
         expect(container.querySelectorAll("[data-testid='entry-icon']")).toHaveLength(entries.length);
     });
 
-    test("declaring an icon switches the group to the categorised treatment", () => {
+    test("declaring an icon adds the header icon and changes nothing else", () => {
         const container = renderGroup({ icon: "LibraryBig" });
-        const classes = labelClasses(container);
 
         expect(container.querySelectorAll("[data-testid='group-icon']")).toHaveLength(1);
-        expect(classes).toEqual(expect.arrayContaining([
-            "text-[12px]", "tracking-wide", "text-surface-600"
-        ]));
-        // Entries give up their icons to indent under the group instead.
-        expect(container.querySelectorAll("[data-testid='entry-icon']")).toHaveLength(0);
+        // The label keeps the styling it has with no icon...
+        expect(labelClasses(container)).toEqual(expect.arrayContaining(ORIGINAL_LABEL));
+        // ...and, the point of the whole test file, so do the rows.
+        expect(container.querySelectorAll("[data-testid='entry-icon']")).toHaveLength(entries.length);
     });
 
-    // Collapsed to a rail the entry icons are the only thing left to click, so the
-    // indent must not apply there however the group is configured.
-    test("a collapsed drawer keeps entry icons even for an icon-bearing group", () => {
+    test("a collapsed drawer hides the header icon and keeps the entry icons", () => {
         const container = renderGroup({ icon: "LibraryBig", drawerOpen: false });
 
         expect(container.querySelectorAll("[data-testid='group-icon']")).toHaveLength(0);

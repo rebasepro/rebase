@@ -3,14 +3,11 @@ import React from "react";
 import { NavLink } from "react-router";
 import { cls, Tooltip } from "@rebasepro/ui";
 
-export function DrawerNavigationItem({
-    name,
-    icon,
-    drawerOpen,
-    url,
-    onClick,
-    indented = false
-}: {
+/**
+ * Props of a drawer navigation row, named so an app overriding
+ * `Shell.DrawerNavigationItem` can type its wrapper against them.
+ */
+export type DrawerNavigationItemProps = {
     icon: React.ReactElement,
     name: string,
     /** @deprecated No longer read: the tooltip is uncontrolled. */
@@ -21,12 +18,24 @@ export function DrawerNavigationItem({
     url: string,
     onClick?: () => void,
     /**
-     * Render as a child of an icon-bearing group: no icon of its own, indented to
-     * sit under the group's label. Set by {@link DrawerNavigationGroup} only when
-     * the group actually has an icon and the drawer is expanded.
+     * Drop the row's icon and indent the label into the space it occupied, so the
+     * row reads as a child of the group header above it.
+     *
+     * Nothing in the framework sets this: the stock drawer always passes `false`,
+     * and an app that wants the categorised look opts into it by overriding
+     * `Shell.DrawerNavigationItem` and deciding for itself which rows get it.
      */
     indented?: boolean,
-}) {
+};
+
+export function DrawerNavigationItem({
+    name,
+    icon,
+    drawerOpen,
+    url,
+    onClick,
+    indented = false
+}: DrawerNavigationItemProps) {
 
     // Indented rows give up the icon rather than keeping it *and* indenting: a
     // per-row icon repeated down a group is what flattens the hierarchy, since
