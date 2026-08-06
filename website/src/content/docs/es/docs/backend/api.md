@@ -302,7 +302,7 @@ La petición de una clave de API pasa por **dos** comprobaciones de autorizació
    `admin: true`). Las claves de administrador pasan a través de las políticas de administrador integradas; una
    clave no administradora solo ve las filas que una regla de seguridad concede explícitamente al
    rol `service` o al público. Las reglas de estilo propietario
-   (`owner_id = auth.uid()`) nunca coinciden con una clave de API.
+   (`owner_id = rebase.uid()`) nunca coinciden con una clave de API.
 
 Por lo tanto, una clave no administradora con permisos `"*"` puede aún obtener resultados vacíos — eso es
 la RLS funcionando, no un error. O bien conceda el rol `service` en las reglas de seguridad de las
@@ -348,7 +348,7 @@ clave no administradora se ejecuta como `uid: "api-key:<id>"` con los roles
 cada colección se compila a:
 
 ```sql
-auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])
+rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
 ```
 
 — el contexto del servidor, o un administrador. Una clave no administradora no
@@ -362,7 +362,7 @@ securityRules: [
 ]
 ```
 
-Como `auth.uid()` lleva el id de la clave, una regla también puede acotar las
+Como `rebase.uid()` lleva el id de la clave, una regla también puede acotar las
 filas a una clave concreta:
 
 ```ts

@@ -130,15 +130,16 @@ after the permissive ones OR.
 
 ```sql
 ALTER POLICY "your_policy" ON "public"."your_table"
-    USING (user_id = auth.uid());
+    USING (user_id = rebase.uid());
 ```
 
 ### policy-anonymous-tautology
 
 **Policy only checks that a caller id exists.** Severity depends on the platform.
 
-The expression is `auth.uid() IS NOT NULL`-shaped: it separates signed-in from signed-out
-callers, but scopes no rows. Every signed-in user reaches every row the policy covers.
+The expression is `rebase.uid() IS NOT NULL`-shaped (or `auth.uid()` on Supabase, and on a
+Rebase database provisioned before 1.0): it separates signed-in from signed-out callers, but
+scopes no rows. Every signed-in user reaches every row the policy covers.
 
 The severity is platform-dependent, and this distinction matters:
 
@@ -153,11 +154,16 @@ The severity is platform-dependent, and this distinction matters:
 ```sql
 -- Scope to the row's owner rather than to the existence of an id
 ALTER POLICY "your_policy" ON "public"."your_table"
-    USING (user_id = auth.uid());
+    USING (user_id = rebase.uid());
 
 -- Or, if "any signed-in user" really is the intent, reject the sentinel explicitly
---     USING (auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous');
+--     USING (rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous');
 ```
+
+The suggested SQL is printed with the caller-id function your database actually has:
+`rebase.uid()` on a Rebase database, `auth.uid()` on Supabase and PostgREST. Both
+spellings are recognised when reading policies, so a Rebase database mid-migration from
+the pre-1.0 `auth` schema is still checked.
 
 ### view-bypasses-rls
 

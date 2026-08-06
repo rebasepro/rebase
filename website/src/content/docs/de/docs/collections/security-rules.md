@@ -33,9 +33,9 @@ Die Identität des authentifizierten Benutzers ist in SQL verfügbar über:
 
 | Funktion | Rückgabewert |
 |----------|---------|
-| `auth.uid()` | Die ID des aktuellen Benutzers |
-| `auth.roles()` | Kommagetrennte App-Rollen-IDs |
-| `auth.jwt()` | Vollständige JWT-Claims als JSONB |
+| `rebase.uid()` | Die ID des aktuellen Benutzers |
+| `rebase.roles()` | Kommagetrennte App-Rollen-IDs |
+| `rebase.jwt()` | Vollständige JWT-Claims als JSONB |
 
 Diese werden vom Rebase-Backend automatisch pro Transaktion gesetzt.
 
@@ -51,7 +51,7 @@ securityRules: [
 ]
 ```
 
-Dies erzeugt: `USING (user_id = auth.uid())`
+Dies erzeugt: `USING (user_id = rebase.uid())`
 
 ### Öffentlicher Zugriff
 
@@ -94,7 +94,7 @@ Für komplexe Logik verwenden Sie `using` und `withCheck`:
 securityRules: [
     {
         operation: "select",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
     }
 ]
 ```
@@ -115,7 +115,7 @@ securityRules: [
     // Reguläre Benutzer können nur ihre eigenen Zeilen sehen
     { operation: "select", ownerField: "user_id" },
     // Benutzer können einfügen, aber nur für sich selbst
-    { operation: "insert", withCheck: "{user_id} = auth.uid()" },
+    { operation: "insert", withCheck: "{user_id} = rebase.uid()" },
     // Gesperrte Zeilen können nicht aktualisiert werden
     { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
 ]
@@ -192,7 +192,7 @@ securityRules: [
 securityRules: [
     {
         operation: "all",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
     }
 ]
 ```
@@ -262,8 +262,8 @@ Wenn eine Anfrage ohne JWT-Token eingeht, setzt das Rebase-Backend die PostgreSQ
 
 Das bedeutet:
 
-- `auth.uid()` gibt `'anonymous'` zurück
-- `auth.roles()` gibt eine leere Zeichenkette zurück
+- `rebase.uid()` gibt `'anonymous'` zurück
+- `rebase.roles()` gibt eine leere Zeichenkette zurück
 - `access: "public"`-Richtlinien werden erfolgreich ausgeführt, da sie `USING (true)` / `WITH CHECK (true)` generieren
 - `access: "authenticated"`-Richtlinien schlagen fehl, da sie eine echte Benutzer-ID prüfen
 - `ownerField`-Richtlinien schlagen fehl, da keine Zeile `user_id = 'anonymous'` haben wird (es sei denn, dies ist explizit festgelegt)
@@ -276,13 +276,13 @@ Wenn Sie eine feinere Kontrolle benötigen, verwenden Sie rohes SQL:
 securityRules: [
     {
         operation: "insert",
-        withCheck: "auth.uid() = 'anonymous' OR auth.uid() IS NOT NULL"
+        withCheck: "rebase.uid() = 'anonymous' OR rebase.uid() IS NOT NULL"
     }
 ]
 ```
 
 :::tip
-Vermeiden Sie das ältere Muster, `string_to_array(auth.roles(), ',')` für anonymen Zugriff zu prüfen. Der `access: "public"`-Shortcut ist einfacher und generiert die korrekte Richtlinie automatisch.
+Vermeiden Sie das ältere Muster, `string_to_array(rebase.roles(), ',')` für anonymen Zugriff zu prüfen. Der `access: "public"`-Shortcut ist einfacher und generiert die korrekte Richtlinie automatisch.
 :::
 
 ## Nächste Schritte

@@ -237,21 +237,21 @@ SELECT
 
 Per rendere semplice la scrittura delle politiche di sicurezza a livello di riga, Rebase crea funzioni di supporto sotto lo schema `auth` durante il bootstrapping del database:
 
-*   **`auth.uid()`** — Restituisce l'ID dell'utente autenticato come `text`, o `NULL` se non impostato:
+*   **`rebase.uid()`** — Restituisce l'ID dell'utente autenticato come `text`, o `NULL` se non impostato:
     ```sql
-    CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
+    CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text AS $$
         SELECT NULLIF(current_setting('app.user_id', true), '');
     $$ LANGUAGE sql STABLE;
     ```
-*   **`auth.roles()`** — Restituisce la stringa dei ruoli separata da virgole:
+*   **`rebase.roles()`** — Restituisce la stringa dei ruoli separata da virgole:
     ```sql
-    CREATE OR REPLACE FUNCTION auth.roles() RETURNS text AS $$
+    CREATE OR REPLACE FUNCTION rebase.roles() RETURNS text AS $$
         SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
     $$ LANGUAGE sql STABLE;
     ```
-*   **`auth.jwt()`** — Restituisce il payload completo del JWT come oggetto `jsonb`:
+*   **`rebase.jwt()`** — Restituisce il payload completo del JWT come oggetto `jsonb`:
     ```sql
-    CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS $$
+    CREATE OR REPLACE FUNCTION rebase.jwt() RETURNS jsonb AS $$
         SELECT COALESCE(NULLIF(current_setting('app.jwt', true), ''), '{}')::jsonb;
     $$ LANGUAGE sql STABLE;
     ```
@@ -261,7 +261,7 @@ Puoi usare questi helper direttamente nelle tue regole di sicurezza personalizza
 CREATE POLICY owner_access ON posts
     FOR ALL
     TO public
-    USING (author_id = auth.uid() OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+    USING (author_id = rebase.uid() OR string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 ```
 
 ## Bootstrap del Primo Utente
@@ -412,14 +412,14 @@ Indipendentemente dal provider di autenticazione esterno scelto, il tuo adattato
 
 ```typescript
 export interface AuthenticatedUser {
-  uid: string;                    // Maps to pg local 'app.user_id' -> auth.uid()
+  uid: string;                    // Maps to pg local 'app.user_id' -> rebase.uid()
   email: string;                  // User email address
   displayName?: string | null;    // Optional display name
   photoUrl?: string | null;        // Optional avatar URL
-  roles: string[];                // Maps to pg local 'app.user_roles' -> auth.roles()
+  roles: string[];                // Maps to pg local 'app.user_roles' -> rebase.roles()
   isAdmin: boolean;               // Grants global superuser privileges if true
   rawToken?: string;              // The original token string (for downstream forwarding)
-  claims?: Record<string, any>;   // Custom claims/metadata (available in auth.jwt())
+  claims?: Record<string, any>;   // Custom claims/metadata (available in rebase.jwt())
 }
 ```
 

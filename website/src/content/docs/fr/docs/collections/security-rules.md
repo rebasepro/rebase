@@ -33,9 +33,9 @@ L'identité de l'utilisateur authentifié est disponible en SQL via :
 
 | Fonction | Renvoie |
 |----------|---------|
-| `auth.uid()` | L'ID de l'utilisateur actuel |
-| `auth.roles()` | ID de rôles d'application séparés par des virgules |
-| `auth.jwt()` | Revendications JWT complètes en JSONB |
+| `rebase.uid()` | L'ID de l'utilisateur actuel |
+| `rebase.roles()` | ID de rôles d'application séparés par des virgules |
+| `rebase.jwt()` | Revendications JWT complètes en JSONB |
 
 Ceux-ci sont définis automatiquement par transaction par le backend Rebase.
 
@@ -51,7 +51,7 @@ securityRules: [
 ]
 ```
 
-Ceci génère : `USING (user_id = auth.uid())`
+Ceci génère : `USING (user_id = rebase.uid())`
 
 ### Accès Public
 
@@ -94,7 +94,7 @@ Pour une logique complexe, utilisez `using` et `withCheck` :
 securityRules: [
     {
         operation: "select",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
     }
 ]
 ```
@@ -115,7 +115,7 @@ securityRules: [
     // Les utilisateurs réguliers ne peuvent voir que leurs propres lignes
     { operation: "select", ownerField: "user_id" },
     // Les utilisateurs peuvent insérer, mais uniquement pour eux-mêmes
-    { operation: "insert", withCheck: "{user_id} = auth.uid()" },
+    { operation: "insert", withCheck: "{user_id} = rebase.uid()" },
     // Les lignes verrouillées ne peuvent pas être mises à jour
     { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
 ]
@@ -192,7 +192,7 @@ securityRules: [
 securityRules: [
     {
         operation: "all",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
     }
 ]
 ```
@@ -262,8 +262,8 @@ Lorsqu'une requête arrive sans jeton JWT, le backend Rebase définit les variab
 
 Cela signifie que :
 
-- `auth.uid()` renvoie `'anonymous'`
-- `auth.roles()` renvoie une chaîne vide
+- `rebase.uid()` renvoie `'anonymous'`
+- `rebase.roles()` renvoie une chaîne vide
 - Les politiques `access: "public"` passent car elles génèrent `USING (true)` / `WITH CHECK (true)`
 - Les politiques `access: "authenticated"` échouent car elles vérifient un véritable ID d'utilisateur
 - Les politiques `ownerField` échouent car aucune ligne n'aura `user_id = 'anonymous'` (sauf si explicitement défini)
@@ -276,13 +276,13 @@ Si vous avez besoin d'un contrôle plus granulaire, utilisez du SQL brut :
 securityRules: [
     {
         operation: "insert",
-        withCheck: "auth.uid() = 'anonymous' OR auth.uid() IS NOT NULL"
+        withCheck: "rebase.uid() = 'anonymous' OR rebase.uid() IS NOT NULL"
     }
 ]
 ```
 
 :::tip
-Évitez le modèle hérité de vérification de `string_to_array(auth.roles(), ',')` pour l'accès anonyme. Le raccourci `access: "public"` est plus simple et génère automatiquement la politique correcte.
+Évitez le modèle hérité de vérification de `string_to_array(rebase.roles(), ',')` pour l'accès anonyme. Le raccourci `access: "public"` est plus simple et génère automatiquement la politique correcte.
 :::
 
 ## Prochaines Étapes

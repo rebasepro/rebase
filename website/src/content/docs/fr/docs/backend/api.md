@@ -302,7 +302,7 @@ La requête d'une clé d'API passe par **deux** contrôles d'autorisation, et le
    `admin: true`). Les clés admin passent via les politiques admin intégrées ; une
    clé non-admin ne voit que les lignes qu'une règle de sécurité accorde explicitement au
    rôle `service` ou au public. Les règles de type propriétaire
-   (`owner_id = auth.uid()`) ne correspondent jamais à une clé d'API.
+   (`owner_id = rebase.uid()`) ne correspondent jamais à une clé d'API.
 
 Ainsi, une clé non-admin avec des permissions `"*"` peut tout de même obtenir des résultats vides — c'est
 la RLS qui fonctionne, pas un bug. Accordez soit le rôle `service` dans les règles de sécurité des
@@ -348,7 +348,7 @@ clé non-admin s'exécute en tant que `uid: "api-key:<id>"` avec les rôles
 compile en :
 
 ```sql
-auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])
+rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
 ```
 
 — le contexte serveur, ou un admin. Une clé non-admin ne correspond à aucune des
@@ -362,7 +362,7 @@ securityRules: [
 ]
 ```
 
-Comme `auth.uid()` porte l'id de la clé, une règle peut aussi restreindre les
+Comme `rebase.uid()` porte l'id de la clé, une règle peut aussi restreindre les
 lignes à une clé précise :
 
 ```ts

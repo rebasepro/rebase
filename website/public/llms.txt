@@ -618,15 +618,95 @@ function Widget() {
 
 ## Upgrading an existing app
 
-This release renames packages, changes what `id` means, drops CJS, moves the
-admin panel to react-router 8, and — most importantly — **fixes three ways
-access could be granted that you did not ask for**: a security rule that was
-silently permissive, and two on the realtime socket. Read the first two sections
-before anything else. They are the changes that alter who can read your data,
-and none of them announces itself.
+This release removes the `auth` schema, renames packages, changes what `id`
+means, drops CJS, moves the admin panel to react-router 8, and — most
+importantly — **fixes three ways access could be granted that you did not ask
+for**: a security rule that was silently permissive, and two on the realtime
+socket. Read the first three sections before anything else. Section 0 is the one
+that changes SQL you may have written by hand; sections 1 and 2 alter who can
+read your data, and none of them announces itself.
 
 Work through the sections in order. Each one names the symptom you would
 otherwise debug from the wrong end.
+
+---
+
+### 0. The `auth` schema is gone — read this first
+
+#### What changed
+
+Rebase's RLS helper functions moved out of the `auth` schema and into `rebase`:
+
+| Before | Now |
+|---|---|
+| `auth.uid()` | `rebase.uid()` |
+| `auth.roles()` | `rebase.roles()` |
+| `auth.jwt()` | `rebase.jwt()` |
+
+`auth` is Supabase's schema name. Borrowing it meant Rebase could not be pointed
+at a database that already had one: applying
+`CREATE OR REPLACE FUNCTION auth.uid() RETURNS text` over Supabase's
+`RETURNS uuid` is something Postgres refuses outright, and the refusal used to
+be swallowed — leaving a database with auth tables, no helper functions, and
+policies calling functions that did not exist.
+
+Rebase now creates exactly one schema in your database: `rebase`. Nothing else.
+
+#### What you have to do
+
+**If your `securityRules` use the structured helpers** — `policy.authUid()`,
+`policy.rolesOverlap()`, `ownerField`, `roles` — **nothing.** They never spelled
+a schema name. Re-run `rebase db push` (or redeploy) and your policies are
+recompiled.
+
+**If you wrote raw policy SQL**, it keeps working: the compiler rewrites
+`auth.uid()` to `rebase.uid()` on its way into the database. The boot log names
+every collection still carrying the old spelling so you can update it. Do — the
+rewrite is a migration aid, not a second supported spelling.
+
+```ts
+// Works, and warns.
+securityRules: [{ operation: "select", using: "owner_id = auth.uid()" }]
+
+// The fix.
+securityRules: [{ operation: "select", using: "owner_id = rebase.uid()" }]
+
+// Better: no schema name to get wrong.
+securityRules: [{ operation: "select",
+    condition: policy.compare(policy.field("owner_id"), "eq", policy.authUid()) }]
+```
+
+**Hand-written policies you created outside Rebase** — a SQL migration, the
+Studio editor — are the one thing nothing can rewrite for you. Until you update
+them, Postgres will not drop the functions they depend on, and the `auth` schema
+stays. Boot tells you exactly which policies, by name:
+
+```
+The pre-1.0 `auth` schema cannot be removed yet: 1 policy still calls
+`auth.uid()` and friends … anything listed here is hand-written SQL that has to
+be updated to `rebase.uid()` by hand, after which the schema goes on its own:
+  • public.posts → "posts_legacy"
+```
+
+#### What happens to the old schema
+
+It is dropped automatically once nothing references it, and only when Rebase is
+what created it. Each function is identified by its result type and body before
+being dropped, and the schema goes by `DROP SCHEMA auth RESTRICT` — never
+CASCADE — so a Supabase installation, or anything else living in `auth`, keeps
+it untouched.
+
+#### Also: the scaffold's database role is now `rebase_app`
+
+Postgres resolves unqualified names through `search_path`, which defaults to
+`"$user", public` — and `$user` is the connection role. A role named `rebase`
+therefore put the `rebase` **schema** ahead of `public`, so unqualified SQL from
+anything that does not pin the path (psql, `pg_dump`, drizzle-kit, a hand-written
+migration) silently landed in the wrong schema.
+
+Existing projects need no change: every connection Rebase opens already pins
+`search_path=public`. New projects get `rebase_app`, and boot now warns if your
+connection role shares a name with a schema.
 
 ---
 
@@ -3035,9 +3115,9 @@ The authenticated user's identity is available in SQL via:
 
 | Function | Returns |
 |----------|---------|
-| `auth.uid()` | The current user's ID |
-| `auth.roles()` | Comma-separated app role IDs |
-| `auth.jwt()` | Full JWT claims as JSONB |
+| `rebase.uid()` | The current user's ID |
+| `rebase.roles()` | Comma-separated app role IDs |
+| `rebase.jwt()` | Full JWT claims as JSONB |
 
 These are set automatically per-transaction by the Rebase backend.
 
@@ -3053,7 +3133,7 @@ securityRules: [
 ]
 ```
 
-This generates: `USING (user_id = auth.uid())`
+This generates: `USING (user_id = rebase.uid())`
 
 #### Public Access
 
@@ -3129,7 +3209,7 @@ For complex logic, use `using` and `withCheck`:
 securityRules: [
     {
         operation: "select",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
     }
 ]
 ```
@@ -3150,7 +3230,7 @@ securityRules: [
     // Regular users can only see their own rows
     { operation: "select", ownerField: "user_id" },
     // Users can insert, but only for themselves
-    { operation: "insert", withCheck: "{user_id} = auth.uid()" },
+    { operation: "insert", withCheck: "{user_id} = rebase.uid()" },
     // Locked rows cannot be updated
     { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
 ]
@@ -3227,7 +3307,7 @@ securityRules: [
 securityRules: [
     {
         operation: "all",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
     }
 ]
 ```
@@ -3295,8 +3375,8 @@ When a request arrives without a JWT token, the Rebase backend sets the PostgreS
 
 This means:
 
-- `auth.uid()` returns `'anonymous'`
-- `auth.roles()` returns an empty string
+- `rebase.uid()` returns `'anonymous'`
+- `rebase.roles()` returns an empty string
 - `access: "public"` policies pass because they generate `USING (true)` / `WITH CHECK (true)`
 - `access: "authenticated"` policies fail because they check for a real user ID
 - `ownerField` policies fail because no row will have `user_id = 'anonymous'` (unless explicitly set)
@@ -3309,13 +3389,13 @@ If you need more granular control, use raw SQL:
 securityRules: [
     {
         operation: "insert",
-        withCheck: "auth.uid() = 'anonymous' OR auth.uid() IS NOT NULL"
+        withCheck: "rebase.uid() = 'anonymous' OR rebase.uid() IS NOT NULL"
     }
 ]
 ```
 
 :::tip
-Avoid the legacy pattern of checking `string_to_array(auth.roles(), ',')` for anonymous access. The `access: "public"` shortcut is simpler and generates the correct policy automatically.
+Avoid the legacy pattern of checking `string_to_array(rebase.roles(), ',')` for anonymous access. The `access: "public"` shortcut is simpler and generates the correct policy automatically.
 :::
 
 ### Next Steps
@@ -3847,7 +3927,7 @@ An API key's request passes through **two** authorization checks, and both must 
    `admin: true`). Admin keys pass via the built-in admin policies; a
    non-admin key only sees rows that a security rule explicitly grants to
    the `service` role or to the public. Owner-style rules
-   (`owner_id = auth.uid()`) never match an API key.
+   (`owner_id = rebase.uid()`) never match an API key.
 
 So a non-admin key with `"*"` permissions can still get empty results — that's
 RLS working, not a bug. Either grant the `service` role in the relevant
@@ -3892,7 +3972,7 @@ runs as `uid: "api-key:<id>"` with the roles `["service"]`, and the RLS policy
 injected into every collection by default compiles to:
 
 ```sql
-auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])
+rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
 ```
 
 — the server context, or an admin. A non-admin key matches neither arm, so on a
@@ -3905,7 +3985,7 @@ securityRules: [
 ]
 ```
 
-Because `auth.uid()` carries the key's id, a rule can also scope rows to one
+Because `rebase.uid()` carries the key's id, a rule can also scope rows to one
 specific key:
 
 ```ts
@@ -4220,21 +4300,21 @@ SELECT
 
 To make writing Row-Level Security policies simple, Rebase creates helper functions under the `auth` schema during database bootstrapping:
 
-*   **`auth.uid()`** — Returns the authenticated user's ID as `text`, or `NULL` if not set:
+*   **`rebase.uid()`** — Returns the authenticated user's ID as `text`, or `NULL` if not set:
     ```sql
-    CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
+    CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text AS $$
         SELECT NULLIF(current_setting('app.user_id', true), '');
     $$ LANGUAGE sql STABLE;
     ```
-*   **`auth.roles()`** — Returns the comma-separated roles string:
+*   **`rebase.roles()`** — Returns the comma-separated roles string:
     ```sql
-    CREATE OR REPLACE FUNCTION auth.roles() RETURNS text AS $$
+    CREATE OR REPLACE FUNCTION rebase.roles() RETURNS text AS $$
         SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
     $$ LANGUAGE sql STABLE;
     ```
-*   **`auth.jwt()`** — Returns the full JWT payload as a `jsonb` object:
+*   **`rebase.jwt()`** — Returns the full JWT payload as a `jsonb` object:
     ```sql
-    CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS $$
+    CREATE OR REPLACE FUNCTION rebase.jwt() RETURNS jsonb AS $$
         SELECT COALESCE(NULLIF(current_setting('app.jwt', true), ''), '{}')::jsonb;
     $$ LANGUAGE sql STABLE;
     ```
@@ -4244,7 +4324,7 @@ You can use these helpers directly in your custom security rules or database mig
 CREATE POLICY owner_access ON posts
     FOR ALL
     TO public
-    USING (author_id = auth.uid() OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+    USING (author_id = rebase.uid() OR string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 ```
 
 ### First User Bootstrap
@@ -4390,14 +4470,14 @@ Regardless of the external authentication provider chosen, your adapter must res
 
 ```typescript
 export interface AuthenticatedUser {
-  uid: string;                    // Maps to pg local 'app.user_id' -> auth.uid()
+  uid: string;                    // Maps to pg local 'app.user_id' -> rebase.uid()
   email: string;                  // User email address
   displayName?: string | null;    // Optional display name
   photoUrl?: string | null;        // Optional avatar URL
-  roles: string[];                // Maps to pg local 'app.user_roles' -> auth.roles()
+  roles: string[];                // Maps to pg local 'app.user_roles' -> rebase.roles()
   isAdmin: boolean;               // Grants global superuser privileges if true
   rawToken?: string;              // The original token string (for downstream forwarding)
-  claims?: Record<string, any>;   // Custom claims/metadata (available in auth.jwt())
+  claims?: Record<string, any>;   // Custom claims/metadata (available in rebase.jwt())
 }
 ```
 
@@ -11019,7 +11099,7 @@ rebase db push
 :::note[Editing a security rule renames its policy]
 A rule without an explicit `name` compiles to `<table>_<op>_<hash>`, where the hash covers the rule's semantics — so *editing* a rule (rather than adding one) produces a policy under a new name and leaves the old one behind.
 
-That used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, so a superseded `USING (auth.uid() IS NOT NULL)` kept granting everything no matter how tight its replacement was. Tightening a rule had no effect, and push reported success.
+That used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, so a superseded `USING (rebase.uid() IS NOT NULL)` kept granting everything no matter how tight its replacement was. Tightening a rule had no effect, and push reported success.
 
 `db push` now reconciles this: it drops generated policies that no longer match any rule, and reports — without dropping — any custom-named policy your collections don't describe, since those are indistinguishable from SQL someone wrote deliberately.
 
@@ -11368,15 +11448,16 @@ after the permissive ones OR.
 
 ```sql
 ALTER POLICY "your_policy" ON "public"."your_table"
-    USING (user_id = auth.uid());
+    USING (user_id = rebase.uid());
 ```
 
 #### policy-anonymous-tautology
 
 **Policy only checks that a caller id exists.** Severity depends on the platform.
 
-The expression is `auth.uid() IS NOT NULL`-shaped: it separates signed-in from signed-out
-callers, but scopes no rows. Every signed-in user reaches every row the policy covers.
+The expression is `rebase.uid() IS NOT NULL`-shaped (or `auth.uid()` on Supabase, and on a
+Rebase database provisioned before 1.0): it separates signed-in from signed-out callers, but
+scopes no rows. Every signed-in user reaches every row the policy covers.
 
 The severity is platform-dependent, and this distinction matters:
 
@@ -11391,11 +11472,16 @@ The severity is platform-dependent, and this distinction matters:
 ```sql
 -- Scope to the row's owner rather than to the existence of an id
 ALTER POLICY "your_policy" ON "public"."your_table"
-    USING (user_id = auth.uid());
+    USING (user_id = rebase.uid());
 
 -- Or, if "any signed-in user" really is the intent, reject the sentinel explicitly
---     USING (auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous');
+--     USING (rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous');
 ```
+
+The suggested SQL is printed with the caller-id function your database actually has:
+`rebase.uid()` on a Rebase database, `auth.uid()` on Supabase and PostgREST. Both
+spellings are recognised when reading policies, so a Rebase database mid-migration from
+the pre-1.0 `auth` schema is still checked.
 
 #### view-bypasses-rls
 

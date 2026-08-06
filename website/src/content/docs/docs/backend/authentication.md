@@ -234,21 +234,21 @@ SELECT
 
 To make writing Row-Level Security policies simple, Rebase creates helper functions under the `auth` schema during database bootstrapping:
 
-*   **`auth.uid()`** — Returns the authenticated user's ID as `text`, or `NULL` if not set:
+*   **`rebase.uid()`** — Returns the authenticated user's ID as `text`, or `NULL` if not set:
     ```sql
-    CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
+    CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text AS $$
         SELECT NULLIF(current_setting('app.user_id', true), '');
     $$ LANGUAGE sql STABLE;
     ```
-*   **`auth.roles()`** — Returns the comma-separated roles string:
+*   **`rebase.roles()`** — Returns the comma-separated roles string:
     ```sql
-    CREATE OR REPLACE FUNCTION auth.roles() RETURNS text AS $$
+    CREATE OR REPLACE FUNCTION rebase.roles() RETURNS text AS $$
         SELECT COALESCE(NULLIF(current_setting('app.user_roles', true), ''), '');
     $$ LANGUAGE sql STABLE;
     ```
-*   **`auth.jwt()`** — Returns the full JWT payload as a `jsonb` object:
+*   **`rebase.jwt()`** — Returns the full JWT payload as a `jsonb` object:
     ```sql
-    CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb AS $$
+    CREATE OR REPLACE FUNCTION rebase.jwt() RETURNS jsonb AS $$
         SELECT COALESCE(NULLIF(current_setting('app.jwt', true), ''), '{}')::jsonb;
     $$ LANGUAGE sql STABLE;
     ```
@@ -258,7 +258,7 @@ You can use these helpers directly in your custom security rules or database mig
 CREATE POLICY owner_access ON posts
     FOR ALL
     TO public
-    USING (author_id = auth.uid() OR string_to_array(auth.roles(), ',') && ARRAY['admin']);
+    USING (author_id = rebase.uid() OR string_to_array(rebase.roles(), ',') && ARRAY['admin']);
 ```
 
 ## First User Bootstrap
@@ -409,14 +409,14 @@ Regardless of the external authentication provider chosen, your adapter must res
 
 ```typescript
 export interface AuthenticatedUser {
-  uid: string;                    // Maps to pg local 'app.user_id' -> auth.uid()
+  uid: string;                    // Maps to pg local 'app.user_id' -> rebase.uid()
   email: string;                  // User email address
   displayName?: string | null;    // Optional display name
   photoUrl?: string | null;        // Optional avatar URL
-  roles: string[];                // Maps to pg local 'app.user_roles' -> auth.roles()
+  roles: string[];                // Maps to pg local 'app.user_roles' -> rebase.roles()
   isAdmin: boolean;               // Grants global superuser privileges if true
   rawToken?: string;              // The original token string (for downstream forwarding)
-  claims?: Record<string, any>;   // Custom claims/metadata (available in auth.jwt())
+  claims?: Record<string, any>;   // Custom claims/metadata (available in rebase.jwt())
 }
 ```
 

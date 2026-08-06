@@ -33,9 +33,9 @@ The authenticated user's identity is available in SQL via:
 
 | Function | Returns |
 |----------|---------|
-| `auth.uid()` | The current user's ID |
-| `auth.roles()` | Comma-separated app role IDs |
-| `auth.jwt()` | Full JWT claims as JSONB |
+| `rebase.uid()` | The current user's ID |
+| `rebase.roles()` | Comma-separated app role IDs |
+| `rebase.jwt()` | Full JWT claims as JSONB |
 
 These are set automatically per-transaction by the Rebase backend.
 
@@ -51,7 +51,7 @@ securityRules: [
 ]
 ```
 
-This generates: `USING (user_id = auth.uid())`
+This generates: `USING (user_id = rebase.uid())`
 
 ### Public Access
 
@@ -128,7 +128,7 @@ For complex logic, use `using` and `withCheck`:
 securityRules: [
     {
         operation: "select",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
     }
 ]
 ```
@@ -149,7 +149,7 @@ securityRules: [
     // Regular users can only see their own rows
     { operation: "select", ownerField: "user_id" },
     // Users can insert, but only for themselves
-    { operation: "insert", withCheck: "{user_id} = auth.uid()" },
+    { operation: "insert", withCheck: "{user_id} = rebase.uid()" },
     // Locked rows cannot be updated
     { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
 ]
@@ -226,7 +226,7 @@ securityRules: [
 securityRules: [
     {
         operation: "all",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
     }
 ]
 ```
@@ -296,8 +296,8 @@ When a request arrives without a JWT token, the Rebase backend sets the PostgreS
 
 This means:
 
-- `auth.uid()` returns `'anonymous'`
-- `auth.roles()` returns an empty string
+- `rebase.uid()` returns `'anonymous'`
+- `rebase.roles()` returns an empty string
 - `access: "public"` policies pass because they generate `USING (true)` / `WITH CHECK (true)`
 - `access: "authenticated"` policies fail because they check for a real user ID
 - `ownerField` policies fail because no row will have `user_id = 'anonymous'` (unless explicitly set)
@@ -310,13 +310,13 @@ If you need more granular control, use raw SQL:
 securityRules: [
     {
         operation: "insert",
-        withCheck: "auth.uid() = 'anonymous' OR auth.uid() IS NOT NULL"
+        withCheck: "rebase.uid() = 'anonymous' OR rebase.uid() IS NOT NULL"
     }
 ]
 ```
 
 :::tip
-Avoid the legacy pattern of checking `string_to_array(auth.roles(), ',')` for anonymous access. The `access: "public"` shortcut is simpler and generates the correct policy automatically.
+Avoid the legacy pattern of checking `string_to_array(rebase.roles(), ',')` for anonymous access. The `access: "public"` shortcut is simpler and generates the correct policy automatically.
 :::
 
 ## Next Steps

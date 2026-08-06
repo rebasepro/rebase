@@ -302,7 +302,7 @@ A requisição de uma chave de API passa por **duas** verificações de autoriza
    `admin: true`). As chaves de administrador passam pelas políticas de administrador integradas; uma
    chave não-administradora só vê as linhas que uma regra de segurança concede explicitamente ao
    papel `service` ou ao público. Regras no estilo proprietário
-   (`owner_id = auth.uid()`) nunca correspondem a uma chave de API.
+   (`owner_id = rebase.uid()`) nunca correspondem a uma chave de API.
 
 Portanto, uma chave não-administradora com permissões `"*"` ainda pode obter resultados vazios — isso é
 a RLS funcionando, não um bug. Conceda o papel `service` nas regras de segurança das
@@ -348,7 +348,7 @@ chave não-administradora é executada como `uid: "api-key:<id>"` com os papéis
 compilada para:
 
 ```sql
-auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])
+rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
 ```
 
 — o contexto do servidor, ou um administrador. Uma chave não-administradora não
@@ -362,7 +362,7 @@ securityRules: [
 ]
 ```
 
-Como `auth.uid()` carrega o id da chave, uma regra também pode restringir as
+Como `rebase.uid()` carrega o id da chave, uma regra também pode restringir as
 linhas a uma chave específica:
 
 ```ts

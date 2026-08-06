@@ -105,7 +105,7 @@ export function SplitLayerDemo() {
   },
   securityRules: [
     { operation: "select",
-      using: "id = auth.uid()::uuid" },
+      using: "id = rebase.uid()::uuid" },
   ],`}</code></pre>
 
                     <div className={`transition-all duration-300 ${full ? "opacity-100 mt-1" : "opacity-30"}`}>

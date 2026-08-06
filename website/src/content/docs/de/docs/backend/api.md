@@ -302,7 +302,7 @@ Die Anfrage eines API-Schlüssels durchläuft **zwei** Autorisierungsprüfungen,
    `admin: true`). Admin-Schlüssel passieren über die integrierten Admin-Richtlinien; ein
    Nicht-Admin-Schlüssel sieht nur Zeilen, die eine Sicherheitsregel explizit der
    Rolle `service` oder der Öffentlichkeit gewährt. Owner-artige Regeln
-   (`owner_id = auth.uid()`) treffen niemals auf einen API-Schlüssel zu.
+   (`owner_id = rebase.uid()`) treffen niemals auf einen API-Schlüssel zu.
 
 Ein Nicht-Admin-Schlüssel mit `"*"`-Berechtigungen kann also trotzdem leere Ergebnisse liefern — das ist
 die RLS bei der Arbeit, kein Fehler. Gewähren Sie entweder die Rolle `service` in den Sicherheitsregeln der
@@ -348,7 +348,7 @@ lässt. Ein Nicht-Admin-Schlüssel läuft als `uid: "api-key:<id>"` mit den Roll
 injiziert wird, kompiliert zu:
 
 ```sql
-auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])
+rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
 ```
 
 — dem Serverkontext oder einem Admin. Ein Nicht-Admin-Schlüssel trifft auf
@@ -362,7 +362,7 @@ securityRules: [
 ]
 ```
 
-Da `auth.uid()` die ID des Schlüssels trägt, kann eine Regel die Zeilen auch auf
+Da `rebase.uid()` die ID des Schlüssels trägt, kann eine Regel die Zeilen auch auf
 einen bestimmten Schlüssel eingrenzen:
 
 ```ts

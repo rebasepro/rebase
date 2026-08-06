@@ -33,9 +33,9 @@ L'identità dell'utente autenticato è disponibile in SQL tramite:
 
 | Funzione | Restituisce |
 |----------|-------------|
-| `auth.uid()` | L'ID dell'utente corrente |
-| `auth.roles()` | ID dei ruoli dell'app separati da virgole |
-| `auth.jwt()` | Claims JWT complete come JSONB |
+| `rebase.uid()` | L'ID dell'utente corrente |
+| `rebase.roles()` | ID dei ruoli dell'app separati da virgole |
+| `rebase.jwt()` | Claims JWT complete come JSONB |
 
 Questi vengono impostati automaticamente per transazione dal backend Rebase.
 
@@ -51,7 +51,7 @@ securityRules: [
 ]
 ```
 
-Questo genera: `USING (user_id = auth.uid())`
+Questo genera: `USING (user_id = rebase.uid())`
 
 ### Accesso Pubblico
 
@@ -94,7 +94,7 @@ Per logiche complesse, usa `using` e `withCheck`:
 securityRules: [
     {
         operation: "select",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
     }
 ]
 ```
@@ -115,7 +115,7 @@ securityRules: [
     // Gli utenti regolari possono vedere solo le proprie righe
     { operation: "select", ownerField: "user_id" },
     // Gli utenti possono inserire, ma solo per se stessi
-    { operation: "insert", withCheck: "{user_id} = auth.uid()" },
+    { operation: "insert", withCheck: "{user_id} = rebase.uid()" },
     // Le righe bloccate non possono essere aggiornate
     { operation: "update", mode: "restrictive", using: "{is_locked} = false" }
 ]
@@ -192,7 +192,7 @@ securityRules: [
 securityRules: [
     {
         operation: "all",
-        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = auth.uid())"
+        using: "EXISTS (SELECT 1 FROM org_members WHERE org_members.org_id = {org_id} AND org_members.user_id = rebase.uid())"
     }
 ]
 ```
@@ -262,8 +262,8 @@ Quando una richiesta arriva senza un token JWT, il backend Rebase imposta le var
 
 Questo significa:
 
-- `auth.uid()` restituisce `'anonymous'`
-- `auth.roles()` restituisce una stringa vuota
+- `rebase.uid()` restituisce `'anonymous'`
+- `rebase.roles()` restituisce una stringa vuota
 - Le politiche `access: "public"` passano perché generano `USING (true)` / `WITH CHECK (true)`
 - Le politiche `access: "authenticated"` falliscono perché controllano un ID utente reale
 - Le politiche `ownerField` falliscono perché nessuna riga avrà `user_id = 'anonymous'` (a meno che non sia impostato esplicitamente)
@@ -276,13 +276,13 @@ Se hai bisogno di un controllo più granulare, usa SQL puro:
 securityRules: [
     {
         operation: "insert",
-        withCheck: "auth.uid() = 'anonymous' OR auth.uid() IS NOT NULL"
+        withCheck: "rebase.uid() = 'anonymous' OR rebase.uid() IS NOT NULL"
     }
 ]
 ```
 
 :::tip
-Evita il pattern legacy di controllare `string_to_array(auth.roles(), ',')` per l'accesso anonimo. La scorciatoia `access: "public"` è più semplice e genera automaticamente la policy corretta.
+Evita il pattern legacy di controllare `string_to_array(rebase.roles(), ',')` per l'accesso anonimo. La scorciatoia `access: "public"` è più semplice e genera automaticamente la policy corretta.
 :::
 
 ## Prossimi Passi

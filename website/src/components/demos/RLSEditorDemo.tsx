@@ -40,7 +40,7 @@ const MOCK_TABLES: RLSTable[] = [
                 id: "1",
                 name: "users_read_own",
                 command: "SELECT",
-                using: "auth.uid() = id",
+                using: "rebase.uid() = id",
                 roles: ["public"],
                 permissive: true,
                 syncStatus: "synced"
@@ -49,8 +49,8 @@ const MOCK_TABLES: RLSTable[] = [
                 id: "2",
                 name: "users_update_own",
                 command: "UPDATE",
-                using: "auth.uid() = id",
-                withCheck: "auth.uid() = id",
+                using: "rebase.uid() = id",
+                withCheck: "rebase.uid() = id",
                 roles: ["public"],
                 permissive: true,
                 syncStatus: "synced"
@@ -85,7 +85,7 @@ const MOCK_TABLES: RLSTable[] = [
                 name: "posts_create_auth",
                 command: "INSERT",
                 using: "true",
-                withCheck: "auth.uid() = author_id",
+                withCheck: "rebase.uid() = author_id",
                 roles: ["authenticated"],
                 permissive: true,
                 syncStatus: "synced"
@@ -94,7 +94,7 @@ const MOCK_TABLES: RLSTable[] = [
                 id: "6",
                 name: "posts_update_own",
                 command: "UPDATE",
-                using: "auth.uid() = author_id",
+                using: "rebase.uid() = author_id",
                 roles: ["authenticated"],
                 permissive: true,
                 syncStatus: "synced"
@@ -182,15 +182,15 @@ interface VisualCondition {
 function parseExpression(expr: string): VisualCondition {
     const clean = (expr || "").trim();
     if (!clean || clean === "true") {
-        return { type: "always", left: "auth.uid()", operator: "=", right: "id" };
+        return { type: "always", left: "rebase.uid()", operator: "=", right: "id" };
     }
     
-    // Check if it's "auth.uid() = something" or "auth.uid() != something"
+    // Check if it's "rebase.uid() = something" or "rebase.uid() != something"
     const uidMatch = clean.match(/^auth\.uid\(\)\s*(=|!=)\s*([a-zA-Z_][a-zA-Z0-9_]*)$/i);
     if (uidMatch) {
         return {
             type: "rule",
-            left: "auth.uid()",
+            left: "rebase.uid()",
             operator: uidMatch[1],
             right: uidMatch[2]
         };
@@ -235,8 +235,8 @@ function serializeExpression(cond: VisualCondition): string {
     if (cond.left === "custom") {
         return cond.right || "true";
     }
-    if (cond.left === "auth.uid()") {
-        return `auth.uid() ${cond.operator} ${cond.right}`;
+    if (cond.left === "rebase.uid()") {
+        return `rebase.uid() ${cond.operator} ${cond.right}`;
     }
     if (cond.left === "auth.role()") {
         return `auth.role() ${cond.operator} '${cond.right}'`;
@@ -269,7 +269,7 @@ function VisualRuleBuilder({
         } else {
             // Pick a logical default based on available columns
             const defaultIdCol = columns.includes("user_id") ? "user_id" : (columns.includes("author_id") ? "author_id" : "id");
-            onChange(`auth.uid() = ${defaultIdCol}`);
+            onChange(`rebase.uid() = ${defaultIdCol}`);
         }
     };
 
@@ -316,7 +316,7 @@ function VisualRuleBuilder({
                             value={cond.left}
                             onChange={(e) => {
                                 const left = e.target.value;
-                                if (left === "auth.uid()") {
+                                if (left === "rebase.uid()") {
                                     const defaultIdCol = columns.includes("user_id") ? "user_id" : (columns.includes("author_id") ? "author_id" : "id");
                                     handleUpdate({ left, operator: "=", right: defaultIdCol });
                                 } else if (left === "auth.role()") {
@@ -329,7 +329,7 @@ function VisualRuleBuilder({
                             }}
                             className="bg-surface-850 border border-surface-700/40 rounded px-2 py-1 text-surface-200 font-mono outline-none focus:border-primary transition-all cursor-pointer"
                         >
-                            <option value="auth.uid()">auth.uid() [User ID]</option>
+                            <option value="rebase.uid()">rebase.uid() [User ID]</option>
                             <option value="auth.role()">auth.role() [User Role]</option>
                             {columns.map(col => (
                                 <option key={col} value={col}>column: {col}</option>
@@ -350,7 +350,7 @@ function VisualRuleBuilder({
                                 </select>
 
                                 {/* Right side selector/input */}
-                                {cond.left === "auth.uid()" ? (
+                                {cond.left === "rebase.uid()" ? (
                                     <select
                                         value={cond.right}
                                         onChange={(e) => handleUpdate({ right: e.target.value })}
@@ -389,7 +389,7 @@ function VisualRuleBuilder({
                             rows={2}
                             value={cond.right}
                             onChange={(e) => handleUpdate({ right: e.target.value })}
-                            placeholder="raw SQL condition expression (e.g. auth.uid() = id OR is_admin = true)"
+                            placeholder="raw SQL condition expression (e.g. rebase.uid() = id OR is_admin = true)"
                             className="w-full bg-surface-850 border border-surface-700/40 rounded px-2 py-1 text-[11px] font-mono text-amber-300 outline-none focus:border-primary transition-all resize-none"
                         />
                     )}

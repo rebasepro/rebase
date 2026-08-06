@@ -302,7 +302,7 @@ La richiesta di una chiave API attraversa **due** controlli di autorizzazione, e
    `admin: true`). Le chiavi admin passano tramite le politiche admin integrate; una
    chiave non-admin vede solo le righe che una regola di sicurezza concede esplicitamente al
    ruolo `service` o al pubblico. Le regole in stile proprietario
-   (`owner_id = auth.uid()`) non corrispondono mai a una chiave API.
+   (`owner_id = rebase.uid()`) non corrispondono mai a una chiave API.
 
 Quindi una chiave non-admin con permessi `"*"` può comunque ottenere risultati vuoti — è
 la RLS che funziona, non un bug. Concedi il ruolo `service` nelle regole di sicurezza delle
@@ -348,7 +348,7 @@ chiave non-admin viene eseguita come `uid: "api-key:<id>"` con i ruoli
 collezione viene compilata in:
 
 ```sql
-auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])
+rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
 ```
 
 — il contesto server, oppure un admin. Una chiave non-admin non corrisponde a
@@ -362,7 +362,7 @@ securityRules: [
 ]
 ```
 
-Poiché `auth.uid()` contiene l'id della chiave, una regola può anche restringere
+Poiché `rebase.uid()` contiene l'id della chiave, una regola può anche restringere
 le righe a una chiave specifica:
 
 ```ts

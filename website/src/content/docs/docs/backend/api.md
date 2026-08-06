@@ -302,7 +302,7 @@ An API key's request passes through **two** authorization checks, and both must 
    `admin: true`). Admin keys pass via the built-in admin policies; a
    non-admin key only sees rows that a security rule explicitly grants to
    the `service` role or to the public. Owner-style rules
-   (`owner_id = auth.uid()`) never match an API key.
+   (`owner_id = rebase.uid()`) never match an API key.
 
 So a non-admin key with `"*"` permissions can still get empty results — that's
 RLS working, not a bug. Either grant the `service` role in the relevant
@@ -347,7 +347,7 @@ runs as `uid: "api-key:<id>"` with the roles `["service"]`, and the RLS policy
 injected into every collection by default compiles to:
 
 ```sql
-auth.uid() IS NULL OR (string_to_array(auth.roles(), ',') && ARRAY['admin'])
+rebase.uid() IS NULL OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])
 ```
 
 — the server context, or an admin. A non-admin key matches neither arm, so on a
@@ -360,7 +360,7 @@ securityRules: [
 ]
 ```
 
-Because `auth.uid()` carries the key's id, a rule can also scope rows to one
+Because `rebase.uid()` carries the key's id, a rule can also scope rows to one
 specific key:
 
 ```ts

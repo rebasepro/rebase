@@ -6,15 +6,95 @@ description: What breaks when you move an existing app to the current release, a
 
 # Upgrading an existing app
 
-This release renames packages, changes what `id` means, drops CJS, moves the
-admin panel to react-router 8, and — most importantly — **fixes three ways
-access could be granted that you did not ask for**: a security rule that was
-silently permissive, and two on the realtime socket. Read the first two sections
-before anything else. They are the changes that alter who can read your data,
-and none of them announces itself.
+This release removes the `auth` schema, renames packages, changes what `id`
+means, drops CJS, moves the admin panel to react-router 8, and — most
+importantly — **fixes three ways access could be granted that you did not ask
+for**: a security rule that was silently permissive, and two on the realtime
+socket. Read the first three sections before anything else. Section 0 is the one
+that changes SQL you may have written by hand; sections 1 and 2 alter who can
+read your data, and none of them announces itself.
 
 Work through the sections in order. Each one names the symptom you would
 otherwise debug from the wrong end.
+
+---
+
+## 0. The `auth` schema is gone — read this first
+
+### What changed
+
+Rebase's RLS helper functions moved out of the `auth` schema and into `rebase`:
+
+| Before | Now |
+|---|---|
+| `auth.uid()` | `rebase.uid()` |
+| `auth.roles()` | `rebase.roles()` |
+| `auth.jwt()` | `rebase.jwt()` |
+
+`auth` is Supabase's schema name. Borrowing it meant Rebase could not be pointed
+at a database that already had one: applying
+`CREATE OR REPLACE FUNCTION auth.uid() RETURNS text` over Supabase's
+`RETURNS uuid` is something Postgres refuses outright, and the refusal used to
+be swallowed — leaving a database with auth tables, no helper functions, and
+policies calling functions that did not exist.
+
+Rebase now creates exactly one schema in your database: `rebase`. Nothing else.
+
+### What you have to do
+
+**If your `securityRules` use the structured helpers** — `policy.authUid()`,
+`policy.rolesOverlap()`, `ownerField`, `roles` — **nothing.** They never spelled
+a schema name. Re-run `rebase db push` (or redeploy) and your policies are
+recompiled.
+
+**If you wrote raw policy SQL**, it keeps working: the compiler rewrites
+`auth.uid()` to `rebase.uid()` on its way into the database. The boot log names
+every collection still carrying the old spelling so you can update it. Do — the
+rewrite is a migration aid, not a second supported spelling.
+
+```ts
+// Works, and warns.
+securityRules: [{ operation: "select", using: "owner_id = auth.uid()" }]
+
+// The fix.
+securityRules: [{ operation: "select", using: "owner_id = rebase.uid()" }]
+
+// Better: no schema name to get wrong.
+securityRules: [{ operation: "select",
+    condition: policy.compare(policy.field("owner_id"), "eq", policy.authUid()) }]
+```
+
+**Hand-written policies you created outside Rebase** — a SQL migration, the
+Studio editor — are the one thing nothing can rewrite for you. Until you update
+them, Postgres will not drop the functions they depend on, and the `auth` schema
+stays. Boot tells you exactly which policies, by name:
+
+```
+The pre-1.0 `auth` schema cannot be removed yet: 1 policy still calls
+`auth.uid()` and friends … anything listed here is hand-written SQL that has to
+be updated to `rebase.uid()` by hand, after which the schema goes on its own:
+  • public.posts → "posts_legacy"
+```
+
+### What happens to the old schema
+
+It is dropped automatically once nothing references it, and only when Rebase is
+what created it. Each function is identified by its result type and body before
+being dropped, and the schema goes by `DROP SCHEMA auth RESTRICT` — never
+CASCADE — so a Supabase installation, or anything else living in `auth`, keeps
+it untouched.
+
+### Also: the scaffold's database role is now `rebase_app`
+
+Postgres resolves unqualified names through `search_path`, which defaults to
+`"$user", public` — and `$user` is the connection role. A role named `rebase`
+therefore put the `rebase` **schema** ahead of `public`, so unqualified SQL from
+anything that does not pin the path (psql, `pg_dump`, drizzle-kit, a hand-written
+migration) silently landed in the wrong schema.
+
+Existing projects need no change: every connection Rebase opens already pins
+`search_path=public`. New projects get `rebase_app`, and boot now warns if your
+connection role shares a name with a schema.
 
 ---
 
