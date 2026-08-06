@@ -7,7 +7,7 @@ import { getDisplayPropertyKey } from "@rebasepro/app";
 import { getLeadingRelationTitleKey, getTitlePropertyCandidates, looksLikeIdentifierValue } from "@rebasepro/app";
 import { getEntityFromCache } from "@rebasepro/app";
 import { getEntityPreviewKeys } from "../../util/previews";
-import { getValueInPath } from "@rebasepro/utils";
+import { formatRelativeTime, getValueInPath } from "@rebasepro/utils";
 import type { AuthController } from "@rebasepro/admin-types";
 import { ChipColorScheme, CHIP_COLORS, CHIP_SEED_KEYS } from "@rebasepro/ui";
 import { useEntityDisplay } from "../../hooks/useEntityDisplay";
@@ -346,15 +346,11 @@ function formatDateValue(value: unknown): string {
     if (isNaN(date.getTime())) return String(value);
 
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    // A date slot holds whatever property the collection points it at, which is
+    // as often a due or publish date as a `updated_at`. `formatRelativeTime`
+    // reads the sign, so a scheduled date says "in 3d" instead of "Just now".
+    const relative = formatRelativeTime(date, { now });
+    if (relative) return relative;
 
     return date.toLocaleDateString(undefined, {
         month: "short",

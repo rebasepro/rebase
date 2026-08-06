@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { logger } from "@rebasepro/server";
+import { formatRelativeTime } from "@rebasepro/utils";
 import {
     diagnoseMissingBin,
     resolveLocalBin,
@@ -668,15 +669,11 @@ function formatBytes(bytes: number): string {
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+/** A branch's age, for "…created 6d ago". */
 function timeAgo(date: Date): string {
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (seconds < 60) return "just now";
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    // No horizon: a branch created a year ago should still report an age here,
+    // rather than fall back to a bare date in a one-line list entry.
+    return formatRelativeTime(date, { maxMs: Number.POSITIVE_INFINITY }) ?? "unknown";
 }
 
 

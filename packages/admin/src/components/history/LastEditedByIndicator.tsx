@@ -3,22 +3,17 @@ import React, { useEffect, useState, useCallback } from "react";
 ;
 import { useApiBase, useApiConfig } from "@rebasepro/app";
 import { useAuthController } from "@rebasepro/app";
+import { formatRelativeTime } from "@rebasepro/utils";
 import { HistoryEntryData } from "../../hooks";
 import type { AdminCollection } from "@rebasepro/admin-types";
 
-function getRelativeTimeString(date: Date): string {
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffSeconds = Math.floor(diffMs / 1000);
-    const diffMinutes = Math.floor(diffSeconds / 60);
-    const diffHours = Math.floor(diffMinutes / 60);
-    const diffDays = Math.floor(diffHours / 24);
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
-    if (diffSeconds < 60) return "just now";
-    if (diffMinutes < 60) return `${diffMinutes}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 30) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+function getRelativeTimeString(date: Date): string {
+    // An edit is in the past, but the timestamp comes from the server and the
+    // phrase is rendered against the browser's clock — a few seconds of skew
+    // used to be enough to make a fresh edit read as the wrong thing entirely.
+    return formatRelativeTime(date, { maxMs: THIRTY_DAYS_MS }) ?? date.toLocaleDateString();
 }
 
 /**

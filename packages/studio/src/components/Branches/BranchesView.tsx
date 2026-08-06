@@ -27,6 +27,7 @@ import {
 import { useRebaseContext, useSnackbarController, ConfirmationDialog } from "@rebasepro/app";
 import { isBranchAdmin } from "@rebasepro/types";
 import type { BranchInfo } from "@rebasepro/types";
+import { formatRelativeTime } from "@rebasepro/utils";
 
 function formatSize(bytes: number | undefined): string {
     if (bytes === undefined || bytes === null) return "—";
@@ -40,13 +41,7 @@ function formatRelative(date: Date | string | undefined): string {
     if (!date) return "—";
     const d = date instanceof Date ? date : new Date(date);
     if (isNaN(d.getTime())) return "—";
-    const now = Date.now();
-    const diff = now - d.getTime();
-    if (diff < 60_000) return "just now";
-    if (diff < 3_600_000) { const m = Math.round(diff / 60_000); return `${m}m ago`; }
-    if (diff < 86_400_000) { const h = Math.round(diff / 3_600_000); return `${h}h ago`; }
-    if (diff < 604_800_000) { const d2 = Math.round(diff / 86_400_000); return `${d2}d ago`; }
-    return d.toLocaleDateString();
+    return formatRelativeTime(d) ?? d.toLocaleDateString();
 }
 
 export function BranchesView() {

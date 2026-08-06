@@ -2,6 +2,7 @@ export * from "./strings";
 export * from "./objects";
 export * from "./arrays";
 export * from "./dates";
+export * from "./storage";
 export * from "./hash";
 export * from "./sha1";
 export * from "./policy-names";
