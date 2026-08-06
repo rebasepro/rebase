@@ -739,11 +739,12 @@ parentEntityIds,
                 // And after this handler returns, not inside it. The layouts
                 // that close this way close by navigating, and they have just
                 // navigated themselves — the split leaves `…/edit` for the
-                // record's own URL. Two navigations raised in one handler leave
-                // only the first: the router is still settling the replace when
-                // the push arrives, and drops it. The record saved and stayed
-                // open, which is the exact defect "save and close" was fixed for
-                // in the side panel.
+                // record's own URL. Deferring keeps the close unambiguously
+                // last, which is what decides it: of two navigations raised for
+                // one action the final one survives, measured in
+                // `router_two_navigations_one_handler.test.tsx`. It also lets
+                // the state those handlers just set settle before the blocker
+                // reads it. See docs/bug-classes.md #28.
                 if (pendingCloseRef.current) {
                     pendingCloseRef.current = false;
                     setTimeout(() => onCloseRequest?.(), 0);
