@@ -469,6 +469,55 @@ direction: "asc" }]);
         const result = parseQueryOptions({});
         expect(result.orderBy).toBeUndefined();
     });
+
+    it("accepts a JSON string and a JSON array of field names", () => {
+        expect(parseQueryOptions({ orderBy: "\"created_at:desc\"" }).orderBy)
+            .toEqual([{ field: "created_at", direction: "desc" }]);
+        expect(parseQueryOptions({ orderBy: "[\"name\"]" }).orderBy)
+            .toEqual([{ field: "name", direction: "asc" }]);
+    });
+
+    it("reads a direction in any case", () => {
+        expect(parseQueryOptions({ orderBy: JSON.stringify([{ field: "name", direction: "DESC" }]) }).orderBy)
+            .toEqual([{ field: "name", direction: "desc" }]);
+    });
+
+    it("treats an empty list as no sort at all", () => {
+        expect(parseQueryOptions({ orderBy: "[]" }).orderBy).toBeUndefined();
+    });
+
+    // The sort *field* has been schema-checked for a while, on the grounds that
+    // answering 200 with unsorted rows leaves the caller believing in an order
+    // that is not there. The parameter's *shape* was not, and it failed the
+    // same silent way one layer earlier: anything `JSON.parse` returned was
+    // assigned to an option the REST layer reads as `orderBy[0].field`, so each
+    // of these dropped the ORDER BY and answered 200.
+    describe("a shape that cannot carry a sort is refused, not ignored", () => {
+        it("refuses a single object where an array belongs", () => {
+            // The most natural wrong guess, and the one that used to be silent.
+            expectBadRequest({ orderBy: "{\"field\":\"name\",\"direction\":\"asc\"}" }, "INVALID_ORDER_BY");
+        });
+
+        it("refuses scalars that are not field names", () => {
+            expectBadRequest({ orderBy: "5" }, "INVALID_ORDER_BY");
+            expectBadRequest({ orderBy: "true" }, "INVALID_ORDER_BY");
+            expectBadRequest({ orderBy: "null" }, "INVALID_ORDER_BY");
+        });
+
+        it("refuses a list entry with no field", () => {
+            expectBadRequest({ orderBy: "[{\"direction\":\"asc\"}]" }, "INVALID_ORDER_BY");
+            expectBadRequest({ orderBy: "[{\"field\":42}]" }, "INVALID_ORDER_BY");
+            expectBadRequest({ orderBy: "[{\"field\":\"  \"}]" }, "INVALID_ORDER_BY");
+            expectBadRequest({ orderBy: "[[\"name\"]]" }, "INVALID_ORDER_BY");
+        });
+
+        it("refuses a direction that names no order", () => {
+            // Silently coercing this to `asc` returns rows in an order the
+            // caller did not ask for and has no way to notice.
+            expectBadRequest({ orderBy: JSON.stringify([{ field: "name", direction: "sideways" }]) }, "INVALID_ORDER_BY");
+            expectBadRequest({ orderBy: JSON.stringify([{ field: "name", direction: 1 }]) }, "INVALID_ORDER_BY");
+        });
+    });
 });
 
 // ─────────────────────────────────────────────────────────────

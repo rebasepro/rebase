@@ -85,6 +85,95 @@ function parseWhereParam(raw: unknown): FilterValues<string> | undefined {
     return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
+type OrderByEntry = { field: string; direction: "asc" | "desc" };
+
+function invalidOrderBy(detail: string): never {
+    throw ApiError.badRequest(
+        `Invalid \`orderBy\` parameter: ${detail}. Expected \`field\`, \`field:desc\`, `
+        + "or a JSON array like [{\"field\":\"created_at\",\"direction\":\"desc\"}]",
+        "INVALID_ORDER_BY"
+    );
+}
+
+/** `asc`/`desc`, in any case. Anything else is a request to sort in a way that does not exist. */
+function toDirection(raw: unknown, context: string): "asc" | "desc" {
+    if (raw === undefined || raw === null) return "asc";
+    if (typeof raw !== "string") invalidOrderBy(`${context} has a non-string \`direction\``);
+    const lowered = raw.toLowerCase();
+    if (lowered !== "asc" && lowered !== "desc") {
+        invalidOrderBy(`${context} has direction '${raw}'`);
+    }
+    return lowered;
+}
+
+/** One entry: the canonical `{field, direction}`, or the `field:direction` shorthand as a string. */
+function toOrderByEntry(raw: unknown, index: number): OrderByEntry {
+    const context = `entry ${index}`;
+    if (typeof raw === "string") {
+        const tuple = deserializeOrderBy(raw);
+        if (!tuple || !tuple[0]) invalidOrderBy(`${context} is an empty field name`);
+        return { field: tuple[0], direction: toDirection(tuple[1], context) };
+    }
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+        invalidOrderBy(`${context} is not a field name or a {field, direction} object`);
+    }
+    const entry = raw as Record<string, unknown>;
+    if (typeof entry.field !== "string" || entry.field.trim() === "") {
+        invalidOrderBy(`${context} has no \`field\``);
+    }
+    return { field: entry.field, direction: toDirection(entry.direction, context) };
+}
+
+/**
+ * Parse the `orderBy` query parameter.
+ *
+ * The field *name* has been validated against the schema for a while — an
+ * `?orderBy=titel` is a 400 rather than 200 with unsorted rows, on the grounds
+ * that silently dropping the sort leaves the caller believing in an order that
+ * is not there. The parameter's *shape* was never checked the same way, and it
+ * failed in exactly the same silent manner one layer earlier: whatever
+ * `JSON.parse` returned was assigned to an option declared as an array of
+ * `{field, direction}`, and the REST layer reads only `orderBy[0].field`. So
+ * `?orderBy={"field":"name"}` — an object rather than an array, and the most
+ * natural thing for a client to try — read `undefined`, dropped the ORDER BY,
+ * and answered 200. So did a number, a boolean, `null`, and `["name"]`.
+ *
+ * This refuses those, the way `parseWhereParam` above already refuses a
+ * malformed filter and for the same reason. What it keeps working is every
+ * shape that worked before: the `field` and `field:desc` shorthands, and the
+ * canonical JSON array.
+ */
+function parseOrderByParam(raw: unknown): OrderByEntry[] | undefined {
+    if (Array.isArray(raw)) {
+        // A repeated query parameter arrives pre-split; treat it as the list.
+        return raw.length === 0 ? undefined : raw.map(toOrderByEntry);
+    }
+
+    const str = String(raw).trim();
+    if (!str) return undefined;
+
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(str);
+    } catch {
+        // Not JSON at all, so it is the `field:direction` shorthand.
+        return [toOrderByEntry(str, 0)];
+    }
+
+    // `JSON.parse` succeeding says nothing about the shape being usable.
+    if (Array.isArray(parsed)) {
+        if (parsed.length === 0) return undefined;
+        return parsed.map(toOrderByEntry);
+    }
+    if (typeof parsed === "string") return [toOrderByEntry(parsed, 0)];
+    if (typeof parsed === "object" && parsed !== null) {
+        // A bare `{field, direction}` is a near miss rather than nonsense, but
+        // accepting it would leave two spellings of one parameter. Name it.
+        invalidOrderBy("a single object was given where a JSON array was expected");
+    }
+    invalidOrderBy(`${typeof parsed} is not a field name or a list of them`);
+}
+
 // Re-exported for callers/tests that reference the REST list bounds. The
 // numbers and clamp live in `@rebasepro/types` so the REST parser and the
 // WebSocket ingress enforce ONE shared guarantee. See `resolveClientListLimit`.
@@ -175,24 +264,7 @@ export function parseQueryOptions(
     // Sorting
     const orderByVal = getLastValue(query.orderBy);
     if (orderByVal) {
-        try {
-            options.orderBy = typeof orderByVal === "string"
-                ? JSON.parse(orderByVal)
-                : orderByVal;
-        } catch {
-            // Try simple format: "field:direction"
-            if (typeof orderByVal === "string") {
-                const parsed = deserializeOrderBy(orderByVal);
-                if (parsed) {
-                    options.orderBy = [
-                        {
-                            field: parsed[0],
-                            direction: parsed[1]
-                        }
-                    ];
-                }
-            }
-        }
+        options.orderBy = parseOrderByParam(orderByVal);
     }
 
     // Relation includes
