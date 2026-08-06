@@ -74,7 +74,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
                 size="small"
                 variant="filled"
                 color="primary">
-                Add {collection.singularName ?? collection.name}
+                {t("add_specific", { name: collection.singularName ?? collection.name })}
             </Button>
             : <Button
                 id={`add_entity_${path}`}

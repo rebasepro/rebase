@@ -14,7 +14,8 @@ import {
     useData,
     useDataTableController,
     useLargeLayout,
-    usePermissions
+    usePermissions,
+    useTranslation
 } from "@rebasepro/app";
 import { ErrorView } from "@rebasepro/app";
 import { Button, DialogActions, PlusIcon, Typography } from "@rebasepro/ui";
@@ -347,6 +348,7 @@ function EntitySelectionDialogActions({
     const { canCreate } = usePermissions();
 
     const largeLayout = useLargeLayout();
+    const { t } = useTranslation();
 
     const onClick: MouseEventHandler<HTMLButtonElement> | undefined = onNewClick
         ? (e) => {
@@ -359,7 +361,7 @@ function EntitySelectionDialogActions({
             ? <Button
                 onClick={onClick}
                 startIcon={<PlusIcon/>}>
-                Add {collection.singularName ?? collection.name}
+                {t("add_specific", { name: collection.singularName ?? collection.name })}
             </Button>
             : <Button
                 onClick={onClick}>

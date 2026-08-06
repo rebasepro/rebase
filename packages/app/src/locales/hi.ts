@@ -69,7 +69,7 @@ export const hi: RebaseTranslations = {
     group_by: "इसके द्वारा समूहित करें",
     initialize_kanban_order: "कानबन क्रम प्रारंभ करें",
     copy_id: "ID कॉपी करें",
-    add_specific: "विशिष्ट {{name}} जोड़ें",
+    add_specific: "{{name}} जोड़ें",
     select_specific: "विशिष्ट {{name}} चुनें",
     select_from: "{{name}} से चुनें",
     done: "हो गया",
