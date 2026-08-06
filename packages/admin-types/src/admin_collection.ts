@@ -354,8 +354,32 @@ export type AdminCollectionOptions<
      * subcollection.
      * It will still be accessible if you reach the specified path.
      * You can also use this collection as a reference target.
+     *
+     * Note that this covers *both* roles at once. A collection that is a root
+     * collection **and** the target of a many-relation is hidden in both places,
+     * which is rarely what you want for a join or audit table: it should not be
+     * a destination in the drawer, but it is exactly what you want to see on its
+     * parent. Use {@link hideFromEntityViews} to separate the two.
      */
     hideFromNavigation?: boolean;
+
+    /**
+     * Should this collection be hidden from the tab strip of a parent entity,
+     * when it is reached as a child view (a Firestore subcollection, or the
+     * target of a `many`-cardinality relation).
+     *
+     * Independent of {@link hideFromNavigation}, which governs the drawer. The
+     * two exist separately because a collection commonly plays both roles and
+     * wants a different answer for each:
+     *
+     * - a join table (`company_members`) is not a destination but *is* a
+     *   meaningful tab → `hideFromNavigation: true`, this left unset;
+     * - a table with a dedicated workspace (`scraped_jobs`) may want the
+     *   opposite, so the workspace stays the only way in.
+     *
+     * Defaults to `false`. Setting {@link hideFromNavigation} does not imply it.
+     */
+    hideFromEntityViews?: boolean;
 
     /**
      * If you want to open custom views or subcollections by default when opening the edit

@@ -205,7 +205,12 @@ entityId }
         }
     }, [selectedTabProp, defaultSelectedView]);
 
-    const childViews = getAdminEntityChildViews(collection).filter(v => !v.collection.hideFromNavigation);
+    // `hideFromEntityViews`, not `hideFromNavigation`: the latter governs the
+    // drawer. Filtering tabs on it defeated the introspection generator, which
+    // sets `hideFromNavigation` on owned-child tables precisely *because* "every
+    // inbound foreign key renders as a tab on the parent" — so the rows it
+    // deliberately kept out of the drawer became reachable from nowhere.
+    const childViews = getAdminEntityChildViews(collection).filter(v => !v.collection.hideFromEntityViews);
     const subcollections = childViews.map(v => v.collection);
     const subcollectionsCount = subcollections?.length ?? 0;
     const customViews = collection.entityViews ?? [];

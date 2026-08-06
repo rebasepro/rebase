@@ -231,8 +231,8 @@ export function EntityIdentityBar({
                 // `rounded-lg overflow-hidden`: the two halves of the split
                 // button are square inside and the group carries the radius, so
                 // there is one control with a seam rather than two buttons that
-                // happen to touch. Their borders are `border-primary` over
-                // `bg-primary` — the same colour — so the seam has to be drawn.
+                // happen to touch. Their borders match their own fill, so the
+                // seam has to be drawn — see the `▾` half for where and in what.
                 <div className={"flex items-stretch rounded-lg overflow-hidden"}>
                     <Tooltip title={saveTooltip}>
                         <LoadingButton
@@ -252,7 +252,6 @@ export function EntityIdentityBar({
                     </Tooltip>
 
                     {saveAndCloseMenu && <>
-                        <span className={"w-px self-stretch bg-white/25 z-10"} aria-hidden={true}/>
                         <Menu align={"end"}
                             trigger={
                                 <Button variant={"filled"}
@@ -260,6 +259,21 @@ export function EntityIdentityBar({
                                     size={"small"}
                                     disabled={saveDisabled}
                                     aria-label={closeLabel}
+                                    // The seam is this half's own left border,
+                                    // tinted from `currentColor` — the ink the
+                                    // label is drawn in — so it holds on any
+                                    // button colour and dims with the control
+                                    // rather than needing a case per state. It
+                                    // was a `bg-white/25` span between the
+                                    // halves: a bright hairline scratched over a
+                                    // saturated blue, and, being a sibling of
+                                    // the buttons rather than part of one, it
+                                    // stayed at full strength while `disabled`
+                                    // dropped both halves to `opacity-40` — a
+                                    // rule brighter than the button it bisected.
+                                    // Inline because it has to beat the
+                                    // variant's `border-<color>` on one edge.
+                                    style={{ borderLeftColor: "color-mix(in oklab, currentColor 15%, transparent)" }}
                                     className={"rounded-none px-1.5"}>
                                     <ChevronDownIcon size={iconSize.smallest}/>
                                 </Button>
