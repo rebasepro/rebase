@@ -919,6 +919,74 @@ is not.
 
 ---
 
+## 28. Two navigations for one action, and nothing decides which one lands
+
+One event, two pieces of code that each believe they own where the app goes
+next. A component navigates as part of finishing its own job — a post-save
+`replace` from `…/edit` onto the record's URL — and in the same handler a
+caller-supplied callback navigates somewhere else entirely, because the user
+asked to close. Both calls run. Only one destination survives, and which one is
+not written down anywhere: it is decided by the order two statements happen to
+appear in, across two files that were not written as a pair.
+
+Adding a close button to the split view's edit form landed exactly there. The
+form's `onSaved` ran the layout's post-save navigation *and* the close
+navigation. The record saved and the panel stayed open. Deferring the close by
+one tick fixed it, which is the tell — a fix that only changes *when* a call
+happens is a fix to an ordering nobody had chosen.
+
+**Do not assume the router drops one.** The reflex explanation — "the second
+navigation arrives while the first is still settling and is silently ignored" —
+is wrong for react-router 8, and it is worth knowing which way round it is
+before writing a fix that depends on it. Pinned in
+`packages/admin/test/components/router_two_navigations_one_handler.test.tsx`:
+against a data router (`createBrowserRouter`, which is what the app boots), the
+**last call wins** in every shape — push after replace, push after push, `-1`
+after replace, replace to the URL you are already on, both from an async
+continuation, with an unsaved-changes blocker mounted. So the failure is not a
+dropped call; it is the *wrong* call being last. Deferring works because it
+moves the close to the end, not because it gives the router room.
+
+**Sweep:** not "two `navigate()`s in one function" — grepping `navigate(` misses
+the case twice over. The second navigation is usually a *callback* whose body is
+in another file, and the first is often a controller method that never says the
+word. Ask instead: for each handler, how many of the things it calls are allowed
+to change the URL? Count `navigate`, every controller method that wraps it
+(`sidePanelController.replace`, `sideDialogsController.close`,
+`urlController.navigate`), and **every caller-supplied callback**, which is
+allowed to do anything. Two or more is the smell; the ordering between them then
+has to be deliberate and commented, or collapsed to one.
+
+The sweep of `packages/admin/src` found one live sibling and one seam.
+`SidePanelBinding.onUpdate` reached three — `props.onUpdate?.()`, then a
+`replace` or `closeEditView()`, then `closeAfterSave()`. Its "save and close"
+path worked only because the close happened to be last; the reference picker's
+path is the same three in the *other* order, so the close lost. It now raises
+exactly one panel navigation — closing wins by construction, because moving a
+panel to an address it is about to leave has no other effect than fighting the
+close — and calls the opener's `onUpdate` last, so the opener's own navigation
+is the final word. `packages/app/src` is clean by construction: it contains no
+`navigate` call at all.
+
+**Watch for:** a caller-supplied callback counting as a navigation. `onUpdate`,
+`onSaved`, `onClose`, `onEntityClick` — a component cannot see what these do,
+so a handler that invokes one and then navigates has *already* raced, whether or
+not today's callers navigate. `EditViewBinding.onSaved` fans out to two of them
+(`onSaved` and `formProps.onSaved`) with no in-repo caller for the second; that
+one is unreachable today and reachable by anyone embedding the panel.
+
+**Watch for, too:** the pair that no longer refers to the same thing. Two
+navigations for one action tends to come with two *stack* operations, and the
+second was written assuming the first had not run. In the reference picker,
+`close()` pops the top panel and the `replace()` after it then wrote into the
+slot below — so the panel the user asked to close stayed open and the one they
+came from was destroyed. Reordering alone would have left that half standing,
+which is why the fix removes the pairing instead: the handler either closes or
+replaces, never both. Two *closes* in one tick are fine and are now relied on —
+they pop two panels, because each reads a ref the previous one already wrote.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -1228,4 +1296,36 @@ Several of these were pinned by tests that asserted the defect. Three
 `{ limit: 20 }`, were restating numbers the code had invented rather than
 checking them against the constant the server uses. A test that repeats the
 implementation's answer cannot fail with it.
+
+
+### Last sweep — 2026-08-05, two navigations for one action
+
+Triggered by the split view's close button (class 28). The recipe used was the
+one in that entry: count, per handler, everything it calls that is *allowed* to
+change the URL — `navigate`, the controller methods that wrap it, and every
+caller-supplied callback.
+
+| checked | result |
+|---|---|
+| the premise itself, before sweeping for it | **the stated mechanism was wrong**, and the sweep would have been aimed at the wrong thing. "The router silently drops the second navigation" does not happen: in a data router the *last* call wins, in all six shapes tried. Pinned in `router_two_navigations_one_handler.test.tsx`, because a react-router upgrade that flips it changes which panels close. |
+| `SidePanelBinding.onUpdate` | **BUG, fixed** — three navigation-capable calls in one body. On "save and close" of an existing record the close was last and won, so it worked. In the reference picker's "add new", the caller's `onUpdate` closes the panel *first* (`SelectionTableBinding.onEntityClick` → `sideDialogContext.close(false)`) and the `status !== "existing"` branch replaced it after — so the close lost, the new-entity panel stayed open, and the `replace` landed in the picker's slot and destroyed it. Now: one navigation, closing wins over replacing, and `props.onUpdate` runs last. Primitives pinned in `side_dialogs_close_then_replace.test.tsx`. |
+| `EditViewBinding`'s `onSaved` fan-out | seam, not reachable in-repo — it calls `onSaved?.()` and `formProps?.onSaved?.()`, both caller-supplied and both free to navigate. No caller in the workspace passes `formProps.onSaved`. Reachable by an embedder; the ordering is now stated in a comment rather than left to whoever edits the block next. |
+| `SplitListView`, `RebaseRoute`, `DetailViewBinding`, `CollectionViewStartActions`, the two `RouterCollection*StudioView`s, `ConfigControllerProvider`, `DefaultAppBar`, `DefaultDrawer`, `FavouritesView`, `NavigationCardBinding` | clean — one navigation per handler, and the delete action's two are a genuine `if`/`else` on `openEntityMode`. |
+| `AdminModeSyncer`, the one component whose job is to react to a URL | clean — it only calls `setMode`; the drawer's mode buttons navigate and it does not, so a mode switch stays one navigation. |
+| `packages/app/src` | clean by construction — the package contains no `navigate` call at all; every navigation in the panel is raised from `packages/admin`. |
+| `closeOnSave` on `SidePanelController` | **BUG, fixed** (class 21) — declared, documented, passed as `true` by `SelectionTableBinding`, and read by nothing. The behaviour it names is exactly what the picker flow above was trying and failing to get by hand, so honouring it *is* the fix: `onUpdate` closes when the opener asked it to, and stops replacing a panel on its way out. |
+| the controller-mediated navigations, on a second pass | **the first pass had missed them** — grepping `navigate(` over `packages/admin/src` finds seventeen files and none of the calls that matter here, because `sidePanelController.replace` and `sideDialogsController.close` navigate without saying so. Re-run against the wrappers: `EntityFormBinding.navigateBack` and `useSelectionDialog` are clean (`if`/`else`, one each), and `SidePanelBinding` held all the rest. |
+
+The picker finding is the one to keep. Correcting the *order* of those three
+calls would still have left `replace()` writing into a slot that `close()` had
+already shifted — the two operations disagree about which panel they are
+talking about, which is class 11 wearing a different hat. An ordering bug and a
+stale-index bug arrived together because both come from the same cause: two
+statements written as if the other one were not there. So the fix removes the
+pairing rather than sequencing it.
+
+A note on the sweep itself, which is the reusable part: the first pass grepped
+for `navigate(` and came back with a clean-looking picture, because the one
+broken handler in the package does not contain the string. A sweep is only as
+good as its recipe naming every *spelling* of the thing it hunts.
 

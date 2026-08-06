@@ -76,12 +76,33 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
         close(true);
     }
 
+    /**
+     * The panel's response to a save, and the one place it decides where the
+     * panel goes next.
+     *
+     * Exactly **one** panel navigation is raised here. These branches used to
+     * run independently — a `replace` onto the saved record's address *and* a
+     * close — and because the last navigation is the one that survives, which
+     * of them the user got was settled by statement order rather than by
+     * intent. Closing wins by construction now: moving a panel to a new address
+     * it is about to leave is work whose only effect is to fight the close.
+     *
+     * `props.onUpdate` runs last for the same reason. It belongs to whoever
+     * opened the panel and it is free to navigate — the reference picker's
+     * selects the record and closes the picker — so the opener's intent should
+     * be the final word, not something this panel overwrites on its way out.
+     */
     const onUpdate = (params: OnUpdateParams) => {
-        if (props.onUpdate) {
-            props.onUpdate(params);
-        }
         setEditInDialog(false);
-        if (params.status !== "existing") {
+
+        // Either "save and close" was clicked, or the opener asked for it when
+        // it opened the panel.
+        const closeRequested = sideDialogsController.pendingClose || props.closeOnSave;
+
+        if (closeRequested) {
+            sideDialogsController.setPendingClose(false);
+            closeAfterSave();
+        } else if (params.status !== "existing") {
             // A newly created entity replaces the panel with its own address,
             // which already leaves the edit view behind.
             sidePanelController.replace({
@@ -95,11 +116,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
             closeEditView();
         }
 
-        if (sideDialogsController.pendingClose) {
-            sideDialogsController.setPendingClose(false);
-            closeAfterSave();
-        }
-
+        props.onUpdate?.(params);
     }
 
     const parentCollectionSlugs = useMemo(() => {

@@ -723,6 +723,11 @@ parentEntityIds,
                     ...params,
                     selectedTab: MAIN_TAB_VALUE === activeTab ? undefined : activeTab
                 };
+                // Two caller-supplied callbacks for one save, and either may
+                // navigate — the layouts' `onSaved` all do. Where both do, the
+                // second one's destination is what survives (docs/bug-classes.md
+                // #28), so `formProps.onSaved` is deliberately last: it belongs
+                // to whoever embedded this view, which outranks the layout.
                 onSaved?.(res);
                 formProps?.onSaved?.(res);
 
