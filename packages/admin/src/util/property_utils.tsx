@@ -159,8 +159,13 @@ export function getResolvedPropertyInPath(properties: Record<string, Property>, 
         }
         if (path.includes(".")) {
             const pathSegments = path.split(".");
+            // A path whose root is not a property at all is simply not found.
+            // Reading `.type` off the miss threw a TypeError instead, which
+            // turned one unresolvable column key into a crash for whatever was
+            // walking the properties — see `propertiesToColumns`, where that is
+            // the whole table. `getPropertyInPath` above already guards this.
             const childProperty = properties[pathSegments[0]];
-            if (childProperty.type === "map" && childProperty.properties) {
+            if (childProperty?.type === "map" && childProperty.properties) {
                 return getResolvedPropertyInPath(childProperty.properties, pathSegments.slice(1).join("."))
             }
         }

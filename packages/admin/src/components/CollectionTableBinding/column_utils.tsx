@@ -39,15 +39,24 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
     const disabledFilter = Boolean(fixedFilter);
     return Object.entries<Property>(properties)
         .flatMap(([key, property]) => getColumnKeysForProperty(property, key))
-        .map(({
+        .flatMap(({
             key,
             disabled
         }) => {
-            const property = getResolvedPropertyInPath(properties, key) as Property;
-            if (!property)
-                throw Error("Internal error: no property found in path " + key);
+            const property = getResolvedPropertyInPath(properties, key) as Property | undefined;
+            // One unresolvable key used to throw, and this runs inside the
+            // memo that builds the table's columns — so a single bad column
+            // took down the header, the rows and the empty state together,
+            // leaving a blank pane with nothing to attribute it to. A column
+            // that cannot be resolved is one column the table cannot offer;
+            // say so and carry the rest. Same choice, and now the same
+            // behaviour, as `getSortablePropertyOptions` below.
+            if (!property) {
+                console.warn(`No property found in path "${key}" — skipping that column.`);
+                return [];
+            }
             const filterable = filterableProperty(property, false, engine);
-            return {
+            return [{
                 key: key as string,
                 align: getTableCellAlignment(property),
                 icon: getIconForProperty(property, "small"),
@@ -63,7 +72,7 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
                 AdditionalHeaderWidget: AdditionalHeaderWidget
                     ? ({ onHover }: { onHover: boolean }) => <AdditionalHeaderWidget property={property} propertyKey={key} onHover={onHover}/>
                     : undefined
-            } satisfies VirtualTableColumn;
+            } satisfies VirtualTableColumn];
         });
 }
 

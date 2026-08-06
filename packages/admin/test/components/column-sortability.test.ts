@@ -128,3 +128,55 @@ describe("the toolbar sort options match the table's sortable columns", () => {
             .toEqual(["Title", "slug"]);
     });
 });
+
+/**
+ * This walk runs inside the memo that builds the table's columns, so anything
+ * it throws takes the header, the rows and the empty state with it — a blank
+ * pane with nothing to attribute it to. One column the table cannot describe is
+ * one column fewer, not a dead table.
+ */
+describe("an unresolvable column key does not take the table down", () => {
+    it("skips a spread-map child whose root property is missing", () => {
+        const properties = {
+            title: { name: "Title", type: "string" },
+            // `spreadChildren` emits `data.mode` as a column key; the lookup
+            // that resolves it back used to read `.type` off the miss.
+            data: {
+                name: "Data",
+                type: "map",
+                admin: { spreadChildren: true },
+                properties: {
+                    mode: { name: "Mode", type: "string" }
+                }
+            }
+        } as unknown as Properties;
+
+        expect(() => columnsFor(properties)).not.toThrow();
+        expect(columnsFor(properties).map(c => c.key)).toEqual(["title", "data.mode"]);
+    });
+
+    it("keeps every resolvable column when one cannot be resolved", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+            const properties = {
+                title: { name: "Title", type: "string" },
+                // A map that promises children it does not have: the emitted
+                // key has no property behind it.
+                broken: {
+                    name: "Broken",
+                    type: "map",
+                    admin: { spreadChildren: true },
+                    properties: { ghost: undefined }
+                },
+                status: { name: "Status", type: "string" }
+            } as unknown as Properties;
+
+            const keys = columnsFor(properties).map(c => c.key);
+            expect(keys).toContain("title");
+            expect(keys).toContain("status");
+            expect(keys).not.toContain("broken.ghost");
+        } finally {
+            warn.mockRestore();
+        }
+    });
+});

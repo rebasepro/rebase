@@ -175,6 +175,10 @@ function getDefaultColumnKeys<M extends Record<string, any> = any>(collection: A
 }
 
 export function getColumnKeysForProperty(property: Property, key: string, disabled?: boolean): PropertyColumnConfig[] {
+    // A key with no property behind it describes no column. Callers walk whole
+    // property maps here to build a table's columns, so reading `.type` off a
+    // hole threw away every other column with it.
+    if (!property) return [];
     if (property.type === "map" && property.admin?.spreadChildren && property.properties) {
         return Object.entries(property.properties)
             .flatMap(([childKey, childProperty]) => getColumnKeysForProperty(
