@@ -19,7 +19,14 @@ import { useSplitView } from "./SplitViewContext";
  * the record's own bar was the other thing on it that read as "close me" — and
  * it is the one control here that does not act on the record at all.
  */
-export function SplitListCloseButton() {
+export function SplitListCloseButton({ onBeforeHide }: {
+    /**
+     * Run before the layout changes, while this form is still mounted: the edit
+     * view uses it to hand its edit in progress to the full-screen form that is
+     * about to show the same record.
+     */
+    onBeforeHide?: () => void;
+} = {}) {
 
     const { t } = useTranslation();
     const splitView = useSplitView();
@@ -30,7 +37,10 @@ export function SplitListCloseButton() {
         <Tooltip title={t("hide_list")}>
             <IconButton
                 size="small"
-                onClick={splitView.openFullScreen}
+                onClick={() => {
+                    onBeforeHide?.();
+                    splitView.openFullScreen();
+                }}
                 aria-label={t("hide_list")}>
                 <PanelLeftCloseIcon size={iconSize.smallest}/>
             </IconButton>

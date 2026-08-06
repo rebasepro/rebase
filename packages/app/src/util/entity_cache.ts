@@ -4,7 +4,21 @@ import { isObject, isPlainObject } from "@rebasepro/utils";
 // Define a unique prefix for entity keys in sessionStorage to avoid key collisions
 const LOCAL_STORAGE_PREFIX = "entity_cache::";
 
-// In-memory cache to store entities for quick access
+/**
+ * The in-session handoff channel: an edit in flight, parked here by the layout
+ * that is being replaced and picked up by the one taking over — the split's
+ * "hide list", full screen's "show list", the side panel's "open full screen".
+ * A record loaded from it opens *dirty*, because that is what it is for.
+ *
+ * Deliberately **not** hydrated from `sessionStorage`, and it is the one thing
+ * here that isn't. The persisted half of this file is the local-changes backup:
+ * a draft that outlives a reload, offered back through the banner or applied on
+ * open, according to the collection's `localChangesBackup`. Loading those
+ * drafts into this map on startup made every one of them look like a handoff —
+ * the first visit to the record after a reload silently opened dirty carrying a
+ * draft the user had walked away from, and the banner that exists to ask about
+ * it never appeared.
+ */
 const entityCache: Map<string, object> = new Map();
 
 // Check `sessionStorage` availability once during initialization
@@ -93,35 +107,12 @@ function customReviver(_key: string, value: unknown): unknown {
     return value;
 }
 
-// Initialize the in-memory cache by loading entities from `sessionStorage`
-if (isSessionStorageAvailable) {
-    try {
-        // Iterate over all keys in sessionStorage to find those with the specified prefix
-        for (let i = 0; i < sessionStorage.length; i++) {
-            const fullKey = sessionStorage.key(i);
-            if (fullKey && fullKey.startsWith(LOCAL_STORAGE_PREFIX)) {
-                const path = fullKey.substring(LOCAL_STORAGE_PREFIX.length);
-                const entityString = sessionStorage.getItem(fullKey);
-                if (entityString) {
-                    try {
-                        const entity: object = JSON.parse(entityString, customReviver);
-                        entityCache.set(path, entity);
-                    } catch (parseError) {
-                        console.error(
-                            `Failed to parse entity for path "${path}" from sessionStorage:`,
-                            parseError
-                        );
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        console.error("Error accessing sessionStorage during initialization:", error);
-    }
-}
-
 /**
- * Saves data to the in-memory cache and persists it individually in `sessionStorage`.
+ * Saves data to the local-changes backup in `sessionStorage`.
+ *
+ * The backup only — a draft that survives a reload is not an edit in flight.
+ * {@link saveEntityToMemoryCache} is the other channel; see {@link entityCache}
+ * for what separates them.
  * @param path - The unique path/key for the data.
  * @param data - The data to cache and persist.
  */
@@ -142,10 +133,19 @@ export function saveEntityToCache(path: string, data: object): void {
     }
 }
 
+/**
+ * Consumes a handoff. The channel is one-shot: whoever picks an edit up owns it
+ * from then on, and an edit left behind here is one that reopens a record dirty
+ * long after the user stopped looking at it.
+ */
 export function removeEntityFromMemoryCache(path: string): void {
     entityCache.delete(path);
 }
 
+/**
+ * Parks an edit in flight for the layout about to take over. See
+ * {@link entityCache}: this is the handoff, not the backup.
+ */
 export function saveEntityToMemoryCache(path: string, data: object): void {
     entityCache.set(path, data);
 }
@@ -156,8 +156,11 @@ export function getEntityFromMemoryCache(path: string): object | undefined {
 
 
 /**
- * Retrieves a entity from the in-memory cache or `sessionStorage`.
- * If the entity is not in the cache but exists in `sessionStorage`, it loads it into the cache.
+ * Retrieves a entity from the local-changes backup in `sessionStorage`.
+ *
+ * The backup only — the handoff channel is read through
+ * {@link getEntityFromMemoryCache}, and the two mean different things to the
+ * form that receives them.
  * @param path - The unique path/key for the entity.
  * @returns The cached entity or `undefined` if not found.
  */

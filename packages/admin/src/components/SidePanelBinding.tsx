@@ -9,7 +9,7 @@ import { EditViewBinding } from "./EditViewBinding";
 import { DetailViewBinding } from "./DetailViewBinding";
 import { useSideDialogContext } from "./SideDialogs";
 import { useNavigate } from "react-router";
-import { saveEntityToMemoryCache, useComponentOverride } from "@rebasepro/app";
+import { useComponentOverride } from "@rebasepro/app";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useSidePanel } from "../hooks/useSidePanel";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
@@ -290,25 +290,19 @@ entityId }
                         onSaved={onUpdate}
                         navigateBack={closeEditView}
                         barActionsStart={barActionsStart}
-                        barActions={({
-                            status,
-                            values,
-                            dirty
-                        }) => windowControls(
+                        barActions={({ carryEdit }) => windowControls(
                             allowFullScreen && <IconButton
                                 className="self-center"
                                 size={"small"}
                                 onClick={() => {
-                                    // Only an edit in progress is worth carrying across.
-                                    // A record loaded from this cache opens dirty, so
-                                    // stashing a clean one made the full-screen view
-                                    // announce unsaved changes to someone who had only
-                                    // looked at it. A new record always carries: there
-                                    // is nothing on the server to fall back to.
-                                    if (dirty || status === "new" || status === "copy") {
-                                        const key = (status === "new" || status === "copy") ? path + "#new" : path + "/" + entityId;
-                                        saveEntityToMemoryCache(key, values);
-                                    }
+                                    // The form's own handoff, rather than a second
+                                    // copy of the rules for it here: only an edit in
+                                    // progress is worth carrying (a clean record
+                                    // stashed anyway arrived announcing unsaved
+                                    // changes to someone who had only looked at it),
+                                    // and only the fields that were edited (carrying
+                                    // the whole record marked every field touched).
+                                    carryEdit?.();
                                     setBlocked(false);
                                     setBlockedNavigationMessage(undefined);
                                     if (entityId) {

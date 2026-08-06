@@ -35,8 +35,8 @@ import { EntityForm } from "./EntityForm";
 import {
     extractTouchedValues,
     removeEmptyContainers,
-    getChanges,
     getInitialEntityValues,
+    getUnappliedLocalChanges,
 } from "./form_utils";
 import { mergeDeep } from "@rebasepro/utils";
 
@@ -145,20 +145,16 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
 
     const localChangesData = useMemo(() => {
         if (!localChangesDataRaw) return undefined;
-        // Against what the form *opens showing*, not against the baseline. The
-        // banner exists to offer a draft the form is not already displaying;
-        // an edit carried over from the side panel is in both the backup and
-        // the form, so measuring it against the baseline alone offered to
-        // restore the values already on screen.
+        // What the form opens showing: the baseline plus any edit handed over by
+        // the layout this one replaced. See {@link getUnappliedLocalChanges} for
+        // why the banner is measured against that and not against the baseline.
         const openingValues = initialDirtyValues
             ? mergeDeep(computedInitialValues, initialDirtyValues)
             : computedInitialValues;
-        const changes = getChanges(localChangesDataRaw, openingValues);
-        const cleaned = removeEmptyContainers(changes);
-        if (cleaned && typeof cleaned === "object" && Object.keys(cleaned).length === 0) {
-            return undefined;
-        }
-        return cleaned;
+        return getUnappliedLocalChanges(
+            localChangesDataRaw as Partial<M>,
+            openingValues as Partial<M>
+        );
     }, [localChangesDataRaw, computedInitialValues, initialDirtyValues]);
 
     const hasLocalChanges = !localChangesCleared && !!localChangesData && Object.keys(localChangesData as object).length > 0;

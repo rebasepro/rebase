@@ -163,8 +163,20 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
         dirty.current = modified;
     }, []);
 
-    // The form remounts per entity, so its dirty state must not leak into the next one.
+    // The form remounts per entity, so its dirty state must not leak into the
+    // next one — and it has to be cleared here rather than left to the next
+    // form's own first report, because that form spends the load in a skeleton
+    // and a navigation during it would prompt about the record before it.
+    //
+    // On a *change* of record only, never on this view's own mount: a record
+    // arriving from full screen carries its edit back in and opens dirty, and
+    // the form says so from its first effect — which runs before this one, being
+    // a child's. Clearing unconditionally overwrote that report with `false`,
+    // and the way out of the split stopped asking about a live edit.
+    const previousEntityId = useRef(selectedEntityId);
     useEffect(() => {
+        if (previousEntityId.current === selectedEntityId) return;
+        previousEntityId.current = selectedEntityId;
         dirty.current = false;
     }, [selectedEntityId]);
 

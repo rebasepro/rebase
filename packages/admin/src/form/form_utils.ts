@@ -114,6 +114,84 @@ export function getChanges<T extends object>(source: Partial<T>, comparison: Par
     return changes;
 }
 
+/**
+ * What the local-changes backup still has to offer, given what the form is
+ * already showing — the answer the "unsaved local changes" banner is asking for.
+ * `undefined` means there is nothing left to apply, and no banner.
+ *
+ * Measured against what the form *opens showing*, not against the stored
+ * record. The banner exists to offer a draft the form is not already displaying,
+ * and an edit carried across a change of layout is in both the backup and the
+ * form: measuring against the stored values alone offered to restore the values
+ * already on screen, over an edit the user had never left.
+ */
+export function getUnappliedLocalChanges<M extends Record<string, unknown>>(
+    backupValues: Partial<M>,
+    openingValues: Partial<M>
+): Partial<M> | undefined {
+    const changes = getChanges(backupValues, openingValues);
+    const cleaned = removeEmptyContainers(changes);
+    if (!cleaned || typeof cleaned !== "object" || Object.keys(cleaned).length === 0) {
+        return undefined;
+    }
+    return cleaned as Partial<M>;
+}
+
+/**
+ * What travels when the same record changes layout — the split's "hide list",
+ * full screen's "show list", the side panel's "open full screen". One mounted
+ * form is replaced by another showing the same record, so the edit in progress
+ * has to be handed over; left to the local-changes backup alone, the new form
+ * met it as a draft from a closed tab and raised the "unsaved local changes"
+ * banner over changes the user had made a second earlier and never left.
+ *
+ * Returns `undefined` when there is nothing to carry, which is its own answer: a
+ * record nobody edited must open in the next layout exactly as clean as it was.
+ *
+ * Only what was edited here travels, keyed by `touched` — the same subset the
+ * backup stores. Carrying the whole record instead marks every field touched in
+ * the receiving form, which lights up every empty required field as an error and
+ * writes the entire record back out as a "local change".
+ */
+export function getEditHandoffValues<M extends Record<string, unknown>>({
+    status,
+    dirty,
+    values,
+    touched,
+    storedValues
+}: {
+    status: EntityStatus;
+    /** Whether `values` differ from what is stored. */
+    dirty: boolean;
+    values: Partial<M>;
+    touched: Record<string, boolean>;
+    /** The stored record, for the fallback below. Absent for a new one. */
+    storedValues?: Partial<M>;
+}): Partial<M> | undefined {
+
+    if (!values) return undefined;
+
+    // A record with nothing stored behind it carries whole: there is no
+    // baseline to fall back to, so anything not carried is simply lost.
+    if (status === "new" || status === "copy") {
+        return Object.keys(values).length > 0 ? values : undefined;
+    }
+
+    if (!dirty) return undefined;
+
+    const touchedValues = removeEmptyContainers(extractTouchedValues(values, touched ?? {})) as Partial<M> | undefined;
+    if (touchedValues && Object.keys(touchedValues).length > 0) {
+        return touchedValues;
+    }
+
+    // Dirty with nothing touched — a value set programmatically, by a plugin or
+    // a custom field that writes through `setFieldValue` without the blur that
+    // marks it. Diffing against the stored record still finds it, and dropping
+    // it here would hand over a form that opens clean over an edit.
+    const changes = getChanges(values, storedValues ?? {});
+    return Object.keys(changes).length > 0 ? changes : undefined;
+}
+
 export function getInitialEntityValues<M extends Record<string, unknown>>(
     authController: AuthController,
     collection: AdminCollection,

@@ -38,8 +38,9 @@ import {
     useSlot,
     getIcon
 } from "@rebasepro/app";
-import { getEntityFromMemoryCache } from "@rebasepro/app";
+import { getEntityFromMemoryCache, removeEntityFromMemoryCache, saveEntityToMemoryCache } from "@rebasepro/app";
 import { EntityFormBinding } from "../form";
+import { getEditHandoffValues } from "../form/form_utils";
 import type { EntityFormBindingProps } from "../form";
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
 import { EditFormActions } from "./EditFormActions";
@@ -65,14 +66,19 @@ export type BarActionsParams = {
     status: EntityStatus,
     path: string,
     entityId?: string | number;
-    /**
-     * Whether `values` differ from what is stored. The side panel's "open full
-     * screen" hands the in-flight edit to the full-screen route through the
-     * memory cache, and a record loaded from that cache opens *dirty*: without
-     * this it stashed the values unconditionally, so expanding a record you had
-     * only looked at arrived saying "Unsaved changes" with Save enabled.
-     */
+    /** Whether `values` differ from what is stored. */
     dirty: boolean;
+    /**
+     * Hand the edit in progress to the layout this action is about to open, so
+     * the record arrives showing — and still holding — what the user typed here.
+     * Call it from any action that changes layout without leaving the record;
+     * it decides on its own whether there is anything worth carrying, so a
+     * record nobody edited still arrives clean.
+     *
+     * Only supplied where there is a form to carry: the detail view passes no
+     * such thing.
+     */
+    carryEdit?: () => void;
 };
 
 export type OnTabChangeParams<M extends Record<string, unknown>> = {
@@ -152,9 +158,38 @@ export function EditViewBinding<M extends Record<string, unknown>>({
         useCache: false
     });
 
-    const initialDirtyValues = entityId
-        ? getEntityFromMemoryCache(props.path + "/" + entityId)
-        : (props.defaultValues ?? getEntityFromMemoryCache(props.path + "#new"));
+    // The edit handed over by another layout of this same record — see
+    // {@link carryEdit} below for the sending half.
+    //
+    // Read once per record and consumed: this is a handoff, and an edit left in
+    // the channel after it has been picked up is one that reopens the record
+    // dirty on a later, unrelated visit, carrying values the user walked away
+    // from. Held in a ref rather than re-read each render, because the read has
+    // to survive the clear — {@link EntityFormBinding} measures the
+    // local-changes banner against what the form opens showing, and a prop that
+    // reverted to `undefined` once the cache was cleared would raise the banner
+    // over the very edit that was just carried in.
+    // A copy is keyed with the new records, not under the record it was copied
+    // from: it is going to be stored as its own row, and both the handoff and
+    // the local-changes backup have always keyed it that way from the writing
+    // side. Reading it under `path/id` meant a copy in progress was written to
+    // one key and looked for under another.
+    const carriesAsNew = props.copy || entityId === undefined;
+    const handoffKey = carriesAsNew ? props.path + "#new" : props.path + "/" + entityId;
+    const handoff = useRef<{ key: string, values: object | undefined } | null>(null);
+    if (handoff.current?.key !== handoffKey) {
+        handoff.current = {
+            key: handoffKey,
+            values: getEntityFromMemoryCache(handoffKey)
+        };
+    }
+    useEffect(() => {
+        removeEntityFromMemoryCache(handoffKey);
+    }, [handoffKey]);
+
+    const initialDirtyValues = carriesAsNew
+        ? (props.defaultValues ?? handoff.current.values)
+        : handoff.current.values;
 
     const { canEdit: canEditHook } = usePermissions();
 
@@ -446,6 +481,35 @@ parentEntityIds,
         || formex?.isSubmitting
         || (status === "existing" && !formex?.dirty)
     );
+
+    /**
+     * Hand this record's edit in progress to the layout about to replace this
+     * one — the split's "hide list", full screen's "show list", the side panel's
+     * "open full screen". None of them is a navigation *away* from the record:
+     * the same record is about to be shown by a different form, and what the
+     * user has typed belongs to the record, not to the pane it was typed in.
+     *
+     * Every control that changes layout has to call this, and none of them is
+     * blocked by the unsaved-changes prompt — the prompt asks about leaving, and
+     * these do not leave. What used to happen instead is that the edit reached
+     * the next layout only as its local-changes backup, which is the channel for
+     * a draft left behind by a closed tab: the record reopened *clean*, with a
+     * banner offering to apply changes the user had never walked away from.
+     */
+    const carryEdit = useCallback(() => {
+        const carried = formex
+            ? getEditHandoffValues<M>({
+                status,
+                dirty: formex.dirty,
+                values: formex.values,
+                touched: formex.touched,
+                storedValues: usedEntity?.values
+            })
+            : undefined;
+        if (!carried) return;
+        const key = (status === "new" || status === "copy") ? path + "#new" : path + "/" + entityId;
+        saveEntityToMemoryCache(key, carried);
+    }, [formex, status, path, entityId, usedEntity]);
 
     const [inspectorTab, setInspectorTab] = useState<InspectorTab | null>(null);
     // A save adds a revision, and the inspector can be open while it happens:
@@ -741,6 +805,7 @@ parentEntityIds,
             <IconButton
                 size="small"
                 onClick={() => {
+                    carryEdit();
                     const editSuffix = collection.defaultEntityAction === "view" ? "/edit" : "";
                     const entityUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}${editSuffix}`);
                     navigate(`${entityUrl}#full`);
@@ -809,9 +874,13 @@ parentEntityIds,
                 {barActionsStart}
                 {/* Split view: closing the list is opening this record
                     full screen, and the control for it belongs at this
-                    bar's leading edge. Full screen carries its mirror. */}
-                {layout === "split" && <SplitListCloseButton/>}
-                {layout === "full_screen" && onShowList && <SplitListShowButton onClick={onShowList}/>}
+                    bar's leading edge. Full screen carries its mirror.
+                    Both change layout, so both hand the edit over. */}
+                {layout === "split" && <SplitListCloseButton onBeforeHide={carryEdit}/>}
+                {layout === "full_screen" && onShowList && <SplitListShowButton onClick={() => {
+                    carryEdit();
+                    onShowList();
+                }}/>}
             </>}
             trailing={<>
                 {pluginActionsTop}
@@ -821,7 +890,8 @@ parentEntityIds,
                     entityId,
                     values: formContext?.values ?? usedEntity?.values ?? {},
                     status,
-                    dirty: Boolean(formContext?.formex?.dirty)
+                    dirty: Boolean(formContext?.formex?.dirty),
+                    carryEdit
                 })}
             </>}
         />
