@@ -1,3 +1,5 @@
+import { isArrayValue, readStoredJson, writeStoredJson } from "@rebasepro/utils";
+
 export function addRecentId(collectionId: string, id: string | number) {
     const recentIds = getRecentIds(collectionId);
     const newRecentIds = [id, ...recentIds.filter(i => i !== id)];
@@ -9,11 +11,12 @@ export function addRecentId(collectionId: string, id: string | number) {
 }
 
 export function saveSearchedIdsLocally(collectionId: string, ids: (string | number)[]) {
-    localStorage.setItem("recent_id_searches::" + collectionId, JSON.stringify(ids));
+    writeStoredJson("recent_id_searches::" + collectionId, ids);
 }
 
 export function getRecentIds(collectionId: string): (string | number)[] {
-    const stored = localStorage.getItem("recent_id_searches::" + collectionId);
-    if (!stored) return [];
-    return JSON.parse(stored);
+    return readStoredJson<(string | number)[]>(
+        "recent_id_searches::" + collectionId,
+        { fallback: [], accept: isArrayValue }
+    );
 }

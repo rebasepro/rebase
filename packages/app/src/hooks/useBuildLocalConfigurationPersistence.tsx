@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { PartialCollectionConfig, UserConfigurationPersistence } from "@rebasepro/admin-types";
 import { stripCollectionPath } from "@rebasepro/common";
-import { mergeDeep } from "@rebasepro/utils";
+import { isArrayValue, isRecordValue, mergeDeep, readStoredJson, writeStoredJson } from "@rebasepro/utils";
 
 export function useBuildLocalConfigurationPersistence(): UserConfigurationPersistence {
 
     const configCache = useRef<Record<string, PartialCollectionConfig>>({});
 
-    const getCollectionFromStorage = useCallback((storageKey: string) => {
-        const item = localStorage.getItem(storageKey);
-        return item ? JSON.parse(item) : {};
+    // Read during render by every collection view, so an unreadable value here
+    // used to throw the view away rather than fall back to an unconfigured one.
+    const getCollectionFromStorage = useCallback(<M extends Record<string, any>>(storageKey: string): PartialCollectionConfig<M> => {
+        return readStoredJson<PartialCollectionConfig<M>>(storageKey, { fallback: {}, accept: isRecordValue });
     }, []);
 
     const getCollectionConfig = useCallback(<M extends Record<string, any>>(path: string): PartialCollectionConfig<M> => {
@@ -22,9 +23,15 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
 
     const onCollectionModified = useCallback(<M extends Record<string, any>>(path: string, data: PartialCollectionConfig<M>) => {
         const storageKey = `collection_config::${stripCollectionPath(path)}`;
-        localStorage.setItem(storageKey, JSON.stringify(data));
+        writeStoredJson(storageKey, data);
         const cachedConfig = configCache.current[storageKey];
-        const newConfig = mergeDeep(cachedConfig ?? getCollectionFromStorage(path), data);
+        // `getCollectionFromStorage` takes the storage key, not the path — every
+        // other caller passes one. Reading `path` looked up a key this hook
+        // never writes, so the fallback could only ever contribute `{}`. It is
+        // masked today because the one caller merges the stored config in
+        // before calling, but `onCollectionModified` accepts a partial by type
+        // and by its public interface, and a real partial would lose the rest.
+        const newConfig = mergeDeep(cachedConfig ?? getCollectionFromStorage(storageKey), data);
         configCache.current[storageKey] = mergeDeep(configCache.current[storageKey], newConfig);
     }, [getCollectionFromStorage]);
 
@@ -33,23 +40,24 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
     const [collapsedGroups, _setCollapsedGroups] = useState<string[]>([]);
 
     useEffect(() => {
-        _setRecentlyVisitedPaths(localStorage.getItem("recently_visited_paths") ? JSON.parse(localStorage.getItem("recently_visited_paths")!) : []);
-        _setFavouritePaths(localStorage.getItem("favourite_paths") ? JSON.parse(localStorage.getItem("favourite_paths")!) : []);
-        _setCollapsedGroups(localStorage.getItem("collapsed_groups") ? JSON.parse(localStorage.getItem("collapsed_groups")!) : []);
+        const readPaths = (key: string) => readStoredJson<string[]>(key, { fallback: [], accept: isArrayValue });
+        _setRecentlyVisitedPaths(readPaths("recently_visited_paths"));
+        _setFavouritePaths(readPaths("favourite_paths"));
+        _setCollapsedGroups(readPaths("collapsed_groups"));
     }, []);
 
     const setRecentlyVisitedPaths = useCallback((paths: string[]) => {
-        localStorage.setItem("recently_visited_paths", JSON.stringify(paths));
+        writeStoredJson("recently_visited_paths", paths);
         _setRecentlyVisitedPaths(paths);
     }, []);
 
     const setFavouritePaths = useCallback((paths: string[]) => {
-        localStorage.setItem("favourite_paths", JSON.stringify(paths));
+        writeStoredJson("favourite_paths", paths);
         _setFavouritePaths(paths);
     }, []);
 
     const setCollapsedGroups = useCallback((paths: string[]) => {
-        localStorage.setItem("collapsed_groups", JSON.stringify(paths));
+        writeStoredJson("collapsed_groups", paths);
         _setCollapsedGroups(paths);
     }, []);
 

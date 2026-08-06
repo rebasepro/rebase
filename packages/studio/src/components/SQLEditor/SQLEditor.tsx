@@ -43,6 +43,7 @@ import {
 } from "@rebasepro/ui";
 
 import { useRebaseContext, useSnackbarController, ConfirmationDialog, ErrorView, useTranslation } from "@rebasepro/app";
+import { isArrayValue, isRecordValue, readStoredJson, readStoredString, writeStoredJson, writeStoredString } from "@rebasepro/utils";
 import { MonacoEditor } from "./MonacoEditor";
 import { SQLEditorSidebar, Snippet } from "./SQLEditorSidebar";
 import { parseFirst } from "pgsql-ast-parser";
@@ -203,6 +204,28 @@ const getStoragePrefix = (baseUrl?: string) => {
     return baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_");
 };
 
+/** The part of a tab that is persisted; the rest is per-session. */
+type StoredTab = {
+    id: string;
+    name: string;
+    sql: string;
+    database?: string;
+    role?: string;
+};
+
+/**
+ * Whether a stored entry is a tab this release can restore. Storage holds
+ * whatever the last version to run wrote, so the fields are checked rather
+ * than assumed.
+ */
+function isStoredTab(value: unknown): value is StoredTab {
+    if (typeof value !== "object" || value === null) return false;
+    const tab = value as Record<string, unknown>;
+    return typeof tab.id === "string"
+        && typeof tab.name === "string"
+        && typeof tab.sql === "string";
+}
+
 export const SQLEditor = () => {
     const { databaseAdmin, client } = useRebaseContext();
     const sidePanelController = useStudioSidePanelController();
@@ -222,11 +245,11 @@ export const SQLEditor = () => {
     // Connection state
     const [selectedDatabase, setSelectedDatabase] = useState<string | undefined>(() => {
         const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
-        return localStorage.getItem(`rebase_sql_selected_db_${projectPrefixSync}`) || undefined;
+        return readStoredString(`rebase_sql_selected_db_${projectPrefixSync}`) || undefined;
     });
     const [selectedRole, setSelectedRole] = useState<string | undefined>(() => {
         const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
-        return localStorage.getItem(`rebase_sql_selected_role_${projectPrefixSync}`) || undefined;
+        return readStoredString(`rebase_sql_selected_role_${projectPrefixSync}`) || undefined;
     });
 
     const [availableDatabases, setAvailableDatabases] = useState<string[]>([]);
@@ -247,25 +270,32 @@ export const SQLEditor = () => {
         execTime: number | null,
         lastExecutedSql: string | null
     }>>(() => {
-        const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
-        const saved = localStorage.getItem(`rebase_sql_tabs_${projectPrefixSync}`);
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            return parsed.map((t: Record<string, unknown>) => ({
-                ...t,
-                results: null,
-                loading: false,
-                error: null,
-                execTime: null,
-                lastExecutedSql: null
-            }));
-        }
+        const projectPrefixSync = getStoragePrefix(client?.baseUrl);
+        // This runs during the first render, so anything it throws takes the
+        // whole editor down — and the value that threw is still in storage on
+        // reload. `readStoredJson` turns unreadable and wrong-shaped state into
+        // the default set of tabs instead, and `isStoredTab` drops the
+        // individual entries an older release wrote differently: a tab with no
+        // `id` never matches the active tab and cannot be closed.
+        const saved = readStoredJson<unknown[]>(
+            `rebase_sql_tabs_${projectPrefixSync}`,
+            { fallback: [], accept: isArrayValue }
+        );
+        const restored = saved.filter(isStoredTab).map(t => ({
+            ...t,
+            results: null,
+            loading: false,
+            error: null,
+            execTime: null,
+            lastExecutedSql: null
+        }));
+        if (restored.length > 0) return restored;
         return [{
             id: "1",
             name: "Query 1",
             sql: "SELECT * FROM ",
-            database: localStorage.getItem(`rebase_sql_selected_db_${projectPrefixSync}`) || undefined,
-            role: localStorage.getItem(`rebase_sql_selected_role_${projectPrefixSync}`) || undefined,
+            database: readStoredString(`rebase_sql_selected_db_${projectPrefixSync}`) || undefined,
+            role: readStoredString(`rebase_sql_selected_role_${projectPrefixSync}`) || undefined,
             results: null,
             loading: false,
             error: null,
@@ -275,7 +305,7 @@ export const SQLEditor = () => {
     });
     const [activeTabId, setActiveTabId] = useState<string>(() => {
         const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
-        return localStorage.getItem(`rebase_sql_active_tab_${projectPrefixSync}`) || "1";
+        return readStoredString(`rebase_sql_active_tab_${projectPrefixSync}`) || "1";
     });
 
     const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
@@ -318,15 +348,18 @@ export const SQLEditor = () => {
                     setAvailableDatabases(dbs);
                     setAvailableRoles(roles);
 
-                    const loadedDb = localStorage.getItem(`rebase_sql_selected_db_${projectPrefix}`) || undefined;
-                    const loadedRole = localStorage.getItem(`rebase_sql_selected_role_${projectPrefix}`) || undefined;
+                    const loadedDb = readStoredString(`rebase_sql_selected_db_${projectPrefix}`) || undefined;
+                    const loadedRole = readStoredString(`rebase_sql_selected_role_${projectPrefix}`) || undefined;
 
-                    const initialActiveTabId = localStorage.getItem(`rebase_sql_active_tab_${projectPrefix}`) || "1";
-                    let initialTabs: Array<{ id?: string; database?: string; role?: string }> = [];
-                    try {
-                        const savedTabs = localStorage.getItem(`rebase_sql_tabs_${projectPrefix}`);
-                        if (savedTabs) initialTabs = JSON.parse(savedTabs);
-                    } catch (e) { /* ignore */ }
+                    const initialActiveTabId = readStoredString(`rebase_sql_active_tab_${projectPrefix}`) || "1";
+                    // The old guard caught a parse failure but not a parse
+                    // *success* of the wrong shape, and the `.find` below sat
+                    // outside it — so an object where an array was expected
+                    // still threw.
+                    const initialTabs = readStoredJson<Array<{ id?: string; database?: string; role?: string }>>(
+                        `rebase_sql_tabs_${projectPrefix}`,
+                        { fallback: [], accept: isArrayValue }
+                    );
                     const currentActiveTab = initialTabs.find(t => t.id === initialActiveTabId);
 
                     let actualDb = currentActiveTab?.database || loadedDb;
@@ -337,7 +370,7 @@ export const SQLEditor = () => {
 
                     if (actualDb) {
                         setSelectedDatabase(actualDb);
-                        localStorage.setItem(`rebase_sql_selected_db_${projectPrefix}`, actualDb);
+                        writeStoredString(`rebase_sql_selected_db_${projectPrefix}`, actualDb);
                         setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.database || !dbs.includes(t.database)) ? { ...t,
 database: actualDb } : t));
                     }
@@ -356,7 +389,7 @@ database: actualDb } : t));
 
                     if (actualRole) {
                         setSelectedRole(actualRole);
-                        localStorage.setItem(`rebase_sql_selected_role_${projectPrefix}`, actualRole);
+                        writeStoredString(`rebase_sql_selected_role_${projectPrefix}`, actualRole);
                         setTabs(prev => prev.map(t => t.id === initialActiveTabId && (!t.role || !roles.includes(t.role)) ? { ...t,
 role: actualRole } : t));
                     }
@@ -381,7 +414,7 @@ role: actualRole } : t));
 
     const handleDatabaseChange = (db: string, tabId?: string) => {
         setSelectedDatabase(db);
-        localStorage.setItem(`rebase_sql_selected_db_${projectPrefix}`, db);
+        writeStoredString(`rebase_sql_selected_db_${projectPrefix}`, db);
         setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t,
 database: db } : t));
         // Reset so the schema will be re-fetched for the new database
@@ -390,7 +423,7 @@ database: db } : t));
 
     const handleRoleChange = (role: string, tabId?: string) => {
         setSelectedRole(role);
-        localStorage.setItem(`rebase_sql_selected_role_${projectPrefix}`, role);
+        writeStoredString(`rebase_sql_selected_role_${projectPrefix}`, role);
         setTabs(prev => prev.map(t => t.id === (tabId || activeTabId) ? { ...t,
 role } : t));
     };
@@ -401,7 +434,7 @@ role } : t));
         if (newTab) {
             if (newTab.database && newTab.database !== selectedDatabase) {
                 setSelectedDatabase(newTab.database);
-                localStorage.setItem(`rebase_sql_selected_db_${projectPrefix}`, newTab.database);
+                writeStoredString(`rebase_sql_selected_db_${projectPrefix}`, newTab.database);
                 schemaFetchedRef.current = false;
             } else if (!newTab.database && selectedDatabase) {
                 setTabs(prev => prev.map(t => t.id === newTabId ? { ...t,
@@ -410,7 +443,7 @@ database: selectedDatabase } : t));
 
             if (newTab.role && newTab.role !== selectedRole) {
                 setSelectedRole(newTab.role);
-                localStorage.setItem(`rebase_sql_selected_role_${projectPrefix}`, newTab.role);
+                writeStoredString(`rebase_sql_selected_role_${projectPrefix}`, newTab.role);
             } else if (!newTab.role && selectedRole) {
                 setTabs(prev => prev.map(t => t.id === newTabId ? { ...t,
 role: selectedRole } : t));
@@ -631,8 +664,10 @@ role: selectedRole });
 
     const [columnWidths, setColumnWidths] = useState<Record<string, Record<string, number>>>(() => {
         const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
-        const saved = localStorage.getItem(`rebase_sql_column_widths_${projectPrefixSync}`);
-        return saved ? JSON.parse(saved) : {};
+        return readStoredJson<Record<string, Record<string, number>>>(
+            `rebase_sql_column_widths_${projectPrefixSync}`,
+            { fallback: {}, accept: isRecordValue }
+        );
     });
     const [snippets, setSnippets] = useState<Snippet[]>([]);
     const [history, setHistory] = useState<string[]>([]);
@@ -641,22 +676,20 @@ role: selectedRole });
 
     // Load from local storage
     useEffect(() => {
-        const savedSnippets = localStorage.getItem(`rebase_sql_snippets_${projectPrefix}`);
-        if (savedSnippets) {
-            setSnippets(JSON.parse(savedSnippets));
-        } else {
-            setSnippets([]);
-        }
-
-        const savedHistory = localStorage.getItem(`rebase_sql_history_${projectPrefix}`);
-        if (savedHistory) {
-            setHistory(JSON.parse(savedHistory));
-        } else {
-            setHistory([]);
-        }
+        setSnippets(readStoredJson<Snippet[]>(
+            `rebase_sql_snippets_${projectPrefix}`,
+            { fallback: [], accept: isArrayValue }
+        ));
+        setHistory(readStoredJson<string[]>(
+            `rebase_sql_history_${projectPrefix}`,
+            { fallback: [], accept: isArrayValue }
+        ));
     }, [projectPrefix]);
 
-    // Save tabs and active tab to local storage
+    // Save tabs and active tab to local storage. Tab text is persisted on every
+    // edit, so this is the write that reaches the origin's quota first — and a
+    // `QuotaExceededError` thrown out of an effect is not something the view
+    // can do anything with.
     useEffect(() => {
         const sanitizedTabs = tabs.map(t => ({
             id: t.id,
@@ -665,21 +698,21 @@ role: selectedRole });
             database: t.database,
             role: t.role
         }));
-        localStorage.setItem(`rebase_sql_tabs_${projectPrefix}`, JSON.stringify(sanitizedTabs));
+        writeStoredJson(`rebase_sql_tabs_${projectPrefix}`, sanitizedTabs);
     }, [tabs, projectPrefix]);
 
     useEffect(() => {
-        localStorage.setItem(`rebase_sql_active_tab_${projectPrefix}`, activeTabId);
+        writeStoredString(`rebase_sql_active_tab_${projectPrefix}`, activeTabId);
     }, [activeTabId, projectPrefix]);
 
     const saveSnippets = (newSnippets: Snippet[]) => {
         setSnippets(newSnippets);
-        localStorage.setItem(`rebase_sql_snippets_${projectPrefix}`, JSON.stringify(newSnippets));
+        writeStoredJson(`rebase_sql_snippets_${projectPrefix}`, newSnippets);
     };
 
     const saveHistory = (newHistory: string[]) => {
         setHistory(newHistory);
-        localStorage.setItem(`rebase_sql_history_${projectPrefix}`, JSON.stringify(newHistory.slice(-50)));
+        writeStoredJson(`rebase_sql_history_${projectPrefix}`, newHistory.slice(-50));
     };
 
     const handleDeleteSnippet = (id: string) => {
@@ -740,7 +773,7 @@ role: selectedRole });
                     [key]: width
                 }
             };
-            localStorage.setItem(`rebase_sql_column_widths_${projectPrefix}`, JSON.stringify(newWidths));
+            writeStoredJson(`rebase_sql_column_widths_${projectPrefix}`, newWidths);
             return newWidths;
         });
     }, [activeTab.sql, projectPrefix]);
@@ -1213,35 +1246,24 @@ id: String(ra.entityId) })}
         );
     };
 
-    const [sidebarSize, setSidebarSize] = useState(() => {
-        try {
-            const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
-            const saved = localStorage.getItem(`rebase_sql_editor_sidebar_size_${projectPrefixSync}`);
-            return saved !== null ? parseFloat(saved) : 20;
-        } catch (e) {
-            return 20;
-        }
-    });
-    const [editorHeight, setEditorHeight] = useState(() => {
-        try {
-            const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";
-            const saved = localStorage.getItem(`rebase_sql_editor_height_${projectPrefixSync}`);
-            return saved !== null ? parseFloat(saved) : 50;
-        } catch (e) {
-            return 50;
-        }
-    });
+    // `parseFloat` answers NaN for anything it cannot read, and a NaN pane size
+    // lays the editor out to nothing — so the stored value has to be checked,
+    // not just parsed.
+    const readStoredSize = (key: string, fallback: number) => {
+        const saved = readStoredString(`${key}_${getStoragePrefix(client?.baseUrl)}`);
+        const parsed = saved === null ? NaN : parseFloat(saved);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const [sidebarSize, setSidebarSize] = useState(() => readStoredSize("rebase_sql_editor_sidebar_size", 20));
+    const [editorHeight, setEditorHeight] = useState(() => readStoredSize("rebase_sql_editor_height", 50));
 
     useEffect(() => {
-        try {
-            localStorage.setItem(`rebase_sql_editor_sidebar_size_${projectPrefix}`, sidebarSize.toString());
-        } catch (e) { /* ignore */ }
+        writeStoredString(`rebase_sql_editor_sidebar_size_${projectPrefix}`, sidebarSize.toString());
     }, [sidebarSize, projectPrefix]);
 
     useEffect(() => {
-        try {
-            localStorage.setItem(`rebase_sql_editor_height_${projectPrefix}`, editorHeight.toString());
-        } catch (e) { /* ignore */ }
+        writeStoredString(`rebase_sql_editor_height_${projectPrefix}`, editorHeight.toString());
     }, [editorHeight, projectPrefix]);
 
     const activeSnippet = snippets.find(s => s.sql === activeTab.sql);
