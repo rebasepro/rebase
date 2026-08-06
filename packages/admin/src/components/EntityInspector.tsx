@@ -65,16 +65,34 @@ export function EntityInspector({
     const { t } = useTranslation();
     const open = tab !== null;
 
+    // Escape closes the inspector, and only the inspector.
+    //
+    // The split view holds its own Escape listener for as long as a record is
+    // selected, and closing the record panel is a navigation — so an Escape
+    // meant for this panel was taking the whole record with it. On `window` in
+    // the bubble phase, as this listener used to be, `stopPropagation` cannot
+    // prevent that: it governs an event's travel *between* elements and says
+    // nothing about the other listeners on the element it is called from. Both
+    // ran, and the split's ran first, because it registered first — this one
+    // only exists while the inspector is open, which is always later.
+    //
+    // Capture on `document` is the idiom that holds regardless of mount order:
+    // it runs on the way down, before anything bubbles back to `window`, and
+    // there `stopPropagation` is enough. It is what the relation and user
+    // selectors already use to own the key while their popovers are open.
+    // Pinned in escape_key_ownership.test.tsx; see docs/bug-classes.md.
     useEffect(() => {
         if (!open) return;
         const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                e.stopPropagation();
-                onClose();
-            }
+            if (e.key !== "Escape") return;
+            // A Radix overlay opened from inside the inspector is above it and
+            // owns the key first — the same rule the split view applies.
+            if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+            e.stopPropagation();
+            onClose();
         };
-        window.addEventListener("keydown", onKeyDown);
-        return () => window.removeEventListener("keydown", onKeyDown);
+        document.addEventListener("keydown", onKeyDown, true);
+        return () => document.removeEventListener("keydown", onKeyDown, true);
     }, [open, onClose]);
 
     if (!open) return null;
