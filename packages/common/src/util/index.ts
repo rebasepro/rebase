@@ -18,3 +18,4 @@ export * from "./junction-policies";
 export * from "./conditions";
 export * from "./pg-column-to-property";
 export * from "./string-column-length";
+export * from "./internal-tables";

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
+import { revokeInternalTableSql } from "@rebasepro/common";
 
 /**
  * Auto-create the row history table if it doesn't exist.
@@ -37,6 +38,12 @@ export async function ensureHistoryTableExists(db: NodePgDatabase): Promise<void
             CREATE INDEX IF NOT EXISTS idx_history_time
             ON rebase.entity_history(table_name, entity_id, updated_at DESC)
         `);
+
+        // Every previous value of every audited row, in one table with no RLS
+        // and no tenant scoping — so a readable copy defeats the row policies on
+        // the tables it shadows. The driver's schema-wide grant reaches it
+        // (created here, after that grant ran), so take it back.
+        await db.execute(sql.raw(revokeInternalTableSql("rebase", "entity_history")));
 
         logger.info("✅ Entity history table ready");
     } catch (error) {

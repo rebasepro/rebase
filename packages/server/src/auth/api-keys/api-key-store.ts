@@ -11,6 +11,7 @@
 import { randomBytes, createHash } from "crypto";
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
+import { revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../../utils/logger";
 import type {
     ApiKey,
@@ -183,6 +184,14 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                     ALTER TABLE ${TABLE}
                     ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE
                 `);
+
+                // This table holds key hashes and an `admin` flag, and it has no
+                // RLS — it is not a collection. The Postgres driver grants the
+                // authenticated role DML on everything in `rebase`, including
+                // tables (like this one) created after that grant ran, so the
+                // privilege has to come back off. Without it a user-context
+                // query that reached this table could mint itself an admin key.
+                await exec(revokeInternalTableSql("rebase", "api_keys"));
 
                 logger.info("✅ API keys table ready");
             } catch (err) {

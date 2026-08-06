@@ -28,6 +28,7 @@
 
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { revokeInternalTableSql } from "@rebasepro/common";
 
 /** A tracked client, as any instance sees it. */
 export interface PresenceRow {
@@ -70,6 +71,11 @@ export class ChannelPresenceStore {
             CREATE INDEX IF NOT EXISTS idx_channel_presence_last_seen
             ON rebase.channel_presence (last_seen)
         `);
+
+        // The roster of every client on every channel, with no RLS — presence
+        // authorization is a channel rule, not a row policy. Revoke the
+        // schema-wide grant the driver handed out before this table existed.
+        await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_presence")));
 
         this.tablesReady = true;
     }

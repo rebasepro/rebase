@@ -1,6 +1,7 @@
 import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo } from "@rebasepro/types";
 import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, getInjectedSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength, relationalCollections } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule, generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
+import { AUTH_USERS_COLUMNS, authUsersColumnDefinition, authUsersColumnSql, isAuthCollection } from "./auth-users-columns";
 
 // --- Helper Functions ---
 
@@ -442,6 +443,23 @@ export const generatePostgresDdl = async (
                     }
                 } else {
                     const colName = resolveColumnName(propName, prop);
+
+                    // On an auth collection, the columns auth reads and writes
+                    // are defined once, in `auth-users-columns`, and every
+                    // creator of this table emits that definition. Before this,
+                    // the desired state here was built from the collection file
+                    // alone — which knows nothing of `is_anonymous` or
+                    // `tokens_valid_after` — so `db push` and the runtime
+                    // disagreed about `email`'s nullability and about which
+                    // columns exist at all.
+                    const authDefinition = isAuthCollection(collection)
+                        ? authUsersColumnDefinition(colName)
+                        : undefined;
+                    if (authDefinition && !isIdProperty(propName, prop, collection)) {
+                        columns.push(`  "${colName}" ${authDefinition}`);
+                        return;
+                    }
+
                     const colType = getSqlColumnType(propName, prop, collection, collections);
                     let colDef = `  "${colName}" ${colType}`;
 
@@ -477,6 +495,27 @@ export const generatePostgresDdl = async (
                     columns.push(colDef);
                 }
             });
+
+            // ── Auth columns the collection file never mentions ──────────────
+            // `db push` is declarative: Atlas diffs the database against exactly
+            // what is emitted here and drops anything else. The scaffold's users
+            // collection describes 12 columns while auth needs 14, so
+            // `is_anonymous` and `tokens_valid_after` — created at boot by
+            // `ensureAuthTablesExist` — read as unmanaged drift, and a push run
+            // after the server had started once planned to DROP them. The
+            // destructive gate catches it, which makes it a data-loss prompt on
+            // the auth table rather than silent damage; either way the desired
+            // state was wrong. Emit the full contract so the two agree.
+            if (isAuthCollection(collection)) {
+                const declared = new Set(
+                    Object.entries(collection.properties ?? {})
+                        .map(([name, prop]) => resolveColumnName(name, prop))
+                );
+                for (const spec of AUTH_USERS_COLUMNS) {
+                    if (declared.has(spec.column)) continue;
+                    columns.push(`  "${spec.column}" ${authUsersColumnSql(spec)}`);
+                }
+            }
 
             // Backwards compatibility: add default id primary key if missing
             const hasPk = columns.some(c => c.includes("PRIMARY KEY"));

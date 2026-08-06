@@ -34,6 +34,7 @@ import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { ChannelHistoryEntry, ChannelRetentionRule } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
+import { revokeInternalTableSql } from "@rebasepro/common";
 
 /** How many messages a replay returns when the caller does not say. */
 const DEFAULT_REPLAY_LIMIT = 200;
@@ -197,6 +198,13 @@ export class ChannelHistoryStore {
                 last_seq BIGINT NOT NULL
             )
         `);
+
+        // Retained broadcasts for every channel in one table, with no RLS: who
+        // may replay a channel is decided by the channel rules the server
+        // evaluates before it reads. The driver's schema-wide grant reaches
+        // these (created here, after it ran), so take the privilege back.
+        await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_messages")));
+        await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "channel_cursors")));
 
         this.tablesReady = true;
         logger.info(`✅ [ChannelHistory] Retained channels ready (${this.rules.length} rule(s)).`);

@@ -1,6 +1,12 @@
 import { sql as drizzleSql, SQL } from "drizzle-orm";
 import { ANONYMOUS_USER_ID, PolicyExpression, SecurityRule } from "@rebasepro/types";
-import { AnonymousGrantRisk, findAnonymousGrants, securityRuleToConditions } from "@rebasepro/common";
+import {
+    AnonymousGrantRisk,
+    findAnonymousGrants,
+    REBASE_USER_ROLE,
+    revokeInternalTableAccess,
+    securityRuleToConditions
+} from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 
 /**
@@ -36,8 +42,14 @@ import { logger } from "@rebasepro/server";
  * not an operator opt-in.
  */
 
-/** The restricted role every authenticated (user-context) request runs as. */
-export const REBASE_USER_ROLE = "rebase_user";
+/**
+ * The restricted role every authenticated (user-context) request runs as.
+ *
+ * Re-exported, not re-declared: the same name is needed by
+ * `@rebasepro/common`'s internal-table revokes, and two spellings of a role name
+ * fail as a silent no-op rather than an error.
+ */
+export { REBASE_USER_ROLE };
 
 /** Minimal SQL runner so callers can adapt drizzle or pg.Client. */
 export type RawSqlRunner = (sqlText: string) => Promise<Record<string, unknown>[]>;
@@ -180,6 +192,21 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
         // migrations), so a migrate can never strand the user role.
         await run(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${s} GRANT ${USER_TABLE_PRIVILEGES} ON TABLES TO ${REBASE_USER_ROLE}`);
         await run(`ALTER DEFAULT PRIVILEGES IN SCHEMA ${s} GRANT USAGE, SELECT ON SEQUENCES TO ${REBASE_USER_ROLE}`);
+
+        // The grants above are deliberately schema-wide — a project's own
+        // collections may live in `rebase`, and future tables must be reachable
+        // or a migration strands the role. Rebase's OWN tables are the exception:
+        // refresh tokens, MFA secrets, API keys and the rest carry no RLS and no
+        // row an end user should ever address. Taking the privilege back here
+        // covers every table that already exists; each creator revokes on the
+        // table it just made, for the boot that creates them for the first time.
+        await revokeInternalTableAccess(async (text) => { await run(text); }, schema, {
+            onError: (table, error) => logger.warn(
+                `🔐 [rls] Could not revoke "${REBASE_USER_ROLE}" access to "${schema}"."${table}" — ` +
+                "it stays reachable by authenticated requests: " +
+                (error instanceof Error ? error.message : String(error))
+            )
+        });
     }
 
     logger.info(`🔐 [rls] User role "${REBASE_USER_ROLE}" provisioned (schemas: ${uniqueSchemas.join(", ")})`);

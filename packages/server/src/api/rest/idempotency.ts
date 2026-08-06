@@ -1,4 +1,5 @@
 import { DataDriver, isSQLAdmin } from "@rebasepro/types";
+import { revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../../utils/logger";
 
 /**
@@ -109,6 +110,11 @@ export function createIdempotencyStore(driver: DataDriver): IdempotencyStore | u
                     )
                 `);
                 await exec(`CREATE INDEX IF NOT EXISTS idx_idempotency_created ON ${TABLE}(created_at)`);
+                // Rows here are keyed by uid and hold a previous response body,
+                // so a readable table is one user's writes replayed to another.
+                // No RLS (not a collection), and the driver's schema-wide grant
+                // reaches it — created lazily, long after that grant ran.
+                await exec(revokeInternalTableSql("rebase", "idempotency_keys"));
                 return true;
             } catch (error) {
                 logger.warn(

@@ -84,8 +84,9 @@ describe("BranchService", () => {
         it("should execute CREATE SCHEMA and CREATE TABLE statements", async () => {
             await service.ensureBranchMetadataTable();
 
-            // Two calls: one for the schema, one for the table
-            expect(db.execute).toHaveBeenCalledTimes(2);
+            // Three calls: the schema, the table, and the revoke that keeps the
+            // authenticated role out of it.
+            expect(db.execute).toHaveBeenCalledTimes(3);
 
             expect(statementAt(db, 0).sql).toBe("CREATE SCHEMA IF NOT EXISTS rebase");
 
@@ -101,25 +102,43 @@ describe("BranchService", () => {
             expect(table).toContain("created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
         });
 
+        it("takes the authenticated role's grant back off the table it just made", async () => {
+            // `rebase.branches` is not a collection, so it has no RLS — and the
+            // driver grants `rebase_user` DML on every table in `rebase`,
+            // including ones (like this) created after that grant ran. Without
+            // this statement the branch list is readable and writable by every
+            // signed-in user.
+            await service.ensureBranchMetadataTable();
+
+            const revoke = statementAt(db, 2).sql;
+            expect(revoke).toContain("REVOKE ALL ON \"rebase\".\"branches\" FROM rebase_user");
+            // Guarded both ways: the role may not exist (unprivileged
+            // connections never provision it) and a bare REVOKE would then error
+            // rather than no-op.
+            expect(revoke).toContain("FROM pg_roles WHERE rolname = 'rebase_user'");
+        });
+
         it("should be idempotent (safe to call multiple times)", async () => {
             await service.ensureBranchMetadataTable();
             await service.ensureBranchMetadataTable();
 
-            // Each call issues 2 executes → total 4
-            expect(db.execute).toHaveBeenCalledTimes(4);
+            // Each call issues 3 executes → total 6
+            expect(db.execute).toHaveBeenCalledTimes(6);
 
             // "Idempotent" is a property of the statements, not of the count:
             // the second run re-issues exactly the same DDL, and it is a no-op
-            // only because both statements are guarded. Drop either guard and
-            // this boot-time call starts throwing on every restart after the
-            // first.
-            const run1 = [statementAt(db, 0), statementAt(db, 1)];
-            const run2 = [statementAt(db, 2), statementAt(db, 3)];
+            // only because every statement is guarded. Drop a guard and this
+            // boot-time call starts throwing on every restart after the first.
+            const run1 = [statementAt(db, 0), statementAt(db, 1), statementAt(db, 2)];
+            const run2 = [statementAt(db, 3), statementAt(db, 4), statementAt(db, 5)];
             expect(run2).toEqual(run1);
-            for (const statement of run1) {
+            for (const statement of run1.slice(0, 2)) {
                 expect(statement.sql).toContain("IF NOT EXISTS");
                 expect(statement.params).toEqual([]);
             }
+            // The revoke's guard is a catalogue lookup rather than IF NOT EXISTS.
+            expect(run1[2].sql).toContain("IF EXISTS (SELECT 1 FROM pg_roles");
+            expect(run1[2].params).toEqual([]);
         });
     });
 

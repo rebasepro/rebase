@@ -9,6 +9,7 @@
 
 import { sql } from "drizzle-orm";
 import { BranchInfo } from "@rebasepro/types";
+import { revokeInternalTableSql } from "@rebasepro/common";
 import { DrizzleClient } from "../interfaces";
 import { DatabasePoolManager } from "../databasePoolManager";
 import { extractPgError, extractCauseMessage } from "../utils/pg-error-utils";
@@ -124,6 +125,10 @@ export class BranchService {
                 metadata     JSONB DEFAULT '{}'
             );
         `));
+
+        // Not a collection, so no RLS — and it names every branch database on
+        // this server. The driver's schema-wide grant reaches it, so revoke.
+        await this.db.execute(sql.raw(revokeInternalTableSql("rebase", "branches")));
     }
 
     /**

@@ -1,6 +1,7 @@
 import type { CronJobLogEntry } from "@rebasepro/types";
 import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
+import { revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -158,6 +159,14 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                         "otherwise have skipped that run"
                     );
                 }
+
+                // Neither table is a collection, so neither carries RLS, while
+                // the Postgres driver's schema-wide grant reaches both. Cron
+                // logs hold job output — arbitrary application data — and a
+                // writable `cron_claims` lets any signed-in user suppress a
+                // scheduled run by claiming its slot.
+                await exec(revokeInternalTableSql("rebase", "cron_logs"));
+                await exec(revokeInternalTableSql("rebase", "cron_claims"));
 
                 logger.info("✅ Cron logs table ready");
             } catch (err) {

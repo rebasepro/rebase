@@ -77,6 +77,16 @@ const SYSTEM_SCHEMAS = ["pg_catalog", "information_schema", "pg_toast"];
  * by design; a scan that reports forty findings inside them buries the one
  * finding in `public` that actually matters, and the reader concludes the tool
  * is wrong. They are still scannable — `--schema auth` opts back in.
+ *
+ * `rebase` is deliberately NOT on this list, though it is as much "ours" as
+ * `auth` is Supabase's. It held refresh-token hashes, TOTP secrets and API-key
+ * rows with RLS off and full DML granted to `rebase_user` — the exact shape
+ * `rls-disabled` exists to catch — and this exclusion is why no scan ever said
+ * so. Those grants are revoked at creation now (`revokeInternalTableSql`), so
+ * scanning the schema is quiet; if a new internal table ships without its
+ * revoke, `pnpm rls:check` fails instead of a reviewer having to notice. The
+ * checks all gate on a grant to a reachable role, so an unexposed table still
+ * produces nothing.
  */
 const PLATFORM_SCHEMAS = [
     // Supabase
@@ -84,7 +94,7 @@ const PLATFORM_SCHEMAS = [
     "graphql", "graphql_public", "supabase_functions", "supabase_migrations",
     "net", "cron", "pgsodium", "pgsodium_masks",
     // Rebase
-    "rebase", "drizzle"
+    "drizzle"
 ];
 
 const RELATION_KINDS: Record<string, PgRelationKind> = {
@@ -319,7 +329,14 @@ async function readSnapshot(
     };
 }
 
-function selectSchemas(
+/**
+ * Which of the database's schemas this scan covers.
+ *
+ * Exported for its own test: which schemas are in scope is a security decision,
+ * not an implementation detail — a schema quietly added to
+ * {@link PLATFORM_SCHEMAS} silently stops being checked.
+ */
+export function selectSchemas(
     all: string[],
     requested: string[] | undefined,
     diagnostics: IntrospectDiagnostics

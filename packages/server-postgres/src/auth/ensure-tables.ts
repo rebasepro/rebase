@@ -1,7 +1,9 @@
 import { sql } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { logger } from "@rebasepro/server";
+import { revokeInternalTableAccess } from "@rebasepro/common";
 import type { CollectionConfig } from "@rebasepro/types";
+import { AUTH_USERS_COLUMNS, authUsersColumnSql } from "../schema/auth-users-columns";
 import {
     AuthSchemaVersionError,
     assertAuthSchemaCompatible,
@@ -44,13 +46,23 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
                 ? `"${resolvedTable}"`
                 : `"${usersSchema}"."${resolvedTable}"`;
 
-            // Derive ID column type from collection properties
+            // Derive ID column type from collection properties.
+            //
+            // `"increment"`, not `"autoincrement"`. The latter was tested for
+            // here and exists nowhere in the type system — the union is
+            // `boolean | "manual" | "increment" | string` — so the INTEGER branch
+            // was unreachable and an integer-keyed auth collection fell through
+            // to TEXT. Introspection below hid it whenever the table already
+            // existed; on a database where it did not, this created
+            // `id TEXT DEFAULT gen_random_uuid()::text` for a collection that
+            // declares a number, and every `uid` foreign key was typed to match
+            // the wrong thing.
             const idProp = collection.properties?.id;
             if (idProp) {
                 const isId = ("isId" in idProp) ? (idProp as unknown as Record<string, unknown>).isId : undefined;
                 if (isId === "uuid") {
                     userIdType = "UUID";
-                } else if (isId === "autoincrement") {
+                } else if (isId === "increment") {
                     userIdType = "INTEGER";
                 }
                 // Otherwise keep TEXT as default
@@ -129,22 +141,24 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // and long signed URLs that OAuth providers hand back. A limit worth
         // having is a CHECK — alterable without a table rewrite, unlike a type
         // modifier — which is why `email` has one and nothing else does.
+        //
+        // The column list comes from AUTH_USERS_COLUMNS rather than being spelled
+        // out here, because this is not the only place that creates this table:
+        // `db push` and the boot-time collection ensure do too, and when the
+        // three lists were maintained separately they disagreed and boot order
+        // silently decided which shape the database got. The `email` CHECK is
+        // appended rather than listed there — it is a named constraint the
+        // migration below has to be able to add separately, `NOT VALID`, to a
+        // table that already holds rows.
+        const usersColumnDdl = AUTH_USERS_COLUMNS
+            .map((spec) => spec.column === "email"
+                ? `${spec.column} ${authUsersColumnSql(spec)} CONSTRAINT ${emailLengthConstraint} CHECK (length(email) <= 320)`
+                : `${spec.column} ${authUsersColumnSql(spec)}`)
+            .join(",\n                ");
         await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ${sql.raw(usersTableName)} (
                 id ${sql.raw(userIdType)} PRIMARY KEY ${sql.raw(idDefault)},
-                email TEXT NOT NULL CONSTRAINT ${sql.raw(emailLengthConstraint)} CHECK (length(email) <= 320),
-                display_name TEXT,
-                photo_url TEXT,
-                roles TEXT[] DEFAULT '{}' NOT NULL,
-                password_hash TEXT,
-                email_verified BOOLEAN DEFAULT FALSE NOT NULL,
-                email_verification_token TEXT,
-                email_verification_sent_at TIMESTAMP WITH TIME ZONE,
-                is_anonymous BOOLEAN DEFAULT FALSE NOT NULL,
-                metadata JSONB DEFAULT '{}' NOT NULL,
-                tokens_valid_after TIMESTAMP WITH TIME ZONE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+                ${sql.raw(usersColumnDdl)}
             )
         `);
 
@@ -164,26 +178,51 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // column once no old backend remains (phase 2, contract).
         //
         // Idempotent throughout: every step is guarded on catalogue state.
-        await db.execute(sql`
-            CREATE OR REPLACE FUNCTION ${sql.raw(`"${authSchema}"`)}.sync_uid_user_id() RETURNS trigger AS $$
-            BEGIN
-                IF NEW.uid IS NULL AND NEW.user_id IS NOT NULL THEN
-                    NEW.uid := NEW.user_id;
-                ELSIF NEW.user_id IS NULL AND NEW.uid IS NOT NULL THEN
-                    NEW.user_id := NEW.uid;
-                END IF;
-                RETURN NEW;
-            END $$ LANGUAGE plpgsql
-        `);
-
-        for (const authTable of [
+        const legacyFkTables = [
             "user_identities",
             "refresh_tokens",
             "password_reset_tokens",
             "magic_link_tokens",
             "mfa_factors",
             "recovery_codes"
-        ]) {
+        ];
+
+        // Only on a database that actually carries the legacy column. This whole
+        // block is a 0.x compatibility shim, and it used to run unconditionally —
+        // so every brand-new database was provisioned with a trigger function
+        // written to reconcile a column it can never have, permanently, as part
+        // of its first boot. A fresh install should not ship someone else's
+        // migration history.
+        // The table list is inlined rather than bound: drizzle expands a JS
+        // array into a parameter TUPLE — `ANY(($2, $3, …))` — which Postgres
+        // rejects, and the thrown error is swallowed by the catch around this
+        // whole function, so auth would silently stop provisioning. These are
+        // module-level constants, not input.
+        const legacyFkTableList = legacyFkTables.map(t => `'${t}'`).join(", ");
+        const legacyUserIdPresent = await db.execute(sql`
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = ${authSchema}
+              AND table_name IN (${sql.raw(legacyFkTableList)})
+              AND column_name = 'user_id'
+            LIMIT 1
+        `);
+
+        if (legacyUserIdPresent.rows.length > 0) {
+            await db.execute(sql`
+                CREATE OR REPLACE FUNCTION ${sql.raw(`"${authSchema}"`)}.sync_uid_user_id() RETURNS trigger AS $$
+                BEGIN
+                    IF NEW.uid IS NULL AND NEW.user_id IS NOT NULL THEN
+                        NEW.uid := NEW.user_id;
+                    ELSIF NEW.user_id IS NULL AND NEW.uid IS NOT NULL THEN
+                        NEW.user_id := NEW.uid;
+                    END IF;
+                    RETURN NEW;
+                END $$ LANGUAGE plpgsql
+            `);
+        }
+
+        for (const authTable of legacyUserIdPresent.rows.length > 0 ? legacyFkTables : []) {
             const qualified = `"${authSchema}"."${authTable}"`;
             await db.execute(sql`
                 DO $$
@@ -378,26 +417,16 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // database provisioned by an older framework era is missing every
         // column added since. Each column the auth services read or write must
         // be back-filled here, or upgraded deployments break on the first
-        // statement that references it. `email` is deliberately absent: it has
-        // existed since the first era and cannot be added NOT NULL safely.
-        const userColumnBackfills = [
-            "display_name TEXT",
-            "photo_url TEXT",
-            "roles TEXT[] DEFAULT '{}' NOT NULL",
-            "password_hash TEXT",
-            "email_verified BOOLEAN DEFAULT FALSE NOT NULL",
-            "email_verification_token TEXT",
-            "email_verification_sent_at TIMESTAMP WITH TIME ZONE",
-            "is_anonymous BOOLEAN DEFAULT FALSE NOT NULL",
-            "metadata JSONB DEFAULT '{}' NOT NULL",
-            "tokens_valid_after TIMESTAMP WITH TIME ZONE",
-            "created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL",
-            "updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL"
-        ];
-        for (const columnDef of userColumnBackfills) {
+        // statement that references it.
+        //
+        // `email` is skipped: it has existed since the first era, so it is never
+        // the missing one, and `ADD COLUMN … NOT NULL` with no default fails on
+        // a table with rows.
+        for (const spec of AUTH_USERS_COLUMNS) {
+            if (spec.column === "email") continue;
             await db.execute(sql`
                 ALTER TABLE ${sql.raw(usersTableName)}
-                ADD COLUMN IF NOT EXISTS ${sql.raw(columnDef)}
+                ADD COLUMN IF NOT EXISTS ${sql.raw(`${spec.column} ${authUsersColumnSql(spec)}`)}
             `);
         }
 
@@ -407,14 +436,69 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // statement past this point has to tolerate that rather than abort the
         // whole migration block.
         const usersColumns = await db.execute(sql`
-            SELECT column_name, data_type
+            SELECT column_name, data_type, is_nullable, column_default
             FROM information_schema.columns
             WHERE table_schema = ${usersSchema} AND table_name = ${resolvedTable}
         `);
-        const usersColumnTypes = new Map(
-            (usersColumns.rows as { column_name: string; data_type: string }[])
-                .map(row => [row.column_name, row.data_type])
-        );
+        type UsersColumnRow = {
+            column_name: string;
+            data_type: string;
+            is_nullable: "YES" | "NO";
+            column_default: string | null;
+        };
+        const usersColumnRows = usersColumns.rows as UsersColumnRow[];
+        const usersColumnTypes = new Map(usersColumnRows.map(row => [row.column_name, row.data_type]));
+        const usersColumnState = new Map(usersColumnRows.map(row => [row.column_name, row]));
+
+        // ── Migration: restore defaults and NOT NULL that another creator dropped ──
+        // `ADD COLUMN IF NOT EXISTS` above only creates what is MISSING. A column
+        // that exists with the wrong shape stays wrong forever — and until
+        // AUTH_USERS_COLUMNS became the single source, that was the normal
+        // outcome rather than an edge case: whichever of `db push`, boot-ensure
+        // and this function reached the table first decided its constraints, so
+        // a managed deploy ended up with a nullable `email`, a `roles` with no
+        // `'{}'` default, and an `email_verified` that could be NULL.
+        //
+        // Ordered DEFAULT → back-fill → SET NOT NULL, because SET NOT NULL is
+        // checked against existing rows: without the back-fill it throws on the
+        // very databases that need it. `email` can carry no default, so a NULL
+        // there is not repairable automatically — say so and leave the column
+        // alone rather than inventing an address.
+        for (const spec of AUTH_USERS_COLUMNS) {
+            const state = usersColumnState.get(spec.column);
+            if (!state) continue;
+
+            if (spec.default !== undefined && state.column_default === null) {
+                await db.execute(sql`
+                    ALTER TABLE ${sql.raw(usersTableName)}
+                    ALTER COLUMN ${sql.raw(`"${spec.column}"`)} SET DEFAULT ${sql.raw(spec.default)}
+                `);
+                logger.info(`🔧 Restored the default on ${usersTableName}.${spec.column}`);
+            }
+
+            if (!spec.notNull || state.is_nullable !== "YES") continue;
+
+            if (spec.default !== undefined) {
+                await db.execute(sql`
+                    UPDATE ${sql.raw(usersTableName)}
+                    SET ${sql.raw(`"${spec.column}"`)} = ${sql.raw(spec.default)}
+                    WHERE ${sql.raw(`"${spec.column}"`)} IS NULL
+                `);
+            }
+            try {
+                await db.execute(sql`
+                    ALTER TABLE ${sql.raw(usersTableName)}
+                    ALTER COLUMN ${sql.raw(`"${spec.column}"`)} SET NOT NULL
+                `);
+                logger.info(`🔧 Restored NOT NULL on ${usersTableName}.${spec.column}`);
+            } catch (err) {
+                logger.warn(
+                    `⚠️ ${usersTableName}.${spec.column} should be NOT NULL but still holds NULLs, so the ` +
+                    "constraint was not applied. Fill or remove those rows and restart: " +
+                    (err instanceof Error ? err.message : String(err))
+                );
+            }
+        }
 
         // ── Migration: VARCHAR(n) → TEXT on the users string columns ────────
         // Tables created before the widths came off still carry them. Postgres
@@ -717,15 +801,22 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
         // registration after an upgrade fails with SQLSTATE 42501. Reconcile
         // on boot; only tables actually flagged get the ALTER (and its lock).
         try {
+            // Every table this function creates, not a subset. `magic_link_tokens`
+            // and `schema_meta` were missing here while their six siblings were
+            // listed — so on a database carrying FORCE from the older RLS model,
+            // magic-link sign-in kept failing 42501 after the upgrade that was
+            // supposed to fix exactly that, and only for the one auth method.
             const authTablePairs: [string, string][] = [
                 [usersSchema, resolvedTable],
                 [authSchema, "user_identities"],
                 [authSchema, "refresh_tokens"],
                 [authSchema, "password_reset_tokens"],
+                [authSchema, "magic_link_tokens"],
                 [authSchema, "app_config"],
                 [authSchema, "mfa_factors"],
                 [authSchema, "mfa_challenges"],
-                [authSchema, "recovery_codes"]
+                [authSchema, "recovery_codes"],
+                [authSchema, "schema_meta"]
             ];
             for (const [schemaName, tableName] of authTablePairs) {
                 const forced = await db.execute(sql`
@@ -756,9 +847,34 @@ export async function ensureAuthTablesExist(db: NodePgDatabase, collection?: Col
             );
         }
 
-        // Stamped last, so a boot that died partway through the migrations above
-        // leaves the older stamp in place and the next boot runs them again.
+        // Stamped last of the MIGRATIONS, so a boot that died partway through
+        // the ones above leaves the older stamp in place and the next boot runs
+        // them again.
         await stampAuthSchemaVersion(db, authSchema);
+
+        // ── Keep the end-user role out of auth's tables ─────────────────────
+        // These carry session token hashes, TOTP secrets and recovery codes, and
+        // none of them has RLS — they are not collections, so nothing ever
+        // compiled a policy for them. Meanwhile the role provisioning grants
+        // `rebase_user` DML on every table in this schema, and its
+        // ALTER DEFAULT PRIVILEGES reaches the ones created right here, after it
+        // ran. So the grant has to come back off; see `revokeInternalTableSql`
+        // for why a revoke rather than an empty RLS policy set.
+        //
+        // After the stamp deliberately: `schema_meta` is created BY the stamp,
+        // so revoking first would leave the one table holding this database's
+        // schema version writable by every signed-in user until the next boot.
+        // Nothing below re-runs the migrations, so the stamp's guarantee holds.
+        await revokeInternalTableAccess(
+            async (text) => { await db.execute(sql.raw(text)); },
+            authSchema,
+            {
+                onError: (table, err) => logger.warn(
+                    `🔐 Could not revoke authenticated-role access to "${authSchema}"."${table}": ` +
+                    (err instanceof Error ? err.message : String(err))
+                )
+            }
+        );
 
         logger.info("✅ Auth tables ready");
     } catch (error) {

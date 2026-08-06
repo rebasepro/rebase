@@ -320,19 +320,49 @@ async function ensureAuthTables(databaseUrl: string, collectionsPath: string): P
  * connection would bypass RLS (superuser / BYPASSRLS / table owner).
  */
 async function ensureRlsUserRole(databaseUrl: string): Promise<void> {
-    const { detectConnectionPosture, ensureAppRole, REBASE_USER_ROLE } = await import("./security/rls-enforcement");
-    const { Client } = await import("pg");
-    const client = new Client({ connectionString: databaseUrl });
-    await client.connect();
+    // Every failure in here used to escape uncaught, and `db migrate`'s caller
+    // turns that into a bare `process.exit(1)` — so the migration would apply,
+    // print `-- ok`, and then the command would die with NO output whatsoever
+    // and a non-zero status. Seen with a module-resolution error inside the
+    // dynamic import, where the entire diagnosis was one silent exit code.
+    //
+    // Reported rather than rethrown, and deliberately not fatal: the schema
+    // change has already landed at this point, so failing the command implies a
+    // rollback that did not happen. What is actually lost is the role
+    // provisioning, and the message says so and how to finish it by hand.
+    const schemas = ["public", "rebase", "auth"];
+    let rls: typeof import("./security/rls-enforcement");
     try {
-        const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
-        const posture = await detectConnectionPosture(runSql);
-        if (posture.privileged) {
-            await ensureAppRole(runSql, ["public", "rebase", "auth"]);
-            logger.info(chalk.gray(`  ✓ RLS role "${REBASE_USER_ROLE}" provisioned/refreshed.`));
+        rls = await import("./security/rls-enforcement");
+    } catch (err) {
+        // A module-resolution failure here is a build problem, not a database
+        // one, and it is exactly the case that used to produce the silent exit.
+        logger.error(chalk.red(
+            `\n  ✗ Could not load the RLS provisioning module: ${err instanceof Error ? err.message : String(err)}`
+        ));
+        return;
+    }
+
+    try {
+        const { Client } = await import("pg");
+        const client = new Client({ connectionString: databaseUrl });
+        await client.connect();
+        try {
+            const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
+            const posture = await rls.detectConnectionPosture(runSql);
+            if (posture.privileged) {
+                await rls.ensureAppRole(runSql, schemas);
+                logger.info(chalk.gray(`  ✓ RLS role "${rls.REBASE_USER_ROLE}" provisioned/refreshed.`));
+            }
+        } finally {
+            await client.end();
         }
-    } finally {
-        await client.end();
+    } catch (err) {
+        logger.error(chalk.red(
+            `\n  ✗ The schema change was applied, but the "${rls.REBASE_USER_ROLE}" role could not be ` +
+            `provisioned: ${err instanceof Error ? err.message : String(err)}`
+        ));
+        logger.error(chalk.gray(rls.appRoleSetupInstructions("your database user", schemas)));
     }
 }
 
