@@ -160,7 +160,15 @@ renaming it later is a drop and recreate, which rewrites the table.
 
 `_score` is `ts_rank` against the same query the rows were matched with, and is
 present only when the collection opted in *and* the request carried a search
-string. Outside those two conditions `orderBy: "_score"` is an unknown field and
+string.
+
+With `fuzzy` on, the trigram similarity is **added** to that rank. This is not a
+refinement — it is what makes `fuzzy` a ranking at all. A typo matches nothing on
+the exact path, so every row it finds has a `ts_rank` of exactly zero; ordering
+by rank alone would return the best match in whatever order the table felt like.
+The two terms are summed rather than weighted, so a row that matched exactly
+contributes both and outranks a merely-similar row without needing a coefficient
+to say so. Outside those two conditions `orderBy: "_score"` is an unknown field and
 returns 400 rather than silently returning unsorted rows.
 
 `_score` cannot be combined with cursor pagination (`startAfter`). Relevance is

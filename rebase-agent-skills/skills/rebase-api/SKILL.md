@@ -125,7 +125,7 @@ Every field in the collection can be used as a query parameter with an operator 
 | `cs` | `array-contains` | Array contains value | `?tags=cs.javascript` |
 | `csa` | `array-contains-any` | Array contains any of values | `?tags=csa.(javascript,typescript)` |
 
-> **WARNING FOR AGENTS:** There is NO `like` operator. Use `searchString` for text search instead.
+> **WARNING FOR AGENTS:** There is NO `like` operator. Use `searchString` for text search instead — and read the Text Search section below before telling a user what it will match, because by default it does not see inside JSONB.
 
 **Array values** for `in`, `nin`, and `csa` use parenthesized comma-separated lists: `(val1,val2,val3)`.
 
@@ -146,15 +146,47 @@ Nested logical conditions are also supported:
 ?or=(status.eq.active,and(price.gte.10,price.lte.50))
 ```
 
-### Full-Text Search
+### Text Search
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `searchString` | string | Full-text search query across searchable fields |
+| `searchString` | string | Text search. Substring by default; ranked full-text if the collection declares a `search` block |
 
 ```
 ?searchString=widget
 ```
+
+By default this is `ILIKE '%widget%'` OR-ed across the collection's top-level
+string properties — it does **not** reach inside `map`/JSONB or array
+properties, and does not rank. A collection that declares a `search` block gets
+ranked full-text matching over the fields it names, and rows carry a `_score`
+that `orderBy` accepts:
+
+```
+?searchString=auditor%20iso%2014001&orderBy=_score:desc
+```
+
+`orderBy=_score` returns 400 on a collection without the block, or without a
+`searchString`.
+
+### Vector Search
+
+Nearest-neighbour search over a property of type `vector`. All four parameters
+below work together; `vector_search` and `vector` are both required.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `vector_search` | string | Name of the `vector` property |
+| `vector` | JSON array | Query embedding, e.g. `[0.12,-0.04,0.98]`. Length must match the property's `dimensions` |
+| `vector_distance` | string | `cosine` (default), `l2`, or `inner_product` |
+| `vector_threshold` | number | Drop rows farther than this |
+
+```
+?vector_search=embedding&vector=%5B0.12%2C-0.04%5D&vector_threshold=0.35
+```
+
+Rows come back closest-first, each with a `_distance`. Other filters apply
+before the ordering.
 
 ### Relation Includes (Eager Loading)
 

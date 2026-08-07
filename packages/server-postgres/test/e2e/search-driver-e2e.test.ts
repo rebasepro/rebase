@@ -46,7 +46,20 @@ const plain: PostgresCollectionConfig = {
     }
 };
 
+/** Same shape again, with `fuzzy` on — the trigram half of the score. */
+const fuzzied: PostgresCollectionConfig = {
+    slug: "fuzzies",
+    table: "fuzzies",
+    name: "Fuzzies",
+    properties: {
+        id: { type: "string", isId: "uuid" },
+        full_name: { type: "string" }
+    },
+    search: { language: "spanish", unaccent: true, fuzzy: true, fields: ["full_name"] }
+};
+
 const spec = buildSearchColumnSpec(searched)!;
+const fuzzySpec = buildSearchColumnSpec(fuzzied)!;
 const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
 const talentsTable = pgTable("talents", {
@@ -61,11 +74,19 @@ const notesTable = pgTable("notes", {
     body: text("body")
 });
 
+const fuzziesTable = pgTable("fuzzies", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    full_name: text("full_name"),
+    search_vector: tsvector("search_vector").generatedAlwaysAs(sql.raw(fuzzySpec.expression)),
+    search_vector_text: text("search_vector_text").generatedAlwaysAs(sql.raw(fuzzySpec.fuzzy!.expression))
+});
+
 describe("search through the driver", () => {
     let container: PgContainer;
     let admin: pg.Client;
     let pool: pg.Pool;
     let fetchService: FetchService;
+    let fuzzyService: FetchService;
 
     beforeAll(async () => {
         container = await startPgContainer();
@@ -73,7 +94,7 @@ describe("search through the driver", () => {
         await admin.connect();
 
         const ddl = await generatePostgresDdl(
-            [searched as CollectionConfig, plain as CollectionConfig],
+            [searched as CollectionConfig, plain as CollectionConfig, fuzzied as CollectionConfig],
             { includePolicies: false }
         );
         await admin.query(ddl);
@@ -84,6 +105,12 @@ describe("search through the driver", () => {
             ('Carlos Marketing', '{"certifications":["Google Ads"]}'::jsonb)
         `);
         await admin.query(`INSERT INTO notes (body) VALUES ('a plain note')`);
+        await admin.query(`
+            INSERT INTO fuzzies (full_name) VALUES
+            ('Ana ISO 14001 Lead Auditor'),
+            ('Beto ISO 9001 Quality'),
+            ('Caro Marketing Growth')
+        `);
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const registry = new PostgresCollectionRegistry();
@@ -92,6 +119,11 @@ describe("search through the driver", () => {
         registry.registerTable(notesTable, "notes");
 
         fetchService = new FetchService(drizzle(pool) as never, registry);
+
+        const fuzzyRegistry = new PostgresCollectionRegistry();
+        fuzzyRegistry.registerMultiple([fuzzied as CollectionConfig]);
+        fuzzyRegistry.registerTable(fuzziesTable, "fuzzies");
+        fuzzyService = new FetchService(drizzle(pool) as never, fuzzyRegistry);
     }, 180_000);
 
     afterAll(async () => {
@@ -168,6 +200,29 @@ describe("search through the driver", () => {
                 startAfter: { id: "00000000-0000-0000-0000-000000000000", values: { _score: 0.1 } }
             })
         ).rejects.toThrow(/cannot be combined with/);
+    });
+
+    it("ranks a fuzzy-only match, which ts_rank alone scores at zero", async () => {
+        // A typo matches nothing on the exact path, so every row it finds has
+        // ts_rank 0. Without the trigram term in the score the best match comes
+        // back in arbitrary order — which is what `fuzzy` is supposed to fix.
+        const rows = await fuzzyService.fetchCollection("fuzzies", {
+            searchString: "iso14000",
+            orderBy: "_score",
+            order: "desc"
+        });
+        expect(rows.length).toBeGreaterThan(0);
+        expect(rows[0].full_name).toBe("Ana ISO 14001 Lead Auditor");
+        expect(rows[0]._score as number).toBeGreaterThan(0);
+    });
+
+    it("still puts an exact match above a merely-similar one", async () => {
+        const rows = await fuzzyService.fetchCollection("fuzzies", {
+            searchString: "auditor",
+            orderBy: "_score",
+            order: "desc"
+        });
+        expect(rows[0].full_name).toBe("Ana ISO 14001 Lead Auditor");
     });
 
     it("leaves a collection without the block on the old ILIKE behaviour", async () => {

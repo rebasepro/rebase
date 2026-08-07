@@ -1443,7 +1443,28 @@ whereConditions };
         if (!spec) return undefined;
         const column = table[spec.column as keyof typeof table] as AnyPgColumn | undefined;
         if (!column) return undefined;
-        return sql`ts_rank(${column}, ${DrizzleConditionBuilder.normalizedTsQuery(searchString, spec)})`;
+
+        const rank = sql`ts_rank(${column}, ${DrizzleConditionBuilder.normalizedTsQuery(searchString, spec)})`;
+        if (!spec.fuzzy) return rank;
+
+        const fuzzyColumn = table[spec.fuzzy.column as keyof typeof table] as AnyPgColumn | undefined;
+        if (!fuzzyColumn) return rank;
+
+        // With `fuzzy` on, `ts_rank` alone is not a ranking — it is zero for
+        // every row the trigram path matched and the exact path did not, which
+        // is the whole population of a typo'd query. Measured on the real
+        // sustentalent pool: "auditor de iso14000" matches four candidates,
+        // every one of them at ts_rank 0, so ordering by rank alone returned
+        // the best match in whatever order the table felt like.
+        //
+        // Summed rather than blended with tuned constants: a row that matched
+        // exactly contributes both terms, so it outranks a fuzzy-only row of
+        // equal similarity without needing a coefficient to say so. Both terms
+        // are non-negative and monotonic, which is all the ordering needs.
+        const needle = spec.unaccent
+            ? sql`${sql.raw(SEARCH_UNACCENT_FN)}(${searchString})`
+            : sql`${searchString}`;
+        return sql`(${rank} + public.word_similarity(${needle}, ${fuzzyColumn}))`;
     }
 
     /**

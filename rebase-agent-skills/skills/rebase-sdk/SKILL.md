@@ -1,6 +1,6 @@
 ---
 name: rebase-sdk
-description: Guide for using the Rebase generated TypeScript SDK and client library. Use this skill when the user needs to interact with a Rebase backend from client-side or server-side code, including CRUD operations, filtering, authentication, realtime subscriptions, live queries, offline support and local-first sync, file storage, custom functions, or admin operations.
+description: Guide for using the Rebase generated TypeScript SDK and client library. Use this skill when the user needs to interact with a Rebase backend from client-side or server-side code, including CRUD operations, filtering, text and vector search, authentication, realtime subscriptions, live queries, offline support and local-first sync, file storage, custom functions, or admin operations.
 ---
 
 # Rebase SDK
@@ -257,10 +257,56 @@ const result = await rebase.data.posts
 | `.orderBy(field, direction?)` | Sort results (`'asc'` or `'desc'`) |
 | `.limit(n)` | Limit number of results |
 | `.offset(n)` | Skip first `n` results |
-| `.search(term)` | Full-text search |
+| `.search(term)` | Text search — substring by default, ranked full-text if the collection opted in |
+| `.vectorSearch(prop, vector, opts?)` | Nearest-neighbour search over a `vector` property |
 | `.include(...relations)` | Include related entities |
 | `.find()` | Execute the query |
 | `.listen(callback, errorCallback?)` | Subscribe to realtime updates |
+
+### Searching
+
+`.search(term)` behaves in one of two ways, and an agent must know which before
+promising anything:
+
+**Default (no `search` block on the collection).** A case-insensitive substring
+match, OR-ed across the collection's *top-level* `string` properties. It cannot
+see inside `map` (JSONB) or `array` properties, does not rank, and cannot use an
+index. If a user reports that search "finds nothing" for content they can see on
+the record, this is almost always why — the content is in a `map`.
+
+**Opted in (collection declares `search`).** Ranked full-text matching over
+exactly the fields named in the block, including paths into JSONB. Rows come
+back with `_score`, which is sortable:
+
+```typescript
+const { data } = await client.data.talents
+    .search("auditor iso 14001")
+    .orderBy("_score", "desc")
+    .find();
+```
+
+`orderBy("_score")` is a 400 on a collection that has not opted in, or on a
+query with no search string. Do not add it speculatively.
+
+To make a collection searchable, edit its config — see the `rebase-collections`
+skill. Do not try to work around the default with `where` + `like`: there is no
+`like` operator.
+
+### Vector search
+
+For a collection with a `vector` property:
+
+```typescript
+const { data } = await client.data.docs
+    .vectorSearch("embedding", queryVector, { threshold: 0.35 })
+    .where("status", "==", "published")
+    .limit(10)
+    .find();
+```
+
+Rows come back closest-first with a `_distance`. `where` filters *before* the
+ordering. Rebase does not compute embeddings — the caller supplies `queryVector`
+from whatever model produced the stored ones.
 
 ## Authentication
 
@@ -526,7 +572,8 @@ try {
 ### Limits agents must not paper over
 
 - **The client is not a replica.** Only rows the app has read or written are local, so a query answered from the cache may be missing rows. Live results flag this as `partial` — surface it rather than presenting it as complete.
-- **`searchString` is approximated** locally as a case-insensitive substring scan; the server runs real full-text search.
+- **`searchString` is approximated** locally as a case-insensitive substring scan. On the server it is *also* a substring scan unless the collection declares a `search` block — do not tell a user they have full-text search until you have checked the collection.
+- **A vector query is never answered from the cache.** The client holds no vectors, and the nearest of what happens to be cached looks exactly like the nearest that exist.
 - **`include`d relations cannot be evaluated locally** — such a query is always `partial` when answered from the cache.
 - **Replay is at-least-once.** Prefer idempotent writes (`createMany` with `upsert`) where a duplicate would matter.
 - **Do not enable `offline` in a server-side script.** It is for interactive clients; a one-shot script wants `realtime: false` and a plain client.

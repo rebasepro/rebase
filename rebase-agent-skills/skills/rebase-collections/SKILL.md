@@ -1,6 +1,6 @@
 ---
 name: rebase-collections
-description: Comprehensive guide for defining Rebase collections, property types, validation, and schema configuration. Use this skill when the user needs help creating collections, adding properties, configuring field types, or understanding the schema-as-code approach.
+description: Comprehensive guide for defining Rebase collections, property types, validation, and schema configuration. Use this skill when the user needs help creating collections, adding properties, configuring field types, understanding the schema-as-code approach, or making a collection searchable — including when search returns nothing for content stored in a map/JSONB property.
 ---
 
 # Rebase Collections
@@ -193,12 +193,88 @@ export default productsCollection;
 | `callbacks` | `CollectionCallbacks<M, USER>` | — | Lifecycle hooks (see Collection Callbacks section) |
 | `relations` | `Relation[]` | — | Explicit relation definitions (usually auto-extracted from properties) |
 | `securityRules` | `SecurityRule[]` | — | Row Level Security policies |
+| `search` | `SearchConfig` | — | Opt in to ranked full-text search over named fields (Postgres only). See **Search** below |
 | `childCollections` | `() => CollectionConfig[]` | — | Nested child collections (populated automatically) |
 | `overrides` | `EntityOverrides` | — | Override data source or storage source |
 | `ownerId` | `string` | — | Owner user ID (for plugins/custom code) |
 | `auth` | `boolean | AuthCollectionConfig` | — | Mark collection as authentication collection (user management, reset password, etc.) |
 | `admin.components` | `CollectionComponentOverrideMap` | — | Collection-scoped UI component overrides |
 
+
+
+## Search
+
+By default `.search("term")` is a case-insensitive **substring** match OR-ed
+across the collection's top-level `string` properties. It cannot see inside
+`map` (JSONB) or `array` properties, does not rank, and cannot use an index.
+
+**This is the single most common "search is broken" report.** If a collection
+keeps searchable content in a `map` — tags, certifications, a questionnaire, an
+answers blob — none of it is reachable by the default, and the search box
+returns nothing with no error. When a user says search finds nothing for content
+they can plainly see on the record, check where that content lives before
+anything else.
+
+Declare a `search` block to fix it. Postgres only.
+
+```typescript
+const talents: PostgresCollectionConfig = {
+    slug: "talents",
+    table: "talents",
+    name: "Candidates",
+    properties: { /* … */ },
+    search: {
+        language: "spanish",     // stemming + stopwords; default "simple" (neither)
+        unaccent: true,          // `auditoria` matches `auditoría`
+        fuzzy: true,             // `iso14000` reaches `ISO 14001`
+        fields: [
+            { path: "full_name", weight: "A" },
+            { path: "questionnaire.certifications", weight: "A" },  // into the JSONB
+            "location",                                             // defaults to weight B
+            "interests"                                             // a string[]
+        ]
+    }
+};
+```
+
+Rows then come back with a sortable `_score`:
+
+```typescript
+client.data.talents.search("auditor iso 14001").orderBy("_score", "desc").find()
+```
+
+### Rules an agent must not get wrong
+
+- **Nothing is inferred.** A field is indexed only if named in `fields`. A path
+  that does not resolve is a **boot error**, not a warning — so a config that
+  boots is a config whose search fields are all real.
+- **A path may name** a `string` property, a `string[]` property, a `map`, or a
+  dotted path inside a map (`"questionnaire.certifications"`). A map path
+  indexes every string value at or below it, at any depth. JSON *keys* are never
+  indexed.
+- **Enums, UUIDs, `json` (not `jsonb`) columns and numeric arrays are refused.**
+  Enums are a fixed vocabulary — filter them with `where`, which is exact and
+  indexed.
+- **`language` defaults to `"simple"`**, which does no stemming. Set it to the
+  content's language deliberately; a stemmer applied to the wrong language
+  silently mangles lexemes.
+- **`unaccent` is not cosmetic** in an accented language. Postgres stems
+  `auditoría` → `auditor` and `auditoria` → `auditori`, *different lexemes*, so
+  without it a query typed without accents misses every row that has them.
+- **Weights are `A`–`D`**, strongest to weakest, defaulting to `B`. Put names and
+  identifiers at `A` and long free text at `D`, or a passing mention in a bio
+  outranks the field the user actually meant.
+- **Declaring it creates schema**: one generated `tsvector` column plus a GIN
+  index (and, with `fuzzy`, a second column and a trigram index). Boot-ensure
+  adds them; adding a stored generated column rewrites the table, so on a large
+  live table treat it as a planned migration.
+- **Do not add it to a Mongo or Firestore collection.** It is refused at boot.
+
+### When *not* to reach for it
+
+If the user wants exact matching on a known field, use `where` — it is exact,
+indexed, and needs no schema. The `search` block is for free-text queries a
+human types.
 
 ## Data sources & multiple backends
 

@@ -117,6 +117,12 @@ export interface SearchConfig {
      * the `tsvector`, and requires the `pg_trgm` extension. Costs write time
      * and disk; buys the single most common class of failed search.
      *
+     * Also changes what `_score` means: the trigram similarity is added to
+     * `ts_rank`. It has to be. A typo matches nothing on the exact path, so
+     * every row this finds has a `ts_rank` of zero — ranking by that alone
+     * would order the results arbitrarily, which is the failure `fuzzy` exists
+     * to fix.
+     *
      * @default false
      */
     fuzzy?: boolean;
