@@ -457,6 +457,52 @@ setupKey: options.setupKey })
     }
 }
 
+/**
+ * Make the initial commit, after everything that writes into the project has run.
+ *
+ * It used to happen immediately after `git init`, which is before dependency
+ * installation and before introspection — so `init --git --install` ended on a
+ * dirty tree whose only untracked file was `pnpm-lock.yaml`. A lockfile is
+ * precisely the thing that should be in a project's first commit, and a brand
+ * new scaffold whose first `git status` is dirty invites the reader to conclude
+ * the lockfile is deliberately ignored and never commit it at all.
+ *
+ * Introspection has the same shape: it generates `config/collections` and
+ * `schema.generated.ts`, which belong in the commit describing the scaffold that
+ * produced them.
+ *
+ * `git init` stays where it was. Creating the repository early costs nothing and
+ * means a failed install still leaves the user a repository to commit into.
+ */
+async function commitScaffold(targetDirectory: string): Promise<void> {
+    try {
+        // Leaving the tree uncommitted makes the very first `git diff`
+        // useless and hides the scaffold in a wall of untracked files.
+        // .gitignore is already in place, so .env is never committed.
+        await execa("git", ["add", "-A"], { cwd: targetDirectory });
+        // A machine with no user.email configured cannot commit at all.
+        // Supply an identity only in that case, so a configured user still
+        // authors their own initial commit.
+        let identity: Record<string, string> = {};
+        try {
+            await execa("git", ["config", "user.email"], { cwd: targetDirectory });
+        } catch {
+            identity = {
+                GIT_AUTHOR_NAME: "Rebase",
+                GIT_AUTHOR_EMAIL: "noreply@rebase.pro",
+                GIT_COMMITTER_NAME: "Rebase",
+                GIT_COMMITTER_EMAIL: "noreply@rebase.pro"
+            };
+        }
+        await execa("git", ["commit", "-m", "Initial commit from Rebase"], {
+            cwd: targetDirectory,
+            env: identity
+        });
+    } catch {
+        console.warn(chalk.yellow("  Warning: Failed to create the initial commit"));
+    }
+}
+
 async function createProject(options: InitOptions) {
     const startedAt = Date.now();
     // Check if directory already exists and is not empty
@@ -528,7 +574,9 @@ async function createProject(options: InitOptions) {
     // Rename .env.example to .env if it exists and randomize secrets
     await configureEnvFile(options.targetDirectory, options.databaseUrl);
 
-    // Initialize git
+    // Create the repository now, but commit at the very end — see
+    // commitScaffold below for why the two halves are separated.
+    let gitInitialized = false;
     if (options.git) {
         console.log(chalk.gray("  Initializing git repository..."));
         try {
@@ -542,28 +590,7 @@ async function createProject(options: InitOptions) {
             } catch {
                 // Leave the default branch name; not worth failing the scaffold.
             }
-            // Leaving the tree uncommitted makes the very first `git diff`
-            // useless and hides the scaffold in a wall of untracked files.
-            // .gitignore is already in place, so .env is never committed.
-            await execa("git", ["add", "-A"], { cwd: options.targetDirectory });
-            // A machine with no user.email configured cannot commit at all.
-            // Supply an identity only in that case, so a configured user still
-            // authors their own initial commit.
-            let identity: Record<string, string> = {};
-            try {
-                await execa("git", ["config", "user.email"], { cwd: options.targetDirectory });
-            } catch {
-                identity = {
-                    GIT_AUTHOR_NAME: "Rebase",
-GIT_AUTHOR_EMAIL: "noreply@rebase.pro",
-                    GIT_COMMITTER_NAME: "Rebase",
-GIT_COMMITTER_EMAIL: "noreply@rebase.pro"
-                };
-            }
-            await execa("git", ["commit", "-m", "Initial commit from Rebase"], {
-                cwd: options.targetDirectory,
-                env: identity
-            });
+            gitInitialized = true;
         } catch {
             console.warn(chalk.yellow("  Warning: Failed to initialize git repository"));
         }
@@ -622,6 +649,8 @@ GIT_COMMITTER_EMAIL: "noreply@rebase.pro"
             console.warn(chalk.yellow(`  Run \`${installCmd.join(" ")}\` then \`${execCmd.join(" ")}\` manually.`));
         }
     }
+
+    if (gitInitialized) await commitScaffold(options.targetDirectory);
 
     await linkScaffoldToCloud(options);
 
@@ -958,17 +987,54 @@ async function replacePlaceholders(options: InitOptions) {
 }
 
 
-async function isPortAvailable(port: number): Promise<boolean> {
+/** `undefined` binds the wildcard address, which is a different question — see isPortAvailable. */
+function canBind(port: number, host?: string): Promise<boolean> {
     return new Promise((resolve) => {
         const server = net.createServer();
-        server.once("error", () => {
-            resolve(false);
+        server.once("error", (err: NodeJS.ErrnoException) => {
+            // The host has no such address family at all — a v4-only machine
+            // asked about `::1`. Nothing can be listening on an address that
+            // cannot exist, so this is free rather than taken.
+            resolve(err.code === "EAFNOSUPPORT" || err.code === "EADDRNOTAVAIL");
         });
         server.once("listening", () => {
             server.close(() => resolve(true));
         });
-        server.listen(port);
+        if (host === undefined) server.listen(port);
+        else server.listen(port, host);
     });
+}
+
+/**
+ * Whether `port` is free — on the wildcard address *and* on both loopback addresses.
+ *
+ * All three, because on macOS/BSD a successful bind does not mean the port is
+ * unused. Sockets carry `SO_REUSEADDR` (Node sets it), under which a wildcard
+ * bind and a specific-address bind on the same port do not conflict — in either
+ * direction. So each probe alone has a blind spot, and they are different ones:
+ *
+ * - **Wildcard only** (what this used to do) misses a server bound to
+ *   `127.0.0.1` and `[::1]` — a Homebrew or Postgres.app install, i.e. most
+ *   developer machines. 5432 was reported free while it was already serving
+ *   another project's database. Docker then published `*:5432` for the same
+ *   reason and the container started cleanly, with no "port already allocated"
+ *   error anywhere to hint at the collision. `DATABASE_URL` pointed at
+ *   `localhost:5432`, `localhost` resolves to `::1` first, and every command
+ *   reported success while reading and writing the *pre-existing* database — a
+ *   `db push` would have created tables, roles and RLS policies inside it.
+ *
+ * - **Loopback only** misses the opposite case: Docker Desktop publishes a
+ *   container's port on `*`, and a specific-address bind succeeds right past it.
+ *   That port is free to probe and unusable to publish, so `docker compose up -d
+ *   db` fails on "Bind for 0.0.0.0:PORT failed: port is already allocated" —
+ *   loudly, but only after the project has been generated around the bad port.
+ *
+ * Requiring all three costs three sockets and leaves neither gap. The wildcard
+ * bind is the one the container itself has to make; the loopback binds are the
+ * addresses `DATABASE_URL` will actually name.
+ */
+export async function isPortAvailable(port: number): Promise<boolean> {
+    return (await canBind(port)) && (await canBind(port, "127.0.0.1")) && (await canBind(port, "::1"));
 }
 
 async function findAvailablePort(startPort: number): Promise<number> {
@@ -1101,6 +1167,28 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
             `CORS_ORIGINS=http://localhost:${composeApiPort}`
         );
 
+        // Blank the build-time API URL rather than shipping `http://localhost:3001`.
+        //
+        // This is the one environment-specific value `init` used to leave alone,
+        // and the chain that made it dangerous is fully closed: `.env.example`
+        // ships the literal, `frontend/vite.config.ts` sets `envDir: ".."` so
+        // `vite build` reads *this* file, and the managed bundle is built on the
+        // developer's own machine — so `.env` being gitignored does not save
+        // anyone. A stock scaffold deployed with `rebase cloud deploy` served
+        // HTML that passed every health check while every XHR from the live site
+        // went to the developer's laptop. `rebase cloud env set VITE_API_URL=…`
+        // refuses build-time variables, so there was no recovery from the
+        // platform side either.
+        //
+        // Empty is not a missing value, it is the correct one: the client falls
+        // back to `window.location.origin`, which is the right shape for a
+        // single-origin bundle and the only one that keeps working when a custom
+        // domain is added. `rebase dev` injects the port it actually bound, so
+        // local development is unaffected.
+        // The template ships it blank, so this is belt-and-braces for a project
+        // whose .env.example was edited or predates that change.
+        envContent = envContent.replace(/^#?\s*VITE_API_URL=.*$/m, "VITE_API_URL=");
+
         // Pin the runtime image `docker-compose.yml` pulls.
         //
         // The compose file reads `rebasepro/server:${REBASE_VERSION:-latest}`,
@@ -1155,7 +1243,12 @@ export async function configureEnvFile(targetDirectory: string, databaseUrl?: st
                 // sslmode=disable: the paired docker-compose Postgres has no TLS,
                 // and Go-based tooling (atlas, via `rebase db push`) defaults to
                 // requiring SSL when the URL doesn't say otherwise.
-                `DATABASE_URL=postgresql://rebase_app:${dbPassword}@localhost:${dbPort}/rebase?options=-c%20search_path=public&sslmode=disable\nDATABASE_PASSWORD=${dbPassword}`
+                //
+                // 127.0.0.1 rather than `localhost`: the name resolves to `::1`
+                // first on macOS, so on a machine that already runs Postgres on
+                // loopback the two addresses can reach two different servers.
+                // An address cannot be ambiguous the way a name can.
+                `DATABASE_URL=postgresql://rebase_app:${dbPassword}@127.0.0.1:${dbPort}/rebase?options=-c%20search_path=public&sslmode=disable\nDATABASE_PASSWORD=${dbPassword}`
             );
 
             // Also update docker-compose.yml with the dynamic host port if it has the default 5432 port mapping

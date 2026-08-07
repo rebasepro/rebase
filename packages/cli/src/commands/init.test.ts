@@ -10,7 +10,8 @@ import path from "path";
 import os from "os";
 import { cp } from "fs/promises";
 import inquirer from "inquirer";
-import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, TEMPLATE_PLACEHOLDER_FILES } from "./init.js";
+import net from "net";
+import { configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES } from "./init.js";
 
 
 let tmpDir: string;
@@ -664,7 +665,9 @@ describe(".env.example", () => {
         expect(envContent).toContain("JWT_SECRET");
         expect(envContent).toContain("PORT");
         expect(envContent).toContain("NODE_ENV");
-        expect(envContent).toContain("VITE_API_URL");
+        // Present, but it must ship empty — see the configureEnvFile test on
+        // why a localhost default here follows the bundle into production.
+        expect(envContent).toMatch(/^VITE_API_URL=$/m);
     });
 
     it("contains setup instructions for required values", () => {
@@ -769,6 +772,77 @@ describe(".env.example", () => {
         // The commented placeholder must be gone, not merely accompanied —
         // otherwise the required-variable guard still has nothing to read.
         expect(envContent).not.toMatch(/^#\s*CORS_ORIGINS=/m);
+    });
+
+    it("configureEnvFile leaves VITE_API_URL empty rather than pointing at localhost", async () => {
+        /*
+         * `VITE_API_URL` was the one environment-specific value `init` did not
+         * rewrite, and the chain that made that dangerous is fully closed:
+         * `.env.example` shipped `http://localhost:3001`, `frontend/vite.config.ts`
+         * sets `envDir: ".."` so `vite build` reads this file, and the managed
+         * bundle is built locally — so `.env` being gitignored saves nobody. A
+         * stock scaffold deployed to Cloud served HTML that passed every
+         * server-side health check while every XHR from the live site went to
+         * the developer's laptop. `rebase cloud env set VITE_API_URL=…` refuses
+         * build-time variables, so there was no recovery from the platform side.
+         *
+         * Empty is the correct value, not a missing one: the client falls back
+         * to `window.location.origin`.
+         */
+        const targetDir = await simulateInit("env-vite-api-url-app");
+
+        // Start from a .env.example that carries a value, which is what this
+        // rewrite exists for: the template ships it blank now, so asserting the
+        // outcome against the stock template would pass with the rewrite
+        // deleted. A project whose .env.example predates that change — or was
+        // edited by hand — is the case that still needs covering.
+        const examplePath = path.join(targetDir, ".env.example");
+        fs.writeFileSync(
+            examplePath,
+            fs.readFileSync(examplePath, "utf-8").replace(/^VITE_API_URL=.*$/m, "VITE_API_URL=http://localhost:3001"),
+            "utf-8"
+        );
+
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+
+        // Present and empty — the key must still be there as documentation.
+        expect(envContent).toMatch(/^VITE_API_URL=$/m);
+        // And nowhere in the file may it name a host.
+        expect(envContent).not.toMatch(/^VITE_API_URL=.+$/m);
+    });
+
+    it("configureEnvFile points DATABASE_URL at 127.0.0.1, not localhost", async () => {
+        /*
+         * `localhost` resolves to `::1` first on macOS, so on a machine already
+         * running Postgres on loopback the name and the address can reach two
+         * different servers — which is exactly how a project got silently wired
+         * to a pre-existing database holding another project's tables. An
+         * address cannot be ambiguous the way a name can.
+         */
+        const targetDir = await simulateInit("env-db-host-app");
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+        const dbMatch = envContent.match(/^DATABASE_URL=(.*)$/m);
+        expect(dbMatch).toBeTruthy();
+        expect(dbMatch![1]).toContain("@127.0.0.1:");
+        expect(dbMatch![1]).not.toContain("@localhost:");
+    });
+
+    it("configureEnvFile agrees with the compose port mapping it rewrote", async () => {
+        // The generated URL and the published port are two halves of one
+        // decision; if they disagree the container is running and unreachable.
+        const targetDir = await simulateInit("env-db-port-agreement-app");
+        await configureEnvFile(targetDir);
+
+        const envContent = fs.readFileSync(path.join(targetDir, ".env"), "utf-8");
+        const compose = fs.readFileSync(path.join(targetDir, "docker-compose.yml"), "utf-8");
+
+        const urlPort = envContent.match(/^DATABASE_URL=.*@127\.0\.0\.1:(\d+)\//m)?.[1];
+        expect(urlPort).toBeTruthy();
+        expect(compose).toContain(`- "${urlPort}:5432"`);
     });
 
     it("leaves the compose file's other required variables satisfied too", async () => {
@@ -1231,5 +1305,64 @@ describe("resolveRuntimeImageTag", () => {
         // `readCliVersion` answers "latest" when it cannot read its own manifest.
         // That is already the floating tag, and it is not a prerelease string.
         expect(resolveRuntimeImageTag("latest")).toEqual({ tag: "latest" });
+    });
+});
+
+describe("choosing a free port for the local database", () => {
+    /*
+     * A successful bind does not mean a port is unused. Node sets SO_REUSEADDR,
+     * under which a wildcard bind and a specific-address bind on the same port
+     * do not conflict — in either direction. So each probe alone has a blind
+     * spot, and they are different ones. Both were shipped, one after the other.
+     */
+    const servers: net.Server[] = [];
+    const listen = (port: number, host?: string) =>
+        new Promise<void>((resolve, reject) => {
+            const s = net.createServer();
+            servers.push(s);
+            s.once("error", reject);
+            host === undefined ? s.listen(port, () => resolve()) : s.listen(port, host, () => resolve());
+        });
+
+    afterEach(async () => {
+        await Promise.all(servers.splice(0).map(s => new Promise<void>(r => s.close(() => r()))));
+    });
+
+    /** A port nothing else on the machine is expected to want. */
+    const free = async (): Promise<number> => {
+        for (let p = 45000; p < 45200; p++) if (await isPortAvailable(p)) return p;
+        throw new Error("no free port in the test range");
+    };
+
+    it("sees a server bound only to loopback", async () => {
+        /*
+         * The original bug. A Homebrew or Postgres.app install binds 127.0.0.1
+         * and [::1] but not the wildcard, so a wildcard probe called 5432 free
+         * while it was already serving another project's database. Docker then
+         * published *:5432 for the same reason and the container started
+         * cleanly. `DATABASE_URL` named `localhost`, which resolves to ::1
+         * first — so every command reported success against the *pre-existing*
+         * database, and a `db push` would have created tables, roles and RLS
+         * policies inside it.
+         */
+        const port = await free();
+        await listen(port, "127.0.0.1");
+        expect(await isPortAvailable(port)).toBe(false);
+    });
+
+    it("sees a server bound only to the wildcard address", async () => {
+        // The inverse, and what a loopback-only probe misses: Docker Desktop
+        // publishes a container's port on *, and a specific-address bind
+        // succeeds right past it. The port probes free and cannot be published,
+        // so `docker compose up -d db` fails on "port is already allocated" —
+        // after the project has been generated around it.
+        const port = await free();
+        await listen(port);
+        expect(await isPortAvailable(port)).toBe(false);
+    });
+
+    it("still accepts a genuinely free port", async () => {
+        // A probe that never says yes would "fix" this by scanning forever.
+        expect(await isPortAvailable(await free())).toBe(true);
     });
 });

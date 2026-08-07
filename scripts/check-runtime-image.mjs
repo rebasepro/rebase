@@ -96,6 +96,87 @@ function repositoryOf(ref) {
     return (idx === -1 ? ref : ref.slice(0, idx)).trim();
 }
 
+/**
+ * The single job in a workflow that mentions `needle`, as text.
+ *
+ * Crude on purpose: a YAML parser would be more correct, and this check has to
+ * run before dependencies are installed. Jobs are the keys indented two spaces
+ * under `jobs:`, which is the layout every workflow here uses.
+ */
+function jobContaining(text, needle) {
+    const lines = text.split("\n");
+    const starts = [];
+    let inJobs = false;
+    for (let i = 0; i < lines.length; i++) {
+        if (/^jobs:\s*$/.test(lines[i])) { inJobs = true; continue; }
+        if (!inJobs) continue;
+        if (/^\S/.test(lines[i])) break;              // a new top-level key ends `jobs:`
+        if (/^ {2}[A-Za-z0-9_-]+:\s*$/.test(lines[i])) starts.push(i);
+    }
+    for (let j = 0; j < starts.length; j++) {
+        const body = lines.slice(starts[j], starts[j + 1] ?? lines.length).join("\n");
+        if (body.includes(needle)) return body;
+    }
+    return null;
+}
+
+/**
+ * A publisher that cannot authenticate is not a publisher.
+ *
+ * The existence check above is satisfied by any automated workflow that mentions
+ * the repository — which is true of one whose registry credentials were never
+ * configured. That is not hypothetical: the job that publishes `rebasepro/server`
+ * was added and this check went green, while `DOCKERHUB_USERNAME` and
+ * `DOCKERHUB_TOKEN` did not exist on the repository at all.
+ *
+ * A script cannot read repository secrets, so it cannot ask whether they are
+ * set. What it can enforce is the property that makes a missing secret
+ * survivable: the release must find out *before* it does anything it cannot take
+ * back. npm cannot be unpublished and a pushed tag is already on the branch, so
+ * a credentials check placed after them converts a missing secret into a
+ * half-released version — npm and git carrying a number whose compose file names
+ * an image that was never built. Which is precisely how 0.13.0 shipped.
+ *
+ * So: if a workflow both publishes to npm and pushes a first-party image, the
+ * first mention of its registry credentials must come before the npm publish.
+ */
+function credentialOrderProblems(workflow, repo) {
+    const { file } = workflow;
+    // Per job, not per file. A workflow holds several — this one's canary job
+    // publishes to npm and pushes no image, so measuring against the file's
+    // first `publish` would compare two unrelated jobs and report a fault in
+    // whichever happened to be written first.
+    const job = jobContaining(workflow.text, repo);
+    if (!job) return [];
+    const text = job;
+
+    const npmPublish = text.search(/^\s*run:.*\b(?:pnpm|npm|yarn)\b[^\n]*\bpublish\b/m);
+    if (npmPublish === -1) return [];
+
+    // The secrets this workflow feeds to its registry login, whatever they are
+    // named — matching on the login step keeps this from hard-coding Docker Hub.
+    const secretNames = [...text.matchAll(/secrets\.([A-Z0-9_]*(?:DOCKER|REGISTRY)[A-Z0-9_]*)/g)]
+        .map(m => m[1]);
+    if (secretNames.length === 0) {
+        return [`${file} pushes ${YELLOW}${repo}${NC} but names no registry credentials — ` +
+            `either the login step is gone or it is authenticating some other way.`];
+    }
+
+    const firstUse = Math.min(...secretNames.map(n => text.indexOf(`secrets.${n}`)));
+    if (firstUse > npmPublish) {
+        return [
+            `${file} checks its registry credentials (${YELLOW}${[...new Set(secretNames)].join(", ")}${NC}) ` +
+            `only AFTER publishing to npm.\n` +
+            `      npm cannot be unpublished, so a missing secret would leave a released version ` +
+            `whose\n` +
+            `      compose file pulls ${repo}:<version> — an image that was never built. Move the ` +
+            `check\n` +
+            `      before the first irreversible step.`
+        ];
+    }
+    return [];
+}
+
 const problems = [];
 const checked = [];
 
@@ -122,6 +203,14 @@ for (const rel of USER_FACING_COMPOSE) {
                 `"repository does not exist".`
             );
         }
+    }
+}
+
+// Once per publisher/repository pair, not once per reference: the same image is
+// named by both shipped compose files, and reporting it twice reads as two faults.
+for (const repo of [...new Set(checked.map(c => c.repo))]) {
+    for (const w of automatedWorkflows().filter(w => w.text.includes(repo))) {
+        problems.push(...credentialOrderProblems(w, repo));
     }
 }
 

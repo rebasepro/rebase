@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { createRequire } from "module";
 
 /**
  * The promises this subsystem makes.
@@ -445,5 +446,30 @@ describe("when the disk will not cooperate", () => {
         telemetry.setConsent(true);
         const mode = fs.statSync(telemetry.configPath()).mode & 0o777;
         expect(mode).toBe(0o600);
+    });
+});
+
+describe("the version stamped on every event", () => {
+    it("is the CLI's real version, not 'unknown'", async () => {
+        /*
+         * It was `unknown` on every install path that has ever existed.
+         * `require("../../package.json")` is resolved relative to the *bundled*
+         * `dist/index.es.js`, so it landed on `<parent-of-package>/package.json`
+         * — absent under npm, pnpm and the monorepo alike. The field that tells
+         * one release from another, and the one shown on the screen asking for
+         * data-sharing consent, never carried a value.
+         */
+        const { buildEvent } = await import("./payload.js");
+        const event = buildEvent("cli.init", {}, { machineId: "m" });
+
+        expect(event.cliVersion).not.toBe("unknown");
+        expect(event.cliVersion).toMatch(/^\d+\.\d+\.\d+/);
+
+        // And it is *this* package's version, not some dependency's — the
+        // failure mode of counting directory levels is finding the nearest
+        // package.json under a hoisted layout.
+        const require = createRequire(import.meta.url);
+        const self = require("../../package.json");
+        expect(event.cliVersion).toBe(self.version);
     });
 });

@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { describe, expect, it } from "vitest";
-import { assertBuiltForPath, foldableApps } from "./fold-static";
+import { afterEach, describe, expect, it } from "vitest";
+import { assertBuiltForPath, foldableApps, staticBuildEnv } from "./fold-static";
 
 describe("choosing which frontends to serve from the backend", () => {
     it("folds the single static app", () => {
@@ -132,6 +132,72 @@ describe("both commands that build a bundle fold it", () => {
         // ships a site-less bundle.
         for (const file of ["commands/build.ts", "commands/cloud/deploy.ts"]) {
             expect(read(file), `${file} re-implements folding`).not.toMatch(/function fold[A-Za-z]*StaticApp/);
+        }
+    });
+});
+
+describe("the environment every static app is built with", () => {
+    const ORIGINAL = process.env.VITE_API_URL;
+    afterEach(() => {
+        if (ORIGINAL === undefined) delete process.env.VITE_API_URL;
+        else process.env.VITE_API_URL = ORIGINAL;
+    });
+
+    it("builds in production mode", () => {
+        /*
+         * The scaffold's `.env` carries `NODE_ENV=development` for the dev
+         * backend, and Vite's `loadEnv` promotes a NODE_ENV found in an env file
+         * into the build unless the environment already sets one. So `rebase
+         * build` and `rebase cloud deploy` shipped a *development* bundle —
+         * `import.meta.env.DEV === true`, development React, dev-only branches
+         * live — from commands whose whole purpose is to produce something
+         * deployable. Vite consults the env file only when process.env has none,
+         * so this line is what closes it.
+         */
+        delete process.env.VITE_API_URL;
+        expect(staticBuildEnv("/", "web").NODE_ENV).toBe("production");
+    });
+
+    it("blanks VITE_API_URL so the bundle talks to its own origin", () => {
+        // The scaffold's `.env` ships `http://localhost:3001` and
+        // `frontend/vite.config.ts` reads the project root via `envDir: ".."`,
+        // so a stock deploy baked the developer's laptop into every request —
+        // passing every server-side health check on the way out. Empty makes
+        // the client fall back to `window.location.origin`.
+        delete process.env.VITE_API_URL;
+        expect(staticBuildEnv("/", "web").VITE_API_URL).toBe("");
+    });
+
+    it("still lets an explicit cross-origin API through", () => {
+        // Vite prioritises `process.env.VITE_*` over `.env` files, so the
+        // escape hatch has to survive — it just has to be deliberate.
+        process.env.VITE_API_URL = "https://api.example.com";
+        expect(staticBuildEnv("/", "web").VITE_API_URL).toBe("https://api.example.com");
+    });
+
+    it("carries the declared path, with the trailing slash `base` expects", () => {
+        expect(staticBuildEnv("/admin", "admin")).toMatchObject({
+            REBASE_APP_PATH: "/admin",
+            REBASE_APP_BASE: "/admin/",
+            REBASE_APP_NAME: "admin"
+        });
+        expect(staticBuildEnv("/", "web").REBASE_APP_BASE).toBe("/");
+    });
+
+    it("is the only build environment either driver constructs", () => {
+        /*
+         * There are two drivers — `foldFrontendIntoBundle` and `buildAssetApp`
+         * in build.ts — and they had already drifted: the path variables were
+         * duplicated into both, so blanking VITE_API_URL in one still shipped a
+         * localhost bundle from the other. A hand-rolled REBASE_APP_PATH outside
+         * `staticBuildEnv` is that drift starting again.
+         */
+        const here = path.dirname(fileURLToPath(import.meta.url));
+        for (const file of ["fold-static.ts", "commands/build.ts"]) {
+            const source = fs.readFileSync(path.join(here, file), "utf8");
+            const assignments = [...source.matchAll(/REBASE_APP_PATH:/g)];
+            const expected = file === "fold-static.ts" ? 1 : 0;
+            expect(assignments.length, `${file} builds its own env`).toBe(expected);
         }
     });
 });

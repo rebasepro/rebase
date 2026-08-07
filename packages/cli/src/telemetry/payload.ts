@@ -1,5 +1,7 @@
 import os from "os";
-import { createRequire } from "module";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 /**
  * Every field that may ever leave the machine, and nothing else.
@@ -149,14 +151,39 @@ export function sanitize(properties: Record<string, unknown>): Record<string, Te
     return out;
 }
 
+/**
+ * The CLI's own version, read by walking up to this package's manifest.
+ *
+ * The obvious `require("../../package.json")` was wrong everywhere, not only on
+ * one install path: `vite build` bundles this module into `dist/index.es.js`, so
+ * the specifier resolves relative to `<pkg>/dist/` and lands on
+ * `<parent-of-pkg>/package.json` — a file that does not exist under npm, pnpm or
+ * the monorepo. Every event ever sent carried `cliVersion: "unknown"`, which is
+ * the one field that makes the rest of a payload interpretable.
+ *
+ * So walk up and check the manifest's `name` rather than counting directory
+ * levels: the count differs between `src/telemetry/` and the bundled `dist/`,
+ * and a wrong count fails silently by finding *some* package.json — the nearest
+ * dependency's, under a hoisted layout. Matching the name cannot do that.
+ */
 function cliVersion(): string {
     try {
-        const require = createRequire(import.meta.url);
-        const pkg = require("../../package.json");
-        return typeof pkg?.version === "string" ? pkg.version : "unknown";
+        let dir = path.dirname(fileURLToPath(import.meta.url));
+        const root = path.parse(dir).root;
+        while (dir && dir !== root) {
+            const manifest = path.join(dir, "package.json");
+            if (fs.existsSync(manifest)) {
+                const pkg = JSON.parse(fs.readFileSync(manifest, "utf-8"));
+                if (pkg?.name === "@rebasepro/cli" && typeof pkg.version === "string" && pkg.version) {
+                    return pkg.version;
+                }
+            }
+            dir = path.dirname(dir);
+        }
     } catch {
-        return "unknown";
+        // Fall through — a version we cannot read is reported as such.
     }
+    return "unknown";
 }
 
 export function buildEvent(

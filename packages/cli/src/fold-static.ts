@@ -139,6 +139,62 @@ export function assertBuiltForPath(
 }
 
 /**
+ * The environment every static app is built with, wherever that build is driven from.
+ *
+ * Shared because there are two drivers — `foldFrontendIntoBundle` here, and
+ * `buildAssetApp` in `build.ts` for a standalone `type: "static"` app — and they
+ * had already drifted: the path variables were duplicated into both, so a fix
+ * applied to one shipped a bundle built the old way from the other. One function
+ * makes that impossible rather than merely unlikely.
+ *
+ * ## REBASE_APP_*
+ *
+ * The declared path is a build-time input, not only a serving concern: Vite
+ * reads `base` from REBASE_APP_BASE, and the trailing slash is that field's
+ * convention. See `assertBuiltForPath`.
+ *
+ * ## NODE_ENV
+ *
+ * A built app is a production artifact by construction, so build it as one. Not
+ * a formality: the scaffold's `.env` carries `NODE_ENV=development` for the dev
+ * backend, and Vite's `loadEnv` promotes a `NODE_ENV` found in an env file into
+ * the build unless the environment already sets one. So `rebase build` and
+ * `rebase cloud deploy` shipped a *development* bundle — `import.meta.env.DEV
+ * === true`, development React, dev-only branches live — from commands whose
+ * whole purpose is to produce something deployable. Setting it here is what
+ * closes it: Vite consults the env file's NODE_ENV only when `process.env`
+ * has none.
+ *
+ * ## VITE_API_URL
+ *
+ * An app served by the backend it talks to has its API on its own origin by
+ * construction, so a baked-in absolute URL can only be wrong. It was: that same
+ * `.env` carries `VITE_API_URL=http://localhost:3001` and
+ * `frontend/vite.config.ts` reads the project root via `envDir: ".."`, so a
+ * stock deploy shipped a site whose every request went to whoever ran the build
+ * — passing every server-side health check on the way out. Blanking it here
+ * fixes the bundle even for a project whose `.env` predates the `init` fix, or
+ * was written by hand. Empty is the right value rather than a missing one: the
+ * client falls back to `window.location.origin`, which keeps working when a
+ * custom domain is added.
+ *
+ * Vite prioritises `process.env.VITE_*` over `.env` files, so an explicit
+ * `VITE_API_URL=https://api.example.com rebase cloud deploy` still wins — the
+ * cross-origin escape hatch stays open, it just has to be deliberate. Nothing on
+ * this path loads the project `.env` into `process.env`, so a value inherited
+ * here really was set by the caller.
+ */
+export function staticBuildEnv(appPath: string, appName: string): Record<string, string> {
+    return {
+        REBASE_APP_PATH: appPath,
+        REBASE_APP_BASE: appPath === "/" ? "/" : `${appPath}/`,
+        REBASE_APP_NAME: appName,
+        NODE_ENV: "production",
+        VITE_API_URL: process.env.VITE_API_URL ?? ""
+    };
+}
+
+/**
  * Build the project's static apps and fold them into the backend bundle.
  *
  * Throws rather than exiting, so the caller decides whether a missing frontend
@@ -161,14 +217,7 @@ export async function foldFrontendIntoBundle(options: FoldOptions): Promise<Fold
                 cwd: projectRoot,
                 stdio: "inherit",
                 shell: true,
-                // The path is a build-time input, not only a serving concern.
-                // Vite reads `base` from REBASE_APP_BASE; the trailing slash is
-                // that field's convention.
-                env: {
-                    REBASE_APP_PATH: app.path,
-                    REBASE_APP_BASE: app.path === "/" ? "/" : `${app.path}/`,
-                    REBASE_APP_NAME: app.name
-                }
+                env: staticBuildEnv(app.path, app.name)
             });
         }
 

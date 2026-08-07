@@ -28,7 +28,7 @@ import {
     resolveCliVersion,
     DEFAULT_BUNDLE_DIR
 } from "../bundle";
-import { assertBuiltForPath, foldFrontendIntoBundle } from "../fold-static";
+import { assertBuiltForPath, foldFrontendIntoBundle, staticBuildEnv } from "../fold-static";
 
 function printHelp(): void {
     console.log(`
@@ -266,12 +266,7 @@ async function buildAssetApp(
             cwd: projectRoot,
             stdio: "inherit",
             shell: true,
-            // See `assertBuiltForPath` — the declared path is a build input.
-            env: {
-                REBASE_APP_PATH: basePath,
-                REBASE_APP_BASE: basePath === "/" ? "/" : `${basePath}/`,
-                REBASE_APP_NAME: name
-            }
+            env: staticBuildEnv(basePath, name)
         });
     } catch {
         console.error(chalk.red(`  ✗ build command failed for "${name}"`));

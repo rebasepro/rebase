@@ -237,6 +237,45 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'pnpm'
 
+      # ── Credentials, before anything irreversible ───────────────
+      #
+      # The Docker Hub push happens near the end of this job, after npm publish
+      # and after the version-bump commit and tag are pushed to main. Both of
+      # those are one-way: a version cannot be unpublished from npm, and the tag
+      # is already on the branch. So a release with no Docker Hub credentials did
+      # not fail — it half-succeeded, leaving npm and git carrying a version
+      # whose `docker-compose.yml` names an image that was never built.
+      #
+      # That is exactly the state 0.13.0 shipped in, and `check:runtime-image`
+      # cannot catch it: it asserts that an automated workflow publishes the
+      # image, which has been true since that job was added. A workflow that
+      # cannot authenticate still counts as one. Only the release itself can see
+      # whether the secret exists, and the only useful moment is before the first
+      # irreversible step.
+      - name: Check release credentials
+        if: ${{ !inputs.dry_run }}
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          missing=""
+          [ -n "$DOCKERHUB_USERNAME" ] || missing="$missing DOCKERHUB_USERNAME"
+          [ -n "$DOCKERHUB_TOKEN" ] || missing="$missing DOCKERHUB_TOKEN"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing"
+            echo ""
+            echo "This release would publish to npm and push a tag, then fail at the Docker Hub"
+            echo "login — leaving a version whose scaffolded docker-compose.yml pulls"
+            echo "rebasepro/server:<version>, an image that would not exist. Stopping first."
+            echo ""
+            echo "Set them once, then re-run:"
+            echo "  gh secret set DOCKERHUB_USERNAME -R ${{ github.repository }}"
+            echo "  gh secret set DOCKERHUB_TOKEN    -R ${{ github.repository }}"
+            echo ""
+            echo "The token needs Read & Write on the rebasepro/server repository."
+            exit 1
+          fi
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
