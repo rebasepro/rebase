@@ -31,6 +31,15 @@ const sizeClasses = {
 // Outer box is the hit area and sets the control's rendered height, so it
 // tracks the shared 28/32/40/48 scale. `smallest` used to reuse `small`'s
 // 32px box, which made the two sizes identical.
+//
+// A checkbox with no `onCheckedChange` is not a hit area — it is a tick mark
+// standing in for a value, as in `BooleanPreview`. There the box was 10px of
+// dead space on each side of a `medium` tick: on top of a read-only field's
+// own padding, it started the tick 10px further in than the text of the field
+// beside it. `padding={false}` reads as the request to drop it, and until now
+// did nothing at all, because it only removed `p-2` from a box whose size was
+// fixed regardless. Kept for anything clickable — the same box is the click
+// target for table row selection and for editor task items.
 const outerSizeClasses = {
     medium: "w-10 h-10",
     small: "w-8 h-8",
@@ -85,7 +94,7 @@ export const Checkbox = React.memo(({
 
             <div className={cls(
                 padding ? paddingClasses[size] : "",
-                outerSizeClasses[size],
+                padding || onCheckedChange ? outerSizeClasses[size] : "",
                 "inline-flex items-center justify-center text-sm font-medium focus:outline-none transition-colors ease-in-out duration-150",
                 onCheckedChange ? "rounded-full hover:bg-surface-accent-200 hover:bg-opacity-75 hover:bg-surface-accent-200/75 dark:hover:bg-surface-accent-700 dark:hover:bg-opacity-75 dark:hover:bg-surface-accent-700/75" : "",
                 onCheckedChange ? "cursor-pointer" : "cursor-default"
