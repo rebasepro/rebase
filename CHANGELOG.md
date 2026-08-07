@@ -240,6 +240,16 @@
 
 ### Breaking
 
+- **Rebase creates exactly one schema in your database, and it is called `rebase`.** The RLS helpers move from `auth.uid()` / `auth.roles()` / `auth.jwt()` to `rebase.uid()` / `rebase.roles()` / `rebase.jwt()`, and the `auth` schema is removed.
+
+  `auth` was Supabase's name, borrowed so that a developer who had written Supabase RLS would recognise `auth.uid()`. The familiarity was real; the name was not ours to take. Pointing Rebase at a database that already had an `auth` schema meant applying `CREATE OR REPLACE FUNCTION auth.uid() RETURNS text` over Supabase's `RETURNS uuid`, which Postgres refuses outright — and at boot that landed in a catch-all, leaving a database with auth tables, no helper functions, and policies calling functions that did not exist.
+
+  Migrating is meant to be uneventful. Structured rules (`policy.authUid()`, `policy.rolesOverlap()`) never spelled a schema and need no change at all. Raw policy SQL written against `auth.uid()` is rewritten on compile, and the boot names the collections carrying it rather than rewriting in silence. Policies already in a database are recompiled by the next push or boot, and keep their names, because policy names hash the rule's semantics rather than its SQL. The `auth` schema is then dropped — each function matched on its own result type and body first, and the schema by `RESTRICT`, never `CASCADE`, so anything else living there keeps it.
+
+- **The scaffolded database role is `rebase_app`, not `rebase`.** Postgres resolves unqualified names through `"$user", public`, so a role named `rebase` put the new `rebase` *schema* ahead of `public` for any tool that does not pin `search_path` — psql, pg_dump, drizzle-kit, a hand-written migration — and statements silently landed in the wrong schema.
+
+  Existing projects are unaffected and stay covered by `pinSearchPath`, and a boot-time check reports the collision for any project that picks a colliding name of its own. **New** projects get `rebase_app` in the generated `docker-compose.yml` and `.env`. If you are following a deployment guide you had already copied, the connection string is the thing to update — a stale `postgresql://rebase:...` against a freshly generated compose file fails with `password authentication failed for user "rebase"`.
+
 - **`rebase.data` is gone — use `rebase.dataAsAdmin`.** The server singleton had two names for one accessor, and the shorter one gave no hint of what it does: `rebase.data` and `rebase.dataAsAdmin` were the same admin-scoped, **RLS-bypassing** driver. `data` is the name a browser client uses for its *user-scoped* accessor, so the same expression meant "whatever this user may read" on the client and "everything, no policies" on the server. That is a bad thing to have to remember at a call site that reads fine either way.
 
   ```diff ts
