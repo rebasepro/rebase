@@ -288,6 +288,13 @@ const { data } = await client.data.talents
 `orderBy("_score")` is a 400 on a collection that has not opted in, or on a
 query with no search string. Do not add it speculatively.
 
+**Explaining a result.** `search(term, { explain: true })` adds `_matches` to
+each row — `{ field, snippet }` per matching field, with hits wrapped in
+`<mark>`. Use it when a user needs to know *why* a row is in the list; skip it
+for bulk reads, since it costs a `ts_headline` per field per row. The snippet
+carries markup and user-typed text: split on `<mark>` and render the parts
+rather than injecting it as HTML.
+
 To make a collection searchable, edit its config — see the `rebase-collections`
 skill. Do not try to work around the default with `where` + `like`: there is no
 `like` operator.

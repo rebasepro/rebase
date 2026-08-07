@@ -270,6 +270,13 @@ client.data.talents.search("auditor iso 14001").orderBy("_score", "desc").find()
   live table treat it as a planned migration.
 - **Do not add it to a Mongo or Firestore collection.** It is refused at boot.
 
+### Explaining a match
+
+`client.data.x.search(term, { explain: true })` returns `_matches` per row —
+which declared field matched, plus a `<mark>`-highlighted snippet. This is
+usually what someone means by "show me why this result appeared". Per-query, not
+config: it costs a `ts_headline` per field per row.
+
 ### When *not* to reach for it
 
 If the user wants exact matching on a known field, use `where` — it is exact,

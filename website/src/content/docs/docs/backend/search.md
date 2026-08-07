@@ -177,6 +177,41 @@ compare the next page against, and two requests with different search strings
 produce scores that are not on the same scale. Use `limit`/`offset` for
 relevance-ordered pages.
 
+## Why did this row match?
+
+A ranked list tells you *which* rows, never *why* one is there. Ask each row to
+explain itself:
+
+```typescript
+const { data } = await client.data.talents
+    .search("iso 14001", { explain: true })
+    .orderBy("_score", "desc")
+    .find();
+
+data[0]._matches;
+// [{ field: "questionnaire.certifications",
+//    snippet: "<mark>ISO</mark> <mark>14001</mark> Lead Auditor" }]
+```
+
+`field` is the path exactly as declared in `fields`, so you can map it to a
+label for display. Fields come back in the order you declared them.
+
+Per-query, not per-collection, because the cost is per-query: one `ts_headline`
+per declared field per returned row, and `ts_headline` re-parses the document
+rather than reading the index. Right for a page of results, wrong for an export.
+
+**The snippet contains markup by construction** — each hit is wrapped in
+`<mark>`. Render it as HTML or strip the tags, but do not treat it as plain
+text, and do not trust the surrounding text: it is whatever the user typed.
+Splitting on `<mark>` and rendering the parts is safer than
+`dangerouslySetInnerHTML`.
+
+With `unaccent` on, snippets read with accents folded — `Auditoria`, not
+`Auditoría`. `ts_headline` over the original text cannot find a hit that an
+unaccented query produced, so it would return the text with nothing marked at
+all; a readable snippet that highlights beats a prettier one that silently
+doesn't.
+
 ## Adding the block to a live collection
 
 The generated column is added by the boot-time schema ensure, like any other
