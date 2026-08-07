@@ -53,6 +53,10 @@
 
   Pinned by `packages/app/test/rebase_client_prop_types.type-test.ts` — compile-time assertions, written as assignments rather than conditional types, because the first draft used `extends` and went on compiling with the bug restored.
 
+- **Retiring the pre-1.0 `auth` schema could drop a helper still in use.** The cleanup refuses to run while a *policy* calls `auth.uid()`, and that half is safe by construction — Postgres records a dependency for a policy that references a function, so `DROP FUNCTION` refuses on its own. The function half has none: a `LANGUAGE sql` body written as a string literal is never parsed at creation, so nothing is recorded, `RESTRICT` has nothing to refuse on, and the drop succeeds while callers still exist. They fail when a query reaches them rather than at boot.
+
+  If you defined your own helper in the `auth` schema — anything calling `auth.uid()`, `auth.roles()` or `auth.jwt()` from its body — the schema is now kept, and the boot names the functions holding it so you can repoint them at `rebase.uid()`. Our own control plane is the case that found this: two org-membership helpers there, with eleven policies going through them, had nothing protecting them.
+
 - **A date in the future was described in the past tense.** Seven hand-rolled relative-time formatters computed `now - then` and then tested only the positive side, so a timestamp ahead of now fell through to whichever branch came first: a post scheduled for next month read "Just now", and one due this afternoon read "-1d ago" — a negative quantity, printed. These are dates a CMS holds constantly, and the two admin formatters render whatever property the collection points its date slot or date column at.
 
   `formatRelativeTime` in `@rebasepro/utils` is now the one implementation: the distance is `Math.abs`, so no branch can see a negative number, and the tense comes from the sign rather than being assumed. It returns `null` past a horizon the caller sets, so each site keeps its own absolute format and locale. The cloud CLI and studio's cron and API-key views were already correct and are unchanged.
