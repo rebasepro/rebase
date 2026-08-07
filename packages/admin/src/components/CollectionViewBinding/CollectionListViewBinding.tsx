@@ -637,6 +637,20 @@ customEntityActions });
     const showImage = size !== "xs";
 
     /**
+     * Does the checkbox ride on the thumbnail rather than sit beside it?
+     *
+     * Only in the split's compact list — the one layout where the list is a
+     * column beside a record rather than the page itself, and where the 48px of
+     * checkbox cell is 48px the title does not get. Everywhere else the list has
+     * the room, and a checkbox that is always there is easier to find than one
+     * that appears under the pointer.
+     *
+     * Needs a thumbnail to ride on: at `xs` there is none, so the checkbox keeps
+     * its cell.
+     */
+    const combineSelection = openEntityMode === "split" && selectedEntityId !== undefined && showImage;
+
+    /**
      * How much room the action buttons take, reserved identically in the header
      * and in every row so the columns line up above one another whether or not a
      * given record has actions.
@@ -668,7 +682,7 @@ customEntityActions });
         if (containerWidth === undefined) return [];
 
         const chrome = ROW_PADDING_WIDTH
-            + (selectionEnabled ? CHECKBOX_WIDTH + COLUMN_GAP : 0)
+            + (selectionEnabled && !combineSelection ? CHECKBOX_WIDTH + COLUMN_GAP : 0)
             + (showImage ? IMAGE_WIDTH + COLUMN_GAP : 0)
             + (actionsWidth > 0 ? actionsWidth + COLUMN_GAP : 0);
         const available = containerWidth - chrome - TITLE_COMFORTABLE_WIDTH;
@@ -684,7 +698,7 @@ customEntityActions });
             total -= cost(col);
         }
         return columns.filter(col => !dropped.has(col.key));
-    }, [declaredColumns, requestedColumns, containerWidth, selectionEnabled, showImage, actionsWidth]);
+    }, [declaredColumns, requestedColumns, containerWidth, selectionEnabled, combineSelection, showImage, actionsWidth]);
 
     const handleEntityClick = useCallback((entity: Entity<M>) => {
         analyticsController.onAnalyticsEvent?.("entity_click", {
@@ -756,7 +770,7 @@ customEntityActions });
         <ListHeader
             titleColumn={titleColumn}
             columns={visibleColumns}
-            selectionEnabled={selectionEnabled}
+            selectionEnabled={selectionEnabled && !combineSelection}
             showImage={showImage}
             actionsWidth={actionsWidth}
             sortBy={sortBy as [string, "asc" | "desc"] | undefined}
@@ -799,6 +813,7 @@ customEntityActions });
                                 highlighted={highlighted}
                                 onSelectionChange={handleRowSelectionChange}
                                 selectionEnabled={selectionEnabled}
+                                combineSelection={combineSelection}
                                 columns={visibleColumns}
                                 slotKeys={slotKeys}
                                 rowClasses={rowClasses}
@@ -815,7 +830,7 @@ customEntityActions });
                             />
                         </div>
                     );
-                }, [resolvedCollection, selectionEnabled, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, actionsWidth, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick])}
+                }, [resolvedCollection, selectionEnabled, combineSelection, visibleColumns, slotKeys, rowClasses, showImage, size, selectedEntityId, getListViewActions, actionsWidth, context, path, selectionController, openEntityMode, handleRowSelectionChange, handleEntityClick])}
             />
         </div>
     );
@@ -837,6 +852,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     highlighted,
     onSelectionChange,
     selectionEnabled,
+    combineSelection = false,
     columns,
     slotKeys,
     rowClasses,
@@ -858,6 +874,13 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     highlighted?: boolean;
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
+    /**
+     * Fold the selection checkbox onto the thumbnail instead of giving it a cell
+     * of its own, buying the row back 48px for its title. Set where the row is
+     * paying for width it does not have — see the split's compact list in
+     * {@link CollectionListViewBinding}.
+     */
+    combineSelection?: boolean;
     columns: ListColumn[];
     slotKeys: CollectionSlotKeys;
     rowClasses: string;
@@ -901,6 +924,12 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
         onSelectionChange?.(entity, checked);
     }, [entity, onSelectionChange]);
 
+    /** The thumbnail-as-checkbox cell: the square toggles, and never opens the record. */
+    const handleSelectionCellClick = useCallback((e: React.MouseEvent) => {
+        e.stopPropagation();
+        onSelectionChange?.(entity, !selected);
+    }, [entity, onSelectionChange, selected]);
+
     // Developer-defined column mode (listProperties is explicitly set)
     const useColumnMode = !!collection.listProperties && collection.listProperties.length > 0;
 
@@ -924,8 +953,9 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary-500 rounded-r-full"/>
             )}
 
-            {/* Selection Checkbox */}
-            {selectionEnabled && (
+            {/* Selection Checkbox — its own cell only when it is not riding on
+                the thumbnail. See {@link ListRowProps.combineSelection}. */}
+            {selectionEnabled && !combineSelection && (
                 <div
                     className="flex-shrink-0 w-8"
                     onClick={handleCheckboxClick}
@@ -940,7 +970,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
 
             {/* MEDIA slot → Image / Icon */}
             {showImage && (
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 relative w-10 h-10">
                     {slots.image ? (
                         <div className={cls("w-10 h-10 rounded-lg border relative overflow-hidden bg-surface-100 dark:bg-surface-900", defaultBorderMixin)}>
                             <SlotValue slot={slots.image} size="small" fill={true}/>
@@ -952,6 +982,39 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                                 className="text-surface-500 dark:text-surface-400"
                                 size="small"
                             />
+                        </div>
+                    )}
+
+                    {/* The checkbox, over the thumbnail rather than beside it.
+                        Hidden until the row is hovered or the record is already
+                        selected: at rest the cell is the picture it was, and the
+                        row spends the reclaimed width on its title instead. The
+                        scrim is what makes an unchecked box legible over a photo. */}
+                    {selectionEnabled && combineSelection && (
+                        <div
+                            className={cls(
+                                "absolute inset-0 flex items-center justify-center rounded-lg transition-opacity duration-150",
+                                "bg-surface-950/55",
+                                selected
+                                    ? "opacity-100"
+                                    : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+                            )}
+                            // The whole square toggles, not just the box drawn in
+                            // it: at 40px the cell is the target the pointer is
+                            // already over, and a click that lands beside a 16px
+                            // checkbox and does nothing reads as a broken row.
+                            // The box itself takes no pointer events, so one
+                            // click is one toggle — it stays focusable, and space
+                            // still works, for the keyboard.
+                            onClick={handleSelectionCellClick}
+                        >
+                            <div className="pointer-events-none">
+                                <Checkbox
+                                    checked={selected ?? false}
+                                    onCheckedChange={handleCheckboxChange}
+                                    size="smallest"
+                                />
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1065,6 +1128,7 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     highlighted?: boolean;
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
+    combineSelection?: boolean;
     columns: ListColumn[];
     slotKeys: CollectionSlotKeys;
     rowClasses: string;

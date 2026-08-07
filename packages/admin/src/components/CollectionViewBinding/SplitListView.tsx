@@ -85,12 +85,14 @@ function isListShortcutTarget(target: HTMLElement | null, detailPanel: HTMLEleme
  * The list only has to identify a record — a title, a subtitle and a status
  * chip — while the detail beside it carries the whole record and its rail. At
  * 30% the list was taking width from the side that had four columns of fields
- * to lay out.
+ * to lay out; 26% still was, by about the width of one field.
  *
  * A default, not a constraint: {@link savePanelSize} remembers the drag per
- * collection, so anyone who has already sized this list keeps their size.
+ * collection, so anyone who has already sized this list keeps their size. The
+ * drag floor is `minPanelSizePx`, and it holds below ~1100px of split — at that
+ * width this percentage is already the floor.
  */
-const DEFAULT_PANEL_SIZE = 26;
+const DEFAULT_PANEL_SIZE = 22;
 
 function getSavedPanelSize(path: string): number {
     try {
@@ -195,12 +197,19 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
         return true;
     }, []));
 
-    // Panel size state with persistence
+    // Panel size state with persistence.
+    //
+    // Written on drag, not on mount. An effect that saved on mount stored
+    // {@link DEFAULT_PANEL_SIZE} under this collection's key the first time
+    // anyone opened the split — after which the default was frozen in every
+    // browser that had ever seen it, and changing it here reached nobody but a
+    // new visitor. Only a size someone chose is a size worth remembering.
     const [panelSize, setPanelSize] = useState(() => getSavedPanelSize(path));
 
-    useEffect(() => {
-        savePanelSize(path, panelSize);
-    }, [panelSize, path]);
+    const handlePanelSizeChange = useCallback((size: number) => {
+        setPanelSize(size);
+        savePanelSize(path, size);
+    }, [path]);
 
     // ── Animation state ──
     // We track the "rendered" entity to keep the detail panel mounted during the exit animation.
@@ -462,7 +471,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
                 secondPanel={detailPanel}
                 showSecondPanel={isDetailVisible}
                 panelSizePercent={animationPhase === "entering" ? 100 : panelSize}
-                onPanelSizeChange={setPanelSize}
+                onPanelSizeChange={handlePanelSizeChange}
                 minPanelSizePx={240}
             />
 
