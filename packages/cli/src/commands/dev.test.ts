@@ -127,6 +127,30 @@ force: true });
         expect(resolveStartPort(projectRoot)).toBe(4321);
     });
 
+    // The twin of the port-file case above. It was the branch without the
+    // check: `PORT=oops` reached `parseInt` and came back `NaN`, which was
+    // returned as the port to start from.
+    it("ignores a PORT holding an out-of-range or unparseable value", () => {
+        const hashed = getProjectPort(projectRoot);
+        for (const bad of ["0", "-1", "65536", "999999", "not-a-port", "80.5", "  "]) {
+            process.env.PORT = bad;
+            const resolved = resolveStartPort(projectRoot);
+            expect(Number.isInteger(resolved)).toBe(true);
+            expect(resolved).toBe(hashed);
+        }
+    });
+
+    it("falls back to the port file, not the hash, when PORT is unusable", () => {
+        writePortFile("4321");
+        process.env.PORT = "not-a-port";
+        expect(resolveStartPort(projectRoot)).toBe(4321);
+    });
+
+    it("tolerates surrounding whitespace in PORT", () => {
+        process.env.PORT = " 5555 ";
+        expect(resolveStartPort(projectRoot)).toBe(5555);
+    });
+
     it("falls back to the hash when the project directory does not exist", () => {
         const missing = path.join(projectRoot, "gone");
         expect(resolveStartPort(missing)).toBe(getProjectPort(missing));

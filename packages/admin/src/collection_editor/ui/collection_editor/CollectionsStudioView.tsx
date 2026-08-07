@@ -17,6 +17,7 @@ import { CollectionsConfigController } from "../../types/config_controller";
 import { CollectionStudioView } from "./CollectionStudioView";
 import type { CollectionEditorExtensionProps } from "../../extensibility_types";
 import type { AdminCollection } from "@rebasepro/admin-types";
+import { readStoredString, writeStoredString } from "@rebasepro/utils";
 
 export interface CollectionsStudioViewProps extends CollectionEditorExtensionProps {
     configController: CollectionsConfigController;
@@ -77,21 +78,18 @@ export function CollectionsStudioView({
     const collections = collectionsProp ?? configController.collections ?? [];
 
     // ── Sidebar sizing ──────────────────────────────────────────────────
+    // Checked, not just parsed: `parseFloat` answers NaN for anything it cannot
+    // read, and a NaN pane size lays the sidebar out to nothing — with the bad
+    // value still in storage on reload. `SplitListView.getSavedPanelSize` is the
+    // same read, done this way.
     const [sidebarSize, setSidebarSize] = useState(() => {
-        try {
-            const saved = localStorage.getItem("rebase_collections_editor_sidebar_size");
-            return saved !== null ? parseFloat(saved) : 25;
-        } catch (e) {
-            return 25;
-        }
+        const saved = readStoredString("rebase_collections_editor_sidebar_size");
+        const parsed = saved === null ? NaN : parseFloat(saved);
+        return Number.isFinite(parsed) && parsed > 0 && parsed < 100 ? parsed : 25;
     });
 
     useEffect(() => {
-        try {
-            localStorage.setItem("rebase_collections_editor_sidebar_size", sidebarSize.toString());
-        } catch (e) {
-            // ignore local storage error
-        }
+        writeStoredString("rebase_collections_editor_sidebar_size", sidebarSize.toString());
     }, [sidebarSize]);
 
     return (

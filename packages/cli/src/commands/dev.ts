@@ -135,19 +135,43 @@ export function getProjectPort(projectRoot: string): number {
  * 3. Previously used port from .rebase-dev-port (port affinity across restarts)
  * 4. Deterministic hash from project path (unique per project)
  */
+/**
+ * A TCP port, or `undefined` for anything that is not one.
+ *
+ * One predicate for both sources below. The port file was already checked for
+ * range, and `PORT` — the source a human or a platform actually sets — was not,
+ * so `PORT=oops` reached `parseInt` and was returned as `NaN`: the dev server
+ * then bound to whatever the OS handed out and the CLI printed a URL for a port
+ * nothing was listening on.
+ */
+function parsePort(raw: string | undefined): number | undefined {
+    if (raw === undefined) return undefined;
+    const port = Number(raw.trim());
+    if (!Number.isInteger(port) || port <= 0 || port >= 65536) return undefined;
+    return port;
+}
+
 export function resolveStartPort(projectRoot: string, explicitPort?: number): number {
     // 1. Explicit flag
     if (explicitPort) return explicitPort;
 
     // 2. PORT env var
-    if (process.env.PORT) return parseInt(process.env.PORT, 10);
+    if (process.env.PORT) {
+        const fromEnv = parsePort(process.env.PORT);
+        if (fromEnv !== undefined) return fromEnv;
+        // Set deliberately and unusable: falling through silently would start a
+        // server on a port nobody asked for and say nothing about why.
+        console.warn(chalk.yellow(
+            `  ⚠ Ignoring PORT="${process.env.PORT}" — not a port between 1 and 65535.`
+        ));
+    }
 
     // 3. Port affinity — check if we wrote a port file from a previous run
     try {
         const portFile = path.join(projectRoot, DEV_PORT_FILENAME);
         if (fs.existsSync(portFile)) {
-            const saved = parseInt(fs.readFileSync(portFile, "utf-8").trim(), 10);
-            if (saved > 0 && saved < 65536) return saved;
+            const saved = parsePort(fs.readFileSync(portFile, "utf-8"));
+            if (saved !== undefined) return saved;
         }
     } catch { /* ignore */ }
 
