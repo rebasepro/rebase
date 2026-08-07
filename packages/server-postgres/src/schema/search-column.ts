@@ -125,6 +125,29 @@ export class SearchConfigError extends Error {
 export const getSearchConfig = (collection: CollectionConfig): SearchConfig | undefined =>
     isPostgresCollectionConfig(collection) ? collection.search : undefined;
 
+/**
+ * Refuse a `search` block on a collection this engine does not store.
+ *
+ * The type only permits one on a `PostgresCollectionConfig`, so TypeScript
+ * already stops the ordinary case. This catches the rest — a JS config, a cast,
+ * a collection whose `engine` was changed after the block was written — because
+ * the alternative is the exact failure the block exists to prevent: a developer
+ * who declared what to index, saw no error, and got the substring fallback.
+ *
+ * Called with *every* collection, before the Postgres ones are filtered out.
+ */
+export const assertSearchIsPostgresOnly = (collections: CollectionConfig[]): void => {
+    for (const collection of collections) {
+        if (isPostgresCollectionConfig(collection)) continue;
+        if (!(collection as { search?: unknown }).search) continue;
+        const engine = (collection as { engine?: string }).engine ?? "non-postgres";
+        throw new SearchConfigError(
+            `${collection.slug}.search: full-text search is a Postgres feature, and this collection is served by \`${engine}\`. ` +
+            "Remove the block — it would otherwise look configured while `.search()` kept using the default substring match."
+        );
+    }
+};
+
 const columnNameOf = (propName: string, prop?: Property | null): string =>
     prop && "columnName" in prop && typeof prop.columnName === "string" ? prop.columnName : toSnakeCase(propName);
 

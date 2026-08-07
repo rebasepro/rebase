@@ -5,7 +5,8 @@ import {
     fuzzyColumnDefinition,
     searchIndexStatements,
     searchHelperFunctions,
-    SearchConfigError
+    SearchConfigError,
+    assertSearchIsPostgresOnly
 } from "../src/schema/search-column";
 
 const talents = (search: PostgresCollectionConfig["search"]): PostgresCollectionConfig => ({
@@ -199,5 +200,38 @@ describe("rendered SQL", () => {
             const spec = buildSearchColumnSpec(talents({ fields: ["full_name"], fuzzy: true }))!;
             expect(spec.fuzzy!.threshold).toBe(0.3);
         });
+    });
+});
+
+describe("assertSearchIsPostgresOnly", () => {
+    const mongoWithSearch = {
+        slug: "notes",
+        name: "Notes",
+        engine: "mongodb",
+        path: "notes",
+        properties: { body: { type: "string" } },
+        search: { fields: ["body"] }
+    } as unknown as PostgresCollectionConfig;
+
+    it("refuses a search block on a collection another engine serves", () => {
+        expect(() => assertSearchIsPostgresOnly([mongoWithSearch]))
+            .toThrow(/Postgres feature/);
+    });
+
+    it("names the engine, so the message says why", () => {
+        expect(() => assertSearchIsPostgresOnly([mongoWithSearch]))
+            .toThrow(/mongodb/);
+    });
+
+    it("passes a non-Postgres collection that declares no search", () => {
+        const { search, ...withoutSearch } = mongoWithSearch as Record<string, unknown>;
+        expect(() => assertSearchIsPostgresOnly([withoutSearch as never])).not.toThrow();
+    });
+
+    it("passes Postgres collections, with or without a block", () => {
+        expect(() => assertSearchIsPostgresOnly([
+            talents({ fields: ["full_name"] }),
+            talents(undefined)
+        ])).not.toThrow();
     });
 });

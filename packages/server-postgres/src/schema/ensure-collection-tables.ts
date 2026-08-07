@@ -29,6 +29,7 @@ import { type CollectionConfig, type Property, isPostgresCollectionConfig } from
 import { getTableName, relationalCollections } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 import {
+    assertSearchIsPostgresOnly,
     buildSearchColumnSpec,
     searchExtensionStatements,
     searchHelperFunctions,
@@ -191,6 +192,10 @@ export function planCollectionSchemaEnsure(
     // Firestore collection is not a harmless extra: the app keeps reading
     // documents from Firestore while an empty table with the same name accretes
     // policies and shows up in every drift report.
+    // Before the filter, deliberately: a `search` block on a collection this
+    // engine does not store would otherwise be dropped here without a word.
+    assertSearchIsPostgresOnly(allCollections);
+
     const collections = relationalCollections(allCollections);
     const actions: EnsureAction[] = [];
     const plannedEnums = new Set<string>();
