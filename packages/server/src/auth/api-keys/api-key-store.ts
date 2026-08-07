@@ -13,6 +13,7 @@ import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
 import { revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../../utils/logger";
+import { createDdlBootstrapper } from "../../boot/ddl-bootstrap";
 import type {
     ApiKey,
     ApiKeyMasked,
@@ -146,58 +147,80 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
     const exec = (sqlText: string, options?: { params?: unknown[] }) =>
         admin.executeSql(sqlText, options?.params ? { params: options.params } : undefined);
 
+    const ddl = createDdlBootstrapper(exec, "api-key-store");
+
     return {
         // ── Schema bootstrap ────────────────────────────────────────
         async ensureTable(): Promise<void> {
-            try {
-                await exec("CREATE SCHEMA IF NOT EXISTS rebase");
-                await exec(`
-                    CREATE TABLE IF NOT EXISTS ${TABLE} (
-                        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                        name TEXT NOT NULL,
-                        key_prefix TEXT NOT NULL,
-                        key_hash TEXT NOT NULL UNIQUE,
-                        permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
-                        admin BOOLEAN NOT NULL DEFAULT FALSE,
-                        rate_limit INTEGER,
-                        created_by TEXT NOT NULL,
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                        last_used_at TIMESTAMPTZ,
-                        expires_at TIMESTAMPTZ,
-                        revoked_at TIMESTAMPTZ
-                    )
-                `);
+            // Every statement here is idempotent, so losing the race to a peer
+            // that booted at the same moment is survivable — but only if the
+            // loser retries instead of abandoning everything below it. One
+            // contained step each, so that a hard failure on any one of them
+            // does not take the others with it. See `boot/ddl-bootstrap.ts`.
+            await ddl.ensureObject("Creating schema rebase", "CREATE SCHEMA IF NOT EXISTS rebase");
 
-                await exec(`
-                    CREATE INDEX IF NOT EXISTS idx_api_keys_hash
-                    ON ${TABLE}(key_hash)
-                `);
+            await ddl.ensureObject(`Creating ${TABLE}`, `
+                CREATE TABLE IF NOT EXISTS ${TABLE} (
+                    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                    name TEXT NOT NULL,
+                    key_prefix TEXT NOT NULL,
+                    key_hash TEXT NOT NULL UNIQUE,
+                    permissions JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    admin BOOLEAN NOT NULL DEFAULT FALSE,
+                    rate_limit INTEGER,
+                    created_by TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    last_used_at TIMESTAMPTZ,
+                    expires_at TIMESTAMPTZ,
+                    revoked_at TIMESTAMPTZ
+                )
+            `);
 
-                await exec(`
-                    CREATE INDEX IF NOT EXISTS idx_api_keys_prefix
-                    ON ${TABLE}(key_prefix)
-                `);
+            await ddl.ensureObject("Creating idx_api_keys_hash", `
+                CREATE INDEX IF NOT EXISTS idx_api_keys_hash
+                ON ${TABLE}(key_hash)
+            `);
 
-                // Migration: add admin column to existing tables
-                await exec(`
-                    ALTER TABLE ${TABLE}
-                    ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE
-                `);
+            await ddl.ensureObject("Creating idx_api_keys_prefix", `
+                CREATE INDEX IF NOT EXISTS idx_api_keys_prefix
+                ON ${TABLE}(key_prefix)
+            `);
 
-                // This table holds key hashes and an `admin` flag, and it has no
-                // RLS — it is not a collection. The Postgres driver grants the
-                // authenticated role DML on everything in `rebase`, including
-                // tables (like this one) created after that grant ran, so the
-                // privilege has to come back off. Without it a user-context
-                // query that reached this table could mint itself an admin key.
-                await exec(revokeInternalTableSql("rebase", "api_keys"));
+            // Migration: add admin column to existing tables. Idempotent in the
+            // same way and raced in the same way — two instances running it
+            // together can deadlock on the table's catalog lock.
+            await ddl.ensureObject(`Adding ${TABLE}.admin`, `
+                ALTER TABLE ${TABLE}
+                ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE
+            `);
 
-                logger.info("✅ API keys table ready");
-            } catch (err) {
-                logger.error("❌ Failed to create API keys table", { error: err });
-                logger.warn("⚠️ Continuing without API keys support.");
+            // Keyed on what exists, not on who created it. The revoke below used
+            // to sit at the end of one long try block, so an instance that lost
+            // any race above skipped it and reported only that API keys were
+            // unavailable — while the table it had just helped create stayed
+            // reachable by the end-user role.
+            if (!await ddl.isReadable(TABLE)) {
+                logger.error(
+                    `❌ [api-key-store] ${TABLE} is unavailable — every API-key authenticated ` +
+                    "request will be rejected on this instance, and the table could not be " +
+                    "taken back off the end-user role."
+                );
+                return;
             }
+
+            // This table holds key hashes and an `admin` flag, and it has no
+            // RLS — it is not a collection. The Postgres driver grants the
+            // authenticated role DML on everything in `rebase`, including
+            // tables (like this one) created after that grant ran, so the
+            // privilege has to come back off. Without it a user-context
+            // query that reached this table could mint itself an admin key.
+            // A security control, so it is re-applied by every instance on
+            // every boot, whatever else went wrong above.
+            await ddl.step("Revoking end-user access to api_keys", () =>
+                exec(revokeInternalTableSql("rebase", "api_keys")));
+
+            logger.info("✅ API keys table ready");
         },
 
         // ── Create ──────────────────────────────────────────────────

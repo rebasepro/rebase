@@ -3,6 +3,7 @@ import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
 import { revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
+import { createDdlBootstrapper, hasInCauseChain } from "../boot/ddl-bootstrap.js";
 
 /**
  * Persistence layer for cron job execution logs.
@@ -69,23 +70,21 @@ const FUTURE_CLAIM_SKEW_MINUTES = 2;
 
 /**
  * Detect a unique-constraint violation anywhere in an error's cause chain.
- * Drizzle wraps the PG error — match the SQLSTATE code, never message text.
- * Also covers SQLite ("UNIQUE constraint failed") and MySQL (ER_DUP_ENTRY 1062)
- * for future SQL drivers.
+ * Match the SQLSTATE code, never message text. Also covers SQLite
+ * ("UNIQUE constraint failed") and MySQL (ER_DUP_ENTRY 1062) for future SQL
+ * drivers.
+ *
+ * Distinct from `isConcurrentDdlRace` in `boot/ddl-bootstrap.ts`, which shares
+ * the 23505 code but asks a different question — that one is about a losing
+ * `CREATE`, this one is about a losing claim, and only the latter means
+ * "another instance already has this slot".
  */
 function isUniqueViolation(err: unknown): boolean {
-    let current: unknown = err;
-    for (let depth = 0; depth < 10 && current; depth++) {
-        if (typeof current === "object") {
-            const e = current as { code?: unknown; errno?: unknown; message?: unknown; cause?: unknown };
-            if (e.code === "23505" || e.errno === 1062) return true;
-            if (typeof e.message === "string" && e.message.includes("UNIQUE constraint failed")) return true;
-            current = e.cause;
-        } else {
-            break;
-        }
-    }
-    return false;
+    return hasInCauseChain(err, (e) =>
+        e.code === "23505" ||
+        e.errno === 1062 ||
+        (typeof e.message === "string" && e.message.includes("UNIQUE constraint failed"))
+    );
 }
 
 export function createCronStore(driver: DataDriver): CronStore | undefined {
@@ -98,45 +97,68 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
     const exec = (sqlText: string, options?: { params?: unknown[] }) =>
         admin.executeSql(sqlText, options?.params ? { params: options.params } : undefined);
 
+    const ddl = createDdlBootstrapper(exec, "cron-store");
+
     return {
         async ensureTable(): Promise<void> {
-            try {
-                await exec("CREATE SCHEMA IF NOT EXISTS rebase");
-                await exec(`
-                    CREATE TABLE IF NOT EXISTS ${TABLE} (
-                        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-                        job_id TEXT NOT NULL,
-                        started_at TIMESTAMPTZ NOT NULL,
-                        finished_at TIMESTAMPTZ NOT NULL,
-                        duration_ms INTEGER NOT NULL,
-                        success BOOLEAN NOT NULL DEFAULT true,
-                        error TEXT,
-                        result JSONB,
-                        logs JSONB,
-                        manual BOOLEAN NOT NULL DEFAULT false
-                    )
-                `);
+            // Creation. Every statement here is idempotent, so losing the race
+            // to a peer that booted at the same moment is survivable — but only
+            // if the loser retries rather than abandoning everything below it.
+            // One step each, so a hard failure on any one of them does not take
+            // the others with it. The claims table in particular must not be
+            // lost because an index on the *logs* table could not be built.
+            await ddl.ensureObject("Creating schema rebase", "CREATE SCHEMA IF NOT EXISTS rebase");
 
-                await exec(`
-                    CREATE INDEX IF NOT EXISTS idx_cron_logs_job
-                    ON ${TABLE}(job_id, started_at DESC)
-                `);
+            await ddl.ensureObject(`Creating ${TABLE}`, `
+                CREATE TABLE IF NOT EXISTS ${TABLE} (
+                    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+                    job_id TEXT NOT NULL,
+                    started_at TIMESTAMPTZ NOT NULL,
+                    finished_at TIMESTAMPTZ NOT NULL,
+                    duration_ms INTEGER NOT NULL,
+                    success BOOLEAN NOT NULL DEFAULT true,
+                    error TEXT,
+                    result JSONB,
+                    logs JSONB,
+                    manual BOOLEAN NOT NULL DEFAULT false
+                )
+            `);
 
-                await exec(`
-                    CREATE TABLE IF NOT EXISTS ${CLAIMS_TABLE} (
-                        job_id TEXT NOT NULL,
-                        slot TIMESTAMPTZ NOT NULL,
-                        claimed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-                        PRIMARY KEY (job_id, slot)
-                    )
-                `);
+            await ddl.ensureObject("Creating idx_cron_logs_job", `
+                CREATE INDEX IF NOT EXISTS idx_cron_logs_job
+                ON ${TABLE}(job_id, started_at DESC)
+            `);
 
+            await ddl.ensureObject(`Creating ${CLAIMS_TABLE}`, `
+                CREATE TABLE IF NOT EXISTS ${CLAIMS_TABLE} (
+                    job_id TEXT NOT NULL,
+                    slot TIMESTAMPTZ NOT NULL,
+                    claimed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    PRIMARY KEY (job_id, slot)
+                )
+            `);
+
+            // Everything from here is keyed on what actually exists, not on
+            // whether *this* instance is the one that created it. A single
+            // failure above used to abandon the rest of this method, which meant
+            // the loser of a boot race skipped the sweeps and — far worse — the
+            // privilege revocation, leaving the claims table writable by end
+            // users on an instance that reported nothing but a warning about
+            // log persistence.
+            const [logsReady, claimsReady] = await Promise.all([
+                ddl.isReadable(TABLE),
+                ddl.isReadable(CLAIMS_TABLE)
+            ]);
+
+            if (claimsReady) {
                 // Garbage-collect old claims — they are only needed while
                 // instances could still contend on the same slot.
-                await exec(
-                    `DELETE FROM ${CLAIMS_TABLE} WHERE claimed_at < now() - make_interval(days => $1)`,
-                    { params: [CLAIM_RETENTION_DAYS] }
-                );
+                await ddl.step("Claim retention sweep", async () => {
+                    await exec(
+                        `DELETE FROM ${CLAIMS_TABLE} WHERE claimed_at < now() - make_interval(days => $1)`,
+                        { params: [CLAIM_RETENTION_DAYS] }
+                    );
+                });
 
                 // Drop claims for slots that have not happened yet. A slot is
                 // claimed at the moment it fires, so a future one can only come
@@ -144,34 +166,56 @@ export function createCronStore(driver: DataDriver): CronStore | undefined {
                 // permanent, that claim would silently skip the real run when it
                 // finally came due. The margin keeps a legitimate claim made
                 // moments early by a clock-skewed peer.
-                const stranded = await exec(
-                    `DELETE FROM ${CLAIMS_TABLE}
-                     WHERE slot > now() + make_interval(mins => $1)
-                     RETURNING job_id, slot`,
-                    { params: [FUTURE_CLAIM_SKEW_MINUTES] }
-                );
-                // A driver that does not honour RETURNING gives back nothing;
-                // the rows are only used to report, so treat that as "none".
-                for (const row of (stranded ?? []) as { job_id: string; slot: string }[]) {
-                    logger.warn(
-                        `[cron-store] Released a claim on the future slot ${new Date(row.slot).toISOString()} ` +
-                        `for "${row.job_id}" — it was claimed by a timer that fired early, and would ` +
-                        "otherwise have skipped that run"
+                await ddl.step("Future-slot claim sweep", async () => {
+                    const stranded = await exec(
+                        `DELETE FROM ${CLAIMS_TABLE}
+                         WHERE slot > now() + make_interval(mins => $1)
+                         RETURNING job_id, slot`,
+                        { params: [FUTURE_CLAIM_SKEW_MINUTES] }
                     );
-                }
+                    // A driver that does not honour RETURNING gives back
+                    // nothing; the rows are only used to report, so treat that
+                    // as "none".
+                    for (const row of (stranded ?? []) as { job_id: string; slot: string }[]) {
+                        logger.warn(
+                            `[cron-store] Released a claim on the future slot ${new Date(row.slot).toISOString()} ` +
+                            `for "${row.job_id}" — it was claimed by a timer that fired early, and would ` +
+                            "otherwise have skipped that run"
+                        );
+                    }
+                });
+            }
 
-                // Neither table is a collection, so neither carries RLS, while
-                // the Postgres driver's schema-wide grant reaches both. Cron
-                // logs hold job output — arbitrary application data — and a
-                // writable `cron_claims` lets any signed-in user suppress a
-                // scheduled run by claiming its slot.
-                await exec(revokeInternalTableSql("rebase", "cron_logs"));
-                await exec(revokeInternalTableSql("rebase", "cron_claims"));
+            // Neither table is a collection, so neither carries RLS, while the
+            // Postgres driver's schema-wide grant reaches both. Cron logs hold
+            // job output — arbitrary application data — and a writable
+            // `cron_claims` lets any signed-in user suppress a scheduled run by
+            // claiming its slot. This is a security control, so it is re-applied
+            // by every instance on every boot, whatever else went wrong.
+            if (logsReady) {
+                await ddl.step("Revoking end-user access to cron_logs", () =>
+                    exec(revokeInternalTableSql("rebase", "cron_logs")));
+            }
+            if (claimsReady) {
+                await ddl.step("Revoking end-user access to cron_claims", () =>
+                    exec(revokeInternalTableSql("rebase", "cron_claims")));
+            }
 
+            if (logsReady && claimsReady) {
                 logger.info("✅ Cron logs table ready");
-            } catch (err) {
-                logger.error("❌ Failed to create cron logs table", { error: err });
-                logger.warn("⚠️ Continuing without cron log persistence.");
+                return;
+            }
+            // Say which capability is gone, and what it costs. "Continuing
+            // without cron log persistence" undersold this: the claims table is
+            // the only thing stopping every instance from running every job.
+            if (!claimsReady) {
+                logger.error(
+                    `❌ [cron-store] ${CLAIMS_TABLE} is unavailable — scheduled runs cannot be coordinated. ` +
+                    "With more than one app instance, every instance will now run every job on every tick."
+                );
+            }
+            if (!logsReady) {
+                logger.warn(`⚠️ [cron-store] ${TABLE} is unavailable — cron run history will not be persisted.`);
             }
         },
 
