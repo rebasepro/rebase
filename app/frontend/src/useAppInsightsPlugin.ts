@@ -6,28 +6,62 @@ import type { createRebaseClient } from "@rebasepro/client";
 
 type RebaseClientType = ReturnType<typeof createRebaseClient>;
 
+/** Period-over-period deltas are null when the previous window was empty. */
+type Change = number | null;
+
+interface HomeInsights {
+    totalRevenue: number;
+    totalRevenueChange: Change;
+    totalOrders: number;
+    totalOrdersChange: Change;
+    avgOrderValue: number;
+    avgOrderValueChange: Change;
+    refundedOrders: number;
+    refundedOrdersChange: Change;
+}
+
 /**
  * Custom hook to initialize the Insights plugin.
  * Handles fetching logic for home and collection insights and returns the plugin instance.
  */
 export function useAppInsightsPlugin(rebaseClient: RebaseClientType): RebasePlugin {
     // ── Insights Fetch Helpers ─────────────────────────────────────────
+    // The insights cache keys on the insight id, so the four home
+    // scorecards each call their own `data()` and would each issue the
+    // same GET. Sharing the in-flight promise collapses them back to the
+    // single round trip the endpoint was written for; it is cleared on
+    // settle so a later refresh still re-fetches.
+    const inflightHome = React.useRef<Promise<HomeInsights> | null>(null);
+    const inflightCollections = React.useRef(new Map<string, Promise<Record<string, number | null>>>());
+
     const fetchHomeInsights = React.useCallback(
-        () => rebaseClient.functions.invoke<{
-            totalRevenue: number;
-            totalOrders: number;
-            avgOrderValue: number;
-            refundedOrders: number;
-        }>("insights", undefined, { method: "GET",
-path: "home" }),
+        () => {
+            if (!inflightHome.current) {
+                inflightHome.current = rebaseClient.functions
+                    .invoke<HomeInsights>("insights", undefined, { method: "GET",
+path: "home" })
+                    .finally(() => { inflightHome.current = null; });
+            }
+            return inflightHome.current;
+        },
         [rebaseClient]
     );
 
     const fetchCollectionInsights = React.useCallback(
-        (slug: string) => rebaseClient.functions.invoke<Record<string, number>>(
-            "insights", undefined, { method: "GET",
+        (slug: string) => {
+            const inflight = inflightCollections.current;
+            let pending = inflight.get(slug);
+            if (!pending) {
+                pending = rebaseClient.functions
+                    .invoke<Record<string, number | null>>(
+                        "insights", undefined, { method: "GET",
 path: `collection/${slug}` }
-        ),
+                    )
+                    .finally(() => { inflight.delete(slug); });
+                inflight.set(slug, pending);
+            }
+            return pending;
+        },
         [rebaseClient]
     );
 
@@ -42,7 +76,7 @@ path: `collection/${slug}` }
                     data: async () => {
                         const stats = await fetchHomeInsights();
                         return { rows: [{ value: stats.totalRevenue,
-comp: 0.15 }] };
+comp: stats.totalRevenueChange }] };
                     },
                     scorecard: {
                         value: { field: "value",
@@ -65,7 +99,7 @@ intent: "increase_is_good" },
                     data: async () => {
                         const stats = await fetchHomeInsights();
                         return { rows: [{ value: stats.totalOrders,
-comp: 0.124 }] };
+comp: stats.totalOrdersChange }] };
                     },
                     scorecard: {
                         value: { field: "value",
@@ -85,7 +119,7 @@ intent: "increase_is_good" },
                     data: async () => {
                         const stats = await fetchHomeInsights();
                         return { rows: [{ value: stats.avgOrderValue,
-comp: -0.052 }] };
+comp: stats.avgOrderValueChange }] };
                     },
                     scorecard: {
                         value: { field: "value",
@@ -107,7 +141,7 @@ intent: "increase_is_good" },
                     data: async () => {
                         const stats = await fetchHomeInsights();
                         return { rows: [{ value: stats.refundedOrders,
-comp: 0.021 }] };
+comp: stats.refundedOrdersChange }] };
                     },
                     scorecard: {
                         value: { field: "value",
@@ -130,7 +164,7 @@ intent: "decrease_is_good" },
                         data: async () => {
                             const stats = await fetchCollectionInsights("orders");
                             return { rows: [{ value: stats.confirmed,
-comp: 0.18 }] };
+comp: stats.confirmedChange }] };
                         },
                         scorecard: {
                             value: { field: "value",
@@ -141,7 +175,7 @@ showSign: true,
 decimals: 1 },
 intent: "increase_is_good" as const },
                             icon: "CheckCircle",
-                            dateRange: "vs Previous Week"
+                            dateRange: "vs Previous 30 Days"
                         }
                     },
                     {
@@ -150,7 +184,7 @@ intent: "increase_is_good" as const },
                         data: async () => {
                             const stats = await fetchCollectionInsights("orders");
                             return { rows: [{ value: stats.shipped,
-comp: 0.074 }] };
+comp: stats.shippedChange }] };
                         },
                         scorecard: {
                             value: { field: "value",
@@ -161,7 +195,7 @@ showSign: true,
 decimals: 1 },
 intent: "increase_is_good" as const },
                             icon: "Truck",
-                            dateRange: "vs Previous Week"
+                            dateRange: "vs Previous 30 Days"
                         }
                     },
                     {
@@ -169,14 +203,21 @@ intent: "increase_is_good" as const },
                         title: "Revenue",
                         data: async () => {
                             const stats = await fetchCollectionInsights("orders");
-                            return { rows: [{ value: stats.revenue }] };
+                            return { rows: [{ value: stats.revenue,
+comp: stats.revenueChange }] };
                         },
                         scorecard: {
                             value: { field: "value",
 format: { style: "currency",
 currency: "USD",
 notation: "compact",
-decimals: 1 } }
+decimals: 1 } },
+                            comparison: { field: "comp",
+format: { style: "percent",
+showSign: true,
+decimals: 1 },
+intent: "increase_is_good" as const },
+                            dateRange: "vs Previous 30 Days"
                         }
                     }
                 ],

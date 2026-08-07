@@ -245,126 +245,31 @@ function pickN<T>(arr: T[], n: number): T[] {
     const s = [...arr].sort(() => Math.random() - 0.5);
     return s.slice(0, n);
 }
-function slugify(s: string): string {
-    return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
 function randomDate(startDaysAgo: number, endDaysAgo: number): string {
     const now = Date.now();
     return new Date(now - startDaysAgo * 86400000 + Math.random() * (startDaysAgo - endDaysAgo) * 86400000).toISOString();
+}
+/**
+ * A date within the last `spanDays`, weighted toward the present.
+ *
+ * The dashboard's scorecards compare a 30-day window against the 30 days
+ * before it, so orders have to span more than one window or every delta
+ * is a comparison against nothing. Raising the uniform draw to a power
+ * tilts the rows toward now; the exponent is deliberately close to 1,
+ * which puts ~40% of a 90-day span in its most recent third and lands
+ * the month-over-month delta around +25%. Steeper values look less like
+ * a store doing well and more like the numbers are made up.
+ */
+function recentBiasedDate(spanDays: number): string {
+    return new Date(Date.now() - (Math.random() ** 1.2) * spanDays * 86400000).toISOString();
 }
 function currentYear(): number { return new Date().getFullYear(); }
 
 
 // ── Blog post topics (no PHP, TypeScript-heavy) ───────────────────────
-const topics = [
-    "Getting Started with React Server Components",
-    "Building Type-Safe APIs with tRPC and Zod",
-    "PostgreSQL Performance Tuning: A Practical Guide",
-    "The Complete Guide to CSS Container Queries",
-    "Microservices vs Monoliths: Making the Right Choice",
-    "Introduction to WebAssembly for Web Developers",
-    "Securing Your Node.js Application: Best Practices",
-    "Understanding the V8 Engine: How JavaScript Executes",
-    "Docker for Full-Stack Developers: From Dev to Prod",
-    "Machine Learning Fundamentals with Python",
-    "Rust for Systems Programming: Why It Matters",
-    "Building Real-Time Applications with WebSockets",
-    "GraphQL vs REST: A Comprehensive Comparison",
-    "Kubernetes for Beginners: Container Orchestration Demystified",
-    "Advanced TypeScript Patterns for Large Codebases",
-    "Testing React Applications with Vitest and Testing Library",
-    "AWS Lambda and Serverless Architecture Deep Dive",
-    "Modern Authentication: JWTs, OAuth 2.0, and Beyond",
-    "The Future of AI-Assisted Development",
-    "React Native vs Flutter: Cross-Platform Showdown",
-    "CI/CD Pipelines with GitHub Actions",
-    "Drizzle ORM: The TypeScript-First Database Toolkit",
-    "Understanding Web Vitals and Core Performance Metrics",
-    "Astro and the Island Architecture: A New Way to Build",
-    "Building a Design System with Tailwind CSS",
-    "Hono: The Ultrafast Web Framework for the Edge",
-    "From Express to Hono: Migrating Your Node.js API",
-    "Data Modeling Best Practices for PostgreSQL",
-    "Tailwind CSS at Scale: Custom Plugins and Design Tokens",
-    "Observability in Production: Logs, Metrics, and Traces",
-    "Astro + React: Building Hybrid Static and Dynamic Sites",
-    "Building CLI Tools with Node.js and Commander",
-    "The Art of Code Review: Beyond Bug Finding",
-    "PostgreSQL Full-Text Search vs Elasticsearch",
-    "Practical Event-Driven Architecture with Node.js",
-    "TypeScript Generics: From Basics to Advanced",
-    "Building a Blog Engine with Astro and Tailwind CSS",
-    "Zero-Trust Security Architecture for Modern Apps",
-    "Effective Debugging Strategies for Node.js Applications",
-    "Horizontal Scaling Strategies for PostgreSQL",
-    "State Management in React: What Actually Works in 2025",
-    "Building Progressive Web Apps with Astro",
-    "Hono Middleware Patterns: Auth, CORS, and Logging",
-    "Tailwind CSS vs Styled Components: A Practical Comparison",
-    "TypeScript Monorepos with Turborepo and pnpm",
-    "Node.js Streams and Backpressure: A Deep Dive",
-    "The Developer's Guide to Technical Writing",
-    "PostgreSQL JSON Columns: When and How to Use Them",
-    "React Server Components and Astro: Complementary Tools",
-    "Deploying Hono to Cloudflare Workers and Deno Deploy"
-];
 
-const markdownIntros = [
-    "In this comprehensive guide, we'll explore the key concepts and practical techniques that every developer should know. Whether you're just starting out or looking to deepen your expertise, this article has something for you.",
-    "The landscape of software development is constantly evolving. What worked a year ago might not be the best approach today. Let's dive into the current state of the art and discover what's changed.",
-    "As applications grow in complexity, choosing the right tools and patterns becomes critical. In this post, we'll walk through real-world examples and battle-tested approaches that scale.",
-    "Have you ever wondered why some teams ship faster with fewer bugs? The answer often lies in the fundamentals. Let's revisit the basics with a modern perspective.",
-    "Performance isn't just a nice-to-have — it's a competitive advantage. In this article, we'll look at concrete techniques to make your applications faster and more efficient."
-];
 
-const markdownSections = [
-    "## Getting Started\n\nBefore diving in, let's set up our development environment:\n\n- **Node.js 20+** installed\n- A modern code editor (VS Code recommended)\n- Basic familiarity with the command line\n\n```bash\nnpm create my-project@latest\ncd my-project\nnpm install\n```\n\nOnce set up, you're ready to start building.",
 
-    "## Core Concepts\n\nThe architecture follows a simple principle: **separation of concerns**.\n\n1. **Presentation Layer** — handles UI rendering\n2. **Business Logic Layer** — domain-specific rules\n3. **Data Access Layer** — manages persistence\n\nThis separation makes code easier to test and maintain.",
-
-    "## Best Practices\n\n- **Write tests first** — TDD catches bugs early\n- **Keep functions small** — each function does one thing\n- **Use meaningful names** — code is read more than written\n- **Prefer composition over inheritance**\n\n> \"Any fool can write code that a computer can understand. Good programmers write code that humans can understand.\" — Martin Fowler",
-
-    "## Performance Optimization\n\n```typescript\n// Before: O(n²)\nconst result = items.filter(item =>\n  otherItems.some(other => other.id === item.id)\n);\n\n// After: O(n) with a Set\nconst idSet = new Set(otherItems.map(o => o.id));\nconst result = items.filter(item => idSet.has(item.id));\n```\n\nSmall changes like this have dramatic impact on large datasets.",
-
-    "## Error Handling\n\nRobust error handling separates production code from prototypes:\n\n```typescript\nasync function fetchData(url: string) {\n  const response = await fetch(url);\n  if (!response.ok) {\n    throw new HttpError(response.status);\n  }\n  return response.json();\n}\n```",
-
-    "## Architecture Patterns\n\n| Pattern | Pros | Cons |\n|---------|------|------|\n| Monolith | Simple deployment | Harder to scale |\n| Microservices | Independent scaling | Operational complexity |\n| Modular Monolith | Best of both | Requires discipline |\n\n**There's no one-size-fits-all solution.** Choose what matches your team.",
-
-    "## Security Considerations\n\n- Validate and sanitize all user input\n- Use parameterized queries to prevent SQL injection\n- Implement rate limiting on public endpoints\n- Store secrets in environment variables\n\n```typescript\n// Never do this\nconst query = `SELECT * FROM users WHERE id = '${userId}'`;\n\n// Do this instead\nconst query = db.select().from(users).where(eq(users.id, userId));\n```",
-
-    "## Deployment Strategies\n\n- **Blue-Green Deployments** — two identical production environments\n- **Canary Releases** — gradually route traffic to new version\n- **Feature Flags** — decouple deployment from feature release\n\nThe goal is to make deployments boring.",
-
-    "## Monitoring and Observability\n\n1. **Structured Logging** — JSON logs with trace IDs\n2. **Metrics** — request latency, error rates\n3. **Distributed Tracing** — follow requests across services\n4. **Alerting** — actionable alerts, not noise\n\nInvest in observability early.",
-
-    "## Conclusion\n\nThe technologies we've discussed represent the current state of the art, but they'll continue to evolve. The most important skill isn't mastering any particular tool — it's the ability to learn, adapt, and make pragmatic decisions.\n\nStay curious, keep building.",
-
-    "## The React Mental Model\n\nReact's component model has fundamentally changed how we think about UI development. Instead of imperatively mutating the DOM, we describe *what* the UI should look like and let the framework figure out the rest.\n\n> \"React is not a framework. It's a library for building composable user interfaces. It encourages the creation of reusable UI components which present data that changes over time.\" — React Documentation\n\nThis declarative approach scales remarkably well. A team of fifty engineers can work on the same codebase without stepping on each other's toes, because each component is a self-contained unit with clear inputs and outputs.\n\n```tsx\nfunction PostCard({ title, excerpt, author }: PostCardProps) {\n  return (\n    <article className=\"rounded-lg border p-6 hover:shadow-md transition-shadow\">\n      <h3 className=\"text-lg font-semibold\">{title}</h3>\n      <p className=\"mt-2 text-gray-600\">{excerpt}</p>\n      <span className=\"mt-4 text-sm text-gray-400\">By {author}</span>\n    </article>\n  );\n}\n```\n\nNotice how Tailwind CSS classes make the styling intent immediately obvious. No jumping between files, no naming debates.",
-
-    "## Why PostgreSQL Keeps Winning\n\nIn a world of shiny new databases, PostgreSQL remains the reliable workhorse that powers everything from startups to Fortune 500 companies.\n\n> \"PostgreSQL is the most advanced open-source relational database in the world. Full stop.\" — Bruce Momjian, PostgreSQL Core Team\n\nWhat makes Postgres special isn't any single feature — it's the *combination* of rock-solid reliability, extensibility, and a feature set that rivals commercial databases costing six figures.\n\n```sql\n-- Full-text search, JSONB, CTEs, window functions — all built in\nSELECT title, ts_rank(search_vector, query) AS rank\nFROM posts, to_tsquery('english', 'react & typescript') AS query\nWHERE search_vector @@ query\nORDER BY rank DESC\nLIMIT 20;\n```\n\nWith features like JSONB columns, row-level security, and logical replication, Postgres adapts to almost any workload without forcing you into a different database.",
-
-    "## Tailwind CSS: Utility-First Done Right\n\nWhen Tailwind CSS first appeared, many developers dismissed it as \"inline styles with extra steps.\" They were wrong.\n\n> \"I've written CSS for over 20 years, and Tailwind CSS is the most productive way I've ever styled anything. Once you get past the initial learning curve, you'll never want to go back.\" — Adam Wathan, Creator of Tailwind CSS\n\nThe key insight is that utility classes aren't just about writing CSS faster — they're about **eliminating the decision fatigue** that comes with naming things and organizing stylesheets.\n\n```html\n<div class=\"flex items-center gap-4 rounded-xl bg-white p-6 shadow-lg\n            ring-1 ring-black/5 dark:bg-gray-800\">\n  <img class=\"size-12 rounded-full\" src=\"/avatar.jpg\" alt=\"\" />\n  <div>\n    <p class=\"text-sm font-semibold text-gray-900 dark:text-white\">Sarah Chen</p>\n    <p class=\"text-sm text-gray-500\">Senior Engineer</p>\n  </div>\n</div>\n```\n\nThe result is a design system that lives in your markup, is instantly readable by any team member, and produces tiny CSS bundles in production.",
-
-    "## Astro's Content-First Philosophy\n\nAstro introduced a radical idea: what if your framework shipped **zero JavaScript by default**?\n\n> \"The secret to a fast website isn't a faster framework — it's less JavaScript.\" — Fred K. Schott, Creator of Astro\n\nWith the island architecture, Astro lets you use React, Vue, Svelte, or any other UI framework — but only hydrates the interactive parts of the page. The static content ships as pure HTML.\n\n```astro\n---\nimport PostList from '../components/PostList.tsx';\nimport Newsletter from '../components/Newsletter.tsx';\nconst posts = await fetch('/api/posts').then(r => r.json());\n---\n<html>\n  <body>\n    <h1>Our Blog</h1>\n    <!-- Static: zero JS -->\n    <PostList posts={posts} />\n    <!-- Interactive island: hydrated on visible -->\n    <Newsletter client:visible />\n  </body>\n</html>\n```\n\nFor content-heavy sites like blogs, documentation, and marketing pages, this approach delivers performance numbers that are almost impossible to match with traditional SPAs.",
-
-    "## Hono: Speed Without Compromise\n\nHono emerged as a game-changer in the Node.js ecosystem — a web framework built for the edge that doesn't sacrifice developer experience for performance.\n\n> \"Hono is ultrafast, lightweight, and works on any JavaScript runtime. It's the web framework for the edges of the internet.\" — Yusuke Wada, Creator of Hono\n\nWhat sets Hono apart is its commitment to Web Standards. It uses the Fetch API, Request, and Response objects natively, meaning your code runs unchanged on Cloudflare Workers, Deno, Bun, and Node.js.\n\n```typescript\nimport { Hono } from 'hono';\nimport { cors } from 'hono/cors';\nimport { jwt } from 'hono/jwt';\n\nconst app = new Hono();\n\napp.use('/api/*', cors());\napp.use('/api/*', jwt({ secret: process.env.JWT_SECRET! }));\n\napp.get('/api/posts', async (c) => {\n  const posts = await db.select().from(postsTable).limit(20);\n  return c.json({ data: posts });\n});\n\nexport default app;\n```\n\nThe middleware ecosystem is rich, the TypeScript support is first-class, and the router is one of the fastest in any JavaScript runtime.",
-
-    "## The Node.js Event Loop Explained\n\nEven experienced Node.js developers get tripped up by the event loop. Understanding it deeply is the difference between writing code that works and code that scales.\n\n> \"Node.js is not a silver bullet. It's a tool that solves a specific class of problems extremely well — I/O-bound, event-driven applications.\" — Ryan Dahl, Creator of Node.js\n\nThe event loop processes callbacks in a specific order: timers, pending callbacks, idle, poll, check, and close callbacks. Each phase has a FIFO queue of callbacks to execute.\n\n```typescript\n// This is NOT what you think it is\nsetTimeout(() => console.log('timeout'), 0);\nsetImmediate(() => console.log('immediate'));\nprocess.nextTick(() => console.log('nextTick'));\nPromise.resolve().then(() => console.log('promise'));\n\n// Output: nextTick → promise → timeout → immediate\n// (or timeout → immediate may swap depending on system load)\n```\n\nWhen you understand the event loop, you understand why `await` matters, why CPU-bound work blocks everything, and why worker threads exist. It's foundational knowledge for any serious Node.js developer."
-];
-
-const excerpts = [
-    "A deep dive into modern development practices that will level up your engineering skills.",
-    "Practical tips and patterns you can start using in your projects today.",
-    "Everything you need to know to get started, with real-world examples and best practices.",
-    "A comprehensive guide for developers looking to build scalable, maintainable applications.",
-    "Lessons learned from building and maintaining production systems at scale.",
-    "Exploring cutting-edge techniques that are reshaping how we build software.",
-    "A hands-on walkthrough with code examples you can copy-paste into your own projects.",
-    "The definitive resource for understanding this technology and its ecosystem.",
-    "Battle-tested strategies from teams who've been there and done that.",
-    "From zero to production: everything you need to build with confidence.",
-    "An honest look at the trade-offs, with guidance on when to use this approach.",
-    "Key insights and practical advice distilled from years of industry experience."
-];
 
 const authorPicFiles = [
     "author_pictures/0phas_Gemini_Generated_Image_.jpeg",
@@ -379,9 +284,6 @@ const authorPicFiles = [
 
 const firstNames = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph", "Jessica", "Thomas", "Sarah", "Charles", "Karen"];
 const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin"];
-function randomName() {
-    return `${pick(firstNames)} ${pick(lastNames)}`;
-}
 
 // ── Main ──────────────────────────────────────────────────────────────
 export async function runSeed() {
@@ -397,7 +299,24 @@ export async function runSeed() {
 
     const NUM_AUTHORS = 20;
     const NUM_TAGS = 30;
-    const POST_COUNT = 1500;
+
+    // Blog corpus: 200 posts with unique copy, bodies assembled from their theme.
+    interface DemoPost {
+        theme: string;
+        title: string;
+        slug: string;
+        excerpt: string;
+        opening: string;
+    }
+    interface BlogTheme {
+        title: string;
+        authorIndex: number;
+        sections: string[];
+    }
+    const loadJson = createRequire(import.meta.url);
+    const demoPosts: DemoPost[] = loadJson(path.join(APP_ROOT, "backend/src/demo-blog-posts.json"));
+    const blogThemes: Record<string, BlogTheme> = loadJson(path.join(APP_ROOT, "backend/src/demo-blog-themes.json"));
+    const POST_COUNT = demoPosts.length;
 
     try {
         // ── Seed images to storage (local or S3/MinIO) ─────────────────
@@ -505,37 +424,34 @@ export async function runSeed() {
         await db.execute("TRUNCATE TABLE posts, authors, tags, products, orders, order_items, customers, tickets, posts_tags, product_locales, exercises RESTART IDENTITY CASCADE;");
 
         // ── Authors ───────────────────────────────────────────────────
-        console.log(`👤 Generating ${NUM_AUTHORS} authors...`);
-        const authorBios = [
-            `## About Me\n\nI'm a **full-stack engineer** with 10+ years of experience building web applications at scale.\n\n### Expertise\n- React & TypeScript\n- PostgreSQL & distributed systems\n- Cloud architecture (AWS, GCP)\n\n> "The best code is the code you never have to write."`,
-            `## Hello! 👋\n\nPassionate about **developer experience** and building tools that make engineers' lives easier.\n\n### Current Focus\n- Open-source tooling\n- Developer advocacy\n- Technical writing\n\nPreviously at Google, now building the future of developer platforms.`,
-            `## Background\n\nDesign engineer bridging the gap between **design and code**. I believe great products emerge when both disciplines work in harmony.\n\n### Skills\n- UI/UX Design\n- Design Systems\n- Frontend Architecture\n- Motion & Interaction Design`,
-            `## Who I Am\n\nA **systems thinker** who loves solving hard problems with elegant solutions.\n\n### Journey\n1. Started with C++ game engines\n2. Fell in love with the web\n3. Now building BaaS platforms\n\n*Currently obsessed with Rust and WebAssembly.*`,
-            `## My Story\n\nFrom **self-taught developer** to engineering lead in 5 years. I write about the lessons learned along the way.\n\n### Topics I Cover\n- Career growth in tech\n- System design patterns\n- Practical TypeScript\n- Team leadership`,
-            `## Hi there!\n\nI'm a **data engineer** turned full-stack developer. I bring a unique perspective combining data pipelines with modern web development.\n\n### Interests\n- Real-time analytics\n- Stream processing\n- Data visualization\n- PostgreSQL internals`,
-            `## About\n\nSecurity researcher and **application security** specialist. I help teams build secure-by-default systems.\n\n### Focus Areas\n- Zero-trust architecture\n- OAuth 2.0 / OIDC\n- API security\n- Threat modeling`,
-            `## Welcome\n\nI'm a **product-minded engineer** who cares deeply about user experience. Every line of code should serve the user.\n\n### Philosophy\n- Ship fast, iterate faster\n- Measure everything\n- Code is a means, not an end\n- Accessibility is non-negotiable`
-        ];
-        const twitterHandles = ["@reactdev", "@ts_wizard", "@nodemaster", "@pgexpert", "@rustacean42", "@cloudnative", "@devtools_fan", "@webperf_guru", null, null, null, null];
-        const githubUsernames = ["alexcodes", "sarah-dev", "mikebuild", "jenn-ts", "rustyfork", "cloudmaster", "designeng", "fullstackjoe", "pgwizard", "nodehero"];
-        const authorValues = [];
-        for (let i = 1; i <= NUM_AUTHORS; i++) {
-            const name = randomName();
-            const email = `${name.toLowerCase().replace(/ /g, ".")}${i}@example.com`;
-            const ghUser = pick(githubUsernames) + i;
-            authorValues.push({
-                id: authorIds[i - 1],
-                name,
-                email,
-                picture: pick(authorPicFiles),
-                bio: pick(authorBios),
-                twitter: pick(twitterHandles),
-                github: ghUser,
-                website: `https://${ghUser}.dev`,
-                userId: i <= 3 ? `user-${i}` : null
-            });
+        // Authored content lives in demo-authors.json — 20 distinct people, each
+        // with their own specialism. The blog themes reference these by index.
+        console.log(`👤 Seeding ${NUM_AUTHORS} authors...`);
+        interface DemoAuthor {
+            name: string;
+            email: string;
+            bio: string;
+            twitter: string;
+            github: string;
+            website: string;
         }
+        const demoAuthors: DemoAuthor[] = require(path.join(APP_ROOT, "backend/src/demo-authors.json"));
+        if (demoAuthors.length !== NUM_AUTHORS) {
+            throw new Error(`demo-authors.json has ${demoAuthors.length} authors, expected ${NUM_AUTHORS}`);
+        }
+        const authorValues = demoAuthors.map((a, i) => ({
+            id: authorIds[i],
+            name: a.name,
+            email: a.email,
+            picture: authorPicFiles[i % authorPicFiles.length],
+            bio: a.bio,
+            twitter: a.twitter,
+            github: a.github,
+            website: a.website,
+            userId: i < 3 ? `user-${i + 1}` : null
+        }));
         await db.insert(authors).values(authorValues);
+
 
         // ── Tags ──────────────────────────────────────────────────────
         console.log(`🏷️  Generating ${NUM_TAGS} tags...`);
@@ -545,55 +461,78 @@ name }));
         await db.insert(tags).values(tagValues);
 
         // ── Posts ─────────────────────────────────────────────────────
-        console.log(`📰 Generating ${POST_COUNT} blog posts...`);
+        // Post copy lives in demo-blog-posts.json (200 posts, each with a unique
+        // title/slug/excerpt/opening) and demo-blog-themes.json (20 themes, 6
+        // sections each). A post's body = its own opening + sections drawn from
+        // its theme, so bodies stay on-topic instead of shuffling a generic pool.
+        console.log(`📰 Seeding ${POST_COUNT} blog posts...`);
         type PostStatus = (typeof postsStatus.enumValues)[number];
         const statuses: PostStatus[] = ["draft", "needs_review", "published", "published", "published", "archived"];
+
+        // Each theme maps to the tags that are actually relevant to it.
+        const themeTagIndices: Record<string, number[]> = {
+            postgres: [3, 24, 28],
+            "frontend-arch": [23, 0, 11, 27],
+            distributed: [22, 29, 24],
+            devex: [15, 20, 19],
+            typescript: [1, 23, 2],
+            "auth-security": [18, 24, 29],
+            "api-design": [24, 4, 29],
+            "design-systems": [14, 13, 11, 23],
+            infrastructure: [15, 6, 5, 7],
+            "data-analytics": [8, 3, 29],
+            migrations: [3, 24, 15],
+            mobile: [26, 0, 23],
+            testing: [19, 20, 15],
+            teams: [29, 15],
+            performance: [28, 23, 24],
+            documentation: [25, 23],
+            "small-teams": [25, 29, 21],
+            "product-eng": [25, 23, 29],
+            "open-source": [2, 1, 25],
+            "ml-retrieval": [16, 17, 8]
+        };
+
         const postValues = [];
-        const usedSlugs = new Set<string>();
+        const ptValues: { post_id: string; tag_id: string }[] = [];
 
-        for (let i = 1; i <= POST_COUNT; i++) {
-            const topicIdx = (i - 1) % topics.length;
-            const round = Math.floor((i - 1) / topics.length);
-            const title = round === 0 ? topics[topicIdx] : `${topics[topicIdx]} — Part ${round + 1}`;
-
-            // Unique slug
-            let slug = slugify(title);
-            let attempt = 1;
-            while (usedSlugs.has(slug)) {
-                slug = slugify(title) + `-${attempt++}`;
-            }
-            usedSlugs.add(slug);
+        for (let i = 0; i < POST_COUNT; i++) {
+            const post = demoPosts[i];
+            const theme = blogThemes[post.theme];
+            if (!theme) throw new Error(`Post "${post.title}" references unknown theme "${post.theme}"`);
 
             const status = pick([...statuses]);
             const isPublished = status === "published";
 
-            // Build content blocks — never two text blocks in a row, always interleave with images
-            const blocks: { type: string; value: string }[] = [{ type: "text",
-value: pick(markdownIntros) }];
-            const sections = pickN(markdownSections, 4 + Math.floor(Math.random() * 4));
-            for (let s = 0; s < sections.length; s++) {
-                // Insert an image between every text block
+            // Body: the post's own opening, then themed sections interleaved with images.
+            const blocks: { type: string; value: string }[] = [{ type: "text", value: post.opening }];
+            const sections = pickN(theme.sections, 3 + Math.floor(Math.random() * 2));
+            for (const section of sections) {
                 if (contentImagePaths.length > 0) {
-                    blocks.push({ type: "image",
-value: pick(contentImagePaths) });
+                    blocks.push({ type: "image", value: pick(contentImagePaths) });
                 }
-                blocks.push({ type: "text",
-value: sections[s] });
+                blocks.push({ type: "text", value: section });
             }
 
             postValues.push({
-                id: postIds[i - 1],
-                title,
-                slug,
+                id: postIds[i],
+                title: post.title,
+                slug: post.slug,
                 hero_image: pick(heroImagePaths),
-                excerpt: pick(excerpts),
+                excerpt: post.excerpt,
                 content: blocks,
                 status,
                 publish_date: isPublished ? randomDate(180, 0) : null,
                 created_at: randomDate(180, 10),
                 updated_at: randomDate(30, 0),
-                author_id: authorIds[Math.floor(Math.random() * NUM_AUTHORS)]
+                // Posts are written by the author whose specialism matches the theme.
+                author_id: authorIds[theme.authorIndex]
             });
+
+            // Tags follow the theme rather than being drawn at random.
+            const candidates = themeTagIndices[post.theme] ?? [];
+            const assigned = new Set(pickN(candidates, 1 + Math.floor(Math.random() * Math.min(3, candidates.length))));
+            for (const t of assigned) ptValues.push({ post_id: postIds[i], tag_id: tagIds[t] });
         }
 
         const BATCH = 50;
@@ -604,14 +543,6 @@ value: sections[s] });
 
         // ── Post-tag associations ─────────────────────────────────────
         console.log("🏷️  Assigning tags...");
-        const ptValues: { post_id: string; tag_id: string }[] = [];
-        for (let i = 1; i <= POST_COUNT; i++) {
-            const n = 1 + Math.floor(Math.random() * 4);
-            const assigned = new Set<number>();
-            for (let j = 0; j < n; j++) assigned.add(Math.floor(Math.random() * NUM_TAGS) + 1);
-            for (const t of assigned) ptValues.push({ post_id: postIds[i - 1],
-tag_id: tagIds[t - 1] });
-        }
         for (let i = 0; i < ptValues.length; i += BATCH) {
             await db.insert(postsTags).values(ptValues.slice(i, i + BATCH));
         }
@@ -717,7 +648,10 @@ tag_id: tagIds[t - 1] });
         }
 
         // ── Orders + Order Items ──────────────────────────────────────
-        const NUM_ORDERS = 80;
+        // Spread over 90 days by `recentBiasedDate`, so only ~half of these
+        // land in the 30-day window the dashboard reports on. 80 orders left
+        // the per-status counts there in the low single digits.
+        const NUM_ORDERS = 180;
         console.log(`🛒 Generating ${NUM_ORDERS} orders with line items...`);
         type OrderStatus = (typeof ordersStatus.enumValues)[number];
         type PaymentStatus = (typeof ordersPayment_status.enumValues)[number];
@@ -767,7 +701,7 @@ tag_id: tagIds[t - 1] });
             const discountAmount = Math.random() > 0.7 ? subtotal * (0.05 + Math.random() * 0.15) : 0;
             const total = subtotal + taxAmount + shippingCost - discountAmount;
 
-            const orderDate = randomDate(30, 0);
+            const orderDate = recentBiasedDate(90);
             const shippedDate = isShipped ? new Date(new Date(orderDate).getTime() + (1 + Math.random() * 3) * 86400000).toISOString() : null;
             const deliveredDate = isDelivered && shippedDate ? new Date(new Date(shippedDate).getTime() + (2 + Math.random() * 5) * 86400000).toISOString() : null;
             const custId = Math.floor(Math.random() * 40) + 1;
