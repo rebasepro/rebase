@@ -73,11 +73,18 @@ export function legacyForeignKeyName(name: string): string {
  *
  * Byte length, not string length: NAMEDATALEN is a byte bound, and a multi-byte
  * character straddling the boundary would be cut mid-sequence by `slice(0, 63)`.
+ *
+ * `TextEncoder` rather than `Buffer`, which is not a matter of taste: `Buffer`
+ * is a Node global, and this package is imported by browser-facing ones. It
+ * typechecked only where `@types/node` happened to be in scope, so
+ * `packages/codegen` — whose tsconfig is `lib: ["ESNext", "dom"]` — could not
+ * compile the file at all, and both of its suites failed to run. `TextEncoder`
+ * and `TextDecoder` are standard in both runtimes and need no ambient types.
  */
 export function toPostgresIdentifier(name: string): string {
-    const bytes = Buffer.from(name, "utf8");
+    const bytes = new TextEncoder().encode(name);
     if (bytes.byteLength <= 63) return name;
-    // `toString` on a slice that ends mid-character yields U+FFFD; dropping it
-    // lands on the last whole character that fits, which is what Postgres does.
-    return bytes.subarray(0, 63).toString("utf8").replace(/�+$/, "");
+    // Decoding a slice that ends mid-character yields U+FFFD; dropping it lands
+    // on the last whole character that fits, which is what Postgres does.
+    return new TextDecoder("utf-8").decode(bytes.subarray(0, 63)).replace(/�+$/, "");
 }
