@@ -376,6 +376,13 @@ ids });
         search(searchString: string) {
             return new QueryBuilder<M>(accessor).search(searchString);
         },
+        vectorSearch(
+            property: string,
+            vector: number[],
+            options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+        ) {
+            return new QueryBuilder<M>(accessor).vectorSearch(property, vector, options);
+        },
         include(...relations: string[]) {
             return new QueryBuilder<M>(accessor).include(...relations);
         }
@@ -486,6 +493,19 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
     limit(count: number): this { this.params.limit = count; return this; }
     offset(count: number): this { this.params.offset = count; return this; }
     search(searchString: string): this { this.params.searchString = searchString; return this; }
+    vectorSearch(
+        property: string,
+        vector: number[],
+        options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+    ): this {
+        this.params.vectorSearch = {
+            property,
+            vector,
+            ...(options?.distance !== undefined && { distance: options.distance }),
+            ...(options?.threshold !== undefined && { threshold: options.threshold })
+        };
+        return this;
+    }
     include(...relations: string[]): this { this.params.include = relations; return this; }
 
     async find(): Promise<FindResult<M>> {
