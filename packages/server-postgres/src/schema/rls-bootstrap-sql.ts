@@ -179,6 +179,44 @@ export const LEGACY_RLS_DEPENDENTS_SQL = `
     ORDER BY 1, 2, 3
 `;
 
+/** Somebody's *function* that still calls a pre-1.0 helper from its own body. */
+export interface LegacyRlsFunctionDependent {
+    schema: string;
+    function: string;
+}
+
+/**
+ * Functions whose body calls `auth.uid()` / `auth.roles()` / `auth.jwt()`.
+ *
+ * This is the half `DROP FUNCTION ... RESTRICT` cannot see, and the reason it
+ * needs its own query. Postgres records a dependency for a *policy* that calls a
+ * function, which is why the drop is safe against the policies above — but a
+ * `LANGUAGE sql` function whose body is a **string literal** is not parsed when
+ * it is created, so nothing is recorded and `RESTRICT` has nothing to refuse on.
+ * The drop succeeds and the caller is left pointing at a function that no longer
+ * exists, which fails at *query* time rather than at boot.
+ *
+ * A downstream project building on these helpers is not hypothetical: the Rebase
+ * control plane defines `auth.is_org_member(uuid)` and `auth.is_org_admin(uuid)`
+ * in this very schema, each calling `auth.uid()` in a string body, and eleven of
+ * its row-level-security policies go through them. Every one of those would have
+ * started failing the first time a recompile left no policy referencing
+ * `auth.uid()` directly — the drop's own precondition.
+ *
+ * Matching on the body text is the only option available, and it is deliberately
+ * broad: a false positive costs a schema that stays one release longer and says
+ * why, while a false negative costs somebody their policies.
+ */
+export const LEGACY_RLS_FUNCTION_DEPENDENTS_SQL = `
+    SELECT n.nspname AS schema, p.proname AS function
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND NOT (n.nspname = '${LEGACY_RLS_SCHEMA}' AND p.proname IN ('uid', 'jwt', 'roles'))
+      AND p.prosrc ~* '\\m${LEGACY_RLS_SCHEMA}\\.(uid|jwt|roles)\\s*\\('
+    ORDER BY 1, 2
+`;
+
 /**
  * Retire the pre-1.0 `auth` schema, reporting what is holding it back.
  *
@@ -209,6 +247,30 @@ export async function dropLegacyAuthSchema(
             `rewritten automatically — anything listed here is hand-written SQL that has to be updated to ` +
             `\`${REBASE_SCHEMA}.uid()\` by hand, after which the schema goes on its own:\n` +
             blockers.map(b => `  • ${b.schema}.${b.table} → "${b.policy}"`).join("\n")
+        );
+        return;
+    }
+
+    // The half Postgres will not refuse on. See LEGACY_RLS_FUNCTION_DEPENDENTS_SQL:
+    // a string-literal SQL body records no dependency, so `DROP FUNCTION` drops
+    // out from under a caller that is still using it and nothing complains until
+    // a query runs.
+    let borrowers: LegacyRlsFunctionDependent[];
+    try {
+        borrowers = (await run(LEGACY_RLS_FUNCTION_DEPENDENTS_SQL)) as unknown as LegacyRlsFunctionDependent[];
+    } catch {
+        return;
+    }
+
+    if (borrowers.length > 0) {
+        report.warn(
+            `The pre-1.0 \`${LEGACY_RLS_SCHEMA}\` schema cannot be removed yet: ${borrowers.length} ` +
+            `${borrowers.length === 1 ? "function calls" : "functions call"} ` +
+            `\`${LEGACY_RLS_SCHEMA}.uid()\` and friends from its own body. Postgres records no dependency ` +
+            `for that — a SQL body written as a string literal is never parsed — so dropping the helpers ` +
+            `would leave these pointing at nothing, and they would fail when a query reached them rather ` +
+            `than now. Repoint them at \`${REBASE_SCHEMA}.uid()\`, after which the schema goes on its own:\n` +
+            borrowers.map(b => `  • ${b.schema}.${b.function}()`).join("\n")
         );
         return;
     }
