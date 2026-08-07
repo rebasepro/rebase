@@ -16,7 +16,7 @@ import type { AuthRepository } from "./interfaces";
 import type { EmailService, EmailConfig } from "../email";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type { AuthCollectionConfig, AuthCollectionContext } from "@rebasepro/types";
-import { getPasswordResetTemplate } from "../email/templates";
+import { getUserInvitationTemplate } from "../email/templates";
 import { logger } from "../utils/logger";
 
 // ─── Shared Crypto Utilities ────────────────────────────────────────────────
@@ -209,12 +209,26 @@ export async function finalizeAdminUserCreation(
             const baseUrl = ctx.emailConfig?.resetPasswordUrl || "";
             const setPasswordUrl = `${baseUrl}/reset-password?token=${token}`;
 
+            // The invitation template, not the password-reset one.
+            //
+            // This is the *creation* path: the recipient has never had an
+            // account, let alone a password to reset. It sent
+            // "Reset your <App> password" anyway, because
+            // `templates.userInvitation` — declared in `EmailConfig`, typed as
+            // `UserInvitationTemplateFunction`, and backed by a written default
+            // that `email/index.ts` exports — was read by nothing at all. The
+            // one flow named for it reached past it to its neighbour.
+            //
+            // `getUserInvitationTemplate` says what actually happened: "An
+            // account has been created for you … set your password and get
+            // started". `reset-password-admin.ts` keeps the reset template,
+            // because there the account really does already exist.
             const appName = ctx.emailConfig?.appName || "Rebase";
-            const templateFn = ctx.emailConfig?.templates?.passwordReset;
+            const templateFn = ctx.emailConfig?.templates?.userInvitation;
             const emailContent = templateFn
                 ? templateFn(setPasswordUrl, { email: entity.values.email as string,
 displayName: entity.values.displayName as string })
-                : getPasswordResetTemplate(setPasswordUrl, { email: entity.values.email as string,
+                : getUserInvitationTemplate(setPasswordUrl, { email: entity.values.email as string,
 displayName: entity.values.displayName as string }, appName);
 
             await ctx.emailService!.send({
