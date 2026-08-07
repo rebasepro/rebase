@@ -186,7 +186,8 @@ const { data } = await client.data.products
 | `.orderBy(field, dir)` | Sort results | `.orderBy("name", "asc")` |
 | `.limit(n)` | Limit result count | `.limit(25)` |
 | `.offset(n)` | Skip first N results | `.offset(50)` |
-| `.search(text)` | Full-text search | `.search("laptop")` |
+| `.search(text)` | Text search — see [Search](/docs/backend/search) | `.search("laptop")` |
+| `.vectorSearch(prop, vector, opts?)` | Nearest-neighbour search over a `vector` property | `.vectorSearch("embedding", vec)` |
 | `.include(...relations)` | Include related entities | `.include("author", "tags")` |
 | `.find()` | Execute the query | Returns `FindResponse<M>` |
 | `.listen(onUpdate, onError?)` | Subscribe to real-time updates | Returns `unsubscribe()` |
@@ -260,7 +261,7 @@ const { data } = await client.data.products
     .find();
 ```
 
-## Full-Text Search
+## Text Search
 
 ```typescript
 // Via find params
@@ -274,6 +275,33 @@ const { data } = await client.data.products
     .limit(10)
     .find();
 ```
+
+By default this is a **case-insensitive substring match** across the
+collection's top-level `string` properties. It is not full-text search: it does
+not reach inside `map` or `array` properties, does not stem or rank, and cannot
+use an index.
+
+A Postgres collection can opt in to real full-text search by declaring a
+`search` block, which also makes results rankable by `_score`. See
+[Search](/docs/backend/search).
+
+## Vector Search
+
+For collections with a `vector` property, order rows by similarity to a query
+embedding. Rows come back closest-first, each carrying a `_distance`.
+
+```typescript
+const { data } = await client.data.docs
+    .vectorSearch("embedding", queryVector, { threshold: 0.35 })
+    .where("status", "==", "published")
+    .limit(10)
+    .find();
+```
+
+`where` and `orderBy` on the same query act as filters applied *before* the
+ordering — this returns the nearest rows that also match, not the nearest rows
+filtered afterwards. Producing `queryVector` is your job: Rebase stores and
+searches embeddings, it does not compute them.
 
 ## Fetching Relations
 

@@ -77,6 +77,7 @@ export default defineConfig({
                         { label: "Authentication", slug: "docs/backend/authentication" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
+                        { label: "Search", slug: "docs/backend/search" },
                         { label: "Cron Jobs", slug: "docs/backend/cron-jobs" },
                         { label: "Custom Functions", slug: "docs/backend/custom-functions" },
                         { label: "Global Hooks", slug: "docs/backend/hooks" },
