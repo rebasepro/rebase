@@ -114,6 +114,25 @@ describe("Data Import Utility Functions", () => {
             expect(ref3.databaseId).toBeUndefined();
         });
 
+        // `Number("")` is 0 and `Number("n/a")` is NaN, so a spreadsheet column
+        // mapped to a number used to import blanks as real zeros and typos as
+        // NaN. A cell nobody filled in is absent, not nought.
+        test("maps an empty or unreadable number cell to null, not to zero", () => {
+            const number: Property = { type: "number" };
+            expect(processValueMapping(mockAuth, "", mockNavigation, number)).toBeNull();
+            expect(processValueMapping(mockAuth, "   ", mockNavigation, number)).toBeNull();
+            expect(processValueMapping(mockAuth, "n/a", mockNavigation, number)).toBeNull();
+            expect(processValueMapping(mockAuth, "—", mockNavigation, number)).toBeNull();
+        });
+
+        test("still reads the number cells that do carry a value", () => {
+            const number: Property = { type: "number" };
+            expect(processValueMapping(mockAuth, "0", mockNavigation, number)).toBe(0);
+            expect(processValueMapping(mockAuth, " 42 ", mockNavigation, number)).toBe(42);
+            expect(processValueMapping(mockAuth, "-3.5", mockNavigation, number)).toBe(-3.5);
+            expect(processValueMapping(mockAuth, "1e3", mockNavigation, number)).toBe(1000);
+        });
+
         test("should perform basic type conversions", () => {
             expect(processValueMapping(mockAuth, "123", mockNavigation, { type: "number" })).toBe(123);
             expect(processValueMapping(mockAuth, "true", mockNavigation, { type: "boolean" })).toBe(true);

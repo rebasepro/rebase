@@ -100,7 +100,15 @@ export function processValueMapping(authController: AuthController, value: any, 
     if (from === "array" && to === "array" && Array.isArray(value) && usedProperty.of && !Array.isArray(usedProperty.of) && !isPropertyBuilder(usedProperty.of)) {
         return value.map(v => processValueMapping(authController, v, navigation, usedProperty.of as Property));
     } else if (from === "string" && to === "number" && typeof value === "string") {
-        return Number(value);
+        // `Number("")` is 0, so a blank cell used to import as a real zero — a
+        // price of nothing rather than a price nobody filled in — and `Number`
+        // of anything unreadable imported as NaN. Both are absent values, and
+        // saying so lets the importer's own validation see them. The `vector`
+        // branch above already draws the same distinction.
+        const trimmed = value.trim();
+        if (trimmed === "") return null;
+        const num = Number(trimmed);
+        return Number.isNaN(num) ? null : num;
     } else if (from === "string" && to === "array" && typeof value === "string" && usedProperty.of && !Array.isArray(usedProperty.of) && !isPropertyBuilder(usedProperty.of)) {
         return value.split(",").map((v: string) => processValueMapping(authController, v, navigation, usedProperty.of as Property));
     } else if (from === "string" && to === "boolean") {
