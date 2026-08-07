@@ -29,6 +29,15 @@ import { type CollectionConfig, type Property, isPostgresCollectionConfig } from
 import { getTableName, relationalCollections } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 import {
+    buildSearchColumnSpec,
+    searchExtensionStatements,
+    searchHelperFunctions,
+    searchIndexStatements,
+    SEARCH_TEXT_FN,
+    SEARCH_UNACCENT_FN,
+    type SearchColumnSpec
+} from "./search-column";
+import {
     getSqlColumnType,
     resolveColumnName,
     isIdProperty,
@@ -83,7 +92,8 @@ export interface ExistingSchema {
 }
 
 export interface EnsureAction {
-    kind: "create-enum" | "create-table" | "add-column" | "add-constraint" | "rename-column";
+    kind: "create-enum" | "create-table" | "add-column" | "add-constraint" | "rename-column"
+        | "create-extension" | "create-function" | "create-index";
     /** Qualified target, for logging: `public.posts` or `public.posts.title`. */
     target: string;
     sql: string;
@@ -197,6 +207,34 @@ export function planCollectionSchemaEnsure(
                 target: name,
                 sql: `CREATE TYPE "${schema}"."${typeName}" AS ENUM (${values.map(quoteSqlLiteral).join(", ")});`
             });
+        }
+    }
+
+    // 1b. Search support, for collections that declared a `search` block.
+    //
+    //     Before the tables, because a generated column's expression is
+    //     resolved when the column is created: a table whose search column
+    //     calls `rebase_search_text` cannot be added before that function
+    //     exists. Both forms are idempotent, so a boot against a database that
+    //     already has them plans nothing.
+    const searchSpecs = collections
+        .map(c => buildSearchColumnSpec(c))
+        .filter((spec): spec is SearchColumnSpec => spec !== undefined);
+
+    const plannedExtensions = new Set<string>();
+    for (const spec of searchSpecs) {
+        for (const statement of searchExtensionStatements(spec)) {
+            if (plannedExtensions.has(statement)) continue;
+            plannedExtensions.add(statement);
+            actions.push({ kind: "create-extension", target: statement.replace(/^CREATE EXTENSION IF NOT EXISTS |;$/g, ""), sql: statement });
+        }
+    }
+    const plannedFunctions = new Set<string>();
+    for (const spec of searchSpecs) {
+        for (const statement of searchHelperFunctions(spec)) {
+            if (plannedFunctions.has(statement)) continue;
+            plannedFunctions.add(statement);
+            actions.push({ kind: "create-function", target: statement.includes("unaccent") ? SEARCH_UNACCENT_FN : SEARCH_TEXT_FN, sql: statement });
         }
     }
 
@@ -375,6 +413,22 @@ export function planCollectionSchemaEnsure(
         }
     }
 
+    // 3aa. The generated search columns.
+    //
+    //      Adding a STORED generated column rewrites the table, which on a large
+    //      one is not free — but it is the same additive shape as every other
+    //      column here, and the alternative (leaving it out until someone runs a
+    //      migration) is a declared `search` block that silently does nothing.
+    for (const spec of searchSpecs) {
+        const key = `${spec.schema}.${spec.table}`;
+        addColumn(key, spec.schema, spec.table, spec.column,
+            `tsvector GENERATED ALWAYS AS (${spec.expression}) STORED`);
+        if (spec.fuzzy) {
+            addColumn(key, spec.schema, spec.table, spec.fuzzy.column,
+                `text GENERATED ALWAYS AS (${spec.fuzzy.expression}) STORED`);
+        }
+    }
+
     // 3b. A junction that already existed, but is short a column. One created
     //     above already carries both — unlike a collection table, whose CREATE
     //     declares only the identity column — so re-listing them would log two
@@ -420,6 +474,23 @@ export function planCollectionSchemaEnsure(
             target: `${fk.schema}.${fk.table}.${fk.constraintName}`,
             sql: fk.sql
         });
+    }
+
+    // 5. Search indexes, after everything — the column has to exist, and this is
+    //    the one step that runs against a populated table for real work.
+    //
+    //    CONCURRENTLY: a plain CREATE INDEX takes a lock that blocks writes for
+    //    the duration of the build, which on a live table is an outage. Each
+    //    statement here is issued on its own, outside any transaction, which is
+    //    the condition CONCURRENTLY requires.
+    for (const spec of searchSpecs) {
+        for (const statement of searchIndexStatements(spec)) {
+            actions.push({
+                kind: "create-index",
+                target: `${spec.schema}.${spec.table}`,
+                sql: statement.replace("CREATE INDEX IF NOT EXISTS", "CREATE INDEX CONCURRENTLY IF NOT EXISTS")
+            });
+        }
     }
 
     return { actions, statements: actions.map(a => a.sql), legacyForeignKeys };

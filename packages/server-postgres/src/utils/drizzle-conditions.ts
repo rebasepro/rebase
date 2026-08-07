@@ -9,7 +9,12 @@ import {
     getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations
 } from "@rebasepro/common";
 import { generateForeignKeyName } from "@rebasepro/utils";
-import { DEFAULT_FUZZY_THRESHOLD } from "@rebasepro/types";
+/**
+ * Postgres's own default for `pg_trgm.word_similarity_threshold`. Named here
+ * because the fuzzy predicate has to know when the index-backed operator agrees
+ * with the collection's declared threshold and when it would narrow too far.
+ */
+const PG_TRGM_WORD_SIMILARITY_DEFAULT = 0.6;
 import { buildSearchColumnSpec, SEARCH_UNACCENT_FN, type SearchColumnSpec } from "../schema/search-column";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
@@ -1378,14 +1383,29 @@ whereConditions };
             ? sql`${sql.raw(SEARCH_UNACCENT_FN)}(${searchString})`
             : sql`${searchString}`;
 
-        // `%` is the index-backed operator, but it tests against the session's
-        // `pg_trgm.similarity_threshold` (0.3), not ours. Above that default the
-        // `%` narrows using the index and `similarity` refines; at or below it,
-        // `%` would wrongly exclude rows the declared threshold admits, so the
-        // predicate stands alone and the planner scans.
-        const similar = sql`similarity(${fuzzyColumn}, ${needle}) >= ${spec.fuzzy.threshold}`;
-        const fuzzy = spec.fuzzy.threshold > DEFAULT_FUZZY_THRESHOLD
-            ? sql`(${fuzzyColumn} % ${needle} AND ${similar})`
+        // `word_similarity(query, document)`, not `similarity`. `similarity`
+        // scores two strings as wholes, so a short query against a whole row's
+        // text scores near zero however well it matches part of it — measured:
+        // "iso 14001 auditor" against one candidate's concatenated fields
+        // scores 0.228 by `similarity` and 0.783 by `word_similarity`. The
+        // first is below any usable threshold, which would have made `fuzzy`
+        // a setting that quietly did nothing.
+        //
+        // Argument order matters: the first operand is the needle, and the
+        // score is its similarity to the best-matching extent of the second.
+        //
+        // Both the function and the operator are schema-qualified: pg_trgm is
+        // installed into `public`, and an unqualified reference resolves
+        // through `search_path`, which does not necessarily reach it.
+        const similar = sql`public.word_similarity(${needle}, ${fuzzyColumn}) >= ${spec.fuzzy.threshold}`;
+        // `<%` is the index-backed form, but it tests against the session's
+        // `pg_trgm.word_similarity_threshold` (0.6), not ours. Above that
+        // default the operator narrows using the trigram index and the explicit
+        // score refines; at or below it, the operator would exclude rows the
+        // declared threshold admits, so the score stands alone and the planner
+        // scans — correct either way, and only the faster path is conditional.
+        const fuzzy = spec.fuzzy.threshold > PG_TRGM_WORD_SIMILARITY_DEFAULT
+            ? sql`(${needle} OPERATOR(public.<%) ${fuzzyColumn} AND ${similar})`
             : similar;
 
         return sql`(${exact} OR ${fuzzy})`;

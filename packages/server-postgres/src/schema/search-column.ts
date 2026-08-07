@@ -391,9 +391,19 @@ export const searchHelperFunctions = (spec: SearchColumnSpec): string[] => {
     return statements;
 };
 
-/** `CREATE EXTENSION` statements the spec's expressions depend on. */
+/**
+ * `CREATE EXTENSION` statements the spec's expressions depend on.
+ *
+ * `WITH SCHEMA public` is load-bearing, not tidiness. An unqualified
+ * `CREATE EXTENSION` installs into the first schema on `search_path`, which
+ * defaults to `"$user", public` — and the scaffold's database role is named
+ * `rebase`, the same as the schema the generator creates one statement earlier.
+ * So the moment that schema exists, `CREATE EXTENSION unaccent` puts the
+ * dictionary in `rebase`, and every reference to `public.unaccent` below fails
+ * with "text search dictionary does not exist". Observed, not theorised.
+ */
 export const searchExtensionStatements = (spec: SearchColumnSpec): string[] =>
-    spec.extensions.map(e => `CREATE EXTENSION IF NOT EXISTS ${e};`);
+    spec.extensions.map(e => `CREATE EXTENSION IF NOT EXISTS ${e} WITH SCHEMA ${HELPER_SCHEMA};`);
 
 /** The column definition as it appears inside `CREATE TABLE`. */
 export const searchColumnDefinition = (spec: SearchColumnSpec): string =>
@@ -418,7 +428,10 @@ export const searchIndexStatements = (spec: SearchColumnSpec): string[] => {
     ];
     if (spec.fuzzy) {
         statements.push(
-            `CREATE INDEX IF NOT EXISTS "${spec.fuzzy.indexName}" ON "${spec.schema}"."${spec.table}" USING GIN ("${spec.fuzzy.column}" gin_trgm_ops);`
+            // The operator class is resolved through `search_path` like any
+            // other object, so it is qualified for the same reason the
+            // extension is installed explicitly.
+            `CREATE INDEX IF NOT EXISTS "${spec.fuzzy.indexName}" ON "${spec.schema}"."${spec.table}" USING GIN ("${spec.fuzzy.column}" ${HELPER_SCHEMA}.gin_trgm_ops);`
         );
     }
     return statements;
