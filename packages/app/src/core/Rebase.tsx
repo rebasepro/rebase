@@ -46,7 +46,7 @@ import { useBuildEffectiveRoleController } from "../hooks/useBuildEffectiveRoleC
  *
  * @group Core
  */
-export function Rebase<USER extends User>(props: RebaseProps<USER>) {
+export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER, DB>) {
 
     const {
         children,

@@ -673,7 +673,16 @@ function toEntityAccessor<M extends Record<string, unknown>>(
  * admin `RebaseDataContext` — without it the admin renders rows with only their
  * `id`.
  */
-export function wrapAsEntityData(sdkData: RebaseSdkData, options?: EntityDataOptions): RebaseData {
+/**
+ * Only the by-slug accessor is asked for, so only that is required.
+ *
+ * Taking a whole `RebaseSdkData` meant taking `RebaseSdkData<unknown>`, whose
+ * dynamic branch is an index signature — and no `RebaseSdkData<DB>` satisfies
+ * it, because its own `collection` method is not a `SDKCollectionClient`. So a
+ * caller holding a *typed* client could not pass it to a function that reads
+ * one method off it, and that method is identical on every instantiation.
+ */
+export function wrapAsEntityData(sdkData: Pick<RebaseSdkData, "collection">, options?: EntityDataOptions): RebaseData {
     const cache = new Map<string, CollectionAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
 

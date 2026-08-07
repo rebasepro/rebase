@@ -76,6 +76,14 @@
     // default-Postgres collection and no engine gate was ever crossed — for as
     // long as this line was missing, nothing could say so.
     // `src` joins `test` because some of these tests sit beside the code.
+    // One file, not the directory. `RebaseProps` is generic over `USER` and,
+    // since the typed-SDK fix, over the database too; the assertions in
+    // `rebase_client_prop_types.test.ts` are compile-time only, so they are
+    // inert unless tsc reads them. The rest of `packages/app/test` carries 52
+    // pre-existing errors — fixtures declaring properties with no `name` — and
+    // clearing those is what would earn the directory its own line here.
+    "packages/app/test/rebase_client_prop_types.type-test.ts",
+    "packages/app/src",
     "packages/common/test",
     "packages/common/src"
   ],

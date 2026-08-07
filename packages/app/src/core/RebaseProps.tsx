@@ -105,7 +105,7 @@ import type { EffectiveRoleController } from "@rebasepro/types";
  *
  * @group Models
  */
-export type RebaseProps<USER extends User> = {
+export type RebaseProps<USER extends User, DB = unknown> = {
 
     /**
      * The root components of your application. Use RebaseAdmin, RebaseStudio, and RebaseShell.
@@ -151,8 +151,16 @@ export type RebaseProps<USER extends User> = {
      * entry keyed `"(default)"` carries a driver.
      * `client.auth` is subscribed unless `authController` is provided.
      * `client.storage` is used unless `storageSource` is provided.
+     *
+     * `DB` is inferred from whatever is passed, and defaults to `unknown` for
+     * an untyped client. It has to be a parameter rather than a fixed
+     * `RebaseClient`: `RebaseClient<unknown>` is not a supertype of
+     * `RebaseClient<Database>` — the dynamic branch of `RebaseSdkData` is an
+     * index signature that no concrete instantiation satisfies — so pinning it
+     * here rejected the client of every project that generates a `Database`
+     * type, which is the whole typed-SDK path.
      */
-    client?: RebaseClient;
+    client?: RebaseClient<DB>;
 
     /**
      * The data sources of the app. Each entry pairs a

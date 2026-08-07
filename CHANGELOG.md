@@ -47,6 +47,12 @@
 
 ### Fixed
 
+- **A client with generated types could not be passed to `<Rebase>`.** `RebaseProps` was generic over `USER` and not over the database, so its `client` prop was pinned to `RebaseClient<unknown>` — and `RebaseClient<unknown>` is not a supertype of `RebaseClient<Database>`. The untyped branch of `RebaseSdkData` is an index signature (`[slug: string]: SDKCollectionClient`), and no concrete instantiation satisfies it, because `RebaseSdkData`'s own `collection` method is not an `SDKCollectionClient`.
+
+  So the typed SDK path — run codegen, get a `Database`, build a typed client — ended at the provider that every panel is mounted inside, and reaching `data.products` through the prop handed back `Record<string, unknown>` rather than the generated row. `RebaseProps` and `Rebase` now take `DB`, inferred from the client and defaulting to `unknown`, so existing untyped callers are unaffected. `wrapAsEntityData` asks for `Pick<RebaseSdkData, "collection">`, which is all it ever used.
+
+  Pinned by `packages/app/test/rebase_client_prop_types.type-test.ts` — compile-time assertions, written as assignments rather than conditional types, because the first draft used `extends` and went on compiling with the bug restored.
+
 - **A date in the future was described in the past tense.** Seven hand-rolled relative-time formatters computed `now - then` and then tested only the positive side, so a timestamp ahead of now fell through to whichever branch came first: a post scheduled for next month read "Just now", and one due this afternoon read "-1d ago" — a negative quantity, printed. These are dates a CMS holds constantly, and the two admin formatters render whatever property the collection points its date slot or date column at.
 
   `formatRelativeTime` in `@rebasepro/utils` is now the one implementation: the distance is `Math.abs`, so no branch can see a negative number, and the tense comes from the sign rather than being assumed. It returns `null` past a horizon the caller sets, so each site keeps its own absolute format and locale. The cloud CLI and studio's cron and API-key views were already correct and are unchanged.
