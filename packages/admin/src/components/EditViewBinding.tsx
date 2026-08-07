@@ -58,7 +58,14 @@ import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { withViewMode } from "../util/view_mode";
 import { useNavigate } from "react-router";
 
-import { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE } from "../util/view_constants";
+import {
+    MAIN_TAB_VALUE,
+    JSON_TAB_VALUE,
+    HISTORY_TAB_VALUE,
+    ENTITY_VIEW_TAB_BAR_CLASS,
+    ENTITY_VIEW_TAB_CLASS,
+    ENTITY_VIEW_TAB_LABEL_CLASS
+} from "../util/view_constants";
 export { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE };
 
 export type BarActionsParams = {
@@ -762,7 +769,7 @@ parentEntityIds,
         const icon = getIcon(subcollection.icon, undefined, undefined, "smallest");
         return (
             <Tab
-                className="text-sm min-w-[90px]"
+                className={cls(ENTITY_VIEW_TAB_CLASS, ENTITY_VIEW_TAB_LABEL_CLASS)}
                 value={subcollection.slug}
                 key={`entity_detail_collection_tab_${subcollection.name}`}>
                 <span className="flex items-center gap-1.5">
@@ -778,7 +785,7 @@ parentEntityIds,
             const icon = getIcon(view.icon, undefined, undefined, "smallest");
             return (
                 <Tab
-                    className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
+                    className={cls(ENTITY_VIEW_TAB_CLASS, !view.tabComponent && ENTITY_VIEW_TAB_LABEL_CLASS)}
                     value={view.key}
                     key={`entity_detail_collection_tab_${view.name}`}>
                     {view.tabComponent ?? (
@@ -795,7 +802,7 @@ parentEntityIds,
             const icon = getIcon(view.icon, undefined, undefined, "smallest");
             return (
                 <Tab
-                    className={!view.tabComponent ? "text-sm min-w-[90px]" : undefined}
+                    className={cls(ENTITY_VIEW_TAB_CLASS, !view.tabComponent && ENTITY_VIEW_TAB_LABEL_CLASS)}
                     value={view.key}
                     key={`entity_detail_collection_tab_${view.name}`}>
                     {view.tabComponent ?? (
@@ -911,10 +918,11 @@ parentEntityIds,
             disappears entirely when there is nowhere else to go. */}
         {hasAdditionalViews && <div className={cls(
             "h-10 shrink-0 flex items-stretch border-b px-2 min-w-0",
+            ENTITY_VIEW_TAB_BAR_CLASS,
             defaultBorderMixin
         )}>
             <Tabs
-                className={"!w-full"}
+                className={"!w-full items-stretch"}
                 innerClassName={"h-full"}
                 variant={"boxy"}
                 value={activeTab}
@@ -922,7 +930,8 @@ parentEntityIds,
                     onSideTabClick(value);
                 }}>
 
-                <Tab value={MAIN_TAB_VALUE}>
+                <Tab value={MAIN_TAB_VALUE}
+                     className={cls(ENTITY_VIEW_TAB_CLASS, ENTITY_VIEW_TAB_LABEL_CLASS)}>
                     <span className="flex items-center gap-1.5">
                         {getIcon(collection.icon, undefined, undefined, "smallest")}
                         {collection.singularName ?? collection.name}
