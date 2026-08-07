@@ -49,7 +49,7 @@ nano .env.production
 Adicione seus segredos:
 
 ```env
-DATABASE_URL=postgresql://rebase:your_secure_db_password@postgres:5432/rebase
+DATABASE_URL=postgresql://rebase_app:your_secure_db_password@postgres:5432/rebase
 JWT_SECRET=generate_a_very_long_secure_random_string_here
 NODE_ENV=production
 ```
@@ -74,7 +74,7 @@ Execute `pnpm run db:push` **uma vez** contra o banco de dados de produção. Na
 
 ```bash
 cd /opt/rebase
-DATABASE_URL="postgresql://rebase:your_secure_db_password@localhost:5432/rebase" pnpm run db:push
+DATABASE_URL="postgresql://rebase_app:your_secure_db_password@localhost:5432/rebase" pnpm run db:push
 ```
 
 Execute isso a partir de um checkout do projeto (aqui, o que já está no servidor) — **não** dentro do contêiner da aplicação, pois a imagem de produção não inclui a CLI.

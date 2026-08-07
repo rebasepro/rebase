@@ -49,7 +49,7 @@ nano .env.production
 Añada sus secretos:
 
 ```env
-DATABASE_URL=postgresql://rebase:your_secure_db_password@postgres:5432/rebase
+DATABASE_URL=postgresql://rebase_app:your_secure_db_password@postgres:5432/rebase
 JWT_SECRET=generate_a_very_long_secure_random_string_here
 NODE_ENV=production
 ```

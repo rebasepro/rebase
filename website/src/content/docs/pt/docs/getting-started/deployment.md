@@ -32,7 +32,7 @@ services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: rebase
+      POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: rebase
       POSTGRES_DB: rebase
     volumes:
@@ -47,7 +47,7 @@ services:
     ports:
       - "3001:3001"
     environment:
-      DATABASE_URL: postgresql://rebase:rebase@postgres:5432/rebase
+      DATABASE_URL: postgresql://rebase_app:rebase@postgres:5432/rebase
       JWT_SECRET: ${JWT_SECRET}
       NODE_ENV: production
     depends_on:

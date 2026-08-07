@@ -30,7 +30,7 @@ services:
   db:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: rebase
+      POSTGRES_USER: rebase_app
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: rebase
     volumes:
