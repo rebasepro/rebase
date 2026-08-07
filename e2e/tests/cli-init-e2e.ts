@@ -485,6 +485,23 @@ function writeEnvVar(projectPath: string, name: string, value: string): boolean 
 }
 
 /** Read a variable's value out of a project's .env, or undefined if unset. */
+/**
+ * Read a scalar from the `db` service's `environment:` block in the project's
+ * generated `docker-compose.yml`.
+ *
+ * Deliberately not a YAML parse: the one value this needs is a plain
+ * `KEY: value` under a fixed key, and adding a YAML dependency to read it would
+ * be the larger change. Returns `undefined` if the file or the key is absent,
+ * so the caller keeps a default.
+ */
+function readComposeEnv(projectPath: string, name: string): string | undefined {
+    const composePath = path.join(projectPath, "docker-compose.yml");
+    if (!fs.existsSync(composePath)) return undefined;
+    const match = fs.readFileSync(composePath, "utf-8")
+        .match(new RegExp(`^\\s*${name}:\\s*(\\S+)\\s*$`, "m"));
+    return match ? match[1] : undefined;
+}
+
 function readEnvVar(projectPath: string, name: string): string | undefined {
     const envPath = path.join(projectPath, ".env");
     if (!fs.existsSync(envPath)) return undefined;
@@ -1177,11 +1194,17 @@ timeout: 10000 });
         // reports that the server is accepting connections without
         // authenticating as anyone.
         //
-        // Same reasoning as `composeDbPassword` below, which is read for
-        // exactly this reason and says so.
-        const composeDbUrl = readEnvVar(projectPath, "DATABASE_URL");
-        const composeDbUser = composeDbUrl ? new URL(composeDbUrl).username : "rebase_app";
-        console.log(`Scaffolded database role: ${composeDbUser}`);
+        // Read from `docker-compose.yml` and NOT from `.env`, which is the
+        // near-miss worth spelling out: this suite runs `rebase init` against
+        // its *own* Postgres container, so the generated `.env` holds that
+        // container's URL — role `rebase`, correctly, because that is the role
+        // `startPgContainer` creates. It says nothing about the compose stack
+        // being brought up here, whose role is whatever `POSTGRES_USER` in the
+        // file that creates it says. Same reasoning as `composeDbPassword`
+        // below — read the value, do not restate it — applied to the file that
+        // actually owns this one.
+        const composeDbUser = readComposeEnv(projectPath, "POSTGRES_USER") ?? "rebase_app";
+        console.log(`Compose database role: ${composeDbUser}`);
 
         // Wait for DB to be healthy
         console.log("Waiting for Docker DB to be healthy...");
