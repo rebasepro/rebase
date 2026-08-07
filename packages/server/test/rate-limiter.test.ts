@@ -157,17 +157,63 @@ windowMs: 60 * 1000 });
         it("ignores X-Forwarded-For entirely when trustedProxyHops is 0", async () => {
             const app = appWith({ limit: 1, trustedProxyHops: 0 });
 
-            // With no trusted proxy, only X-Real-IP is believed. Different XFF
-            // values with the same X-Real-IP share one bucket.
             const first = await app.request("/api/test", {
-                headers: { "x-forwarded-for": "1.1.1.1", "x-real-ip": "8.8.8.8" }
+                headers: { "x-forwarded-for": "1.1.1.1" }
             });
             expect(first.status).toBe(200);
 
             const second = await app.request("/api/test", {
-                headers: { "x-forwarded-for": "2.2.2.2", "x-real-ip": "8.8.8.8" }
+                headers: { "x-forwarded-for": "2.2.2.2" }
             });
             expect(second.status).toBe(429);
+        });
+
+        it("ignores X-Real-IP too when trustedProxyHops is 0", async () => {
+            // `trustedProxyHops: 0` means "nothing is in front of me", and
+            // `X-Real-IP` is a proxy header exactly like `X-Forwarded-For`. With
+            // no proxy, the only thing that writes it is the caller — so
+            // believing it handed them the rate-limit key. One header per
+            // request bought a fresh bucket every time, and the limiters on
+            // login, registration and password reset counted to one.
+            //
+            // This test used to assert the opposite ("only X-Real-IP is
+            // believed"), which is why the hole survived a careful reading of
+            // the XFF logic sitting three lines above it.
+            const app = appWith({ limit: 1, trustedProxyHops: 0 });
+
+            const first = await app.request("/api/test", {
+                headers: { "x-real-ip": "8.8.8.8" }
+            });
+            expect(first.status).toBe(200);
+
+            const second = await app.request("/api/test", {
+                headers: { "x-real-ip": "8.8.4.4" }
+            });
+            expect(second.status).toBe(429);
+
+            // And a third spelling, to make the point that it is not about
+            // these two values.
+            const third = await app.request("/api/test", {
+                headers: { "x-real-ip": "203.0.113.7", "x-forwarded-for": "198.51.100.9" }
+            });
+            expect(third.status).toBe(429);
+        });
+
+        it("still believes X-Real-IP when a proxy is declared to be in front", async () => {
+            // The stock nginx recipe sets `X-Real-IP` and nothing else, so a
+            // deployment that declares a hop must keep working.
+            const app = appWith({ limit: 1, trustedProxyHops: 1 });
+
+            const first = await app.request("/api/test", { headers: { "x-real-ip": "8.8.8.8" } });
+            expect(first.status).toBe(200);
+
+            // A different client, per the proxy: its own bucket.
+            const other = await app.request("/api/test", { headers: { "x-real-ip": "8.8.4.4" } });
+            expect(other.status).toBe(200);
+
+            // The first client again: its bucket is spent.
+            const again = await app.request("/api/test", { headers: { "x-real-ip": "8.8.8.8" } });
+            expect(again.status).toBe(429);
         });
     });
 });

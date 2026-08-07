@@ -1,4 +1,5 @@
 import { MiddlewareHandler } from "hono";
+import { getConnInfo } from "@hono/node-server/conninfo";
 import { isAnonymousUid } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { MemoryRateLimitStore, RateLimitStore } from "./rate-limit-store";
@@ -103,7 +104,24 @@ export function createRateLimiter(options: RateLimiterOptions = {}): MiddlewareH
 }
 
 /**
- * Default key generator: extract client IP from standard headers.
+ * The address the socket is actually connected to, or `undefined` on a runtime
+ * that cannot say. Unforgeable, unlike every header below.
+ *
+ * `getConnInfo` is Node-specific and throws elsewhere, so the failure is
+ * swallowed: a runtime without connection info falls back to the shared bucket,
+ * which is a availability trade the caller cannot exploit.
+ */
+function socketAddress(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string | undefined {
+    try {
+        return getConnInfo(c).remote.address;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * Default key generator: the client's address, from the most trustworthy source
+ * this deployment has.
  *
  * `X-Forwarded-For` is a client-writable header; only the entries appended by
  * trusted reverse proxies can be believed. With `trustedProxyHops` proxies in
@@ -112,8 +130,20 @@ export function createRateLimiter(options: RateLimiterOptions = {}): MiddlewareH
  * client-supplied and must be ignored. This is what prevents a caller from
  * spoofing `X-Forwarded-For` to spread its requests across many rate-limit keys.
  *
- * With `trustedProxyHops === 0` (server exposed directly, no proxy),
- * `X-Forwarded-For` is not trusted at all and `X-Real-IP` is used instead.
+ * `X-Real-IP` is the *same* kind of header and needs the same rule, which it
+ * did not have: it was read unconditionally, including under
+ * `trustedProxyHops === 0` — the mode whose entire meaning is "no proxy is in
+ * front of me". With no proxy there, nothing writes `X-Real-IP` except the
+ * caller, so the key was theirs to choose: one header per request bought an
+ * unlimited number of buckets, and the limiters on login, registration and
+ * password reset counted to one. The reasoning had been done carefully for one
+ * spelling of a proxy header and not carried to its twin.
+ *
+ * So `X-Real-IP` is now believed only where a proxy is declared to exist. With
+ * none, the connection's own address is used — unforgeable, and available
+ * because the server runs on `@hono/node-server`. `"unknown"` is the last
+ * resort only, and it is a single shared bucket by design: better that
+ * anonymous callers throttle each other than that any of them throttles nobody.
  */
 function defaultKeyGenerator(
     c: Parameters<MiddlewareHandler<HonoEnv>>[0],
@@ -128,8 +158,13 @@ function defaultKeyGenerator(
                 return ips[idx];
             }
         }
+        // A trusted proxy is declared to be in front, so this header is its to
+        // set — and a proxy that sets only `X-Real-IP` (the stock nginx recipe)
+        // is a normal deployment.
+        const realIp = c.req.header("x-real-ip");
+        if (realIp) return realIp;
     }
-    return c.req.header("x-real-ip") || "unknown";
+    return socketAddress(c) ?? "unknown";
 }
 
 /**
