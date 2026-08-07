@@ -6,7 +6,8 @@ import {
     LogicalCondition,
     QueryBuilderInterface,
     WhereFilterOp,
-    WhereValue
+    WhereValue,
+    type ComputedSortField
 } from "@rebasepro/types";
 
 export function or(...conditions: (FilterCondition | LogicalCondition)[]): LogicalCondition {
@@ -80,7 +81,7 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
      * @example
      * client.collection('users').orderBy('createdAt', 'desc').find()
      */
-    orderBy(column: keyof M & string, direction: "asc" | "desc" = "asc"): this {
+    orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
         this.params.orderBy = [column, direction];
         return this;
     }

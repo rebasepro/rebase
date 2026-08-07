@@ -5,7 +5,8 @@ import {
     SDKCollectionClient,
     SDKQueryBuilderInterface,
     WhereFilterOp,
-    WhereValue
+    WhereValue,
+    type ComputedSortField
 } from "@rebasepro/types";
 
 /**
@@ -72,7 +73,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
     /**
      * Order the results by a specific column.
      */
-    orderBy(column: keyof M & string, direction: "asc" | "desc" = "asc"): this {
+    orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
         this.params.orderBy = [column, direction];
         return this;
     }

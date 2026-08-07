@@ -180,3 +180,31 @@ export const DEFAULT_SEARCH_WEIGHT: SearchWeight = "B";
 
 /** The similarity floor used when {@link SearchConfig.fuzzyThreshold} is not given. */
 export const DEFAULT_FUZZY_THRESHOLD = 0.3;
+
+/**
+ * Sort keys a query computes rather than reads from a column.
+ *
+ * `orderBy` is otherwise typed against the row — `keyof M` — which is exactly
+ * right for a column and exactly wrong for relevance: `_score` is produced by
+ * the query, so it appears in no generated row type and a project with a
+ * generated SDK could not name it. The runtime accepted it, the docs told
+ * people to use it, and the types rejected it.
+ *
+ * Kept as a named union rather than a loose `string` so the other half of the
+ * guarantee survives: a typo'd column is still a compile error, and remains a
+ * 400 at runtime rather than a silently unsorted list.
+ *
+ * `_distance` is deliberately not here. A vector search orders by distance on
+ * its own and overrides `orderBy` outright, so naming it would imply a choice
+ * the caller does not have.
+ *
+ * @group Search
+ */
+export type ComputedSortField = typeof RELEVANCE_SORT_FIELD;
+
+/**
+ * The relevance sort key. Valid only on a collection that declares a
+ * {@link SearchConfig} *and* on a query that carries a search string; anywhere
+ * else it is an unknown field and the request is refused.
+ */
+export const RELEVANCE_SORT_FIELD = "_score";

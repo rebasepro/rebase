@@ -14,7 +14,8 @@ import {
     SDKCollectionClient,
     SDKQueryBuilderInterface,
     WhereFilterOp,
-    WhereValue
+    WhereValue,
+    type ComputedSortField
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
@@ -363,7 +364,7 @@ ids });
             }
             return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValue<M[keyof M & string]>);
         },
-        orderBy(column: keyof M & string, ascending?: "asc" | "desc") {
+        orderBy(column: (keyof M & string) | ComputedSortField, ascending?: "asc" | "desc") {
             return new QueryBuilder<M>(accessor).orderBy(column, ascending);
         },
         limit(count: number) {
@@ -477,7 +478,7 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
         return this;
     }
 
-    orderBy(column: keyof M & string, direction: "asc" | "desc" = "asc"): this {
+    orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
         this.params.orderBy = [column, direction];
         return this;
     }

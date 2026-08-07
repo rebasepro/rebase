@@ -1,4 +1,5 @@
 import type { VectorSearchParams } from "./data_driver";
+import type { ComputedSortField } from "../types/search";
 import { Entity, EntityValues } from "../types/entities";
 import { WhereFilterOp, FieldPath, FilterValues, OrderByTuple } from "../types/filter-operators";
 
@@ -87,7 +88,7 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * Sort order as a `[field, direction]` tuple.
      * @example orderBy: ["created_at", "desc"]
      */
-    orderBy?: OrderByTuple<FieldPath<M>>;
+    orderBy?: OrderByTuple<FieldPath<M> | ComputedSortField>;
     /**
      * Relations to include in the response.
      *
@@ -158,7 +159,7 @@ export interface FindResponse<M extends Record<string, unknown> = Record<string,
 export interface QueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
     where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): this;
     where(logicalCondition: LogicalCondition): this;
-    orderBy(column: keyof M & string, direction?: "asc" | "desc"): this;
+    orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): this;
     limit(count: number): this;
     offset(count: number): this;
     search(searchString: string): this;
@@ -271,7 +272,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     // Fluent Query Builder
     where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): QueryBuilderInterface<M>;
     where(logicalCondition: LogicalCondition): QueryBuilderInterface<M>;
-    orderBy(column: keyof M & string, direction?: "asc" | "desc"): QueryBuilderInterface<M>;
+    orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): QueryBuilderInterface<M>;
     limit(count: number): QueryBuilderInterface<M>;
     offset(count: number): QueryBuilderInterface<M>;
     search(searchString: string): QueryBuilderInterface<M>;
@@ -320,10 +321,41 @@ export interface PaginationMeta {
  * @group Data
  */
 export interface FindResult<M extends Record<string, unknown> = Record<string, unknown>> {
-    /** Array of flat rows matching the query */
-    data: M[];
+    /**
+     * Flat rows matching the query, each carrying whatever the query computed
+     * for it — see {@link QueryComputedFields}.
+     */
+    data: (M & QueryComputedFields)[];
     /** Pagination metadata */
     meta: PaginationMeta;
+}
+
+/**
+ * Values a query attaches to a row that are not columns of it.
+ *
+ * Both are absent unless the query asked for the thing that produces them, so
+ * both are optional — and reading one on a query that did not ask returns
+ * `undefined` rather than a wrong number.
+ *
+ * They live here rather than on the row type because a generated row type
+ * describes a *table*, and neither of these is in one. Without this, a caller
+ * who sorted by relevance could not then read the relevance.
+ *
+ * @group Data
+ */
+export interface QueryComputedFields {
+    /**
+     * Relevance, when the collection declares a {@link SearchConfig} and the
+     * query carried a search string. Higher is better; the scale is not
+     * comparable between two different search strings.
+     */
+    _score?: number;
+    /**
+     * Distance to the query vector, when the query used
+     * {@link FindParams.vectorSearch}. Lower is closer, and the rows are
+     * already ordered by it.
+     */
+    _distance?: number;
 }
 
 /**
@@ -420,7 +452,7 @@ export type FindAllParams<M extends Record<string, unknown> = Record<string, unk
 export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Record<string, unknown>> {
     where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): this;
     where(logicalCondition: LogicalCondition): this;
-    orderBy(column: keyof M & string, direction?: "asc" | "desc"): this;
+    orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): this;
     limit(count: number): this;
     offset(count: number): this;
     search(searchString: string): this;
@@ -720,7 +752,7 @@ export interface SDKCollectionClient<
     // Fluent Query Builder
     where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): SDKQueryBuilderInterface<M>;
     where(logicalCondition: LogicalCondition): SDKQueryBuilderInterface<M>;
-    orderBy(column: keyof M & string, direction?: "asc" | "desc"): SDKQueryBuilderInterface<M>;
+    orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): SDKQueryBuilderInterface<M>;
     limit(count: number): SDKQueryBuilderInterface<M>;
     offset(count: number): SDKQueryBuilderInterface<M>;
     search(searchString: string): SDKQueryBuilderInterface<M>;

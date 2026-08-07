@@ -9,7 +9,8 @@ import {
     SDKQueryBuilderInterface,
     WhereFilterOp,
     WhereValue,
-    WriteOptions
+    WriteOptions,
+    type ComputedSortField
 } from "@rebasepro/types";
 import { collectAllPages, paginateFind, resolveFindWindow } from "@rebasepro/common";
 
@@ -382,7 +383,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             }
             return builder.where(columnOrCondition as keyof M & string, operator!, value as WhereValue<M[keyof M & string]>);
         },
-        orderBy(column: keyof M & string, direction?: "asc" | "desc") {
+        orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc") {
             return new SDKQueryBuilder<M>(client).orderBy(column, direction);
         },
         limit(count: number) {
