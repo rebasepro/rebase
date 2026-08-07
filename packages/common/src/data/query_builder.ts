@@ -111,6 +111,26 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
     }
 
     /**
+     * Order rows by nearest-neighbour distance to `vector`, closest first.
+     *
+     * Postgres only, over a property declared as `type: "vector"`. Rows come
+     * back with a `_distance`; `where` filters before the ordering.
+     */
+    vectorSearch(
+        property: string,
+        vector: number[],
+        options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+    ): this {
+        this.params.vectorSearch = {
+            property,
+            vector,
+            ...(options?.distance !== undefined && { distance: options.distance }),
+            ...(options?.threshold !== undefined && { threshold: options.threshold })
+        };
+        return this;
+    }
+
+    /**
      * Include related entities in the response.
      * Relations will be populated with full entity data instead of just IDs.
      *
