@@ -79,6 +79,43 @@ because it is how the folder route marks a prefix) and is not cosmetic on `list`
 where a prefix of `public` also matches `publicity/` and hands back keys the
 caller never asked for.
 
+**String ordering in the offline cache cannot match the server.**
+`compareValues` orders strings with an `Intl.Collator`; PostgreSQL uses the
+database's collation, which the client has never been told. `'apple' < 'Banana'`
+is false under the C collation, true under `en_US.UTF-8`, and true for the
+collator. So a cache hit on `name < 'Banana'` returns a different set from the
+server, silently, while `isExactlyEvaluable` has told the offline layer the
+answer is exact. The same trap is recorded one layer down for board order keys,
+where the fix was to restrict the alphabet until every collation agrees; there is
+no equivalent move for arbitrary user text. The honest fix is to narrow the
+promise — `isExactlyEvaluable` should return false for a string ordering
+comparison or a text `orderBy` — which means more cache misses and more network,
+and is therefore a decision.
+
+**ORDER BY has no deterministic tiebreaker.** Sorting on a column with duplicate
+values leaves the order of tied rows undefined, so `LIMIT`/`OFFSET` paging over
+it can skip a row and repeat another between two requests, with no error and no
+way for the client to notice. The offline cache cannot reproduce the server's
+arbitrary choice either. The standard fix is to append the primary key to every
+generated ORDER BY; that changes generated SQL and index expectations.
+
+**The configured list default is not bounded by the configured cap.** `maxLimit`
+is applied only to a client-supplied `?limit`. A deployment with `defaultLimit`
+above `maxLimit` answers a bare `GET /<collection>` with more rows than its own
+cap allows — exactly for the request that carries no limit, which is the one the
+cap exists for. Only reachable by misconfiguration, and nothing rejects the
+inversion, so it is silent. Rejecting the inverted config at boot is probably
+better than clamping.
+
+**"Cannot evaluate" and "definitively not granted" are both spelled `unknown`.**
+Since the NULL-comparison fix, `evaluatePolicy` returns `"unknown"` both when it
+genuinely cannot decide (raw SQL, a membership subquery, no row in hand) and when
+SQL would answer NULL — where the row is *definitely* not granted. Only the first
+deserves the optimism that `onUnknown: "allow"` gives it, and optimistic gating
+now shows an edit button on rows whose owner column is NULL. Enforcement paths
+are unaffected (they resolve fail-closed). Distinguishing the two is a change to
+`TriState`, which is API surface across packages.
+
 **A generated policy name can overrun PostgreSQL's identifier limit.** Found and
 pinned, not fixed — see the open items below.
 
@@ -187,6 +224,67 @@ counterexample was found" but "there is none of this size". No card is lost,
 duplicated or invented; untouched cards keep their relative order; a drop onto
 itself is a no-op.
 
+### Policy semantics vs. real PostgreSQL — `packages/server-postgres/test/e2e/policy-agreement-exhaustive.test.ts`
+
+The differential this document previously listed as the biggest gap. Every
+policy expression of depth two over fifteen leaves — 480 of them — compiled,
+executed against a real database as three different callers on three rows
+chosen to put a NULL in every column position, and compared with
+`evaluatePolicy`. Requires Docker.
+
+Two directions, deliberately separate: JavaScript is never more permissive than
+Postgres (the panel must not offer what the database refuses) and never more
+restrictive (the model's promise is agreement, not conservatism). Plus: every
+compiled expression must actually execute.
+
+This found the NULL-comparison defect described above, and then found a second
+one after the first was fixed.
+
+### Membership policies — `packages/server-postgres/test/e2e/exists-in-enforcement.test.ts`
+
+`policy.existsIn` compiles to a correlated `EXISTS` and was previously only ever
+checked as a string. A string test cannot see the failure that matters, because
+it is not a syntax error: an unqualified `outerField` makes the correlation
+collapse into `m.x = m.x`, and the policy quietly changes from "documents on a
+team you belong to" to "documents, if you belong to any team". It compiles, it
+runs, it returns rows.
+
+So the policy is installed as a real `CREATE POLICY`, read back as each user
+through `rebase_user`, and compared with a reference computed in JavaScript from
+the same fixture. The suite also installs the collapsed version on purpose and
+shows it behaving differently — otherwise the assertions would pass equally
+against a compiler that had regressed some other way into denying rows, and the
+suite would be measuring the fixture rather than the correlation. Covers sibling
+subqueries and the negated form. No defect found.
+
+### Refresh-token rotation — `packages/server/test/property/refresh-rotation.property.test.ts`
+
+Driven as a state machine, because the handler's comments are claims about
+*sequences*: a client that never received the answer, two tabs booting together,
+a refresh in flight when a password reset lands. Random operation sequences
+against a real in-memory store — not jest mocks, which return what the previous
+line told them to and therefore cannot have a state machine's bugs — with every
+token ever issued re-checked after every step. That last part is what an example
+test cannot do: not "the operation I just performed was right" but "nothing else
+moved". 8000 sequences, no violation.
+
+### Offline evaluator vs. the server — `packages/server-postgres/test/e2e/offline-query-agreement.test.ts`
+
+`isExactlyEvaluable` promises a cache hit is not an approximation. Most of that
+promise holds and is now asserted strictly; two classes cannot, and are pinned —
+see the open items.
+
+### Shared list limits — `packages/server/test/property/list-limits.property.test.ts`
+
+The clamp REST and the WebSocket ingress share. Bounded, never more than asked
+for, monotone, and identical across the numeric and string spellings.
+
+### Portable SHA-1 — `packages/utils/test/property/sha1.property.test.ts`
+
+Against `node:crypto` on arbitrary unicode, binary strings, JSON-shaped input,
+every length through three blocks, and lone surrogates — the case that usually
+separates a hand-rolled UTF-8 encoder from Node's. No divergence.
+
 ## Running them
 
 They run in the normal `pnpm test`, at a run count chosen to stay in CI. To
@@ -205,19 +303,20 @@ also the honest test of whether a property is any good.
 Being explicit about this is the difference between a verification effort and a
 badge.
 
-**Nothing here proves anything about PostgreSQL.** The policy properties are
-about the parser and the compiler agreeing with each other and with the
-JavaScript evaluator. Whether the emitted SQL *means* what we think it means is
-decided by Postgres, and the only honest way to check that is to execute it. The
-right shape is differential: generate random schema + policy + row triples,
-execute against a real database, and compare against the JavaScript evaluator.
-That would catch a whole class the current properties cannot — and would need
-the `server-postgres` e2e harness rather than a unit suite.
+**The Postgres checks are bounded, not general.** The differential executes 480
+expressions of depth two over one table with four columns. That is a real check
+against real SQL semantics — it is what found the NULL-comparison defect — but
+it is not "the compiler is correct". Generated schemas, more column types
+(arrays, jsonb, timestamps, uuid), and `existsIn` inside the generated grammar
+are all still missing, and each is a place the two evaluators could part without
+anything here noticing.
 
 **Nothing here is a proof.** A property that passes 200,000 times has not been
 proved; it has failed to be refuted 200,000 times. For the parser that is a
 strong signal because the input space is structured and the generator covers it.
-For anything with a wide state space it is much weaker than it looks.
+For anything with a wide state space it is much weaker than it looks. The
+exhaustive checks (kanban placement, the policy differential) are the exception
+and say something stronger, but only within their stated scope.
 
 **The generator is part of the claim.** The identifier-limit property below
 originally passed for a bad reason: `fc.stringMatching` biases towards short
@@ -225,17 +324,25 @@ strings and never generated a long enough table name. A generator that cannot
 reach the interesting end of the input space turns a property into a decoration.
 When reading these, read the arbitraries too.
 
-**The concurrency-shaped bugs are untouched.** Refresh-token rotation, the
-WebSocket auth race, device sessions — these are where model checking (TLA+ or
-Alloy) would earn its keep, because "can any interleaving reach a state where a
-rotated token is accepted twice" is a question a test suite structurally cannot
-answer. Nothing here attempts it.
+**Concurrency is only half addressed.** Refresh-token rotation is now driven as
+a state machine over random operation sequences, which covers the *ordering* of
+operations. It does not cover true interleaving — two requests genuinely in
+flight against one store — and the realtime/CDC path, the WebSocket auth race
+and device sessions are untouched. "Can any interleaving reach a state where a
+rotated token is accepted twice" remains a model-checking question.
 
 **The authorization model as a whole is unverified.** "Can any principal reach
 any row they should not" over a bounded universe of users, orgs and collections
-is an Alloy question, and the most valuable single thing that could be added
-next. The policy properties verify that a rule survives a round trip; they say
-nothing about whether the *set* of rules admits something it shouldn't.
+is an Alloy question, and remains the most valuable single thing that could be
+added. The work here verifies that a rule means the same thing everywhere it is
+consumed; it says nothing about whether the *set* of rules a project ends up
+with admits something it shouldn't.
+
+**Two findings are load-bearing and unfixed.** The collation divergence in the
+offline cache and the missing ORDER BY tiebreaker are both live, both silent,
+and both pinned by tests that currently assert the *broken* behaviour so that
+fixing it is a visible decision. Do not read a green suite as "no known
+problems" — read the open items.
 
 ## Open items found along the way
 
@@ -287,19 +394,25 @@ rule applies: decide on the canonical key, never on the one that arrived.
 
 ## If you want to go further
 
-In rough order of value per hour:
+The three biggest gaps this document named have since been closed: the Postgres
+differential, the membership-policy execution check, and the refresh-rotation
+state machine. What is left, in rough order of value per hour:
 
-1. **Differential policy testing against a real Postgres.** Random schema +
-   policy + row, executed, compared against `evaluatePolicy`. This is the single
-   biggest gap, because it is the only thing that checks the emitted SQL against
-   the semantics that actually decide access.
-2. **Alloy model of the authorization model.** Bounded universe of users, orgs,
-   collections and rules; the assertion is that no principal reaches a row no
-   rule grants them. Answers a question the test suite structurally cannot.
-3. **TLA+ or a stateful property model of refresh-token rotation.** Reuse
-   detection, the grace window, session revocation, the WebSocket auth race.
-4. **Properties on the offline query evaluator** against the server's semantics
-   — `isExactlyEvaluable` claims soundness that nothing checks.
+1. **Alloy (or a bounded exhaustive checker) over the authorization model.** A
+   universe of users, orgs, collections and rules, with the assertion that no
+   principal reaches a row no rule grants them. The policy work verifies that a
+   rule means the same thing everywhere; it says nothing about whether the *set*
+   of rules admits something it shouldn't. Still the most valuable single
+   addition.
+2. **Widen the Postgres differential.** It covers depth two over fifteen leaves
+   on one table. Generated schemas, more column types (arrays, jsonb, timestamps,
+   uuid), and `existsIn` inside the generated grammar would all extend it
+   cheaply, since the harness now exists.
+3. **The realtime/CDC path.** Subscriptions, the auth race, and refetch under
+   RLS — a state machine like the refresh one, and the same reasons apply.
+4. **Migration ordering.** The high-water-mark rule that silently skips an
+   out-of-order migration is a property about sequences of releases, and
+   `upgrade-e2e` already has the fixtures to state it over.
 
-None of these is a proof either. All of them are cheaper than one, and aimed at
-the places where this codebase actually breaks.
+None of these is a proof either. All are cheaper than one, and aimed at the
+places this codebase actually breaks.
