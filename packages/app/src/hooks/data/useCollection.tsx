@@ -143,6 +143,10 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
                 page,
                 orderBy: orderByParams,
                 searchString,
+                // While searching, ask each row which field matched so the view can
+                // show *why* it is here. Costs a ts_headline per field per row,
+                // so it rides along only when there is a search string at all.
+                searchExplain: Boolean(searchString),
                 include: includeParams
             }, (res) => onEntitiesUpdate({ data: res.data as Entity<M>[],
 meta: res.meta }), onError);
@@ -164,6 +168,10 @@ meta: res.meta }), onError);
                 page,
                 orderBy: orderByParams,
                 searchString,
+                // While searching, ask each row which field matched so the view can
+                // show *why* it is here. Costs a ts_headline per field per row,
+                // so it rides along only when there is a search string at all.
+                searchExplain: Boolean(searchString),
                 include: includeParams
             })
                 .then((res) => {

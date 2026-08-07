@@ -27,6 +27,7 @@ import { hasDeclaredDisplay } from "@rebasepro/app";
 import { formatRelativeTime, getValueInPath } from "@rebasepro/utils";
 import { useCollectionSlotKeys, useEntitySlots, type CollectionSlotKeys, type EntityPreviewSlots } from "./usePreviewSlots";
 import { SlotValue, TagChips } from "./SlotValue";
+import { Highlighted, Snippet, searchTerms, offSlotMatch } from "./SearchHighlight";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { resolveEntityAction } from "../../util/resolutions";
 import { getSortablePropertyOptions } from "../CollectionTableBinding/column_utils";
@@ -149,6 +150,32 @@ function getIdealColumnWidth(prop: Property): { width: string, widthPx: number }
 /**
  * Get row padding/spacing classes based on size
  */
+/**
+ * What to call a matched field in the results.
+ *
+ * The server returns the path the collection declared — `questionnaire.
+ * certifications` — which is precise and unreadable. Resolve it to the
+ * property's own `name`, walking into `map` properties for a dotted path, and
+ * fall back to the last segment humanised. A field with no declared name still
+ * reads as words rather than as a path.
+ */
+function fieldLabel(collection: { properties?: Record<string, unknown> }, path: string): string {
+    const segments = path.split(".");
+    let node: Record<string, unknown> | undefined = collection.properties as Record<string, unknown> | undefined;
+    let named: string | undefined;
+
+    for (const segment of segments) {
+        const property = node?.[segment] as { name?: string; properties?: Record<string, unknown> } | undefined;
+        if (!property) { named = undefined; break; }
+        named = property.name ?? named;
+        node = property.properties;
+    }
+
+    if (named) return named;
+    const last = segments[segments.length - 1] ?? path;
+    return last.replace(/[_-]+/g, " ").replace(/^./, c => c.toUpperCase());
+}
+
 function getRowClasses(size: CollectionSize): string {
     switch (size) {
         case "xs": return "py-2 px-5";
@@ -400,7 +427,8 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
         sortBy,
         setSortBy,
         filterValues,
-        checkFilterCombination
+        checkFilterCombination,
+        searchString
     } = tableController;
 
     const resolvedCollection = collection;
@@ -808,6 +836,7 @@ customEntityActions });
                             <ListRow
                                 entity={entity}
                                 collection={resolvedCollection}
+                                searchString={searchString}
                                 onClick={handleEntityClick}
                                 selected={selected}
                                 highlighted={highlighted}
@@ -865,9 +894,12 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
     context,
     path,
     selectionController,
-    openEntityMode
+    openEntityMode,
+    searchString
 }: {
     entity: Entity<M>;
+    /** The active search, so a row can show where it matched. */
+    searchString?: string;
     collection: AdminCollection<M>;
     onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
@@ -904,6 +936,17 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
         entity as Entity<Record<string, unknown>>,
         collection as AdminCollection<Record<string, unknown>>,
         slotKeys
+    );
+
+    // Why is this row here? Terms to mark inside values the row already shows,
+    // and — when the hit is in a field it does not show — the one match worth
+    // putting where the subtitle would have gone.
+    const terms = useMemo(() => searchTerms(searchString), [searchString]);
+    const offSlot = useMemo(
+        () => (terms.length > 0
+            ? offSlotMatch(entity.searchMatches, [slotKeys.titleKey, slotKeys.subtitleKey])
+            : undefined),
+        [entity.searchMatches, slotKeys.titleKey, slotKeys.subtitleKey, terms.length]
     );
 
     const handleClick = useCallback((e: React.MouseEvent) => {
@@ -1025,7 +1068,9 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                 <div className="truncate">
                     {slots.title?.value !== undefined ? (
                         <Typography component="div" variant="body2" className="font-semibold text-surface-900 dark:text-surface-50 truncate transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                            <SlotValue slot={slots.title} size="small"/>
+                            {terms.length > 0 && typeof slots.title?.value === "string"
+                                ? <Highlighted text={slots.title.value} terms={terms}/>
+                                : <SlotValue slot={slots.title} size="small"/>}
                         </Typography>
                     ) : (
                         <Typography component="div" variant="body2" className="font-semibold text-surface-500 dark:text-surface-400 font-mono text-xs transition-colors group-hover:text-primary-600 dark:group-hover:text-primary-400">
@@ -1034,11 +1079,30 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                     )}
                 </div>
 
-                {/* SUBTITLE slot */}
-                {slots.subtitle && (
+                {/* SUBTITLE slot — or, while searching, where the match was.
+                    A hit in a field the row does not display makes the row look
+                    arbitrary; the subtitle is the one line already reserved for
+                    secondary context, so it carries the explanation instead. */}
+                {offSlot ? (
+                    <div className="truncate mt-0.5 flex items-baseline gap-1.5">
+                        <Typography
+                            variant="caption"
+                            component="span"
+                            className="shrink-0 text-[10px] uppercase tracking-wide font-semibold text-amber-700 dark:text-amber-500/90"
+                            title={offSlot.field}
+                        >
+                            {fieldLabel(collection, offSlot.field)}
+                        </Typography>
+                        <Typography variant="caption" component="div" className="text-surface-500 dark:text-surface-400 truncate">
+                            <Snippet text={offSlot.snippet}/>
+                        </Typography>
+                    </div>
+                ) : slots.subtitle && (
                     <div className="truncate mt-0.5">
                         <Typography variant="caption" component="div" className="text-surface-500 dark:text-surface-400 truncate">
-                            <SlotValue slot={slots.subtitle} size="small"/>
+                            {terms.length > 0 && typeof slots.subtitle.value === "string"
+                                ? <Highlighted text={slots.subtitle.value} terms={terms}/>
+                                : <SlotValue slot={slots.subtitle} size="small"/>}
                         </Typography>
                     </div>
                 )}
@@ -1123,6 +1187,8 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
 }) as <M extends Record<string, unknown>>(props: {
     entity: Entity<M>;
     collection: AdminCollection<M>;
+    /** The active search, so a row can show where it matched. */
+    searchString?: string;
     onClick?: (entity: Entity<M>) => void;
     selected?: boolean;
     highlighted?: boolean;

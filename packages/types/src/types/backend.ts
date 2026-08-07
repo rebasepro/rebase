@@ -243,6 +243,8 @@ export interface CollectionSubscriptionConfig {
     startAfter?: unknown;
     databaseId?: string;
     searchString?: string;
+    /** Ask each row which declared search field matched. */
+    searchExplain?: boolean;
 }
 
 /**

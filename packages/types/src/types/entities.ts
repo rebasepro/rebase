@@ -1,3 +1,4 @@
+import type { SearchMatch } from "./search";
 /**
  * New or existing status
  * @group Models
@@ -25,6 +26,17 @@ export interface Entity<M extends Record<string, unknown> = Record<string, unkno
      * Current values
      */
     values: EntityValues<M>;
+
+    /**
+     * Why this entity is in a search result: which declared fields matched, and
+     * the text around each hit.
+     *
+     * Present only on rows returned by a search that asked for it. A sibling of
+     * `values` rather than a key inside it, because it describes the *query*,
+     * not the record — nothing in the collection declares it, no form edits it,
+     * and a record fetched by id never has one.
+     */
+    searchMatches?: SearchMatch[];
 
     /**
      * Which driver this entity belongs to (e.g., 'postgres', 'firestore').

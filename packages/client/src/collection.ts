@@ -431,7 +431,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                     offset: window.driverOffset,
                     orderBy: params?.orderBy?.[0],
                     order: params?.orderBy?.[1],
-                    searchString: params?.searchString
+                    searchString: params?.searchString,
+                    searchExplain: params?.searchExplain
                 },
                 (incomingRows: Record<string, unknown>[]) => {
                     const currentUpdateId = ++lastUpdateId;

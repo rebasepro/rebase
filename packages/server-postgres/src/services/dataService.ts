@@ -87,6 +87,7 @@ export class DataService implements DataRepository {
             order?: "desc" | "asc";
             limit?: number;
             databaseId?: string;
+            searchExplain?: boolean;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         return this.fetchService.searchRows<M>(collectionPath, searchString, options);

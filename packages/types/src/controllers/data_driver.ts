@@ -117,6 +117,8 @@ export interface FetchCollectionProps<M extends Record<string, unknown> = Record
     startAfter?: unknown;
     orderBy?: string;
     searchString?: string;
+    /** Ask each row which declared search field matched — populates `_matches`. */
+    searchExplain?: boolean;
     order?: "desc" | "asc";
     /** Vector similarity search configuration */
     vectorSearch?: VectorSearchParams;

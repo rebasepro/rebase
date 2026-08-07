@@ -1085,6 +1085,8 @@ relatedTo: hop });
             order?: "desc" | "asc";
             limit?: number;
             databaseId?: string;
+            /** Ask each row which declared search field matched. */
+            searchExplain?: boolean;
         } = {}
     ): Promise<Record<string, unknown>[]> {
         return this.fetchRowsWithConditions<M>(collectionPath, {

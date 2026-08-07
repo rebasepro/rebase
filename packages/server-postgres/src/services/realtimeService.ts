@@ -61,6 +61,8 @@ type StoredCollectionRequest = {
     startAfter?: Record<string, unknown>;
     databaseId?: string;
     searchString?: string;
+    /** Ask each row which declared search field matched — populates `_matches`. */
+    searchExplain?: boolean;
 };
 
 type RealTimeListenEntityProps = ListenOneProps & { subscriptionId: string };
@@ -266,7 +268,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 limit: config.limit,
                 startAfter: config.startAfter as Record<string, unknown> | undefined,
                 databaseId: config.databaseId,
-                searchString: config.searchString
+                searchString: config.searchString,
+                searchExplain: config.searchExplain
             }
         });
 
@@ -459,7 +462,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                     offset: request.offset,
                     startAfter: request.startAfter as Record<string, unknown> | undefined,
                     databaseId: request.collection?.databaseId,
-                    searchString: request.searchString
+                    searchString: request.searchString,
+                    searchExplain: request.searchExplain
                 },
                 authContext
             });
@@ -747,7 +751,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 limit: collectionRequest.limit,
                 offset: collectionRequest.offset,
                 startAfter: collectionRequest.startAfter,
-                searchString: collectionRequest.searchString
+                searchString: collectionRequest.searchString,
+                searchExplain: collectionRequest.searchExplain
             });
 
             // Always wrap in a transaction with session vars, defaulting to anonymous context if missing.
@@ -768,7 +773,8 @@ roles: ["anon"] };
                             orderBy: collectionRequest.orderBy,
                             order: collectionRequest.order,
                             limit: collectionRequest.limit,
-                            databaseId: collectionRequest.databaseId
+                            databaseId: collectionRequest.databaseId,
+                            searchExplain: collectionRequest.searchExplain
                         }
                     );
                 } else {

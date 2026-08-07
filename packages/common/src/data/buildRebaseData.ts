@@ -15,7 +15,8 @@ import {
     SDKQueryBuilderInterface,
     WhereFilterOp,
     WhereValue,
-    type ComputedSortField
+    type ComputedSortField,
+    type SearchMatch
 } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 import { QueryBuilder } from "./query_builder";
@@ -90,12 +91,19 @@ function rowToEntity<M extends Record<string, unknown>>(
     slug: string,
     primaryKeys: PrimaryKeyInfo[] = []
 ): Entity<M> {
+    // Query-computed metadata rides in on the row because that is how the wire
+    // carries it, but it is not a column: it belongs beside `values`, not in
+    // them. Left inside, `_matches` would show up in the record inspector as a
+    // field the collection never declared.
+    const { _matches, ...values } = row as Record<string, unknown> & { _matches?: SearchMatch[] };
+
     return {
         id: primaryKeys.length > 0
             ? buildCompositeId(row, primaryKeys)
             : row.id as string | number,
         path: slug,
-        values: row as EntityValues<M>
+        values: values as EntityValues<M>,
+        ...(_matches ? { searchMatches: _matches } : {})
     };
 }
 
@@ -325,6 +333,7 @@ ids });
                     orderBy: params?.orderBy?.[0],
                     order: params?.orderBy?.[1],
                     searchString: params?.searchString,
+                    searchExplain: params?.searchExplain,
                     onUpdate: (entities) => {
                         onUpdate({
                             data: entities.map((row: Record<string, unknown>) => rowToEntity<M>(normalize(row), slug, getPks())),

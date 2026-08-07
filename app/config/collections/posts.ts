@@ -11,6 +11,17 @@ const postsCollection: PostgresCollectionConfig = {
     slug: "posts",
     table: "posts",
     history: true,
+    // Dogfooding the opt-in search block. `content` is the interesting field:
+    // the list shows a title and an excerpt, so a term that appears only in the
+    // body makes a row look arbitrary — exactly the case `_matches` explains.
+    search: {
+        language: "english",
+        fields: [
+            { path: "title", weight: "A" },
+            { path: "excerpt", weight: "C" },
+            { path: "content", weight: "D" }
+        ]
+    },
     properties: {
         id: {
             name: "ID",

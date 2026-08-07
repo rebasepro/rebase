@@ -265,6 +265,10 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 limit: itemCount,
                 orderBy: orderByParams,
                 searchString,
+                // While searching, ask each row which declared field matched so
+                // the list can show *why* it is there. Costs a ts_headline per
+                // field per row, so it rides along only with a search string.
+                searchExplain: Boolean(searchString),
                 include: includeParams
             }, (res) => onEntitiesUpdate(res.data as Entity<M>[]), onError);
         } else {
@@ -273,6 +277,10 @@ export function useDataTableController<M extends Record<string, any> = any, USER
                 limit: itemCount,
                 orderBy: orderByParams,
                 searchString,
+                // While searching, ask each row which declared field matched so
+                // the list can show *why* it is there. Costs a ts_headline per
+                // field per row, so it rides along only with a search string.
+                searchExplain: Boolean(searchString),
                 include: includeParams
             })
                 .then((res) => onEntitiesUpdate(res.data as Entity<M>[]))
