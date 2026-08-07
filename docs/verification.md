@@ -79,18 +79,32 @@ because it is how the folder route marks a prefix) and is not cosmetic on `list`
 where a prefix of `public` also matches `publicity/` and hands back keys the
 caller never asked for.
 
-**String ordering in the offline cache cannot match the server.**
-`compareValues` orders strings with an `Intl.Collator`; PostgreSQL uses the
-database's collation, which the client has never been told. `'apple' < 'Banana'`
-is false under the C collation, true under `en_US.UTF-8`, and true for the
-collator. So a cache hit on `name < 'Banana'` returns a different set from the
-server, silently, while `isExactlyEvaluable` has told the offline layer the
-answer is exact. The same trap is recorded one layer down for board order keys,
-where the fix was to restrict the alphabet until every collation agrees; there is
-no equivalent move for arbitrary user text. The honest fix is to narrow the
-promise — `isExactlyEvaluable` should return false for a string ordering
-comparison or a text `orderBy` — which means more cache misses and more network,
-and is therefore a decision.
+**String ordering in the offline cache cannot match the server — now declared
+rather than silently wrong.** `compareValues` orders strings with an
+`Intl.Collator`; PostgreSQL uses the database's collation, which the client has
+never been told. `'apple' < 'Banana'` is false under the C collation, true under
+`en_US.UTF-8`, and true for the collator, so a cache hit on `name < 'Banana'`
+returns a different set from the server. The comparator is unchanged — neither
+side is wrong — but the *promise* was: `isExactlyEvaluable` now refuses any
+ordering comparison, and a new `isLocallySortable` decides whether the overlay
+may re-sort a page or must keep the server's order.
+
+Two things worth knowing about the shape of that fix. First, it refuses
+*numeric* ranges too, not only string ones: `compareValues` deliberately reads
+numeric strings as numbers, so it cannot tell an integer column from a text
+column of digits, and on the latter Postgres orders `"10"` before `"9"` while
+this orders 9 before 10. The operand's type does not settle it and `params`
+carries nothing else. Passing the collection schema into `isExactlyEvaluable`
+would let a number- or date-typed column be claimed again, and is the obvious
+next move if the conservatism bites.
+
+Second, the cost is bounded and is a *degradation*, not a loss: `exact` gates
+whether locally-created rows are injected into page zero, whether a locally
+edited row that no longer matches is removed, and whether queued writes adjust
+a count. It does not gate whether the cache answers at all — the server's
+snapshot is still the skeleton. So an affected query keeps working and stops
+placing unsynced local writes optimistically, and the result now carries
+`partial: true` to say so.
 
 **ORDER BY has no deterministic tiebreaker.** Sorting on a column with duplicate
 values leaves the order of tied rows undefined, so `LIMIT`/`OFFSET` paging over
@@ -271,8 +285,18 @@ moved". 8000 sequences, no violation.
 ### Offline evaluator vs. the server — `packages/server-postgres/test/e2e/offline-query-agreement.test.ts`
 
 `isExactlyEvaluable` promises a cache hit is not an approximation. Most of that
-promise holds and is now asserted strictly; two classes cannot, and are pinned —
-see the open items.
+promise holds and is asserted strictly: equality with the wire's type erasure,
+all four NULL-testing operators, membership, and all four `LIKE` variants select
+identical rows, as does sorting and paging on a reproducible column.
+
+Where it could not hold, the promise was narrowed rather than the divergence
+tolerated, and the suite now asserts the *contract* as well as the divergence:
+every query that diverges is one `isExactlyEvaluable` declines, every query that
+agrees is still claimed, and the text column the overlay must not re-sort is one
+`isLocallySortable` refuses. Asserting both halves is what stops a narrowing from
+becoming a blanket refusal dressed up as a fix.
+
+The tie-ordering divergence remains open — see below.
 
 ### Shared list limits — `packages/server/test/property/list-limits.property.test.ts`
 

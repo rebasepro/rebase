@@ -1,6 +1,7 @@
 import {
     compareValues,
     isExactlyEvaluable,
+    isLocallySortable,
     looseEquals,
     matchesLogical,
     matchesOperator,
@@ -254,6 +255,93 @@ describe("local query engine", () => {
             // …and related rows live in collections this query never loaded.
             expect(isExactlyEvaluable({ include: ["author"] })).toBe(false);
             expect(isExactlyEvaluable({ include: [] })).toBe(true);
+        });
+
+        /**
+         * An ordering comparison is answered here by `compareValues`, which
+         * falls back to an `Intl.Collator`, and by Postgres using the
+         * *database's* collation — a property of the server this process has
+         * never been told. `'apple' < 'Banana'` is false under the C collation
+         * and true under `en_US.UTF-8`; the collator says true. So the two
+         * select different sets, in whichever direction the deployment happened
+         * to be created.
+         */
+        it("refuses an ordering comparison, whose answer depends on the server's collation", () => {
+            for (const op of ["<", "<=", ">", ">="] as const) {
+                expect({ op, exact: isExactlyEvaluable({ where: { name: [op, "Banana"] } }) })
+                    .toEqual({ op, exact: false });
+            }
+            // Equality, membership and pattern matching are unaffected — all
+            // verified against a real database in
+            // `server-postgres/test/e2e/offline-query-agreement.test.ts`.
+            for (const op of ["==", "!=", "in", "not-in", "like", "ilike"] as const) {
+                expect({ op, exact: isExactlyEvaluable({ where: { name: [op, "x"] } }) })
+                    .toEqual({ op, exact: true });
+            }
+            expect(isExactlyEvaluable({ where: { a: ["is-null", null] } })).toBe(true);
+        });
+
+        it("refuses a numeric range too, because the operand type does not settle it", () => {
+            // `compareValues` deliberately reads numeric strings as numbers, so
+            // it cannot tell an integer column from a text column of digits —
+            // and on the latter Postgres orders "10" before "9" while this
+            // orders 9 before 10. Conservative on purpose; the schema would be
+            // needed to do better.
+            expect(isExactlyEvaluable({ where: { qty: [">", 10] } })).toBe(false);
+        });
+
+        it("looks inside and/or groups, not just the top-level where", () => {
+            expect(isExactlyEvaluable({
+                logical: { type: "or", conditions: [
+                    { column: "a", operator: "==", value: 1 },
+                    { column: "b", operator: "==", value: 2 }
+                ] }
+            } as never)).toBe(true);
+            expect(isExactlyEvaluable({
+                logical: { type: "or", conditions: [
+                    { column: "a", operator: "==", value: 1 },
+                    { type: "and", conditions: [{ column: "b", operator: "<", value: "m" }] }
+                ] }
+            } as never)).toBe(false);
+        });
+
+        it("still refuses several conditions on one field when any of them orders", () => {
+            expect(isExactlyEvaluable({ where: { a: [["==", 1], ["<", "m"]] } } as never)).toBe(false);
+            expect(isExactlyEvaluable({ where: { a: [["==", 1], ["!=", 2]] } } as never)).toBe(true);
+        });
+    });
+
+    describe("isLocallySortable", () => {
+        /**
+         * Asked of the rows rather than the query, because unlike a filter this
+         * one is decidable from the data in hand: the collator is reachable
+         * only when a value cannot be read as a number.
+         */
+        it("accepts a column this page holds only as numbers", () => {
+            expect(isLocallySortable([{ id: 1, n: 3 }, { id: 2, n: 10 }], ["n", "asc"])).toBe(true);
+            // The wire's type erasure is already undone by `compareValues`.
+            expect(isLocallySortable([{ id: 1, n: "3" }, { id: 2, n: "10" }], ["n", "asc"])).toBe(true);
+            // Dates normalise to instants before any comparison happens.
+            expect(isLocallySortable(
+                [{ id: 1, at: new Date(1) }, { id: 2, at: new Date(2) }], ["at", "desc"]
+            )).toBe(true);
+        });
+
+        it("refuses a column holding text, whose order is the database's to decide", () => {
+            expect(isLocallySortable([{ id: 1, name: "apple" }, { id: 2, name: "Banana" }], ["name", "asc"]))
+                .toBe(false);
+            // One text value is enough — a column is one type, and the page that
+            // happens to be cached does not get to vote.
+            expect(isLocallySortable([{ id: 1, n: 3 }, { id: 2, n: "x" }], ["n", "asc"])).toBe(false);
+        });
+
+        it("ignores nulls, which are ordered by an explicit rule", () => {
+            expect(isLocallySortable([{ id: 1, n: null }, { id: 2, n: 5 }], ["n", "asc"])).toBe(true);
+            expect(isLocallySortable([{ id: 1 }, { id: 2 }], ["missing", "asc"])).toBe(true);
+        });
+
+        it("is vacuously true with no sort", () => {
+            expect(isLocallySortable([{ id: 1, name: "a" }], undefined)).toBe(true);
         });
     });
 

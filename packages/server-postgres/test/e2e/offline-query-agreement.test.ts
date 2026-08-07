@@ -28,7 +28,7 @@ import { pgTable, varchar, integer, boolean } from "drizzle-orm/pg-core";
 import type { CollectionConfig, FilterValues, WhereFilterOp } from "@rebasepro/types";
 // Not on the client's public surface — imported from source, like the
 // evaluator it is checking.
-import { runLocalQuery } from "../../../client/src/offline-query.js";
+import { runLocalQuery, isExactlyEvaluable, isLocallySortable } from "../../../client/src/offline-query.js";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
@@ -111,11 +111,17 @@ const QUERIES = queries();
  * Split out because they cannot agree, and the reason is structural rather
  * than a bug in either evaluator — see the pinned test at the bottom.
  */
-const STRING_ORDERING = new Set(["<", "<=", ">", ">="]);
-const isStringOrdering = (q: { filter: FilterValues<string> }): boolean => {
-    const [column, condition] = Object.entries(q.filter)[0]!;
-    return column === "name" && STRING_ORDERING.has((condition as [WhereFilterOp, unknown])[0]);
-};
+const ORDERING_OPS = new Set(["<", "<=", ">", ">="]);
+const opOf = (q: { filter: FilterValues<string> }): WhereFilterOp =>
+    (Object.values(q.filter)[0] as [WhereFilterOp, unknown])[0];
+const columnOf = (q: { filter: FilterValues<string> }): string => Object.keys(q.filter)[0]!;
+
+/** Orders its operands — the operators whose answer depends on a collation. */
+const isOrdering = (q: { filter: FilterValues<string> }): boolean => ORDERING_OPS.has(opOf(q));
+
+/** Orders *text* operands — the subset that actually diverges here. */
+const isStringOrdering = (q: { filter: FilterValues<string> }): boolean =>
+    isOrdering(q) && columnOf(q) === "name";
 
 const idsOf = (rows: Record<string, unknown>[]): string[] => rows.map(r => String(r.id)).sort();
 
@@ -230,12 +236,12 @@ describe("offline evaluator vs the server, on identical data", () => {
      *
      * The same trap is already recorded one layer down, for board order keys,
      * where the fix was to restrict the alphabet so every collation agrees.
-     * There is no equivalent move for arbitrary user text — the honest fix is
-     * to narrow the promise, which is a behaviour change in the offline layer
-     * (more cache misses, more network) and therefore a decision rather than a
-     * correction.
+     * There is no equivalent move for arbitrary user text, so the promise was
+     * narrowed instead: `isExactlyEvaluable` now refuses these queries, which
+     * is asserted below. The divergence itself remains — it is not a defect in
+     * either comparator — and this test exists to keep it *declared*.
      */
-    it("KNOWN: string ordering comparisons diverge, by collation", async () => {
+    it("string ordering comparisons diverge, and the offline layer refuses to claim otherwise", async () => {
         const divergences: string[] = [];
         for (const q of QUERIES) {
             if (!isStringOrdering(q)) continue;
@@ -250,9 +256,33 @@ describe("offline evaluator vs the server, on identical data", () => {
         const { rows } = await pool.query("SELECT ('apple' < 'Banana') AS pg, datcollate FROM pg_database WHERE datname = current_database()");
         expect(rows[0].pg).toBe(false);                               // this container: byte order
         expect("apple".localeCompare("Banana") < 0).toBe(true);       // the collator: locale order
+
+        // The contract: every query that diverges is one the offline layer
+        // declines to answer exactly. This is the assertion that makes the
+        // divergence safe rather than merely known.
+        for (const q of QUERIES.filter(isStringOrdering)) {
+            expect({ q: q.label, exact: isExactlyEvaluable({ where: q.filter } as never) })
+                .toEqual({ q: q.label, exact: false });
+        }
+        // …and everything that is not an ordering comparison is still claimed,
+        // or the narrowing would be a blanket refusal dressed up as a fix.
+        for (const q of QUERIES.filter(x => !isOrdering(x))) {
+            expect({ q: q.label, exact: isExactlyEvaluable({ where: q.filter } as never) })
+                .toEqual({ q: q.label, exact: true });
+        }
+
+        // The cost of the conservatism, stated rather than hidden: a *numeric*
+        // range filter is refused too, even though it agrees here. The operand
+        // type does not settle it — `compareValues` deliberately reads numeric
+        // strings as numbers, so it cannot tell an integer column from a text
+        // column of digits, and on the latter Postgres orders "10" before "9"
+        // while this orders 9 before 10. Passing the collection schema in would
+        // let a number- or date-typed column be claimed again; nothing else
+        // would.
+        expect(isExactlyEvaluable({ where: { qty: [">", 10] } } as never)).toBe(false);
     });
 
-    it("KNOWN: sorting a text column diverges the same way", async () => {
+    it("sorting a text column diverges, and is not claimed as locally sortable", async () => {
         for (const order of ["asc", "desc"] as const) {
             expect(await serverOrder({ orderBy: "name", order }))
                 .not.toEqual(localOrder({ orderBy: ["name", order] }));
@@ -260,6 +290,14 @@ describe("offline evaluator vs the server, on identical data", () => {
         // NULL placement, at least, does agree: last on asc, first on desc.
         expect((await serverOrder({ orderBy: "name", order: "asc" })).at(-1)).toBe("i4");
         expect(localOrder({ orderBy: ["name", "asc"] }).at(-1)).toBe("i4");
+
+        // The contract: the overlay keeps the server's order for this column
+        // rather than replacing it with the collator's.
+        expect(isLocallySortable(allRows, ["name", "asc"])).toBe(false);
+        // A numeric column is reproducible, so the overlay still sorts it —
+        // the narrowing has to be a distinction, not a blanket refusal.
+        expect(isLocallySortable(allRows, ["qty", "asc"])).toBe(true);
+        expect(isLocallySortable(allRows, ["id", "asc"])).toBe(false); // text ids
     });
 
     /**
