@@ -86,6 +86,18 @@ export function canonicalStorageKey(rawKey: string): string {
     const withoutLeadingSlashes = rawKey.replace(/^\/+/, "");
     if (withoutLeadingSlashes === "") return "";
 
+    // Whether the key names a *directory* rather than an object: it ends with a
+    // separator, or its last segment is the `.` that means "this directory".
+    //
+    // Recorded before normalizing, because `path.posix.normalize` drops the
+    // distinction in one of those two spellings and not the other: `public/.`
+    // becomes `public` while `public/./` stays `public/`. That asymmetry breaks
+    // the rule this module states — a trailing slash is preserved, because it is
+    // how the folder route marks a prefix — and it is not cosmetic on `list`,
+    // where a prefix of `public` also matches `publicity/` and hands back keys
+    // the caller never asked for.
+    const denotesDirectory = /(?:^|\/)\.?$/.test(withoutLeadingSlashes);
+
     // Safe now: with no `..` segment in the input, `normalize` can only collapse
     // `.` and duplicate slashes — it cannot climb.
     const normalized = path.posix.normalize(withoutLeadingSlashes);
@@ -94,7 +106,9 @@ export function canonicalStorageKey(rawKey: string): string {
     if (normalized === "." || normalized === "./") return "";
 
     // `normalize` re-introduces a leading `./` for keys like `.//a`.
-    return normalized.replace(/^\.\//, "").replace(/^\/+/, "");
+    const key = normalized.replace(/^\.\//, "").replace(/^\/+/, "");
+    if (key === "") return "";
+    return denotesDirectory && !key.endsWith("/") ? `${key}/` : key;
 }
 
 /**

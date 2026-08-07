@@ -59,6 +59,15 @@ const hostileKey = fc.oneof(
         .map(p => p.join(""))
 );
 
+/**
+ * Keys within a bucket — the domain `canonicalStorageKey` is defined on.
+ *
+ * `://` is excluded because it is the one sequence on which this domain and
+ * `isPublicStoragePath`'s differ; see the pinned test at the bottom of the file
+ * for what that difference is and why it is not a defect.
+ */
+const bucketRelativeKey = hostileKey.filter(k => !k.includes("://"));
+
 /** Canonical keys only — the output side of the function. */
 const canonicalKey = hostileKey
     .map(tryCanonicalStorageKey)
@@ -217,12 +226,42 @@ describe("public prefix agreement", () => {
      * an object that is not there, or worse, is somewhere else.
      */
     it("keeps a public-reading key public after canonicalization", () => {
-        fc.assert(fc.property(hostileKey, raw => {
+        fc.assert(fc.property(bucketRelativeKey, raw => {
             if (!isPublicStoragePath(raw)) return;
             const key = tryCanonicalStorageKey(raw);
             if (key === null) return; // refused outright is fail-closed, and fine
             expect(isPublicStoragePath(key)).toBe(true);
         }), { numRuns: RUNS });
+    });
+
+    /**
+     * **The two functions do not take the same domain**, and the property above
+     * is restricted to the one they share.
+     *
+     * `isPublicStoragePath` accepts a full URL — its doc says to strip any
+     * `scheme://` and `bucket/` prefix, and it does that itself.
+     * `canonicalStorageKey` accepts a key *within* a bucket, and collapses
+     * repeated slashes wherever they appear, which destroys the `://` that the
+     * other function was looking for. So `x://public/y` reads as public and
+     * canonicalizes to `x:/public/y`, which does not.
+     *
+     * This was found by the property above failing intermittently — the
+     * generator produced a `://` roughly one run in three. Nothing is broken:
+     * no caller feeds a URL to the canonicalizer, because the routes derive the
+     * key from the URL path, which is already bucket-relative. It is pinned
+     * because "these two agree" is the kind of thing that gets assumed later,
+     * and the assumption is false outside a domain nobody has written down.
+     */
+    it("PINNED: the public check accepts URLs, the canonicalizer does not", () => {
+        expect(isPublicStoragePath("x://public/y")).toBe(true);
+        expect(canonicalStorageKey("x://public/y")).toBe("x:/public/y");
+        expect(isPublicStoragePath(canonicalStorageKey("x://public/y"))).toBe(false);
+
+        // …and on the shared domain — a key within a bucket — they agree.
+        for (const key of ["public/x", "public//x", "public/./x", "//public/x", "default/public/x"]) {
+            expect(isPublicStoragePath(key)).toBe(true);
+            expect(isPublicStoragePath(canonicalStorageKey(key))).toBe(true);
+        }
     });
 
     /**
