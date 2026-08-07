@@ -1,0 +1,162 @@
+[
+  {
+    "name": "Elena Vasquez",
+    "email": "elena.vasquez@example.com",
+    "twitter": "elenabuilds",
+    "github": "evasquez",
+    "website": "https://elenavasquez.dev",
+    "bio": "## About\n\nDatabase engineer. I spent six years on the storage team at a payments company, which is a polite way of saying I spent six years being paged at 3am about replication lag.\n\n### What I write about\n- Postgres internals, mostly the parts that surprise people\n- Query planning and why your index isn't being used\n- Migrations that don't take the site down\n\n> If your migration doesn't have a rollback plan, it isn't a migration. It's a bet."
+  },
+  {
+    "name": "Tomas Lindqvist",
+    "email": "tomas.lindqvist@example.com",
+    "twitter": "tlindqvist",
+    "github": "tlindqvist",
+    "website": "https://lindqvist.se",
+    "bio": "## Hej\n\nFrontend architect in Stockholm. I care a lot about the boring parts of the browser — layout, paint, and the 200ms nobody can account for.\n\n### Current obsessions\n- View transitions and what they replace\n- CSS container queries in real design systems\n- Getting Lighthouse scores honestly instead of gaming them\n\nPreviously built design systems at two companies you've heard of and one you haven't."
+  },
+  {
+    "name": "Priya Raghunathan",
+    "email": "priya.raghunathan@example.com",
+    "twitter": "priya_r",
+    "github": "praghunathan",
+    "website": "https://priya.engineering",
+    "bio": "## Background\n\nDistributed systems, mostly. I like problems where the answer is \"it depends on your consistency model.\"\n\n### Focus\n- Event-driven architectures that don't become event-driven spaghetti\n- Idempotency as a design constraint, not an afterthought\n- Observability: traces over logs, always\n\n*Currently writing a book about failure modes that I will probably never finish.*"
+  },
+  {
+    "name": "Marcus Bell",
+    "email": "marcus.bell@example.com",
+    "twitter": "marcusbell",
+    "github": "mbell",
+    "website": "https://marcusbell.io",
+    "bio": "## Who I am\n\nSelf-taught, started in support, ended up in platform engineering. The support years were the most useful engineering education I got.\n\n### Topics\n1. Developer experience as a product discipline\n2. Internal tooling nobody wants to own\n3. Career paths that aren't management\n\nI write about the parts of the job that don't fit in a commit message."
+  },
+  {
+    "name": "Yuki Tanaka",
+    "email": "yuki.tanaka@example.com",
+    "twitter": "yukicodes",
+    "github": "ytanaka",
+    "website": "https://yuki.dev",
+    "bio": "## Profile\n\nCompiler and tooling work. I build the things that run before your code runs.\n\n### Interests\n- Incremental compilation and why builds get slow\n- TypeScript's type system as a programming language in its own right\n- Rust, WebAssembly, and the parts of both that are oversold\n\n> Fast feedback loops are worth more than any individual optimization."
+  },
+  {
+    "name": "Aisha Okonkwo",
+    "email": "aisha.okonkwo@example.com",
+    "twitter": "aisha_ok",
+    "github": "aokonkwo",
+    "website": "https://aishaokonkwo.com",
+    "bio": "## Hello\n\nSecurity engineer with a background in application development, which means I break things I used to build.\n\n### What I cover\n- Threat modelling for teams that have never done it\n- Auth flows: the ten ways OAuth goes wrong in practice\n- Secrets management beyond \"put it in the env file\"\n\nI believe most security incidents are design problems wearing a costume."
+  },
+  {
+    "name": "Daniel Roth",
+    "email": "daniel.roth@example.com",
+    "twitter": "danroth",
+    "github": "drothdev",
+    "website": "https://danielroth.dev",
+    "bio": "## Intro\n\nBackend engineer, currently working on API design at a mid-size SaaS company.\n\n### Writing about\n- REST vs. RPC arguments that are actually about coupling\n- Versioning strategies and their long-term costs\n- Pagination, filtering, and other things everyone reinvents badly\n\nI have strong opinions about error responses and I will share them."
+  },
+  {
+    "name": "Sofia Marchetti",
+    "email": "sofia.marchetti@example.com",
+    "twitter": "sofiam",
+    "github": "smarchetti",
+    "website": "https://sofiamarchetti.it",
+    "bio": "## Chi sono\n\nDesign engineer working between the design and frontend teams — the seam where most product quality is won or lost.\n\n### Areas\n- Design tokens and the tooling that keeps them honest\n- Accessibility as a default, not an audit finding\n- Motion design that survives contact with real data\n\nBased in Milan. Formerly agency, now product."
+  },
+  {
+    "name": "Jonas Weber",
+    "email": "jonas.weber@example.com",
+    "twitter": "jonasweber",
+    "github": "jweber",
+    "website": "https://weber.dev",
+    "bio": "## About me\n\nInfrastructure. Kubernetes when it's warranted, a single server when it isn't — and it usually isn't.\n\n### Themes\n- Cost as an architectural constraint\n- Deployment pipelines that fail loudly and early\n- The operational overhead nobody budgets for\n\n> Every abstraction you adopt is an abstraction you have to debug at 2am."
+  },
+  {
+    "name": "Nadia Haddad",
+    "email": "nadia.haddad@example.com",
+    "twitter": "nadiahaddad",
+    "github": "nhaddad",
+    "website": "https://nadiahaddad.dev",
+    "bio": "## Bio\n\nData engineer turned analytics lead. I moved from building pipelines to arguing about what the numbers mean, which is harder.\n\n### Subjects\n- Modelling events so they're still useful in a year\n- Warehouse costs and the queries that drive them\n- Metrics that change behaviour vs. metrics that decorate dashboards"
+  },
+  {
+    "name": "Oliver Grant",
+    "email": "oliver.grant@example.com",
+    "twitter": "olivergrant",
+    "github": "ogrant",
+    "website": "https://olivergrant.co.uk",
+    "bio": "## Hi\n\nStaff engineer, currently doing a lot of migration work — the kind that takes eighteen months and has no demo.\n\n### I write about\n- Strangler-fig migrations and when to abandon them\n- Legacy code as an asset rather than a liability\n- Technical debt conversations with non-technical stakeholders\n\nTen years in, still mostly deleting code."
+  },
+  {
+    "name": "Camila Duarte",
+    "email": "camila.duarte@example.com",
+    "twitter": "camiladuarte",
+    "github": "cduarte",
+    "website": "https://camiladuarte.br",
+    "bio": "## Sobre\n\nMobile engineer working across React Native and native iOS. I've shipped the same feature three times in three frameworks and have opinions about it.\n\n### Focus areas\n- Cross-platform tradeoffs, honestly assessed\n- Offline-first sync and conflict resolution\n- App performance on the devices people actually own\n\nBased in São Paulo."
+  },
+  {
+    "name": "Henrik Solberg",
+    "email": "henrik.solberg@example.com",
+    "twitter": "hsolberg",
+    "github": "hsolberg",
+    "website": "https://solberg.no",
+    "bio": "## Background\n\nTesting and quality engineering. I got here by being the person who kept asking why the suite was red.\n\n### Writing on\n- Test pyramids and why yours is an hourglass\n- Flaky tests as a systems problem\n- Contract testing between services\n\n> A test suite you don't trust is worse than no test suite. It costs the same and tells you nothing."
+  },
+  {
+    "name": "Leila Farsi",
+    "email": "leila.farsi@example.com",
+    "twitter": "leilafarsi",
+    "github": "lfarsi",
+    "website": "https://leilafarsi.dev",
+    "bio": "## About\n\nEngineering manager, formerly a backend developer who missed writing code and now writes about not writing code.\n\n### Topics\n- Team topologies and cognitive load\n- Hiring processes that don't filter for interview skill\n- Incident review without blame theatre\n\nI manage six people and read a great deal about managing six people."
+  },
+  {
+    "name": "Andrei Popescu",
+    "email": "andrei.popescu@example.com",
+    "twitter": "andreipop",
+    "github": "apopescu",
+    "website": "https://andreipopescu.ro",
+    "bio": "## Hello\n\nPerformance engineer. My job is mostly measuring things carefully and then telling people their assumptions were wrong.\n\n### Areas\n- Profiling methodology, and why flame graphs mislead\n- Latency budgets across a request path\n- Caching strategies and their invalidation costs\n\n*Measure first. Then measure again, differently.*"
+  },
+  {
+    "name": "Grace Whitfield",
+    "email": "grace.whitfield@example.com",
+    "twitter": "gracewhit",
+    "github": "gwhitfield",
+    "website": "https://gracewhitfield.dev",
+    "bio": "## Intro\n\nTechnical writer who codes, or a developer who writes — the ratio shifts by quarter.\n\n### Subjects\n- Documentation as part of the product surface\n- API reference generation from source\n- Onboarding paths that get someone to a working call in five minutes\n\nI think most docs problems are actually information architecture problems."
+  },
+  {
+    "name": "Rafael Ortiz",
+    "email": "rafael.ortiz@example.com",
+    "twitter": "rafaortiz",
+    "github": "rortiz",
+    "website": "https://rafaelortiz.mx",
+    "bio": "## Sobre mí\n\nFull-stack developer at a small team where everyone touches everything. Generalist by necessity, which turned out to suit me.\n\n### What I cover\n- Small-team architecture decisions\n- Choosing boring technology on purpose\n- Shipping with two engineers and no platform team\n\nBased in Mexico City."
+  },
+  {
+    "name": "Ingrid Nilsen",
+    "email": "ingrid.nilsen@example.com",
+    "twitter": "ingridnilsen",
+    "github": "inilsen",
+    "website": "https://ingridnilsen.dk",
+    "bio": "## About\n\nProduct engineer with a research background. I spend a lot of time on the question of whether we should build the thing at all.\n\n### Interests\n- Prototyping to answer questions, not to impress\n- Feature flags and progressive delivery\n- Instrumenting a feature before shipping it\n\n> The cheapest feature is the one you proved you didn't need."
+  },
+  {
+    "name": "Kwame Mensah",
+    "email": "kwame.mensah@example.com",
+    "twitter": "kwamemensah",
+    "github": "kmensah",
+    "website": "https://kwamemensah.dev",
+    "bio": "## Hi there\n\nOpen-source maintainer and infrastructure developer. I maintain two libraries, one of which people actually use.\n\n### Writing about\n- Maintainer burnout and issue triage at scale\n- Semantic versioning as a social contract\n- Dependency risk in modern package ecosystems\n\nMost of my best code was written in response to someone else's bug report."
+  },
+  {
+    "name": "Mei Lin Chow",
+    "email": "meilin.chow@example.com",
+    "twitter": "meilinchow",
+    "github": "mlchow",
+    "website": "https://meilinchow.dev",
+    "bio": "## Profile\n\nMachine learning engineer working on retrieval systems. Less model training than people expect, more data plumbing.\n\n### Focus\n- Evaluation sets and why yours is leaking\n- Retrieval quality as an engineering problem\n- Serving latency for model-backed features\n\nI am suspicious of any benchmark I did not build myself."
+  }
+]

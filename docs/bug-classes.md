@@ -1122,6 +1122,44 @@ rather than a `try` at each site.
 
 ---
 
+## 32. A portalled layer that escapes a modal's scroll lock
+
+The sibling of class 25, through the same seam and with a different symptom. A
+modal — `Dialog`, `Sheet` — wraps itself in `react-remove-scroll`, which adds a
+`wheel` listener on `document` and calls `preventDefault()` on every event whose
+target is not inside the lock or one of its declared shards. So a popup portalled
+to `document.body` while a modal is open is *outside* the lock: it opens, it is
+positioned, it is clickable, arrow keys move through it — and the wheel does
+nothing. Dragging its scrollbar still works, which is what makes the report
+"scrolling is broken sometimes" rather than "the dropdown is broken".
+
+The repo already had the answer: `PortalContainerContext`, which a modal supplies
+and every popup reads to portal *inside* the lock. `Sheet` supplied it; `Dialog`
+did not, and `RelationSelector` and `UserSelector` ignored it either way —
+`const portalContainer = document.body`, under a comment saying "use Sheet portal
+container if available". So the relation picker was unscrollable in every dialog
+and every side panel, and everything else was unscrollable in dialogs only.
+
+**Sweep:** `grep -rn "document.body" packages/*/src --include=*.tsx` for portal
+targets, and check each modal actually *provides* a container as well as
+consuming one — `usePortalContainer` without a matching `PortalContainerProvider`
+around its own content is a modal that only forwards someone else's host.
+
+**Watch for:** a host that is inside the lock but *behind* the paper. Fixing the
+scroll by portalling inward walks straight into class 25 — the paper carries
+`z-60`, the popup `z-50`. `Dialog`'s host is `relative z-70 w-0 h-0`: positioned
+and stacked so it wins, sized to nothing so it changes no layout.
+
+**Watch for, too:** the global stylesheet that decides *which* element scrolls.
+`useInjectStyles` writes to `document.head`, so a rule keyed on a bare
+`[cmdk-group]` from one component governs every cmdk list on the page. `MultiSelect`'s
+`max-height: 45vh` was landing inside the relation and user pickers, which set
+their own height on the list — two nested scroll containers of near-identical
+height, so the outer one never overflowed and the infinite-scroll listener bound
+to it never fired once.
+
+---
+
 ## The discipline
 
 When you find a bug:

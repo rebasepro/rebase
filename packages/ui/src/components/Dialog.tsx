@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { paperMixin } from "../styles";
 import { cls } from "../util";
-import { usePortalContainer } from "../hooks/PortalContainerContext";
+import { PortalContainerProvider, usePortalContainer } from "../hooks/PortalContainerContext";
 
 export type DialogProps = {
     open?: boolean;
@@ -65,6 +65,12 @@ export const Dialog = ({
                            "aria-describedby": ariaDescribedby
                        }: DialogProps) => {
     const [displayed, setDisplayed] = useState(false);
+    // Where popups rendered *inside* this dialog get portaled to. A modal
+    // dialog locks scrolling everywhere but its own content, so a popup
+    // portaled to `document.body` renders fine and then refuses to scroll:
+    // `react-remove-scroll` cancels every wheel event outside the lock.
+    // Handing descendants this host keeps them inside it.
+    const [popupHost, setPopupHost] = useState<HTMLDivElement | null>(null);
 
     // Get the portal container from context
     const contextContainer = usePortalContainer();
@@ -134,8 +140,15 @@ export const Dialog = ({
                                 maxWidth && !fullScreen ? widthClasses[maxWidth] : undefined,
                                 className
                             )}>
-                            {children}
+                            <PortalContainerProvider container={popupHost}>
+                                {children}
+                            </PortalContainerProvider>
                         </div>
+
+                        {/* Sized to nothing so it changes no layout, but positioned and
+                            stacked above the paper so popups portaled here are not
+                            painted behind it. */}
+                        <div ref={setPopupHost} className={"relative z-70 w-0 h-0"}/>
 
                     </DialogPrimitive.Content>
                 </div>

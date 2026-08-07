@@ -194,11 +194,13 @@ export const MultiSelect = React.forwardRef<
             onPopoverOpenChange(false);
         };
 
+        // Scoped to this popover. Unscoped, it reached every other cmdk list on
+        // the page — the relation and user selectors set their own height on
+        // the list and got a second, competing scroll container inside it.
         useInjectStyles("MultiSelect", `
-[cmdk-group] {
+[data-multi-select-content] [cmdk-group] {
   max-height: 45vh;
   overflow-y: auto;
-  // width: 400px;
 } `)
 
         const contextValue = React.useMemo(() => ({
@@ -306,6 +308,7 @@ export const MultiSelect = React.forwardRef<
                     </PopoverPrimitive.Trigger>
                     <PopoverPrimitive.Portal container={finalContainer}>
                         <PopoverPrimitive.Content
+                            data-multi-select-content
                             className={cls("z-50 overflow-hidden border bg-white dark:bg-surface-800 rounded-lg w-[400px]", defaultBorderMixin)}
                             align="start"
                             sideOffset={8}

@@ -1,0 +1,1402 @@
+[
+  {
+    "theme": "postgres",
+    "title": "The query that got slower after we added an index",
+    "excerpt": "An index that improved one endpoint by 80% quietly doubled write latency across the whole orders table. Here's how we found it and what we should have measured first.",
+    "opening": "We added a composite index on a Tuesday and the dashboard endpoint went from 400ms to 70ms. Everyone was pleased. On Thursday, order creation was timing out under load and nobody connected the two events for most of a day.\n\nThis is a short account of what an index actually costs, and why the write side of that trade almost never appears in the pull request that adds one.",
+    "slug": "the-query-that-got-slower-after-we-added-an-index"
+  },
+  {
+    "theme": "postgres",
+    "title": "Understanding why the planner chose a sequential scan",
+    "excerpt": "The planner ignoring your index is usually correct. A walk through the cost model, the four common causes, and how to tell a genuine bug from an accurate decision.",
+    "opening": "The first instinct on seeing `Seq Scan` in an execution plan is that something is broken. Usually nothing is. The planner has a cost model, it applied that model to your statistics, and it concluded that reading the whole table is cheaper than the index lookups plus the heap fetches.\n\nSometimes it's wrong. Knowing which case you're in is the difference between a five-minute fix and a week of cargo-culting hints.",
+    "slug": "understanding-why-the-planner-chose-a-sequential-scan"
+  },
+  {
+    "theme": "postgres",
+    "title": "Connection pool sizing, from first principles",
+    "excerpt": "Most pools are sized by guesswork or by copying a default. Deriving the number from cores and disk concurrency produces a smaller pool and a faster database.",
+    "opening": "A team I worked with had 400 database connections configured across their fleet and a database that fell over at peak. The fix was reducing the pool to 25 per instance, which nobody believed would help until they tried it in staging.\n\nThe reasoning is simple enough to do on paper, and it starts from the observation that a connection which isn't executing a query is pure overhead.",
+    "slug": "connection-pool-sizing-from-first-principles"
+  },
+  {
+    "theme": "postgres",
+    "title": "Three-valued logic and the bug that returned zero rows",
+    "excerpt": "A `NOT IN` against a subquery containing a single NULL collapsed an entire report to empty. No error, no warning — just a correct answer to a different question.",
+    "opening": "The report had been running nightly for two years. One morning it produced nothing, and the query hadn't changed. What had changed was a single row in a referenced table where someone had left a nullable column empty.\n\n`NOT IN` with a `NULL` in the subquery returns no rows. That's specified behaviour, it's logically correct, and it is one of the most reliable ways to produce a silent data bug in a Postgres codebase.",
+    "slug": "three-valued-logic-and-the-bug-that-returned-zero-rows"
+  },
+  {
+    "theme": "postgres",
+    "title": "Partial indexes: smaller, faster, and easy to get wrong",
+    "excerpt": "When 3% of your rows are the ones you query, indexing the other 97% is waste. Partial indexes fix that, with one constraint that catches most people out.",
+    "opening": "The pending-orders queue is a classic shape: a table of millions of rows, of which a few thousand matter at any moment, queried constantly. A full index on `status` spends most of its size on rows that will never be looked up again.\n\nA partial index solves it neatly. It also has a matching rule that means a parameterised query — the kind an ORM generates — often can't use it at all.",
+    "slug": "partial-indexes-smaller-faster-and-easy-to-get-wrong"
+  },
+  {
+    "theme": "postgres",
+    "title": "What BUFFERS tells you that ANALYZE doesn't",
+    "excerpt": "Execution time tells you a query was slow. Buffer counts tell you whether it was slow because of cache misses, and that changes what you do about it.",
+    "opening": "Two queries take 200ms. One reads everything from shared buffers; the other goes to disk for most of it. They look identical in timing output and they need completely different fixes — one is a query problem and the other is a memory problem.\n\n`EXPLAIN (ANALYZE, BUFFERS)` costs nothing extra to run and I'm still surprised how rarely I see it in a bug report.",
+    "slug": "what-buffers-tells-you-that-analyze-doesn-t"
+  },
+  {
+    "theme": "postgres",
+    "title": "Materialised views as a cache with SQL syntax",
+    "excerpt": "Evaluating a materialised view like a cache — staleness budget, invalidation strategy, refresh cost — makes the decision straightforward. Treating it as a view does not.",
+    "opening": "The pitch for materialised views is that an expensive query becomes cheap. The part that gets less attention is that you've introduced a second copy of the data with its own consistency story, which is the definition of a cache.\n\nOnce you frame it that way, the questions answer themselves: how stale can this be, what triggers a refresh, and what happens to readers while the refresh runs.",
+    "slug": "materialised-views-as-a-cache-with-sql-syntax"
+  },
+  {
+    "theme": "postgres",
+    "title": "Row-level security and the unqualified column reference",
+    "excerpt": "A bare `id` inside a policy subquery bound to the inner table instead of the outer one. The policy passed review, passed tests, and granted access to every row.",
+    "opening": "Row-level security moves access control into the database, which converts a class of breach into a class of empty result. That's a good trade. It also introduces a failure mode that application code doesn't have, because policy expressions are SQL and SQL has scoping rules people don't think about while writing a `USING` clause.\n\nThe specific bug is small enough to miss in review and large enough to matter.",
+    "slug": "row-level-security-and-the-unqualified-column-reference"
+  },
+  {
+    "theme": "postgres",
+    "title": "Statistics, and the estimate that was off by 400x",
+    "excerpt": "When the planner's row estimate diverges from reality, everything built on top of it is wrong. Fixing the estimate is usually faster than rewriting the query.",
+    "opening": "There's a reflex when a query is slow: rewrite it. Add a CTE, restructure the joins, try a lateral. Sometimes that works, and often it produces a different query that's slow for the same underlying reason.\n\nThe underlying reason is frequently that the planner thinks a node will return 12 rows and it returns 5,000. Every join strategy above that point was chosen for a workload that doesn't exist.",
+    "slug": "statistics-and-the-estimate-that-was-off-by-400x"
+  },
+  {
+    "theme": "postgres",
+    "title": "Locking behaviour during ALTER TABLE, by statement",
+    "excerpt": "Some schema changes take a lock that blocks reads. Others don't. Knowing which is which is the difference between a routine deploy and an outage.",
+    "opening": "Adding a nullable column is instant. Adding a column with a non-volatile default is instant on modern Postgres and rewrites the entire table on older versions. Adding a check constraint blocks writes while it validates, unless you add it `NOT VALID` and validate separately.\n\nNone of this is obscure, and I have watched three separate teams take production down by not knowing one specific case of it.",
+    "slug": "locking-behaviour-during-alter-table-by-statement"
+  },
+  {
+    "theme": "frontend-arch",
+    "title": "Choosing a rendering strategy per route, not per app",
+    "excerpt": "Static, server-rendered and client-rendered aren't competing options — they're answers to different questions about what changes and how often.",
+    "opening": "The framework decision gets made once, at the start, for the whole application. Then a pricing page and an analytics dashboard get built with identical rendering assumptions despite having nothing in common.\n\nOne changes twice a year and must load instantly for anonymous traffic. The other changes on every interaction and is only ever seen by authenticated users. Treating those the same is how you end up fighting your own framework.",
+    "slug": "choosing-a-rendering-strategy-per-route-not-per-app"
+  },
+  {
+    "theme": "frontend-arch",
+    "title": "Container queries and the death of the size prop",
+    "excerpt": "Threading a size prop from a parent that knows about layout was always a workaround. Container queries let a component respond to the space it's actually given.",
+    "opening": "For years, making a card render differently in a sidebar than in a main column meant telling it where it was. A `variant` prop, or a `compact` boolean, set by a parent that had to know about the layout two levels up.\n\nThat coupling broke every time the design changed, and it was never anyone's fault — the platform didn't offer an alternative. Now it does.",
+    "slug": "container-queries-and-the-death-of-the-size-prop"
+  },
+  {
+    "theme": "frontend-arch",
+    "title": "The waterfall is costing you more than the bundle",
+    "excerpt": "Bundle size is easy to measure, which is why it gets optimised first. Request waterfalls are harder to see and usually the larger share of time-to-interactive.",
+    "opening": "A team spent a quarter getting their main bundle from 380KB to 240KB. Time to interactive improved by about 8%. The chunk that loaded after the bundle, which depended on a config fetch that depended on an auth check, accounted for 1.4 seconds and nobody had drawn the dependency graph.\n\nBytes are visible in every build output. Sequencing isn't visible anywhere unless you go looking.",
+    "slug": "the-waterfall-is-costing-you-more-than-the-bundle"
+  },
+  {
+    "theme": "frontend-arch",
+    "title": "Most of your global state belongs in the URL",
+    "excerpt": "Filters, pagination and the selected tab are shareable, restorable state. Putting them in a store makes them none of those things, for no benefit.",
+    "opening": "Open a filtered table view in your product, copy the URL, and send it to a colleague. If they see something different, the state is in the wrong place.\n\nThis is the cheapest architectural improvement available to most frontend applications, and it usually removes more code than it adds, because the browser already implements persistence, history and sharing for the thing you built a store for.",
+    "slug": "most-of-your-global-state-belongs-in-the-url"
+  },
+  {
+    "theme": "frontend-arch",
+    "title": "View transitions in an app that fetches data",
+    "excerpt": "The API is straightforward until your DOM update is async. Sequencing the fetch before the transition changes how the whole interaction is structured.",
+    "opening": "`document.startViewTransition` takes a callback that must update the DOM synchronously. That single constraint is where most real-world usage gets complicated, because in an application of any size, the new state usually requires a network request.\n\nThe fix isn't complicated but it does invert the order you'd naturally write things in, and the failure mode — a transition that snapshots the loading state — looks like a bug in the browser.",
+    "slug": "view-transitions-in-an-app-that-fetches-data"
+  },
+  {
+    "theme": "frontend-arch",
+    "title": "Unplug the mouse: ten minutes of accessibility testing",
+    "excerpt": "Automated tools catch contrast and labels. They don't catch focus that goes nowhere, and that's the failure that actually strands people.",
+    "opening": "The accessibility audit came back with 40 findings, all of them colour contrast and missing alt attributes. The team fixed all 40 and the product was still unusable with a keyboard, because the modal returned focus to the document body on close and there was no way back to the trigger.\n\nNo linter reports that. Ten minutes with the mouse unplugged reports it immediately.",
+    "slug": "unplug-the-mouse-ten-minutes-of-accessibility-testing"
+  },
+  {
+    "theme": "frontend-arch",
+    "title": "Hydration cost on the devices your users have",
+    "excerpt": "Hydration blocks the main thread in proportion to component count, and the effect on a four-year-old phone is not proportional to what you see on a laptop.",
+    "opening": "The interaction felt instant in development. On a mid-range Android device from 2021 there was a 900ms window after the page painted where nothing responded to touch, and the page looked completely ready during all of it.\n\nThat gap — visually complete, functionally dead — is the worst state an interface can be in, because the user has already decided to tap.",
+    "slug": "hydration-cost-on-the-devices-your-users-have"
+  },
+  {
+    "theme": "frontend-arch",
+    "title": "Cascade layers, or why your utility class lost",
+    "excerpt": "An unlayered global rule beats a utility class regardless of specificity. The fix is usually inline styles, which quietly removes the component from the design system.",
+    "opening": "A `h-full` utility had no effect on a video element. The cause was a single line in a global stylesheet setting `video { height: auto }`, loaded before the utility framework and outside any layer.\n\nSpecificity wasn't the issue — origin and layer order were. Once you've hit this once, you start noticing how much of a mature codebase's styling is fighting an argument nobody has made explicit.",
+    "slug": "cascade-layers-or-why-your-utility-class-lost"
+  },
+  {
+    "theme": "frontend-arch",
+    "title": "Streaming SSR and the shape of a slow page",
+    "excerpt": "Streaming lets you send the shell before the data resolves. It also means deciding what's above the fold matters at the architecture level, not the CSS level.",
+    "opening": "Server rendering waits for all data before sending anything. Streaming sends what's ready and fills the rest in as it resolves, which changes a 1.2-second blank page into a 200ms shell with three loading regions.\n\nWhether that's an improvement depends entirely on which regions. A shell whose only ready content is the navigation is a spinner with extra infrastructure.",
+    "slug": "streaming-ssr-and-the-shape-of-a-slow-page"
+  },
+  {
+    "theme": "frontend-arch",
+    "title": "Design tokens that survive a rebrand",
+    "excerpt": "A token named for what it looks like encodes today's decision. A token named for what it's for survives the decision changing.",
+    "opening": "`blue-500` was the primary action colour for three years. Then the brand refresh made the primary action green, and the codebase now has hundreds of references to a token whose name is a lie.\n\nThe rename is mechanical and it's also a several-week project across a large frontend, which is why it doesn't happen and the lie stays. Naming for intent at the outset costs nothing.",
+    "slug": "design-tokens-that-survive-a-rebrand"
+  },
+  {
+    "theme": "distributed",
+    "title": "Where the idempotency key has to come from",
+    "excerpt": "A key generated server-side can't help you — the retry arrives with a different one. It has to originate at the caller, and that's a client API decision.",
+    "opening": "Everyone agrees that payment endpoints should be idempotent. Fewer implementations get the key's provenance right, and it's the only part that determines whether the mechanism works at all.\n\nIf the server generates it, the retry — which is a fresh request from the client's perspective — gets a new key and the operation runs twice. The key must survive the retry, which means it must be created before the first attempt, by the caller.",
+    "slug": "where-the-idempotency-key-has-to-come-from"
+  },
+  {
+    "theme": "distributed",
+    "title": "Exactly-once delivery does not exist",
+    "excerpt": "What vendors sell as exactly-once is at-least-once plus deduplication. Understanding that changes where you put the correctness work.",
+    "opening": "The claim shows up in product documentation regularly and it's always describing one of two things: idempotent operations, or a dedup table with a retention window. Both are consumer-side mechanisms, both are things you could build, and neither makes the network reliable.\n\nThis matters because a team that believes the transport guarantees uniqueness stops defending against duplicates, and the duplicates arrive anyway.",
+    "slug": "exactly-once-delivery-does-not-exist"
+  },
+  {
+    "theme": "distributed",
+    "title": "Timeout budgets, and the retry that arrived too late",
+    "excerpt": "Service A timed out at 5 seconds and called service B, which times out at 10. A had given up and retried while B was still working on the first request.",
+    "opening": "This configuration is extremely common and it's a load amplifier that activates precisely when the system is already struggling. The upstream abandons the request, retries, and the downstream is now processing two copies of work that nobody is waiting for.\n\nThe fix is to propagate a deadline rather than configure a timeout, so every hop knows how much of the original budget remains.",
+    "slug": "timeout-budgets-and-the-retry-that-arrived-too-late"
+  },
+  {
+    "theme": "distributed",
+    "title": "Load shedding feels like failure and isn't",
+    "excerpt": "Rejecting requests early keeps a struggling service alive. Accepting everything into a queue you can't drain turns degradation into an outage.",
+    "opening": "There's a strong instinct against returning errors to users. It leads to unbounded queues, which convert a service that's slow into a service that's dead, and turns a partial degradation into a total one.\n\nShedding 20% of requests immediately and cheaply, so the other 80% succeed, is almost always better than accepting 100% and serving none of them. The hard part is that it has to be decided before the incident.",
+    "slug": "load-shedding-feels-like-failure-and-isn-t"
+  },
+  {
+    "theme": "distributed",
+    "title": "Trace propagation across the boundaries you forgot",
+    "excerpt": "The trace ID survives your HTTP calls. It gets dropped at the queue, the cron job, and the third-party webhook — which is where the interesting failures are.",
+    "opening": "Adding tracing to synchronous service-to-service calls is well-supported and mostly automatic. The gaps are everywhere else: a message published to a queue and consumed forty minutes later, a scheduled job that processes a batch, a callback from a payment provider.\n\nThose are exactly the paths where debugging is hardest, and they're the ones where the trace ends and you're correlating timestamps by hand.",
+    "slug": "trace-propagation-across-the-boundaries-you-forgot"
+  },
+  {
+    "theme": "distributed",
+    "title": "Writing down the staleness tolerance for every read",
+    "excerpt": "\"Should this be strongly consistent?\" has no engineering answer. \"How many seconds of lag can a user observe here?\" does, and it's usually a bigger number.",
+    "opening": "A team spent two months building a strongly consistent read path for a feature where the data was displayed on a page users refresh manually and which was already several minutes stale by the time it reached the cache.\n\nNobody had written down the requirement, so the strictest available option won by default. Stating the tolerance in seconds, per read path, takes an afternoon and frequently eliminates the entire project.",
+    "slug": "writing-down-the-staleness-tolerance-for-every-read"
+  },
+  {
+    "theme": "distributed",
+    "title": "Jitter, and why your retries synchronised",
+    "excerpt": "Exponential backoff without jitter causes every client to retry at the same instant. The recovery attempt becomes a second outage.",
+    "opening": "A downstream dependency blipped for two seconds. Every client backed off, waited exactly one second, and retried simultaneously. The dependency, now serving a thundering herd, failed again. Each subsequent round was more synchronised than the last.\n\nBackoff without jitter doesn't spread load, it schedules it. The fix is a single line and it's absent from most retry implementations I read.",
+    "slug": "jitter-and-why-your-retries-synchronised"
+  },
+  {
+    "theme": "distributed",
+    "title": "Circuit breakers need a half-open state that works",
+    "excerpt": "Opening the circuit is easy. Deciding when to close it — and letting through exactly enough traffic to find out — is where implementations get it wrong.",
+    "opening": "A breaker that opens on failure and closes on a timer will close into a service that's still down, fail everything again, and oscillate. The half-open state exists to sample: let one request through, and only close fully if it succeeds.\n\nWhat that requires is concurrency control on the probe. Ten instances each sending a probe request simultaneously is not a sample, it's the herd again in miniature.",
+    "slug": "circuit-breakers-need-a-half-open-state-that-works"
+  },
+  {
+    "theme": "distributed",
+    "title": "Event ordering guarantees you probably don't have",
+    "excerpt": "Per-partition ordering is not global ordering. A consumer that assumes events arrive in causal order will be wrong, intermittently, in production only.",
+    "opening": "The queue documentation says ordering is preserved. What it means is that ordering is preserved within a partition, and the partition is chosen by a key you may not have thought about.\n\nTwo events about the same entity, published with different keys, can be consumed in either order. The bug this produces is rare, non-reproducible locally, and looks like data corruption.",
+    "slug": "event-ordering-guarantees-you-probably-don-t-have"
+  },
+  {
+    "theme": "distributed",
+    "title": "The dedup window is a retention decision",
+    "excerpt": "Storing idempotency keys forever is expensive. Expiring them while a client is still retrying produces the duplicate charge you built the system to prevent.",
+    "opening": "Every deduplication scheme has a window, whether it's chosen or inherited from a default. Too short and a client retrying after a long network partition gets through twice. Too long and you're paying to store keys for operations nobody will ever repeat.\n\nThe number should be derived from the maximum retry horizon of your slowest client, which is a thing worth knowing and which almost nobody has measured.",
+    "slug": "the-dedup-window-is-a-retention-decision"
+  },
+  {
+    "theme": "devex",
+    "title": "The two cliffs in test suite duration",
+    "excerpt": "Behaviour changes qualitatively around ten seconds and around two minutes. Between those thresholds, a suite stops being run interactively and starts being CI's problem.",
+    "opening": "Suite duration is treated as a linear cost — twice as slow is twice as annoying. In practice there are thresholds where usage patterns change discontinuously.\n\nUnder about ten seconds, people run tests on save. Past two minutes, they run them before pushing, and past twenty they don't run them at all. Optimising from 4 minutes to 3 changes nothing; getting to 90 seconds changes everything.",
+    "slug": "the-two-cliffs-in-test-suite-duration"
+  },
+  {
+    "theme": "devex",
+    "title": "Hand the laptop to someone who's never seen the repo",
+    "excerpt": "The onboarding document went stale the week after it was written. The only reliable way to find out is to watch someone follow it and refuse to help.",
+    "opening": "Every team believes their setup is roughly a fifteen-minute process. The last person to actually do it was the last person to join, and they solved four undocumented problems by asking someone on Slack.\n\nThose four problems are still there. The fix is uncomfortable and takes one afternoon: sit behind someone new, write down every stall, and don't rescue them.",
+    "slug": "hand-the-laptop-to-someone-who-s-never-seen-the-repo"
+  },
+  {
+    "theme": "devex",
+    "title": "Error messages are the documentation people read",
+    "excerpt": "The error is read at the exact moment someone is stuck. That's a context no documentation page will ever match, and it's usually written as an afterthought.",
+    "opening": "`Error: invalid configuration` is a message that has been written thousands of times and has never once helped anybody. It reports that a check failed without reporting which check, what value it saw, where the value came from, or what a correct value looks like.\n\nAll four of those are known at the point the error is raised. Including them is a ten-minute change with a permanent payoff.",
+    "slug": "error-messages-are-the-documentation-people-read"
+  },
+  {
+    "theme": "devex",
+    "title": "Golden paths beat guardrails",
+    "excerpt": "If the compliant path is slower than the non-compliant one, you've documented a preference rather than established a standard. Engineers route around it under deadline.",
+    "opening": "A platform team published a policy document listing what teams must not do. Six months later, adoption was near zero and the team concluded there was a culture problem.\n\nThere wasn't. The approved deployment path took forty minutes and the unapproved one took four. Every engineer made the same rational choice, and no amount of policy was going to change the arithmetic.",
+    "slug": "golden-paths-beat-guardrails"
+  },
+  {
+    "theme": "devex",
+    "title": "Instrument your own CLI",
+    "excerpt": "Platform teams routinely have no data on which of their commands fail and how often. A counter per subcommand and exit code answers it in a week.",
+    "opening": "Product teams have accepted for a decade that you measure what users do. Internal tooling teams, serving a captive audience, frequently measure nothing at all and reason about their tools from intuition and the occasional complaint.\n\nThe cheapest possible version — increment a counter keyed by subcommand and exit code — surfaced a command with a 34% failure rate at one team I worked with. Nobody had reported it; they'd just stopped using it.",
+    "slug": "instrument-your-own-cli"
+  },
+  {
+    "theme": "devex",
+    "title": "The ownership audit that finds your dead tools",
+    "excerpt": "For every internal tool: who breaks if it stops working, and who fixes it. Anything without an answer to the second question is already unmaintained.",
+    "opening": "Internal tooling accumulates by addition. Each script solved a real problem on the day it was written, and none of them are ever removed, because removal requires knowing that nothing depends on them.\n\nThe audit is two columns and it's revealing precisely because so many rows come back with an empty second column. Those tools aren't maintained — the team just hasn't discovered it yet.",
+    "slug": "the-ownership-audit-that-finds-your-dead-tools"
+  },
+  {
+    "theme": "devex",
+    "title": "Reproducible environments without the ceremony",
+    "excerpt": "Full containerisation of the dev environment solves drift and costs you file-watching, debugger attachment and IO speed. There's a middle position worth considering.",
+    "opening": "\"Works on my machine\" is a real problem and containerising development is a real solution, but the cost lands on the inner loop — the thing that runs hundreds of times a day.\n\nPinning the toolchain and running dependencies in containers while the application itself runs natively gets most of the reproducibility for none of the file-watching pain. It's a less satisfying answer than one uniform mechanism, and it's usually the right one.",
+    "slug": "reproducible-environments-without-the-ceremony"
+  },
+  {
+    "theme": "devex",
+    "title": "A monorepo is a build-graph decision",
+    "excerpt": "The argument is usually framed as one repo or many. What actually determines whether it works is whether your tooling can compute what changed and skip the rest.",
+    "opening": "Monorepo debates focus on code sharing and atomic commits across services, which are real benefits. They tend to skip the operational requirement that makes those benefits available: a build system that can determine, cheaply and correctly, which projects a change affects.\n\nWithout it, every change runs everything, CI takes 40 minutes, and the atomic commit you wanted is blocked behind a test for an unrelated service.",
+    "slug": "a-monorepo-is-a-build-graph-decision"
+  },
+  {
+    "theme": "devex",
+    "title": "Lint rules should be autofixable or absent",
+    "excerpt": "A rule that flags a problem without fixing it converts a style preference into recurring manual work for every engineer, forever.",
+    "opening": "Style rules earn their place by removing a decision. When the rule also removes the work — autofix on save, autofix in CI — the cost is genuinely zero and the consistency is free.\n\nWhen it doesn't, every violation is a context switch, a lookup of what the rule wants, and a manual edit. Multiply by the team and by the year. A surprising number of enabled rules fail this test and could simply be turned off.",
+    "slug": "lint-rules-should-be-autofixable-or-absent"
+  },
+  {
+    "theme": "devex",
+    "title": "Scaffolding that generates code you'd have written",
+    "excerpt": "A generator producing code nobody would write by hand teaches the wrong pattern and gets edited immediately, which defeats the point of generating it.",
+    "opening": "The test for a scaffolding tool is whether an experienced engineer on the team, given the same task, would produce something close to its output. If not, the generated code is a liability — it establishes a pattern by volume that the team then has to correct by review.\n\nGenerators are a strong opinion expressed at scale. That works when the opinion is one you actually hold.",
+    "slug": "scaffolding-that-generates-code-you-d-have-written"
+  },
+  {
+    "theme": "typescript",
+    "title": "Annotate the boundary, infer the interior",
+    "excerpt": "Explicit types on every local variable add noise and suppress the inference that would have caught a genuine mismatch. There's a principled place to draw the line.",
+    "opening": "There's a style, common in codebases converted from JavaScript, where every declaration carries an annotation. It reads as thorough and it actively weakens the checking, because an annotation is an assertion that overrides what the compiler would have worked out.\n\nThe useful rule is positional: annotate where values cross a boundary, and let inference own everything between those points.",
+    "slug": "annotate-the-boundary-infer-the-interior"
+  },
+  {
+    "theme": "typescript",
+    "title": "Every JSON.parse in your codebase is a lie",
+    "excerpt": "The result is typed `any`, gets asserted to a shape nobody verified, and the compiler believes it. Runtime validation at the boundary is the only fix.",
+    "opening": "`const order = JSON.parse(body) as Order` compiles cleanly and asserts something no one has checked. From that point on the type system is reasoning confidently about a shape that may not exist, and the error surfaces three call frames away as an undefined property access.\n\nThe type is only as good as the check that produced it, and an assertion is not a check.",
+    "slug": "every-json-parse-in-your-codebase-is-a-lie"
+  },
+  {
+    "theme": "typescript",
+    "title": "Making impossible states unrepresentable",
+    "excerpt": "A type with optional fields for every variant permits combinations that can't occur. A discriminated union permits exactly the states that can, and gets exhaustiveness for free.",
+    "opening": "`{ loading?: boolean; error?: Error; data?: Order }` describes eight combinations, of which three are meaningful. The other five are states your code must nonetheless handle, or crash on, and most of the \"why is data undefined\" bugs in a frontend trace back to exactly this shape.\n\nThe alternative isn't more defensive checks. It's a type that can't express the bad states.",
+    "slug": "making-impossible-states-unrepresentable"
+  },
+  {
+    "theme": "typescript",
+    "title": "The generic that got dropped at a wrapper",
+    "excerpt": "A type parameter widened by an intermediate function loses specificity silently, because widening is legal. A previously-strict API starts accepting anything.",
+    "opening": "A refactor introduced a helper between the caller and the implementation. The helper's signature used the base type rather than the type parameter, which compiled fine and was entirely reasonable-looking in review.\n\nDownstream, a function that had rejected misspelled field names for two years began accepting any string. No error appeared anywhere. The guarantee was gone and the tests, which used correct field names, all passed.",
+    "slug": "the-generic-that-got-dropped-at-a-wrapper"
+  },
+  {
+    "theme": "typescript",
+    "title": "Typecheck your consumers against the built output",
+    "excerpt": "The emitted declarations are the contract your users see. They can be wrong while the implementation is right, and testing against source will never reveal it.",
+    "opening": "A package's tests all passed. Its own typecheck passed. Consumers installing it got errors about a type that couldn't be resolved, because a path alias worked inside the repository and meant nothing outside it.\n\nThe only check that catches this class of bug is building the package and typechecking a separate consumer project against the artefact. Anything else is testing a configuration your users don't have.",
+    "slug": "typecheck-your-consumers-against-the-built-output"
+  },
+  {
+    "theme": "typescript",
+    "title": "When your type system needs a profiler",
+    "excerpt": "Deeply recursive conditional types can turn a two-second check into forty. `--generateTrace` shows which one, and it's usually a single clever utility.",
+    "opening": "Compile time degrades gradually and nobody attributes it to a specific commit, because no specific commit is responsible — it's the accumulated cost of type-level cleverness applied across a growing union.\n\nThe cost is real and it's paid by every engineer on every save. `--extendedDiagnostics` will name the culprit in about a minute, and the fix is often to simplify one utility type that's doing something impressive.",
+    "slug": "when-your-type-system-needs-a-profiler"
+  },
+  {
+    "theme": "typescript",
+    "title": "`satisfies` and the annotation you didn't need",
+    "excerpt": "Annotating a config object widens its type and loses the literal information. `satisfies` checks conformance while preserving what you actually wrote.",
+    "opening": "Declaring `const config: Config = { ... }` checks the object against `Config` and then types it as `Config`, discarding the specific keys and literal values you supplied. Every downstream use loses the precision.\n\n`satisfies` performs the same check and keeps the inferred type. It's a small addition to the language that removes a genuinely annoying tradeoff people had been working around with helper functions.",
+    "slug": "satisfies-and-the-annotation-you-didn-t-need"
+  },
+  {
+    "theme": "typescript",
+    "title": "Type-level tests for guarantees regular tests can't see",
+    "excerpt": "A test that asserts a known-bad call fails to compile is the only way to catch a type guarantee silently disappearing during a refactor.",
+    "opening": "Runtime tests exercise correct usage. They can't detect that the compiler stopped rejecting incorrect usage, because incorrect usage isn't in the suite — it wouldn't compile, until the day it does.\n\n`@ts-expect-error` on a deliberately wrong call inverts this: the test fails if the error stops appearing. It's a few lines per invariant and it's the difference between a type guarantee and a type coincidence.",
+    "slug": "type-level-tests-for-guarantees-regular-tests-can-t-see"
+  },
+  {
+    "theme": "typescript",
+    "title": "Structural typing and the accidental compatibility",
+    "excerpt": "Two unrelated interfaces with the same shape are interchangeable. Usually convenient, occasionally the reason a user ID was accepted where an order ID was expected.",
+    "opening": "Structural typing is what makes TypeScript pleasant to use with existing JavaScript, and it means a `UserId` and an `OrderId` that are both `string` are the same type as far as the compiler is concerned.\n\nFor identifiers, currency amounts, and anything else where mixing two values of the same primitive is a real bug, branded types restore the distinction at a cost of some ceremony at the boundaries.",
+    "slug": "structural-typing-and-the-accidental-compatibility"
+  },
+  {
+    "theme": "typescript",
+    "title": "Migrating a JavaScript codebase without a big bang",
+    "excerpt": "`allowJs` plus incremental strictness converts a codebase file by file. The alternative — a branch that converts everything — merges badly and is abandoned.",
+    "opening": "The rewrite-everything approach to adoption produces a long-lived branch, a painful merge, and a team that spends three weeks not shipping. It also front-loads all the difficult files, because there's no way to defer them.\n\nRunning both languages side by side, tightening compiler options one flag at a time, is slower in total and never blocks anyone. It's also the only version I've seen finish.",
+    "slug": "migrating-a-javascript-codebase-without-a-big-bang"
+  },
+  {
+    "theme": "auth-security",
+    "title": "Being logged in is not permission",
+    "excerpt": "A middleware chain that validates a token and then hands an unrestricted database handle to the route has authenticated the caller and authorised nothing.",
+    "opening": "The pattern is everywhere: authentication in middleware, authorisation scattered across route handlers as individual checks. It works exactly as well as the discipline of whoever wrote the most recent endpoint under deadline pressure.\n\nThe structural problem is that the default is permissive. Every new route starts with full access and has to earn its restrictions, which is precisely backwards.",
+    "slug": "being-logged-in-is-not-permission"
+  },
+  {
+    "theme": "auth-security",
+    "title": "A missing check that returns nothing beats one that returns data",
+    "excerpt": "Access rules in application code fail open. The same rules as database policies fail closed. Both are bugs; only one is a breach.",
+    "opening": "This is the entire argument for pushing authorisation into the data layer, and it's worth stating plainly because the costs of row-level security are real and often lead teams to dismiss it.\n\nWhen an application-layer check is forgotten, the query returns rows the caller shouldn't see. When a policy is forgotten, the query returns nothing and someone files a bug. The second failure is one you find in staging.",
+    "slug": "a-missing-check-that-returns-nothing-beats-one-that-returns-data"
+  },
+  {
+    "theme": "auth-security",
+    "title": "Refresh token rotation and reuse detection",
+    "excerpt": "Rotating on every refresh is half the mechanism. Detecting that an old token was presented — and revoking the whole family — is the half that matters.",
+    "opening": "Short access tokens require refresh tokens, and refresh tokens are long-lived credentials sitting in client storage. Rotation limits the window, but on its own it doesn't tell you when one has been stolen.\n\nReuse detection does. If a token that was already exchanged shows up again, either the legitimate client or an attacker is using a copy, and you cannot tell which — so you revoke both.",
+    "slug": "refresh-token-rotation-and-reuse-detection"
+  },
+  {
+    "theme": "auth-security",
+    "title": "Four ways OAuth implementations go wrong",
+    "excerpt": "The protocol is sound. Prefix-matched redirect URIs, optional state, tokens in fragments and unverified ID token signatures are where it breaks in practice.",
+    "opening": "I've reviewed a lot of OAuth integrations and the failures cluster tightly. None of them are protocol flaws; all of them are implementation shortcuts that work correctly in the happy path and are exploitable in the adversarial one.\n\nThe one I find most often is a JWT that's decoded rather than verified. It parses, the claims look right, and nothing checked the signature.",
+    "slug": "four-ways-oauth-implementations-go-wrong"
+  },
+  {
+    "theme": "auth-security",
+    "title": "Password reset is a complete account takeover path",
+    "excerpt": "It gets built as a peripheral feature and it has the same security requirements as login, plus session invalidation that's routinely omitted.",
+    "opening": "The reset flow issues a credential over email that grants full account access. That's the same power as a password, delivered over a channel you don't control, and it's frequently implemented by whoever had capacity that sprint.\n\nThe omission I see most is the last step: a reset that doesn't invalidate existing sessions has changed the lock while leaving everyone already inside the building.",
+    "slug": "password-reset-is-a-complete-account-takeover-path"
+  },
+  {
+    "theme": "auth-security",
+    "title": "Timing differences leak account existence",
+    "excerpt": "Identical response bodies aren't enough. If the registered path hashes a password and the unregistered one returns early, the clock tells the attacker everything.",
+    "opening": "Enumeration defences usually stop at the response body: return the same message whether or not the address is registered. That closes the obvious channel and leaves an easily measurable one open.\n\nHashing a password takes deliberate, tunable time. Returning early because no user was found takes almost none. The difference is large enough to measure over a network from a coffee shop.",
+    "slug": "timing-differences-leak-account-existence"
+  },
+  {
+    "theme": "auth-security",
+    "title": "Environment variables are the floor for secrets",
+    "excerpt": "Out of source control is the minimum bar. They're still readable by every process on the host, present in crash dumps, and printed by anything that logs its config.",
+    "opening": "Moving a credential from a committed file to an environment variable closes the worst exposure and is often treated as the end of the work.\n\nThe useful question to ask about any secret is: if this leaked today, what would we have to do, and how long would it take? For most teams the honest answer involves a manual rotation nobody has practised, across systems nobody has fully enumerated.",
+    "slug": "environment-variables-are-the-floor-for-secrets"
+  },
+  {
+    "theme": "auth-security",
+    "title": "Threat modelling for teams that have never done it",
+    "excerpt": "It doesn't require a framework or a consultant. Four questions, a whiteboard, and an hour produces more than most security tooling purchases.",
+    "opening": "Threat modelling has an intimidating reputation, largely because the published methodologies are thorough enough to be a project in themselves. That thoroughness is appropriate for some contexts and it's a barrier for a team that has never done any.\n\nThe lightweight version — what are we building, what can go wrong, what are we doing about it, did we do a good job — fits in a meeting and surfaces real issues on the first attempt.",
+    "slug": "threat-modelling-for-teams-that-have-never-done-it"
+  },
+  {
+    "theme": "auth-security",
+    "title": "API keys need a permission model, not just validity",
+    "excerpt": "A key that's either valid or invalid grants everything to anyone who obtains it. Scoping by capability turns a leak into a limited one.",
+    "opening": "The simplest API key check answers one question: does this key exist. Every key then has the same power, which is all of it, and a key embedded in a mobile app for read access can also delete.\n\nScopes attached to the key, checked per endpoint, and enforced again at the data layer make the blast radius of a leaked key proportional to what it was issued for.",
+    "slug": "api-keys-need-a-permission-model-not-just-validity"
+  },
+  {
+    "theme": "auth-security",
+    "title": "Auditing the policies that are already deployed",
+    "excerpt": "A security rule edited in the config and never migrated is cosmetic. The database is running the policy it was given, which may not be the one in your repository.",
+    "opening": "There's a specific and unnerving failure mode where the access rules in source control and the access rules in the database have diverged. The repository looks correct. Review passed. The live policy is whatever the last successful migration applied.\n\nDetecting it requires reading the policies back out of the database and comparing them to what the source says they should be — a check that's easy to automate and rarely exists.",
+    "slug": "auditing-the-policies-that-are-already-deployed"
+  },
+  {
+    "theme": "api-design",
+    "title": "The versioning argument is a coupling argument",
+    "excerpt": "URL versions are coarse and honest. Field-level evolution is cheaper and demands discipline that has to survive staff turnover. Most APIs end up with both by accident.",
+    "opening": "Teams debate `/v2` versus additive evolution as though it were a matter of taste. Underneath, the question is how tightly clients are bound to your internal model and what you're willing to pay to loosen it.\n\nPicking one deliberately is more important than which one you pick. The expensive outcome is a codebase with a `/v2` prefix, three deprecated fields, and a header-based variant, none of which were planned.",
+    "slug": "the-versioning-argument-is-a-coupling-argument"
+  },
+  {
+    "theme": "api-design",
+    "title": "Error codes are for programs, messages are for people",
+    "excerpt": "Conflating them means clients string-match on prose, and your copy edit becomes their outage. The separation costs one field.",
+    "opening": "An error response with only a human-readable message forces every client into the same position: parse the sentence, or treat all errors identically. Both are bad, and the first one creates a contract you didn't know you'd signed.\n\nOnce a client matches on `\"Insufficient stock\"`, that string is API surface. Changing the capitalisation is a breaking change and nothing in your process will flag it.",
+    "slug": "error-codes-are-for-programs-messages-are-for-people"
+  },
+  {
+    "theme": "api-design",
+    "title": "Cursor pagination and what you give up",
+    "excerpt": "Cursors are stable under concurrent writes and scale past `OFFSET 100000`. They also cost you random access to page N, which is sometimes a UI requirement.",
+    "opening": "Offset pagination has a correctness problem that only shows up under concurrent inserts: rows shift between requests, so a client sees a duplicate or misses an item entirely. It also degrades badly, because the database counts and discards every skipped row.\n\nCursors fix both. Before switching, check whether anything in the product shows numbered pages, because that's the feature you're trading away.",
+    "slug": "cursor-pagination-and-what-you-give-up"
+  },
+  {
+    "theme": "api-design",
+    "title": "Reject unknown filters, don't ignore them",
+    "excerpt": "A server that silently drops a filter it doesn't understand returns 200 with the wrong data. The client believes it filtered. This is the worst available outcome.",
+    "opening": "Ad-hoc query parameters tend toward leniency: unknown parameters are ignored, on the theory that being permissive is friendly. For filters specifically, that theory produces silent data exposure.\n\nA client requesting `?status=archived` on a server that doesn't implement that filter receives every row, with a success status, and displays them as though the filter applied. Rejecting the request is the friendly behaviour.",
+    "slug": "reject-unknown-filters-don-t-ignore-them"
+  },
+  {
+    "theme": "api-design",
+    "title": "Bounded expansion, or the N+1 comes back",
+    "excerpt": "`?expand=customer,items.product` looks harmless and generates a query per row without a batching layer. Depth limits and query-count assertions are the defence.",
+    "opening": "Resource expansion is a good feature. It's also an invitation for clients to request an arbitrary object graph, and the cost of servicing it falls on a resolution layer that has to be right every single time.\n\nThe first implementation batches correctly. The third feature added to it resolves one relation per row, and nothing in CI notices because the response is correct — just expensive.",
+    "slug": "bounded-expansion-or-the-n-1-comes-back"
+  },
+  {
+    "theme": "api-design",
+    "title": "Designing the error taxonomy before the endpoints",
+    "excerpt": "Errors are part of the contract and they get designed last, which is why they're the least consistent surface in most APIs.",
+    "opening": "Endpoint design gets careful attention: resource naming, method semantics, response shapes. Error responses get whatever the framework does by default, plus ad-hoc additions as failures are discovered.\n\nThe result is an API where a validation failure looks different depending on which layer caught it, and clients write branching logic to normalise your inconsistency.",
+    "slug": "designing-the-error-taxonomy-before-the-endpoints"
+  },
+  {
+    "theme": "api-design",
+    "title": "Sunset headers and deprecations clients can see",
+    "excerpt": "A deprecation announced in a changelog reaches the people who read changelogs. One in a response header reaches the integration that's still calling the endpoint.",
+    "opening": "The deprecation problem is a targeting problem. The people who need to know are the ones running old integrations, and they are precisely the population least likely to be reading your release notes.\n\nA `Sunset` header on the response reaches them at the point of use, and — more usefully — it gives you a log of exactly which clients are still calling, which is the data the whole decision depends on.",
+    "slug": "sunset-headers-and-deprecations-clients-can-see"
+  },
+  {
+    "theme": "api-design",
+    "title": "Idempotency keys: the two edge cases nobody handles",
+    "excerpt": "Same key with a different body, and a repeat arriving while the original is still in flight. Both need defined answers before you ship the mechanism.",
+    "opening": "The straightforward path — store the key with the response, replay on repeat — covers the common case. The two edges determine whether the mechanism is trustworthy.\n\nA key reused with a different payload is a client bug and must be rejected rather than served a stale response. A concurrent repeat has no stored response yet, and returning a conflict is more honest than blocking indefinitely or executing twice.",
+    "slug": "idempotency-keys-the-two-edge-cases-nobody-handles"
+  },
+  {
+    "theme": "api-design",
+    "title": "Rate limits that clients can cooperate with",
+    "excerpt": "A 429 with no information invites immediate retry. Headers stating the limit, remaining budget and reset time turn an adversarial relationship into a cooperative one.",
+    "opening": "Rate limiting is usually built as a defence, and defensive framing produces a response that tells the caller nothing except that they failed. The caller's only strategy is to try again and find out.\n\nPublishing the budget lets well-behaved clients pace themselves, which reduces the load you were defending against. The clients that ignore it are the ones the defence was for anyway.",
+    "slug": "rate-limits-that-clients-can-cooperate-with"
+  },
+  {
+    "theme": "api-design",
+    "title": "Webhook delivery is your problem, not the receiver's",
+    "excerpt": "Signing, retry with backoff, ordering caveats and a replay endpoint are the minimum. Without a replay path, every receiver outage becomes your support ticket.",
+    "opening": "Sending an HTTP POST on an event is an afternoon. Building something integrators can rely on is considerably more, and the difference shows up entirely during their incidents rather than yours.\n\nThe piece most often missing is replay. When a receiver is down for an hour, they need a way to fetch what they missed, and without one your support team becomes the delivery mechanism.",
+    "slug": "webhook-delivery-is-your-problem-not-the-receiver-s"
+  },
+  {
+    "theme": "design-systems",
+    "title": "Name tokens for intent, not appearance",
+    "excerpt": "`blue-500` encodes what it looks like today. `color-action-primary` encodes what it's for, and survives the brand refresh that makes the primary action green.",
+    "opening": "The most common design token naming scheme describes the value. It's easy to generate, easy to map from a design tool, and it bakes today's visual decision into every reference across the codebase.\n\nWhen the decision changes — and it does, roughly every three years — you're left with hundreds of references to a name that no longer describes what it points at.",
+    "slug": "name-tokens-for-intent-not-appearance"
+  },
+  {
+    "theme": "design-systems",
+    "title": "Composition beats a variant prop that encodes design",
+    "excerpt": "`variant=\"primary-large-icon-left\"` combines four orthogonal decisions into one string, and every new combination is a new value to document and guard.",
+    "opening": "Variant props start small and grow combinatorially. Four sizes, three tones, an optional icon on either side, and you have a prop with 24 legal values, an unknown number of illegal ones, and a switch statement nobody wants to touch.\n\nSeparating the axes and expressing icon placement through children collapses the whole thing into props that compose and can't be combined wrongly.",
+    "slug": "composition-beats-a-variant-prop-that-encodes-design"
+  },
+  {
+    "theme": "design-systems",
+    "title": "Generated tokens or drift within a quarter",
+    "excerpt": "Tokens exported by hand from design tooling are accurate on the day of the export. Generation turns the drift into a build failure instead of a bug report.",
+    "opening": "The handoff between design and code is where design systems decay, and the decay is gradual enough that nobody schedules the fix. A colour adjusted in the design file, not propagated, is invisible until someone compares two screens side by side.\n\nGenerating the token file from a single source means the divergence can't happen quietly — either the build runs and they match, or it fails.",
+    "slug": "generated-tokens-or-drift-within-a-quarter"
+  },
+  {
+    "theme": "design-systems",
+    "title": "The four focus rules, and how refactors break them",
+    "excerpt": "Focus into the dialog, trapped while open, returned on close, nothing tabbable behind it. All four get implemented, and one breaks in a later change with no test to catch it.",
+    "opening": "Dialog accessibility is well-documented and most teams implement it correctly the first time. What's missing is anything that keeps it correct.\n\nThese are behavioural properties with no type signature and no runtime error. A refactor that changes how the dialog mounts can break focus return, and every visual test still passes because the pixels are identical.",
+    "slug": "the-four-focus-rules-and-how-refactors-break-them"
+  },
+  {
+    "theme": "design-systems",
+    "title": "Reduced motion needs a designed state, not a disabled one",
+    "excerpt": "Setting every animation to near-zero duration is better than ignoring the preference and worse than designing the alternative. Menus that appear from nowhere lose their spatial meaning.",
+    "opening": "The blunt implementation of `prefers-reduced-motion` — override all durations to a millisecond — respects the preference and often breaks comprehension. An animation that showed where a panel came from now shows nothing, and the interface becomes harder to follow rather than calmer.\n\nSubstituting a cross-fade for movement preserves the relationship while removing the vestibular trigger. It's more work and it's the actual request.",
+    "slug": "reduced-motion-needs-a-designed-state-not-a-disabled-one"
+  },
+  {
+    "theme": "design-systems",
+    "title": "Extract component docs from the source",
+    "excerpt": "Hand-written prop tables are accurate the day they're written. Generated ones fail the build when they're wrong, which is the only mechanism that reliably works.",
+    "opening": "Every component library starts with carefully written documentation and ends with documentation describing a version of the component that no longer exists. Props were added, defaults changed, and the doc page had no relationship to the code that would surface the difference.\n\nDeriving the prop table from the type definitions and the examples from typechecked files closes the loop mechanically.",
+    "slug": "extract-component-docs-from-the-source"
+  },
+  {
+    "theme": "design-systems",
+    "title": "Adoption is a migration problem, not a quality problem",
+    "excerpt": "Teams don't reject the design system because the components are bad. They reject it because migrating a working screen has a cost and no visible benefit.",
+    "opening": "When adoption stalls, the instinct is to improve the components — more variants, better API, richer documentation. That addresses a problem that usually isn't the blocker.\n\nThe blocker is that a product team has a screen that works, a roadmap that doesn't include rewriting it, and no way to adopt incrementally. Making partial adoption possible moves the number more than any component improvement.",
+    "slug": "adoption-is-a-migration-problem-not-a-quality-problem"
+  },
+  {
+    "theme": "design-systems",
+    "title": "Contribution models for a system with one owner",
+    "excerpt": "A design system maintained by a dedicated team becomes a bottleneck. One maintained by everyone becomes inconsistent. The workable shape is in between and has to be explicit.",
+    "opening": "Both failure modes are common enough to be predictable. Centralised ownership produces a queue, and every product team routes around the queue with a local component that duplicates something almost identical.\n\nFully open contribution produces six subtly different button implementations. What works is a defined contribution path with review by the owning team — slower than local, much faster than the queue.",
+    "slug": "contribution-models-for-a-system-with-one-owner"
+  },
+  {
+    "theme": "design-systems",
+    "title": "Dark mode is a token problem, not a colour problem",
+    "excerpt": "Teams that theme by inverting values get grey text on grey backgrounds. Semantic tokens with per-theme values produce a design, not a filter.",
+    "opening": "The quick approach to dark mode maps each light value to a dark equivalent. It produces something dark and usually something with wrong contrast relationships, because the mapping treats colours as values rather than as roles.\n\nA surface colour and a border colour that happen to be the same in light mode often shouldn't be in dark. Only semantic naming lets you express that.",
+    "slug": "dark-mode-is-a-token-problem-not-a-colour-problem"
+  },
+  {
+    "theme": "design-systems",
+    "title": "Component APIs that survive the second product",
+    "excerpt": "A component designed against one screen encodes that screen's assumptions. The second consumer reveals which props were general and which were incidental.",
+    "opening": "Every component is designed for a specific use, and the design system's promise is that it generalises. Whether it actually does isn't knowable until a second, genuinely different consumer tries.\n\nThat's an argument for extracting components from real usage rather than designing them speculatively — a library built ahead of demand encodes guesses, and the guesses are wrong in ways that only appear as awkward props later.",
+    "slug": "component-apis-that-survive-the-second-product"
+  },
+  {
+    "theme": "infrastructure",
+    "title": "The cluster isn't the cost",
+    "excerpt": "Kubernetes itself is manageable. The ingress controller, certificate lifecycle, network policies, node upgrades and the on-call rotation to hold them are the actual bill.",
+    "opening": "The argument against Kubernetes is rarely about Kubernetes. A managed control plane is genuinely straightforward to obtain and the basic concepts are learnable in a week.\n\nWhat accumulates is everything around it, and each piece arrives individually, justified on its own terms, until the team's operational surface is larger than the product's. That's the number worth estimating before starting, and it's the one nobody estimates.",
+    "slug": "the-cluster-isn-t-the-cost"
+  },
+  {
+    "theme": "infrastructure",
+    "title": "Readiness probes that check nothing",
+    "excerpt": "A handler returning 200 without touching a dependency confirms the HTTP server is up. The orchestrator then routes traffic to an instance that errors on every request.",
+    "opening": "The default health endpoint returns a constant. It's cheap, it never flaps, and it answers a question nobody asked — whether the process is listening — while the question that matters is whether it can serve a request.\n\nThe fix is a probe that exercises the critical dependencies. The trap is making it so thorough that a blip in a non-critical service takes the whole fleet out of rotation.",
+    "slug": "readiness-probes-that-check-nothing"
+  },
+  {
+    "theme": "infrastructure",
+    "title": "The crash loop that was a missing startupProbe",
+    "excerpt": "A slow boot gets killed by the liveness probe before it finishes, restarts, and repeats. It looks like an application bug and it's a manifest omission.",
+    "opening": "The symptom that identifies this one: restarts that increase under load. Boot takes longer because the database is busy, crosses the liveness threshold, and the pod is killed mid-startup — which adds load, which slows the next boot.\n\nEverything works fine in staging where the boot is fast, and the manifest has been missing the same four lines since it was written.",
+    "slug": "the-crash-loop-that-was-a-missing-startupprobe"
+  },
+  {
+    "theme": "infrastructure",
+    "title": "Order your CI gates by cost",
+    "excerpt": "Anything that can fail in five seconds should never run after something that takes five minutes. Most pipelines are ordered by how they were written.",
+    "opening": "Pipeline stages accumulate in the order features were added, which has no relationship to how long they take or how likely they are to fail. A lint error is discovered after a six-minute integration suite, on every broken commit, for the life of the project.\n\nReordering is usually a fifteen-minute change to a YAML file and pays back weekly.",
+    "slug": "order-your-ci-gates-by-cost"
+  },
+  {
+    "theme": "infrastructure",
+    "title": "A failing gate that skips the gates behind it",
+    "excerpt": "The run goes red, someone fixes the lint error, and discovers the integration tests were broken too — three commits later. Sequential gates hide the total damage.",
+    "opening": "A pipeline that stops at the first failure gives you one piece of information per run. When a change breaks four things, that's four cycles of fix-push-wait to find out.\n\nWorse is the version where later gates are skipped and reported as passed rather than as not-run. The dashboard is green in the places nobody looked, and the impression is that only one thing was wrong.",
+    "slug": "a-failing-gate-that-skips-the-gates-behind-it"
+  },
+  {
+    "theme": "infrastructure",
+    "title": "Attributing cloud cost per feature",
+    "excerpt": "\"Reduce the cloud bill\" has no owner. \"This feature costs 40 cents per user per month\" is a sentence a product manager can act on.",
+    "opening": "Cost optimisation initiatives are announced, produce a spreadsheet, and fade. The reason is structural: the bill is organised by service and the decisions that drive it are made per feature, so nobody who could change anything sees a number they recognise.\n\nTagging by feature is tedious to set up and it converts an infrastructure problem into a product conversation, which is where it belongs.",
+    "slug": "attributing-cloud-cost-per-feature"
+  },
+  {
+    "theme": "infrastructure",
+    "title": "Expand, migrate, contract — and when to contract",
+    "excerpt": "A column dropped on deploy means the previous version can't run. You no longer have a rollback, only a forward fix under pressure.",
+    "opening": "The three-phase migration pattern is well known and the third phase is where discipline lapses, because by the time you get there the interesting work is done and the old column is just clutter.\n\nDropping it immediately re-couples the schema to the current release. The rollback window is the entire justification for the pattern, and the contract step is what closes it — deliberately, later, when nothing is on fire.",
+    "slug": "expand-migrate-contract-and-when-to-contract"
+  },
+  {
+    "theme": "infrastructure",
+    "title": "One machine handles more than you think",
+    "excerpt": "A single well-provisioned server serves more traffic than most products will ever see, and fails in ways one person can reason about at three in the morning.",
+    "opening": "This isn't nostalgia. Hardware got dramatically faster while the default architecture got more distributed, and the gap between what one machine can do and what teams assume it can do has widened considerably.\n\nThe relevant question isn't capacity, which is usually ample. It's whether you're willing to accept the availability characteristics, and for a great many products the honest answer is yes.",
+    "slug": "one-machine-handles-more-than-you-think"
+  },
+  {
+    "theme": "infrastructure",
+    "title": "Rollbacks should be boring by design",
+    "excerpt": "The deploy that needs reverting is the one where everyone is stressed. That's the wrong moment to discover the previous artefact was garbage-collected.",
+    "opening": "Rollback procedures are written down and rarely exercised, which means they're theoretical until the moment they're urgent. The failure modes are mundane: the previous image is gone, the rollback needs a manual step nobody remembers, or a migration has made the old version unable to boot.\n\nAll three are found by rolling back deliberately, in staging, on a calm afternoon.",
+    "slug": "rollbacks-should-be-boring-by-design"
+  },
+  {
+    "theme": "infrastructure",
+    "title": "Certificates, renewals, and the annotation you must not overwrite",
+    "excerpt": "Applying a whole manifest file over a resource whose annotations are managed by a controller reverts the controller's state and takes TLS down at renewal.",
+    "opening": "Ingress resources are frequently partly owned by a controller — a certificate manager writing status annotations onto the same object your manifest describes.\n\nApplying the full file from source control overwrites those annotations with the version in git, which is empty. Nothing breaks immediately. It breaks at the next renewal, weeks later, with no change in the deploy log to point at.",
+    "slug": "certificates-renewals-and-the-annotation-you-must-not-overwrite"
+  },
+  {
+    "theme": "data-analytics",
+    "title": "Capture the context you can't reconstruct",
+    "excerpt": "Anything derivable from other tables can be joined later. Anything ephemeral — which variant they saw, what state the object was in — is gone the moment you don't record it.",
+    "opening": "Event schema design tends toward minimalism, on the reasonable-sounding grounds that storage costs money and you can always add fields later.\n\nYou can add fields later. You cannot add them retroactively, and the analysis you want in six months is usually about a condition that existed at the moment of the event and nowhere else. Over-capture at write time is the cheaper mistake.",
+    "slug": "capture-the-context-you-can-t-reconstruct"
+  },
+  {
+    "theme": "data-analytics",
+    "title": "Two queries are your warehouse bill",
+    "excerpt": "In every audit I've run, a small number of queries dominate spend, and they're never the ones the team worries about. Both are usually visible within an hour.",
+    "opening": "Warehouse cost conversations start with modelling and partitioning strategy. The actual distribution is far more concentrated: a dashboard on a five-minute auto-refresh scanning a large table, and a nightly job reprocessing full history because incremental was harder.\n\nNeither is an architectural problem. Both are defaults nobody revisited after the data grew, and both are a day's work.",
+    "slug": "two-queries-are-your-warehouse-bill"
+  },
+  {
+    "theme": "data-analytics",
+    "title": "If you can't re-run it, you'll be reconciling by hand",
+    "excerpt": "Something fails weekly. A pipeline that isn't safely repeatable requires a human every time, and the human has to work out what partially landed.",
+    "opening": "Idempotency in data pipelines is usually framed as a nice-to-have and it determines whether failures are routine or incidents.\n\nThe practical shape is writing partitioned output keyed by the processing window and replacing the partition wholesale. Append-only is simpler and works until the first backfill, at which point you have duplicates and no way to tell which run produced which row.",
+    "slug": "if-you-can-t-re-run-it-you-ll-be-reconciling-by-hand"
+  },
+  {
+    "theme": "data-analytics",
+    "title": "Name the decision or delete the chart",
+    "excerpt": "A metric with no threshold at which someone acts differently is a number on a screen with a permanent pipeline maintenance cost.",
+    "opening": "Dashboards accumulate charts the way codebases accumulate scripts: each one was justified when added, and none are ever removed. The maintenance is invisible until a schema change breaks six of them and nobody can say which matter.\n\nThe test is uncomfortable and quick — for each chart, who would notice if it stopped updating, and what would they do differently at what value.",
+    "slug": "name-the-decision-or-delete-the-chart"
+  },
+  {
+    "theme": "data-analytics",
+    "title": "Event time, arrival time, and the number that changed",
+    "excerpt": "Aggregating by arrival is stable and wrong. Aggregating by event time is right and revises after the fact, which surprises anyone who screenshotted yesterday.",
+    "opening": "Mobile clients buffer events while offline and flush days later. Webhooks retry for hours. Events do not arrive in the order they occurred, and any aggregation has to pick a side.\n\nArrival-time aggregation produces numbers that never change and don't describe reality. Event-time aggregation describes reality and restates history, which requires telling people it will.",
+    "slug": "event-time-arrival-time-and-the-number-that-changed"
+  },
+  {
+    "theme": "data-analytics",
+    "title": "Slowly changing dimensions are a finance decision",
+    "excerpt": "When a customer moves, does last quarter's report show the old address or the new one? Both are defensible; only one matches what the business expects.",
+    "opening": "This gets decided implicitly by whoever writes the table, usually in favour of whatever's simplest, and surfaces two quarters later when a report doesn't reconcile with a previous version of itself.\n\nThe decision is per-attribute rather than global — most fields genuinely don't need history and a few need it absolutely — and it belongs to the people who read the reports.",
+    "slug": "slowly-changing-dimensions-are-a-finance-decision"
+  },
+  {
+    "theme": "data-analytics",
+    "title": "The dbt model that was really a view",
+    "excerpt": "Materialising everything is expensive; materialising nothing pushes the cost to query time. The choice is per-model and it's usually made by copying the file above.",
+    "opening": "Transformation frameworks make materialisation a one-line configuration, which means it gets set once from a template and rarely revisited against how the model is actually used.\n\nA model queried twice a day and materialised hourly is paying twelve times over. A heavily-joined view hit by every dashboard is paying on every load. Both are visible in the query log and neither is visible in the code.",
+    "slug": "the-dbt-model-that-was-really-a-view"
+  },
+  {
+    "theme": "data-analytics",
+    "title": "Tests on data, not just on transformations",
+    "excerpt": "Unit tests confirm the SQL does what you wrote. They say nothing about whether yesterday's load dropped 40% of rows because an upstream API changed.",
+    "opening": "Data pipelines have two failure modes and testing usually covers one. Logic errors are caught by tests over fixtures. Input drift — a source that changed shape, a partial load, a silently truncated export — passes every test and produces confidently wrong output.\n\nVolume assertions, freshness checks and distribution comparisons against recent history catch the second class, and they're the ones that fire in practice.",
+    "slug": "tests-on-data-not-just-on-transformations"
+  },
+  {
+    "theme": "data-analytics",
+    "title": "Reverse ETL and the second source of truth",
+    "excerpt": "Pushing warehouse data back into operational systems is useful and creates a copy with a different update cadence. Two systems now disagree, on a schedule.",
+    "opening": "Syncing a computed segment or score from the warehouse into a CRM closes a genuinely painful loop. It also means an operational system holds a value derived hours ago from a pipeline that may have failed.\n\nWhen the sales team sees a number that doesn't match the dashboard, both are correct and the difference is latency. That needs to be a documented property rather than a support conversation.",
+    "slug": "reverse-etl-and-the-second-source-of-truth"
+  },
+  {
+    "theme": "data-analytics",
+    "title": "Instrumenting a feature before it ships",
+    "excerpt": "The instrumentation added after launch cannot answer questions about launch, which is the only time you observe genuinely first-time use.",
+    "opening": "Analytics work gets scheduled after the feature, on the reasonable basis that the feature is the deliverable. The consequence is that the most informative period — the first two weeks, when every user is new to it — is unobserved.\n\nThere's a secondary benefit to doing it first: if you can't state what success looks like as a number, the specification is vaguer than it appeared.",
+    "slug": "instrumenting-a-feature-before-it-ships"
+  },
+  {
+    "theme": "migrations",
+    "title": "The migration that was skipped forever, silently",
+    "excerpt": "A branch authored a migration with an earlier timestamp and merged it after a later one had run. The runner tracks a high-water mark, so it was never applied. No error.",
+    "opening": "This is my least favourite class of bug because there is no failure. The deploy succeeds, the runner reports everything up to date, and a column simply doesn't exist on production.\n\nIt surfaces weeks later as an exception in an unrelated feature, and reconstructing what happened requires understanding that your migration tool records the latest version applied rather than the set of versions applied.",
+    "slug": "the-migration-that-was-skipped-forever-silently"
+  },
+  {
+    "theme": "migrations",
+    "title": "Backfilling ten million rows without holding a lock",
+    "excerpt": "A single-transaction update bloats the WAL, blocks writers, and fails at 90% on a timeout. Batching turns it into something you can stop and restart.",
+    "opening": "The naive backfill is one statement, and on a large table it will hold locks for however long it takes, generate an enormous amount of WAL, and give you no progress information.\n\nWhen it fails — and at that scale something will interrupt it — you have no idea how far it got and no safe way to resume. Batching costs a loop and buys observability and resumability.",
+    "slug": "backfilling-ten-million-rows-without-holding-a-lock"
+  },
+  {
+    "theme": "migrations",
+    "title": "Renaming a column across two deploys",
+    "excerpt": "One-step renames require the schema and the application to deploy simultaneously. They won't. Here's the three-phase version and where teams cut it short.",
+    "opening": "A rename looks atomic in a migration file and isn't atomic in a running system. There's a window, however brief, where old application instances are querying a column that no longer exists.\n\nOn a fleet with a rolling deploy that window is minutes. Under a rollback it's unbounded, because the old version can never run again against the new schema.",
+    "slug": "renaming-a-column-across-two-deploys"
+  },
+  {
+    "theme": "migrations",
+    "title": "Which ALTER TABLE statements block writers",
+    "excerpt": "Adding a nullable column is instant. Adding a check constraint validates the whole table under a lock unless you add it NOT VALID and validate separately.",
+    "opening": "The lock behaviour of schema changes is documented, version-dependent, and almost never consulted before a migration is written. Most changes are fine, which builds a false confidence that all of them are.\n\nThe ones that aren't will hold an exclusive lock on a large table during business hours, and every query behind it queues. Knowing the short list of dangerous statements is a couple of hours of reading with a very good return.",
+    "slug": "which-alter-table-statements-block-writers"
+  },
+  {
+    "theme": "migrations",
+    "title": "Deciding to abandon a strangler-fig migration",
+    "excerpt": "Incremental replacement works, and it produces a period where both systems exist and every feature costs double. Bounding that period is the whole discipline.",
+    "opening": "The strangler pattern is sound and it has a failure mode that isn't discussed enough: the last 20% is the hard part, the team's attention moves on, and the transitional state becomes permanent architecture.\n\nWhat prevents it is deciding, at the outset, what evidence would justify stopping — and writing it down while nobody is emotionally invested in the answer.",
+    "slug": "deciding-to-abandon-a-strangler-fig-migration"
+  },
+  {
+    "theme": "migrations",
+    "title": "Git blame is the only documentation for legacy code",
+    "excerpt": "Every strange conditional in an old system is a bug report from years ago. Rewriting from the specification loses all of it, which is why rewrites overrun.",
+    "opening": "The system everyone wants to replace encodes a decade of requirements that were never written down. The odd branch handling a specific customer, the retry with an unusual backoff, the validation that seems redundant — each one exists because something went wrong once.\n\nA rewrite from spec handles the happy path beautifully and rediscovers all of it, expensively, in production.",
+    "slug": "git-blame-is-the-only-documentation-for-legacy-code"
+  },
+  {
+    "theme": "migrations",
+    "title": "Adding an enum value is a breaking change for old readers",
+    "excerpt": "Relaxing a constraint is safe before the code that needs it. Adding a value that old instances switch on exhaustively will throw during the rolling deploy.",
+    "opening": "Backward compatibility during a deploy runs in both directions and the second one gets missed. Old code must tolerate what new code writes, for the length of the rollout and the rollback window.\n\nAn added enum value is the classic case: the new version writes `partially_refunded`, the old version's exhaustive switch has no branch for it, and a percentage of requests fail until the rollout completes.",
+    "slug": "adding-an-enum-value-is-a-breaking-change-for-old-readers"
+  },
+  {
+    "theme": "migrations",
+    "title": "A migration test that runs against last release's schema",
+    "excerpt": "Replaying schema snapshots through the current migration set catches the upgrade path breaking, which unit tests on a freshly-created database never will.",
+    "opening": "Migrations are almost always tested against an empty database that's built by running every migration in order. That validates the sequence and validates nothing about upgrading a database that already contains data in an older shape.\n\nThe bugs live in the second case: a backfill that assumes a column is populated, a constraint that existing rows violate. Snapshot replay is the only thing I've found that catches them.",
+    "slug": "a-migration-test-that-runs-against-last-release-s-schema"
+  },
+  {
+    "theme": "migrations",
+    "title": "The generated schema file that didn't match the database",
+    "excerpt": "A boot-time check compared the live schema against a checked-in artefact and failed permanently after a rename it had itself performed. The fix required manual intervention.",
+    "opening": "Schema validation at startup is a good safety net and it introduces a dependency on a generated file being regenerated. When a migration renames something and the artefact isn't updated, the application refuses to boot — correctly, and unhelpfully, forever.\n\nThe recovery path for that state needs to exist before you need it, and it usually doesn't.",
+    "slug": "the-generated-schema-file-that-didn-t-match-the-database"
+  },
+  {
+    "theme": "migrations",
+    "title": "Talking about technical debt with people who don't write code",
+    "excerpt": "\"We need to refactor\" is a request for time with no stated return. Framing it as risk, cost per change, or a specific future blocker gets a different answer.",
+    "opening": "The conversation fails on framing more often than on substance. Engineering describes an internal quality problem; the listener hears a request to spend weeks producing nothing observable.\n\nWhat translates is consequence: this doubles the cost of every change in this area, or this is the reason the last two incidents took six hours instead of one. Both are usually true and neither is usually said.",
+    "slug": "talking-about-technical-debt-with-people-who-don-t-write-code"
+  },
+  {
+    "theme": "mobile",
+    "title": "Last-write-wins is a decision to discard someone's work",
+    "excerpt": "Offline sync makes conflict inevitable. Choosing the default resolution silently means choosing, on the user's behalf, whose edit disappears.",
+    "opening": "Queuing writes while offline is the well-understood part of offline-first. What determines whether users trust the product is what happens when two devices edited the same record and both reconnect.\n\nLast-write-wins is simple, deterministic, and destroys data without telling anyone. It's a legitimate choice for some records and it should be a choice, not a consequence of not deciding.",
+    "slug": "last-write-wins-is-a-decision-to-discard-someone-s-work"
+  },
+  {
+    "theme": "mobile",
+    "title": "Keep a mid-range phone on the desk",
+    "excerpt": "The development device is the fastest hardware released recently. A meaningful share of your users are three to five years behind, and nothing in your metrics shows it.",
+    "opening": "Performance work on mobile is dominated by a sampling problem: everyone building the app is testing on the best device available, and the experience there is unrepresentative in a specific direction.\n\nA cheap Android phone from a few years ago, used for the final check before merge, catches more real problems than any profiling session on a current flagship.",
+    "slug": "keep-a-mid-range-phone-on-the-desk"
+  },
+  {
+    "theme": "mobile",
+    "title": "Budget 70% shared, not 90%",
+    "excerpt": "Cross-platform saves substantial effort on business logic and much less on navigation, permissions, background execution, push and deep links. Teams that plan for the real number ship on time.",
+    "opening": "The framework isn't usually the problem. The estimate is.\n\nShared code covers business logic and most of the UI. Everything touching platform capabilities needs platform work, and that portion is consistently larger than planned. A team that budgets 90% and achieves 70% experiences a successful project as a failure, purely because of where the line was drawn at the start.",
+    "slug": "budget-70-shared-not-90"
+  },
+  {
+    "theme": "mobile",
+    "title": "Install conversion drops with download size",
+    "excerpt": "The effect is strongest on exactly the connections and devices where growth is. A 30% reduction is usually available before any architectural change.",
+    "opening": "App size isn't on most teams' dashboards, and it has a measurable effect on whether an install completes — most sharply in the markets where the user base is expanding fastest.\n\nThe available wins are unglamorous: assets bundled for an onboarding flow nobody repeats, a dependency duplicated at two versions by two libraries, images shipped at resolutions never rendered.",
+    "slug": "install-conversion-drops-with-download-size"
+  },
+  {
+    "theme": "mobile",
+    "title": "Your background task didn't run",
+    "excerpt": "Both platforms defer and kill background work based on battery and usage patterns. Code that assumes a sync happened is wrong for a subset of users, permanently and invisibly.",
+    "opening": "Background execution is best-effort on both platforms, and the effort varies with things you don't control — battery level, how recently the app was opened, an operating system heuristic that changes between releases.\n\nMost teams don't know their actual execution rate because nothing measures it. The design consequence is that the foreground path must be able to catch up from any state.",
+    "slug": "your-background-task-didn-t-run"
+  },
+  {
+    "theme": "mobile",
+    "title": "Push tokens rot",
+    "excerpt": "Tokens expire, invalidate on reinstall, and go quiet when a category is disabled. Without pruning from delivery feedback, you're paying to notify people who left.",
+    "opening": "The push token table only grows unless something removes entries, and the signal for removal comes from the delivery service rather than from the app.\n\nTeams that never wire up that feedback accumulate an audience of uninstalled devices, pay for the sends, and — more damagingly — compute engagement rates against a denominator that includes people who deleted the app a year ago.",
+    "slug": "push-tokens-rot"
+  },
+  {
+    "theme": "mobile",
+    "title": "Treat a notification as a nudge, not a transport",
+    "excerpt": "Delivery is best-effort with no acknowledgement. If the payload carries state the client can't get another way, some users silently never receive it.",
+    "opening": "It's tempting to put data in the notification payload — it's already going to the device and it saves a round trip.\n\nThe problem is that non-delivery is invisible from the server. There's no ack, no retry that you control, and no way to distinguish delivered from dropped. A notification that points at state the server already holds degrades gracefully; one that carries the state doesn't degrade, it just fails.",
+    "slug": "treat-a-notification-as-a-nudge-not-a-transport"
+  },
+  {
+    "theme": "mobile",
+    "title": "Deep links break in the places you don't test",
+    "excerpt": "The link works from a browser and fails from the in-app browser of a social platform, which is where most of your traffic actually originates.",
+    "opening": "Deep link testing is usually done by tapping a link in a notes app or typing a URL. The real traffic arrives from inside other applications, each with its own webview, its own interception behaviour, and its own opinion about whether to hand off to your app.\n\nThe matrix is tedious and the failures are total — the user lands on a web page instead of the app, or on a blank screen.",
+    "slug": "deep-links-break-in-the-places-you-don-t-test"
+  },
+  {
+    "theme": "mobile",
+    "title": "Store review timelines belong in your release plan",
+    "excerpt": "A fix that takes an hour to write takes days to reach users. Anything you can't fix without a release needs a remote switch before you need it.",
+    "opening": "Web deploys make the cost of a bad release low. Mobile doesn't, and teams moving between the two carry the wrong intuitions about how quickly a mistake can be corrected.\n\nThe mitigations — feature flags, remote configuration, a server-side kill switch for a risky path — must be shipped in advance of the incident. Adding them afterwards requires the release you're trying to avoid.",
+    "slug": "store-review-timelines-belong-in-your-release-plan"
+  },
+  {
+    "theme": "mobile",
+    "title": "Sync conflict resolution the user can see",
+    "excerpt": "Automatic merging handles most cases. The remainder need to surface, because a silent wrong resolution is indistinguishable from data loss.",
+    "opening": "Per-field merging resolves a good proportion of conflicts correctly and without user involvement. The cases it can't resolve — two edits to the same field, or edits that violate an invariant across fields — need a decision.\n\nMaking that decision automatically and quietly is the option teams choose by default, and it's the one that produces support tickets about data disappearing.",
+    "slug": "sync-conflict-resolution-the-user-can-see"
+  },
+  {
+    "theme": "testing",
+    "title": "Your test pyramid is an hourglass",
+    "excerpt": "A large pile of unit tests, a large pile of end-to-end tests, and almost nothing between. The missing middle is where real bugs live.",
+    "opening": "The canonical shape is drawn in every testing talk and almost never matches what teams have. Unit tests are easy to write and get written; end-to-end tests are visibly valuable and get demanded. The integration layer requires infrastructure and gets skipped.\n\nWhich is unfortunate, because the seam between two individually-correct components is where most production bugs actually are.",
+    "slug": "your-test-pyramid-is-an-hourglass"
+  },
+  {
+    "theme": "testing",
+    "title": "A flake is information, and the retry destroys it",
+    "excerpt": "Something is timing-dependent, order-dependent, or sharing state. The retry hides which, and the nondeterminism stays in the product where users find it.",
+    "opening": "Auto-retry on failure is a reasonable operational response to a flaky suite and a terrible diagnostic one. It converts a signal about real nondeterminism into a slightly slower green build.\n\nThe nondeterminism doesn't go away. It shows up in production as a bug reported once, never reproduced, and eventually closed as not-reproducible.",
+    "slug": "a-flake-is-information-and-the-retry-destroys-it"
+  },
+  {
+    "theme": "testing",
+    "title": "Would this test fail if the code were rewritten correctly?",
+    "excerpt": "If yes, it's testing implementation. It will fail during the next refactor and be deleted by someone who correctly identifies it as noise.",
+    "opening": "This is the single most useful question to ask about an assertion, and it disqualifies a large fraction of the tests in most codebases.\n\nAsserting that a method was called with particular arguments couples the test to a structure that has no reason to be stable. When the structure changes, the test fails without anything being broken — which teaches the team that failures are noise.",
+    "slug": "would-this-test-fail-if-the-code-were-rewritten-correctly"
+  },
+  {
+    "theme": "testing",
+    "title": "Break the code on purpose and see what survives",
+    "excerpt": "Coverage tells you which lines ran. Mutation testing tells you which wrong behaviours your suite would have let through, which is the thing you wanted to know.",
+    "opening": "A line can be covered and completely unasserted. Coverage counts execution, and execution without assertion is just running the code.\n\nMutation testing flips comparisons and removes conditions, then reports which mutants the suite failed to kill. The first run is uncomfortable and it produces something no other technique does: a specific list of the tests you're missing.",
+    "slug": "break-the-code-on-purpose-and-see-what-survives"
+  },
+  {
+    "theme": "testing",
+    "title": "Fixtures fossilise in untypechecked directories",
+    "excerpt": "A test directory invisible to the compiler is where fixtures drift from reality. Both the fixture and the assertion encode the same outdated model, so the test passes.",
+    "opening": "Test directories are frequently excluded from typechecking for historical reasons — it was slow once, or the config was copied from a template.\n\nThe consequence is that a fixture describing an object shape from two years ago sits there passing. Nothing enforces that it resembles anything the application produces. Adding tests to the typecheck produces an alarming number of errors and a genuinely better suite.",
+    "slug": "fixtures-fossilise-in-untypechecked-directories"
+  },
+  {
+    "theme": "testing",
+    "title": "Contract tests move the cost onto the breaking team",
+    "excerpt": "A consumer declares what it needs; the provider's CI verifies it still supplies it. The failure appears in the pull request that caused it.",
+    "opening": "When two teams integrate, breaking changes are discovered at deploy time by the consuming team, who then have to work out what changed and negotiate a fix.\n\nConsumer-driven contracts relocate that: the provider's build fails when it stops satisfying a declared expectation. The technical mechanism is straightforward; the organisational effect — the person who broke it is the person who sees it — is the actual benefit.",
+    "slug": "contract-tests-move-the-cost-onto-the-breaking-team"
+  },
+  {
+    "theme": "testing",
+    "title": "Test databases should be real databases",
+    "excerpt": "An in-memory substitute has different transaction semantics, different constraint enforcement, and no row-level security. It passes tests your production database would fail.",
+    "opening": "Substituting a lightweight database in tests is faster and it tests a different system. Constraint violations, cascade behaviour, isolation levels and any policy-based access control either don't exist or behave differently.\n\nContainerised databases have made the speed argument much weaker than it was. The remaining objection is usually setup complexity, which is a one-time cost against a permanent fidelity gain.",
+    "slug": "test-databases-should-be-real-databases"
+  },
+  {
+    "theme": "testing",
+    "title": "Assert on query count, not just on the response",
+    "excerpt": "The response stays correct while the endpoint quietly starts issuing one query per row. Nothing in a normal test suite notices until it's a latency graph.",
+    "opening": "N+1 regressions are invisible to functional tests by construction — the output is right, which is what the test checks.\n\nA counter around the endpoint, asserted against an expected number, fails on the pull request that introduces the problem and names the cause. It's a few lines of test infrastructure and it's the only thing I've seen prevent the same regression recurring annually.",
+    "slug": "assert-on-query-count-not-just-on-the-response"
+  },
+  {
+    "theme": "testing",
+    "title": "Snapshot tests that nobody reads",
+    "excerpt": "A large snapshot diff gets approved because reviewing it properly would take an hour. The test now records changes rather than detecting them.",
+    "opening": "Snapshots are excellent for small, meaningful outputs and corrosive for large ones. Past a certain size, the review step degrades into pressing the update key, and at that point the test has no failure mode.\n\nThe useful discipline is keeping snapshots small enough that a diff is actually readable — which usually means asserting on a projection of the output rather than all of it.",
+    "slug": "snapshot-tests-that-nobody-reads"
+  },
+  {
+    "theme": "testing",
+    "title": "The test suite you don't trust costs the same and tells you nothing",
+    "excerpt": "At a 2% flake rate over 400 tests, a third of runs fail for reasons unrelated to the change. The suite has stopped being a signal and become a toll.",
+    "opening": "There's a threshold where a test suite crosses from asset to liability, and it's reached faster than people expect because the maths is multiplicative.\n\nOnce the team's default interpretation of a red build is \"probably flaky, re-run it\", every genuine failure is also interpreted that way. The suite is now actively harmful: it costs full price and provides no information.",
+    "slug": "the-test-suite-you-don-t-trust-costs-the-same-and-tells-you-nothing"
+  },
+  {
+    "theme": "teams",
+    "title": "Cognitive load is the constraint, not headcount",
+    "excerpt": "A team owning four services in one domain is fine. The same team owning four services across four domains is overloaded regardless of how many people it has.",
+    "opening": "Capacity planning counts people and work. It rarely counts how much a team must hold in mind to make a safe change, which is what actually limits throughput.\n\nThe symptom isn't missed deadlines. It's caution — changes get smaller and slower because nobody is confident about the blast radius, and that shows up as low velocity with no obvious cause.",
+    "slug": "cognitive-load-is-the-constraint-not-headcount"
+  },
+  {
+    "theme": "teams",
+    "title": "Root cause: human error, action item: be careful",
+    "excerpt": "A review that identifies an action as the cause and adds a process step has learned nothing. The question is why the system permitted that action to have that consequence.",
+    "opening": "Blameless postmortems are widely claimed and less widely practised. The tell is an action item about attention, training, or an added approval step.\n\nSomeone ran a command against production. The useful questions are why that was possible from where they were standing, why it wasn't obvious which environment they were in, and why it took eleven minutes for anyone to notice.",
+    "slug": "root-cause-human-error-action-item-be-careful"
+  },
+  {
+    "theme": "teams",
+    "title": "Your hiring process selects for recent interview practice",
+    "excerpt": "Algorithmic puzzles measure a real skill that correlates weakly with the job. Work samples predict better and cost more to run, which is the point.",
+    "opening": "A cheap process that selects poorly is more expensive than an expensive process that selects well. The bill just arrives eighteen months later, disguised as a performance management problem.\n\nWork-sample tasks resembling actual work require someone to design them and read the results carefully. That's the cost, and it's small relative to a single mis-hire on a team of six.",
+    "slug": "your-hiring-process-selects-for-recent-interview-practice"
+  },
+  {
+    "theme": "teams",
+    "title": "Code review is for shared understanding",
+    "excerpt": "It catches some defects, less reliably than tests. Its durable value is a second person who knows why the change was made — and that reframes what a good review is.",
+    "opening": "If review's purpose is defect detection, then thorough is better and delay is justified. If its purpose is knowledge distribution, a comment that improves the code slightly while delaying the merge by a day is a poor trade.\n\nThe second framing is closer to reality, and it makes questions more valuable than corrections. A question that reveals the author and reviewer disagree about how the system works is worth a week of nitpicks.",
+    "slug": "code-review-is-for-shared-understanding"
+  },
+  {
+    "theme": "teams",
+    "title": "Estimates without conditions are noise",
+    "excerpt": "\"Three weeks\" and \"three weeks unless the API lacks bulk updates, in which case six\" are different statements. The second lets someone de-risk today.",
+    "opening": "A single-number estimate discards the only genuinely useful information it contains: what the estimator is uncertain about.\n\nThat's also why estimates get treated as commitments — they're delivered as though there's no uncertainty, so the listener reasonably assumes there isn't. Attaching the conditions changes what the conversation is about, from a date to a set of unknowns someone can go and resolve.",
+    "slug": "estimates-without-conditions-are-noise"
+  },
+  {
+    "theme": "teams",
+    "title": "A senior IC track that exists on the careers page",
+    "excerpt": "A credible individual-contributor ladder needs real architectural scope, roadmap influence, and comparable compensation. Without those, the title fools nobody.",
+    "opening": "Organisations that lose good engineers to management often have a technical ladder on paper. What they don't have is a senior IC whose architectural decisions actually stick, or whose compensation matches the equivalent manager.\n\nEngineers evaluate the track by looking at who's on it and what happened to them, which is a much better signal than the job architecture document.",
+    "slug": "a-senior-ic-track-that-exists-on-the-careers-page"
+  },
+  {
+    "theme": "teams",
+    "title": "On-call is a design constraint on the system",
+    "excerpt": "A rotation that wakes someone twice a week isn't a staffing problem to solve with more people. It's the system telling you something about its failure modes.",
+    "opening": "The usual response to painful on-call is to spread the pain — larger rotation, follow-the-sun coverage, better compensation for the disruption.\n\nThose help and they treat the symptom. Page volume is a measurable property of the architecture, and a rotation nobody dreads is achievable, but only by treating each recurring page as a defect rather than as the cost of running software.",
+    "slug": "on-call-is-a-design-constraint-on-the-system"
+  },
+  {
+    "theme": "teams",
+    "title": "Documenting decisions, not architecture",
+    "excerpt": "The successor can read the code. What they can't recover is which constraints were real, which were preferences, and what was rejected.",
+    "opening": "Architecture documentation describes what exists, which is the part that's discoverable by reading the system. It goes stale immediately and duplicates something authoritative.\n\nA short record of each significant decision — options considered, constraint that decided it, what would change the answer — doesn't go stale, because it's a record of a moment. It's also the thing every new person actually asks about.",
+    "slug": "documenting-decisions-not-architecture"
+  },
+  {
+    "theme": "teams",
+    "title": "Meetings are a synchronisation primitive",
+    "excerpt": "Treating them as a scheduling problem misses the point. The question is what state needs to be consistent across how many people, and how stale it can be.",
+    "opening": "Calendar complaints usually produce calendar solutions: fewer meetings, shorter meetings, meeting-free days. Those help and they don't address why the meeting existed.\n\nThinking about it as synchronisation makes the alternatives visible. Some information needs everyone consistent immediately; most tolerates lag and belongs in writing, where it's also durable and searchable.",
+    "slug": "meetings-are-a-synchronisation-primitive"
+  },
+  {
+    "theme": "teams",
+    "title": "The reorg that moved boundaries without moving ownership",
+    "excerpt": "Teams were restructured around the new domain map and the services stayed where they were. Every change now crosses two teams that no longer talk.",
+    "opening": "Reorganisations redraw reporting lines faster than they redraw system ownership, and for a period — often a long one — the two don't match.\n\nDuring that period, the coordination cost of every change goes up, and it's attributed to the usual suspects: unclear priorities, technical debt, communication problems. The actual cause is a mismatch between who owns the code and who owns the outcome.",
+    "slug": "the-reorg-that-moved-boundaries-without-moving-ownership"
+  },
+  {
+    "theme": "performance",
+    "title": "Your second measurement is where the surprises are",
+    "excerpt": "The first one confirms your hypothesis, because you chose what to measure based on the hypothesis. A different tool at a different layer disagrees.",
+    "opening": "Profiling has a confirmation problem built into its workflow. You suspect a component, you instrument that component, and you find it consuming time — which it is, along with everything else.\n\nThe measurement that changes your mind is usually at a different layer: wall-clock on the request path rather than CPU in the function, or the same workload at a different time of day.",
+    "slug": "your-second-measurement-is-where-the-surprises-are"
+  },
+  {
+    "theme": "performance",
+    "title": "What a flame graph doesn't show you",
+    "excerpt": "It shows where CPU time went, not time spent blocked — which on most web workloads is the majority. It also averages away the occasional catastrophe.",
+    "opening": "Flame graphs are the default profiling artefact and they answer one specific question well. The failure is using them for questions they can't answer.\n\nBlocked time doesn't appear. Tail behaviour is aggregated into a shape optimised for totals, so a function that's fine 99% of the time and terrible otherwise looks unremarkable. Both of those are frequently the actual problem.",
+    "slug": "what-a-flame-graph-doesn-t-show-you"
+  },
+  {
+    "theme": "performance",
+    "title": "Divide the latency budget before you defend it",
+    "excerpt": "200ms for an endpoint means nothing until it's split across the steps. With a split, a regression is attributable; without one, you have a debate.",
+    "opening": "Writing the budget down is itself the valuable part. Teams routinely discover a step consuming a third of the total that nobody had thought of as a cost — serialisation, an auth lookup, a logging call that does more than it looks like.\n\nAfterwards, a regression names itself: the database step went from 80ms to 140ms and everything else held.",
+    "slug": "divide-the-latency-budget-before-you-defend-it"
+  },
+  {
+    "theme": "performance",
+    "title": "The mean is nobody's experience",
+    "excerpt": "120ms average is compatible with 95% at 50ms and 5% at 1.5 seconds. A page making twenty requests hits p99 more often than not.",
+    "opening": "Averages are the default aggregation in most dashboards and they describe no actual user. Worse, they're stable — a growing tail barely moves the mean, so the dashboard looks fine while the experience degrades for a specific group.\n\nThe compounding point is the one that changes minds: with twenty requests per page load, hitting the 99th percentile at least once is more likely than not.",
+    "slug": "the-mean-is-nobody-s-experience"
+  },
+  {
+    "theme": "performance",
+    "title": "Every cache is a staleness decision",
+    "excerpt": "Time-based expiry is simple and serves stale data for the TTL. Event-based invalidation is correct and couples every writer to every cache.",
+    "opening": "Adding a cache is a few lines of code and a permanent commitment to reasoning about correctness. The commitment is what people underestimate, because the initial version is obviously beneficial and obviously correct.\n\nIt stops being obviously correct the first time someone writes to the database through a path that doesn't know the cache exists — a migration, an admin tool, another service.",
+    "slug": "every-cache-is-a-staleness-decision"
+  },
+  {
+    "theme": "performance",
+    "title": "Fixing an N+1 so it stays fixed",
+    "excerpt": "The batch loader solves today's instance. A query-count assertion in a test solves the one someone reintroduces in six weeks with a new field.",
+    "opening": "N+1 regressions recur because the conditions that produce them recur: someone adds a field to a response and resolves it per-row, which is the natural way to write it.\n\nThe fix that lasts isn't in the resolver, it's in the test suite. Without an assertion, the second instance surfaces the same way as the first — as a latency graph, three deploys after the cause.",
+    "slug": "fixing-an-n-1-so-it-stays-fixed"
+  },
+  {
+    "theme": "performance",
+    "title": "Measuring on the hardware your users have",
+    "excerpt": "Development machines are unrepresentative in a consistent direction. A CPU throttle in the profiler is a cheap approximation of the median device.",
+    "opening": "Every performance measurement taken on a developer laptop is optimistic, and it's optimistic by a factor that varies with the workload — which means you can't apply a correction.\n\nThrottling the CPU during profiling isn't a substitute for testing on real hardware, and it costs nothing and catches the worst of it before code review.",
+    "slug": "measuring-on-the-hardware-your-users-have"
+  },
+  {
+    "theme": "performance",
+    "title": "The optimisation that made things slower",
+    "excerpt": "A cache added in front of a fast query added a network hop, a serialisation step, and an invalidation bug — for a lookup that was already using an index.",
+    "opening": "Optimisations get applied by pattern rather than by measurement: caching is good, so cache. The cost of the cache — the hop, the serialisation, the memory, the invalidation logic — is rarely compared against the cost of the operation it replaces.\n\nFor an indexed primary key lookup on a warm database, that comparison frequently comes out against the cache.",
+    "slug": "the-optimisation-that-made-things-slower"
+  },
+  {
+    "theme": "performance",
+    "title": "Load tests that don't resemble load",
+    "excerpt": "A hundred threads hitting one endpoint with identical parameters exercises your cache. Real traffic has a distribution, and the distribution is the test.",
+    "opening": "Synthetic load tests are usually written for convenience: one endpoint, fixed parameters, maximum concurrency. They produce a number and the number is meaningless because everything after the first request is served from cache.\n\nReplaying a sample of real request logs is more work to set up and it's the only version that tells you anything about capacity.",
+    "slug": "load-tests-that-don-t-resemble-load"
+  },
+  {
+    "theme": "performance",
+    "title": "Perceived performance and the spinner you didn't need",
+    "excerpt": "An optimistic update makes a 300ms operation feel instant. A spinner makes the same operation feel like waiting, and the measured latency is identical.",
+    "opening": "Some of the largest available wins aren't in the code path at all. The same 300ms feels instantaneous when the interface responds immediately and reconciles afterwards, and feels slow when it displays a loading state.\n\nThe engineering cost is a rollback path for the optimistic case. That's real work, and it's frequently less than the work required to get the operation from 300ms to 100ms.",
+    "slug": "perceived-performance-and-the-spinner-you-didn-t-need"
+  },
+  {
+    "theme": "documentation",
+    "title": "Time your quickstart with a stopwatch",
+    "excerpt": "If it takes twenty minutes to a working call, it isn't a quickstart regardless of the heading. The success criterion is narrow and measurable.",
+    "opening": "The quickstart is the only page most readers will ever open, and its job is one thing: produce a request that returns real data as fast as possible.\n\nEverything else — the configuration reference, the architectural context, the full auth model — competes with that job. A page that explains concepts before producing a result loses a fraction of its readers at every paragraph, and they don't come back.",
+    "slug": "time-your-quickstart-with-a-stopwatch"
+  },
+  {
+    "theme": "documentation",
+    "title": "Every code sample is an untested assertion",
+    "excerpt": "It was true when written and nothing keeps it true. Extracting fenced blocks and typechecking them turns drift into a build failure.",
+    "opening": "Documentation code samples are the highest-trust content on the site and the least verified. A renamed export or a changed signature invalidates them silently, and the reader who hits it concludes the product is unreliable — which, in the specific sense that its documentation lies, it is.\n\nThe fix is mechanical: extract the fences, compile them against the current workspace, fail CI on error.",
+    "slug": "every-code-sample-is-an-untested-assertion"
+  },
+  {
+    "theme": "documentation",
+    "title": "Reference should be generated, explanation should be written",
+    "excerpt": "One is mechanical and drifts. The other encodes judgement and doesn't. Merging them produces a document that fails both readers.",
+    "opening": "The most common documentation structure interleaves \"what this function accepts\" with \"why you'd use it\", and serves neither reader well. Someone doing a lookup wades through prose; someone trying to understand gets a parameter table.\n\nSeparating them also clarifies what to automate. Reference material should never be typed by a human, and explanation should never be generated.",
+    "slug": "reference-should-be-generated-explanation-should-be-written"
+  },
+  {
+    "theme": "documentation",
+    "title": "Your support volume maps to error text",
+    "excerpt": "Support tickets correlate far more tightly with unhelpful error messages than with documentation gaps, and almost nobody checks the correlation.",
+    "opening": "Documentation teams look at page analytics to decide what to write. The higher-signal dataset is usually sitting in the support system: the exact strings people paste when they open a ticket.\n\nThose strings are your error messages. Fixing the top ten — what happened, what was expected, where, what to do — reliably removes more support load than any new page.",
+    "slug": "your-support-volume-maps-to-error-text"
+  },
+  {
+    "theme": "documentation",
+    "title": "Write down what the product doesn't do",
+    "excerpt": "An explicit limits page prevents a whole category of conversation that starts \"I assumed\". It also forces the team to know its own limits.",
+    "opening": "Documentation describes capability. What costs users the most time is discovering boundaries — the undocumented limit, the combination that isn't supported, the thing that works until it's under load.\n\nStating them plainly reads as confidence rather than weakness, and writing the page is frequently the first time anyone has enumerated them internally.",
+    "slug": "write-down-what-the-product-doesn-t-do"
+  },
+  {
+    "theme": "documentation",
+    "title": "Your search log is a table of contents you didn't write",
+    "excerpt": "The queries returning nothing are a prioritised list of missing pages, composed by the people who needed them.",
+    "opening": "When readers can't find things, the usual responses are a better search box or more pages. Neither addresses a structure organised around how the team thinks about the product rather than how users arrive at it.\n\nUsers arrive with a task. The zero-result queries in the search log are that mismatch, itemised, and they're usually sitting unexamined in an analytics tool nobody has opened.",
+    "slug": "your-search-log-is-a-table-of-contents-you-didn-t-write"
+  },
+  {
+    "theme": "documentation",
+    "title": "Docs review belongs in the pull request",
+    "excerpt": "Documentation written after the release describes what shipped from memory. Written alongside, it's reviewed by someone who knows whether it's true.",
+    "opening": "The separate documentation ticket, filed at the end of a project, is where accuracy goes. By the time anyone picks it up, the details are reconstructed and the person who knew them has moved on.\n\nRequiring the doc change in the same pull request is unpopular and it's the only workflow I've seen where the documentation and the behaviour describe the same system.",
+    "slug": "docs-review-belongs-in-the-pull-request"
+  },
+  {
+    "theme": "documentation",
+    "title": "Changelogs written for the person upgrading",
+    "excerpt": "A list of merged pull request titles is a git log with extra steps. What's needed is what breaks, what to do about it, and what's now possible.",
+    "opening": "Auto-generated changelogs are complete and useless. They report every change at the same weight, in the author's language, with no indication of whether a reader needs to act.\n\nThe reader has one question — does this upgrade require anything from me — and answering it requires a human to sort changes into breaking, notable, and everything else.",
+    "slug": "changelogs-written-for-the-person-upgrading"
+  },
+  {
+    "theme": "documentation",
+    "title": "Screenshots are a maintenance liability",
+    "excerpt": "They go stale invisibly and at scale. Either generate them from the running product or design pages that don't depend on them.",
+    "opening": "A screenshot is accurate on the day it's taken and there's no mechanism to detect when it stops being. Users notice — an interface that doesn't match the picture undermines confidence in everything else on the page.\n\nGenerating them in CI from the real application is genuinely achievable and rarely done. The alternative is being deliberate about how few you need.",
+    "slug": "screenshots-are-a-maintenance-liability"
+  },
+  {
+    "theme": "documentation",
+    "title": "Documentation for the reader who arrived from Google",
+    "excerpt": "Most readers land on an interior page with no context. A page assuming they read the introduction is a page that fails most of its audience.",
+    "opening": "Documentation is written in order and read at random. The typical arrival is a search result pointing at a page three levels deep, with no exposure to the concepts introduced earlier.\n\nWhich means each page needs enough orientation to stand alone — what this is, what it assumes, where to go next — without duplicating the whole guide on every page.",
+    "slug": "documentation-for-the-reader-who-arrived-from-google"
+  },
+  {
+    "theme": "small-teams",
+    "title": "Spend your novelty budget where it differentiates",
+    "excerpt": "Every unfamiliar technology consumes part of a small, finite budget for things that can surprise you. On a team of three that budget is very small.",
+    "opening": "The question about a new database isn't whether it's better. It's whether it's better by enough to justify being the team that has never operated it, at 2am, with no colleague who has seen this failure before.\n\nSometimes the answer is yes, and it should be yes for the thing that makes your product different. Everywhere else, the dullest available option is the correct one.",
+    "slug": "spend-your-novelty-budget-where-it-differentiates"
+  },
+  {
+    "theme": "small-teams",
+    "title": "Buy the boring parts",
+    "excerpt": "Advice written for large organisations assumes a platform team. Without one, every piece of infrastructure competes directly with product work.",
+    "opening": "Managed services look expensive on the invoice and the comparison is usually made against zero rather than against the real alternative, which is a founder debugging certificate renewal on a Saturday.\n\nThat cost doesn't appear on any statement, and on a team of three it's the largest cost you have. The premium is generally worth paying well past the point where the spreadsheet says otherwise.",
+    "slug": "buy-the-boring-parts"
+  },
+  {
+    "theme": "small-teams",
+    "title": "Ship the ugly version to the three people who asked",
+    "excerpt": "A feature nobody has used is a hypothesis. Polishing before validation spends the scarce resource on the part that might be wrong.",
+    "opening": "The instinct is to make it good before showing anyone, and on a small team that instinct is expensive — engineering time is the entire budget.\n\nThe smallest version that answers the question, given to the customers who requested it, closes the loop in days. The gap between what people request and what they use is routinely large, and it's only observable after shipping something.",
+    "slug": "ship-the-ugly-version-to-the-three-people-who-asked"
+  },
+  {
+    "theme": "small-teams",
+    "title": "Half a page per decision beats a wiki nobody wrote",
+    "excerpt": "Comprehensive documentation won't get written on a small team. A short decision log — chosen, rejected, why — will, and it's what a successor actually needs.",
+    "opening": "Every system on a small team has exactly one person who understands it. That's arithmetic rather than a process failure, and the mitigation has to be proportionate to the time available.\n\nThe successor can read the implementation. What they can't recover is which constraints were real and which were preferences, and that fits in a paragraph written while it's fresh.",
+    "slug": "half-a-page-per-decision-beats-a-wiki-nobody-wrote"
+  },
+  {
+    "theme": "small-teams",
+    "title": "Generalists until the system won't fit in one head",
+    "excerpt": "Specialisation is efficient at scale and costly below it, because every handoff between specialists is a queue longer than the work.",
+    "opening": "Engineers who touch the database, the API, the frontend and the deploy pipeline make worse decisions in each area and much better decisions about the whole. Below a certain size that trade is strongly favourable.\n\nThe transition point is when a single person can no longer hold the system in their head — and it arrives considerably later than most teams assume it does.",
+    "slug": "generalists-until-the-system-won-t-fit-in-one-head"
+  },
+  {
+    "theme": "small-teams",
+    "title": "Say no on the record",
+    "excerpt": "Small teams die of dilution more than of any single wrong decision. A visible list of what was declined turns awkward individual conversations into one position.",
+    "opening": "Each individual commitment is reasonable. The aggregate is a team maintaining eleven things and advancing none, and there's no single decision you could point at as the mistake.\n\nWriting refusals down — what, when, why — makes the position durable and revisitable. Without the record, every declined request gets relitigated from memory, individually, forever.",
+    "slug": "say-no-on-the-record"
+  },
+  {
+    "theme": "small-teams",
+    "title": "The monolith is fine",
+    "excerpt": "Service boundaries solve organisational scaling problems. Adopting them at four engineers imports the operational cost without the problem they address.",
+    "opening": "Splitting services is a response to teams stepping on each other — independent deploys, independent ownership, independent scaling. Those are real benefits available to organisations that have the problem.\n\nAt four engineers there is no coordination problem to solve, and what you've bought instead is network calls where function calls were, distributed transactions, and a tracing requirement.",
+    "slug": "the-monolith-is-fine"
+  },
+  {
+    "theme": "small-teams",
+    "title": "Automate the third time, not the first",
+    "excerpt": "The first occurrence is a task. The second is a coincidence. The third is a pattern, and by then you know enough about its shape to automate it correctly.",
+    "opening": "Premature automation is a specific small-team failure: a script that encodes a process you didn't understand yet, which then has to be maintained and worked around.\n\nWaiting until the third occurrence costs two manual repetitions and buys a much better understanding of which parts are stable and which vary. The tooling that results is smaller and survives longer.",
+    "slug": "automate-the-third-time-not-the-first"
+  },
+  {
+    "theme": "small-teams",
+    "title": "One environment that matters",
+    "excerpt": "Staging, QA, preview and production is four things to keep in sync with two engineers. Preview environments per branch plus production is usually enough.",
+    "opening": "Environment proliferation is inherited from larger organisations where each one serves a distinct team's needs. On a small team they mostly serve as places for configuration to drift.\n\nEphemeral per-branch environments that are created and destroyed with the pull request give you the isolation without the maintenance, because nothing persists long enough to diverge.",
+    "slug": "one-environment-that-matters"
+  },
+  {
+    "theme": "small-teams",
+    "title": "Support as a product research channel",
+    "excerpt": "On a small team the engineers can answer tickets directly. The information density is far higher than any survey and the loop closes in an afternoon.",
+    "opening": "Routing support away from engineers is standard practice and it's a scaling adaptation, not a default. Before you need it, having engineers in the queue is one of the strongest advantages a small team has.\n\nThe person who can fix the confusing error message is reading the ticket about it, and the fix ships the same day.",
+    "slug": "support-as-a-product-research-channel"
+  },
+  {
+    "theme": "product-eng",
+    "title": "State the question before building the prototype",
+    "excerpt": "A prototype built to impress gets polished. One built to answer a question gets thrown away once it's answered, which is the point.",
+    "opening": "Without a stated question, a prototype becomes a foundation by accident and its shortcuts become architecture. That's the most common way throwaway code becomes permanent.\n\nWriting the question first — will users understand this, is the API fast enough, does this model support the reports finance needs — determines both what to build and, more usefully, what not to.",
+    "slug": "state-the-question-before-building-the-prototype"
+  },
+  {
+    "theme": "product-eng",
+    "title": "Instrument before you ship, or don't ask about launch",
+    "excerpt": "Analytics added afterwards can't answer questions about the launch period, which is the only time you observe genuinely first-time use.",
+    "opening": "Instrumentation gets scheduled after the feature because the feature is the deliverable. The consequence is that the most informative two weeks in a feature's life pass unobserved.\n\nThere's a second benefit to doing it first, and it's the one that improves the product: if you can't express success as a number before building, the specification is vaguer than it looked.",
+    "slug": "instrument-before-you-ship-or-don-t-ask-about-launch"
+  },
+  {
+    "theme": "product-eng",
+    "title": "Feature flags need an owner and an expiry",
+    "excerpt": "Each flag doubles the number of states. The combination nobody tested is where the bug is, and a two-year-old flag is dead code nobody dares remove.",
+    "opening": "A flag is a temporary branch that persists because removing it requires proving nothing depends on it, and nobody wants to be the person who was wrong about that.\n\nThe mechanism that works is external: a scheduled report of flags past their removal date, addressed to a named owner. Intention doesn't clean them up; a recurring nag does.",
+    "slug": "feature-flags-need-an-owner-and-an-expiry"
+  },
+  {
+    "theme": "product-eng",
+    "title": "Fake doors and concierge versions",
+    "excerpt": "Measuring click-through on something that doesn't exist, or serving the first ten customers by hand, both cost days. A quarter of engineering costs a quarter.",
+    "opening": "A disproportionate share of engineering goes into features almost nobody uses, and this is knowable in advance more often than teams admit.\n\nThe techniques feel like not-building, which is why they get skipped. They're also the difference between validating demand for a few days of effort and validating it for a few months of it.",
+    "slug": "fake-doors-and-concierge-versions"
+  },
+  {
+    "theme": "product-eng",
+    "title": "Percentage rollouts give you a control group for free",
+    "excerpt": "A launch to everyone has one chance to be right and no comparison. Rolling out by percentage makes the problem small and the metric interpretable.",
+    "opening": "The rollback argument for progressive delivery is well understood. The measurement argument gets less attention and is at least as valuable.\n\nWithout a cohort that didn't get the feature, you can't tell whether the metric moved because of your change or because it was a Tuesday in a month with a holiday. The comparison is the only thing that makes the number mean anything.",
+    "slug": "percentage-rollouts-give-you-a-control-group-for-free"
+  },
+  {
+    "theme": "product-eng",
+    "title": "You can't deprecate what you can't measure",
+    "excerpt": "Without per-customer usage data, removal is either postponed indefinitely out of caution or executed blind and breaks someone important.",
+    "opening": "Deprecation stalls on a question nobody can answer: who is still using this. In the absence of data, the safe-feeling choice is to leave it, and the accumulated weight of things nobody dares remove becomes its own tax.\n\nThe blocker is instrumentation rather than policy, and it's usually a day of work to add usage counters keyed by account.",
+    "slug": "you-can-t-deprecate-what-you-can-t-measure"
+  },
+  {
+    "theme": "product-eng",
+    "title": "The roadmap item that was a support workaround",
+    "excerpt": "A feature request repeated by five customers may be five people describing the same underlying obstacle in the vocabulary of their current workaround.",
+    "opening": "Requests arrive as solutions. \"We need bulk export\" is a proposal, and behind it there's a task the person is trying to complete, which may have a much smaller answer.\n\nThe discipline is asking what they do with the export. Frequently it turns out that four of the five would be better served by something you could build in a week, and the fifth genuinely needs the export.",
+    "slug": "the-roadmap-item-that-was-a-support-workaround"
+  },
+  {
+    "theme": "product-eng",
+    "title": "Shipping the removal",
+    "excerpt": "Taking a feature away is a product change deserving the same care as adding one: notice period, migration path, and a way to tell who's affected.",
+    "opening": "Removals get treated as cleanup and executed with far less rigour than additions, despite having a much higher chance of making someone's day worse.\n\nThe asymmetry is worth naming: adding a feature nobody wants costs you engineering time. Removing one someone depends on costs them their workflow, and they didn't get a say.",
+    "slug": "shipping-the-removal"
+  },
+  {
+    "theme": "product-eng",
+    "title": "Defaults are the product",
+    "excerpt": "The overwhelming majority of users never open settings. Every option you add is a decision you've declined to make on their behalf.",
+    "opening": "Adding a setting feels accommodating and it's frequently an abdication — the team couldn't agree, so both behaviours ship and the user arbitrates.\n\nThe cost isn't only the user's. Every option multiplies the states you support, test and document, and the combinations are where the bugs are. A well-chosen default serves more people than a well-built preference.",
+    "slug": "defaults-are-the-product"
+  },
+  {
+    "theme": "product-eng",
+    "title": "Measuring the thing rather than its proxy",
+    "excerpt": "Sessions, clicks and time-on-page are proxies for value, and optimising a proxy hard enough eventually detaches it from the thing it stood for.",
+    "opening": "Proxy metrics are chosen because the real outcome is hard to measure, then they become targets, then they become the definition of success.\n\nThe detachment is gradual and usually invisible until someone notices that engagement is up and retention is flat. Keeping a harder-to-measure outcome metric alongside the proxy is the cheapest defence available.",
+    "slug": "measuring-the-thing-rather-than-its-proxy"
+  },
+  {
+    "theme": "open-source",
+    "title": "Triage is the job now",
+    "excerpt": "Writing the library was the fun part and it's finished. What determines whether the project survives is whether issues get a response.",
+    "opening": "The transition catches maintainers by surprise. The creative work is largely done within the first year, and what remains is a sustained obligation with no end date and no schedule.\n\nTemplates and labels help with throughput. They don't address the actual cost, which is that every open issue is an implied promise, and the count only moves in one direction.",
+    "slug": "triage-is-the-job-now"
+  },
+  {
+    "theme": "open-source",
+    "title": "Is a bug fix a breaking change?",
+    "excerpt": "Strictly, if anyone depends on the buggy behaviour, yes. Practically, treating every fix as major makes the version number meaningless.",
+    "opening": "Semantic versioning is precise about categories and silent about judgement, and the judgement is where every real argument happens.\n\nThe workable position is to document the intent — what's covered by the compatibility promise, what's explicitly not — so the calls are at least predictable. Undocumented behaviour isn't part of the contract, but only if you said so before someone relied on it.",
+    "slug": "is-a-bug-fix-a-breaking-change"
+  },
+  {
+    "theme": "open-source",
+    "title": "Audit your dependency tree by maintainer count",
+    "excerpt": "The risk isn't primarily malicious packages. It's abandonment — one maintainer who stops, and an advisory arriving eighteen months later with no upstream fix.",
+    "opening": "Dependency risk is usually discussed in terms of supply-chain attacks, which are real and rare. The failure that actually happens is quieter.\n\nSorting the tree by last release date and number of maintainers takes an afternoon and identifies a small number of genuinely fragile links — usually packages nobody chose directly, pulled in three levels down.",
+    "slug": "audit-your-dependency-tree-by-maintainer-count"
+  },
+  {
+    "theme": "open-source",
+    "title": "`>=2.1.0` is a floating pin",
+    "excerpt": "A constraint written to satisfy a security advisory permits every future major version, including the one that removes the API you use.",
+    "opening": "The build breaks on a day nobody changed anything, which is the most expensive kind of break because the cause isn't in the diff and the first hour goes to looking for it there.\n\nUnbounded ranges get introduced with good intentions — a minimum version to clear an advisory — and they're pins that float upward without limit. Lockfiles protect you and not your published package's consumers.",
+    "slug": "2-1-0-is-a-floating-pin"
+  },
+  {
+    "theme": "open-source",
+    "title": "A project with one maintainer has already failed",
+    "excerpt": "The failure just hasn't been observed. Burnout is silent — responses get slower, then stop, and there's no announcement.",
+    "opening": "The single-maintainer package is a structural risk to everyone depending on it and to the maintainer, who has an obligation with no relief valve.\n\nWhat helps is structural rather than motivational: a second person with publish rights, a documented release procedure, and a written scope so that out-of-scope requests can be declined once rather than negotiated repeatedly.",
+    "slug": "a-project-with-one-maintainer-has-already-failed"
+  },
+  {
+    "theme": "open-source",
+    "title": "The reporter who took the time to make a reproduction",
+    "excerpt": "The best contributions to a library aren't features. They're precisely described edge cases from production, and the reporting experience determines whether you get them.",
+    "opening": "A good bug report is expensive to produce. Someone hit a problem, reduced it to a minimal case, and wrote it up — that's an hour of unpaid work donated to your project.\n\nThe experience they get determines whether they do it again. The ones who get a fast acknowledgement come back with the next one; the ones who don't patch it privately, and you never learn the class of bug exists.",
+    "slug": "the-reporter-who-took-the-time-to-make-a-reproduction"
+  },
+  {
+    "theme": "open-source",
+    "title": "Publishing trust is per-package and easy to orphan",
+    "excerpt": "Renaming a package or a workflow file breaks the trust relationship silently. The next release fails at publish, after the tag is cut.",
+    "opening": "Keyless publishing through CI is a substantial security improvement and it introduces a configuration binding that's invisible in the repository.\n\nThe trust is registered against a specific package name and a specific workflow path. Change either — a rename, a refactor of the CI directory — and the relationship no longer matches. Nothing warns you until a release is halfway done.",
+    "slug": "publishing-trust-is-per-package-and-easy-to-orphan"
+  },
+  {
+    "theme": "open-source",
+    "title": "What ships in the tarball",
+    "excerpt": "Packaging strips some files by convention, includes others by accident, and the result is only observable by installing the published artefact.",
+    "opening": "The gap between the repository and the published package is a recurring source of bugs that are invisible in development and total for consumers — a missing directory, a stripped configuration file, a dependency needed at runtime but declared as a dev dependency.\n\nInstalling the packed artefact into a scratch project, in CI, is the only check that reflects what users get.",
+    "slug": "what-ships-in-the-tarball"
+  },
+  {
+    "theme": "open-source",
+    "title": "Undeclared dependencies that npm hoisting hid",
+    "excerpt": "A package imported without being declared resolves fine under a flat node_modules and fails immediately under a strict one. Half your users hit it.",
+    "opening": "Hoisting makes undeclared dependencies work by accident, which means the bug is invisible to anyone using the tooling that hoists — frequently including the entire team that maintains the package.\n\nUnder strict resolution the import fails outright. The report arrives from a user whose setup differs from yours, and the first instinct is to assume their environment is broken.",
+    "slug": "undeclared-dependencies-that-npm-hoisting-hid"
+  },
+  {
+    "theme": "open-source",
+    "title": "Scope, written down, declines requests for you",
+    "excerpt": "Without a stated scope, every out-of-bounds feature request is an individual negotiation. With one, it's a link and a sentence.",
+    "opening": "Maintainer time goes to explanation more than to code, and much of that explanation is repeating the same boundary in different words to different people.\n\nA short document stating what the project is for, and what it deliberately doesn't do, converts a recurring negotiation into a reference. It also makes the project easier to evaluate, which is worth something on its own.",
+    "slug": "scope-written-down-declines-requests-for-you"
+  },
+  {
+    "theme": "ml-retrieval",
+    "title": "Measure retrieval separately from generation",
+    "excerpt": "An end-to-end evaluation hides which half is failing, and the fixes for each are entirely different. Most quality problems are retrieval problems.",
+    "opening": "Attention goes to the model because that's the part that feels like the system. In most retrieval-augmented applications, output quality is determined by whether the right documents were fetched — a search problem with decades of prior work behind it.\n\nEvaluating the pipeline as a single unit gives you one number that goes up and down for reasons you can't attribute.",
+    "slug": "measure-retrieval-separately-from-generation"
+  },
+  {
+    "theme": "ml-retrieval",
+    "title": "Your evaluation set is leaking",
+    "excerpt": "Examples curated by the person who tuned the prompts, or sampled from a period whose distribution has shifted, produce a number that won't survive production.",
+    "opening": "Leakage in evaluation sets is usually indirect rather than blatant. Nobody trained on the test set; someone assembled it while building the system, from the same data, with the same intuitions about what a representative example looks like.\n\nA set collected from real traffic at a different time, labelled by someone who didn't build the system, will report a worse number. That's the point of it.",
+    "slug": "your-evaluation-set-is-leaking"
+  },
+  {
+    "theme": "ml-retrieval",
+    "title": "Define the fallback before the model is slow",
+    "excerpt": "A feature with no specified behaviour when the model times out has specified it implicitly, as an error page.",
+    "opening": "Model calls are network requests to a system with variable and occasionally very long latency. Designing around the median produces a p99 that fails, and the failure path is whatever the framework does by default.\n\nStreaming, a strict deadline, and a degraded-but-useful fallback are the three mechanisms. The fallback is the one that gets deferred, and it's the one users experience.",
+    "slug": "define-the-fallback-before-the-model-is-slow"
+  },
+  {
+    "theme": "ml-retrieval",
+    "title": "Prompts are code with no test suite",
+    "excerpt": "A prompt edit is a behaviour change deployed with no type check, no test, and often no review — and it directly determines output.",
+    "opening": "Of everything in a model-backed system, the prompt has the most influence over behaviour and the least process around changing it. It's frequently edited in a config file by whoever noticed a bad output.\n\nVersioning prompts as artefacts with an eval run attached brings them roughly up to the standard of the rest of the codebase, which is a low bar they currently don't clear.",
+    "slug": "prompts-are-code-with-no-test-suite"
+  },
+  {
+    "theme": "ml-retrieval",
+    "title": "Keep a regression set of things that used to break",
+    "excerpt": "Improvements on one dimension routinely regress another, and without a fixed set of previously-bad inputs there's no way to see it happen.",
+    "opening": "Prompt and retrieval changes are evaluated against whether they fix the problem that prompted them. What they break is discovered later, by users, in an area nobody was looking at.\n\nA growing collection of inputs that previously produced bad output, run on every change, is the cheapest available guard. It takes minutes to add an entry and it accumulates value indefinitely.",
+    "slug": "keep-a-regression-set-of-things-that-used-to-break"
+  },
+  {
+    "theme": "ml-retrieval",
+    "title": "Chunking is where retrieval quality is won",
+    "excerpt": "Splitting on a fixed token count severs the context a passage needs to be interpretable. The embedding is then of a fragment that means nothing on its own.",
+    "opening": "Chunk size gets tuned as a hyperparameter and treated as an implementation detail. It determines what the embedding actually represents, which makes it one of the most consequential decisions in the pipeline.\n\nA passage split mid-argument, or separated from the heading that gives it meaning, produces a vector for text that no longer says anything. No amount of model quality recovers that.",
+    "slug": "chunking-is-where-retrieval-quality-is-won"
+  },
+  {
+    "theme": "ml-retrieval",
+    "title": "Hybrid search beats pure vector more often than not",
+    "excerpt": "Semantic similarity misses exact identifiers, error codes and product names — which is a large share of what people actually search for.",
+    "opening": "Vector search handles paraphrase and conceptual similarity well, and it's notably weak at the thing keyword search is trivially good at: finding the document containing this exact string.\n\nUsers search for error codes, SKUs and function names. A hybrid ranking that combines both signals is more work than either alone and consistently outperforms both.",
+    "slug": "hybrid-search-beats-pure-vector-more-often-than-not"
+  },
+  {
+    "theme": "ml-retrieval",
+    "title": "Deletion has to be as reliable as ingestion",
+    "excerpt": "A document removed at the source and still present in the index is a correctness problem and frequently a compliance one.",
+    "opening": "Ingestion gets built carefully because it's the visible path. Deletion is added later, often as a best-effort cleanup, and it fails quietly.\n\nThe result is an index that accumulates content the source has removed — including, eventually, something someone had a legal right to have deleted. That's a different category of problem from stale search results.",
+    "slug": "deletion-has-to-be-as-reliable-as-ingestion"
+  },
+  {
+    "theme": "ml-retrieval",
+    "title": "Budget the majority of the timeline for data plumbing",
+    "excerpt": "Extraction, deduplication, format normalisation, permission handling and keeping an index in sync are the work. That's not a planning failure.",
+    "opening": "The expectation going in is model work. The reality is that the model is an API call and everything around it is a data engineering project with a search component.\n\nTeams that plan for this ship on schedule. Teams that treat it as overhead discover it as slippage, and describe the project afterwards as having been harder than expected.",
+    "slug": "budget-the-majority-of-the-timeline-for-data-plumbing"
+  },
+  {
+    "theme": "ml-retrieval",
+    "title": "A hundred of your own examples beats any leaderboard",
+    "excerpt": "Published benchmarks measure someone else's task on someone else's distribution, often with contamination nobody has ruled out.",
+    "opening": "Benchmarks are useful for excluding options and close to useless for choosing among the top few, where the differences are within the noise of your specific workload.\n\nA small evaluation set drawn from your own traffic — a hundred examples, labelled carefully — can be built in a day and predicts production behaviour far better than any public ranking.",
+    "slug": "a-hundred-of-your-own-examples-beats-any-leaderboard"
+  }
+]

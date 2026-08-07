@@ -64,8 +64,8 @@ async function getS3Client() {
         forcePathStyle: env.S3_FORCE_PATH_STYLE,
         credentials: {
             accessKeyId: env.S3_ACCESS_KEY_ID || "",
-            secretAccessKey: env.S3_SECRET_ACCESS_KEY || "",
-        },
+            secretAccessKey: env.S3_SECRET_ACCESS_KEY || ""
+        }
     });
     return _s3Client;
 }
@@ -73,8 +73,12 @@ async function getS3Client() {
 function getContentType(file: string): string {
     const ext = file.split(".").pop()?.toLowerCase() ?? "jpg";
     const map: Record<string, string> = {
-        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
-        webp: "image/webp", avif: "image/avif", gif: "image/gif",
+        jpg: "image/jpeg",
+jpeg: "image/jpeg",
+png: "image/png",
+        webp: "image/webp",
+avif: "image/avif",
+gif: "image/gif"
     };
     return map[ext] || "application/octet-stream";
 }
@@ -105,7 +109,8 @@ async function uploadAssetsToS3(assetSubdir: string, storagePrefix: string): Pro
 
         // Check if already exists
         try {
-            await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+            await client.send(new HeadObjectCommand({ Bucket: bucket,
+Key: key }));
             continue; // already exists
         } catch {
             // doesn't exist, upload it
@@ -116,7 +121,7 @@ async function uploadAssetsToS3(assetSubdir: string, storagePrefix: string): Pro
             Bucket: bucket,
             Key: key,
             Body: body,
-            ContentType: getContentType(file),
+            ContentType: getContentType(file)
         }));
         uploaded++;
     }
@@ -269,8 +274,6 @@ function currentYear(): number { return new Date().getFullYear(); }
 // ── Blog post topics (no PHP, TypeScript-heavy) ───────────────────────
 
 
-
-
 const authorPicFiles = [
     "author_pictures/0phas_Gemini_Generated_Image_.jpeg",
     "author_pictures/5kuxx_chromaflow_landing_page.png",
@@ -328,7 +331,7 @@ export async function runSeed() {
         console.log(`  ✅ ${contentImagePaths.length} content images`);
 
         await seedAssets("author_pictures", "author_pictures/");
-        console.log(`  ✅ author pictures`);
+        console.log("  ✅ author pictures");
 
         const productImagePaths = await seedAssets("product_images", "product_images/");
         console.log(`  ✅ ${productImagePaths.length} product images`);
@@ -346,11 +349,11 @@ export async function runSeed() {
         function mapCategory(cat: string | undefined | null): ProductCategory {
             if (!cat) return validCategories[Math.floor(Math.random() * validCategories.length)];
             const c = cat.toLowerCase();
-            if (c.includes('clothing') || c.includes('sunglasses')) return 'clothing';
-            if (c.includes('home') || c.includes('kitchen') || c.includes('serveware')) return 'home_garden';
-            if (c.includes('electronic') || c.includes('watch')) return 'electronics';
-            if (c.includes('toy')) return 'toys';
-            if (c.includes('health') || c.includes('beauty')) return 'health_beauty';
+            if (c.includes("clothing") || c.includes("sunglasses")) return "clothing";
+            if (c.includes("home") || c.includes("kitchen") || c.includes("serveware")) return "home_garden";
+            if (c.includes("electronic") || c.includes("watch")) return "electronics";
+            if (c.includes("toy")) return "toys";
+            if (c.includes("health") || c.includes("beauty")) return "health_beauty";
             return validCategories[Math.floor(Math.random() * validCategories.length)];
         }
 
@@ -505,13 +508,16 @@ name }));
             const isPublished = status === "published";
 
             // Body: the post's own opening, then themed sections interleaved with images.
-            const blocks: { type: string; value: string }[] = [{ type: "text", value: post.opening }];
+            const blocks: { type: string; value: string }[] = [{ type: "text",
+value: post.opening }];
             const sections = pickN(theme.sections, 3 + Math.floor(Math.random() * 2));
             for (const section of sections) {
                 if (contentImagePaths.length > 0) {
-                    blocks.push({ type: "image", value: pick(contentImagePaths) });
+                    blocks.push({ type: "image",
+value: pick(contentImagePaths) });
                 }
-                blocks.push({ type: "text", value: section });
+                blocks.push({ type: "text",
+value: section });
             }
 
             postValues.push({
@@ -532,7 +538,8 @@ name }));
             // Tags follow the theme rather than being drawn at random.
             const candidates = themeTagIndices[post.theme] ?? [];
             const assigned = new Set(pickN(candidates, 1 + Math.floor(Math.random() * Math.min(3, candidates.length))));
-            for (const t of assigned) ptValues.push({ post_id: postIds[i], tag_id: tagIds[t] });
+            for (const t of assigned) ptValues.push({ post_id: postIds[i],
+tag_id: tagIds[t] });
         }
 
         const BATCH = 50;
@@ -628,21 +635,39 @@ name }));
         }));
         await db.insert(products).values(productValues);
 
+        // Real translations live in demo-product-translations.json, keyed by the
+        // product's index in demo-products.json. English rows reuse the source copy;
+        // every other locale must have a genuine translation or we fail loudly —
+        // silently falling back to English is what made this data useless before.
         console.log("📦 Generating product locales subcollections...");
+        interface LocaleCopy { name: string; description: string }
+        const productTranslations: Record<string, Partial<Record<ProductLocale, LocaleCopy>>> =
+            loadJson(path.join(APP_ROOT, "backend/src/demo-product-translations.json"));
         const productLocalesValues: { id: string; product_id: string; locale: ProductLocale; name: string; description: string }[] = [];
+        const untranslated: string[] = [];
         allProducts.forEach((p, i) => {
             const pid = productIds[i];
             const locales = p.locales || ["en"];
             for (const locale of locales) {
+                const translated = locale === "en"
+                    ? { name: p.name, description: p.desc }
+                    : productTranslations[String(i)]?.[locale];
+                if (!translated) {
+                    untranslated.push(`${i}:${locale}`);
+                    continue;
+                }
                 productLocalesValues.push({
                     id: generateUUID("locale", productLocalesValues.length),
                     product_id: pid,
                     locale: locale,
-                    name: p.name + ` (${locale.toUpperCase()})`,
-                    description: p.desc
+                    name: translated.name,
+                    description: translated.description
                 });
             }
         });
+        if (untranslated.length > 0) {
+            throw new Error(`Missing product translations for: ${untranslated.join(", ")}`);
+        }
         for (let i = 0; i < productLocalesValues.length; i += 100) {
             await db.insert(productLocales).values(productLocalesValues.slice(i, i + 100));
         }
@@ -746,71 +771,236 @@ name }));
         type TicketCategory = (typeof ticketsCategory.enumValues)[number];
         const ticketSubjects: { subject: string; description: string; category: TicketCategory; priority: TicketPriority }[] = [
             // Bug reports
-            { subject: "Checkout page freezes on mobile", description: "When I try to complete my purchase on an iPhone 13, the page freezes after entering my credit card details. I've tried Safari and Chrome with the same result. Please help, I really want to buy the camping tent.", category: "bug", priority: "high" },
-            { subject: "Promo code SAVE20 not working", description: "I'm trying to use the SAVE20 promo code from your email newsletter, but it says 'Invalid code' when applied to my cart. I only have the Sony headphones in my cart. Is there a restriction?", category: "bug", priority: "medium" },
-            { subject: "Can't add items to wishlist", description: "Clicking the heart icon on any product page does nothing. I am logged into my account but my wishlist remains empty. I'm using Chrome on Windows 11.", category: "bug", priority: "low" },
-            { subject: "Wrong product image showing", description: "The product image for the 'Merino V-Neck Sweater' in Navy actually shows the Charcoal color. It's confusing and I want to make sure I'm ordering the right color.", category: "bug", priority: "low" },
-            { subject: "Shipping calculator is broken", description: "The estimated shipping calculator in the cart keeps saying 'Unable to calculate' for my zip code (90210). It worked fine last week.", category: "bug", priority: "medium" },
-            { subject: "Password reset link is expired instantly", description: "Every time I request a password reset email, the link says it's already expired as soon as I click it. I can't get back into my account.", category: "bug", priority: "high" },
-            { subject: "Search returns no results for existing products", description: "When I search for 'headphones' or 'keyboard' the search page says 'No results found' even though I can see those products when browsing categories.", category: "bug", priority: "medium" },
-            { subject: "Order confirmation email not received", description: "I placed an order 3 hours ago and still haven't received a confirmation email. I've checked spam. My email is correct in my account settings.", category: "bug", priority: "medium" },
-            { subject: "Product reviews not loading", description: "The reviews section on every product page just shows a spinning loader that never finishes. I've tried multiple browsers and cleared cache.", category: "bug", priority: "low" },
-            { subject: "Dark mode breaks product gallery", description: "When I switch to dark mode, the product image gallery overlaps with the price section and the zoom feature stops working entirely.", category: "bug", priority: "low" },
-            { subject: "Cart quantity won't update", description: "I'm trying to change the quantity of the yoga mat from 1 to 2, but the quantity field resets back to 1 every time I click the + button.", category: "bug", priority: "medium" },
-            { subject: "Filtering by price range shows wrong products", description: "I set the price filter to $50-$100 but I'm seeing products that cost $200+. The filter UI shows the correct range but the results are wrong.", category: "bug", priority: "low" },
+            { subject: "Checkout page freezes on mobile",
+description: "When I try to complete my purchase on an iPhone 13, the page freezes after entering my credit card details. I've tried Safari and Chrome with the same result. Please help, I really want to buy the camping tent.",
+category: "bug",
+priority: "high" },
+            { subject: "Promo code SAVE20 not working",
+description: "I'm trying to use the SAVE20 promo code from your email newsletter, but it says 'Invalid code' when applied to my cart. I only have the Sony headphones in my cart. Is there a restriction?",
+category: "bug",
+priority: "medium" },
+            { subject: "Can't add items to wishlist",
+description: "Clicking the heart icon on any product page does nothing. I am logged into my account but my wishlist remains empty. I'm using Chrome on Windows 11.",
+category: "bug",
+priority: "low" },
+            { subject: "Wrong product image showing",
+description: "The product image for the 'Merino V-Neck Sweater' in Navy actually shows the Charcoal color. It's confusing and I want to make sure I'm ordering the right color.",
+category: "bug",
+priority: "low" },
+            { subject: "Shipping calculator is broken",
+description: "The estimated shipping calculator in the cart keeps saying 'Unable to calculate' for my zip code (90210). It worked fine last week.",
+category: "bug",
+priority: "medium" },
+            { subject: "Password reset link is expired instantly",
+description: "Every time I request a password reset email, the link says it's already expired as soon as I click it. I can't get back into my account.",
+category: "bug",
+priority: "high" },
+            { subject: "Search returns no results for existing products",
+description: "When I search for 'headphones' or 'keyboard' the search page says 'No results found' even though I can see those products when browsing categories.",
+category: "bug",
+priority: "medium" },
+            { subject: "Order confirmation email not received",
+description: "I placed an order 3 hours ago and still haven't received a confirmation email. I've checked spam. My email is correct in my account settings.",
+category: "bug",
+priority: "medium" },
+            { subject: "Product reviews not loading",
+description: "The reviews section on every product page just shows a spinning loader that never finishes. I've tried multiple browsers and cleared cache.",
+category: "bug",
+priority: "low" },
+            { subject: "Dark mode breaks product gallery",
+description: "When I switch to dark mode, the product image gallery overlaps with the price section and the zoom feature stops working entirely.",
+category: "bug",
+priority: "low" },
+            { subject: "Cart quantity won't update",
+description: "I'm trying to change the quantity of the yoga mat from 1 to 2, but the quantity field resets back to 1 every time I click the + button.",
+category: "bug",
+priority: "medium" },
+            { subject: "Filtering by price range shows wrong products",
+description: "I set the price filter to $50-$100 but I'm seeing products that cost $200+. The filter UI shows the correct range but the results are wrong.",
+category: "bug",
+priority: "low" },
 
             // Feature requests
-            { subject: "Please add Apple Pay", description: "It would be so much faster to checkout if you supported Apple Pay or Google Pay. Typing in credit card numbers on mobile is a hassle.", category: "feature_request", priority: "medium" },
-            { subject: "Option to save multiple addresses", description: "I frequently buy gifts for family members. It would be great if I could save their addresses in an address book rather than typing them out every time.", category: "feature_request", priority: "low" },
-            { subject: "Notify when back in stock", description: "I really want the Keychron keyboard but it's sold out. Can you add a feature to email me when it comes back in stock?", category: "feature_request", priority: "medium" },
-            { subject: "Detailed sizing charts needed", description: "The clothing items really need detailed measurements instead of just S/M/L. Knowing the chest and length measurements would reduce returns.", category: "feature_request", priority: "low" },
-            { subject: "Add a gift wrapping option at checkout", description: "I buy a lot of gifts here and would love the option to add gift wrapping and a personalized note during checkout. I'd happily pay extra for it.", category: "feature_request", priority: "low" },
-            { subject: "Subscription / auto-reorder for consumables", description: "I buy the same coffee beans and protein bars every month. A subscribe-and-save option with a small discount would be amazing.", category: "feature_request", priority: "medium" },
-            { subject: "Compare products side by side", description: "When choosing between the Sony and Bose headphones, it would be super helpful to compare specs side by side on one page.", category: "feature_request", priority: "low" },
-            { subject: "Add order tracking page with map", description: "It would be great to have a visual map showing where my package is in real-time, similar to what Amazon and DoorDash provide.", category: "feature_request", priority: "low" },
+            { subject: "Please add Apple Pay",
+description: "It would be so much faster to checkout if you supported Apple Pay or Google Pay. Typing in credit card numbers on mobile is a hassle.",
+category: "feature_request",
+priority: "medium" },
+            { subject: "Option to save multiple addresses",
+description: "I frequently buy gifts for family members. It would be great if I could save their addresses in an address book rather than typing them out every time.",
+category: "feature_request",
+priority: "low" },
+            { subject: "Notify when back in stock",
+description: "I really want the Keychron keyboard but it's sold out. Can you add a feature to email me when it comes back in stock?",
+category: "feature_request",
+priority: "medium" },
+            { subject: "Detailed sizing charts needed",
+description: "The clothing items really need detailed measurements instead of just S/M/L. Knowing the chest and length measurements would reduce returns.",
+category: "feature_request",
+priority: "low" },
+            { subject: "Add a gift wrapping option at checkout",
+description: "I buy a lot of gifts here and would love the option to add gift wrapping and a personalized note during checkout. I'd happily pay extra for it.",
+category: "feature_request",
+priority: "low" },
+            { subject: "Subscription / auto-reorder for consumables",
+description: "I buy the same coffee beans and protein bars every month. A subscribe-and-save option with a small discount would be amazing.",
+category: "feature_request",
+priority: "medium" },
+            { subject: "Compare products side by side",
+description: "When choosing between the Sony and Bose headphones, it would be super helpful to compare specs side by side on one page.",
+category: "feature_request",
+priority: "low" },
+            { subject: "Add order tracking page with map",
+description: "It would be great to have a visual map showing where my package is in real-time, similar to what Amazon and DoorDash provide.",
+category: "feature_request",
+priority: "low" },
 
             // Questions
-            { subject: "When will the Keychron Q1 Pro be back in stock?", description: "I've been checking every day for the Keychron Q1 Pro Keyboard. Do you have an ETA on the next restock?", category: "question", priority: "low" },
-            { subject: "Do the leather boots run true to size?", description: "I'm interested in the Leather Chelsea Boots but I'm normally between sizes. Should I size up or down? Do they stretch over time?", category: "question", priority: "medium" },
-            { subject: "Can I change the shipping address on my order?", description: "I just placed order ORD-2025-0042 but realized it has my old apartment number. Can this be updated before it ships?", category: "question", priority: "urgent" },
-            { subject: "International return policy?", description: "I'm ordering from Canada. If the jacket doesn't fit, do I have to pay for return shipping? How long do I have to return it?", category: "question", priority: "medium" },
-            { subject: "Are the ceramic pots frost-proof?", description: "I want to keep the Ceramic Plant Pot Set outside on my patio during winter. Will they crack if the temperature drops below freezing?", category: "question", priority: "low" },
-            { subject: "Warranty on the RC Drone?", description: "Does the RC Drone with 4K Camera come with a manufacturer's warranty? What does it cover if I crash it?", category: "question", priority: "medium" },
-            { subject: "Is the coffee ethically sourced?", description: "I care about fair trade practices. Can you tell me if the Ethiopian Yirgacheffe beans are certified fair trade or direct trade?", category: "question", priority: "low" },
-            { subject: "Do you offer bulk or wholesale pricing?", description: "I run a small office and would like to order 20 stainless steel water bottles for my team. Is there a bulk discount available?", category: "question", priority: "medium" },
-            { subject: "How do I care for the cast iron dutch oven?", description: "I just received the enameled cast iron dutch oven. Do I need to season it like regular cast iron? Can it go in the dishwasher?", category: "question", priority: "low" },
-            { subject: "Do you ship to PO boxes?", description: "I live in a rural area and only have a PO box. Will you ship larger items like the standing desk mat to a PO box address?", category: "question", priority: "low" },
+            { subject: "When will the Keychron Q1 Pro be back in stock?",
+description: "I've been checking every day for the Keychron Q1 Pro Keyboard. Do you have an ETA on the next restock?",
+category: "question",
+priority: "low" },
+            { subject: "Do the leather boots run true to size?",
+description: "I'm interested in the Leather Chelsea Boots but I'm normally between sizes. Should I size up or down? Do they stretch over time?",
+category: "question",
+priority: "medium" },
+            { subject: "Can I change the shipping address on my order?",
+description: "I just placed order ORD-2025-0042 but realized it has my old apartment number. Can this be updated before it ships?",
+category: "question",
+priority: "urgent" },
+            { subject: "International return policy?",
+description: "I'm ordering from Canada. If the jacket doesn't fit, do I have to pay for return shipping? How long do I have to return it?",
+category: "question",
+priority: "medium" },
+            { subject: "Are the ceramic pots frost-proof?",
+description: "I want to keep the Ceramic Plant Pot Set outside on my patio during winter. Will they crack if the temperature drops below freezing?",
+category: "question",
+priority: "low" },
+            { subject: "Warranty on the RC Drone?",
+description: "Does the RC Drone with 4K Camera come with a manufacturer's warranty? What does it cover if I crash it?",
+category: "question",
+priority: "medium" },
+            { subject: "Is the coffee ethically sourced?",
+description: "I care about fair trade practices. Can you tell me if the Ethiopian Yirgacheffe beans are certified fair trade or direct trade?",
+category: "question",
+priority: "low" },
+            { subject: "Do you offer bulk or wholesale pricing?",
+description: "I run a small office and would like to order 20 stainless steel water bottles for my team. Is there a bulk discount available?",
+category: "question",
+priority: "medium" },
+            { subject: "How do I care for the cast iron dutch oven?",
+description: "I just received the enameled cast iron dutch oven. Do I need to season it like regular cast iron? Can it go in the dishwasher?",
+category: "question",
+priority: "low" },
+            { subject: "Do you ship to PO boxes?",
+description: "I live in a rural area and only have a PO box. Will you ship larger items like the standing desk mat to a PO box address?",
+category: "question",
+priority: "low" },
 
             // Billing issues
-            { subject: "Double charged for my recent order", description: "I placed an order yesterday and got an error on the first attempt, so I tried again. Now I see two pending charges of $149 on my credit card. Please cancel one of them.", category: "billing", priority: "high" },
-            { subject: "Haven't received refund for returned item", description: "I returned the standing desk mat two weeks ago. Tracking shows you received it last Tuesday, but I still haven't seen the refund on my credit card. Order #ORD-2025-0015.", category: "billing", priority: "high" },
-            { subject: "Invoice request for business purchase", description: "I bought the MacBook Pro and need a formal VAT invoice for my company's accounting department. The standard email receipt doesn't include our company VAT number.", category: "billing", priority: "medium" },
-            { subject: "Wrong tax amount charged", description: "I was charged sales tax on my order, but my state has a tax holiday this week for clothing items under $100. The merino sweater should have been tax-free.", category: "billing", priority: "medium" },
-            { subject: "Partial refund amount seems incorrect", description: "I returned 2 of the 3 items from my order but the refund amount doesn't match. I was refunded $45 but the two items totaled $78. Can you check?", category: "billing", priority: "high" },
-            { subject: "Gift card balance disappeared", description: "I had a $50 gift card balance on my account. I didn't use it on my last order, but now it shows $0. Can you look into what happened?", category: "billing", priority: "medium" },
-            { subject: "Currency conversion fee was unexpected", description: "I'm in the UK and paid in GBP, but my bank shows an extra currency conversion fee. Shouldn't the GBP price be final?", category: "billing", priority: "low" },
+            { subject: "Double charged for my recent order",
+description: "I placed an order yesterday and got an error on the first attempt, so I tried again. Now I see two pending charges of $149 on my credit card. Please cancel one of them.",
+category: "billing",
+priority: "high" },
+            { subject: "Haven't received refund for returned item",
+description: "I returned the standing desk mat two weeks ago. Tracking shows you received it last Tuesday, but I still haven't seen the refund on my credit card. Order #ORD-2025-0015.",
+category: "billing",
+priority: "high" },
+            { subject: "Invoice request for business purchase",
+description: "I bought the MacBook Pro and need a formal VAT invoice for my company's accounting department. The standard email receipt doesn't include our company VAT number.",
+category: "billing",
+priority: "medium" },
+            { subject: "Wrong tax amount charged",
+description: "I was charged sales tax on my order, but my state has a tax holiday this week for clothing items under $100. The merino sweater should have been tax-free.",
+category: "billing",
+priority: "medium" },
+            { subject: "Partial refund amount seems incorrect",
+description: "I returned 2 of the 3 items from my order but the refund amount doesn't match. I was refunded $45 but the two items totaled $78. Can you check?",
+category: "billing",
+priority: "high" },
+            { subject: "Gift card balance disappeared",
+description: "I had a $50 gift card balance on my account. I didn't use it on my last order, but now it shows $0. Can you look into what happened?",
+category: "billing",
+priority: "medium" },
+            { subject: "Currency conversion fee was unexpected",
+description: "I'm in the UK and paid in GBP, but my bank shows an extra currency conversion fee. Shouldn't the GBP price be final?",
+category: "billing",
+priority: "low" },
 
             // Account issues
-            { subject: "Can't log into my account", description: "I'm getting an 'Invalid credentials' error but I'm 100% sure the password is correct. I use a password manager. Could my account have been locked?", category: "account", priority: "high" },
-            { subject: "Please delete my account and data", description: "I am requesting that you delete my customer account and all associated personal data from your systems in accordance with data privacy laws.", category: "account", priority: "medium" },
-            { subject: "Email address update", description: "I no longer have access to the email address associated with my account. Can I change it to my new email without losing my order history?", category: "account", priority: "low" },
-            { subject: "Two-factor authentication not working", description: "The authenticator app codes keep being rejected when I try to log in. I've verified the time is synced on my phone. Am I locked out?", category: "account", priority: "high" },
-            { subject: "Merge my duplicate accounts", description: "I accidentally created two accounts with different emails. Can you merge them so all my order history is in one place?", category: "account", priority: "low" },
-            { subject: "Someone placed an order on my account", description: "I just got a confirmation email for an order I didn't place. The shipping address isn't mine. I think my account was compromised.", category: "account", priority: "urgent" },
+            { subject: "Can't log into my account",
+description: "I'm getting an 'Invalid credentials' error but I'm 100% sure the password is correct. I use a password manager. Could my account have been locked?",
+category: "account",
+priority: "high" },
+            { subject: "Please delete my account and data",
+description: "I am requesting that you delete my customer account and all associated personal data from your systems in accordance with data privacy laws.",
+category: "account",
+priority: "medium" },
+            { subject: "Email address update",
+description: "I no longer have access to the email address associated with my account. Can I change it to my new email without losing my order history?",
+category: "account",
+priority: "low" },
+            { subject: "Two-factor authentication not working",
+description: "The authenticator app codes keep being rejected when I try to log in. I've verified the time is synced on my phone. Am I locked out?",
+category: "account",
+priority: "high" },
+            { subject: "Merge my duplicate accounts",
+description: "I accidentally created two accounts with different emails. Can you merge them so all my order history is in one place?",
+category: "account",
+priority: "low" },
+            { subject: "Someone placed an order on my account",
+description: "I just got a confirmation email for an order I didn't place. The shipping address isn't mine. I think my account was compromised.",
+category: "account",
+priority: "urgent" },
 
             // Other
-            { subject: "Package shows delivered but I didn't receive it", description: "FedEx tracking says my package was delivered to the front porch yesterday at 3 PM, but there is nothing there. I've checked with my neighbors. What should I do?", category: "other", priority: "urgent" },
-            { subject: "Wrong item received in my order", description: "I ordered the Single Origin Coffee Beans, but I received the Organic Matcha Powder instead. How can we get this exchanged?", category: "other", priority: "high" },
-            { subject: "Arrived damaged", description: "The French Press coffee maker arrived shattered in the box. There wasn't enough bubble wrap. I have photos of the damage.", category: "other", priority: "high" },
-            { subject: "Cancel my order", description: "I placed an order an hour ago but changed my mind. Please cancel order ORD-2025-0089 before it ships out.", category: "other", priority: "urgent" },
-            { subject: "Package stuck in transit for 10 days", description: "My tracking number hasn't updated since May 1st. It just says 'In Transit' with no estimated delivery. The order was supposed to arrive last week.", category: "other", priority: "high" },
-            { subject: "Missing item from my order", description: "My order had 4 items but only 3 were in the box. The packing slip shows all 4 but the resistance band set is missing.", category: "other", priority: "high" },
-            { subject: "Received someone else's order", description: "The package had my name and address on it, but inside was a LEGO set and a puzzle I never ordered. My actual items are missing.", category: "other", priority: "medium" },
-            { subject: "Request for expedited shipping upgrade", description: "I placed order ORD-2025-0067 with standard shipping but I now need it by Friday for a birthday. Can I upgrade to express and pay the difference?", category: "other", priority: "medium" },
-            { subject: "Product arrived with missing accessories", description: "The Keychron Q1 Pro arrived but the keycap puller and extra switches mentioned in the description were not in the box.", category: "other", priority: "medium" },
-            { subject: "Complaint about packaging waste", description: "My order of a small bottle of matcha came in an enormous box with excessive plastic filling. Please consider more eco-friendly packaging options.", category: "other", priority: "low" },
-            { subject: "How to return without original packaging?", description: "I want to return the overcoat but I already threw away the original shipping box. Can I use my own box? Do I need the tags still attached?", category: "other", priority: "low" },
-            { subject: "Delivery left in the rain", description: "The carrier left my package on the doorstep during a rainstorm with no protection. The outer box is soaked and the books inside have water damage.", category: "other", priority: "high" },
+            { subject: "Package shows delivered but I didn't receive it",
+description: "FedEx tracking says my package was delivered to the front porch yesterday at 3 PM, but there is nothing there. I've checked with my neighbors. What should I do?",
+category: "other",
+priority: "urgent" },
+            { subject: "Wrong item received in my order",
+description: "I ordered the Single Origin Coffee Beans, but I received the Organic Matcha Powder instead. How can we get this exchanged?",
+category: "other",
+priority: "high" },
+            { subject: "Arrived damaged",
+description: "The French Press coffee maker arrived shattered in the box. There wasn't enough bubble wrap. I have photos of the damage.",
+category: "other",
+priority: "high" },
+            { subject: "Cancel my order",
+description: "I placed an order an hour ago but changed my mind. Please cancel order ORD-2025-0089 before it ships out.",
+category: "other",
+priority: "urgent" },
+            { subject: "Package stuck in transit for 10 days",
+description: "My tracking number hasn't updated since May 1st. It just says 'In Transit' with no estimated delivery. The order was supposed to arrive last week.",
+category: "other",
+priority: "high" },
+            { subject: "Missing item from my order",
+description: "My order had 4 items but only 3 were in the box. The packing slip shows all 4 but the resistance band set is missing.",
+category: "other",
+priority: "high" },
+            { subject: "Received someone else's order",
+description: "The package had my name and address on it, but inside was a LEGO set and a puzzle I never ordered. My actual items are missing.",
+category: "other",
+priority: "medium" },
+            { subject: "Request for expedited shipping upgrade",
+description: "I placed order ORD-2025-0067 with standard shipping but I now need it by Friday for a birthday. Can I upgrade to express and pay the difference?",
+category: "other",
+priority: "medium" },
+            { subject: "Product arrived with missing accessories",
+description: "The Keychron Q1 Pro arrived but the keycap puller and extra switches mentioned in the description were not in the box.",
+category: "other",
+priority: "medium" },
+            { subject: "Complaint about packaging waste",
+description: "My order of a small bottle of matcha came in an enormous box with excessive plastic filling. Please consider more eco-friendly packaging options.",
+category: "other",
+priority: "low" },
+            { subject: "How to return without original packaging?",
+description: "I want to return the overcoat but I already threw away the original shipping box. Can I use my own box? Do I need the tags still attached?",
+category: "other",
+priority: "low" },
+            { subject: "Delivery left in the rain",
+description: "The carrier left my package on the doorstep during a rainstorm with no protection. The outer box is soaked and the books inside have water damage.",
+category: "other",
+priority: "high" }
         ];
 
         const agentNames = ["Alex Rivera", "Sam Chen", "Jordan Park", "Morgan Lee", "Casey Brooks", null, null];
@@ -871,304 +1061,512 @@ name }));
             {
                 name: "Barbell Bench Press",
                 description: "The king of chest exercises. The flat barbell bench press is a compound movement that primarily targets the pectoralis major, with secondary engagement of the anterior deltoids and triceps.",
-                difficulty: "intermediate", category: "strength",
+                difficulty: "intermediate",
+category: "strength",
                 equipment: ["barbell", "bench"],
                 body_parts: ["chest", "shoulders", "triceps"],
                 instructions: "## Setup\n1. Lie flat on a bench with feet firmly on the floor\n2. Grip the barbell slightly wider than shoulder-width\n3. Unrack the bar and hold it above your chest\n\n## Execution\n1. Lower the bar slowly to your mid-chest\n2. Touch your chest lightly without bouncing\n3. Press the bar back up explosively to the starting position\n4. Keep your shoulder blades retracted throughout\n\n> **Tip:** Maintain a slight arch in your lower back for stability.",
-                default_reps: 8, default_sets: 4, rest_seconds: 90, calories_per_minute: 7,
-                is_compound: true, is_featured: true, status: "published", image_file: "bench_press.png",
+                default_reps: 8,
+default_sets: 4,
+rest_seconds: 90,
+calories_per_minute: 7,
+                is_compound: true,
+is_featured: true,
+status: "published",
+image_file: "bench_press.png",
                 video_url: "https://www.youtube.com/watch?v=rT7DgCr-3pg"
             },
             {
                 name: "Barbell Back Squat",
                 description: "The fundamental lower body exercise. Back squats build overall leg strength and size, targeting quads, glutes, and hamstrings while engaging the core for stabilization.",
-                difficulty: "intermediate", category: "strength",
+                difficulty: "intermediate",
+category: "strength",
                 equipment: ["barbell"],
                 body_parts: ["quads", "glutes", "hamstrings", "lower_back", "abs"],
                 instructions: "## Setup\n1. Position the barbell on your upper traps\n2. Stand with feet shoulder-width apart, toes slightly out\n3. Brace your core and unrack the bar\n\n## Execution\n1. Initiate the movement by pushing your hips back\n2. Descend until your thighs are at least parallel to the floor\n3. Drive through your heels to stand back up\n4. Keep your chest up and knees tracking over your toes\n\n> **Tip:** Aim for depth — hip crease below the knee for full ROM.",
-                default_reps: 6, default_sets: 4, rest_seconds: 120, calories_per_minute: 9,
-                is_compound: true, is_featured: true, status: "published", image_file: "squat.png",
+                default_reps: 6,
+default_sets: 4,
+rest_seconds: 120,
+calories_per_minute: 9,
+                is_compound: true,
+is_featured: true,
+status: "published",
+image_file: "squat.png",
                 video_url: "https://www.youtube.com/watch?v=ultWZbUMPL8"
             },
             {
                 name: "Conventional Deadlift",
                 description: "The ultimate posterior chain builder. Deadlifts develop raw pulling strength across the back, glutes, and hamstrings, making it one of the most functional lifts.",
-                difficulty: "advanced", category: "strength",
+                difficulty: "advanced",
+category: "strength",
                 equipment: ["barbell"],
                 body_parts: ["lower_back", "upper_back", "glutes", "hamstrings", "forearms"],
                 instructions: "## Setup\n1. Stand with feet hip-width apart, bar over mid-foot\n2. Hinge at the hips and grip the bar just outside your knees\n3. Drop your hips, lift your chest, and pull the slack out of the bar\n\n## Execution\n1. Drive through your feet and extend your hips and knees simultaneously\n2. Keep the bar close to your body throughout\n3. Lock out at the top with hips fully extended\n4. Lower the bar under control back to the floor\n\n> **Tip:** Never round your lower back. Think \"push the floor away\" rather than \"pull the bar up.\"",
-                default_reps: 5, default_sets: 3, rest_seconds: 180, calories_per_minute: 10,
-                is_compound: true, is_featured: true, status: "published", image_file: "deadlift.png"
+                default_reps: 5,
+default_sets: 3,
+rest_seconds: 180,
+calories_per_minute: 10,
+                is_compound: true,
+is_featured: true,
+status: "published",
+image_file: "deadlift.png"
             },
             {
                 name: "Pull-Up",
                 description: "A bodyweight staple for building a wide, V-shaped back. Pull-ups target the latissimus dorsi, biceps, and forearms with unmatched efficiency.",
-                difficulty: "intermediate", category: "calisthenics",
+                difficulty: "intermediate",
+category: "calisthenics",
                 equipment: ["pull_up_bar"],
                 body_parts: ["upper_back", "biceps", "forearms", "shoulders"],
                 instructions: "## Setup\n1. Hang from a pull-up bar with an overhand grip, slightly wider than shoulder-width\n2. Engage your lats and retract your shoulder blades\n\n## Execution\n1. Pull yourself up until your chin clears the bar\n2. Squeeze your back muscles at the top\n3. Lower yourself under control to a full dead hang\n4. Avoid swinging or kipping\n\n> **Tip:** If you can't do full pull-ups, start with negatives (slow lowering phase).",
-                default_reps: 8, default_sets: 3, rest_seconds: 90, calories_per_minute: 8,
-                is_compound: true, is_featured: true, status: "published", image_file: "pullup.png"
+                default_reps: 8,
+default_sets: 3,
+rest_seconds: 90,
+calories_per_minute: 8,
+                is_compound: true,
+is_featured: true,
+status: "published",
+image_file: "pullup.png"
             },
             {
                 name: "Forearm Plank",
                 description: "The gold standard of core stability. Planks build isometric endurance in the entire anterior chain — abs, obliques, and hip flexors — while also engaging the shoulders and lower back.",
-                difficulty: "beginner", category: "calisthenics",
+                difficulty: "beginner",
+category: "calisthenics",
                 equipment: ["none"],
                 body_parts: ["abs", "obliques", "lower_back", "shoulders"],
                 instructions: "## Setup\n1. Place your forearms on the floor, elbows directly below shoulders\n2. Extend your legs back, toes on the ground\n\n## Execution\n1. Lift your body into a straight line from head to heels\n2. Brace your core as if bracing for a punch\n3. Hold for the prescribed time\n4. Don't let your hips sag or pike up\n\n> **Tip:** Squeeze your glutes and quads for extra stability.",
-                default_reps: null, default_sets: 3, rest_seconds: 60, calories_per_minute: 4,
-                is_compound: false, is_featured: false, status: "published", image_file: "plank.png"
+                default_reps: null,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 4,
+                is_compound: false,
+is_featured: false,
+status: "published",
+image_file: "plank.png"
             },
             {
                 name: "Dumbbell Bicep Curl",
                 description: "A classic isolation exercise for building bicep size and peak. The dumbbell variation allows for natural wrist rotation (supination) through the movement.",
-                difficulty: "beginner", category: "strength",
+                difficulty: "beginner",
+category: "strength",
                 equipment: ["dumbbell"],
                 body_parts: ["biceps", "forearms"],
                 instructions: "## Setup\n1. Stand with a dumbbell in each hand, arms at your sides\n2. Palms facing forward, feet shoulder-width apart\n\n## Execution\n1. Curl the weights up by bending at the elbow\n2. Keep your upper arms stationary — no swinging\n3. Squeeze your biceps at the top\n4. Lower under control to full extension\n\n> **Tip:** Alternate arms or curl both simultaneously — both are effective.",
-                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 5,
-                is_compound: false, is_featured: false, status: "published", image_file: "bicep_curl.png"
+                default_reps: 12,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 5,
+                is_compound: false,
+is_featured: false,
+status: "published",
+image_file: "bicep_curl.png"
             },
             {
                 name: "Walking Lunges",
                 description: "A unilateral leg exercise that builds single-leg strength, balance, and coordination. Targets quads, glutes, and hip flexors while challenging stability.",
-                difficulty: "beginner", category: "strength",
+                difficulty: "beginner",
+category: "strength",
                 equipment: ["dumbbell"],
                 body_parts: ["quads", "glutes", "hamstrings", "hip_flexors", "calves"],
                 instructions: "## Setup\n1. Stand tall holding dumbbells at your sides\n2. Feet hip-width apart\n\n## Execution\n1. Step forward with one leg into a deep lunge\n2. Lower your back knee toward the floor\n3. Push through the front heel and step the back leg forward into the next lunge\n4. Continue alternating legs\n\n> **Tip:** Keep your torso upright and core braced throughout.",
-                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 6,
-                is_compound: true, is_featured: false, status: "published", image_file: "lunges.png"
+                default_reps: 12,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 6,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "lunges.png"
             },
             {
                 name: "Overhead Shoulder Press",
                 description: "A foundational pressing movement for building strong, capped deltoids. The standing variation also requires significant core stabilization.",
-                difficulty: "intermediate", category: "strength",
+                difficulty: "intermediate",
+category: "strength",
                 equipment: ["barbell"],
                 body_parts: ["shoulders", "triceps", "upper_back", "abs"],
                 instructions: "## Setup\n1. Grip the barbell at shoulder width, resting it on your front deltoids\n2. Stand with feet shoulder-width apart, core braced\n\n## Execution\n1. Press the bar overhead in a straight line\n2. Push your head through once the bar passes your forehead\n3. Lock out at the top with arms fully extended\n4. Lower the bar under control back to your shoulders\n\n> **Tip:** Avoid excessive back lean — if you need to lean, the weight is too heavy.",
-                default_reps: 8, default_sets: 4, rest_seconds: 90, calories_per_minute: 6,
-                is_compound: true, is_featured: true, status: "published", image_file: "shoulder_press.png"
+                default_reps: 8,
+default_sets: 4,
+rest_seconds: 90,
+calories_per_minute: 6,
+                is_compound: true,
+is_featured: true,
+status: "published",
+image_file: "shoulder_press.png"
             },
             {
                 name: "Romanian Deadlift",
                 description: "A hip-hinge variation that isolates the hamstrings and glutes through an eccentric-focused stretch under load.",
-                difficulty: "intermediate", category: "strength",
+                difficulty: "intermediate",
+category: "strength",
                 equipment: ["barbell"],
                 body_parts: ["hamstrings", "glutes", "lower_back"],
                 instructions: "## Setup\n1. Hold a barbell at hip height with an overhand grip\n2. Feet hip-width apart, slight bend in the knees\n\n## Execution\n1. Push your hips back while lowering the bar along your legs\n2. Keep the bar close to your shins\n3. Lower until you feel a deep stretch in your hamstrings\n4. Drive your hips forward to return to standing\n\n> **Tip:** This is NOT a squat — minimal knee bend, maximal hip hinge.",
-                default_reps: 10, default_sets: 3, rest_seconds: 90, calories_per_minute: 7,
-                is_compound: true, is_featured: false, status: "published", image_file: "romanian_deadlift.png"
+                default_reps: 10,
+default_sets: 3,
+rest_seconds: 90,
+calories_per_minute: 7,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "romanian_deadlift.png"
             },
             {
                 name: "Dumbbell Lateral Raise",
                 description: "An isolation exercise targeting the medial deltoid, essential for building shoulder width and the \"capped\" shoulder look.",
-                difficulty: "beginner", category: "strength",
+                difficulty: "beginner",
+category: "strength",
                 equipment: ["dumbbell"],
                 body_parts: ["shoulders"],
                 instructions: "## Setup\n1. Stand with a light dumbbell in each hand at your sides\n\n## Execution\n1. Raise both arms out to the sides until parallel with the floor\n2. Lead with your elbows, slight bend in the arms\n3. Pause at the top for a one-second squeeze\n4. Lower slowly — don't just drop them\n\n> **Tip:** Use lighter weight with strict form. Momentum defeats the purpose.",
-                default_reps: 15, default_sets: 3, rest_seconds: 45, calories_per_minute: 4,
-                is_compound: false, is_featured: false, status: "published", image_file: "lateral_raise.png"
+                default_reps: 15,
+default_sets: 3,
+rest_seconds: 45,
+calories_per_minute: 4,
+                is_compound: false,
+is_featured: false,
+status: "published",
+image_file: "lateral_raise.png"
             },
             {
                 name: "Barbell Row",
                 description: "A horizontal pulling movement that builds thickness in the mid-back, lats, and rear deltoids.",
-                difficulty: "intermediate", category: "strength",
+                difficulty: "intermediate",
+category: "strength",
                 equipment: ["barbell"],
                 body_parts: ["upper_back", "biceps", "forearms", "lower_back"],
                 instructions: "## Setup\n1. Hinge forward at the hips, holding a barbell with an overhand grip\n2. Back flat, chest up, knees slightly bent\n\n## Execution\n1. Pull the bar toward your lower chest / upper abdomen\n2. Squeeze your shoulder blades together at the top\n3. Lower the bar under control\n\n> **Tip:** Aim for a 45-degree torso angle for best lat activation.",
-                default_reps: 8, default_sets: 4, rest_seconds: 90, calories_per_minute: 7,
-                is_compound: true, is_featured: false, status: "published", image_file: "barbell_row.png"
+                default_reps: 8,
+default_sets: 4,
+rest_seconds: 90,
+calories_per_minute: 7,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "barbell_row.png"
             },
             {
                 name: "Tricep Dips",
                 description: "A bodyweight pressing exercise emphasizing the triceps. Can be performed on parallel bars or a bench.",
-                difficulty: "intermediate", category: "calisthenics",
+                difficulty: "intermediate",
+category: "calisthenics",
                 equipment: ["none"],
                 body_parts: ["triceps", "chest", "shoulders"],
                 instructions: "## Setup\n1. Grip parallel dip bars and support yourself with straight arms\n\n## Execution\n1. Lower your body by bending your elbows until upper arms are parallel to the floor\n2. Keep elbows close to your body for tricep focus\n3. Press back up to full lockout\n\n> **Tip:** Lean slightly forward for more chest engagement, stay upright for tricep focus.",
-                default_reps: 10, default_sets: 3, rest_seconds: 90, calories_per_minute: 7,
-                is_compound: true, is_featured: false, status: "published", image_file: "tricep_dips.png"
+                default_reps: 10,
+default_sets: 3,
+rest_seconds: 90,
+calories_per_minute: 7,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "tricep_dips.png"
             },
             {
                 name: "Kettlebell Swing",
                 description: "An explosive hip-hinge movement that builds power, cardiovascular endurance, and posterior chain strength.",
-                difficulty: "intermediate", category: "cardio",
+                difficulty: "intermediate",
+category: "cardio",
                 equipment: ["kettlebell"],
                 body_parts: ["glutes", "hamstrings", "lower_back", "shoulders", "abs"],
                 instructions: "## Setup\n1. Stand with feet slightly wider than shoulder-width\n2. Hold a kettlebell with both hands in front of you\n\n## Execution\n1. Hinge at the hips and swing the kettlebell between your legs\n2. Explosively drive your hips forward to swing the bell to chest height\n3. Let the bell swing back down and repeat\n4. Power comes from the HIPS, not the arms\n\n> **Tip:** At the top, your body should form a straight line — glutes squeezed, core tight.",
-                default_reps: 15, default_sets: 4, rest_seconds: 60, calories_per_minute: 12,
-                is_compound: true, is_featured: true, status: "published", image_file: "kettlebell_swing.png"
+                default_reps: 15,
+default_sets: 4,
+rest_seconds: 60,
+calories_per_minute: 12,
+                is_compound: true,
+is_featured: true,
+status: "published",
+image_file: "kettlebell_swing.png"
             },
             {
                 name: "Cable Face Pull",
                 description: "A corrective and hypertrophy exercise for the rear deltoids and rotator cuff. Essential for shoulder health and posture.",
-                difficulty: "beginner", category: "strength",
+                difficulty: "beginner",
+category: "strength",
                 equipment: ["cable_machine"],
                 body_parts: ["shoulders", "upper_back"],
                 instructions: "## Setup\n1. Set a cable pulley to upper chest height with a rope attachment\n\n## Execution\n1. Pull the rope toward your face, splitting the ends past your ears\n2. Externally rotate your shoulders at the end position\n3. Squeeze your rear delts and hold for one second\n4. Return under control\n\n> **Tip:** This is a prehab exercise — prioritize form over weight.",
-                default_reps: 15, default_sets: 3, rest_seconds: 45, calories_per_minute: 3,
-                is_compound: false, is_featured: false, status: "published", image_file: "face_pull.png"
+                default_reps: 15,
+default_sets: 3,
+rest_seconds: 45,
+calories_per_minute: 3,
+                is_compound: false,
+is_featured: false,
+status: "published",
+image_file: "face_pull.png"
             },
             {
                 name: "Box Jump",
                 description: "An explosive plyometric exercise for developing lower body power, fast-twitch muscle fibers, and athletic performance.",
-                difficulty: "intermediate", category: "plyometrics",
+                difficulty: "intermediate",
+category: "plyometrics",
                 equipment: ["box"],
                 body_parts: ["quads", "glutes", "calves", "hip_flexors"],
                 instructions: "## Setup\n1. Stand facing a sturdy box, feet shoulder-width apart\n\n## Execution\n1. Swing your arms back and dip into a quarter squat\n2. Explode upward, jumping onto the box\n3. Land softly with both feet fully on the box\n4. Stand up tall, then step down (don't jump down)\n\n> **Tip:** Start with a lower box and progress gradually. Land quietly!",
-                default_reps: 8, default_sets: 4, rest_seconds: 90, calories_per_minute: 10,
-                is_compound: true, is_featured: false, status: "published", image_file: "box_jump.png"
+                default_reps: 8,
+default_sets: 4,
+rest_seconds: 90,
+calories_per_minute: 10,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "box_jump.png"
             },
             {
                 name: "Resistance Band Pull-Apart",
                 description: "A simple but effective exercise for rear deltoid and scapular health. Great as a warm-up or high-rep finisher.",
-                difficulty: "beginner", category: "strength",
+                difficulty: "beginner",
+category: "strength",
                 equipment: ["resistance_band"],
                 body_parts: ["shoulders", "upper_back"],
                 instructions: "## Setup\n1. Hold a resistance band at shoulder height with arms extended\n\n## Execution\n1. Pull the band apart by squeezing your shoulder blades together\n2. Keep arms straight throughout\n3. Return to the starting position slowly\n\n> **Tip:** Use a lighter band and do high reps (20+) for best results.",
-                default_reps: 20, default_sets: 3, rest_seconds: 30, calories_per_minute: 3,
-                is_compound: false, is_featured: false, status: "published", image_file: "band_pull_apart.png"
+                default_reps: 20,
+default_sets: 3,
+rest_seconds: 30,
+calories_per_minute: 3,
+                is_compound: false,
+is_featured: false,
+status: "published",
+image_file: "band_pull_apart.png"
             },
             {
                 name: "TRX Row",
                 description: "A bodyweight rowing movement using suspension straps. Adjustable difficulty by changing your body angle.",
-                difficulty: "beginner", category: "calisthenics",
+                difficulty: "beginner",
+category: "calisthenics",
                 equipment: ["trx"],
                 body_parts: ["upper_back", "biceps", "forearms", "abs"],
                 instructions: "## Setup\n1. Hold TRX handles with arms extended, lean back\n2. Walk your feet forward to increase difficulty\n\n## Execution\n1. Pull your chest toward the handles\n2. Keep your body in a straight line\n3. Squeeze your shoulder blades at the top\n4. Lower yourself slowly to full arm extension\n\n> **Tip:** The more horizontal your body, the harder it gets.",
-                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 5,
-                is_compound: true, is_featured: false, status: "published", image_file: "trx_row.png"
+                default_reps: 12,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 5,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "trx_row.png"
             },
             {
                 name: "Standing Calf Raise",
                 description: "An isolation exercise targeting the gastrocnemius and soleus muscles of the calves. Important for balanced leg development.",
-                difficulty: "beginner", category: "strength",
+                difficulty: "beginner",
+category: "strength",
                 equipment: ["dumbbell"],
                 body_parts: ["calves"],
                 instructions: "## Setup\n1. Stand on the edge of a step or platform with heels hanging off\n2. Hold dumbbells at your sides for added resistance\n\n## Execution\n1. Rise up onto your toes as high as possible\n2. Hold the top position for 2 seconds\n3. Lower your heels below the platform for a full stretch\n\n> **Tip:** Slow eccentrics (3-second lowering) dramatically improve results.",
-                default_reps: 15, default_sets: 4, rest_seconds: 45, calories_per_minute: 3,
-                is_compound: false, is_featured: false, status: "published", image_file: "calf_raise.png"
+                default_reps: 15,
+default_sets: 4,
+rest_seconds: 45,
+calories_per_minute: 3,
+                is_compound: false,
+is_featured: false,
+status: "published",
+image_file: "calf_raise.png"
             },
             {
                 name: "Medicine Ball Slam",
                 description: "A full-body explosive exercise that builds power and serves as high-intensity cardio. Great for stress relief too.",
-                difficulty: "beginner", category: "plyometrics",
+                difficulty: "beginner",
+category: "plyometrics",
                 equipment: ["medicine_ball"],
                 body_parts: ["abs", "shoulders", "upper_back", "quads"],
                 instructions: "## Setup\n1. Stand with feet shoulder-width apart holding a medicine ball overhead\n\n## Execution\n1. Brace your core and slam the ball into the ground as hard as possible\n2. Hinge at the hips and follow through\n3. Catch the ball on the bounce (or pick it up)\n4. Repeat with maximum intensity\n\n> **Tip:** Use a slam ball (dead bounce), not a standard medicine ball.",
-                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 11,
-                is_compound: true, is_featured: false, status: "published", image_file: "med_ball_slam.png"
+                default_reps: 12,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 11,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "med_ball_slam.png"
             },
             {
                 name: "Pigeon Pose Stretch",
                 description: "A deep hip opener that stretches the glutes, hip flexors, and piriformis. Essential for mobility and injury prevention.",
-                difficulty: "beginner", category: "flexibility",
+                difficulty: "beginner",
+category: "flexibility",
                 equipment: ["none"],
                 body_parts: ["glutes", "hip_flexors"],
                 instructions: "## Setup\n1. Start in a high plank or all-fours position\n\n## Execution\n1. Bring your right knee forward and place it behind your right wrist\n2. Extend your left leg straight back\n3. Lower your hips toward the floor\n4. Hold for 30-60 seconds per side\n5. Keep your hips square to the floor\n\n> **Tip:** Place a yoga block under your hip if you can't reach the floor comfortably.",
-                default_reps: null, default_sets: 2, rest_seconds: 0, calories_per_minute: 2,
-                is_compound: false, is_featured: false, status: "draft", image_file: "pigeon_pose.png"
+                default_reps: null,
+default_sets: 2,
+rest_seconds: 0,
+calories_per_minute: 2,
+                is_compound: false,
+is_featured: false,
+status: "draft",
+image_file: "pigeon_pose.png"
             },
             {
                 name: "Burpee",
                 description: "The ultimate full-body conditioning exercise. Burpees combine a squat, push-up, and explosive jump into one brutally effective movement.",
-                difficulty: "intermediate", category: "cardio",
+                difficulty: "intermediate",
+category: "cardio",
                 equipment: ["none"],
                 body_parts: ["quads", "chest", "shoulders", "abs", "glutes"],
                 instructions: "## Setup\n1. Stand with feet shoulder-width apart\n\n## Execution\n1. Drop into a squat and place your hands on the floor\n2. Kick your feet back into a push-up position\n3. Perform a push-up\n4. Jump your feet back toward your hands\n5. Explode upward into a jump with arms overhead\n\n> **Tip:** For a scaled version, skip the push-up or step back instead of jumping.",
-                default_reps: 10, default_sets: 3, rest_seconds: 60, calories_per_minute: 14,
-                is_compound: true, is_featured: true, status: "published", image_file: "burpee.png"
+                default_reps: 10,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 14,
+                is_compound: true,
+is_featured: true,
+status: "published",
+image_file: "burpee.png"
             },
             {
                 name: "Mountain Climbers",
                 description: "A dynamic bodyweight exercise that elevates heart rate while strengthening the core, shoulders, and hip flexors.",
-                difficulty: "beginner", category: "cardio",
+                difficulty: "beginner",
+category: "cardio",
                 equipment: ["none"],
                 body_parts: ["abs", "hip_flexors", "shoulders", "quads"],
                 instructions: "## Setup\n1. Start in a high plank position with hands under shoulders\n\n## Execution\n1. Drive one knee toward your chest\n2. Quickly switch legs, extending the bent leg back\n3. Alternate rapidly in a running motion\n4. Keep your hips level — no bouncing\n\n> **Tip:** The faster you go, the more cardio benefit. Slow down for core focus.",
-                default_reps: 20, default_sets: 3, rest_seconds: 45, calories_per_minute: 11,
-                is_compound: true, is_featured: false, status: "published", image_file: "mountain_climber.png"
+                default_reps: 20,
+default_sets: 3,
+rest_seconds: 45,
+calories_per_minute: 11,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "mountain_climber.png"
             },
             {
                 name: "Russian Twist",
                 description: "A rotational core exercise that targets the obliques and transverse abdominis. Excellent for building rotational power.",
-                difficulty: "beginner", category: "strength",
+                difficulty: "beginner",
+category: "strength",
                 equipment: ["dumbbell"],
                 body_parts: ["obliques", "abs", "hip_flexors"],
                 instructions: "## Setup\n1. Sit on the floor with knees bent, feet elevated slightly\n2. Lean back to about 45 degrees, holding a weight at chest height\n\n## Execution\n1. Rotate your torso to touch the weight to the floor on one side\n2. Rotate through center to the other side\n3. Keep your core braced and back straight throughout\n\n> **Tip:** Don't rush — control the rotation for maximum oblique engagement.",
-                default_reps: 20, default_sets: 3, rest_seconds: 45, calories_per_minute: 5,
-                is_compound: false, is_featured: false, status: "published", image_file: "russian_twist.png"
+                default_reps: 20,
+default_sets: 3,
+rest_seconds: 45,
+calories_per_minute: 5,
+                is_compound: false,
+is_featured: false,
+status: "published",
+image_file: "russian_twist.png"
             },
             {
                 name: "Push-Up",
                 description: "The foundational bodyweight upper-body exercise. Push-ups build chest, shoulder, and tricep strength with zero equipment needed.",
-                difficulty: "beginner", category: "calisthenics",
+                difficulty: "beginner",
+category: "calisthenics",
                 equipment: ["none"],
                 body_parts: ["chest", "triceps", "shoulders", "abs"],
                 instructions: "## Setup\n1. Place hands slightly wider than shoulder-width on the floor\n2. Extend legs back, body in a straight line\n\n## Execution\n1. Lower your chest toward the floor by bending your elbows\n2. Go until your chest is just above the ground\n3. Push back up to full arm extension\n4. Keep your core tight — no sagging hips\n\n> **Tip:** Elevate your hands on a bench to make it easier, or elevate your feet to make it harder.",
-                default_reps: 15, default_sets: 3, rest_seconds: 60, calories_per_minute: 7,
-                is_compound: true, is_featured: true, status: "published", image_file: "push_up.png"
+                default_reps: 15,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 7,
+                is_compound: true,
+is_featured: true,
+status: "published",
+image_file: "push_up.png"
             },
             {
                 name: "Barbell Hip Thrust",
                 description: "The most effective exercise for glute hypertrophy and strength. Hip thrusts produce peak glute activation unmatched by squats or deadlifts.",
-                difficulty: "intermediate", category: "strength",
+                difficulty: "intermediate",
+category: "strength",
                 equipment: ["barbell", "bench"],
                 body_parts: ["glutes", "hamstrings", "quads"],
                 instructions: "## Setup\n1. Sit on the floor with your upper back against a bench\n2. Roll a loaded barbell over your legs to your hip crease\n3. Plant feet flat, shoulder-width apart\n\n## Execution\n1. Drive through your heels to lift your hips\n2. Squeeze your glutes hard at the top\n3. Your shins should be vertical at full extension\n4. Lower under control and repeat\n\n> **Tip:** Use a barbell pad for comfort. Full hip extension at the top is critical.",
-                default_reps: 10, default_sets: 4, rest_seconds: 90, calories_per_minute: 6,
-                is_compound: true, is_featured: false, status: "published", image_file: "hip_thrust.png"
+                default_reps: 10,
+default_sets: 4,
+rest_seconds: 90,
+calories_per_minute: 6,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "hip_thrust.png"
             },
             {
                 name: "Farmer's Walk",
                 description: "A loaded carry exercise that builds grip strength, core stability, and total-body conditioning. Simple but devastatingly effective.",
-                difficulty: "beginner", category: "strength",
+                difficulty: "beginner",
+category: "strength",
                 equipment: ["dumbbell"],
                 body_parts: ["forearms", "abs", "shoulders", "upper_back", "calves"],
                 instructions: "## Setup\n1. Stand between two heavy dumbbells or kettlebells\n2. Deadlift them to your sides\n\n## Execution\n1. Stand tall with shoulders pulled back\n2. Walk in a straight line with controlled, even steps\n3. Keep your core braced and don't lean to either side\n4. Walk for distance (20-40m) or time (30-60s)\n\n> **Tip:** Go heavier than you think. Your grip will be the limiting factor.",
-                default_reps: null, default_sets: 3, rest_seconds: 90, calories_per_minute: 8,
-                is_compound: true, is_featured: false, status: "published", image_file: "farmers_walk.png"
+                default_reps: null,
+default_sets: 3,
+rest_seconds: 90,
+calories_per_minute: 8,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "farmers_walk.png"
             },
             {
                 name: "Cable Woodchop",
                 description: "A rotational movement that trains the obliques and core through a diagonal pulling pattern. Great for athletic performance.",
-                difficulty: "intermediate", category: "strength",
+                difficulty: "intermediate",
+category: "strength",
                 equipment: ["cable_machine"],
                 body_parts: ["obliques", "abs", "shoulders"],
                 instructions: "## Setup\n1. Set a cable pulley to the highest position\n2. Stand sideways to the machine, feet shoulder-width apart\n\n## Execution\n1. Grab the handle with both hands\n2. Pull diagonally across your body from high to low\n3. Rotate through your core — arms stay mostly straight\n4. Control the return to the starting position\n\n> **Tip:** The power comes from your core rotation, not your arms. Pivot on your back foot.",
-                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 5,
-                is_compound: true, is_featured: false, status: "published", image_file: "cable_woodchop.png"
+                default_reps: 12,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 5,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "cable_woodchop.png"
             },
             {
                 name: "Goblet Squat",
                 description: "A beginner-friendly squat variation that teaches perfect squat mechanics. The front-loaded weight naturally promotes an upright torso.",
-                difficulty: "beginner", category: "strength",
+                difficulty: "beginner",
+category: "strength",
                 equipment: ["kettlebell"],
                 body_parts: ["quads", "glutes", "abs"],
                 instructions: "## Setup\n1. Hold a kettlebell or dumbbell at chest height with both hands\n2. Feet slightly wider than shoulder-width, toes slightly out\n\n## Execution\n1. Push your hips back and squat down\n2. Keep the weight close to your chest\n3. Go as deep as your mobility allows\n4. Drive through your heels to stand back up\n\n> **Tip:** Use your elbows to push your knees out at the bottom for better depth.",
-                default_reps: 12, default_sets: 3, rest_seconds: 60, calories_per_minute: 7,
-                is_compound: true, is_featured: false, status: "published", image_file: "goblet_squat.png"
+                default_reps: 12,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 7,
+                is_compound: true,
+is_featured: false,
+status: "published",
+image_file: "goblet_squat.png"
             },
             {
                 name: "Bulgarian Split Squat",
                 description: "A single-leg squat variation with the rear foot elevated. Builds unilateral leg strength, balance, and addresses muscular imbalances.",
-                difficulty: "intermediate", category: "strength",
+                difficulty: "intermediate",
+category: "strength",
                 equipment: ["dumbbell", "bench"],
                 body_parts: ["quads", "glutes", "hamstrings", "hip_flexors"],
                 instructions: "## Setup\n1. Stand 2-3 feet in front of a bench\n2. Place one foot behind you on the bench, laces down\n3. Hold dumbbells at your sides\n\n## Execution\n1. Lower your back knee toward the floor\n2. Keep your front knee tracking over your toes\n3. Descend until your front thigh is parallel to the floor\n4. Push through your front heel to stand back up\n\n> **Tip:** The closer you stand to the bench, the more quad-dominant. Farther = more glute.",
-                default_reps: 10, default_sets: 3, rest_seconds: 60, calories_per_minute: 7,
-                is_compound: true, is_featured: false, status: "published"
+                default_reps: 10,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 7,
+                is_compound: true,
+is_featured: false,
+status: "published"
             },
             {
                 name: "Hanging Leg Raise",
                 description: "An advanced core exercise performed hanging from a bar. Targets the lower abs and hip flexors with intense tension.",
-                difficulty: "advanced", category: "calisthenics",
+                difficulty: "advanced",
+category: "calisthenics",
                 equipment: ["pull_up_bar"],
                 body_parts: ["abs", "obliques", "hip_flexors"],
                 instructions: "## Setup\n1. Hang from a pull-up bar with an overhand grip\n2. Arms fully extended, shoulders engaged\n\n## Execution\n1. Keeping legs straight, raise them until they're parallel to the floor (or higher)\n2. Pause at the top and squeeze your abs\n3. Lower your legs slowly — don't swing\n4. Maintain a slight posterior pelvic tilt throughout\n\n> **Tip:** Bend your knees to make it easier. For a challenge, raise your toes to the bar.",
-                default_reps: 10, default_sets: 3, rest_seconds: 60, calories_per_minute: 5,
-                is_compound: false, is_featured: false, status: "published"
+                default_reps: 10,
+default_sets: 3,
+rest_seconds: 60,
+calories_per_minute: 5,
+                is_compound: false,
+is_featured: false,
+status: "published"
             }
         ];
 

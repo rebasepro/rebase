@@ -14,7 +14,7 @@ import {
     PopoverPrimitive,
     SearchIcon,
     Separator,
-    useInjectStyles,
+    usePortalContainer,
     XIcon
 } from "@rebasepro/ui";
 import * as React from "react";
@@ -178,6 +178,7 @@ export const UserSelector = React.forwardRef<
 
         const [isPopoverOpen, setIsPopoverOpen] = useState(false);
         const [searchString, setSearchString] = useState<string>("");
+        const contextPortalContainer = usePortalContainer();
 
         const scrollContainerRef = useRef<HTMLDivElement>(null);
         const sentinelRef = useRef<HTMLDivElement>(null);
@@ -301,10 +302,10 @@ export const UserSelector = React.forwardRef<
             };
         }, [isPopoverOpen]);
 
-        useInjectStyles("UserSelector", " [cmdk-group] { max-height: 40vh; overflow-y: auto; } ");
-
         const resolvedPlaceholder = placeholder || <EmptyValue className={"ml-2"}/>;
-        const portalContainer = (typeof document !== "undefined" ? document.body : undefined);
+        // See RelationSelector: a modal dialog cancels wheel events outside its
+        // own content, so a list portaled to the body opens unscrollable.
+        const portalContainer = (contextPortalContainer ?? (typeof document !== "undefined" ? document.body : undefined)) ?? undefined;
 
         return (
             <>

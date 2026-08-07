@@ -18,7 +18,7 @@ import {
     SearchIcon,
     Separator,
     Tooltip,
-    useInjectStyles,
+    usePortalContainer,
     XIcon
 } from "@rebasepro/ui";
 import * as React from "react";
@@ -124,6 +124,7 @@ export const RelationSelector = React.forwardRef<
         const collection = relation.target();
         const dataClient = useData();
         const sidePanelController = useSidePanel();
+        const contextPortalContainer = usePortalContainer();
         const multiple = multipleOverride ?? relationCardinality(relation) === "many";
 
         const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -455,8 +456,6 @@ relation } as RelationItem;
             };
         }, [isPopoverOpen]);
 
-        useInjectStyles("RelationSelector", " [cmdk-group] { max-height: 40vh; overflow-y: auto; } ");
-
         const closePopover = useCallback(() => {
             setIsPopoverOpen(false);
             isPopoverOpenRef.current = false;
@@ -465,8 +464,12 @@ relation } as RelationItem;
 
         const resolvedPlaceholder = placeholder || emptyPlaceholder || <EmptyValue className={"ml-2"}/>;
 
-        // Use Sheet portal container if available, otherwise document.body
-        const portalContainer = (typeof document !== "undefined" ? document.body : undefined);
+        // Whatever dialog, side dialog or sheet we are inside offers as its
+        // portal host, falling back to `document.body`. This is not cosmetic:
+        // those are modal, and a modal locks scrolling everywhere outside its
+        // own content — a list portaled to the body opens and then refuses to
+        // scroll, because every wheel event over it is cancelled.
+        const portalContainer = (contextPortalContainer ?? (typeof document !== "undefined" ? document.body : undefined)) ?? undefined;
 
         return (
             <>
