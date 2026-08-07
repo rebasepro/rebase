@@ -47,7 +47,7 @@ services:
       # The runtime must not start before the database can answer, or its first
       # boot fails on a connection refused and the container restarts for no
       # reason a reader would understand.
-      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
+      test: ["CMD-SHELL", "pg_isready -U rebase_app -d rebase"]
       interval: 5s
       timeout: 5s
       retries: 10

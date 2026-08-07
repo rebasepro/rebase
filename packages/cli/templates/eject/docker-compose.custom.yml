@@ -33,7 +33,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
+      test: ["CMD-SHELL", "pg_isready -U rebase_app -d rebase"]
       interval: 5s
       timeout: 5s
       retries: 10
