@@ -1165,11 +1165,29 @@ timeout: 10000 });
             env: cleanEnv
         });
 
+        // The role the scaffold's own compose file creates, taken from the
+        // project's `.env` rather than written out again here.
+        //
+        // It was spelled `rebase` in both places until the role was renamed to
+        // `rebase_app` — the schema is called `rebase` now, and a role of the
+        // same name makes `search_path`'s `"$user"` resolve to it and sends DDL
+        // somewhere nobody asked for. The template moved; this file did not, so
+        // every run since failed on `password authentication failed for user
+        // "rebase"` at `db migrate`. `pg_isready` never noticed, because it
+        // reports that the server is accepting connections without
+        // authenticating as anyone.
+        //
+        // Same reasoning as `composeDbPassword` below, which is read for
+        // exactly this reason and says so.
+        const composeDbUrl = readEnvVar(projectPath, "DATABASE_URL");
+        const composeDbUser = composeDbUrl ? new URL(composeDbUrl).username : "rebase_app";
+        console.log(`Scaffolded database role: ${composeDbUser}`);
+
         // Wait for DB to be healthy
         console.log("Waiting for Docker DB to be healthy...");
         for (let i = 0; i < 30; i++) {
             try {
-                await execa("docker", ["compose", "exec", "db", "pg_isready", "-U", "rebase", "-d", "rebase"], {
+                await execa("docker", ["compose", "exec", "db", "pg_isready", "-U", composeDbUser, "-d", "rebase"], {
                     cwd: projectPath,
                     env: cleanEnv
                 });
@@ -1198,7 +1216,7 @@ timeout: 10000 });
             stdio: "inherit",
             env: {
                 ...cleanEnv,
-                DATABASE_URL: `postgresql://rebase:${composeDbPassword}@localhost:${DOCKER_DB_PORT}/rebase?options=-c%20search_path=public&sslmode=disable`
+                DATABASE_URL: `postgresql://${composeDbUser}:${composeDbPassword}@localhost:${DOCKER_DB_PORT}/rebase?options=-c%20search_path=public&sslmode=disable`
             }
         });
         console.log("Migrations applied inside Docker.");
@@ -1275,10 +1293,10 @@ stdio: "inherit" });
             }
             try {
                 console.log("--- Docker DB Tables in 'public' schema ---");
-                execSync("docker compose exec db psql -U rebase -d rebase -c '\\dt'", { cwd: projectPath,
+                execSync(`docker compose exec db psql -U ${composeDbUser} -d rebase -c '\\dt'`, { cwd: projectPath,
 stdio: "inherit" });
                 console.log("--- Docker DB Tables in 'rebase' schema ---");
-                execSync("docker compose exec db psql -U rebase -d rebase -c '\\dt rebase.*'", { cwd: projectPath,
+                execSync(`docker compose exec db psql -U ${composeDbUser} -d rebase -c '\\dt rebase.*'`, { cwd: projectPath,
 stdio: "inherit" });
             } catch (err: any) {
                 console.warn("Failed to query DB tables:", err.message);
