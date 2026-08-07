@@ -346,14 +346,16 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
     }
 
     return (
-        <div ref={containerRef} className={cls("flex-1 flex flex-row w-full min-h-0", className)}>
+        <div ref={containerRef} className={cls("@container/form flex-1 flex flex-row w-full min-h-0", className)}>
 
             {/* `items-start`: without it the cross-axis default stretches the
                 column to the scroller's height and its bottom padding lands at
                 the bottom of the viewport instead of after the last field. */}
             <div className={"flex-1 min-w-0 overflow-y-auto flex justify-center items-start"}>
                 <div className={cls(
-                    "@container/col w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
+                    // Same widths as the editable form (see EntityForm) — toggling
+                    // between read-only and edit must not move the column.
+                    "@container/col w-full max-w-3xl @7xl/form:max-w-4xl 2xl:max-w-4xl flex flex-col",
                     openEntityMode === "dialog"
                         ? "pt-5 pb-8 px-6 sm:px-8"
                         : "pt-6 pb-12 px-5 sm:px-8"

@@ -697,7 +697,16 @@ export function EntityForm<M extends Record<string, unknown>>({
                         <div
                             id={`form_${path}`}
                             className={cls(
-                                "@container/col w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
+                                // Two rules widen the column, and they answer to
+                                // different things on purpose. `@7xl/form` measures
+                                // the form itself: full screen on a laptop is ~1400px
+                                // of form, which after the 304px rail leaves room for
+                                // the wider column with real gutters either side — and
+                                // it stays 768 in the split pane and the side panel,
+                                // which never get that wide. `2xl` is the older
+                                // viewport rule, kept so a panel on a large monitor
+                                // does not get *narrower* than it is today.
+                                "@container/col w-full max-w-3xl @7xl/form:max-w-4xl 2xl:max-w-4xl flex flex-col",
                                 openEntityMode === "dialog"
                                     ? "pt-5 pb-8 px-6 sm:px-8"
                                     : "pt-6 pb-12 px-5 sm:px-8"

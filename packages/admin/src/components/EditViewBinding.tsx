@@ -644,10 +644,11 @@ parentEntityIds,
     const entityReadOnlyView = !canEdit && entity ? (
         FormViewBuilder && readOnlyFormContext
             ? <div className={cls(
-                "flex-1 flex flex-row w-full overflow-y-auto justify-center",
+                "@container/form flex-1 flex flex-row w-full overflow-y-auto justify-center",
                 (canEdit || !mainViewVisible || selectedSecondaryForm) ? "hidden" : ""
             )}>
-                <div className={"w-full max-w-3xl 2xl:max-w-4xl flex flex-col pt-6 pb-16 px-5 sm:px-8"}>
+                {/* Same widths as the default form (see EntityForm). */}
+                <div className={"w-full max-w-3xl @7xl/form:max-w-4xl 2xl:max-w-4xl flex flex-col pt-6 pb-16 px-5 sm:px-8"}>
                     <ErrorBoundary>
                         <Suspense fallback={<CircularProgressCenter />}>
                             <FormViewBuilder

@@ -400,9 +400,10 @@ entityId }
         // centred column the record used to be given here; the default display
         // now lays itself out, rail included.
         if (FormViewBuilder && usedEntity) {
-            return <div className={"flex-1 min-w-0 overflow-y-auto flex justify-center items-start"}>
+            return <div className={"@container/form flex-1 min-w-0 overflow-y-auto flex justify-center items-start"}>
                 <div className={cls(
-                    "w-full max-w-3xl 2xl:max-w-4xl flex flex-col",
+                    // Same widths as the default form (see EntityForm).
+                    "w-full max-w-3xl @7xl/form:max-w-4xl 2xl:max-w-4xl flex flex-col",
                     layout === "dialog"
                         ? "pt-5 pb-12 px-6 sm:px-8"
                         : "pt-6 pb-16 px-5 sm:px-8"
