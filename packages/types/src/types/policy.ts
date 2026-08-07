@@ -32,7 +32,7 @@ export type PolicyExpression =
     | RawPolicyExpression;
 
 /**
- * The id a request without a logged-in user reports as `auth.uid()`.
+ * The id a request without a logged-in user reports as `rebase.uid()`.
  *
  * A user-context request always sets `app.uid`: blank would read back as
  * `NULL`, and `NULL` is how the trusted server context is recognised, so an
@@ -40,7 +40,7 @@ export type PolicyExpression =
  * therefore substitutes this sentinel at the single chokepoint where the GUC
  * is set.
  *
- * The consequence for policy authors is that **`auth.uid() IS NOT NULL` is a
+ * The consequence for policy authors is that **`rebase.uid() IS NOT NULL` is a
  * tautology on the user path** — it is true for anonymous visitors too. Use
  * {@link policy.authenticated} to mean "signed in", and
  * {@link policy.serverContext} to mean "the trusted server context". Do not
@@ -58,7 +58,7 @@ export const ANONYMOUS_USER_ID = "anonymous";
  * JavaScript evaluator and the linter were all built on
  * {@link ANONYMOUS_USER_ID}, while the request path scoped unauthenticated
  * callers as `'anon'` — so `policy.authenticated()`, which compiled to
- * `auth.uid() <> 'anonymous'`, was *true* for an anonymous visitor. The
+ * `rebase.uid() <> 'anonymous'`, was *true* for an anonymous visitor. The
  * sanctioned way to write "signed in" granted to everyone, and the linter
  * flagged the spelling that actually worked as a foreign convention.
  *
@@ -117,7 +117,7 @@ export interface NotPolicyExpression {
 export type PolicyCompareOperator = "eq" | "neq" | "lt" | "lte" | "gt" | "gte";
 
 /**
- * Compares two operands, e.g. `owner_id = auth.uid()`.
+ * Compares two operands, e.g. `owner_id = rebase.uid()`.
  * @group Models
  */
 export interface ComparePolicyExpression {
@@ -129,7 +129,7 @@ export interface ComparePolicyExpression {
 
 /**
  * True when the user holds *at least one* of the given application roles.
- * Compiles to `string_to_array(auth.roles(), ',') && ARRAY[...]`.
+ * Compiles to `string_to_array(rebase.roles(), ',') && ARRAY[...]`.
  * @group Models
  */
 export interface RolesOverlapPolicyExpression {
@@ -139,7 +139,7 @@ export interface RolesOverlapPolicyExpression {
 
 /**
  * True when the user holds *all* of the given application roles.
- * Compiles to `string_to_array(auth.roles(), ',') @> ARRAY[...]`.
+ * Compiles to `string_to_array(rebase.roles(), ',') @> ARRAY[...]`.
  * @group Models
  */
 export interface RolesContainPolicyExpression {
@@ -149,11 +149,11 @@ export interface RolesContainPolicyExpression {
 
 /**
  * True when a signed-in user is making the request. Compiles to
- * `auth.uid() IS NOT NULL AND auth.uid() <> 'anonymous'`.
+ * `rebase.uid() IS NOT NULL AND rebase.uid() <> 'anonymous'`.
  *
  * Both halves are load-bearing. `IS NOT NULL` excludes the server context;
  * the {@link ANONYMOUS_USER_ID} comparison excludes anonymous visitors, who
- * *do* carry a non-null `auth.uid()`. Checking only `IS NOT NULL` grants to
+ * *do* carry a non-null `rebase.uid()`. Checking only `IS NOT NULL` grants to
  * everyone — see {@link ANONYMOUS_USER_ID}.
  *
  * `policy.not(policy.authenticated())` therefore means "anonymous visitor or
@@ -168,8 +168,8 @@ export interface AuthenticatedPolicyExpression {
 /**
  * True only in the trusted **server context** — the built-in flows that run
  * without a user (signup, migrations, `dataAsAdmin`) set no user GUC, so
- * `auth.uid()` is `NULL` for them and only for them. Compiles to
- * `auth.uid() IS NULL`.
+ * `rebase.uid()` is `NULL` for them and only for them. Compiles to
+ * `rebase.uid() IS NULL`.
  *
  * This is what lets the owner connection satisfy a policy even under FORCE RLS.
  * It is deliberately a primitive rather than `not(authenticated())`: the two
@@ -207,7 +207,7 @@ export interface ServerContextPolicyExpression {
  *   ),
  * })
  * // → EXISTS (SELECT 1 FROM team_members _ex0
- * //           WHERE _ex0.team_id = documents.team_id AND _ex0.user_id = auth.uid())
+ * //           WHERE _ex0.team_id = documents.team_id AND _ex0.user_id = rebase.uid())
  * ```
  *
  * Postgres-authoritative: like {@link RawPolicyExpression}, the JavaScript
@@ -272,14 +272,14 @@ export interface LiteralPolicyOperand {
     value: string | number | boolean | null;
 }
 
-/** The current user's id — compiles to `auth.uid()`. @group Models */
+/** The current user's id — compiles to `rebase.uid()`. @group Models */
 export interface AuthUidPolicyOperand {
     kind: "authUid";
 }
 
 /**
  * The current user's roles as an array — compiles to
- * `string_to_array(auth.roles(), ',')`.
+ * `string_to_array(rebase.roles(), ',')`.
  * @group Models
  */
 export interface AuthRolesPolicyOperand {

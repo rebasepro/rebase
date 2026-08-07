@@ -12,7 +12,7 @@
  *   baas — there are no collection files; a table is served only once it has
  *          row-level security and a policy. The baas cases therefore assert
  *          the security posture too: an unprotected table must NOT be served,
- *          and `auth.uid()` must isolate one user's rows from another's.
+ *          and `rebase.uid()` must isolate one user's rows from another's.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import fs from "fs";
@@ -333,14 +333,15 @@ describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
     }, 60_000);
 
     it("refuses to serve a table that has no row-level security", async () => {
-        // Schema-qualified on purpose: the database role is itself named
-        // `rebase` and a `rebase` schema exists, so an unqualified CREATE TABLE
-        // resolves through search_path's "$user" and lands in the wrong schema.
+        // Schema-qualified on purpose. The scaffold's role is `rebase_app`
+        // now, so `"$user"` no longer resolves to the `rebase` schema for a new
+        // project — but this suite may run against a database whose role does
+        // collide, and naming the schema costs nothing and depends on neither.
         await client.query(`
             CREATE TABLE public.notes (
                 id serial PRIMARY KEY,
                 body text NOT NULL,
-                user_id text NOT NULL DEFAULT auth.uid()
+                user_id text NOT NULL DEFAULT rebase.uid()
             )
         `);
 
@@ -356,12 +357,12 @@ describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
         expect(backend.output()).toMatch(/ENABLE ROW LEVEL SECURITY/i);
     }, 240_000);
 
-    it("serves the table once RLS and a policy exist, and isolates rows by auth.uid()", async () => {
+    it("serves the table once RLS and a policy exist, and isolates rows by rebase.uid()", async () => {
         await client.query("ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY");
         await client.query(`
             CREATE POLICY notes_owner ON public.notes
-                FOR ALL USING (user_id = auth.uid())
-                WITH CHECK (user_id = auth.uid())
+                FOR ALL USING (user_id = rebase.uid())
+                WITH CHECK (user_id = rebase.uid())
         `);
 
         await stopBackend(backend);
@@ -387,7 +388,7 @@ describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
         expect(ownerView.rows).toHaveLength(1);
 
         // The whole point of the RLS gate: another authenticated user must not
-        // see it. auth.uid() is what makes that true.
+        // see it. rebase.uid() is what makes that true.
         const otherView = await readRows(backend.baseUrl, other.accessToken, "notes");
         expect(otherView.rows).toHaveLength(0);
 
