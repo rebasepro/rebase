@@ -1,3 +1,4 @@
+import type { VectorSearchParams } from "./data_driver";
 import { Entity, EntityValues } from "../types/entities";
 import { WhereFilterOp, FieldPath, FilterValues, OrderByTuple } from "../types/filter-operators";
 
@@ -96,11 +97,34 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      */
     include?: string[];
     /**
-     * Full-text search string. Matched (OR-ed) across the collection's
-     * searchable columns, then AND-ed with `where`/`logical`. This is the
-     * value behind the query builder's `.search()` method.
+     * Text search string, AND-ed with `where`/`logical`. This is the value
+     * behind the query builder's `.search()` method.
+     *
+     * What it compiles to depends on the collection. By default — matching
+     * every collection that has not said otherwise — it is a case-insensitive
+     * substring match OR-ed across the collection's top-level `string`
+     * properties: it does not reach inside `map` or `array` properties, it does
+     * not stem or rank, and it cannot use an index.
+     *
+     * A Postgres collection that declares a `search` block instead gets a
+     * ranked full-text match over exactly the fields it named, and rows come
+     * back with a {@link FindParams.orderBy}-able `_score`.
      */
     searchString?: string;
+
+    /**
+     * Nearest-neighbour search over a `vector` property.
+     *
+     * Postgres only, and only for a collection that declares a property of
+     * type `vector`. Rows come back ordered by distance, closest first, each
+     * carrying a `_distance`. Combines with `where` and `logical`, which are
+     * applied as filters before the ordering — so this is "the nearest rows
+     * that also match", not "the nearest rows, then filtered".
+     *
+     * Supplying the query vector is the caller's job: rebase stores and
+     * searches embeddings, it does not compute them.
+     */
+    vectorSearch?: VectorSearchParams;
 }
 
 /**
@@ -138,6 +162,21 @@ export interface QueryBuilderInterface<M extends Record<string, unknown> = Recor
     limit(count: number): this;
     offset(count: number): this;
     search(searchString: string): this;
+
+    /**
+     * Order rows by nearest-neighbour distance to `vector`, closest first.
+     *
+     * Postgres only, over a property declared as `type: "vector"`. Each row
+     * comes back with a `_distance`. Any `where` on the same query filters
+     * before the ordering; distance decides the order.
+     *
+     * The query embedding is the caller's to produce.
+     */
+    vectorSearch(
+        property: string,
+        vector: number[],
+        options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+    ): this;
     include(...relations: string[]): this;
     find(): Promise<FindResponse<M>>;
     listen(onUpdate: (data: FindResponse<M>) => void, onError?: (error: Error) => void): () => void;
@@ -236,6 +275,21 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     limit(count: number): QueryBuilderInterface<M>;
     offset(count: number): QueryBuilderInterface<M>;
     search(searchString: string): QueryBuilderInterface<M>;
+
+    /**
+     * Order rows by nearest-neighbour distance to `vector`, closest first.
+     *
+     * Postgres only, over a property declared as `type: "vector"`. Each row
+     * comes back with a `_distance`. Any `where` on the same query filters
+     * before the ordering; distance decides the order.
+     *
+     * The query embedding is the caller's to produce.
+     */
+    vectorSearch(
+        property: string,
+        vector: number[],
+        options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+    ): QueryBuilderInterface<M>;
     include(...relations: string[]): QueryBuilderInterface<M>;
 }
 
@@ -370,6 +424,21 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
     limit(count: number): this;
     offset(count: number): this;
     search(searchString: string): this;
+
+    /**
+     * Order rows by nearest-neighbour distance to `vector`, closest first.
+     *
+     * Postgres only, over a property declared as `type: "vector"`. Each row
+     * comes back with a `_distance`. Any `where` on the same query filters
+     * before the ordering; distance decides the order.
+     *
+     * The query embedding is the caller's to produce.
+     */
+    vectorSearch(
+        property: string,
+        vector: number[],
+        options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+    ): this;
     include(...relations: string[]): this;
     find(): Promise<FindResult<M>>;
     count(): Promise<number>;
@@ -655,6 +724,16 @@ export interface SDKCollectionClient<
     limit(count: number): SDKQueryBuilderInterface<M>;
     offset(count: number): SDKQueryBuilderInterface<M>;
     search(searchString: string): SDKQueryBuilderInterface<M>;
+    /**
+     * Order rows by nearest-neighbour distance to `vector`, closest first.
+     * Postgres only, over a `type: "vector"` property. See
+     * {@link SDKQueryBuilderInterface.vectorSearch}.
+     */
+    vectorSearch(
+        property: string,
+        vector: number[],
+        options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+    ): SDKQueryBuilderInterface<M>;
     include(...relations: string[]): SDKQueryBuilderInterface<M>;
 }
 

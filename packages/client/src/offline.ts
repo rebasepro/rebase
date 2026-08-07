@@ -736,6 +736,7 @@ data: u.data as AnyRow })),
             limit: (count) => new SDKQueryBuilder<M>(wrapped).limit(count),
             offset: (count) => new SDKQueryBuilder<M>(wrapped).offset(count),
             search: (searchString) => new SDKQueryBuilder<M>(wrapped).search(searchString),
+            vectorSearch: (property, vector, options) => new SDKQueryBuilder<M>(wrapped).vectorSearch(property, vector, options),
             include: (...relations) => new SDKQueryBuilder<M>(wrapped).include(...relations)
         };
 

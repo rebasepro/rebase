@@ -359,6 +359,11 @@ export function isExactlyEvaluable(params?: FindParams): boolean {
     if (!params) return true;
     if (params.include && params.include.length > 0) return false;
     if (params.searchString) return false;
+    // Nearest-neighbour ordering is the server's to compute: the cache holds no
+    // vectors, and even with them, answering from a subset would return the
+    // nearest of what happens to be cached while looking like the nearest there
+    // are — a wrong answer that is indistinguishable from a right one.
+    if (params.vectorSearch) return false;
     return true;
 }
 

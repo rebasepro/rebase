@@ -95,9 +95,50 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
 
     /**
      * Set a free-text search string if supported by the backend.
+     *
+     * By default this is a substring match across the collection's top-level
+     * string properties. A Postgres collection that declares a `search` block
+     * gets ranked full-text matching over the fields it named instead, and each
+     * row comes back with a `_score` you can sort on:
+     *
+     * ```ts
+     * client.data.talents.search("auditor iso 14001").orderBy("_score", "desc").find()
+     * ```
      */
     search(searchString: string): this {
         this.params.searchString = searchString;
+        return this;
+    }
+
+    /**
+     * Order rows by nearest-neighbour distance to `vector`.
+     *
+     * The server has supported this from the REST layer since vectors landed;
+     * this is the SDK reaching it. Results come back closest-first with a
+     * `_distance` on each row, and any `where` / `orderBy` on the same query is
+     * a filter applied before the ordering — distance decides the order.
+     *
+     * You supply the query vector. Rebase stores and searches embeddings; it
+     * does not produce them, so this is where whatever model you already use
+     * for the stored vectors gets called.
+     *
+     * @param property - Name of the `vector` property to compare against.
+     * @param vector - The query embedding. Its length must match the property's
+     *                 declared `dimensions`, or the server answers 400.
+     * @example
+     * client.data.docs.vectorSearch("embedding", queryVector, { threshold: 0.35 }).limit(10).find()
+     */
+    vectorSearch(
+        property: string,
+        vector: number[],
+        options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+    ): this {
+        this.params.vectorSearch = {
+            property,
+            vector,
+            ...(options?.distance !== undefined && { distance: options.distance }),
+            ...(options?.threshold !== undefined && { threshold: options.threshold })
+        };
         return this;
     }
 

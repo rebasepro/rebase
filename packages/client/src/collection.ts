@@ -394,6 +394,13 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         search(searchString: string) {
             return new SDKQueryBuilder<M>(client).search(searchString);
         },
+        vectorSearch(
+            property: string,
+            vector: number[],
+            options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+        ) {
+            return new SDKQueryBuilder<M>(client).vectorSearch(property, vector, options);
+        },
         include(...relations: string[]) {
             return new SDKQueryBuilder<M>(client).include(...relations);
         }

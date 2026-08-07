@@ -100,7 +100,40 @@ export function generateOpenApiSpec(
             name: "searchString",
             in: "query",
             schema: { type: "string" },
-            description: "Full-text search query"
+            description:
+                "Text search. By default a case-insensitive substring match OR-ed across the " +
+                "collection's top-level string properties. A collection declaring a `search` block " +
+                "gets ranked full-text matching over the fields it names, and rows carry a `_score`."
+        },
+        // Vector search has been served here since vectors landed and was
+        // documented nowhere, so the only way to find it was to read the query
+        // parser. All four are needed together; `vector_search` and `vector`
+        // are ignored unless both are present.
+        {
+            name: "vector_search",
+            in: "query",
+            schema: { type: "string" },
+            description: "Name of the `vector` property to run a nearest-neighbour search against. Requires `vector`.",
+            example: "embedding"
+        },
+        {
+            name: "vector",
+            in: "query",
+            schema: { type: "string" },
+            description: "The query embedding, as a JSON array of numbers. Its length must match the property's declared `dimensions`.",
+            example: "[0.12,-0.04,0.98]"
+        },
+        {
+            name: "vector_distance",
+            in: "query",
+            schema: { type: "string", enum: ["cosine", "l2", "inner_product"], default: "cosine" },
+            description: "Distance function used for ordering."
+        },
+        {
+            name: "vector_threshold",
+            in: "query",
+            schema: { type: "number" },
+            description: "Drop rows farther than this distance. Rows are returned closest-first with a `_distance` field."
         }
     ];
 

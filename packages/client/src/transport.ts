@@ -192,6 +192,17 @@ export function buildQueryString(params?: FindParams): string {
         parts.push(`searchString=${encodeURIComponent(params.searchString)}`);
     }
 
+    // The server keys vector search off `vector_search` naming the property and
+    // `vector` carrying the embedding as a JSON array; both must be present or
+    // it ignores the pair entirely.
+    if (params.vectorSearch) {
+        const vs = params.vectorSearch;
+        parts.push(`vector_search=${encodeURIComponent(vs.property)}`);
+        parts.push(`vector=${encodeURIComponent(JSON.stringify(vs.vector))}`);
+        if (vs.distance) parts.push(`vector_distance=${encodeURIComponent(vs.distance)}`);
+        if (vs.threshold !== undefined) parts.push(`vector_threshold=${encodeURIComponent(String(vs.threshold))}`);
+    }
+
     if (params.include && params.include.length > 0) {
         parts.push(`include=${encodeURIComponent(params.include.join(","))}`);
     }
