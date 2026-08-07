@@ -1,4 +1,4 @@
-import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection } from "./permissions";
+import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection, checkOperation } from "./permissions";
 import { AuthState, CollectionConfig, Entity, User, SecurityRule } from "@rebasepro/types";
 
 describe("Permissions Evaluator", () => {
@@ -823,7 +823,28 @@ roles: ["author"],
 using: "status = 'draft'" }
             ]);
             expect(canEditEntity(collection, unauthenticatedController, "test", draftOwned)).toBe(true);
-            expect(canEditEntity(restrictedCollection, unauthenticatedController, "test", draftOwned)).toBe(false);
+
+            // `true`, not `false`, and the change is in `evaluatePolicy` rather
+            // than here. The ownerField rule compares `user_id` (null on this
+            // row) against the uid, and a comparison against NULL is now
+            // "unknown" — SQL's answer — where it used to be a flat `false`.
+            // `canEditEntity` gates optimistically (`onUnknown: "allow"`), so
+            // an undecided rule shows the button.
+            //
+            // The old `false` matched Postgres here by accident and diverged
+            // from it under negation; see the note on the null branch in
+            // `evaluatePolicy`. What this now exposes is a separate, real gap:
+            // "the client cannot evaluate this" (raw SQL, a membership
+            // subquery) and "SQL would answer NULL, so the row is definitively
+            // not granted" are both spelled "unknown", and only the first
+            // deserves optimism. Recorded in docs/verification.md.
+            expect(canEditEntity(restrictedCollection, unauthenticatedController, "test", draftOwned)).toBe(true);
+
+            // Fail-closed callers — every enforcement path — are unaffected:
+            // an undecided rule denies.
+            expect(checkOperation(
+                restrictedCollection, unauthenticatedController, draftOwned, "update", { onUnknown: "deny" }
+            )).toBe(false);
         });
 
         test("58. Missing authController ('blankAuth') handled gracefully", () => {
