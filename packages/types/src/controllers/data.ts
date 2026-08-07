@@ -1,5 +1,5 @@
 import type { VectorSearchParams } from "./data_driver";
-import type { ComputedSortField } from "../types/search";
+import type { ComputedSortField, SearchMatch } from "../types/search";
 import { Entity, EntityValues } from "../types/entities";
 import { WhereFilterOp, FieldPath, FilterValues, OrderByTuple } from "../types/filter-operators";
 
@@ -126,6 +126,19 @@ export interface FindParams<M extends Record<string, unknown> = Record<string, u
      * searches embeddings, it does not compute them.
      */
     vectorSearch?: VectorSearchParams;
+
+    /**
+     * Ask each returned row to explain itself: which declared search fields
+     * matched, with a highlighted snippet from each. Populates `_matches`.
+     *
+     * Off by default because it is not free — one `ts_headline` per declared
+     * field per returned row, and `ts_headline` re-parses the document rather
+     * than reading the index. Fine for a page of results, not for an export.
+     *
+     * Ignored unless the collection declares a `search` block and the query
+     * carries a `searchString`; there is nothing to explain otherwise.
+     */
+    searchExplain?: boolean;
 }
 
 /**
@@ -162,7 +175,7 @@ export interface QueryBuilderInterface<M extends Record<string, unknown> = Recor
     orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): this;
     limit(count: number): this;
     offset(count: number): this;
-    search(searchString: string): this;
+    search(searchString: string, options?: { explain?: boolean }): this;
 
     /**
      * Order rows by nearest-neighbour distance to `vector`, closest first.
@@ -275,7 +288,7 @@ export interface CollectionAccessor<M extends Record<string, unknown> = Record<s
     orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): QueryBuilderInterface<M>;
     limit(count: number): QueryBuilderInterface<M>;
     offset(count: number): QueryBuilderInterface<M>;
-    search(searchString: string): QueryBuilderInterface<M>;
+    search(searchString: string, options?: { explain?: boolean }): QueryBuilderInterface<M>;
 
     /**
      * Order rows by nearest-neighbour distance to `vector`, closest first.
@@ -356,6 +369,12 @@ export type QueryComputedFields = {
      * comparable between two different search strings.
      */
     _score?: number;
+    /**
+     * Which declared fields matched, and the text around each hit. Present only
+     * when the query asked for it — `.search(term, { explain: true })` — because
+     * it costs a `ts_headline` per field per row.
+     */
+    _matches?: SearchMatch[];
     /**
      * Distance to the query vector, when the query used
      * {@link FindParams.vectorSearch}. Lower is closer, and the rows are
@@ -461,7 +480,7 @@ export interface SDKQueryBuilderInterface<M extends Record<string, unknown> = Re
     orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): this;
     limit(count: number): this;
     offset(count: number): this;
-    search(searchString: string): this;
+    search(searchString: string, options?: { explain?: boolean }): this;
 
     /**
      * Order rows by nearest-neighbour distance to `vector`, closest first.
@@ -761,7 +780,7 @@ export interface SDKCollectionClient<
     orderBy(column: (keyof M & string) | ComputedSortField, direction?: "asc" | "desc"): SDKQueryBuilderInterface<M>;
     limit(count: number): SDKQueryBuilderInterface<M>;
     offset(count: number): SDKQueryBuilderInterface<M>;
-    search(searchString: string): SDKQueryBuilderInterface<M>;
+    search(searchString: string, options?: { explain?: boolean }): SDKQueryBuilderInterface<M>;
     /**
      * Order rows by nearest-neighbour distance to `vector`, closest first.
      * Postgres only, over a `type: "vector"` property. See

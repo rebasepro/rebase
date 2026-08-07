@@ -692,7 +692,7 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
  * well be called `_internal`, and passing it through here would put a value on
  * the row that no property describes and nothing downstream knows how to type.
  */
-const QUERY_METADATA_KEYS = new Set(["_score", "_distance"]);
+const QUERY_METADATA_KEYS = new Set(["_score", "_distance", "_matches"]);
 
 function normalizeScalarValues<M extends Record<string, unknown>>(
     data: M,

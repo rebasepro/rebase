@@ -105,8 +105,9 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
     /**
      * Set a free-text search string if supported by the backend.
      */
-    search(searchString: string): this {
+    search(searchString: string, options?: { explain?: boolean }): this {
         this.params.searchString = searchString;
+        if (options?.explain !== undefined) this.params.searchExplain = options.explain;
         return this;
     }
 

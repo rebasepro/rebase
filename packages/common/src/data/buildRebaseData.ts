@@ -373,8 +373,8 @@ ids });
         offset(count: number) {
             return new QueryBuilder<M>(accessor).offset(count);
         },
-        search(searchString: string) {
-            return new QueryBuilder<M>(accessor).search(searchString);
+        search(searchString: string, options?: { explain?: boolean }) {
+            return new QueryBuilder<M>(accessor).search(searchString, options);
         },
         vectorSearch(
             property: string,
@@ -492,7 +492,7 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
 
     limit(count: number): this { this.params.limit = count; return this; }
     offset(count: number): this { this.params.offset = count; return this; }
-    search(searchString: string): this { this.params.searchString = searchString; return this; }
+    search(searchString: string, options?: { explain?: boolean }): this { this.params.searchString = searchString; if (options?.explain !== undefined) this.params.searchExplain = options.explain; return this; }
     vectorSearch(
         property: string,
         vector: number[],

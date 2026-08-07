@@ -1426,6 +1426,67 @@ whereConditions };
     }
 
     /**
+     * A JSONB array of `{ field, snippet }` naming which declared fields matched
+     * and showing the text around each hit — what backs `_matches`.
+     *
+     * A ranked list answers "which rows", never "why this row". For a talent
+     * pool that difference is the product: a candidate surfacing for
+     * "iso 14001" on a *certification* is a different candidate from one whose
+     * bio happens to mention the standard, and the score cannot tell them apart.
+     *
+     * Built as a correlated subquery over a `VALUES` list of the declared
+     * fields, rather than one `CASE` per field, so the shape does not change
+     * with the number of fields and the empty result is a plain `[]`.
+     *
+     * `ts_headline` runs over the same normalized text that was indexed. Over
+     * the *original* text it would find nothing to mark whenever `unaccent` is
+     * on — the query's lexemes are folded and the document's are not — and
+     * would return the text silently unhighlighted. Folded-but-marked beats
+     * pretty-but-inert.
+     *
+     * Undefined when the collection has not opted in, when the column is not on
+     * the table yet, or when the caller did not ask: this costs a `ts_headline`
+     * per field per row and `ts_headline` re-parses the document.
+     */
+    static buildSearchMatchesExpression(
+        searchString: string,
+        table: PgTable<any>,
+        collection: CollectionConfig
+    ): SQL | undefined {
+        let spec: SearchColumnSpec | undefined;
+        try {
+            spec = buildSearchColumnSpec(collection);
+        } catch {
+            return undefined;
+        }
+        if (!spec || spec.fields.length === 0) return undefined;
+        if (!table[spec.column as keyof typeof table]) return undefined;
+
+        const query = DrizzleConditionBuilder.normalizedTsQuery(searchString, spec);
+        const config = sql`${spec.language}`;
+
+        // `ord` keeps the author's declared field order in the output, so the
+        // most important field they named reads first rather than whichever
+        // Postgres aggregated first.
+        const rows = spec.fields.map((f, i) =>
+            sql`(${i}, ${f.path}, ${sql.raw(f.textSql)})`
+        );
+
+        return sql`(
+            SELECT coalesce(jsonb_agg(s.m ORDER BY f.ord), '[]'::jsonb)
+            FROM (VALUES ${sql.join(rows, sql`, `)}) AS f(ord, path, txt)
+            CROSS JOIN LATERAL (
+                SELECT jsonb_build_object(
+                    'field', f.path,
+                    'snippet', ts_headline(${config}::regconfig, f.txt, ${query},
+                        'StartSel=<mark>,StopSel=</mark>,MaxWords=14,MinWords=1,MaxFragments=1,FragmentDelimiter= … ')
+                ) AS m
+                WHERE to_tsvector(${config}::regconfig, f.txt) @@ ${query}
+            ) s
+        )`;
+    }
+
+    /**
      * `ts_rank(<column>, <query>)` for the collection, or undefined when it has
      * not opted in. This is what backs `orderBy: ["_score", "desc"]`.
      */

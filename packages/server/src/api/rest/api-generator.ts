@@ -202,6 +202,11 @@ export class RestApiGenerator {
             const queryDict = c.req.queries();
             const queryOptions = this.parseQuery(queryDict);
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
+            // `?searchExplain=true` asks each row which declared field matched.
+            // Opt-in per request because it costs a `ts_headline` per field per
+            // row; any value other than "true" is a no.
+            const searchExplainRaw = Array.isArray(queryDict.searchExplain) ? queryDict.searchExplain[queryDict.searchExplain.length - 1] : undefined;
+            const searchExplain = searchExplainRaw === "true";
 
             const driver = this.getScopedDriver(c);
             const fetchService = driver.restFetchService;
@@ -220,6 +225,7 @@ export class RestApiGenerator {
                         orderBy: queryOptions.orderBy?.[0]?.field,
                         order: queryOptions.orderBy?.[0]?.direction === "desc" ? "desc" : "asc",
                         searchString,
+                        searchExplain,
                         vectorSearch: queryOptions.vectorSearch
                     },
                     queryOptions.include

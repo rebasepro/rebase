@@ -208,3 +208,40 @@ export type ComputedSortField = typeof RELEVANCE_SORT_FIELD;
  * else it is an unknown field and the request is refused.
  */
 export const RELEVANCE_SORT_FIELD = "_score";
+
+/**
+ * One field that matched, and the text around the hit.
+ *
+ * Returned per row as `_matches` when a query asks for it — see the `explain`
+ * option on `.search()`. Answers the question a ranked list otherwise leaves
+ * open: *why is this row here?* A candidate surfacing for "iso 14001" because
+ * of a certification is a different result from one surfacing because the
+ * string appears in a paragraph about something else, and the score alone
+ * cannot tell them apart.
+ *
+ * @group Search
+ */
+export interface SearchMatch {
+    /**
+     * The declared field path that matched, exactly as written in
+     * {@link SearchConfig.fields} — e.g. `"questionnaire.certifications"`.
+     * Map it to a label for display; the path is stable, a label is yours.
+     */
+    field: string;
+
+    /**
+     * The matching text, with each hit wrapped in `<mark>…</mark>`.
+     *
+     * Built by Postgres's `ts_headline` over the same normalized text that was
+     * indexed. With {@link SearchConfig.unaccent} on that means the snippet
+     * reads with accents folded — `Auditoria` rather than `Auditoría`. That is
+     * deliberate: `ts_headline` over the *original* text cannot find a hit the
+     * unaccented query produced, so it returns the text with nothing marked at
+     * all. A readable snippet that highlights beats a prettier one that
+     * silently does not.
+     *
+     * Contains markup by construction. Render it as HTML or strip the tags —
+     * do not display it raw, and do not trust it as plain text.
+     */
+    snippet: string;
+}

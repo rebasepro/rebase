@@ -244,7 +244,7 @@ export function parseQueryOptions(
     // list made the documented `?where={...}` compile as a filter on a
     // nonexistent field — which used to be dropped, widening the read to the
     // whole table, and is now a 400 `UNKNOWN_FILTER_FIELD`.
-    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "where"];
+    const reservedQueryKeys = ["limit", "offset", "page", "orderBy", "include", "fields", "searchString", "searchExplain", "vector_search", "vector", "vector_distance", "vector_threshold", "or", "and", "where"];
     const filterDict: Record<string, unknown> = {};
     for (const [key, rawValue] of Object.entries(query)) {
         if (reservedQueryKeys.includes(key)) continue;

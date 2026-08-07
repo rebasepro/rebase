@@ -190,6 +190,7 @@ export function buildQueryString(params?: FindParams): string {
 
     if (params.searchString) {
         parts.push(`searchString=${encodeURIComponent(params.searchString)}`);
+        if (params.searchExplain) parts.push("searchExplain=true");
     }
 
     // The server keys vector search off `vector_search` naming the property and

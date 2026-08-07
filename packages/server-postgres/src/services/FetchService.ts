@@ -754,6 +754,7 @@ idColumn };
             offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
+            searchExplain?: boolean;
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
             logical?: LogicalCondition;
@@ -830,11 +831,20 @@ idColumn };
             ? DrizzleConditionBuilder.buildSearchRankExpression(options.searchString, table, collection)
             : undefined;
 
+        // Only when asked: a `ts_headline` per declared field per row.
+        const matchesSelect = options.searchString && options.searchExplain
+            ? DrizzleConditionBuilder.buildSearchMatchesExpression(options.searchString, table, collection)
+            : undefined;
+
         let query = vectorMeta
             ? this.db.select({ table_row: (visible ?? table) as never,
 _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             : rankSelect
-                ? this.db.select({ table_row: (visible ?? table) as never, _score: rankSelect }).from(table).$dynamic()
+                ? this.db.select({
+                    table_row: (visible ?? table) as never,
+                    _score: rankSelect,
+                    ...(matchesSelect ? { _matches: matchesSelect } : {})
+                }).from(table).$dynamic()
                 : (visible ? this.db.select(visible as never).from(table).$dynamic() : this.db.select().from(table).$dynamic());
         const allConditions: SQL[] = [];
 
@@ -910,9 +920,10 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             // Same nested shape, unwrapped the same way, when a relevance
             // score was selected instead.
             : rankSelect
-                ? (rawResults as { table_row: Record<string, unknown>; _score: unknown }[]).map(r => ({
+                ? (rawResults as { table_row: Record<string, unknown>; _score: unknown; _matches?: unknown }[]).map(r => ({
                     ...r.table_row,
-                    _score: typeof r._score === "number" ? r._score : parseFloat(String(r._score))
+                    _score: typeof r._score === "number" ? r._score : parseFloat(String(r._score)),
+                    ...(matchesSelect ? { _matches: r._matches ?? [] } : {})
                 }))
                 : rawResults as Record<string, unknown>[];
 
@@ -1446,6 +1457,7 @@ relatedTo: hop }, include
             offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
+            searchExplain?: boolean;
             vectorSearch?: VectorSearchParams;
             relatedTo?: NestedPathHop;
         } = {}
@@ -1474,11 +1486,20 @@ relatedTo: hop }, include
             ? DrizzleConditionBuilder.buildSearchRankExpression(options.searchString, table, collection)
             : undefined;
 
+        // Only when asked: a `ts_headline` per declared field per row.
+        const matchesSelect = options.searchString && options.searchExplain
+            ? DrizzleConditionBuilder.buildSearchMatchesExpression(options.searchString, table, collection)
+            : undefined;
+
         let query = vectorMeta
             ? this.db.select({ table_row: (visible ?? table) as never,
 _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             : rankSelect
-                ? this.db.select({ table_row: (visible ?? table) as never, _score: rankSelect }).from(table).$dynamic()
+                ? this.db.select({
+                    table_row: (visible ?? table) as never,
+                    _score: rankSelect,
+                    ...(matchesSelect ? { _matches: matchesSelect } : {})
+                }).from(table).$dynamic()
                 : (visible ? this.db.select(visible as never).from(table).$dynamic() : this.db.select().from(table).$dynamic());
         const allConditions: SQL[] = [];
 
@@ -1536,9 +1557,10 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         }
 
         if (rankSelect) {
-            return (rawResults as { table_row: Record<string, unknown>; _score: unknown }[]).map(r => ({
+            return (rawResults as { table_row: Record<string, unknown>; _score: unknown; _matches?: unknown }[]).map(r => ({
                 ...r.table_row,
-                _score: typeof r._score === "number" ? r._score : parseFloat(String(r._score))
+                _score: typeof r._score === "number" ? r._score : parseFloat(String(r._score)),
+                ...(matchesSelect ? { _matches: r._matches ?? [] } : {})
             }));
         }
 

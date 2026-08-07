@@ -105,9 +105,19 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * ```ts
      * client.data.talents.search("auditor iso 14001").orderBy("_score", "desc").find()
      * ```
+     *
+     * Pass `{ explain: true }` to have each row report which of the declared
+     * fields matched, with a highlighted snippet, on `_matches`:
+     *
+     * ```ts
+     * const { data } = await client.data.talents.search("iso 14001", { explain: true }).find();
+     * data[0]._matches
+     * // [{ field: "questionnaire.certifications", snippet: "<mark>ISO</mark> <mark>14001</mark> Lead Auditor" }]
+     * ```
      */
-    search(searchString: string): this {
+    search(searchString: string, options?: { explain?: boolean }): this {
         this.params.searchString = searchString;
+        if (options?.explain !== undefined) this.params.searchExplain = options.explain;
         return this;
     }
 

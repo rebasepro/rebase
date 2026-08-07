@@ -428,6 +428,8 @@ export interface RestFetchService {
             offset?: number;
             startAfter?: Record<string, unknown>;
             searchString?: string;
+            /** Ask each row which declared search fields matched — populates `_matches`. */
+            searchExplain?: boolean;
             databaseId?: string;
             vectorSearch?: VectorSearchParams;
         },

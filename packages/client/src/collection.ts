@@ -392,8 +392,8 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         offset(count: number) {
             return new SDKQueryBuilder<M>(client).offset(count);
         },
-        search(searchString: string) {
-            return new SDKQueryBuilder<M>(client).search(searchString);
+        search(searchString: string, options?: { explain?: boolean }) {
+            return new SDKQueryBuilder<M>(client).search(searchString, options);
         },
         vectorSearch(
             property: string,

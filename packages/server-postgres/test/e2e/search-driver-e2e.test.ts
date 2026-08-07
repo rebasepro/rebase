@@ -225,6 +225,59 @@ describe("search through the driver", () => {
         expect(rows[0].full_name).toBe("Ana ISO 14001 Lead Auditor");
     });
 
+    describe("explaining why a row matched", () => {
+        it("names the field the hit came from, with the text around it", async () => {
+            const rows = await fetchService.fetchCollection("talents", {
+                searchString: "ISO 14001",
+                searchExplain: true
+            });
+            expect(rows).toHaveLength(1);
+            const matches = rows[0]._matches as { field: string; snippet: string }[];
+            expect(matches).toHaveLength(1);
+            expect(matches[0].field).toBe("questionnaire.certifications");
+            expect(matches[0].snippet).toContain("<mark>");
+            expect(matches[0].snippet).toContain("14001");
+        });
+
+        it("distinguishes a name hit from a certification hit for the same term", async () => {
+            // "ISO" is in one row's name and another's certifications. A score
+            // cannot tell those apart; this is the whole point of the feature.
+            const rows = await fetchService.fetchCollection("talents", {
+                searchString: "ISO",
+                searchExplain: true,
+                orderBy: "_score",
+                order: "desc"
+            });
+            const byName = Object.fromEntries(rows.map(r =>
+                [r.full_name as string, (r._matches as { field: string }[]).map(m => m.field)]));
+            expect(byName["Consultora ISO Ibérica"]).toEqual(["full_name"]);
+            expect(byName["Ana Gutiérrez"]).toEqual(["questionnaire.certifications"]);
+        });
+
+        it("returns fields in the order the collection declared them", async () => {
+            const rows = await fetchService.fetchCollection("talents", {
+                searchString: "Ana OR 14001",
+                searchExplain: true
+            });
+            const matches = rows[0]._matches as { field: string }[];
+            expect(matches.map(m => m.field)).toEqual(["full_name", "questionnaire.certifications"]);
+        });
+
+        it("attaches nothing unless the caller asked", async () => {
+            const rows = await fetchService.fetchCollection("talents", { searchString: "ISO 14001" });
+            expect(rows[0]._matches).toBeUndefined();
+        });
+
+        it("is ignored on a collection that never opted in", async () => {
+            const rows = await fetchService.fetchCollection("notes", {
+                searchString: "plain",
+                searchExplain: true
+            });
+            expect(rows.length).toBeGreaterThan(0);
+            expect(rows[0]._matches).toBeUndefined();
+        });
+    });
+
     it("leaves a collection without the block on the old ILIKE behaviour", async () => {
         // Substring, mid-word — something `websearch_to_tsquery` would not match
         // and ILIKE does. Its presence proves the fallback still runs.
