@@ -1321,7 +1321,8 @@ describe("choosing a free port for the local database", () => {
             const s = net.createServer();
             servers.push(s);
             s.once("error", reject);
-            host === undefined ? s.listen(port, () => resolve()) : s.listen(port, host, () => resolve());
+            if (host === undefined) s.listen(port, () => resolve());
+            else s.listen(port, host, () => resolve());
         });
 
     afterEach(async () => {
