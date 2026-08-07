@@ -1,4 +1,5 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
+import type { PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig } from "@rebasepro/types";
 
 import { logger } from "../utils/logger";
 
@@ -78,8 +79,18 @@ export function unknownKeyPolicyFromEnv(
 // type-checks them against the option types, so those two cannot drift.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** `BaseCollectionConfig`, plus every engine-specific field, plus the `admin` block. */
-const COLLECTION_KEYS = new Set<string>([
+/**
+ * `BaseCollectionConfig`, plus every engine-specific field, plus the `admin`
+ * block.
+ *
+ * A `as const` tuple rather than a bare `Set` so the compile-time assertion
+ * below can compare it against the config types. It was a hand-maintained list
+ * checked by nothing, and it drifted the first time a key was added: `search`
+ * landed on `PostgresCollectionConfig`, typechecked everywhere, shipped, and
+ * was then discarded at boot by this file with a warning nobody was watching —
+ * a declared feature that silently did nothing in production.
+ */
+const COLLECTION_KEY_LIST = [
     // BaseCollectionConfig
     "slug",
     "name",
@@ -102,13 +113,40 @@ const COLLECTION_KEYS = new Set<string>([
     "securityRules",
     // PostgresCollectionConfig
     "schema",
+    "search",
     // FirebaseCollectionConfig / MongoDBCollectionConfig
     "path",
     "subcollections",
     // Added back by @rebasepro/admin-types through declaration merging. Its
     // contents belong to the admin panel and are deliberately not checked here.
     "admin"
-]);
+] as const;
+
+const COLLECTION_KEYS = new Set<string>(COLLECTION_KEY_LIST);
+
+// ── The list cannot drift from the types ─────────────────────────────────────
+//
+// Every key of every engine's config must appear above. If one does not,
+// `MissingCollectionKeys` stops being `never` and `AssertNever` fails to
+// compile — so adding a key to a config type and forgetting this list is a
+// build error here rather than a silently ignored block in someone's project.
+//
+// `pnpm run typecheck` reads this file; a jest test could not, because ts-jest
+// is transpile-only in this repo.
+
+/** Compiles only when `T` is `never`. */
+type AssertNever<T extends never = never> = T;
+
+/** Keys the config types declare that {@link COLLECTION_KEY_LIST} does not. */
+type MissingCollectionKeys = Exclude<
+    | keyof PostgresCollectionConfig
+    | keyof FirebaseCollectionConfig
+    | keyof MongoDBCollectionConfig,
+    typeof COLLECTION_KEY_LIST[number]
+>;
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _EveryCollectionKeyIsListed = AssertNever<MissingCollectionKeys>;
 
 /** `BaseProperty` — legal on a property of any type. */
 const BASE_PROPERTY_KEYS = [

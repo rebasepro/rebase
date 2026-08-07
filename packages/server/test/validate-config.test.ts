@@ -160,6 +160,43 @@ describe("unrecognised keys", () => {
         expect(() => assertCollectionConfigs([{ ...valid(), somethingOfOurOwn: true }])).not.toThrow();
     });
 
+    /**
+     * `search` was added to `PostgresCollectionConfig`, typechecked everywhere,
+     * shipped, and was discarded right here at boot — the deployed backend
+     * logged "`search` is not a known collection key and is being ignored" and
+     * served the old behaviour. The feature was declared and did nothing, which
+     * is worse than not having it: the config says the column is indexed.
+     *
+     * A compile-time assertion in `validate-config.ts` now makes the list
+     * unable to drift from the types. This is the runtime half — it fails if
+     * the key is dropped from the list even where the types still permit it.
+     */
+    it("accepts the `search` block, which was ignored in production once", () => {
+        const collection = {
+            ...valid(),
+            search: {
+                language: "spanish",
+                unaccent: true,
+                fields: [{ path: "title", weight: "A" }, "body"]
+            }
+        };
+
+        expect(errors([collection])).toEqual([]);
+        expect(warnings([collection])).toEqual([]);
+    });
+
+    it("still warns for a key that really is unknown, beside a valid `search`", () => {
+        const collection = {
+            ...valid(),
+            search: { fields: ["title"] },
+            searrch: { fields: ["title"] }
+        };
+
+        const paths = warnings([collection]).map(w => w.path);
+        expect(paths).toContain("posts.searrch");
+        expect(paths).not.toContain("posts.search");
+    });
+
     it("escalates to an error when asked", () => {
         const collections = [{ ...valid(), somethingOfOurOwn: true }];
 
