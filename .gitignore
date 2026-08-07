@@ -32,7 +32,15 @@ firebase-debug.log*
 
 report.**.json
 
+# The saas control plane is its own git repository living inside this one, and
+# its worktrees get checked out beside it as `saas-<topic>`. They are foreign
+# checkouts, so `git add` on one writes a gitlink to a commit this repo has
+# never heard of. Ignored as a class rather than a line per worktree: the
+# per-worktree entries this replaces lived in .git/info/exclude, which is
+# local-only, so every new worktree showed up as untracked work to anyone who
+# had not hand-patched their own copy.
 /saas
+/saas-*/
 
 .pnp.*
 .yarn/*
