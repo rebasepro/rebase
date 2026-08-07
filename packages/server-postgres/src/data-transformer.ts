@@ -685,6 +685,15 @@ export function parsePropertyFromServer(value: unknown, property: Property, coll
  *                       from the result (used by `normalizeDbValues` where
  *                       Drizzle's relational API already hydrates them).
  */
+/**
+ * Keys a query computes and attaches to a row, rather than reads from a column.
+ *
+ * An explicit set rather than a `_` prefix rule: a user's column may perfectly
+ * well be called `_internal`, and passing it through here would put a value on
+ * the row that no property describes and nothing downstream knows how to type.
+ */
+const QUERY_METADATA_KEYS = new Set(["_score", "_distance"]);
+
 function normalizeScalarValues<M extends Record<string, unknown>>(
     data: M,
     properties: Properties,
@@ -706,6 +715,15 @@ function normalizeScalarValues<M extends Record<string, unknown>>(
         // Keep internal FK columns as primitives
         if (internalFKColumns.has(key)) {
             result[key] = value === null ? null : (typeof value === "number" ? value : String(value));
+            continue;
+        }
+
+        // Query-computed metadata, which by definition is not a column and so
+        // has no property to be found. Dropped here until now — which meant
+        // `_distance` was computed for every vector search on this path and
+        // then discarded before the caller ever saw it.
+        if (QUERY_METADATA_KEYS.has(key)) {
+            result[key] = value;
             continue;
         }
 

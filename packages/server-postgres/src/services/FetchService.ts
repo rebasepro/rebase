@@ -120,6 +120,31 @@ export class FetchService {
      * and skips rows rather than erroring. The guesses stay, last, for a
      * caller that hands over no collection to resolve against.
      */
+    /**
+     * The ORDER BY target, which may be relevance rather than a column.
+     *
+     * `_score` is only meaningful for a collection that declared a `search`
+     * block *and* for a request that carried a search string — ranking rows
+     * against no query ranks them all at zero. Outside those two conditions it
+     * is an unknown field and gets the same 400 as any other typo, which is the
+     * behaviour that matters: a sort that is silently dropped returns 200 with
+     * rows in arbitrary order, and paging over that repeats and skips rows.
+     */
+    static readonly SCORE_FIELD = "_score";
+
+    private resolveOrderTarget(
+        table: PgTable<any>,
+        orderBy: string,
+        collection?: CollectionConfig,
+        searchString?: string
+    ): AnyPgColumn | SQL | undefined {
+        if (orderBy === FetchService.SCORE_FIELD && collection && searchString) {
+            const rank = DrizzleConditionBuilder.buildSearchRankExpression(searchString, table, collection);
+            if (rank) return rank;
+        }
+        return this.resolveOrderByField(table, orderBy, collection);
+    }
+
     private resolveOrderByField(
         table: PgTable<any>,
         orderBy: string,
@@ -461,7 +486,7 @@ export class FetchService {
         const orderExpressions: unknown[] = [];
         if (options.orderBy) {
             const collection = getCollectionByPath(collectionPath, this.registry);
-            const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
+            const orderByField = this.resolveOrderTarget(table, options.orderBy, collection, options.searchString);
             if (orderByField) {
                 orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
             }
@@ -495,6 +520,21 @@ export class FetchService {
         const cursor = options.startAfter;
 
         if (options.orderBy) {
+            // Relevance is computed per query, not stored, so there is no value
+            // on the cursor row to compare a later page against — and two
+            // requests with different search strings would produce scores that
+            // are not on the same scale at all. Refusing is the only honest
+            // answer: a dropped cursor condition silently repeats and skips
+            // rows, which is precisely what paging exists to prevent.
+            if (options.orderBy === FetchService.SCORE_FIELD) {
+                throw ApiError.badRequest(
+                    "Cursor pagination (`startAfter`) cannot be combined with `orderBy: \"_score\"`. " +
+                    "Relevance is computed per query rather than stored, so it cannot key a cursor. " +
+                    "Use `limit`/`offset` for relevance-ordered pages, or order by a column.",
+                    "SCORE_CURSOR_UNSUPPORTED",
+                    { field: FetchService.SCORE_FIELD }
+                );
+            }
             const collection = collectionPath ? getCollectionByPath(collectionPath, this.registry) : undefined;
             const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
             if (orderByField) {
@@ -781,10 +821,21 @@ idColumn };
         // would ship it to every caller. The projection is undefined — and the
         // SQL therefore unchanged — for any table without one.
         const visible = visibleColumnProjection(getTableColumns(table), collection);
+
+        // Relevance, alongside the row, exactly as `_distance` rides along with
+        // a vector search. Present only when the collection opted in and the
+        // request carried a search string, so a caller can order by it, show
+        // it, or blend it with a score of their own.
+        const rankSelect = options.searchString
+            ? DrizzleConditionBuilder.buildSearchRankExpression(options.searchString, table, collection)
+            : undefined;
+
         let query = vectorMeta
             ? this.db.select({ table_row: (visible ?? table) as never,
 _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
-            : (visible ? this.db.select(visible as never).from(table).$dynamic() : this.db.select().from(table).$dynamic());
+            : rankSelect
+                ? this.db.select({ table_row: (visible ?? table) as never, _score: rankSelect }).from(table).$dynamic()
+                : (visible ? this.db.select(visible as never).from(table).$dynamic() : this.db.select().from(table).$dynamic());
         const allConditions: SQL[] = [];
 
         if (scopeCondition) allConditions.push(scopeCondition);
@@ -822,7 +873,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         if (vectorMeta) {
             orderExpressions.push(asc(vectorMeta.orderBy));
         } else if (options.orderBy) {
-            const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
+            const orderByField = this.resolveOrderTarget(table, options.orderBy, collection, options.searchString);
             if (orderByField) {
                 orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
             }
@@ -856,7 +907,14 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
                 ...r.table_row,
                 _distance: typeof r._distance === "number" ? r._distance : parseFloat(String(r._distance))
             }))
-            : rawResults as Record<string, unknown>[];
+            // Same nested shape, unwrapped the same way, when a relevance
+            // score was selected instead.
+            : rankSelect
+                ? (rawResults as { table_row: Record<string, unknown>; _score: unknown }[]).map(r => ({
+                    ...r.table_row,
+                    _score: typeof r._score === "number" ? r._score : parseFloat(String(r._score))
+                }))
+                : rawResults as Record<string, unknown>[];
 
         return this.processRowResults<M>(results, collection, collectionPath, idInfo, options.databaseId, false, idInfoArray);
     }
@@ -1407,10 +1465,21 @@ relatedTo: hop }, include
         // would ship it to every caller. The projection is undefined — and the
         // SQL therefore unchanged — for any table without one.
         const visible = visibleColumnProjection(getTableColumns(table), collection);
+
+        // Relevance, alongside the row, exactly as `_distance` rides along with
+        // a vector search. Present only when the collection opted in and the
+        // request carried a search string, so a caller can order by it, show
+        // it, or blend it with a score of their own.
+        const rankSelect = options.searchString
+            ? DrizzleConditionBuilder.buildSearchRankExpression(options.searchString, table, collection)
+            : undefined;
+
         let query = vectorMeta
             ? this.db.select({ table_row: (visible ?? table) as never,
 _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
-            : (visible ? this.db.select(visible as never).from(table).$dynamic() : this.db.select().from(table).$dynamic());
+            : rankSelect
+                ? this.db.select({ table_row: (visible ?? table) as never, _score: rankSelect }).from(table).$dynamic()
+                : (visible ? this.db.select(visible as never).from(table).$dynamic() : this.db.select().from(table).$dynamic());
         const allConditions: SQL[] = [];
 
         if (options.relatedTo) allConditions.push(this.buildRelationScope(options.relatedTo));
@@ -1441,7 +1510,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         if (vectorMeta) {
             orderExpressions.push(asc(vectorMeta.orderBy));
         } else if (options.orderBy) {
-            const orderByField = this.resolveOrderByField(table, options.orderBy, collection);
+            const orderByField = this.resolveOrderTarget(table, options.orderBy, collection, options.searchString);
             if (orderByField) {
                 orderExpressions.push(options.order === "asc" ? asc(orderByField) : desc(orderByField));
             }
@@ -1463,6 +1532,13 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
             return (rawResults as { table_row: Record<string, unknown>; _distance: unknown }[]).map(r => ({
                 ...r.table_row,
                 _distance: typeof r._distance === "number" ? r._distance : parseFloat(String(r._distance))
+            }));
+        }
+
+        if (rankSelect) {
+            return (rawResults as { table_row: Record<string, unknown>; _score: unknown }[]).map(r => ({
+                ...r.table_row,
+                _score: typeof r._score === "number" ? r._score : parseFloat(String(r._score))
             }));
         }
 
