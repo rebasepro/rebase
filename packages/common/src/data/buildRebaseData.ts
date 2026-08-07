@@ -625,6 +625,11 @@ data: u.data as Partial<EntityValues<M>> }))
         limit: (count: number) => new SdkQueryBuilder<M>(client).limit(count),
         offset: (count: number) => new SdkQueryBuilder<M>(client).offset(count),
         search: (searchString: string) => new SdkQueryBuilder<M>(client).search(searchString),
+        vectorSearch: (
+            property: string,
+            vector: number[],
+            options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+        ) => new SdkQueryBuilder<M>(client).vectorSearch(property, vector, options),
         include: (...relations: string[]) => new SdkQueryBuilder<M>(client).include(...relations)
     };
     return client;
@@ -680,6 +685,11 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         limit: (count: number) => new QueryBuilder<M>(accessor).limit(count),
         offset: (count: number) => new QueryBuilder<M>(accessor).offset(count),
         search: (searchString: string) => new QueryBuilder<M>(accessor).search(searchString),
+        vectorSearch: (
+            property: string,
+            vector: number[],
+            options?: { distance?: "cosine" | "l2" | "inner_product"; threshold?: number }
+        ) => new QueryBuilder<M>(accessor).vectorSearch(property, vector, options),
         include: (...relations: string[]) => new QueryBuilder<M>(accessor).include(...relations)
     };
     return accessor;
