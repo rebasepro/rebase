@@ -8,6 +8,10 @@ import { isApiKeyToken, validateApiKey } from "./api-keys/api-key-middleware";
 import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { logger } from "../utils/logger";
 import { extractBearerToken } from "./bearer-token";
+// A leaf module (node:path only), so this does not close an import cycle with
+// `storage/routes.ts` — which is the point: both sides of the token comparison
+// must derive a key with the same function, not with two copies of one rule.
+import { tryCanonicalStorageKey } from "../storage/keys";
 
 // Re-exported from here because this is where callers look for it; the separate
 // module exists only so `api-key-middleware` can use it without closing an
@@ -506,17 +510,27 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
         return fullPath.substring(idx + prefix.length + 1);
     };
 
-    const parseBucketPath = (filePath: string): { bucket: string; resolvedPath: string } => {
+    /**
+     * Must agree with `parseBucketAndPath` in `storage/routes.ts`, because the
+     * path a token GRANTS is minted there and the path a request ASKS FOR is
+     * derived here. `/metadata` canonicalizes before signing, so a raw
+     * comparison here would 403 an otherwise-valid request for any key whose
+     * URL form is not already canonical (`a//b.txt`, `a/./b.txt`).
+     *
+     * A key that cannot be canonicalized yields null, which matches no grant —
+     * the same fail-closed answer `isPathMatch` gives a `..` segment.
+     */
+    const parseBucketPath = (filePath: string): { bucket: string; resolvedPath: string | null } => {
         const parts = filePath.split("/");
         if (parts.length > 1 && parts[0].toLowerCase() === "default") {
             return {
                 bucket: "default",
-                resolvedPath: parts.slice(1).join("/")
+                resolvedPath: tryCanonicalStorageKey(parts.slice(1).join("/"))
             };
         }
         return {
             bucket: "default",
-            resolvedPath: filePath
+            resolvedPath: tryCanonicalStorageKey(filePath)
         };
     };
 
@@ -531,9 +545,9 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
             if (rawPath) {
                 const filePath = decodeURIComponent(rawPath);
                 const { bucket, resolvedPath } = parseBucketPath(filePath);
-                const requestedFullPath = `${bucket}/${resolvedPath}`;
+                const requestedFullPath = resolvedPath === null ? null : `${bucket}/${resolvedPath}`;
 
-                if (isPathMatch(requestedFullPath, payload.path)) {
+                if (requestedFullPath !== null && isPathMatch(requestedFullPath, payload.path)) {
                     c.set("user", { uid: "download-token", roles: ["reader"] });
                     return next();
                 } else {
@@ -560,9 +574,9 @@ export const fileTokenAuth: MiddlewareHandler<HonoEnv> = async (c, next) => {
             if (rawPath) {
                 const filePath = decodeURIComponent(rawPath);
                 const { bucket, resolvedPath } = parseBucketPath(filePath);
-                const requestedFullPath = `${bucket}/${resolvedPath}`;
+                const requestedFullPath = resolvedPath === null ? null : `${bucket}/${resolvedPath}`;
 
-                if (isPathMatch(requestedFullPath, payload.path)) {
+                if (requestedFullPath !== null && isPathMatch(requestedFullPath, payload.path)) {
                     c.set("user", { uid: "download-token", roles: ["reader"] });
                     return next();
                 } else {

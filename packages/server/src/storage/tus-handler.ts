@@ -17,6 +17,7 @@ import type { StorageController } from "./types";
 import type { StorageRegistry } from "./storage-registry";
 import { logger } from "../utils/logger.js";
 import { ApiError } from "../api/errors";
+import { canonicalStorageKey, InvalidStorageKeyError } from "./keys";
 
 /** Metadata for an in-progress resumable upload. */
 interface TusUpload {
@@ -33,8 +34,17 @@ interface TusUpload {
     filePath: string;
     /** Target bucket (from metadata). */
     bucket?: string;
-    /** Target key / filename (from metadata). */
-    key?: string;
+    /**
+     * The canonical key this upload will be written to.
+     *
+     * Resolved once, at creation, and never re-derived: it is both what the
+     * authorize hook was shown and what `finalize` passes to `putObject`. It
+     * used to be neither — the hook saw a sanitized `metadata.key` while
+     * `finalize` used the raw header value with its own chain of fallbacks, so
+     * the two were different strings by construction and no fix to the
+     * sanitizer could have brought them together.
+     */
+    key: string;
     /** Whether the upload has been fully received and finalized. */
     completed: boolean;
 }
@@ -163,14 +173,33 @@ export class TusHandler {
 
         const metadata = this.parseMetadata(c.req.header("Upload-Metadata") || "");
 
+        const id = randomUUID();
+
+        // Resolve the destination ONCE, here, and carry it on the upload.
+        // Everything downstream — the authorize call below, `finalize` — reads
+        // this field rather than re-deriving from `metadata`.
+        //
+        // The `id` fallback (an upload that names no key at all) is resolved
+        // here too, so the hook is asked about the key that will actually be
+        // written instead of the empty string it used to see.
+        const rawKey = metadata.key || metadata.filename || "";
+        let key: string;
+        try {
+            key = canonicalStorageKey(rawKey) || id;
+        } catch (err) {
+            throw new ApiError(
+                400,
+                "INVALID_STORAGE_KEY",
+                err instanceof InvalidStorageKeyError ? err.message : "Invalid storage key"
+            );
+        }
+
         // Gate before any temp file exists, so a denied upload leaves nothing
         // behind to resume.
         if (this.authorizeUpload) {
-            const key = metadata.key || metadata.filename || "";
             await this.authorizeUpload(c, key, metadata.bucket || "default");
         }
 
-        const id = randomUUID();
         const filePath = join(this.tusDir, id);
 
         // Create empty temp file
@@ -184,7 +213,7 @@ export class TusHandler {
             createdAt: Date.now(),
             filePath,
             bucket: metadata.bucket || undefined,
-            key: metadata.key || metadata.filename || undefined,
+            key,
             completed: false
         };
         this.uploads.set(id, upload);
@@ -323,7 +352,11 @@ export class TusHandler {
         try {
             const { readFile } = await import("fs/promises");
             const data = await readFile(upload.filePath);
-            const fileName = upload.key || upload.metadata.filename || upload.id;
+            // `upload.key` and nothing else. The fallback chain that used to
+            // live here (`|| metadata.filename || id`) is what let the write
+            // land somewhere the hook was never asked about; the destination is
+            // decided in `create`, where it is authorized.
+            const fileName = upload.key;
             const mimeType = upload.metadata.contentType || upload.metadata.filetype || "application/octet-stream";
 
             // `new Uint8Array(buffer)` rather than the Buffer directly: a Node

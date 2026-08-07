@@ -20,6 +20,7 @@ import { ApiError, errorHandler } from "../api/errors";
 import { HonoEnv } from "../api/types";
 import { parseTransformOptions, transformImage, isTransformableImage, TransformCache } from "./image-transform";
 import { TusHandler } from "./tus-handler";
+import { canonicalStorageKey, InvalidStorageKeyError } from "./keys";
 
 /** Shared image transform cache (LRU, 500 entries, 1 hour TTL). */
 const transformCache = new TransformCache();
@@ -98,20 +99,25 @@ export function extractWildcardPath(c: { req: { path: string; routePath: string 
 }
 
 /**
- * Sanitize a user-supplied storage key to prevent path traversal and other attacks.
- * Removes null bytes, ../ sequences, leading slashes, and limits length.
+ * Canonicalize a caller-supplied storage key, answering 400 when it names
+ * something other than what it says.
+ *
+ * The single place a request's key becomes canonical. Every route runs its key
+ * through this before anything else touches it, so the authorize hook, the
+ * storage controller and the minted download token are all looking at the same
+ * string — which is the only thing that makes the hook's answer meaningful.
+ * See `keys.ts` for why an unacceptable key is refused rather than repaired.
  */
-function sanitizeStorageKey(key: string): string {
-    let sanitized = key;
-    // Remove null bytes
-    sanitized = sanitized.replace(/\0/g, "");
-    // Remove ../ sequences (and ..\ on Windows)
-    sanitized = sanitized.replace(/\.\.\/|\.\.\\/g, "");
-    // Remove leading slashes
-    sanitized = sanitized.replace(/^\/+/, "");
-    // Limit length
-    sanitized = sanitized.slice(0, 1024);
-    return sanitized;
+function canonicalKeyOrBadRequest(key: string): string {
+    try {
+        return canonicalStorageKey(key);
+    } catch (err) {
+        throw new ApiError(
+            400,
+            "INVALID_STORAGE_KEY",
+            err instanceof InvalidStorageKeyError ? err.message : "Invalid storage key"
+        );
+    }
 }
 
 /**
@@ -262,15 +268,15 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
     /**
      * Parse bucket and path from a combined file path.
      *
-     * The resolved path is run through `sanitizeStorageKey` here — the same
-     * function the upload route applies to incoming keys — so that read,
-     * delete, metadata and folder routes strip `../`, null bytes and leading
-     * slashes before the path reaches the controller, the authorize hook, or
-     * the download-token it mints. The `LocalStorageController` traversal guard
-     * (`getFullPath`) remains the load-bearing defence; this is the same
-     * normalization on the write and read sides so a `..%2f` read/delete cannot
-     * even reach it as a raw traversal string (it 404s as a normal miss instead
-     * of throwing, and never leaks whether an escape was attempted).
+     * The resolved path is canonicalized here — by the same function the upload
+     * route applies to incoming keys — so read, delete, metadata and folder
+     * routes agree with the write side about what a key means before it reaches
+     * the controller, the authorize hook, or the download token it mints.
+     *
+     * A key that cannot be canonicalized (a real `..` segment, a null byte) is
+     * a 400, not a repaired key. The `LocalStorageController` traversal guard
+     * (`getFullPath`) is still the load-bearing defence for the *bucket*
+     * boundary; this is what defends the boundary the hook drew inside it.
      */
     const parseBucketAndPath = (filePath: string): { bucket: string; resolvedPath: string } => {
         const parts = filePath.split("/");
@@ -279,14 +285,14 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         if (parts.length > 1 && parts[0].toLowerCase() === "default") {
             return {
                 bucket: "default",
-                resolvedPath: sanitizeStorageKey(parts.slice(1).join("/"))
+                resolvedPath: canonicalKeyOrBadRequest(parts.slice(1).join("/"))
             };
         }
 
         // All other paths use 'default' bucket with the full path
         return {
             bucket: "default",
-            resolvedPath: sanitizeStorageKey(filePath)
+            resolvedPath: canonicalKeyOrBadRequest(filePath)
         };
     };
 
@@ -307,7 +313,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         const bucket = typeof body["bucket"] === "string" ? body["bucket"] : undefined;
         const storageId = typeof body["storageId"] === "string" ? body["storageId"] : c.req.query("storageId");
 
-        const finalKey = sanitizeStorageKey(key || uploadedFile.name || "unnamed");
+        const finalKey = canonicalKeyOrBadRequest(key || uploadedFile.name || "unnamed");
 
         // Extract custom metadata from request body
         const metadata: Record<string, unknown> = {};
@@ -512,10 +518,11 @@ message: "No file to delete" });
      * GET /list - List files in a path
      */
     router.get("/list", writeAuthMiddleware, async (c) => {
-        // Fallback to path for backward compatibility. Sanitize the prefix the
-        // same way object keys are sanitized elsewhere, so a listing cannot be
-        // steered out of the bucket with `../` before it hits the controller.
-        const storagePrefix = sanitizeStorageKey(c.req.query("prefix") || c.req.query("path") || "");
+        // Fallback to path for backward compatibility. The prefix is
+        // canonicalized like any other key: a listing is the one operation
+        // where a prefix that means something other than what it says hands
+        // back exactly the keys the hook meant to withhold.
+        const storagePrefix = canonicalKeyOrBadRequest(c.req.query("prefix") || c.req.query("path") || "");
         const bucket = c.req.query("bucket");
         const maxResults = c.req.query("maxResults");
         const pageToken = c.req.query("pageToken");
@@ -597,9 +604,14 @@ message: "No file to delete" });
         tusBaseDir,
         defaultCtrl,
         registry,
+        // The key arrives already canonical: `TusHandler` canonicalizes once at
+        // creation and stores the result, so the key shown here is the exact
+        // key `finalize` writes. Canonicalizing again *here* would recreate the
+        // bug this closes — two call sites deriving the key separately is how
+        // the check and the write came apart in the first place.
         authorize
             ? async (c, key, bucket) => {
-                await checkAuthorized(c as never, "write", sanitizeStorageKey(key), bucket, c.req.query("storageId"));
+                await checkAuthorized(c as never, "write", key, bucket, c.req.query("storageId"));
             }
             : undefined
     );
