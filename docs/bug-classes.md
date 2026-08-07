@@ -1080,6 +1080,48 @@ have.
 
 ---
 
+## 31. A quantity read from outside, parsed but never checked
+
+`parseInt`, `parseFloat`, `Number` and `JSON.parse` all answer *something* for
+input they cannot read: `NaN`, or a value of the wrong shape. None of them
+throws, so the check has to be written, and it is the kind of line that reads
+like noise next to the parse that "obviously" worked.
+
+Three properties make this class worth sweeping as one rather than fixing one at
+a time. The input is almost always **aged** — a port file, a `localStorage`
+entry, a spreadsheet column, a query parameter — so it was written by something
+that is no longer running and no longer agrees with the reader. The failure is
+**silent**, because `NaN` and `undefined` flow onward and fail somewhere else.
+And the sites come in **pairs**, one checked and one not, because the check gets
+written the first time somebody is bitten and not propagated to its twin:
+
+| checked | its unchecked twin |
+|---|---|
+| the dev-server port *file* — range-checked, with a test naming "0", "-1", "65536", "not-a-port" | `process.env.PORT`, one line above, straight to `parseInt` |
+| `SplitListView.getSavedPanelSize` — `!isNaN(val) && val > 0 && val < 100` | two other stored pane sizes, bare `parseFloat` |
+| `?where=` — malformed is a 400, and the docblock says why | `?orderBy=`, six lines below, whatever `JSON.parse` returned |
+| the `vector` import branch — empty string to `null`, NaN to a default | the `number` import branch, twelve lines below, bare `Number` |
+| `rebase_sql_tabs_*` read inside a `try` | the *same key*, read again in a `useState` initializer |
+
+**Sweep:** `grep -rnE "parseInt\(|parseFloat\(|Number\(|JSON\.parse"` and, for
+each hit, ask what the function returns for input it cannot read and whether the
+next line can tell. Then look for the sibling: the same value read somewhere
+else, the same parameter parsed by the neighbouring branch.
+
+**Watch for:** `Number("")`, which is `0` and perfectly finite. It is the one
+value in this class that survives an `isFinite` check, and it turns "nobody
+filled this in" into a real quantity — a zero price, a zero quantity, a pane
+sized to nothing. `GeopointFieldBinding` carries a comment about exactly this;
+the importer did not.
+
+**Watch for, too:** a parse in a `useState` initializer. It runs during render,
+so what it throws takes the view down — and the value that threw is still in
+storage on reload, so the view stays down. That is the difference between a bad
+value and a bricked screen, and it is why the fix is a helper that cannot throw
+rather than a `try` at each site.
+
+---
+
 ## The discipline
 
 When you find a bug:
@@ -1447,3 +1489,39 @@ worked first time because `return () => {}` is the *stub itself* rather than a
 description of it. Prefer hunting the artifact a defect leaves behind over
 hunting the situation that produces it — one is a string, the other is a
 judgement call.
+
+---
+
+### Last sweep — 2026-08-07
+
+An open-ended pass over the whole monorepo, after merging the outstanding
+branches into main. Two classes came out of it — one new (31), one an
+application of 2 — and a red main that nobody had noticed.
+
+| checked | result |
+|---|---|
+| every relative-time formatter (7) | **BUG** (class 2) — five assumed their input was in the past. A date next month read "Just now"; one two hours out read "-1d ago". Unified on `formatRelativeTime` in `@rebasepro/utils`. |
+| every `JSON.parse` of persisted UI state | **BUG** (class 31) — the SQL editor parsed its tabs and column widths in `useState` initializers, so one unreadable entry bricked the view on every reload. `readStoredJson`/`writeStoredJson` now cover all four failure modes. |
+| `?orderBy=` shape vs `?where=` shape | **BUG** (classes 2, 31) — the sort *field* has been schema-checked for a while; the parameter's *shape* was not, so `?orderBy={"field":"name"}` answered 200 with unsorted rows. Now a 400, matching the published OpenAPI parameter. |
+| `resolveStartPort`, both sources | **BUG** (class 31) — the port file was range-checked and tested; `PORT` was not. `PORT=oops` started the dev server on `NaN`. |
+| the number branch of the data importer | **BUG** (class 31) — `Number("")` is 0, so blank cells imported as real zeros and typos as NaN. |
+| `check:derived-names` on main | **RED** — `d9da841e` renamed the emitted schema `auth` → `rebase` and left the contract naming the old one. Verified `dropLegacyAuthSchema` handles aged databases before regenerating. |
+| `check:unused` ratchet on main | **RED** — the list-view merge removed three findings and left the baseline unbanked. |
+| `ADMIN_COLLECTION_KEYS` count gate | **RED** — the same merge added `hideFromEntityViews` to the list, correctly sorted, and left the tripwire at 40. |
+| `ListView` pagination gate (`isLoadingMore`) | clean — suspected a wedge when a page loads without flipping `dataLoading`; `useCollection` calls `setDataLoading(true)` synchronously on every `itemCount` change, so the reset always runs. |
+| API-key permission guard on an empty list | clean — still fails closed by construction |
+| `applyCollectionDefaults` on a collection with no rules | clean |
+| inbound WebSocket frame parsing | clean — inside the handler's `try`, and a non-object destructure is caught with it |
+| comparator-less `.sort()` (20 sites) | clean — every one is on strings |
+| empty `catch` blocks in server/client | clean — all are teardown (`unlink`, `client.end`, socket close) |
+
+Worth repeating: three of the eight findings were *red gates on main that no
+run had reported*, because `check:unused` fails early in the job and everything
+after it is skipped. A gate that never gets reached is a gate that is not
+running, and the ordering made two real failures invisible behind a ratchet
+that only wanted a number banked.
+
+The other thing this sweep confirms is the pairing in class 31. Not one of the
+five parse bugs was in code nobody had thought about — every single one had a
+sibling a few lines away that was already doing it correctly, with a comment or
+a test explaining why. The check was written once and never carried across.
