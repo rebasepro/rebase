@@ -1,4 +1,5 @@
 import { ANONYMOUS_USER_ID, ANONYMOUS_USER_IDS, LiteralPolicyOperand, PolicyExpression, policy, rewriteLegacyRlsFunctions } from "@rebasepro/types";
+import { toSnakeCase } from "@rebasepro/utils";
 
 /**
  * A tiny, regex-based SQL "parser" for security rules.
@@ -276,20 +277,100 @@ function parseOperand(str: string) {
     // pre-rename spelling and stays parseable: policies are data, so a
     // database provisioned before the rename still holds rules written
     // against it, and round-tripping one must not silently drop the operand.
-    if (/current_setting\s*\(\s*'app\.(uid|user_id)'\s*\)/i.test(str) || /rebase\.uid\(\)/i.test(str)) {
+    //
+    // ANCHORED, and that is the whole point. These tests used to be
+    // unanchored — `.test(str)` rather than `^…$` — so any operand text that
+    // merely *contained* a uid call was replaced wholesale by the call itself.
+    // Everything else in the expression was discarded with it, including a
+    // leading `NOT (`:
+    //
+    //   NOT (rebase.uid() = rebase.uid())   parsed as   rebase.uid() = rebase.uid()
+    //
+    // A deny became an unconditional grant. The realistic spelling is a
+    // hand-written defensive rule with a uid call on both sides —
+    //   COALESCE(rebase.uid(), '') = COALESCE(owner_id, rebase.uid())
+    // — which collapsed to the same tautology. This is not confined to the
+    // admin UI: `securityRuleToConditions` feeds a rule's raw `using:` string
+    // through here, and the Postgres DDL generators compile the result, so the
+    // tautology was written into the database as the policy body.
+    //
+    // An operand this cannot identify exactly must return null, which drops the
+    // whole clause to `raw` and reproduces it verbatim. That is the rule the
+    // rest of this file already follows: when in doubt, prefer `raw`.
+    if (/^current_setting\s*\(\s*'app\.(uid|user_id)'\s*\)$/i.test(str) || /^rebase\.uid\(\)$/i.test(str)) {
         return policy.authUid();
     }
 
-    // Literal string: 'value'
-    const stringMatch = str.match(/^'(.+)'$/);
-    if (stringMatch) {
-        return policy.literal(stringMatch[1]);
+    // Literal string: 'value', with `''` decoded back to a single quote.
+    //
+    // `quoteLiteral` doubles every quote on the way out, and this did not undo
+    // it, so a literal containing an apostrophe grew on every trip: O'Brien →
+    // O''Brien → O''''Brien, doubling each time a policy was read back and
+    // recompiled. Past the first trip the emitted policy compares against a
+    // string no row holds.
+    const literal = parseSingleQuoted(str);
+    if (literal !== null) {
+        return policy.literal(literal);
     }
 
-    // Bare field name
-    if (/^\w+$/.test(str)) {
+    // Unquoted literals, which must be recognised BEFORE the bare-word branch
+    // below or they are read as column names.
+    //
+    // `quoteLiteral` emits booleans, numbers and null unquoted, so `a = false`
+    // came back as a comparison against a *field* called `false`, and `a = 42`
+    // against a field called `42`. The recompiled SQL is identical either way,
+    // which is why this survived a round-trip check on the SQL — but the
+    // expression is now wrong, and the expression is what the admin UI
+    // evaluates. Against a row with no `a`, Postgres denies (`NULL = false` is
+    // not true) while the JS evaluator compared two missing columns, found them
+    // equal, and allowed. That is precisely the client/database drift the
+    // shared PolicyExpression model exists to make impossible.
+    //
+    // Unambiguous in both directions: a SQL identifier cannot begin with a
+    // digit, and bare `true`/`false`/`null` are always the literals — a column
+    // so named would have to be double-quoted to be referenced at all.
+    if (/^-?\d+$/.test(str)) return policy.literal(Number(str));
+    if (/^-?\d*\.\d+$/.test(str)) return policy.literal(Number(str));
+    if (/^true$/i.test(str)) return policy.literal(true);
+    if (/^false$/i.test(str)) return policy.literal(false);
+    if (/^null$/i.test(str)) return policy.literal(null);
+
+    // Bare field name — but only one that survives the snake-casing the
+    // compiler will apply to it. `toSnakeCase("_")` is the empty string, and a
+    // field that compiles to an empty column reference emits `= 'x'`, which is
+    // a syntax error at CREATE POLICY time. Such a name is left to `raw`, where
+    // it round-trips verbatim instead. `toSnakeCase` itself is not touched:
+    // column names derived by it are already in shipped databases.
+    if (/^\w+$/.test(str) && toSnakeCase(str) !== "") {
         return policy.field(str);
     }
 
     return null;
+}
+
+/**
+ * Decode a single-quoted SQL literal, or null when `str` is not exactly one.
+ *
+ * Rejecting is as important as decoding: `'a' = 'b'` is two literals and an
+ * operator, not one literal whose body contains a quote, and a regex anchored
+ * on the outer quotes would happily read it as the latter. Every interior quote
+ * must therefore be part of a `''` pair.
+ */
+function parseSingleQuoted(str: string): string | null {
+    if (str.length < 2 || !str.startsWith("'") || !str.endsWith("'")) return null;
+    const body = str.slice(1, -1);
+    let out = "";
+    for (let i = 0; i < body.length; i++) {
+        if (body[i] !== "'") {
+            out += body[i];
+            continue;
+        }
+        if (body[i + 1] === "'") {
+            out += "'";
+            i++;
+            continue;
+        }
+        return null; // a bare quote — `str` is not a single literal
+    }
+    return out;
 }
