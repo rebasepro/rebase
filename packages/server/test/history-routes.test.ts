@@ -45,11 +45,27 @@ function mount(entry: Entry | null) {
         getCollections: () => [collection("posts"), collection("comments")]
     } as unknown as BackendCollectionRegistry;
 
+    // The request-scoped, RLS-bound driver every request to this router carries
+    // — the auth middleware sets it before the route is ever reached. The route
+    // reads the target row through it to decide whether this caller may see the
+    // row's history at all; here that caller can see `post-1`, so these tests
+    // are about the guard *after* authorization. See
+    // `history-routes-authorization.test.ts` for the guard itself.
+    const scopedDriver = {
+        fetchOne: jest.fn(async ({ id }: { id: string | number }) =>
+            (String(id) === "post-1" ? { id, title: "current title" } : undefined)),
+        save
+    } as unknown as DataDriver;
+
     const app = new Hono<HonoEnv>();
+    app.use("/*", async (c, next) => {
+        c.set("driver", scopedDriver);
+        await next();
+    });
     app.route("/api/data", createHistoryRoutes({
         historyService,
         registry,
-        driver: { save } as unknown as DataDriver
+        driver: { save: jest.fn() } as unknown as DataDriver
     }));
 
     return { app, save };
