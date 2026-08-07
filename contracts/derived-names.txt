@@ -133,7 +133,7 @@ policy shop.inventory_items.inventory_items_delete_82b8225 (permissive delete) [
 policy shop.inventory_items.inventory_items_insert_29ea277 (permissive insert) [boot,push]
 policy shop.inventory_items.inventory_items_select_841c287 (permissive select) [boot,push]
 policy shop.inventory_items.inventory_items_update_b2b72ff (permissive update) [boot,push]
-schema auth [push]
+schema rebase [push]
 schema shop [push]
 table public.addresses [boot,push]
 table public.categories [boot,push]
