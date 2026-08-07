@@ -1563,3 +1563,84 @@ The other thing this sweep confirms is the pairing in class 31. Not one of the
 five parse bugs was in code nobody had thought about — every single one had a
 sibling a few lines away that was already doing it correctly, with a comment or
 a test explaining why. The check was written once and never carried across.
+
+
+---
+
+## 33. A privileged reader on a route that never asks who is calling
+
+Some data cannot live under row policies. An audit table shadows every table it
+audits, so it cannot carry their `securityRules`; a search index spans
+collections; a metrics rollup is nobody's row. The honest answer is to read
+those through the privileged handle and **revoke the restricted role's access**
+so no client can reach them by SQL.
+
+That revoke closes one door and quietly nominates the route in front of it as
+the entire access-control model — the same position `storageAuthorize` is in.
+And a route that inherited its mounting from a router where *every other
+handler* is authorized tends not to notice it has been handed that job.
+
+The tell is a route handler that reads through a service captured in a closure
+while its neighbours read through `c.get("driver")`.
+
+**Recipe.** For every router that serves data, list the handlers and ask of each
+one where its data comes from. Any handler whose read does not pass through the
+request-scoped driver is either (a) authorized by hand — check that it is — or
+(b) unauthorized. Grep is enough to enumerate but not to judge:
+
+```
+grep -rn 'c.get("driver")' packages/server/src   # the ones that do
+```
+
+then read the routers those files *don't* appear in. The gap is the finding.
+Note that "it revokes the table from `rebase_user`" is evidence the author knew
+the data was sensitive — it is not evidence the HTTP path is closed.
+
+**Found:** `GET /api/data/:slug/:id/history` returned `values` and
+`previous_values` — the complete contents of a row at every past revision — for
+any id in any history-enabled collection, to any authenticated caller, and to
+any API key regardless of its permission list. The REST generator mounted one
+line below it in `init.ts` has `getScopedDriver`, which refuses to fall back to
+the unscoped driver, in a comment naming this exact hazard.
+
+### Last sweep — 2026-08-07, the second pass
+
+An open-ended pass over surfaces the log had never named: auth token lifecycle,
+injection, SSRF, transaction boundaries, cache isolation. Three findings, one
+new class (33), and a tool.
+
+| checked | result |
+|---|---|
+| every route that reads data, against the driver it reads through | **BUG** (class 33, P0) — `GET /:slug/:id/history` read the audit table on the *privileged* handle and applied no authorization of its own: neither RLS nor the API key's permission list. Every past value of every row in a history-enabled collection, to anyone signed in. Fixed by asking the request-scoped driver for the row first — a 404 when it is not visible, never a 403. |
+| the same route's revert half | **already guarded, and tested** — the cross-entity check was load-bearing and had a suite reasoning about it. The list route beside it had `fetchHistory` mocked to `{ data: [], total: 0 }` and was never exercised. The guard people thought about is the guard they tested. |
+| `c.get("driver") \|\| driver` on the revert write | **BUG, latent** — an RLS-free write reached by the *absence* of a value. Unreachable once authorization runs first; removed rather than left armed. |
+| every optional field on an exported `*Config`/`*Options`, against whether anything reads it (`scripts`-style pass, 607 fields) | **BUG** ×1 (class 21) — `EmailConfig.templates.userInvitation`. Read by nothing; `finalizeAdminUserCreation` reached past it to `passwordReset`, so an admin creating an account sent that person **"Reset your <App> password"** for an account they had never seen. `getUserInvitationTemplate` was written, typed, exported and unit-tested — every part of it except the call. |
+| `X-Real-IP` against the reasoning already done for `X-Forwarded-For` | **BUG** (class 2) — read unconditionally, including under `trustedProxyHops: 0`, the mode that means "no proxy is in front of me". With no proxy nothing writes it but the caller, so the rate-limit key was theirs to choose: the limiters on login, registration and password reset counted to one. Now believed only where a hop is declared; otherwise the connection's own address, via `@hono/node-server/conninfo`. |
+| the test that should have caught it | **asserted the defect** (class 7) — "With no trusted proxy, only X-Real-IP is believed", three lines below the XFF test that gets it right. It kept passing after the fix, for a different reason. |
+| history pagination `meta` | **BUG** — echoed the *requested* limit while serving the clamped one, so a client paginating on `meta` skips what it never received. |
+| `SET LOCAL ROLE` + `set_config(is_local: true)` on the data plane | clean, and the reference for this repo — fails closed by construction, and `LOCAL` means a pooled connection cannot carry one request's identity into the next. |
+| `executeSql`'s fail-open when the role switch is refused | clean in reach — `EXECUTE_SQL` is in `ADMIN_ONLY_TYPES`, and an admin already has the connection. Worth knowing the asymmetry exists: the same operation fails closed on one path and open on the other. |
+| every `sql.raw` built from a template (131 sites) | clean — DDL over developer-controlled identifiers, and `BranchService` validates against `^[a-zA-Z0-9_-]+$` before quoting. |
+| email normalization across both drivers | clean — one `normalizeEmail`, called inside each repository rather than by its callers, so a caller that forgets cannot break it. |
+| every outbound `fetch` with a non-literal URL | clean — OAuth endpoints are literals or config; `WebhookDispatcher` is instantiated by the developer, not from data. |
+| module-level caches in server / server-postgres / saas | clean — three, all keyed on cluster id or Stripe lookup key, none per-tenant. |
+| `applyAdminGate` on every admin surface | clean — fresh router, gate, *then* route, consistently. The comment on the schema editor explains what happens when that order is reversed. |
+| `check:derived-names`, `names`, `generated`, `control-chars`, `api-surface`, `hooks`, `test-scripts`, `unused`, `untranslated`, `deps` on main | all green — unlike the previous sweep. |
+
+Two things worth keeping.
+
+The first is the tool. "Which of our options are lies?" was a hunch until it was
+a script: parse every exported `*Config`/`*Options` interface, take the optional
+fields, and ask whether the name occurs anywhere that is not its own
+declaration or a doc comment. 607 fields, 6 candidates, 1 real — a good ratio
+for something that runs in two seconds, and it re-runs on every future config
+addition. Four of the five `EmailConfig.templates` slots were wired; the fifth
+was not, and no amount of reading `EmailConfig` would have told you which.
+
+The second is that two of the three findings were *inconsistencies with a
+correct sibling in the same file or the next one over* — `X-Real-IP` beside
+`X-Forwarded-For`, `userInvitation` beside `passwordReset`. That is class 31's
+pairing again, now seen often enough to state plainly: **the highest-yield
+question in this codebase is not "is this right?" but "does this agree with the
+thing next to it?"** Both fixes were three lines. Finding them was the work.
+
