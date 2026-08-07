@@ -5,6 +5,7 @@ export * from "./chips";
 export * from "./properties";
 export * from "./admin_block";
 export * from "./collections";
+export * from "./search";
 export * from "./relations";
 export * from "./policy";
 export * from "./rls-functions";

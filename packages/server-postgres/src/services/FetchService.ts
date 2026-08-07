@@ -22,6 +22,7 @@ import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { toFlatRow, toRestRow, isJunctionRelation } from "./row-pipeline";
+import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
 import { ApiError, logger } from "@rebasepro/server";
 import { reachedDatabase } from "../utils/pg-error-utils";
@@ -407,6 +408,15 @@ export class FetchService {
     ): Record<string, unknown> {
         const queryOpts: Record<string, unknown> = {};
 
+        // Same exclusion the `db.select` fallback applies, in the shape the
+        // relational query builder takes. Both paths serve the same request, so
+        // a row must not carry the search column down one and not the other.
+        const hidden = hiddenColumnsOption(
+            getTableColumns(table),
+            this.registry.getCollectionByPath(collectionPath) ?? undefined
+        );
+        if (hidden) queryOpts.columns = hidden;
+
         if (withConfig) queryOpts.with = withConfig;
 
         // Build where conditions
@@ -417,7 +427,7 @@ export class FetchService {
         if (options.searchString) {
             const collection = getCollectionByPath(collectionPath, this.registry);
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, collection.properties, table
+                options.searchString, collection.properties, table, collection
             );
             if (searchConditions.length === 0) {
                 // Return options that will produce empty results
@@ -607,9 +617,12 @@ idColumn };
             try {
                 const withConfig = this.buildWithConfig(collection);
 
+                const hidden = hiddenColumnsOption(getTableColumns(table), collection);
+
                 const row = await qb.findFirst({
                     where: eq(idField, parsedId),
-                    with: withConfig
+                    with: withConfig,
+                    ...(hidden ? { columns: hidden } : {})
                 } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
 
                 if (!row) return undefined;
@@ -631,8 +644,9 @@ idColumn };
         }
 
         // Fallback: db.select + N+1 relation loading
+        const visibleOne = visibleColumnProjection(getTableColumns(table), collection);
         const result = await this.db
-            .select()
+            .select(visibleOne as never)
             .from(table)
             .where(eq(idField, parsedId))
             .limit(1);
@@ -763,17 +777,21 @@ idColumn };
             vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch);
         }
 
+        // A generated search column is an index in column form; `SELECT *`
+        // would ship it to every caller. The projection is undefined — and the
+        // SQL therefore unchanged — for any table without one.
+        const visible = visibleColumnProjection(getTableColumns(table), collection);
         let query = vectorMeta
-            ? this.db.select({ table_row: table,
+            ? this.db.select({ table_row: (visible ?? table) as never,
 _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
-            : this.db.select().from(table).$dynamic();
+            : (visible ? this.db.select(visible as never).from(table).$dynamic() : this.db.select().from(table).$dynamic());
         const allConditions: SQL[] = [];
 
         if (scopeCondition) allConditions.push(scopeCondition);
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, collection.properties, table
+                options.searchString, collection.properties, table, collection
             );
             if (searchConditions.length === 0) return [];
             allConditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions)!);
@@ -1034,7 +1052,7 @@ relatedTo: hop });
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, collection.properties, table
+                options.searchString, collection.properties, table, collection
             );
             if (searchConditions.length === 0) return 0;
             allConditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions)!);
@@ -1308,8 +1326,9 @@ relatedTo: hop }, include
         }
 
         // Fallback: db.select + N+1 relation loading
+        const visibleOne = visibleColumnProjection(getTableColumns(table), collection);
         const result = await this.db
-            .select()
+            .select(visibleOne as never)
             .from(table)
             .where(eq(idField, parsedId))
             .limit(1);
@@ -1384,17 +1403,21 @@ relatedTo: hop }, include
             vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch);
         }
 
+        // A generated search column is an index in column form; `SELECT *`
+        // would ship it to every caller. The projection is undefined — and the
+        // SQL therefore unchanged — for any table without one.
+        const visible = visibleColumnProjection(getTableColumns(table), collection);
         let query = vectorMeta
-            ? this.db.select({ table_row: table,
+            ? this.db.select({ table_row: (visible ?? table) as never,
 _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
-            : this.db.select().from(table).$dynamic();
+            : (visible ? this.db.select(visible as never).from(table).$dynamic() : this.db.select().from(table).$dynamic());
         const allConditions: SQL[] = [];
 
         if (options.relatedTo) allConditions.push(this.buildRelationScope(options.relatedTo));
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, collection.properties, table
+                options.searchString, collection.properties, table, collection
             );
             if (searchConditions.length === 0) return [];
             allConditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions)!);

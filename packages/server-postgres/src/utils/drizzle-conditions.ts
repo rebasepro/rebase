@@ -9,6 +9,8 @@ import {
     getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations
 } from "@rebasepro/common";
 import { generateForeignKeyName } from "@rebasepro/utils";
+import { DEFAULT_FUZZY_THRESHOLD } from "@rebasepro/types";
+import { buildSearchColumnSpec, SEARCH_UNACCENT_FN, type SearchColumnSpec } from "../schema/search-column";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { ApiError, logger } from "@rebasepro/server";
@@ -1275,14 +1277,36 @@ whereConditions };
     }
 
     /**
-     * Build search conditions for text fields
+     * Build search conditions for text fields.
+     *
+     * Two shapes, chosen by whether the collection declared a `search` block:
+     *
+     * - **Declared** — one `@@ websearch_to_tsquery` against the generated
+     *   `tsvector` column. Stems, drops stopwords, AND-es the terms, reaches
+     *   inside JSONB and arrays, and uses the GIN index.
+     * - **Not declared** — the original `ILIKE '%term%'` OR-ed across top-level
+     *   string properties, unchanged.
+     *
+     * The second is the default and stays the default. A collection that has
+     * not opted in compiles to exactly the SQL it compiled to before this
+     * branch existed, which is the only reason it is safe to have added it.
+     *
+     * `collection` is optional so that the callers which genuinely have no
+     * collection in hand — nested paths, derived views — keep working; without
+     * one there is no `search` block to read and the ILIKE path is correct.
      */
     static buildSearchConditions(
         searchString: string,
         properties: Record<string, unknown>,
-        table: PgTable<any>
+        table: PgTable<any>,
+        collection?: CollectionConfig
     ): SQL[] {
         const searchConditions: SQL[] = [];
+
+        const ftsCondition = collection
+            ? DrizzleConditionBuilder.buildFullTextCondition(searchString, table, collection)
+            : undefined;
+        if (ftsCondition) return [ftsCondition];
 
         for (const [key, prop] of Object.entries(properties)) {
             const p = prop as Record<string, unknown>;
@@ -1305,6 +1329,101 @@ whereConditions };
         }
 
         return searchConditions;
+    }
+
+    /**
+     * The `@@` predicate for a collection that declared a `search` block, or
+     * undefined for one that did not.
+     *
+     * The query is normalized exactly as the indexed content was — same text
+     * search configuration, same accent folding. Skipping that on the query
+     * side is the subtle way to get a search that matches nothing: the column
+     * would hold `gestion` while the query asked for `gestión`.
+     *
+     * `websearch_to_tsquery` rather than `plainto_tsquery` because it is the
+     * one that behaves the way a search box looks like it should — quoted
+     * phrases, `or`, and a leading `-` to exclude — and because it never throws
+     * on user input, which `to_tsquery` does on so much as a stray parenthesis.
+     */
+    static buildFullTextCondition(
+        searchString: string,
+        table: PgTable<any>,
+        collection: CollectionConfig
+    ): SQL | undefined {
+        let spec: SearchColumnSpec | undefined;
+        try {
+            spec = buildSearchColumnSpec(collection);
+        } catch {
+            // Reported at boot. Falling back to ILIKE here keeps reads serving.
+            return undefined;
+        }
+        if (!spec) return undefined;
+
+        const column = table[spec.column as keyof typeof table] as AnyPgColumn | undefined;
+        if (!column) {
+            // The block is declared but the column is not on the table yet —
+            // a database that has not been migrated. ILIKE still answers.
+            return undefined;
+        }
+
+        const query = DrizzleConditionBuilder.normalizedTsQuery(searchString, spec);
+        const exact = sql`${column} @@ ${query}`;
+
+        if (!spec.fuzzy) return exact;
+
+        const fuzzyColumn = table[spec.fuzzy.column as keyof typeof table] as AnyPgColumn | undefined;
+        if (!fuzzyColumn) return exact;
+
+        const needle = spec.unaccent
+            ? sql`${sql.raw(SEARCH_UNACCENT_FN)}(${searchString})`
+            : sql`${searchString}`;
+
+        // `%` is the index-backed operator, but it tests against the session's
+        // `pg_trgm.similarity_threshold` (0.3), not ours. Above that default the
+        // `%` narrows using the index and `similarity` refines; at or below it,
+        // `%` would wrongly exclude rows the declared threshold admits, so the
+        // predicate stands alone and the planner scans.
+        const similar = sql`similarity(${fuzzyColumn}, ${needle}) >= ${spec.fuzzy.threshold}`;
+        const fuzzy = spec.fuzzy.threshold > DEFAULT_FUZZY_THRESHOLD
+            ? sql`(${fuzzyColumn} % ${needle} AND ${similar})`
+            : similar;
+
+        return sql`(${exact} OR ${fuzzy})`;
+    }
+
+    /**
+     * `websearch_to_tsquery(<config>, <normalized search string>)`.
+     *
+     * Split out because the ranking expression needs the identical query — a
+     * row ranked against a different tsquery than it was matched against is a
+     * ranking of something else.
+     */
+    static normalizedTsQuery(searchString: string, spec: SearchColumnSpec): SQL {
+        const normalized = spec.unaccent
+            ? sql`${sql.raw(SEARCH_UNACCENT_FN)}(${searchString})`
+            : sql`${searchString}`;
+        return sql`websearch_to_tsquery(${spec.language}, ${normalized})`;
+    }
+
+    /**
+     * `ts_rank(<column>, <query>)` for the collection, or undefined when it has
+     * not opted in. This is what backs `orderBy: ["_score", "desc"]`.
+     */
+    static buildSearchRankExpression(
+        searchString: string,
+        table: PgTable<any>,
+        collection: CollectionConfig
+    ): SQL | undefined {
+        let spec: SearchColumnSpec | undefined;
+        try {
+            spec = buildSearchColumnSpec(collection);
+        } catch {
+            return undefined;
+        }
+        if (!spec) return undefined;
+        const column = table[spec.column as keyof typeof table] as AnyPgColumn | undefined;
+        if (!column) return undefined;
+        return sql`ts_rank(${column}, ${DrizzleConditionBuilder.normalizedTsQuery(searchString, spec)})`;
     }
 
     /**

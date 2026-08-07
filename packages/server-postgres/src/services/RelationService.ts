@@ -423,7 +423,8 @@ export class RelationService {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
                 options.searchString,
                 targetCollection.properties,
-                targetTable
+                targetTable,
+                targetCollection
             );
 
             if (searchConditions.length === 0) {

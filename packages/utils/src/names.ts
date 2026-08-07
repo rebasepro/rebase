@@ -63,3 +63,21 @@ export function legacyForeignKeyName(name: string): string {
     const snake = toSnakeCase(name);
     return `${snake.endsWith("s") ? snake.slice(0, -1) : snake}_id`;
 }
+
+/**
+ * Truncate an identifier to what Postgres will actually store.
+ *
+ * Postgres silently truncates identifiers at NAMEDATALEN-1 = 63 **bytes**, so a
+ * name generated longer than that is not the name the database ends up holding.
+ * Anything that later looks the object up by the name it generated then misses.
+ *
+ * Byte length, not string length: NAMEDATALEN is a byte bound, and a multi-byte
+ * character straddling the boundary would be cut mid-sequence by `slice(0, 63)`.
+ */
+export function toPostgresIdentifier(name: string): string {
+    const bytes = Buffer.from(name, "utf8");
+    if (bytes.byteLength <= 63) return name;
+    // `toString` on a slice that ends mid-character yields U+FFFD; dropping it
+    // lands on the last whole character that fits, which is what Postgres does.
+    return bytes.subarray(0, 63).toString("utf8").replace(/�+$/, "");
+}

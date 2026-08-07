@@ -1,5 +1,6 @@
 import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, hasForeignKeyOnTarget } from "@rebasepro/types";
 import { getPrimaryKeys } from "../services/collection-helpers";
+import { buildSearchColumnSpec } from "./search-column";
 import { getEnumVarName, getTableName, getTableVarName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength, relationalCollections } from "@rebasepro/common";
 import { toSnakeCase, getPolicyNamesForRule } from "@rebasepro/utils";
 import { logger } from "@rebasepro/server";
@@ -479,11 +480,15 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
         )
     );
 
+    // drizzle ships no `tsvector` builder, so an opted-in search column reaches
+    // the schema the same way `bytea` does — through `customType`.
+    const hasSearch = collections.some(c => buildSearchColumnSpec(c) !== undefined);
+
     // Always import pgPolicy and sql — RLS is enabled on every table (secure by default)
     const pgCoreImports = ["primaryKey", "pgTable", "integer", "varchar", "text", "char", "boolean", "timestamp", "date", "time", "jsonb", "json", "pgEnum", "numeric", "real", "doublePrecision", "bigint", "serial", "bigserial", "pgPolicy"];
     if (hasUuid) pgCoreImports.push("uuid");
     if (hasVector) pgCoreImports.push("vector");
-    if (hasBinary) pgCoreImports.push("customType");
+    if (hasBinary || hasSearch) pgCoreImports.push("customType");
 
     const uniqueSchemas = Array.from(new Set(
         collections.map(c => isPostgresCollectionConfig(c) ? c.schema : undefined).filter(Boolean)
@@ -631,6 +636,25 @@ export const generateSchema = async (allCollections: CollectionConfig[], stripPo
                 if (columnString) columns.add(columnString);
 
             });
+
+            // The opt-in search column. Declared with its real generation
+            // expression rather than as a bare custom type: `schema.generated.ts`
+            // is what a developer running drizzle-kit themselves diffs against,
+            // and a column declared without its expression reads to drizzle-kit
+            // as one it should alter.
+            const searchSpec = buildSearchColumnSpec(collection);
+            if (searchSpec) {
+                columns.add(
+                    `    ${searchSpec.column}: customType({ dataType() { return 'tsvector'; } })("${searchSpec.column}")` +
+                    `.generatedAlwaysAs(sql\`${searchSpec.expression}\`)`
+                );
+                if (searchSpec.fuzzy) {
+                    columns.add(
+                        `    ${searchSpec.fuzzy.column}: text("${searchSpec.fuzzy.column}")` +
+                        `.generatedAlwaysAs(sql\`${searchSpec.fuzzy.expression}\`)`
+                    );
+                }
+            }
 
             // Backwards compatibility: if no id/primary key column is found in properties, but `id` wasn't explicitly provided
             // We should generate a basic id column if one was completely omitted.

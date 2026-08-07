@@ -1,7 +1,16 @@
 import { CollectionConfig, NumberProperty, Property, ResolvedRelation, RelationProperty, SecurityOperation, SecurityRule, StringProperty, isPostgresCollectionConfig, DateProperty, ArrayProperty, MapProperty, ReferenceProperty, VectorProperty, BinaryProperty, isManyToMany, type ResolvedManyToMany, type ResolvedBelongsTo } from "@rebasepro/types";
 import { getEnumVarName, getTableName, resolveCollectionRelations, findRelation, securityRuleToConditions, policyToPostgres, getEffectiveSecurityRules, getInjectedSecurityRules, resolveJunctionSpecs, getJunctionSecurityRules, getJunctionCollectionConfig, resolveStringColumnLength, relationalCollections } from "@rebasepro/common";
-import { toSnakeCase, getPolicyNamesForRule, generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
+import { toSnakeCase, getPolicyNamesForRule, generateForeignKeyName, legacyForeignKeyName, toPostgresIdentifier } from "@rebasepro/utils";
 import { AUTH_USERS_COLUMNS, authUsersColumnDefinition, authUsersColumnSql, isAuthCollection } from "./auth-users-columns";
+import {
+    buildSearchColumnSpec,
+    searchColumnDefinition,
+    fuzzyColumnDefinition,
+    searchIndexStatements,
+    searchHelperFunctions,
+    searchExtensionStatements,
+    type SearchColumnSpec
+} from "./search-column";
 import { REBASE_SCHEMA } from "@rebasepro/types";
 
 // --- Helper Functions ---
@@ -263,6 +272,26 @@ export const generatePostgresDdl = async (
     });
     if (uniqueSchemas.length > 0) ddl += "\n";
 
+    // 1b. Search support, for collections that opted in.
+    //
+    // Extensions and helper functions come before every CREATE TABLE because a
+    // generated column's expression is resolved at creation time: a table whose
+    // search column calls `rebase_search_text` cannot be created before that
+    // function exists. Both are `IF NOT EXISTS` / `OR REPLACE`, so a file
+    // replayed against a live database is a no-op here.
+    const searchSpecs = collections
+        .map(c => buildSearchColumnSpec(c))
+        .filter((s): s is SearchColumnSpec => s !== undefined);
+
+    if (searchSpecs.length > 0) {
+        const extensions = Array.from(new Set(searchSpecs.flatMap(searchExtensionStatements)));
+        const helpers = Array.from(new Set(searchSpecs.flatMap(searchHelperFunctions)));
+        ddl += "-- Full-text search support (collections declaring a `search` block)\n";
+        extensions.forEach(s => { ddl += `${s}\n`; });
+        if (extensions.length > 0) ddl += "\n";
+        helpers.forEach(s => { ddl += `${s}\n\n`; });
+    }
+
     // 2. Generate Enums
     //
     // The enum type name is derived from table + column, so two collections
@@ -330,6 +359,9 @@ export const generatePostgresDdl = async (
 
     // 3. Generate tables
     const fkStatements: string[] = [];
+    // Indexes follow the tables for the same reason the FK constraints do: the
+    // table has to exist first.
+    const indexStatements: string[] = [];
     // Policies are emitted after every CREATE TABLE, like the FK constraints:
     // a policy may reference other tables (a junction's derived policies always
     // reference both endpoints; `policy.existsIn` references a join table), and
@@ -526,6 +558,19 @@ export const generatePostgresDdl = async (
                 }
             }
 
+            // ── The opt-in search column ─────────────────────────────────────
+            // Last, so it reads as what it is: derived from the columns above
+            // it. Postgres recomputes it on every write of a source column and
+            // rejects any attempt to write it directly, which is the property
+            // that makes it impossible for the index to drift from the row.
+            const searchSpec = buildSearchColumnSpec(collection);
+            if (searchSpec) {
+                columns.push(`  ${searchColumnDefinition(searchSpec)}`);
+                const fuzzyDef = fuzzyColumnDefinition(searchSpec);
+                if (fuzzyDef) columns.push(`  ${fuzzyDef}`);
+                indexStatements.push(...searchIndexStatements(searchSpec));
+            }
+
             // Backwards compatibility: add default id primary key if missing
             const hasPk = columns.some(c => c.includes("PRIMARY KEY"));
             if (!hasPk) {
@@ -557,6 +602,11 @@ export const generatePostgresDdl = async (
     if (fkStatements.length > 0) {
         ddl += "-- Foreign Key Constraints\n";
         ddl += fkStatements.join("\n") + "\n\n";
+    }
+
+    if (indexStatements.length > 0) {
+        ddl += "-- Indexes\n";
+        ddl += indexStatements.join("\n") + "\n\n";
     }
 
     if (policyStatements.length > 0) {
@@ -642,13 +692,9 @@ const bareTableName = (name: string): string => (name.includes(".") ? name.split
  * Byte length, not string length: NAMEDATALEN is 64 bytes, and a multi-byte
  * character straddling the boundary would be cut mid-sequence by `slice(0, 63)`.
  */
-const toPostgresIdentifier = (name: string): string => {
-    const bytes = Buffer.from(name, "utf8");
-    if (bytes.byteLength <= 63) return name;
-    // `toString` on a slice that ends mid-character yields U+FFFD; dropping it
-    // lands on the last whole character that fits, which is what Postgres does.
-    return bytes.subarray(0, 63).toString("utf8").replace(/�+$/, "");
-};
+// Moved to `@rebasepro/utils` so the search-column builder derives index names
+// under the same 63-byte rule this file derives constraint names under. Two
+// copies of a truncation rule is two rules the moment one of them is edited.
 
 const foreignKeyPlan = (
     args: Omit<ForeignKeyPlan, "constraintName" | "sql"> & { onDelete: string; onUpdate?: string }

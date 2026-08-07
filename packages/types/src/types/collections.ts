@@ -7,6 +7,7 @@ import type { Relation } from "./relations";
 import type { SecurityRule } from "./security_rules";
 import { getDataSourceCapabilities } from "./data_source";
 import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operators";
+import type { SearchConfig } from "./search";
 
 /**
  * Base interface containing all driver-agnostic collection properties.
@@ -301,6 +302,21 @@ export interface PostgresCollectionConfig<M extends Record<string, unknown> = Re
      * @default false
      */
     disableDefaultPolicies?: boolean;
+
+    /**
+     * Opt in to Postgres full-text search for this collection.
+     *
+     * Omit it and `.search()` keeps its existing behaviour exactly — an
+     * `ILIKE '%term%'` across top-level string properties. Declare it and the
+     * collection gains one generated `tsvector` column and a GIN index, and
+     * `.search()` compiles to a ranked `@@ websearch_to_tsquery` against them.
+     *
+     * Postgres-only, like {@link VectorProperty}: the block is rejected at boot
+     * on other engines rather than silently ignored.
+     *
+     * @see SearchConfig
+     */
+    search?: SearchConfig;
 }
 
 /**
