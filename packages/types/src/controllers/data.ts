@@ -341,9 +341,15 @@ export interface FindResult<M extends Record<string, unknown> = Record<string, u
  * describes a *table*, and neither of these is in one. Without this, a caller
  * who sorted by relevance could not then read the relevance.
  *
+ * A `type` alias, deliberately, not an `interface`. TypeScript grants an
+ * implicit index signature to a type alias and withholds it from an interface,
+ * so `Row & QueryComputedFields` stops being assignable to
+ * `Record<string, unknown>` the moment this becomes an interface. Seven casts
+ * in one downstream app broke on exactly that.
+ *
  * @group Data
  */
-export interface QueryComputedFields {
+export type QueryComputedFields = {
     /**
      * Relevance, when the collection declares a {@link SearchConfig} and the
      * query carried a search string. Higher is better; the scale is not
@@ -356,7 +362,7 @@ export interface QueryComputedFields {
      * already ordered by it.
      */
     _distance?: number;
-}
+};
 
 /**
  * Which column an iteration seeks on, for keyset ("seek") pagination.

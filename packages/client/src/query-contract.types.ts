@@ -98,3 +98,17 @@ export const readComputed = (result: FindResult<ContractRow>) => {
 export const readUnknown = (result: FindResult<ContractRow>) =>
     // @ts-expect-error - `nope` is neither a column nor computed
     result.data[0].nope;
+
+/**
+ * A result row must stay assignable to `Record<string, unknown>`.
+ *
+ * Widening the row to `M & QueryComputedFields` broke this in seven places in
+ * one downstream app, because `QueryComputedFields` was first written as an
+ * `interface`: TypeScript grants an implicit index signature to a type alias
+ * and withholds it from an interface, so the intersection stopped overlapping
+ * with `Record<string, unknown>` and every `as Record<string, unknown>` cast
+ * became an error. Nothing in this repo casts a row that way, which is why
+ * nothing here noticed.
+ */
+export const rowStaysIndexable = (result: FindResult<ContractRow>) =>
+    result.data.map(row => row as Record<string, unknown>);
