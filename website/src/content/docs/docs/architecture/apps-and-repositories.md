@@ -127,8 +127,8 @@ what this repository contributes, and a link to the project:
 ```
 
 ```bash
-rebase link https://api.example.com     # a self-hosted project
-rebase link                             # or pick a Rebase Cloud project
+rebase cloud link https://api.example.com   # a self-hosted project
+rebase cloud link                           # or pick a Rebase Cloud project
 ```
 
 The link is written to `.rebase/cloud.json` and is **not committed** — it is

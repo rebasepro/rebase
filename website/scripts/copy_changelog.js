@@ -11,6 +11,7 @@ const destFile = path.resolve(__dirname, "../src/content/docs/docs/CHANGELOG.md"
 const frontmatter = `---
 slug: docs/changelog
 title: Changelog
+description: Every released change to Rebase — new features, fixes, and the breaking changes each version asks you to migrate.
 ---
 `;
 

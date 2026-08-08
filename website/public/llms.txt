@@ -3620,8 +3620,8 @@ If initialization fails (e.g., database connection error), the server still star
 
 ### Next Steps
 
-- **[Authentication](/docs/auth)** — JWT, Google OAuth, user management
-- **[Storage](/docs/storage)** — Local and S3 file storage
+- **[Authentication](/docs/backend/authentication)** — JWT, Google OAuth, user management
+- **[Storage](/docs/backend/storage)** — Local and S3 file storage
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks and `context.data` API
 - **[Entity History](/docs/backend/history)** — Audit trail
 - **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
@@ -4942,6 +4942,163 @@ Worth knowing:
 
 - **[Frontend Storage & File Uploads](/docs/frontend/storage)** — File upload fields and hooks
 - **[Properties](/docs/collections/properties)** — Storage property configuration
+
+## Multiple Databases and Buckets
+
+### Overview
+
+A project is not limited to one database and one bucket. Collections already
+route by `dataSource`, and file properties route by `storageSource`; this page is
+about how each named source gets its configuration.
+
+Two steps: **declare** the sources in your config package, then **configure**
+each one with environment variables derived from its key.
+
+### Declaring sources
+
+Export `dataSources` and `storageSources` from your config package's `index.ts`.
+They are shared with the frontend, which uses the same declarations to decide
+whether it talks to a source through the Rebase API or directly.
+
+```ts
+// config/index.ts
+
+export const dataSources: DataSourceDefinition[] = [
+    { key: "(default)", engine: "postgres" },
+    { key: "analytics", engine: "postgres", label: "Analytics warehouse" }
+];
+
+export const storageSources: StorageSourceDefinition[] = [
+    { key: "(default)", engine: "local", transport: "server" },
+    { key: "media", engine: "s3", transport: "server", label: "Public media" }
+];
+```
+
+Then point a collection at one:
+
+```ts
+
+const pageViewsCollection = defineCollection({
+    name: "Page Views",
+    slug: "page_views",
+    table: "page_views",
+    dataSource: "analytics",
+    properties: { /* … */ }
+});
+```
+
+...or a file property:
+
+```ts
+coverImage: {
+    name: "Cover image",
+    type: "string",
+    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+}
+```
+
+### Configuring each source
+
+Environment variable names are derived from the source key, so there is nothing
+to keep in sync by hand:
+
+```
+<VARIABLE>              the default source     DATABASE_URL, S3_BUCKET
+<VARIABLE>__<KEY>       a named source         DATABASE_URL__ANALYTICS, S3_BUCKET__MEDIA
+```
+
+The key is upper-cased and non-alphanumeric characters become underscores, so
+`media-cdn` reads `S3_BUCKET__MEDIA_CDN`.
+
+The separator is a **double** underscore on purpose. A single one would collide
+with real variable names — `S3_BUCKET_NAME` would parse as the bucket for a
+source called `name`.
+
+#### Databases
+
+```bash
+DATABASE_URL=postgres://localhost/app
+DATABASE_URL__ANALYTICS=postgres://warehouse.internal/analytics
+
+# Optional, per source:
+DB_POOL_MAX__ANALYTICS=5
+ADMIN_CONNECTION_STRING__ANALYTICS=postgres://…
+REBASE_DRIVER__ANALYTICS=@rebasepro/server-postgres
+```
+
+The driver is chosen from the declared `engine` (`postgres` and `mongodb` are
+known), and `REBASE_DRIVER__<KEY>` overrides it for anything else.
+
+#### Storage
+
+```bash
+STORAGE_TYPE__MEDIA=s3
+S3_BUCKET__MEDIA=my-media-bucket
+S3_REGION__MEDIA=eu-central-1
+S3_ACCESS_KEY_ID__MEDIA=…
+S3_SECRET_ACCESS_KEY__MEDIA=…
+```
+
+`STORAGE_TYPE__<KEY>` may be omitted when the declaration already names the
+engine.
+
+### Failure behaviour
+
+A declared server-transport data source with no connection string **fails the
+boot**, naming the variable to set. This is deliberate and worth understanding:
+the alternative is that collections routed to the missing source quietly fall
+back to the default database. That is data landing in the wrong place behind a
+server that reports itself healthy — far worse than a container that refuses to
+start.
+
+Two keys that would derive the same variable name are also rejected, because one
+of them would silently read the other's configuration.
+
+Sources declared with `transport: "direct"` are skipped entirely: the client
+talks to those itself, so the backend holds no connection and demands no
+configuration for them.
+
+### Storage access control
+
+Storage keys share one flat namespace and are not under row-level security, so
+without an explicit access-control model the default would be "any signed-in user
+may read, overwrite, delete or list any object". Production refuses to boot
+rather than assume that.
+
+The way to say what access means for your project is a `storageAuthorize` export
+from the config package — a function, because no environment variable can express
+"this user may read this key":
+
+```ts
+// config/index.ts
+
+export const storageAuthorize: StorageAuthorize = async ({ key, user, operation }) => {
+    if (!user) return false;
+    const [ownerId] = key.split("/");
+    return ownerId === user.uid || operation === "read";
+};
+```
+
+Two environment escapes exist for the cases where that really is the model:
+
+- `STORAGE_PUBLIC_READ=true` — the bucket is a public, read-only CDN. Writes,
+  deletes and listing still require authentication.
+- `STORAGE_ALLOW_ANY_AUTHENTICATED=true` — every signed-in user is trusted with
+  every file. Defensible for a single-tenant app, never for a multi-tenant one.
+
+### Storage in production
+
+With no bucket configured, storage is **off** in production and uploads answer
+`501`. Local disk is the container filesystem, so files written there vanish on
+the next restart — an upload that fails loudly can be retried, one that succeeded
+into a disk about to be wiped cannot. Set `FORCE_LOCAL_STORAGE=true` only when a
+durable volume really is mounted.
+
+One consequence worth knowing if you declare storage sources explicitly: no
+default bucket is invented for you. Declaring only a `media` source means there
+is no `(default)` source, and a property that does not name one has nowhere to
+go — deliberately, and identically in development and production. Declare
+`(default)` too if you want one.
 
 ## Realtime & WebSocket
 
@@ -12135,6 +12292,344 @@ When Rebase updates the database schema, it maps TypeScript collection definitio
 - **[Collections](/docs/collections)** — Full collection configuration reference
 - **[Properties](/docs/collections/properties)** — Detailed column type mappings
 
+## Runtime and Bundles
+
+### The two halves of a deployment
+
+A Rebase deployment is two things, not one:
+
+- **The bundle** — your project. Compiled collections, hooks, functions and cron
+  jobs, plus a generated manifest describing what they need.
+- **The runtime** — the engine. `@rebasepro/server`, shipped as the published
+  `rebasepro/server` container image.
+
+They are built, versioned and shipped separately. That single decision is what
+everything else on this page follows from: because the engine is not baked into
+your application image, it can be replaced underneath your project — for a
+security fix, a performance improvement, a new feature — without rebuilding
+anything you wrote.
+
+```
+  your repository                 built artifact              running container
+  ───────────────                 ──────────────              ─────────────────
+  config/collections/*.ts   ──►   dist-bundle/config/     ──►  rebasepro/server
+  backend/functions/*.ts          dist-bundle/backend/         + /bundle mounted
+  rebase.json                     dist-bundle/manifest.json
+```
+
+The runtime you self-host is the same runtime Rebase Cloud runs. There is no
+separate "platform" build, and nothing about the managed tier is unavailable to
+someone running `docker compose up`.
+
+### Building a bundle
+
+```bash
+rebase build
+```
+
+This regenerates the database schema from your collections, type-checks and
+compiles them, resolves import specifiers so Node can load the output directly,
+and writes `dist-bundle/` containing:
+
+| Path | What it is |
+| --- | --- |
+| `manifest.json` | Generated. The contract this bundle claims to satisfy. |
+| `package.json` | Generated. Your project's runtime dependencies. |
+| `config/` | Compiled collections. |
+| `backend/functions/` | Compiled server functions. |
+| `backend/crons/` | Compiled cron jobs. |
+| `backend/src/schema.generated.js` | Compiled database schema. |
+
+The manifest is worth understanding, because it is what a runtime validates
+before it agrees to boot:
+
+```jsonc
+{
+  "bundleFormat": 2,
+  "runtime": { "range": "^1", "builtAgainst": "0.13.0", "contract": 1 },
+  "schemaVersion": "v1:c5d97d0f96b7f87a",
+  "kind": "backend",
+  "entry": {
+    "config": "config",
+    "functions": "backend/functions",
+    "static": [{ "path": "/", "dir": "static/admin", "spa": true }]
+  },
+  "hooks": { "native": false },
+  "deps": { "declared": { "zod": "^4.4.3" } }
+}
+```
+
+`kind` is either `backend` — boot the server, plus any static apps in
+`entry.static` — or `static`, which serves those assets and nothing else: no
+database, no auth. Whether a backend declares its collections in code or
+introspects them from the live database is not a third kind; it is simply
+whether `entry.config` is there.
+
+### Running a bundle
+
+```bash
+rebase start                       # locally
+docker run -v ./dist-bundle:/bundle rebasepro/server   # anywhere
+```
+
+`rebase start` loads the bundle in-process, so signals and stack traces reach
+you directly. Locally it links your already-installed dependencies into the
+bundle so there is no second install; a deployment installs the bundle's own
+`package.json` instead.
+
+### Compatibility
+
+Two version numbers govern whether a bundle and a runtime can work together, and
+they are deliberately not the package version.
+
+**`bundleFormat`** is the on-disk layout. A runtime accepts any bundle whose
+format is less than or equal to its own, and refuses a newer one rather than
+half-loading it. An older bundle on a newer runtime must keep working — that is
+the entire point of the separation, so a runtime reads every format it has ever
+shipped. Format 1 bundles, which named this field `mode` and carried a single
+static directory, still boot unchanged.
+
+**`runtime.contract`** is the interface between a bundle and the engine. Within
+one contract major, any bundle that validated keeps validating. Patches and
+minors are drop-in; a major is not, and a runtime will refuse a bundle from a
+different one rather than start and misbehave later.
+
+This is why upgrading Rebase in a self-hosted deployment is a tag change:
+
+```yaml
+image: rebasepro/server:0.13.0   # was 0.12.0 — your bundle is untouched
+```
+
+### Development uses the same path
+
+`rebase dev` boots the same runtime over your TypeScript source instead of a
+compiled bundle. Hot reload still works, and development predicts production
+because both go through one boot path rather than two implementations that
+drift.
+
+A project that needs something the stock runtime does not do can still write its
+own `backend/src/index.ts` and import the server as a library. `rebase dev`
+detects it and runs it. See [Custom server](/docs/backend/custom-server/) — you
+lose the stock runtime, not the API surface.
+
+### What the runtime reads from the environment
+
+The runtime is configured entirely by environment variables, because that is what
+every deployment target agrees on.
+
+| Variable | Meaning |
+| --- | --- |
+| `DATABASE_URL` | Connection string for the default database. Required. |
+| `JWT_SECRET` | Signing secret, at least 32 characters. Required in production. |
+| `CORS_ORIGINS` | Comma-separated origins allowed to call the API. Required in production. |
+| `PORT` | Port to bind. Default `3001` locally, `8080` in the image. |
+| `REBASE_SERVICE_KEY` | Server-to-server key granting admin access. |
+| `REBASE_METRICS` | `true` to expose Prometheus metrics at `/metrics`. |
+| `REBASE_MIGRATE_ON_BOOT` | `none`, `ensure` or `push`. Defaults to `none` in production. |
+| `REBASE_SERVE_STATIC` | Serve the bundle's static assets from this process. Default on. |
+
+Several databases and several buckets are configured by suffixing the variable
+with the source key — see [Multiple databases and
+buckets](/docs/backend/multiple-sources/).
+
+### Endpoints the runtime always serves
+
+| Path | Purpose |
+| --- | --- |
+| `GET /health` | Readiness. Performs a database round-trip. |
+| `GET /livez` | Liveness. Deliberately does *not* touch the database, so a database blip cannot make an orchestrator kill a healthy process. |
+| `GET /api/meta/schema-version` | The current schema version. Unauthenticated — it is a version stamp, not a schema. |
+| `GET /api/meta/contract` | The full collection contract. Admin-only. |
+| `GET /metrics` | Prometheus metrics, when `REBASE_METRICS=true`. |
+
+## Apps and Repositories
+
+### Projects and apps
+
+A **project** is the backend: the database, auth, storage, realtime and
+functions. An **app** is something that talks to it.
+
+| Type | What it is |
+| --- | --- |
+| `backend` | The collections, hooks and functions that define the API. Exactly one per project. |
+| `static` | A built client bundle — an SPA or static site, served at its own path. |
+
+That is the whole list. The admin panel is a `static` app like any other: it is
+built in your repository, against your collections, which is why custom fields
+and custom views work in it on day one.
+
+Who owns the server process is a property of the backend, not a separate app
+type:
+
+| `runtime` | What it means |
+| --- | --- |
+| `managed` | The platform's runtime image runs your bundle. You supply collections, functions, crons and schema. |
+| `custom` | You supply the server: your own Dockerfile and entrypoint. `rebase eject` sets this up. |
+
+This is independent of *where* it runs. Both run on Rebase Cloud and both
+self-host — the destination lives in `.rebase/cloud.json`, not in the manifest.
+
+The important part is what *owns* the list. A repository declares only the apps
+it contains; the project owns the set of apps that exist. Two repositories never
+need to know about each other — they only need to know the project. That is what
+makes a separate frontend repository, or a mobile app with no repository
+relationship at all, an ordinary thing rather than a special case.
+
+### `rebase.json`
+
+The manifest declares topology, and nothing else. Schema, security rules, hooks
+and functions stay in TypeScript where a type system can check them.
+
+```jsonc
+{
+  "rebase": "^1",
+  "apps": {
+    "backend": { "type": "backend", "runtime": "managed" },
+    "site": {
+      "type": "static",
+      "root": "frontend",
+      "build": "npm run build --workspace frontend",
+      "output": "frontend/dist",
+      "path": "/"
+    },
+    "admin": {
+      "type": "static",
+      "root": "admin",
+      "build": "npm run build --workspace admin",
+      "output": "admin/dist",
+      "path": "/admin"
+    }
+  }
+}
+```
+
+One process serves all of it: the API at `/api`, the site at `/`, the admin at
+`/admin`. That is the self-hosting story, and a perfectly good small tier on
+Rebase Cloud.
+
+`path` is a **build-time** input as well as a serving one. An app mounted at
+`/admin` has to be *built* for `/admin`, or `index.html` loads and every asset
+404s — a blank page with no error anywhere. `rebase build` passes the value as
+`REBASE_APP_BASE`, which your bundler reads as its base path:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  base: process.env.REBASE_APP_BASE ?? "/",
+  // …
+});
+```
+
+and refuses to ship a build that ignored it.
+
+An existing project does not need one. The CLI infers the same layout from the
+directory structure, and `rebase apps init` writes it down when you want it
+explicit:
+
+```bash
+rebase apps list      # what this repository contributes
+rebase apps init      # write an inferred rebase.json
+```
+
+### Building and deploying apps
+
+```bash
+rebase build              # every app in this repository
+rebase build backend      # just the bundle
+rebase build admin        # just that app's static assets
+```
+
+The backend builds first, because a client app's build may consume an SDK
+generated from its collections.
+
+### Multiple repositories
+
+The monorepo stays the default: one repository with a backend and an admin panel
+is the simplest thing that works, and `rebase init` scaffolds it. Splitting up is
+the graduation step, not a requirement.
+
+In a separate frontend repository you need two things — a manifest declaring
+what this repository contributes, and a link to the project:
+
+```jsonc
+// rebase.json
+{
+  "rebase": "^1",
+  "apps": {
+    "marketing": {
+      "type": "static",
+      "root": ".",
+      "build": "npm run build",
+      "output": "dist"
+    }
+  }
+}
+```
+
+```bash
+rebase cloud link https://api.example.com   # a self-hosted project
+rebase cloud link                           # or pick a Rebase Cloud project
+```
+
+The link is written to `.rebase/cloud.json` and is **not committed** — it is
+per-checkout, like a git remote. The manifest is committed; the link is not.
+
+### Typed clients without the collections
+
+This is the mechanism that makes multi-repo work. A repository that contains no
+collections generates its typed SDK from the project itself:
+
+```bash
+rebase generate-sdk --from link
+rebase generate-sdk --from https://api.example.com --token $REBASE_SERVICE_KEY
+```
+
+The CLI fetches `/api/meta/contract`, rebuilds the collection definitions —
+including relation targets, which the type generator needs to decide whether a
+foreign key is a string or a number — and emits exactly the same output it would
+have produced from local source.
+
+The contract endpoint is admin-only. Collection definitions describe every table,
+column and relation in the project, including ones no security rule would ever
+expose; that is a map of the database, not public API documentation.
+
+### Detecting drift
+
+Splitting repositories costs you one thing worth naming: a schema change and the
+frontend that uses it no longer land in the same commit. The backend can deploy a
+change that strands a client built against the old shape.
+
+Every generated SDK records the schema it came from:
+
+```ts
+// src/rebase/schema.meta.ts — generated
+export const SCHEMA_VERSION = "v1:c5d97d0f96b7f87a";
+```
+
+And every project publishes its current one, without authentication, because a
+version stamp reveals nothing about the schema it stands for:
+
+```bash
+curl -s https://api.example.com/api/meta/schema-version
+# {"schemaVersion":"v1:c5d97d0f96b7f87a"}
+```
+
+Comparing the two in CI turns a silent mismatch into a failed check. The stamp
+changes when the generated types could change — a new property, a changed
+relation — and deliberately *not* when a hook, a security rule or an icon
+changes, so it does not cry wolf.
+
+### Client configuration
+
+```bash
+rebase apps config web
+```
+
+Prints what a client needs to reach the project. It never prints a secret: the
+API URL and an app's publishable identity are meant to ship inside a client
+bundle, and anything that is not safe there does not belong in output that will
+end up in a committed `.env`.
+
 ## Deployment
 
 ### What a Deployment Serves
@@ -12335,6 +12830,180 @@ catch-all serves `index.html` for both `/` and `/admin/*`.
 - **[Backend Overview](/docs/backend)** — Full backend configuration
 - **[Storage Configuration](/docs/backend/storage)** — S3 setup for production
 
+## Self-Hosting
+
+### Overview
+
+Self-hosting Rebase means running two things: a Postgres database, and the
+official `rebasepro/server` image with your project's bundle mounted into it.
+
+There is **no application image to build**. Your project travels as a bundle,
+the runtime is published, and upgrading Rebase is a tag change rather than a
+rebuild. See [Runtime and bundles](/docs/architecture/runtime-and-bundles/) for
+why it is split that way.
+
+### Docker Compose
+
+```bash
+rebase build                     # produces ./dist-bundle
+docker compose up -d db          # start Postgres
+rebase db push                   # create the collection tables, once
+docker compose up                # start the runtime
+```
+
+A minimal `docker-compose.yml`:
+
+```yaml
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: rebase_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: rebase
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase"]
+      interval: 5s
+      retries: 12
+
+  api:
+    image: rebasepro/server:latest
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgres://rebase:${POSTGRES_PASSWORD}@db:5432/rebase
+      JWT_SECRET: ${JWT_SECRET}
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    volumes:
+      # Writable: the container installs the bundle's declared dependencies into
+      # it on first start. See "Dependencies" below for the read-only variant.
+      - ./dist-bundle:/bundle
+    ports:
+      - "8080:8080"
+
+volumes:
+  db-data:
+```
+
+### Dependencies
+
+`rebase build` writes a `package.json` next to your bundle listing the
+dependencies your project declared. The container installs them on first start,
+which is why the mount above is writable.
+
+To mount read-only instead — worth doing, because a compromised hook then cannot
+rewrite the code that runs after the next restart — install them first:
+
+```bash
+npm install --omit=dev --prefix dist-bundle
+```
+
+```yaml
+    volumes:
+      - ./dist-bundle:/bundle:ro
+```
+
+For a real deployment, prefer baking both into an image, which also pins exactly
+what runs:
+
+```dockerfile
+FROM rebasepro/server:0.11.0
+COPY dist-bundle /bundle
+```
+
+### Creating the schema
+
+The runtime creates its own **auth** tables at boot. **Collection tables are a
+separate, deliberate step**, and the runtime image does not do it — a container
+restart must not be able to change a schema as a side effect of a deploy.
+
+```bash
+rebase db push
+```
+
+Run it from a checkout or a CI job, pointed at the deployment's database. It
+dry-runs the change first, refuses destructive ones without explicit
+confirmation, and can take a backup before applying.
+
+`REBASE_MIGRATE_ON_BOOT` accepts `ensure` (the default — auth tables only) and
+`none`.
+
+### Other platforms
+
+The runtime is an ordinary container listening on `$PORT`, so anything that runs
+containers works. Two things to get right everywhere:
+
+1. The bundle must be present at `/bundle` (or wherever `REBASE_BUNDLE` points),
+   with its dependencies installed beside it — see [Dependencies](#dependencies).
+2. Set `CORS_ORIGINS`, `JWT_SECRET` and `DATABASE_URL`. The runtime refuses to
+   start in production without them rather than guessing.
+
+#### Fly.io
+
+```toml
+[build]
+  image = "rebasepro/server:0.11.0"
+
+[http_service]
+  internal_port = 8080
+
+[[http_service.checks]]
+  path = "/livez"
+```
+
+Use the derived-image form above so the bundle ships with the app, then
+`fly deploy`.
+
+#### Railway / Render
+
+Point the service at the derived image, set the environment variables, and set
+the health check path to `/livez`.
+
+#### A plain VPS
+
+```bash
+npm install -g @rebasepro/server @rebasepro/server-postgres
+rebase-server /srv/myapp/dist-bundle
+```
+
+Run it under systemd, with `Environment=` lines for the variables above.
+
+### Health checks
+
+| Path | Use for |
+| --- | --- |
+| `/livez` | Liveness. Answers "is this process alive" without touching the database. |
+| `/health` | Readiness. Performs a database round-trip and reports latency. |
+
+Point liveness probes at `/livez`. A liveness probe on `/health` restarts a
+perfectly healthy process during a brief database hiccup, which is the opposite
+of what it is for.
+
+### Metrics
+
+```bash
+REBASE_METRICS=true
+REBASE_METRICS_TOKEN=<random string>
+```
+
+Exposes Prometheus metrics at `/metrics`: request counts and latency histograms
+broken down by API surface (data, auth, storage, functions) and collection, plus
+process gauges. Without a token the endpoint is readable by anyone who can reach
+the port, so set one unless it is on a private network.
+
+### Upgrading
+
+```yaml
+image: rebasepro/server:0.12.0
+```
+
+Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
+validated keeps working — see
+[Compatibility](/docs/architecture/runtime-and-bundles/#compatibility).
+
 ## Deploying Rebase on AWS
 
 Amazon Web Services (AWS) provides incredible scale and enterprise-grade security. For a production Rebase deployment, we recommend decoupling the architecture by using **Amazon RDS** for the PostgreSQL database and **AWS App Runner** (or ECS Fargate) to serve the Node.js backend. 
@@ -12450,7 +13119,7 @@ gcloud run deploy rebase-backend \
 Since Cloud Run instances are strictly stateless and ephemeral, you cannot use local disk storage for Rebase File Uploads.
 
 1. Navigate to **Google Cloud Storage** and create a new private bucket in your chosen EU region.
-2. Follow the [Rebase Storage Documentation](/docs/storage) to configure Rebase to use the S3-compatible API provided by Google Cloud Storage instead of the local filesystem.
+2. Follow the [Rebase Storage Documentation](/docs/backend/storage) to configure Rebase to use the S3-compatible API provided by Google Cloud Storage instead of the local filesystem.
 
 Your Rebase instance is now fully serverless and highly scalable natively inside the EU!
 

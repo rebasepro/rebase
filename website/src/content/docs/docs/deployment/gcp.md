@@ -53,7 +53,7 @@ gcloud run deploy rebase-backend \
 Since Cloud Run instances are strictly stateless and ephemeral, you cannot use local disk storage for Rebase File Uploads.
 
 1. Navigate to **Google Cloud Storage** and create a new private bucket in your chosen EU region.
-2. Follow the [Rebase Storage Documentation](/docs/storage) to configure Rebase to use the S3-compatible API provided by Google Cloud Storage instead of the local filesystem.
+2. Follow the [Rebase Storage Documentation](/docs/backend/storage) to configure Rebase to use the S3-compatible API provided by Google Cloud Storage instead of the local filesystem.
 
 Your Rebase instance is now fully serverless and highly scalable natively inside the EU!
 

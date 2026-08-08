@@ -76,6 +76,7 @@ export default defineConfig({
                         { label: "REST & GraphQL API", slug: "docs/backend/api" },
                         { label: "Authentication", slug: "docs/backend/authentication" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
+                        { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
                         { label: "Search", slug: "docs/backend/search" },
                         { label: "Cron Jobs", slug: "docs/backend/cron-jobs" },
@@ -144,7 +145,9 @@ export default defineConfig({
                     collapsed: true,
                     items: [
                         { label: "How Rebase Works", slug: "docs/architecture" },
-                        { label: "Schema as Code", slug: "docs/architecture/schema-as-code" }
+                        { label: "Schema as Code", slug: "docs/architecture/schema-as-code" },
+                        { label: "Runtime & Bundles", slug: "docs/architecture/runtime-and-bundles" },
+                        { label: "Apps & Repositories", slug: "docs/architecture/apps-and-repositories" }
                     ]
                 },
                 {
@@ -152,6 +155,7 @@ export default defineConfig({
                     collapsed: true,
                     items: [
                         { label: "Deployment Guide", slug: "docs/getting-started/deployment" },
+                        { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },
                         { label: "AWS", slug: "docs/deployment/aws" },
                         { label: "Google Cloud", slug: "docs/deployment/gcp" },
                         { label: "Azure", slug: "docs/deployment/azure" },

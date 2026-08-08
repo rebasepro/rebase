@@ -221,8 +221,8 @@ If initialization fails (e.g., database connection error), the server still star
 
 ## Next Steps
 
-- **[Authentication](/docs/auth)** — JWT, Google OAuth, user management
-- **[Storage](/docs/storage)** — Local and S3 file storage
+- **[Authentication](/docs/backend/authentication)** — JWT, Google OAuth, user management
+- **[Storage](/docs/backend/storage)** — Local and S3 file storage
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks and `context.data` API
 - **[Entity History](/docs/backend/history)** — Audit trail
 - **[Custom Functions](/docs/backend/custom-functions)** — Add custom API endpoints
