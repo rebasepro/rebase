@@ -48,3 +48,9 @@
 /.fallow/
 **/.astro/
 
+# Port file written by a running `rebase dev`. It is rewritten and removed
+# while the server runs, so gcloud can enumerate it and then fail to read it
+# mid-tar — the upload dies with `FileNotFoundError: app/.rebase-dev-port`
+# and the deploy never reaches Cloud Build.
+**/.rebase-dev-port
+
