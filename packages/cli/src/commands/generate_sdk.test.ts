@@ -5,7 +5,14 @@ import os from "os";
 import { generateSdkCommand } from "./generate_sdk";
 import * as sdkGen from "@rebasepro/codegen";
 
-vi.mock("@rebasepro/codegen", () => ({
+// Only `generateSDK` is stubbed. Everything else the command imports comes from
+// the real module — a factory that returned just the one export made this file
+// fail whenever the command started using another, which says nothing about the
+// loader these tests are actually about. The `--from` path, the credential
+// guard and the real generated output are covered unmocked in
+// `generate_sdk_from.test.ts`.
+vi.mock("@rebasepro/codegen", async (importOriginal) => ({
+    ...(await importOriginal<typeof sdkGen>()),
     generateSDK: vi.fn(() => [
         { path: "database.types.ts",
 content: "export type Database = {};" },

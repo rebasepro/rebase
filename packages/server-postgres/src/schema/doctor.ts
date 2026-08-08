@@ -250,12 +250,27 @@ issues };
         }
     } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
-        issues.push({
-            severity: "warning",
-            category: "sdk_stale",
-            message: `Could not regenerate SDK types for comparison: ${message}`,
-            fix: "Run `rebase generate-sdk` to verify"
-        });
+
+        // A `CodegenError` is not "the comparison did not run" — it is the
+        // schema saying it cannot produce a valid typed client at all, most
+        // often two slugs collapsing onto one accessor. Reporting that as a
+        // warning about staleness described the wrong problem and pointed at a
+        // command that would fail the same way.
+        if (err instanceof Error && err.name === "CodegenError") {
+            issues.push({
+                severity: "error",
+                category: "sdk_ungeneratable",
+                message: `The typed SDK cannot be generated from these collections: ${message}`,
+                fix: "Fix the collection definitions named above, then run `rebase generate-sdk`"
+            });
+        } else {
+            issues.push({
+                severity: "warning",
+                category: "sdk_stale",
+                message: `Could not regenerate SDK types for comparison: ${message}`,
+                fix: "Run `rebase generate-sdk` to verify"
+            });
+        }
     }
 
     return { passed: issues.length === 0,

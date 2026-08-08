@@ -7,7 +7,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { generateTypedefs } from "./generate-types";
 
-export { generateTypedefs } from "./generate-types";
+export { generateTypedefs, CodegenError } from "./generate-types";
 export { toPascalCase, toCamelCase, toSafeIdentifier, indent } from "./utils";
 
 // ─── Public API ────────────────────────────────────────────────────
@@ -52,20 +52,41 @@ export function generateSDK(
 2. Initialize with your generated types:
    \`\`\`typescript
     import { createRebaseClient } from '@rebasepro/client';
-    import { Database, collectionsDictionary } from './database.types';
+    import { collectionsDictionary, type Database } from './database.types';
 
     const rebase = createRebaseClient<Database>({
         baseUrl: 'http://localhost:3001',
+        // Maps each accessor back to the slug the wire uses. Without it a
+        // hyphenated slug is not resolvable from the property name alone.
         collections: collectionsDictionary,
     });
 
-   // Both syntax styles are fully typed!
+   // Property access is the typed surface: rows, filters and sorts are all
+   // checked against the generated Database.
    const { data: users } = await rebase.data.users.find();
    console.log(users[0].email); // flat access — no .values wrapper
-
-   const { data: posts } = await rebase.data.collection('posts').find();
-   console.log(posts[0].title); // just post.title, not post.values.title
    \`\`\`
+
+## Field names are the ones the API serves
+
+The generated \`Row\` uses each column's real name, unchanged — a \`created_at\`
+column is \`row.created_at\`, not \`row.createdAt\`. \`where\` and \`orderBy\` are keyed
+off the same type, so what compiles is what the backend answers to.
+
+Only the *collection accessor* is turned into a property name
+(\`my-notes\` → \`rebase.data.myNotes\`), which is what \`collectionsDictionary\` maps
+back.
+
+## \`Row\` vs \`Insert\` vs \`Update\`
+
+| Type | What it describes |
+|---|---|
+| \`Row\` | What a read serves. Nullable columns are \`T \\| null\`; relations appear only when \`include\` names them; \`excludeFromApi\` columns are absent. |
+| \`Insert\` | What \`create()\` accepts. Server-assigned ids are optional; a \`belongsTo\` target may be named either way (\`{ author: 5 }\` or \`{ author_id: 5 }\`). |
+| \`Update\` | What \`update()\` accepts. Everything optional, and the primary key is not settable. |
+
+If you need an untyped escape hatch, \`rebase.data.collection(slug)\` still works —
+but it is generic over \`Record<string, unknown>\` and gives up everything above.
 `
         });
     }

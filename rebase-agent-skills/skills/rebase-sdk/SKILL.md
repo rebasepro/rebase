@@ -34,17 +34,24 @@ A single `database.types.ts` file containing:
 
 | Export | Description |
 |--------|-------------|
-| `Database` | Interface with a key per collection, each containing `Row`, `Insert`, and `Update` sub-types |
-| `CollectionName` | Union type of all collection slug strings |
-| `CollectionsDictionary` | Runtime constant mapping camelCase names to snake_case slugs |
+| `Database` | Interface with a key per collection *accessor*, each containing `Row`, `Insert`, and `Update` sub-types |
+| `CollectionName` | Union of the accessor names (`keyof Database`) — not the slugs |
+| `collectionsDictionary` | Runtime constant mapping each accessor to the slug the wire uses |
+| `CollectionsDictionary` | The type of that constant |
 
 **Sub-type semantics:**
 
-| Sub-type | Purpose | ID fields | Required fields |
-|----------|---------|-----------|-----------------|
-| `Row` | Read type — what you get back from queries | Required | All present |
-| `Insert` | Create type — for new records | Optional (auto-generated) | Required fields stay required |
-| `Update` | Partial update type | N/A | All optional |
+| Sub-type | Purpose | Primary key | Other fields |
+|----------|---------|-------------|--------------|
+| `Row` | Read type — what a query returns | Always present | Required ones present; the rest are `T \| null`. `excludeFromApi` columns are absent. |
+| `Insert` | Create type — for new records | Optional when the server assigns it | Required fields stay required |
+| `Update` | Partial update type | Not settable | All optional |
+
+**Field names are the API's, unchanged.** A `created_at` column is
+`row.created_at`; a relation's foreign key is `author_id`. Only the collection
+accessor is turned into a property name (`my-notes` → `data.myNotes`). Do not
+guess a camelCase variant — `where` and `orderBy` are keyed off `Row`, so the
+generated name is the one the backend answers to.
 
 ### Property Type Mapping
 
@@ -61,16 +68,26 @@ A single `database.types.ts` file containing:
 | `vector` | `number[]` |
 | `binary` | `string` |
 
-Relations are typed as `{ id: string; path: string; __type: "relation"; data?: RelatedRow }`.
+A relation is typed as the **target's own `Row`, inlined** — that is what
+`include` serves. It is optional on every read, because it is only loaded when
+the query names it in `include`. The `{ __type: "relation" }` envelope is the
+admin panel's view-model and never reaches `find()`.
+
+On writes, a `belongsTo` target can be named either way: `{ author: 5 }` (the
+relation) or `{ author_id: 5 }` (its foreign-key column). Both are in `Insert`
+and `Update`.
 
 ## Client Initialization
 
 ```typescript
 import { createRebaseClient } from '@rebasepro/client';
-import type { Database } from './generated/sdk/database.types';
+import { collectionsDictionary, type Database } from './generated/sdk/database.types';
 
 const rebase = createRebaseClient<Database>({
     baseUrl: 'http://localhost:3001',
+    // Maps each accessor back to its slug. Without it, a slug that is not a
+    // valid property name cannot be resolved and the request 404s.
+    collections: collectionsDictionary,
 });
 ```
 

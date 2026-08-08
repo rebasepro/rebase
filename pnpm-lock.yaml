@@ -894,16 +894,13 @@ importers:
 
   packages/codegen:
     dependencies:
-      '@rebasepro/client':
+      '@rebasepro/common':
         specifier: workspace:*
-        version: link:../client
+        version: link:../common
     devDependencies:
       '@jest/globals':
         specifier: ^30.4.1
         version: 30.4.1
-      '@rebasepro/common':
-        specifier: workspace:*
-        version: link:../common
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types

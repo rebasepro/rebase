@@ -15,6 +15,11 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
+    // Wired explicitly: without it the test directory could not import `node:fs`,
+    // which is what a test that compiles the generator's output needs. `types`
+    // defaulting to "everything under @types" does not survive this package's
+    // symlinked layout.
+    "types": ["node", "jest"],
     "jsx": "react-jsx",
     "paths": {
       "@rebasepro/types": ["../types/src"],

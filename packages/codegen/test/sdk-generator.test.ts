@@ -238,7 +238,9 @@ label: "High" }
             } as unknown as CollectionConfig;
 
             const ts = generateTypedefs([col]);
-            expect(ts).toContain("profile?: { age: number; tagline: string; };");
+            // Nested fields carry their own `validation`; none of these declare it, so
+            // each is optional and nullable rather than silently required.
+            expect(ts).toContain("profile?: { age?: number | null; tagline?: string | null; } | null;");
         });
 
         it("falls back to Record<string, any> if properties is absent", () => {
@@ -432,7 +434,10 @@ isId: "increment" },
         // Row should have authorId as number since authors PK (id) is number
         expect(ts).toContain("posts: {");
         expect(ts).toContain("Row: {");
-        expect(ts).toContain("authorId?: number;");
+        // The foreign key is emitted under `localKey` verbatim — that is the
+        // Drizzle field key, so it is the JSON key the row arrives with.
+        expect(ts).toContain("author_id?: number | null;");
+        expect(ts).not.toContain("authorId");
     });
 
     it("defaults to string | number when target primary key cannot be resolved", () => {
@@ -460,7 +465,7 @@ isId: "increment" },
 
         expect(ts).toContain("posts: {");
         expect(ts).toContain("Row: {");
-        expect(ts).toContain("authorId?: string | number;");
+        expect(ts).toContain("author_id?: string | number | null;");
     });
 
     it("supports relation validation constraints making FK required", () => {
@@ -500,7 +505,8 @@ isId: "increment" },
 
         expect(ts).toContain("posts: {");
         expect(ts).toContain("Row: {");
-        expect(ts).toContain("authorId: string;"); // target is string uuid, validation required is true
+        // target is a string uuid and the relation is required
+        expect(ts).toContain("author_id: string;");
     });
 
     it("types a relation as the target's own row, inlined — the shape a read serves", () => {
@@ -558,7 +564,7 @@ isId: "increment" },
 
         const ts = generateTypedefs([postsCol]);
 
-        expect(ts).toContain("authorId?: string | number;");
+        expect(ts).toContain("author_id?: string | number | null;");
         expect(ts).toContain("author?: Record<string, unknown>;");
     });
 
@@ -595,7 +601,7 @@ isId: "uuid" }
 
         const ts = generateTypedefs([jobsCol, companiesCol]);
 
-        expect(ts).toContain("companyId?: string | Database[\"companies\"][\"Row\"];");
+        expect(ts).toContain("company_id?: string | Database[\"companies\"][\"Row\"] | null;");
     });
 });
 
@@ -622,5 +628,111 @@ describe("generateSDK configurations", () => {
         const types = files.find(f => f.path === "database.types.ts")!;
         expect(types.content).toContain("export interface Database");
         expect(types.content).toContain("authors:");
+    });
+});
+
+/**
+ * `Row` describes what a read serves; `Insert` and `Update` describe what a
+ * write accepts. They were near-identical, and all three were wrong in the same
+ * direction: everything optional, nothing nullable, the primary key writable
+ * and the documented relation-write shape missing.
+ */
+describe("Row, Insert and Update describe different things", () => {
+    /** The body of one of the three blocks, so an assertion cannot match the wrong one. */
+    function block(ts: string, name: "Row" | "Insert" | "Update"): string {
+        const start = ts.indexOf(`    ${name}: {`);
+        expect(start).toBeGreaterThan(-1);
+        return ts.slice(start, ts.indexOf("    };", start));
+    }
+
+    const authorsCol = {
+        slug: "authors",
+        properties: { id: { type: "number", isId: "increment" } }
+    } as unknown as CollectionConfig;
+
+    const postsCol = {
+        slug: "posts",
+        properties: {
+            id: { type: "string", isId: "uuid" },
+            title: { type: "string", validation: { required: true } },
+            subtitle: { type: "string" },
+            secret: { type: "string", excludeFromApi: true },
+            author: { type: "relation", relation: { kind: "belongsTo", target: () => authorsCol } }
+        }
+    } as unknown as CollectionConfig;
+
+    it("marks the primary key required on Row, whatever its validation says", () => {
+        // Introspection sets `isId` and never sets `validation.required`, so
+        // `row.id` was `string | undefined` for every baas project.
+        expect(block(generateTypedefs([postsCol, authorsCol]), "Row")).toContain("id: string;");
+    });
+
+    it("types an optional column as nullable, not merely absent", () => {
+        // The column is on every row a read returns; what varies is whether the
+        // value is null. `subtitle?: string` said the key might not be there.
+        expect(block(generateTypedefs([postsCol, authorsCol]), "Row"))
+            .toContain("subtitle?: string | null;");
+    });
+
+    it("leaves excludeFromApi columns out of Row but keeps them writable", () => {
+        // `excludeFromApi` is a server-side guarantee that the column is
+        // stripped from every row the API serves — the scaffolded `users`
+        // collection uses it for the password hash.
+        const ts = generateTypedefs([postsCol, authorsCol]);
+        expect(block(ts, "Row")).not.toContain("secret");
+        expect(block(ts, "Insert")).toContain("secret?: string;");
+    });
+
+    it("does not let Update reassign the primary key", () => {
+        const update = block(generateTypedefs([postsCol, authorsCol]), "Update");
+        expect(update).not.toMatch(/^\s+id\??:/m);
+        expect(update).toContain("title?: string;");
+        // The foreign key is still writable — it is a column, not the row's own key.
+        expect(update).toContain("author_id?: number;");
+    });
+
+    it("accepts both write shapes for a belongsTo relation", () => {
+        // The server takes either: `{ author: 5 }`, which the write transformer
+        // maps onto the foreign-key column, or `{ author_id: 5 }`, which passes
+        // through. Only the second was generated, so the documented form was a
+        // type error.
+        const insert = block(generateTypedefs([postsCol, authorsCol]), "Insert");
+        expect(insert).toContain("author_id?: number;");
+        expect(insert).toContain("author?: number;");
+    });
+
+    it("offers the relation write key the server actually accepts", () => {
+        // The write transformer looks the payload key up in `properties` and
+        // only treats it as a relation if what it finds there is one. So the
+        // accepted key is the property key — a relation whose `relationName`
+        // differs is not reachable under that name, and offering it would have
+        // written to a column that does not exist.
+        const renamed = {
+            slug: "posts",
+            properties: {
+                id: { type: "string", isId: "uuid" },
+                author: {
+                    type: "relation",
+                    relation: {
+                        kind: "belongsTo",
+                        relationName: "author_rel",
+                        target: () => authorsCol,
+                        localKey: "author_id"
+                    }
+                }
+            }
+        } as unknown as CollectionConfig;
+
+        const insert = block(generateTypedefs([renamed, authorsCol]), "Insert");
+        expect(insert).toContain("author?: number;");
+        expect(insert).toContain("author_id?: number;");
+        expect(insert).not.toContain("author_rel");
+    });
+
+    it("types a foreign key from the target's primary key on writes too", () => {
+        // Insert hardcoded `string | number`, so a string typechecked against a
+        // numeric-keyed target while Row knew better.
+        expect(block(generateTypedefs([postsCol, authorsCol]), "Insert"))
+            .not.toContain("string | number");
     });
 });

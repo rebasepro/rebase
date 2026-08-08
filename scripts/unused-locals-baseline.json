@@ -96,8 +96,6 @@
   "packages/cli/templates/template/scripts/example.ts::rebase": 1,
   "packages/client-postgres/src/usePostgresClientDriver.ts::onError": 1,
   "packages/client-postgres/src/usePostgresClientDriver.ts::onUpdate": 1,
-  "packages/codegen/src/generate-types.ts::relKey": 2,
-  "packages/codegen/src/generate-types.ts::typeName": 1,
   "packages/firebase/src/components/RebaseFirebaseApp.tsx::appCheckVerified": 1,
   "packages/firebase/src/components/RebaseFirebaseApp.tsx::defaultUserManagement": 1,
   "packages/firebase/src/components/RebaseFirebaseApp.tsx::error": 1,

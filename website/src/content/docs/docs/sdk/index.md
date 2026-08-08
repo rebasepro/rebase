@@ -67,10 +67,11 @@ Then pass the `Database` type parameter to `createRebaseClient` for full autocom
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
-import type { Database } from "./generated/sdk/database.types";
+import { collectionsDictionary, type Database } from "./generated/sdk/database.types";
 
 const client = createRebaseClient<Database>({
     baseUrl: "http://localhost:3001",
+    collections: collectionsDictionary,
 });
 
 // Full autocomplete on collection names and field types
@@ -78,6 +79,14 @@ const { data } = await client.data.products.find();
 ```
 
 When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientResult<DB>` instance. This maps camelCase collection accessors directly on `client.data` to their corresponding types, giving you full autocomplete on collection operations and types (e.g. `client.data.products.find()`).
+
+`collectionsDictionary` maps each accessor back to the slug the wire uses. Pass it whenever a slug is not already a valid property name — `my-notes` is reachable as `client.data.myNotes` only because the dictionary says so.
+
+### Field names
+
+Columns keep their real names in the generated types: a `created_at` column is `row.created_at`, and a relation's foreign key is `author_id`. `where` and `orderBy` are keyed off the same `Row` type, so what compiles is what the backend answers to.
+
+`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. Nullable columns are `T | null` on `Row`, the primary key is always present on a read and never settable on an update, and a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ author_id: 5 }`).
 
 ## Quick Example
 

@@ -172,22 +172,29 @@ rebase generate-sdk
 
 | Flag | Beschreibung |
 |------|-------------|
-| `--collections` | Pfad zum Collections-Verzeichnis |
-| `--output` | Ausgabeverzeichnis für das SDK (Standard: `generated/sdk/`) |
+| `-c`, `--collections-dir` | Pfad zum Collections-Verzeichnis (Standard: `config/collections/`) |
+| `-o`, `--output` | Ausgabeverzeichnis für das SDK (Standard: `generated/sdk/`) |
+| `--from <link\|url>` | Liest das Schema von einem laufenden Projekt statt aus lokalem Quellcode. `link` verwendet das verknüpfte Projekt dieses Checkouts. |
+| `--token` | Bearer-Token für den Contract-Endpunkt (Standard: `$REBASE_SERVICE_KEY`) |
+
+Mit `--from` kann ein Repository ohne eigene Collections — ein separates Frontend, eine zweite Web-App, eine Mobile-App — einen typisierten Client für das Projekt generieren, mit dem es spricht. `REBASE_SERVICE_KEY` wird nur an das Projekt gesendet, mit dem dieses Checkout verknüpft ist; für jeden anderen Host ist `--token` explizit anzugeben.
 
 **Verwendung nach der Generierung:**
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
-import type { Database } from "./generated/sdk/database.types";
+import { collectionsDictionary, type Database } from "./generated/sdk/database.types";
 
 const client = createRebaseClient<Database>({
     baseUrl: "http://localhost:3001",
+    collections: collectionsDictionary,
 });
 
 // Full type safety and autocomplete
 const { data } = await client.data.products.find();
 ```
+
+Feldnamen in den generierten Typen sind unverändert die, die die API liefert — eine Spalte `created_at` ist `row.created_at`. Nur der Collection-*Accessor* wird in einen Property-Namen umgewandelt (`my-notes` → `client.data.myNotes`); genau diese Zuordnung stellt `collectionsDictionary` auf den Slug zurück.
 
 ## Entwicklungs-Workflow
 

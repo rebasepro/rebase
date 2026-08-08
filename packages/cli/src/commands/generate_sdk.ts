@@ -11,7 +11,7 @@ import fs from "fs";
 import path from "path";
 import chalk from "chalk";
 import { CollectionConfig, computeSchemaVersion, deserializeCollections } from "@rebasepro/types";
-import { generateSDK, GeneratedFile } from "@rebasepro/codegen";
+import { CodegenError, generateSDK, GeneratedFile, toSafeIdentifier } from "@rebasepro/codegen";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { findProjectRoot } from "../utils/project";
 import { readLink } from "./cloud/context";
@@ -385,7 +385,21 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
 
     // 2. Generate SDK files
     console.log(chalk.cyan("  → Generating SDK files..."));
-    const files = generateSDK(collections);
+    let files: GeneratedFile[];
+    try {
+        files = generateSDK(collections);
+    } catch (err) {
+        // A schema that cannot be expressed as valid TypeScript — two slugs
+        // that collide on one accessor, a slug with no usable name. The
+        // generator refuses rather than emitting a file that does not compile,
+        // or one that silently routes a collection's reads to another's table.
+        if (err instanceof CodegenError) {
+            console.log("");
+            console.log(chalk.red(`  ✗ ${err.message}`));
+            process.exit(1);
+        }
+        throw err;
+    }
 
     // Stamp the schema this SDK was built from.
     //
@@ -393,6 +407,13 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
     // is stale: the backend moves on, the frontend keeps compiling against types
     // captured weeks ago, and the mismatch only surfaces as a runtime error. With
     // it, CI can compare against `/api/meta/schema-version` and say so.
+    //
+    // No generation timestamp. Collections are sorted above precisely so that
+    // the same schema produces the same bytes; a timestamp put that back,
+    // turning every regeneration into a diff and making the obvious staleness
+    // gate — `rebase generate-sdk && git diff --exit-code` — impossible to pass.
+    // `SCHEMA_VERSION` already identifies what this was built from, and does it
+    // in a way that can be compared against a running project.
     const schemaVersion = remoteSchemaVersion ?? computeSchemaVersion(collections);
     files.push({
         path: "schema.meta.ts",
@@ -404,7 +425,6 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
 //     curl -s <api-url>/api/meta/schema-version
 //
 export const SCHEMA_VERSION = ${JSON.stringify(schemaVersion)};
-export const GENERATED_AT = ${JSON.stringify(new Date().toISOString())};
 `
     });
 
@@ -433,13 +453,15 @@ export const GENERATED_AT = ${JSON.stringify(new Date().toISOString())};
     console.log(chalk.gray("        // token: 'your-jwt-token',"));
     console.log(chalk.gray("    });"));
     console.log("");
-    // `rebase.data.…` is the typed surface. `rebase.collection(slug)` exists
-    // too, but it is generic over `Record<string, unknown>` and has no link to
-    // `Database` — printing it here would advertise the one call shape that
-    // throws away the types this command just generated.
-    console.log(chalk.gray(`    const { data } = await rebase.data.collection('${exampleSlug}').find();`));
-    if (isIdentifierLike(exampleSlug)) {
-        console.log(chalk.gray(`    // …or in property style: rebase.data.${exampleSlug}.find()`));
-    }
+    // `rebase.data.<accessor>` is the typed surface, so it is what gets printed.
+    // `rebase.data.collection(slug)` exists too, but it is generic over
+    // `Record<string, unknown>` and has no link to `Database` — it was the
+    // headline example here for a while, which advertised the one call shape
+    // that throws away the types this command just generated.
+    const exampleAccessor = toSafeIdentifier(exampleSlug);
+    const exampleAccess = isIdentifierLike(exampleAccessor)
+        ? `rebase.data.${exampleAccessor}`
+        : `rebase.data[${JSON.stringify(exampleAccessor)}]`;
+    console.log(chalk.gray(`    const { data } = await ${exampleAccess}.find();`));
     console.log("");
 }

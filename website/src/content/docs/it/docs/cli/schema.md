@@ -172,22 +172,29 @@ rebase generate-sdk
 
 | Flag | Descrizione |
 |------|-------------|
-| `--collections` | Percorso alla directory delle collezioni |
-| `--output` | Directory di output per l'SDK (predefinito: `generated/sdk/`) |
+| `-c`, `--collections-dir` | Percorso alla directory delle collezioni (predefinito: `config/collections/`) |
+| `-o`, `--output` | Directory di output per l'SDK (predefinito: `generated/sdk/`) |
+| `--from <link\|url>` | Legge lo schema da un progetto in esecuzione anziché dal codice locale. `link` usa il progetto collegato a questo checkout. |
+| `--token` | Token Bearer per l'endpoint del contratto (predefinito: `$REBASE_SERVICE_KEY`) |
+
+`--from` è ciò che permette a un repository privo di collezioni — un frontend separato, una seconda web app, un'app mobile — di generare un client tipizzato dal progetto con cui parla. `REBASE_SERVICE_KEY` viene inviato solo al progetto collegato a questo checkout; per qualsiasi altro host, passa `--token` esplicitamente.
 
 **Utilizzo dopo la generazione:**
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
-import type { Database } from "./generated/sdk/database.types";
+import { collectionsDictionary, type Database } from "./generated/sdk/database.types";
 
 const client = createRebaseClient<Database>({
     baseUrl: "http://localhost:3001",
+    collections: collectionsDictionary,
 });
 
 // Full type safety and autocomplete
 const { data } = await client.data.products.find();
 ```
+
+I nomi dei campi nei tipi generati sono quelli che l'API serve, invariati: una colonna `created_at` è `row.created_at`. Solo l'*accessor* della collezione diventa un nome di proprietà (`my-notes` → `client.data.myNotes`), ed è questo che `collectionsDictionary` rimappa sullo slug.
 
 ## Flusso di Lavoro di Sviluppo
 

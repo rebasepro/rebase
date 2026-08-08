@@ -28,12 +28,10 @@
   "author": "rebase.pro",
   "license": "MIT",
   "peerDependencies": {
-    "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
-    "@rebasepro/common": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.1.2",
@@ -50,7 +48,7 @@
   },
   "gitHead": "d935eefa5aa8d1009a2398cfac2c1e4ee9aeb6b6",
   "dependencies": {
-    "@rebasepro/client": "workspace:*"
+    "@rebasepro/common": "workspace:*"
   },
   "repository": {
     "type": "git",

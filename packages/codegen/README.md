@@ -8,10 +8,10 @@ Generates typed TypeScript definitions from Rebase collection definitions — pr
 pnpm add @rebasepro/codegen
 ```
 
-### Peer Dependencies
+### Dependencies
 
-- `@rebasepro/common`
-- `@rebasepro/types`
+- `@rebasepro/common` — a runtime dependency (`resolveCollectionRelations`)
+- `@rebasepro/types` — a peer dependency (types only)
 
 ## What This Package Does
 
@@ -29,19 +29,48 @@ This is typically invoked via the CLI (`npx rebase generate-sdk`) rather than ca
 | `GenerateSDKOptions` | Interface | `{ includeReadme?: boolean }` (default: `true`) |
 | `toPascalCase` | Function | `"my_collection"` → `"MyCollection"` |
 | `toCamelCase` | Function | `"my_collection"` → `"myCollection"` |
-| `toSafeIdentifier` | Function | Converts slugs to valid JS identifiers |
+| `toSafeIdentifier` | Function | Converts a **slug** to a valid JS identifier (collection accessors only — never column names) |
 | `indent` | Function | Indent text by N spaces |
+| `CodegenError` | Class | Thrown for a schema that cannot be expressed as valid TypeScript |
 
 ## Generated Output
 
 `generateSDK()` produces:
 
-1. **`database.types.ts`** — A `Database` interface where each collection slug is a key containing:
-   - `Row` — Full snapshot type (read operations)
-   - `Insert` — Type for creating snapshots (auto-ID fields are optional)
-   - `Update` — All-optional partial type for updates
+1. **`database.types.ts`** — A `Database` interface keyed by each collection's
+   *accessor* (`my-notes` → `myNotes`, the property name on `client.data`),
+   alongside a `collectionsDictionary` const mapping each accessor back to the
+   slug the wire uses. Each entry contains:
+   - `Row` — what a read serves. Column names are the **real** ones, unchanged:
+     a `created_at` column is `row.created_at`. Nullable columns are `T | null`,
+     the primary key is always present, relations appear only when `include`
+     names them, and `excludeFromApi` columns are absent.
+   - `Insert` — what `create()` accepts. Server-assigned ids are optional; a
+     `belongsTo` target may be named either way (`{ author: 5 }` or
+     `{ author_id: 5 }`); `excludeFromApi` columns are still writable.
+   - `Update` — what `update()` accepts. Everything optional, primary key
+     omitted.
 
 2. **`README.md`** — Usage instructions (opt out with `includeReadme: false`)
+
+### Names
+
+Only the collection accessor is transformed. Column names are emitted verbatim,
+quoted when they are not valid identifiers (`"user id"?: string | null`), because
+`where` and `orderBy` are keyed off `Row` — a renamed column makes the correct
+filter fail to compile and the wrong one fail at runtime.
+
+Generation **fails** rather than emitting a broken file when two slugs would
+produce the same accessor: the interface would not compile, and
+`collectionsDictionary` would silently keep only one, routing a collection's
+reads to another's table.
+
+### Untrusted schemas
+
+`rebase generate-sdk --from <url>` generates from a remote contract, so slugs,
+column names and enum values come from that server. Every one of them is emitted
+as an escaped literal — untrusted input cannot add a declaration to the generated
+file. There is a test that asserts exactly this.
 
 ### Property Type Mapping
 
@@ -53,8 +82,8 @@ This is typically invoked via the CLI (`npx rebase generate-sdk`) rather than ca
 | `date` | `string` (ISO 8601) |
 | `geopoint` | `{ latitude: number; longitude: number }` |
 | `reference` | `string \| number` |
-| `relation` | Relation object type |
-| `map` | Inline object type or `Record<string, any>` |
+| `relation` | The target's own `Row`, inlined (what `include` serves) |
+| `map` | Inline object type or `Record<string, unknown>` |
 | `array` | `Array<T>` with inferred inner type |
 | `vector` | `number[]` |
 | `binary` | `string` |
