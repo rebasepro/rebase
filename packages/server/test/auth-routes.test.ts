@@ -539,7 +539,9 @@ withEmail: false }); // Hack to pass empty list of providers
 
         it("links Google to existing account by email", async () => {
             const app = createApp();
-            const existing = mockUser({ email: "existing@test.com" });
+            // Verified on the local side too — auto-linking requires both
+            // halves to be trustworthy, see the pre-hijack case below.
+            const existing = mockUser({ email: "existing@test.com", emailVerified: true });
             mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(existing);
 
@@ -572,7 +574,7 @@ withEmail: false }); // Hack to pass empty list of providers
     describe("password account + Google sign-in with the same email", () => {
         it("links to the existing user (no second account) when the provider verified the email", async () => {
             const app = createApp();
-            const passwordUser = mockUser({ id: "pw-user-1", email: "existing@test.com", passwordHash: "salt:hash" });
+            const passwordUser = mockUser({ id: "pw-user-1", email: "existing@test.com", passwordHash: "salt:hash", emailVerified: true });
             mockAuthRepo.getUserByIdentity.mockResolvedValueOnce(null);
             mockAuthRepo.getUserByEmail.mockResolvedValueOnce(passwordUser);
 

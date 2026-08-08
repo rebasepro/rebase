@@ -41,6 +41,7 @@ import { ErrorView } from "../ErrorView";
 import { RebaseLogo } from "../RebaseLogo";
 import { LanguageToggle } from "../LanguageToggle";
 import { useModeController, useTranslation } from "../../hooks";
+import { consumeOAuthCallback, startOAuthRedirect } from "./oauth-redirect-flow";
 
 /**
  * Props for the generic LoginView.
@@ -274,25 +275,38 @@ export function LoginView({
         return () => clearTimeout(timer);
     }, []);
 
-    // Effect to handle incoming redirect OAuth codes (GitHub, LinkedIn, etc.)
+    // Effect to handle incoming redirect OAuth codes (GitHub, LinkedIn, etc.).
+    //
+    // The `code` is only spent when it belongs to an authorization this browser
+    // started: `consumeOAuthCallback` matches the returned `state` against the
+    // one generated at button-click time. Without that, an attacker who starts
+    // their own authorization, captures the code and gets the victim to load
+    // `?code=<theirs>` hands the victim a session on the *attacker's* account.
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get("code");
-        const provider = localStorage.getItem("rebase_oauth_provider");
-        if (code && provider) {
-            localStorage.removeItem("rebase_oauth_provider");
-            // Clear URL search params without page reload
-            const cleanUrl = window.location.origin + window.location.pathname;
-            window.history.replaceState({}, document.title, cleanUrl);
+        const result = consumeOAuthCallback(window.location.search);
+        if (result.status === "none") return;
 
-            if (authController.oauthLogin) {
-                authController.oauthLogin(provider, {
-                    code,
-                    redirectUri: cleanUrl
-                }).catch((err) => {
-                    console.error(`${provider} login failed:`, err);
-                });
-            }
+        // Clear URL search params without page reload
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+
+        if (result.status === "error") {
+            console.error(`OAuth sign-in failed: ${result.error}`);
+            return;
+        }
+        if (result.status === "mismatch") {
+            console.error("Ignoring an OAuth code that does not match a sign-in this browser started.");
+            return;
+        }
+
+        if (authController.oauthLogin) {
+            authController.oauthLogin(result.provider, {
+                code: result.code,
+                redirectUri: result.redirectUri,
+                ...(result.codeVerifier ? { codeVerifier: result.codeVerifier } : {})
+            }).catch((err: unknown) => {
+                console.error(`${result.provider} login failed:`, err);
+            });
         }
     }, [authController]);
 
@@ -612,10 +626,15 @@ function GitHubLoginButton({
     githubClientId: string
 }) {
     const handleClick = () => {
-        localStorage.setItem("rebase_oauth_provider", "github");
-        const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
-        const scope = "read:user,user:email";
-        window.location.href = `https://github.com/login/oauth/authorize?client_id=${githubClientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+        // GitHub OAuth Apps do not implement PKCE, so `state` is the whole
+        // binding between this click and the code that comes back.
+        void startOAuthRedirect({
+            provider: "github",
+            authorizeUrl: "https://github.com/login/oauth/authorize",
+            clientId: githubClientId,
+            redirectUri: window.location.origin + window.location.pathname,
+            scope: "read:user,user:email"
+        });
     };
 
     return (
@@ -642,10 +661,13 @@ function LinkedInLoginButton({
     linkedinClientId: string
 }) {
     const handleClick = () => {
-        localStorage.setItem("rebase_oauth_provider", "linkedin");
-        const redirectUri = encodeURIComponent(window.location.origin + window.location.pathname);
-        const scope = "openid profile email";
-        window.location.href = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedinClientId}&redirect_uri=${redirectUri}&scope=${scope}`;
+        void startOAuthRedirect({
+            provider: "linkedin",
+            authorizeUrl: "https://www.linkedin.com/oauth/v2/authorization",
+            clientId: linkedinClientId,
+            redirectUri: window.location.origin + window.location.pathname,
+            scope: "openid profile email"
+        });
     };
 
     return (

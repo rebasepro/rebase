@@ -1,6 +1,7 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
 import { logger } from "../utils/logger";
+import { pkceTokenParams, providerVerifiedEmail } from "./oauth-code-flow";
 
 let _googleAuth: typeof import("google-auth-library/build/src/index.js") | undefined;
 
@@ -61,7 +62,7 @@ async function verifyGoogleAccessToken(
         throw new Error("Google access token missing sub or email (the email scope is required)");
     }
 
-    const emailVerified = tokenInfo.email_verified === true || tokenInfo.email_verified === "true";
+    const emailVerified = providerVerifiedEmail(tokenInfo.email_verified);
 
     let displayName: string | null = null;
     let photoUrl: string | null = null;
@@ -135,6 +136,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
     accessToken?: string;
     code?: string;
     redirectUri?: string;
+    codeVerifier?: string;
 }> {
     const clientId = typeof config === "string" ? config : config.clientId;
     const clientSecret = typeof config === "string" ? undefined : config.clientSecret;
@@ -166,7 +168,8 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
             idToken: z.string().min(1).optional(),
             accessToken: z.string().min(1).optional(),
             code: z.string().min(1).optional(),
-            redirectUri: z.string().min(1).optional()
+            redirectUri: z.string().min(1).optional(),
+            codeVerifier: z.string().min(1).optional()
         }).refine(
             (data) => data.idToken || data.accessToken || (data.code && data.redirectUri),
             { message: "One of idToken, accessToken, or code+redirectUri is required" }
@@ -176,6 +179,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
             accessToken?: string;
             code?: string;
             redirectUri?: string;
+            codeVerifier?: string;
         }): Promise<OAuthProviderProfile | null> => {
             try {
                 // Path 1: verify an ID token (One Tap / renderButton)
@@ -196,7 +200,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                         email: content.email || "",
                         displayName: content.name || null,
                         photoUrl: content.picture || null,
-                        emailVerified: content.email_verified === true
+                        emailVerified: providerVerifiedEmail(content.email_verified)
                     };
                 }
 
@@ -228,7 +232,8 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                             client_id: clientId,
                             client_secret: clientSecret,
                             redirect_uri: payload.redirectUri,
-                            grant_type: "authorization_code"
+                            grant_type: "authorization_code",
+                            ...pkceTokenParams(payload.codeVerifier)
                         })
                     });
 
@@ -266,7 +271,7 @@ export function createGoogleProvider(config: GoogleProviderConfig | string): OAu
                             email: content.email || "",
                             displayName: content.name || null,
                             photoUrl: content.picture || null,
-                            emailVerified: content.email_verified === true
+                            emailVerified: providerVerifiedEmail(content.email_verified)
                         };
                     }
 

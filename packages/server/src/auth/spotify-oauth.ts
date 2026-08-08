@@ -1,19 +1,16 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
-import { z } from "zod";
 import { logger } from "../utils/logger";
+import { oauthCodeFlowSchema, pkceTokenParams, type OAuthCodeFlowPayload } from "./oauth-code-flow";
 
 /**
  * Creates a Spotify OAuth Provider integration.
  * Uses the authorization code flow with the "user-read-email" scope.
  */
-export function createSpotifyProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
+export function createSpotifyProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<OAuthCodeFlowPayload> {
     return {
         id: "spotify",
-        schema: z.object({
-            code: z.string().min(1, "Auth code is required"),
-            redirectUri: z.string().url("Valid redirect URI is required")
-        }),
-        verify: async (payload: { code: string; redirectUri: string }): Promise<OAuthProviderProfile | null> => {
+        schema: oauthCodeFlowSchema(),
+        verify: async (payload: OAuthCodeFlowPayload): Promise<OAuthProviderProfile | null> => {
             try {
                 const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
 
@@ -26,7 +23,8 @@ export function createSpotifyProvider(config: { clientId: string; clientSecret: 
                     body: new URLSearchParams({
                         grant_type: "authorization_code",
                         code: payload.code,
-                        redirect_uri: payload.redirectUri
+                        redirect_uri: payload.redirectUri,
+                        ...pkceTokenParams(payload.codeVerifier)
                     })
                 });
 
@@ -58,7 +56,14 @@ export function createSpotifyProvider(config: { clientId: string; clientSecret: 
                     email: p.email,
                     displayName: p.display_name || null,
                     photoUrl: p.images?.[0]?.url || null,
-                    emailVerified: true
+                    // `/v1/me` carries no verification field, so there is
+                    // nothing here to read — and `emailVerified` is the sole
+                    // gate on attaching this identity to a pre-existing
+                    // account. Reporting "not verified" is the honest answer;
+                    // users with an existing account link through
+                    // `POST /auth/link/spotify`, which proves ownership with a
+                    // live session instead.
+                    emailVerified: false
                 };
             } catch (error) {
                 logger.error("Spotify OAuth error", { error: error });

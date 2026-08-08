@@ -1,6 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
-import { z } from "zod";
 import { logger } from "../utils/logger";
+import { oauthCodeFlowSchema, pkceTokenParams, type OAuthCodeFlowPayload } from "./oauth-code-flow";
 
 /**
  * Creates a Twitter/X OAuth 2.0 Provider integration.
@@ -11,23 +11,13 @@ import { logger } from "../utils/logger";
  * Twitter API v2 requires the "tweet.read" and "users.read" scopes at minimum,
  * plus "offline.access" if refresh tokens are needed on Twitter's side.
  */
-export function createTwitterProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{
-            code: string;
-            redirectUri: string;
-            codeVerifier: string;
-        }> {
+export function createTwitterProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<OAuthCodeFlowPayload> {
     return {
         id: "twitter",
-        schema: z.object({
-            code: z.string().min(1, "Auth code is required"),
-            redirectUri: z.string().url("Valid redirect URI is required"),
-            codeVerifier: z.string().min(1, "PKCE code verifier is required")
-        }),
-        verify: async (payload: {
-            code: string;
-            redirectUri: string;
-            codeVerifier: string;
-        }): Promise<OAuthProviderProfile | null> => {
+        // The one provider where PKCE is not optional: Twitter's token
+        // endpoint rejects an exchange without a verifier.
+        schema: oauthCodeFlowSchema({ pkce: "required" }),
+        verify: async (payload: OAuthCodeFlowPayload): Promise<OAuthProviderProfile | null> => {
             try {
                 // Twitter OAuth 2.0 uses Basic auth for the token endpoint
                 const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
@@ -43,7 +33,7 @@ export function createTwitterProvider(config: { clientId: string; clientSecret: 
                         code: payload.code,
                         grant_type: "authorization_code",
                         redirect_uri: payload.redirectUri,
-                        code_verifier: payload.codeVerifier
+                        ...pkceTokenParams(payload.codeVerifier)
                     })
                 });
 

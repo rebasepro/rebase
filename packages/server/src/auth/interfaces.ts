@@ -60,7 +60,21 @@ export interface OAuthProviderProfile {
     email: string;
     displayName?: string | null;
     photoUrl?: string | null;
-    /** Whether the OAuth provider has verified the user's email address */
+    /**
+     * Whether the provider reported that it verified this email address.
+     *
+     * This is not a display field. It is the sole authorization input to
+     * account linking: a `true` here lets the sign-in route attach the
+     * incoming identity to a pre-existing account that shares the address.
+     * Set it `true` **only** from a verification signal actually present in
+     * the provider's response — pass that signal through
+     * `providerVerifiedEmail()` rather than writing a literal, so a provider
+     * that reports nothing comes back `false`.
+     *
+     * `false` is not a failure: the user signs in and, if they already have an
+     * account, links through `POST /auth/link/<provider>`, which proves
+     * ownership with a live session instead of an unverified address.
+     */
     emailVerified?: boolean;
 }
 

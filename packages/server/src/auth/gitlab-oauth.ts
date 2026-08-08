@@ -1,25 +1,26 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
-import { z } from "zod";
 import { logger } from "../utils/logger";
+import { oauthCodeFlowSchema, pkceTokenParams, type OAuthCodeFlowPayload } from "./oauth-code-flow";
 
 /**
  * Creates a GitLab OAuth Provider integration.
  * Works with both GitLab.com and self-hosted instances.
+ *
+ * `baseUrl` is configuration only and must stay that way: a caller-supplied
+ * instance URL would make this provider an SSRF primitive and an
+ * arbitrary-identity oracle in one step.
  */
 export function createGitLabProvider(config: {
     clientId: string;
     clientSecret: string;
     baseUrl?: string;
-}): OAuthProvider<{ code: string; redirectUri: string }> {
+}): OAuthProvider<OAuthCodeFlowPayload> {
     const gitlabUrl = (config.baseUrl || "https://gitlab.com").replace(/\/$/, "");
 
     return {
         id: "gitlab",
-        schema: z.object({
-            code: z.string().min(1, "Auth code is required"),
-            redirectUri: z.string().url("Valid redirect URI is required")
-        }),
-        verify: async (payload: { code: string; redirectUri: string }): Promise<OAuthProviderProfile | null> => {
+        schema: oauthCodeFlowSchema(),
+        verify: async (payload: OAuthCodeFlowPayload): Promise<OAuthProviderProfile | null> => {
             try {
                 const tokenResponse = await fetch(`${gitlabUrl}/oauth/token`, {
                     method: "POST",
@@ -29,7 +30,8 @@ export function createGitLabProvider(config: {
                         client_secret: config.clientSecret,
                         code: payload.code,
                         grant_type: "authorization_code",
-                        redirect_uri: payload.redirectUri
+                        redirect_uri: payload.redirectUri,
+                        ...pkceTokenParams(payload.codeVerifier)
                     })
                 });
 
@@ -51,7 +53,8 @@ export function createGitLabProvider(config: {
 
                 const p = await profileResponse.json() as {
                     id: number; username: string; name?: string;
-                    email: string; avatar_url?: string | null;
+                    email?: string; avatar_url?: string | null;
+                    confirmed_at?: string | null;
                 };
 
                 if (!p.email) { logger.error("GitLab user has no email"); return null; }
@@ -61,7 +64,13 @@ export function createGitLabProvider(config: {
                     email: p.email,
                     displayName: p.name || p.username || null,
                     photoUrl: p.avatar_url || null,
-                    emailVerified: true
+                    // `/api/v4/user` timestamps the address confirmation for
+                    // the authenticated user. That timestamp is the only
+                    // verification signal GitLab gives us, so it is the only
+                    // thing allowed to produce a `true` — a self-hosted
+                    // instance with confirmation disabled reports nothing here
+                    // and correctly comes back unverified.
+                    emailVerified: Boolean(p.confirmed_at)
                 };
             } catch (error) {
                 logger.error("GitLab OAuth error", { error: error });

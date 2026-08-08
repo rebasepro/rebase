@@ -2,6 +2,22 @@ import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
 import { z } from "zod";
 import jwt from "jsonwebtoken";
 import { logger } from "../utils/logger";
+import { oauthCodeFlowSchema, pkceTokenParams, providerVerifiedEmail, type OAuthCodeFlowPayload } from "./oauth-code-flow";
+import { tryVerifyOidcIdToken } from "./oidc-id-token";
+
+const APPLE_ISSUER = "https://appleid.apple.com";
+const APPLE_JWKS_URI = "https://appleid.apple.com/auth/keys";
+
+/** Extra field Apple's client sends that no other provider has. */
+export interface AppleCodeFlowPayload extends OAuthCodeFlowPayload {
+    /**
+     * Apple sends the user's *name* only on the first authorization, so the
+     * frontend has to forward it. It is display data and nothing else — the
+     * identity email comes from the id_token, never from the request body.
+     */
+    user?: { name?: { firstName?: string; lastName?: string } };
+}
+
 /**
  * Creates an Apple Sign In OAuth Provider integration.
  *
@@ -20,11 +36,7 @@ export function createAppleProvider(config: {
     keyId: string;
     /** The raw PEM contents of the .p8 private key file */
     privateKey: string;
-}): OAuthProvider<{
-            code: string;
-            redirectUri: string;
-            user?: { name?: { firstName?: string; lastName?: string }; email?: string };
-        }> {
+}): OAuthProvider<AppleCodeFlowPayload> {
     /**
      * Generate a client_secret JWT signed with the Apple private key.
      * Apple requires this instead of a static client_secret.
@@ -42,23 +54,23 @@ export function createAppleProvider(config: {
 
     return {
         id: "apple",
-        schema: z.object({
-            code: z.string().min(1, "Auth code is required"),
-            redirectUri: z.string().url("Valid redirect URI is required"),
-            /** Apple sends user info only on first authorization; the frontend must forward it. */
+        schema: oauthCodeFlowSchema().extend({
+            /**
+             * Apple sends user info only on first authorization; the frontend
+             * must forward it. Only the *name* is accepted — an `email` here
+             * used to be promoted to the account's identity whenever the
+             * id_token had no `email` claim, and an attacker chooses whether
+             * that claim is absent simply by omitting the `email` scope from
+             * their own authorization request.
+             */
             user: z.object({
                 name: z.object({
                     firstName: z.string().optional(),
                     lastName: z.string().optional()
-                }).optional(),
-                email: z.string().email().optional()
+                }).optional()
             }).optional()
         }),
-        verify: async (payload: {
-            code: string;
-            redirectUri: string;
-            user?: { name?: { firstName?: string; lastName?: string }; email?: string };
-        }): Promise<OAuthProviderProfile | null> => {
+        verify: async (payload: AppleCodeFlowPayload): Promise<OAuthProviderProfile | null> => {
             try {
                 const clientSecret = await generateClientSecret();
 
@@ -71,7 +83,8 @@ export function createAppleProvider(config: {
                         client_secret: clientSecret,
                         code: payload.code,
                         grant_type: "authorization_code",
-                        redirect_uri: payload.redirectUri
+                        redirect_uri: payload.redirectUri,
+                        ...pkceTokenParams(payload.codeVerifier)
                     })
                 });
 
@@ -80,23 +93,31 @@ export function createAppleProvider(config: {
                     return null;
                 }
 
-                const tokenData = await tokenResponse.json() as { id_token: string };
+                const tokenData = await tokenResponse.json() as { id_token?: string };
 
-                // Decode the id_token (JWT) to get user info.
-                // Apple's id_token is a standard JWT — we only need the payload.
-                const [, payloadB64] = tokenData.id_token.split(".");
-                const decoded = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf8")) as {
-                    sub: string;
-                    email?: string;
-                    email_verified?: string | boolean;
-                };
+                // Verify the id_token against Apple's JWKS rather than
+                // base64-decoding it. The signature is the least of it: `aud`
+                // is what confirms the token was minted for *this* Services ID
+                // and not another one under the same Apple team, and `exp`
+                // stops a captured token being replayed.
+                const decoded = tokenData.id_token
+                    ? await tryVerifyOidcIdToken("apple", {
+                        idToken: tokenData.id_token,
+                        jwksUri: APPLE_JWKS_URI,
+                        issuer: APPLE_ISSUER,
+                        audience: config.clientId
+                    })
+                    : null;
 
-                // Apple only sends the user's name on the FIRST authorization.
-                // Subsequent logins only have the id_token. The frontend should pass
-                // the user object from the first auth for us to capture the name.
-                const email = decoded.email || payload.user?.email;
+                if (!decoded) {
+                    logger.error("Apple token exchange returned no verifiable id_token");
+                    return null;
+                }
+
+                // The id_token is the only acceptable source of the address.
+                const email = decoded.email;
                 if (!email) {
-                    logger.error("Apple user has no email");
+                    logger.error("Apple id_token carries no email claim");
                     return null;
                 }
 
@@ -111,7 +132,7 @@ export function createAppleProvider(config: {
                     email,
                     displayName,
                     photoUrl: null, // Apple does not provide a profile photo
-                    emailVerified: decoded.email_verified === true || decoded.email_verified === "true"
+                    emailVerified: providerVerifiedEmail(decoded.email_verified)
                 };
             } catch (error) {
                 logger.error("Apple OAuth error", { error: error });

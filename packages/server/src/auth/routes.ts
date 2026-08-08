@@ -18,6 +18,7 @@ import { mountMfaRoutes } from "./mfa-routes";
 import { mountSessionRoutes } from "./session-routes";
 import { mountMagicLinkRoutes } from "./magic-link-routes";
 import { isSteadyStateRegistrationOpen } from "./registration-policy";
+import { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy";
 import type { AuthResponsePayload, TransformAuthResponseContext } from "@rebasepro/types";
 import type { Context } from "hono";
 import { readRefreshToken, redactRefreshToken, clearRefreshCookie } from "./cookie-utils";
@@ -37,6 +38,14 @@ export interface AuthModuleConfig {
     defaultRole?: string;
     /** Optional array of OAuth providers */
     oauthProviders?: OAuthProvider<unknown>[];
+    /**
+     * Redirect URIs the OAuth routes will accept, for every provider.
+     *
+     * Left unset, the only check is the provider's own registered-URI match,
+     * which authorises every URI registered on that OAuth client. Compared on
+     * origin plus path; query and fragment are ignored, as is a trailing slash.
+     */
+    allowedRedirectUris?: string[];
     /** When true, blocks all self-registration regardless of `allowRegistration`. */
     disableSelfRegistration?: boolean;
     /**
@@ -495,12 +504,32 @@ displayName: user.displayName });
             router.post(`/${provider.id}`, defaultAuthLimiter, async (c) => {
                 const payload = parseBody(provider.schema, await c.req.json());
 
+                // Allowlist the redirect URI before the code is spent. The
+                // provider's own registered-URI match authorises *every* URI
+                // on that OAuth client — a leftover localhost entry, a staging
+                // host, a second product sharing the client id — and any of
+                // them can mint a code this backend would otherwise accept.
+                const requestedRedirectUri = (payload as { redirectUri?: unknown }).redirectUri;
+                if (typeof requestedRedirectUri === "string"
+                    && !isRedirectUriAllowed(requestedRedirectUri, config.allowedRedirectUris)) {
+                    throw ApiError.badRequest(
+                        "redirectUri is not allowed for this backend",
+                        "REDIRECT_URI_NOT_ALLOWED"
+                    );
+                }
+
                 let externalUser;
                 try {
                     externalUser = await provider.verify(payload);
                 } catch (err: unknown) {
-                    const msg = err instanceof Error ? err.message : String(err);
-                    throw ApiError.unauthorized(`${provider.id} login failed: ${msg}`, "OAUTH_ERROR");
+                    // The message is logged, never returned: a provider's
+                    // token-endpoint error body routinely echoes the client_id,
+                    // the redirect URI and diagnostics about the credential
+                    // state, and this response goes to an anonymous caller.
+                    logger.error(`[OAuth] ${provider.id} verification threw`, {
+                        error: err instanceof Error ? err.message : String(err)
+                    });
+                    throw ApiError.unauthorized(`Invalid ${provider.id} credentials`, "OAUTH_ERROR");
                 }
                 if (!externalUser) {
                     throw ApiError.unauthorized(`Invalid ${provider.id} credentials`, "INVALID_TOKEN");
@@ -514,10 +543,16 @@ displayName: user.displayName });
                     user = await authRepo.getUserByEmail(externalUser.email);
 
                     if (user) {
-                        // Only auto-link if the OAuth provider confirmed the email is verified
-                        if (!externalUser.emailVerified) {
+                        const decision = decideOAuthAutoLink({
+                            providerEmailVerified: externalUser.emailVerified,
+                            existingUser: user
+                        });
+                        if (!decision.allowed) {
+                            const why = decision.reason === "provider-email-unverified"
+                                ? `${provider.id} has not verified this email address, so it cannot be linked automatically.`
+                                : "That account's email address was never verified, so it cannot be linked automatically.";
                             throw ApiError.forbidden(
-                                `An account with this email already exists with a different sign-in method. ${provider.id} has not verified this email address, so it cannot be linked automatically. Sign in with your existing method, then POST to /auth/link/${provider.id} to link ${provider.id} to your account.`,
+                                `An account with this email already exists with a different sign-in method. ${why} Sign in with your existing method, then POST to /auth/link/${provider.id} to link ${provider.id} to your account.`,
                                 "EMAIL_NOT_VERIFIED"
                             );
                         }
@@ -530,11 +565,32 @@ displayName: user.displayName });
                             photoUrl: user.photoUrl || externalUser.photoUrl || undefined
                         });
                     } else {
-                        // Create new user
+                        // Creating an account through an OAuth button is still
+                        // registration, and used to be the one account-creating
+                        // path that consulted no policy at all — kill switch
+                        // included, first-user-becomes-admin included.
+                        if (config.disableSelfRegistration) {
+                            throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
+                        }
+                        let bootstrapRegistration = false;
+                        if (!isRegistrationAllowed()) {
+                            const { total } = await authRepo.listUsersPaginated({ limit: 1 });
+                            bootstrapRegistration = total === 0;
+                            if (!bootstrapRegistration) {
+                                throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
+                            }
+                        }
+
+                        // Create new user. `emailVerified` was computed for the
+                        // link decision above and used to be discarded here, so
+                        // every OAuth account sat unverified forever — and was
+                        // then exactly the unverified local account the link
+                        // decision refuses to trust.
                         user = await authRepo.createUser({
                             email: normalizeEmail(externalUser.email),
                             displayName: externalUser.displayName || undefined,
-                            photoUrl: externalUser.photoUrl || undefined
+                            photoUrl: externalUser.photoUrl || undefined,
+                            emailVerified: externalUser.emailVerified === true
                         });
 
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, { email: externalUser.email });
@@ -551,6 +607,13 @@ displayName: user.displayName });
                         // Auto-bootstrap: first user in the system gets admin
                         const allUsers = await authRepo.listUsers();
                         const isFirstUser = allUsers.length === 1 && allUsers[0].id === user.id;
+
+                        if (bootstrapRegistration && !isFirstUser) {
+                            // Two sign-ups raced through the empty-table check;
+                            // same undo as POST /auth/register.
+                            await authRepo.deleteUser(user.id);
+                            throw ApiError.forbidden("Registration is disabled", "REGISTRATION_DISABLED");
+                        }
 
                         if (isFirstUser) {
                             await authRepo.setUserRoles(user.id, ["admin"]);

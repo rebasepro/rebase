@@ -72,6 +72,8 @@ export interface BuiltinAuthAdapterConfig {
     defaultRole?: string;
     /** OAuth providers to register. */
     oauthProviders?: OAuthProvider<unknown>[];
+    /** Redirect URIs the OAuth routes accept, for every provider. */
+    allowedRedirectUris?: string[];
     /** Static service key for server-to-server auth. */
     serviceKey?: string;
     /** Auth hooks for customizing password, credentials, lifecycle, etc. */
@@ -101,6 +103,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         allowUserLookup = false,
         defaultRole,
         oauthProviders = [],
+        allowedRedirectUris,
         serviceKey,
         authHooks,
         collectionAuthConfig,
@@ -216,6 +219,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 allowUserLookup,
                 defaultRole,
                 oauthProviders,
+                allowedRedirectUris,
                 authHooks,
                 enableMagicLink,
                 cookieAuth

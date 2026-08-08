@@ -30,6 +30,16 @@ export { createGitLabProvider } from "./gitlab-oauth";
 export { createBitbucketProvider } from "./bitbucket-oauth";
 export { createSlackProvider } from "./slack-oauth";
 export { createSpotifyProvider } from "./spotify-oauth";
+export type { AppleCodeFlowPayload } from "./apple-oauth";
+
+// Shared OAuth machinery — the controls every provider, including a custom one
+// passed through `auth.providers`, is expected to go through.
+export { oauthCodeFlowSchema, pkceTokenParams, providerVerifiedEmail } from "./oauth-code-flow";
+export type { OAuthCodeFlowPayload } from "./oauth-code-flow";
+export { verifyOidcIdToken, tryVerifyOidcIdToken } from "./oidc-id-token";
+export type { OidcIdTokenClaims, VerifyOidcIdTokenOptions } from "./oidc-id-token";
+export { decideOAuthAutoLink, isRedirectUriAllowed } from "./oauth-signin-policy";
+export type { AutoLinkDecision, AutoLinkRefusal } from "./oauth-signin-policy";
 
 export { requireAuth, requireAdmin, optionalAuth, extractUserFromToken, createAuthMiddleware, queryTokenAuth, fileTokenAuth } from "./middleware";
 export type { AuthMiddlewareOptions, AuthResult } from "./middleware";
