@@ -1,6 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
-import { z } from "zod";
 import { logger } from "../utils/logger";
+import { oauthCodeFlowSchema, pkceTokenParams, providerVerifiedEmail, type OAuthCodeFlowPayload } from "./oauth-code-flow";
 
 /**
  * Creates a GitHub OAuth Provider integration.
@@ -9,14 +9,11 @@ import { logger } from "../utils/logger";
  * This provider exchanges the code for an access token, then fetches the user's
  * profile and primary email from the GitHub API.
  */
-export function createGitHubProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
+export function createGitHubProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<OAuthCodeFlowPayload> {
     return {
         id: "github",
-        schema: z.object({
-            code: z.string().min(1, "Auth code is required"),
-            redirectUri: z.string().url("Valid redirect URI is required")
-        }),
-        verify: async (payload: { code: string; redirectUri: string }): Promise<OAuthProviderProfile | null> => {
+        schema: oauthCodeFlowSchema(),
+        verify: async (payload: OAuthCodeFlowPayload): Promise<OAuthProviderProfile | null> => {
             try {
                 // Exchange code for access token
                 const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
@@ -29,7 +26,8 @@ export function createGitHubProvider(config: { clientId: string; clientSecret: s
                         client_id: config.clientId,
                         client_secret: config.clientSecret,
                         code: payload.code,
-                        redirect_uri: payload.redirectUri
+                        redirect_uri: payload.redirectUri,
+                        ...pkceTokenParams(payload.codeVerifier)
                     })
                 });
 
@@ -68,31 +66,41 @@ export function createGitHubProvider(config: { clientId: string; clientSecret: s
                     email?: string | null;
                 };
 
-                // GitHub may not return email in profile if it's private.
-                // Fetch from /user/emails endpoint instead.
+                // `/user`'s `email` is the *public profile* address — GitHub
+                // applies no verification to it, and it is often absent
+                // anyway. `/user/emails` is the only endpoint that reports a
+                // `verified` flag, so ask it unconditionally rather than
+                // treating the profile field as a fast path that skips the
+                // check: that fast path is precisely what used to reach the
+                // hardcoded `emailVerified: true` below.
                 let email = profileData.email;
-                if (!email) {
-                    const emailsResponse = await fetch("https://api.github.com/user/emails", {
-                        headers: {
-                            "Authorization": `Bearer ${accessToken}`,
-                            "Accept": "application/vnd.github+json",
-                            "User-Agent": "Rebase-Auth"
-                        }
-                    });
+                let emailVerified = false;
 
-                    if (emailsResponse.ok) {
-                        const emails = await emailsResponse.json() as Array<{
-                            email: string;
-                            primary: boolean;
-                            verified: boolean;
-                        }>;
-                        const primary = emails.find(e => e.primary && e.verified) || emails.find(e => e.verified);
-                        email = primary?.email || null;
+                const emailsResponse = await fetch("https://api.github.com/user/emails", {
+                    headers: {
+                        "Authorization": `Bearer ${accessToken}`,
+                        "Accept": "application/vnd.github+json",
+                        "User-Agent": "Rebase-Auth"
+                    }
+                });
+
+                if (emailsResponse.ok) {
+                    const emails = await emailsResponse.json() as Array<{
+                        email: string;
+                        primary: boolean;
+                        verified: boolean;
+                    }>;
+                    const chosen = emails.find(e => e.primary && e.verified)
+                        || emails.find(e => e.verified)
+                        || (email ? emails.find(e => e.email.toLowerCase() === email!.toLowerCase()) : undefined);
+                    if (chosen) {
+                        email = chosen.email;
+                        emailVerified = providerVerifiedEmail(chosen.verified);
                     }
                 }
 
                 if (!email) {
-                    logger.error("GitHub user has no verified email");
+                    logger.error("GitHub user has no email");
                     return null;
                 }
 
@@ -101,7 +109,7 @@ export function createGitHubProvider(config: { clientId: string; clientSecret: s
                     email,
                     displayName: profileData.name || profileData.login || null,
                     photoUrl: profileData.avatar_url || null,
-                    emailVerified: true
+                    emailVerified
                 };
             } catch (error) {
                 logger.error("GitHub OAuth error", { error: error });

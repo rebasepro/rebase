@@ -103,9 +103,12 @@ function loadDeclaredStorageSources
 function loadEnv
 function loadFunctionsFromDirectory
 function loadUsersCollection
+function oauthCodeFlowSchema
 function parseBackupDestination
 function parseBackupTimestamp
 function parseTransformOptions
+function pkceTokenParams
+function providerVerifiedEmail
 function readBackupBytes
 function readBundleManifest
 function resolveAuthHooks
@@ -120,10 +123,12 @@ function runFromBundle
 function safeCompare
 function serveSPA
 function transformImage
+function tryVerifyOidcIdToken
 function unknownKeyPolicyFromEnv
 function validateApiKey
 function validateCronExpression
 function validatePasswordStrength
+function verifyOidcIdToken
 function verifyPassword
 interface AccessTokenPayload { aal, amr, displayName, email, mfa_verified, photoURL, roles, uid }
 interface ApiKey { admin, created_at, created_by, expires_at, id, key_hash, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
@@ -141,12 +146,12 @@ interface BackendInstance { admin, collectionRegistry, connection, entityReposit
 interface BackupRoutesConfig { getDestination, storage }
 interface BootOptions { bundle, bundleDir, handleSignals, listen }
 interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, shutdown }
-interface BuiltinAuthAdapterConfig { allowRegistration, allowUserLookup, authHooks, authRepository, collectionAuthConfig, cookieAuth, defaultRole, disableSelfRegistration, emailConfig, emailService, enableMagicLink, oauthProviders, serviceKey }
+interface BuiltinAuthAdapterConfig { allowRegistration, allowUserLookup, allowedRedirectUris, authHooks, authRepository, collectionAuthConfig, cookieAuth, defaultRole, disableSelfRegistration, emailConfig, emailService, enableMagicLink, oauthProviders, serviceKey }
 interface BundleConfigExports { callbacks, dataSources, storageAuthorize, storageSources }
 interface BundleSchema { enums, relations, tables }
 interface CollectionDefaults { defaultSecurityRules }
 interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
-interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, order, orderBy, path, searchString, startAfter }
+interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, order, orderBy, path, searchExplain, searchString, startAfter }
 interface ConditionBuilder { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 interface ConfigProblem { message, path, severity }
 interface ContractRoutesConfig { collectionRegistry, runtimeVersion, schemaVersion }
@@ -191,7 +196,7 @@ interface QueryFilter { field, operator, value }
 interface QueryOptions { fields, include, limit, logical, offset, orderBy, vectorSearch, where }
 interface RealtimeProvider { destroy, notifyUpdate, onServerReady, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseApiError { code, details, statusCode }
-interface RebaseAuthConfig { accessExpiresIn, allowRegistration, allowUserLookup, apple, bitbucket, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, microsoft, providers, refreshExpiresIn, requireAuth, serviceKey, slack, spotify, twitter }
+interface RebaseAuthConfig { accessExpiresIn, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, microsoft, providers, refreshExpiresIn, requireAuth, serviceKey, slack, spotify, twitter }
 interface RebaseBackendConfig { app, auth, baas, basePath, bootstrappers, callbacks, collections, collectionsDir, compression, corsHandled, cronPersistence, cronsDir, csrf, dataSources, database, enableSwagger, functionsDir, history, logging, maxBodySize, rateLimit, runtimeVersion, schemaEditor, schemaVersion, server, storage, storageAuthorize, storageInsecureAllowAnyAuthenticated, storagePublicRead, storageSources }
 interface RebaseBackendInstance { auth, collectionRegistry, cronScheduler, driver, driverRegistry, healthCheck, history, realtimeService, realtimeServices, setCollectionCallbacks, shutdown, storageController, storageRegistry }
 interface RebaseFunctionContext { rebase }

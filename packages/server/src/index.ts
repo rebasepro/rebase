@@ -105,6 +105,12 @@ export {
     createBitbucketProvider,
     createSlackProvider,
     createSpotifyProvider,
+    // Shared OAuth machinery, for custom providers passed via `auth.providers`
+    oauthCodeFlowSchema,
+    pkceTokenParams,
+    providerVerifiedEmail,
+    verifyOidcIdToken,
+    tryVerifyOidcIdToken,
     // API-key permission helpers
     isApiKeyToken,
     validateApiKey,

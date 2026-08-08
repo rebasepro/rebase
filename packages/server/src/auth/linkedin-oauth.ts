@@ -1,6 +1,6 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
-import { z } from "zod";
 import { logger } from "../utils/logger";
+import { oauthCodeFlowSchema, pkceTokenParams, providerVerifiedEmail, type OAuthCodeFlowPayload } from "./oauth-code-flow";
 
 export interface LinkedinUserInfo {
     linkedinId: string;
@@ -13,14 +13,11 @@ export interface LinkedinUserInfo {
 /**
  * Creates a LinkedIn OAuth Provider integration
  */
-export function createLinkedinProvider(config: { clientId: string, clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
+export function createLinkedinProvider(config: { clientId: string, clientSecret: string }): OAuthProvider<OAuthCodeFlowPayload> {
     return {
         id: "linkedin",
-        schema: z.object({
-            code: z.string().min(1, "Auth code is required"),
-            redirectUri: z.string().url("Valid redirect URI is required")
-        }),
-        verify: async (payload: { code: string; redirectUri: string }): Promise<OAuthProviderProfile | null> => {
+        schema: oauthCodeFlowSchema(),
+        verify: async (payload: OAuthCodeFlowPayload): Promise<OAuthProviderProfile | null> => {
             try {
                 // Exchange code for access token
                 const tokenResponse = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
@@ -33,7 +30,8 @@ export function createLinkedinProvider(config: { clientId: string, clientSecret:
                         code: payload.code,
                         redirect_uri: payload.redirectUri,
                         client_id: config.clientId,
-                        client_secret: config.clientSecret
+                        client_secret: config.clientSecret,
+                        ...pkceTokenParams(payload.codeVerifier)
                     })
                 });
 
@@ -61,18 +59,23 @@ export function createLinkedinProvider(config: { clientId: string, clientSecret:
 
                 const profileData = await profileResponse.json() as {
                     sub: string;
-                    email: string;
+                    email?: string;
                     name?: string;
                     picture?: string;
                     email_verified?: boolean;
                 };
+
+                if (!profileData.email) {
+                    logger.error("LinkedIn user has no email (the 'email' scope may not have been granted)");
+                    return null;
+                }
 
                 return {
                     providerId: profileData.sub,
                     email: profileData.email,
                     displayName: profileData.name || null,
                     photoUrl: profileData.picture || null,
-                    emailVerified: profileData.email_verified === true
+                    emailVerified: providerVerifiedEmail(profileData.email_verified)
                 };
             } catch (error) {
                 logger.error("LinkedIn OAuth error", { error: error });

@@ -1,18 +1,15 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
-import { z } from "zod";
 import { logger } from "../utils/logger";
+import { oauthCodeFlowSchema, pkceTokenParams, providerVerifiedEmail, type OAuthCodeFlowPayload } from "./oauth-code-flow";
 
 /**
  * Creates a Bitbucket OAuth Provider integration (OAuth 2.0 consumer).
  */
-export function createBitbucketProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
+export function createBitbucketProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<OAuthCodeFlowPayload> {
     return {
         id: "bitbucket",
-        schema: z.object({
-            code: z.string().min(1, "Auth code is required"),
-            redirectUri: z.string().url("Valid redirect URI is required")
-        }),
-        verify: async (payload: { code: string; redirectUri: string }): Promise<OAuthProviderProfile | null> => {
+        schema: oauthCodeFlowSchema(),
+        verify: async (payload: OAuthCodeFlowPayload): Promise<OAuthProviderProfile | null> => {
             try {
                 const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
 
@@ -25,7 +22,8 @@ export function createBitbucketProvider(config: { clientId: string; clientSecret
                     body: new URLSearchParams({
                         grant_type: "authorization_code",
                         code: payload.code,
-                        redirect_uri: payload.redirectUri
+                        redirect_uri: payload.redirectUri,
+                        ...pkceTokenParams(payload.codeVerifier)
                     })
                 });
 
@@ -56,24 +54,26 @@ export function createBitbucketProvider(config: { clientId: string; clientSecret
                     headers: { "Authorization": `Bearer ${accessToken}` }
                 });
 
-                let email: string | null = null;
+                let selected: { email: string; is_confirmed: boolean } | undefined;
                 if (emailsResponse.ok) {
                     const emailData = await emailsResponse.json() as {
                         values: Array<{ email: string; is_primary: boolean; is_confirmed: boolean }>;
                     };
-                    const primary = emailData.values.find(e => e.is_primary && e.is_confirmed)
+                    selected = emailData.values.find(e => e.is_primary && e.is_confirmed)
                         || emailData.values.find(e => e.is_confirmed);
-                    email = primary?.email || null;
                 }
 
-                if (!email) { logger.error("Bitbucket user has no verified email"); return null; }
+                if (!selected?.email) { logger.error("Bitbucket user has no verified email"); return null; }
 
                 return {
                     providerId: p.uuid,
-                    email,
+                    email: selected.email,
                     displayName: p.display_name || p.username || null,
                     photoUrl: p.links?.avatar?.href || null,
-                    emailVerified: true
+                    // Read off the address we actually chose rather than
+                    // restating the filter above as a literal `true` — the two
+                    // cannot drift apart this way.
+                    emailVerified: providerVerifiedEmail(selected.is_confirmed)
                 };
             } catch (error) {
                 logger.error("Bitbucket OAuth error", { error: error });

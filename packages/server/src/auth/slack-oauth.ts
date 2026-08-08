@@ -1,19 +1,16 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
-import { z } from "zod";
 import { logger } from "../utils/logger";
+import { oauthCodeFlowSchema, pkceTokenParams, providerVerifiedEmail, type OAuthCodeFlowPayload } from "./oauth-code-flow";
 
 /**
  * Creates a Slack OAuth Provider integration (OAuth 2.0 / "Sign in with Slack").
  * Uses the OpenID Connect flow with the "openid,email,profile" scopes.
  */
-export function createSlackProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
+export function createSlackProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<OAuthCodeFlowPayload> {
     return {
         id: "slack",
-        schema: z.object({
-            code: z.string().min(1, "Auth code is required"),
-            redirectUri: z.string().url("Valid redirect URI is required")
-        }),
-        verify: async (payload: { code: string; redirectUri: string }): Promise<OAuthProviderProfile | null> => {
+        schema: oauthCodeFlowSchema(),
+        verify: async (payload: OAuthCodeFlowPayload): Promise<OAuthProviderProfile | null> => {
             try {
                 const tokenResponse = await fetch("https://slack.com/api/openid.connect.token", {
                     method: "POST",
@@ -23,7 +20,8 @@ export function createSlackProvider(config: { clientId: string; clientSecret: st
                         client_secret: config.clientSecret,
                         code: payload.code,
                         redirect_uri: payload.redirectUri,
-                        grant_type: "authorization_code"
+                        grant_type: "authorization_code",
+                        ...pkceTokenParams(payload.codeVerifier)
                     })
                 });
 
@@ -62,7 +60,7 @@ export function createSlackProvider(config: { clientId: string; clientSecret: st
                     email: p.email,
                     displayName: p.name || null,
                     photoUrl: p.picture || null,
-                    emailVerified: p.email_verified === true
+                    emailVerified: providerVerifiedEmail(p.email_verified)
                 };
             } catch (error) {
                 logger.error("Slack OAuth error", { error: error });

@@ -1,21 +1,19 @@
 import type { OAuthProvider, OAuthProviderProfile } from "./interfaces";
-import { z } from "zod";
 import { logger } from "../utils/logger";
+import { oauthCodeFlowSchema, pkceTokenParams, providerVerifiedEmail, type OAuthCodeFlowPayload } from "./oauth-code-flow";
 
 /**
  * Creates a Discord OAuth2 Provider integration.
  *
- * Uses the authorization code flow. Requires the "identify" and "email"
- * scopes to retrieve the user's email and profile information.
+ * Uses the authorization code flow (with PKCE when the client supplies a
+ * verifier). Requires the "identify" and "email" scopes to retrieve the
+ * user's email and profile information.
  */
-export function createDiscordProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<{ code: string; redirectUri: string }> {
+export function createDiscordProvider(config: { clientId: string; clientSecret: string }): OAuthProvider<OAuthCodeFlowPayload> {
     return {
         id: "discord",
-        schema: z.object({
-            code: z.string().min(1, "Auth code is required"),
-            redirectUri: z.string().url("Valid redirect URI is required")
-        }),
-        verify: async (payload: { code: string; redirectUri: string }): Promise<OAuthProviderProfile | null> => {
+        schema: oauthCodeFlowSchema(),
+        verify: async (payload: OAuthCodeFlowPayload): Promise<OAuthProviderProfile | null> => {
             try {
                 // Exchange code for access token
                 const tokenResponse = await fetch("https://discord.com/api/v10/oauth2/token", {
@@ -26,7 +24,8 @@ export function createDiscordProvider(config: { clientId: string; clientSecret: 
                         client_secret: config.clientSecret,
                         grant_type: "authorization_code",
                         code: payload.code,
-                        redirect_uri: payload.redirectUri
+                        redirect_uri: payload.redirectUri,
+                        ...pkceTokenParams(payload.codeVerifier)
                     })
                 });
 
@@ -74,7 +73,7 @@ export function createDiscordProvider(config: { clientId: string; clientSecret: 
                     email: profileData.email,
                     displayName: profileData.global_name || profileData.username || null,
                     photoUrl,
-                    emailVerified: profileData.verified === true
+                    emailVerified: providerVerifiedEmail(profileData.verified)
                 };
             } catch (error) {
                 logger.error("Discord OAuth error", { error: error });

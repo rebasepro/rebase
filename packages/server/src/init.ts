@@ -173,6 +173,22 @@ export interface RebaseAuthConfig {
      */
     providers?: OAuthProvider<unknown>[];
     /**
+     * Redirect URIs the OAuth sign-in routes will accept, for every provider.
+     *
+     * Left unset, the only check is the provider's own registered-URI match —
+     * which authorises *every* URI registered on that OAuth client, including
+     * the `localhost` entry someone added for development and the staging host
+     * nobody removed. List the origins this backend actually serves to narrow
+     * it. Compared on origin plus path; query, fragment and a trailing slash
+     * are ignored.
+     *
+     * @example
+     * ```ts
+     * auth: { allowedRedirectUris: ["https://admin.example.com/"] }
+     * ```
+     */
+    allowedRedirectUris?: string[];
+    /**
      * Override specific parts of the built-in auth implementation.
      *
      * Each override replaces one piece of the default behavior while
@@ -1030,6 +1046,7 @@ async function _initializeRebaseBackend(config: RebaseBackendConfig): Promise<Re
                 allowUserLookup: safeAuthConfig.allowUserLookup ?? false,
                 defaultRole: safeAuthConfig.defaultRole,
                 oauthProviders,
+                allowedRedirectUris: safeAuthConfig.allowedRedirectUris,
                 // The internal per-boot fallback is included so the closure the
                 // adapter's routes capture recognizes the singleton's own
                 // control-plane requests even without a configured key.
