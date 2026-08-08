@@ -37,7 +37,7 @@ export type IssueSeverity = "error" | "warning" | "info";
 
 export interface DoctorIssue {
     severity: IssueSeverity;
-    category: "missing_table" | "missing_column" | "type_mismatch" | "missing_constraint" | "schema_stale" | "missing_enum" | "enum_value_mismatch" | "missing_foreign_key" | "sdk_stale" | "sdk_not_generated";
+    category: "missing_table" | "missing_column" | "type_mismatch" | "missing_constraint" | "schema_stale" | "missing_enum" | "enum_value_mismatch" | "missing_foreign_key" | "sdk_stale" | "sdk_not_generated" | "sdk_ungeneratable";
     table?: string;
     column?: string;
     expected?: string;
@@ -716,7 +716,8 @@ function formatCategory(cat: DoctorIssue["category"]): string {
         enum_value_mismatch: "Enum Value Mismatch",
         missing_foreign_key: "Missing Foreign Key",
         sdk_stale: "Stale SDK Types",
-        sdk_not_generated: "SDK Types Not Generated"
+        sdk_not_generated: "SDK Types Not Generated",
+        sdk_ungeneratable: "SDK Cannot Be Generated"
     };
     return labels[cat];
 }
