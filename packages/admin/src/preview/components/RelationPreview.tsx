@@ -189,11 +189,14 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
         useCache: true
     });
 
-    if (entity) {
-        relationsCache.set(relation.pathWithId, entity);
-    }
-
-    const usedEntity = passedEntity ?? entity ?? relationsCache.get(relation.pathWithId);
+    // Only what the fetch currently reports. There used to be a module-level
+    // Map behind this, written on every successful fetch and never invalidated:
+    // when the target row was deleted `useFetch` correctly reported it gone and
+    // the card carried on rendering the copy in the Map, so the "missing"
+    // branches below were unreachable for anything previewed this session — and
+    // the Map outlived a sign-out. `useFetch` keeps its own cache, seeds the
+    // first render from it, and clears the entry when the row disappears.
+    const usedEntity = passedEntity ?? entity;
 
     let body: React.ReactNode;
 
@@ -266,5 +269,3 @@ function RelationPreviewExisting<M extends Record<string, unknown> = Record<stri
         hover={hover}/>;
 
 }
-
-const relationsCache = new Map<string, Entity<any>>();

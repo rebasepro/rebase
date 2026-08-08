@@ -240,7 +240,13 @@ export function getTableBindingForProperty(
                     Component: RelationDialogBindingComponent,
                     allowScroll: false
                 };
-            } else {
+            } else if (selected) {
+                // Gated on `selected`, like the number and string editors above.
+                // This one mounts a live picker against the *target* collection,
+                // and the cell is rendered once per visible row: ungated, opening
+                // a table with one relation column fired a request — or, on the
+                // realtime path, a subscription — per row, for data nobody had
+                // asked to see. Unselected cells fall through to PropertyPreview.
                 return {
                     Component: RelationSelectorBindingComponent,
                     allowScroll: false

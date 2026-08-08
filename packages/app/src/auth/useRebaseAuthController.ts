@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { User, AuthChangeEvent, RebaseSession } from "@rebasepro/types";
 import type { AuthConfigResponse } from "./api";
 import { RebaseAuthController, RebaseAuthControllerProps } from "./types";
+import { clearFetchCache } from "../hooks/data/useFetch";
 
 /**
  * Auth controller hook for JWT-based authentication.
@@ -77,6 +78,11 @@ export function useRebaseAuthController(
         const syncState = async (event: AuthChangeEvent, session: RebaseSession | null) => {
             await updateState(session);
             if (event === "SIGNED_OUT") {
+                // Entities fetched by the session that just ended. The cache is
+                // module-level and keyed by path only, so without this the next
+                // user in the same tab is shown rows they may not be allowed to
+                // read — previews render straight out of it.
+                clearFetchCache();
                 if (isMountedRef.current) {
                     setLoginSkipped(false);
                 }
