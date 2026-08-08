@@ -36,6 +36,40 @@ import { getColumnMeta } from "../services/collection-helpers";
 export type UnknownFilterFieldsMode = "error" | "warn";
 
 /**
+ * A user's search term, made safe to drop inside a `%…%` LIKE pattern.
+ *
+ * The term is already a bind parameter, so this is not about injection. It is
+ * about the two things a LIKE metacharacter does when it arrives from a search
+ * box:
+ *
+ *  1. **It changes the query.** `%` and `_` are wildcards, so searching for
+ *     `50%` returned every row and `a_c` matched `abc`. Nothing the caller
+ *     could type would find a literal `%`.
+ *  2. **It is a cost the caller chooses.** Postgres matches LIKE by
+ *     backtracking: each `%` re-tries every remaining offset, so
+ *     `?searchString=a%a%a%a%a%a%a%b` is polynomial with an attacker-chosen
+ *     exponent — evaluated per row, OR-ed across every string property of the
+ *     collection, on a sequential scan (a leading `%` cannot use an index), and
+ *     the page limit does not bound it because the scan happens first.
+ *
+ * This is the server-side half of the pattern `like-pattern-redos.test.ts`
+ * hardened the offline evaluator against; that test's own note ("the same
+ * translation in the Mongo driver hands the expression to the database, where
+ * it occupies a server thread instead") describes this call site.
+ *
+ * Backslash is the default `ESCAPE` character for LIKE, and the pattern is
+ * bound rather than interpolated, so a single backslash here reaches the
+ * matcher as one. Escaping the escape character first is what keeps a term
+ * ending in `\` from swallowing the closing `%`.
+ *
+ * Note this is a *substring search*, not the `like` filter operator: a caller
+ * who wants wildcards has `?title=like.foo%` for that, where the pattern is the
+ * documented input.
+ */
+export const escapeLikePattern = (value: string): string =>
+    value.replace(/[\\%_]/g, ch => `\\${ch}`);
+
+/**
  * Process-wide default, set once when the driver is constructed.
  *
  * The condition builder is a set of *static* methods reached from a dozen
@@ -1290,7 +1324,8 @@ whereConditions };
      *   `tsvector` column. Stems, drops stopwords, AND-es the terms, reaches
      *   inside JSONB and arrays, and uses the GIN index.
      * - **Not declared** — the original `ILIKE '%term%'` OR-ed across top-level
-     *   string properties, unchanged.
+     *   string properties, with the term escaped (see {@link escapeLikePattern})
+     *   so it is matched as the literal text the user typed.
      *
      * The second is the default and stays the default. A collection that has
      * not opted in compiles to exactly the SQL it compiled to before this
@@ -1327,7 +1362,7 @@ whereConditions };
                         fieldColumn instanceof PgChar ||
                         (fieldColumn && typeof fieldColumn === "object" && !("columnType" in fieldColumn));
                     if (supportsILike) {
-                        searchConditions.push(ilike(fieldColumn, `%${searchString}%`));
+                        searchConditions.push(ilike(fieldColumn, `%${escapeLikePattern(searchString)}%`));
                     }
                 }
             }
@@ -1759,6 +1794,16 @@ whereConditions };
      * - `orderBy`: SQL expression to ORDER BY distance (ascending = closest first)
      * - `filter`: optional WHERE clause for distance threshold
      * - `distanceSelect`: SQL expression for selecting the distance as `_distance`
+     *
+     * `property` is `?vector_search=` off the querystring, so it is an untrusted
+     * *name*, and it used to be looked up straight in the drizzle table object.
+     * Two ways that went wrong, both answering 500 to a malformed request:
+     * `?vector_search=title` built `"title" <=> '[1,2]'::vector`, which the
+     * database rejects with "operator does not exist"; and a table object also
+     * carries non-column keys (`_`, methods), which passed the `if (!column)`
+     * guard and compiled to nonsense. The name is resolved against the table's
+     * actual columns and required to be a `vector` — anything else is the
+     * caller's mistake and gets a 400 that says so.
      */
     static buildVectorSearchConditions(
         table: PgTable<any>,
@@ -1769,10 +1814,7 @@ whereConditions };
             threshold?: number;
         }
     ): { orderBy: SQL; filter?: SQL; distanceSelect: SQL } {
-        const column = table[vectorSearch.property as keyof typeof table] as AnyPgColumn;
-        if (!column) {
-            throw new Error(`Vector column '${vectorSearch.property}' not found in table`);
-        }
+        const column = DrizzleConditionBuilder.resolveVectorColumn(table, vectorSearch.property);
 
         // The vector is interpolated as a raw SQL literal below (pgvector has no
         // bind form for the `::vector` cast), so every element must be a finite
@@ -1813,7 +1855,51 @@ whereConditions };
             distanceSelect: sql`(${column} ${sql.raw(operator)} ${sql.raw(vectorLiteral)})`
         };
     }
+
+    /**
+     * The `vector` column a request named, or a 400 explaining what it named.
+     *
+     * `getTableColumns` rather than a key lookup: it returns only the columns,
+     * so `_`, `getSQL` and every other property of a drizzle table stop looking
+     * like candidates. The type check is on the *physical* column
+     * (`vector(1536)`) rather than on the declared property, so it holds for an
+     * introspected collection too, where the property carries no Rebase type.
+     */
+    private static resolveVectorColumn(table: PgTable<any>, property: string): AnyPgColumn {
+        const columns = getTableColumns(table) as Record<string, AnyPgColumn> | undefined;
+        const column = columns?.[property];
+        if (!column) {
+            const known = Object.entries(columns ?? {})
+                .filter(([, c]) => isVectorColumn(c))
+                .map(([name]) => name);
+            throw ApiError.badRequest(
+                `Unknown vector property "${property}". ` +
+                (known.length > 0
+                    ? `This collection's vector properties are: ${known.join(", ")}.`
+                    : "This collection declares no `vector` property to search."),
+                "UNKNOWN_VECTOR_PROPERTY"
+            );
+        }
+        if (!isVectorColumn(column)) {
+            throw ApiError.badRequest(
+                `Property "${property}" is not a vector column (it is \`${columnSqlType(column) || "unknown"}\`), ` +
+                "so it has no distance operator. Name the property declared as `{ type: \"vector\" }`.",
+                "UNKNOWN_VECTOR_PROPERTY"
+            );
+        }
+        return column;
+    }
 }
+
+/** The column's SQL type, for a value that may not be a drizzle column at all. */
+const columnSqlType = (column: unknown): string => {
+    const getSQLType = (column as { getSQLType?: () => string })?.getSQLType;
+    return typeof getSQLType === "function" ? getSQLType.call(column).toLowerCase() : "";
+};
+
+/** True for `vector(1536)` and its pgvector siblings, whatever the width. */
+const isVectorColumn = (column: unknown): boolean =>
+    /^(vector|halfvec|sparsevec)\b/.test(columnSqlType(column));
 
 /**
  * Alias for DrizzleConditionBuilder for consistent naming with other database implementations.

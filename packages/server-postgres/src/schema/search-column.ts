@@ -58,6 +58,7 @@ import {
     DEFAULT_SEARCH_WEIGHT,
     DEFAULT_FUZZY_THRESHOLD
 } from "@rebasepro/types";
+import { createHash } from "node:crypto";
 import { getTableName } from "@rebasepro/common";
 import { toSnakeCase, toPostgresIdentifier } from "@rebasepro/utils";
 
@@ -459,6 +460,90 @@ export const searchIndexStatements = (spec: SearchColumnSpec): string[] => {
     }
     return statements;
 };
+
+// ── Telling a changed `search` block from an unchanged one ──────────────────
+
+/**
+ * Marker on the comment of every generated search column this module creates.
+ *
+ * Versioned because the fingerprint below is only comparable against itself: a
+ * future change to how it is computed has to read as "not stamped by this
+ * version" rather than as drift on every existing column.
+ */
+export const SEARCH_STAMP_PREFIX = "rebase:search:v1:";
+
+/**
+ * A stable fingerprint of one generated column's expression.
+ *
+ * Why a stamp rather than reading the expression back: Postgres stores a
+ * generated column's expression *parsed*, and hands it back deparsed — casts
+ * made explicit, identifiers requoted, schema qualifications added or dropped
+ * according to `search_path`. Comparing that text to the text we generated
+ * would report drift on wording, and this comparison decides whether a boot
+ * refuses, so a false positive is an outage. The stamp is written by the same
+ * code that writes the column, so equality means what it says.
+ */
+export const searchExpressionFingerprint = (expression: string): string =>
+    `${SEARCH_STAMP_PREFIX}${createHash("sha256").update(expression).digest("hex").slice(0, 16)}`;
+
+/** One generated column, with the fingerprint that identifies its expression. */
+export interface SearchColumnStamp {
+    column: string;
+    /** The expression the column is generated from. */
+    expression: string;
+    fingerprint: string;
+    /** `COMMENT ON COLUMN …`, which is where the fingerprint is recorded. */
+    sql: string;
+}
+
+/**
+ * The stamps for a spec's generated columns — one per column, never shared.
+ *
+ * Per column on purpose: turning `fuzzy` on adds a second column and changes
+ * nothing about the first, and a spec-wide fingerprint would report the
+ * untouched `tsvector` column as drifted and refuse a boot over a change that
+ * is purely additive.
+ */
+export const searchColumnStamps = (spec: SearchColumnSpec): SearchColumnStamp[] => {
+    const stamp = (column: string, expression: string): SearchColumnStamp => {
+        const fingerprint = searchExpressionFingerprint(expression);
+        return {
+            column,
+            expression,
+            fingerprint,
+            sql: `COMMENT ON COLUMN "${spec.schema}"."${spec.table}"."${column}" IS ${quote(fingerprint)};`
+        };
+    };
+    const stamps = [stamp(spec.column, spec.expression)];
+    if (spec.fuzzy) stamps.push(stamp(spec.fuzzy.column, spec.fuzzy.expression));
+    return stamps;
+};
+
+/**
+ * The same drift check as the boot ensure, for the SQL file.
+ *
+ * Needed because {@link searchColumnStamps} would otherwise *launder* drift on
+ * the migration path: `ADD COLUMN IF NOT EXISTS` does nothing to a column that
+ * exists, so a re-generated `search.sql` would stamp a stale column with the
+ * new block's fingerprint and the next boot would find them in agreement.
+ * Guarding first means the file refuses instead — `rebase db push` is attended,
+ * and the operator reading the failure is the person who changed the block.
+ */
+export const searchStampGuards = (spec: SearchColumnSpec): string[] =>
+    searchColumnStamps(spec).map(stamp => {
+        const relation = quote(`"${spec.schema}"."${spec.table}"`);
+        return `DO $rebase_search$
+DECLARE recorded text;
+BEGIN
+    SELECT col_description(a.attrelid, a.attnum) INTO recorded
+    FROM pg_attribute a
+    WHERE a.attrelid = ${relation}::regclass AND a.attname = ${quote(stamp.column)} AND NOT a.attisdropped;
+    IF recorded LIKE ${quote(`${SEARCH_STAMP_PREFIX}%`)} AND recorded <> ${quote(stamp.fingerprint)} THEN
+        RAISE EXCEPTION 'Rebase: the search block for ${spec.schema}.${spec.table} changed after the generated column "${stamp.column}" was built (recorded %, expected ${stamp.fingerprint}). Postgres cannot alter a generated expression in place. Drop the column and re-apply this file — it rewrites the table and rebuilds the index: ALTER TABLE ${relation.slice(1, -1)} DROP COLUMN "${stamp.column}";', recorded;
+    END IF;
+END
+$rebase_search$;`;
+    });
 
 /**
  * The index names the spec creates.

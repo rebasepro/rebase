@@ -27,6 +27,12 @@ three limits that no setting inside it can fix:
 - **It cannot use an index.** A leading `%` defeats a B-tree, so every search is
   a sequential scan. Fine at a thousand rows; a cliff at a million.
 
+The term is matched **literally**: `%` and `_` are LIKE metacharacters, and they
+are escaped before the pattern is built, so searching for `50%` searches for
+`50%` rather than returning every row. If you want wildcards, the `like` filter
+operator takes a pattern (`.where("title", "like", "post-%")`); `.search()` does
+not.
+
 The default does not change, and a collection that has not opted in compiles to
 exactly the SQL it always did.
 
@@ -96,6 +102,24 @@ adding a `search` block on its own produces no migration, because the schema
 Atlas compares has not changed. `rebase db generate` says so when it happens.
 The block is still applied by `rebase db push` and by the boot-time schema
 ensure; to put it in a migration explicitly, append `drizzle/search.sql` to one.
+
+### Changing the block later
+
+A generated column carries its expression, and Postgres cannot alter that
+expression in place — so adding a field, moving a weight, changing the language
+or turning `unaccent` on is **not** something `ADD COLUMN IF NOT EXISTS` can
+apply to a column that already exists.
+
+Rebase records a fingerprint of the expression on the column when it creates it,
+and compares it on every boot and every `db push`. A change is refused, loudly,
+with the two statements that apply it — a `DROP COLUMN` and an `ADD COLUMN`,
+which rewrite the table and rebuild the GIN index. Run them at a time you
+choose; nothing rewrites a live table on your behalf. (Turning `fuzzy` on is
+additive — a second column — and applies without any of this.)
+
+Boot refuses rather than serving, because the alternative is what this check
+replaced: a column that keeps indexing the previous field set, and a search that
+returns nothing for content plainly in the row.
 
 ## What you can name in `fields`
 

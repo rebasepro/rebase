@@ -83,6 +83,8 @@ export class DataService implements DataRepository {
         searchString: string,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
+            /** An `or(...)`/`and(...)` group, applied alongside `filter`. */
+            logical?: LogicalCondition;
             orderBy?: string;
             order?: "desc" | "asc";
             limit?: number;

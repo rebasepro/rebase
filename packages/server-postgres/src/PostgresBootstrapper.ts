@@ -835,8 +835,15 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) 
             );
             for (const failure of plan.failures) {
                 logger.warn(
-                    `🔗 [schema] Could not add foreign key "${failure.target}" — the column exists and the ` +
-                    `collection still serves, but rows are not policed by this constraint: ${failure.error}`
+                    failure.kind === "comment-column"
+                        // The stamp records which `search` block the generated
+                        // column was built from. Without it the next boot cannot
+                        // tell a changed block from an unchanged one and adopts
+                        // the column again instead of refusing.
+                        ? `🔍 [schema] Could not record the search fingerprint on "${failure.target}" — search works, ` +
+                          `but a later change to the \`search\` block will not be detected: ${failure.error}`
+                        : `🔗 [schema] Could not add foreign key "${failure.target}" — the column exists and the ` +
+                          `collection still serves, but rows are not policed by this constraint: ${failure.error}`
                 );
             }
             return { applied: plan.actions.length - plan.failures.length };
