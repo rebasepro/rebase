@@ -25,8 +25,9 @@ export type SortButtonProps<M extends Record<string, unknown>> = {
      */
     properties: Properties;
     /**
-     * Narrow toolbar (split view). Only decides the icon size, which follows
-     * the neighbouring controls — see `CollectionViewStartActions`.
+     * Toolbar showing icon-only controls (split view, or a layout too narrow
+     * for the filters button's label). Only decides the icon size, which
+     * follows that button — see `CollectionViewStartActions`.
      */
     compact?: boolean;
 };

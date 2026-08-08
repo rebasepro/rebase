@@ -104,6 +104,13 @@ parentEntityIds,
         </Tooltip>
     );
 
+    // Whether the toolbar is showing icon-only controls. The filters button
+    // drops its label — and its icon a size with it — on a narrow layout as
+    // well as in the split view, and the sort and clear controls beside it
+    // follow: keyed on `compact` alone they stayed 20px next to a 16px filter
+    // icon at every width below `largeLayout`.
+    const iconOnlyToolbar = !largeLayout || Boolean(compact);
+
     const filtersButton = resolvedProperties && tableController.setFilterValues && (
         <Tooltip title={t("filters")}
             key={"filters_tooltip"}>
@@ -147,7 +154,7 @@ parentEntityIds,
             key={"sort_button"}
             tableController={tableController}
             properties={resolvedProperties}
-            compact={compact}
+            compact={iconOnlyToolbar}
         />
     );
 
@@ -171,7 +178,7 @@ parentEntityIds,
         <ClearFilterSortButton
             key={"clear_filter"}
             tableController={tableController}
-            compact={compact}
+            compact={iconOnlyToolbar}
             enabled={!collection.fixedFilter}/>,
         filterPresetsButton
     ];
