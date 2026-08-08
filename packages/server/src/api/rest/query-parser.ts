@@ -1,6 +1,6 @@
 import type { FilterValues, LogicalCondition, VectorSearchParams } from "@rebasepro/types";
 import { toCanonicalOp, resolveClientListLimit, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { deserializeOrderBy, deserializeFilter, deserializeLogicalCondition } from "@rebasepro/common";
+import { deserializeFilter, deserializeLogicalCondition } from "@rebasepro/common";
 import { QueryOptions } from "../types";
 import { ApiError } from "../errors";
 
@@ -110,9 +110,17 @@ function toDirection(raw: unknown, context: string): "asc" | "desc" {
 function toOrderByEntry(raw: unknown, index: number): OrderByEntry {
     const context = `entry ${index}`;
     if (typeof raw === "string") {
-        const tuple = deserializeOrderBy(raw);
-        if (!tuple || !tuple[0]) invalidOrderBy(`${context} is an empty field name`);
-        return { field: tuple[0], direction: toDirection(tuple[1], context) };
+        // Split here rather than through `deserializeOrderBy`, which is the
+        // *client* end of the codec and normalises anything that is not
+        // literally "desc" to "asc". Routed through it, `?orderBy=x:DESC`
+        // reached `toDirection` already collapsed to "asc" and answered 200
+        // with the rows in the opposite order — a newest-first list showing
+        // the oldest rows — and `x:sideways` did the same. The direction token
+        // has to arrive here raw for `toDirection` to have anything to refuse.
+        const idx = raw.indexOf(":");
+        const field = (idx === -1 ? raw : raw.slice(0, idx)).trim();
+        if (!field) invalidOrderBy(`${context} is an empty field name`);
+        return { field, direction: idx === -1 ? "asc" : toDirection(raw.slice(idx + 1), context) };
     }
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
         invalidOrderBy(`${context} is not a field name or a {field, direction} object`);

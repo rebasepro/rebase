@@ -23,7 +23,7 @@
  * generated SDK — where `M` is a concrete row type — the documented call was a
  * compile error. Nothing in this repo noticed; a downstream application did.
  */
-import type { FindParams, FindResult, SDKQueryBuilderInterface } from "@rebasepro/types";
+import type { FindParams, FindResult, SDKQueryBuilderInterface, WhereFilterOp } from "@rebasepro/types";
 
 /**
  * A row shaped the way a **generated** SDK shapes one: a type alias with a
@@ -43,7 +43,15 @@ type ContractRow = {
     id: string;
     title: string;
     created_at: string;
+    /** An `array` property, which codegen emits as `Array<X>`. */
+    tags: string[];
+    age: number;
+    deleted_at: string | null;
 };
+
+/** A to-many relation, which codegen emits as `Array<TargetRow>`. */
+type TagRow = { id: string; label: string };
+type PostRow = { id: string; title: string; tags: TagRow[] };
 
 // ── orderBy accepts relevance, and still rejects nonsense ───────────────────
 
@@ -79,6 +87,90 @@ export const fluentTypo = (qb: SDKQueryBuilderInterface<ContractRow>) =>
 /** Vector search must be reachable from the builder, and chain. */
 export const fluentVector = (qb: SDKQueryBuilderInterface<ContractRow>) =>
     qb.vectorSearch("embedding", [0.1, 0.2], { threshold: 0.3 }).limit(10);
+
+// ── the operator decides what the value is ─────────────────────────────────
+
+/**
+ * `array-contains` takes an **element** of the column, not the column.
+ *
+ * This was the second `_score`: documented in `docs/sdk/querying.md`, accepted
+ * by the runtime, and a compile error on a generated SDK — because
+ * `WhereValue<T> = T | T[] | null` was one value type for all sixteen
+ * operators, so on `tags: string[]` it wanted a `string[]`. The spelling that
+ * did compile, `["featured"]`, builds `@> ARRAY[$1]` with the whole array bound
+ * as the single element and matches nothing, forever, with no error anywhere.
+ */
+export const fluentArrayContains = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    qb.where("tags", "array-contains", "featured");
+
+export const fluentArrayContainsWrapped = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    // @ts-expect-error - the column is not one of its own elements
+    qb.where("tags", "array-contains", ["featured"]);
+
+/**
+ * Same defect, and the case the relation compiler was specifically built for:
+ * a to-many relation is emitted as `Array<TargetRow>`, and the compiler answers
+ * `array-contains` on it by comparing **ids**. So the id must be accepted even
+ * though it is not the element type.
+ */
+export const fluentRelationContains = (qb: SDKQueryBuilderInterface<PostRow>, tagId: string) =>
+    qb.where("tags", "array-contains", tagId);
+
+export const fluentRelationIn = (qb: SDKQueryBuilderInterface<PostRow>, tagIds: string[]) =>
+    qb.where("tags", "in", tagIds);
+
+export const fluentRelationTypo = (qb: SDKQueryBuilderInterface<PostRow>) =>
+    // @ts-expect-error - neither a `TagRow` nor a `TagRow["id"]`
+    qb.where("tags", "array-contains", 42);
+
+/** The list operators take a list of elements — or one, read as a one-element list. */
+export const fluentInList = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    qb.where("tags", "in", ["featured", "new"]);
+
+export const fluentInScalar = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    qb.where("title", "in", "hello");
+
+export const fluentInNested = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    // @ts-expect-error - a list of lists is not a list of elements
+    qb.where("tags", "in", [["featured"]]);
+
+/** A comparison takes one value. `eq(column, ["a","b"])` is not a query anyone meant. */
+export const fluentEqArray = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    // @ts-expect-error - `==` compares against a value, not a list
+    qb.where("title", "==", ["a", "b"]);
+
+/**
+ * A pattern is a string on every column type. The driver casts, so refusing
+ * `"%3%"` on a numeric column was the type being stricter than the runtime.
+ */
+export const fluentLikeOnNumber = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    qb.where("age", "like", "%3%");
+
+/** The null operators ignore their value; `null` is the conventional spelling. */
+export const fluentIsNull = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    qb.where("deleted_at", "is-null", null);
+
+/**
+ * A caller holding an unnarrowed operator — a dynamic filter UI — must keep
+ * compiling. `WhereValueFor` distributes over the operator, so this is the
+ * union of every branch rather than a `never`.
+ */
+export const fluentDynamicOp = (qb: SDKQueryBuilderInterface<ContractRow>, op: WhereFilterOp) =>
+    qb.where("title", op, "anything");
+
+/** Two conditions on one column: the shape the Mongo compiler used to drop. */
+export const fluentRange = (qb: SDKQueryBuilderInterface<ContractRow>) =>
+    qb.where("age", ">=", 18).where("age", "<", 65);
+
+/** The object form must accept exactly what the fluent form accepts. */
+export const paramsArrayContains: FindParams<ContractRow> = {
+    where: { tags: ["array-contains", "featured"] }
+};
+
+/** …and the array-of-tuples form the builder produces from two `.where()` calls. */
+export const paramsRange: FindParams<ContractRow> = {
+    where: { age: [[">=", 18], ["<", 65]] }
+};
 
 // ── what a query computes is readable off the row ──────────────────────────
 

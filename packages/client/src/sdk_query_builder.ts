@@ -5,7 +5,7 @@ import {
     SDKCollectionClient,
     SDKQueryBuilderInterface,
     WhereFilterOp,
-    WhereValue,
+    WhereValueFor,
     type ComputedSortField
 } from "@rebasepro/types";
 
@@ -37,7 +37,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * @example
      * client.data.users.where('age', '>=', 18).find()
      */
-    where<K extends keyof M & string>(column: K, operator: WhereFilterOp, value: WhereValue<M[K]>): this;
+    where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
     where(logicalCondition: LogicalCondition): this;
     where(columnOrCondition: string | LogicalCondition, operator?: WhereFilterOp, value?: unknown): this {
         if (typeof columnOrCondition === "object" && columnOrCondition !== null && "type" in columnOrCondition) {

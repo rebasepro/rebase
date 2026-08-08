@@ -5,8 +5,9 @@
  */
 
 import { CollectionConfig, FilterCondition, FilterValues, LogicalCondition, WhereFilterOp } from "@rebasepro/types";
+import { toFilterTuples } from "@rebasepro/common";
 import { Filter, Document } from "mongodb";
-import { logger } from "@rebasepro/server";
+import { ApiError, logger } from "@rebasepro/server";
 
 /**
  * Mapping from Rebase filter operators to MongoDB query operators
@@ -78,9 +79,14 @@ export class MongoConditionBuilder {
         for (const [field, filterParam] of Object.entries(filter)) {
             if (!filterParam) continue;
 
-            const [op, value] = filterParam as [WhereFilterOp, any];
-            const condition = this.buildCondition(field, op, value);
-            if (condition) conditions.push(condition);
+            // One tuple or an array of them. This destructured the param
+            // directly, so `{ age: [[">=", 18], ["<", 65]] }` bound `op` to the
+            // tuple `[">=", 18]`, matched no operator, and dropped **both**
+            // conditions — a filtered read answering 200 with the whole
+            // collection. The grammar is shared with the Postgres compiler now.
+            for (const [op, value] of toFilterTuples(filterParam)) {
+                conditions.push(this.buildCondition(field, op, value));
+            }
         }
 
         return conditions;
@@ -93,12 +99,15 @@ export class MongoConditionBuilder {
      * A group written as a second dialect is a group where `array-contains` or
      * `ilike` quietly means something else than it does in `filter`, which is
      * the kind of difference nobody finds until a query returns the wrong rows.
+     *
+     * Always returns a condition or throws: there is no operator this can be
+     * given that legitimately means "no condition".
      */
     private static buildCondition(
         field: string,
         op: WhereFilterOp,
         value: any
-    ): Filter<Document> | undefined {
+    ): Filter<Document> {
         // Null-testing operators ignore their value.
         if (op === "is-null") return { [field]: { $eq: null } };
         if (op === "is-not-null") return { [field]: { $ne: null } };
@@ -114,8 +123,17 @@ export class MongoConditionBuilder {
         const mongoOp = REBASE_TO_MONGO_OP[op];
 
         if (!mongoOp) {
-            logger.warn(`Unsupported filter operator: ${op}`);
-            return undefined;
+            // A filter that cannot be compiled must not compile to "no filter".
+            // Returning `undefined` here dropped the condition and widened the
+            // read — inside an `or(...)` group it drops a branch, which widens
+            // it further — and the only trace was a line in the server log
+            // behind a 200.
+            logger.warn(`Unsupported filter operator '${op}' on field '${field}'`);
+            throw ApiError.badRequest(
+                `Operator '${op}' is not supported on field '${field}' by the MongoDB driver.`,
+                "UNSUPPORTED_FILTER_OPERATOR",
+                { field, operator: op }
+            );
         }
 
         // Handle array-contains specially
@@ -144,8 +162,7 @@ export class MongoConditionBuilder {
                 continue;
             }
             const { column, operator, value } = entry as FilterCondition;
-            const condition = this.buildCondition(column, operator, value);
-            if (condition) parts.push(condition);
+            parts.push(this.buildCondition(column, operator, value));
         }
 
         // Through the same combiners the rest of this class uses, so a

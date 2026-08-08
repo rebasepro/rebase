@@ -1076,6 +1076,24 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             expect(conditions).toHaveLength(1);
         });
 
+        // The grammar `FilterValues` declares — one tuple, or an array of them —
+        // is read through the shared `toFilterTuples` now, because the Mongo
+        // compiler was reading it a second way and dropping both conditions.
+        // This pins the Postgres side of that contract, which had no test.
+        it("compiles an array of tuples on one field into every condition", () => {
+            const conditions = DrizzleConditionBuilder.buildFilterConditions(
+                { age: [[">=", 18], ["<", 65]] },
+                mockUsersTable,
+                "users"
+            );
+            expect(conditions).toHaveLength(2);
+            const rendered = conditions.map(c => new PgDialect().sqlToQuery(c));
+            expect(rendered[0].sql).toBe('"users"."age" >= $1');
+            expect(rendered[0].params).toEqual([18]);
+            expect(rendered[1].sql).toBe('"users"."age" < $1');
+            expect(rendered[1].params).toEqual([65]);
+        });
+
         it("keeps a not-in filter with an empty array instead of skipping it", () => {
             const conditions = DrizzleConditionBuilder.buildFilterConditions(
                 { age: ["not-in", []] },

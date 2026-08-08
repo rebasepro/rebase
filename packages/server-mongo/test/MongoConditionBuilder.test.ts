@@ -105,6 +105,42 @@ describe("MongoConditionBuilder", () => {
             expect(result).toContainEqual({ priority: { $gte: 5 } });
         });
 
+        /**
+         * `FilterValues` declares two shapes per field — one tuple, or an array
+         * of them — and the fluent builder produces the second from two
+         * `.where()` calls on the same column. This compiler destructured the
+         * param directly, so `op` bound to the tuple `[">=", 18]`, no operator
+         * matched, and BOTH conditions were dropped: an age-range read answered
+         * 200 with every user in the collection.
+         */
+        it("compiles an array of tuples on one field into every condition", () => {
+            const filter: FilterValues<string> = {
+                age: [[">=", 18], ["<", 65]]
+            };
+            const result = MongoConditionBuilder.buildFilterConditions(filter);
+            expect(result).toHaveLength(2);
+            expect(result).toContainEqual({ age: { $gte: 18 } });
+            expect(result).toContainEqual({ age: { $lt: 65 } });
+        });
+
+        it("still reads a single tuple as one condition", () => {
+            const result = MongoConditionBuilder.buildFilterConditions({
+                status: ["==", "active"]
+            });
+            expect(result).toEqual([{ status: { $eq: "active" } }]);
+        });
+
+        /**
+         * A filter that cannot be compiled must not compile to "no filter".
+         * This logged a warning and returned `undefined`, which the caller read
+         * as "nothing to add" — the read ran unfiltered behind a 200.
+         */
+        it("refuses an operator it cannot compile instead of dropping the condition", () => {
+            expect(() => MongoConditionBuilder.buildFilterConditions({
+                status: ["≈" as never, "active"]
+            })).toThrow(/not supported/);
+        });
+
         it("should skip null filter params", () => {
             const filter: FilterValues<string> = {
                 status: ["==", "active"],
