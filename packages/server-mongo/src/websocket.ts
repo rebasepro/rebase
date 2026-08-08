@@ -1,8 +1,7 @@
-import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, SaveProps, DeleteProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User } from "@rebasepro/types";
+import { RealtimeProvider, DataDriver, FetchCollectionProps, FetchOneProps, SaveProps, DeleteProps, TableMetadata, DatabaseAdmin, isSchemaAdmin, isDocumentAdmin, User, AuthAdapter } from "@rebasepro/types";
 import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import { inspect } from "util";
-import type { AccessTokenPayload } from "@rebasepro/server";
 import { extractUserFromToken, resolveRequireAuth } from "@rebasepro/server";
 import type { RebaseAuthConfig } from "@rebasepro/server";
 import { MongoRealtimeService } from "./services/MongoRealtimeService";
@@ -17,9 +16,22 @@ function isDriverWithAuth(driver: DataDriver): driver is DriverWithAuth {
     return "withAuth" in driver && typeof (driver as Record<string, unknown>).withAuth === "function";
 }
 
+/**
+ * Normalized user identity for WebSocket sessions — the same shape the Postgres
+ * socket keeps, because an `AuthAdapter` user is not an access-token payload.
+ */
+interface WsUserIdentity {
+    uid: string;
+    email?: string;
+    displayName?: string;
+    photoURL?: string;
+    roles: string[];
+    isAdmin: boolean;
+}
+
 interface ClientSession {
     ws: WebSocket;
-    user?: AccessTokenPayload;
+    user?: WsUserIdentity;
     authenticated: boolean;
     messageCount: number;
     messageWindowStart: number;
@@ -41,8 +53,11 @@ const ADMIN_ONLY_TYPES = new Set([
 ]);
 
 function isAdminSession(session: ClientSession | undefined): boolean {
-    if (!session?.user?.roles) return false;
-    return session.user.roles.includes("admin");
+    if (!session?.user) return false;
+    // The adapter's own answer first; a role *named* `admin` is only the
+    // fallback for the built-in JWT path.
+    if (session.user.isAdmin) return true;
+    return (session.user.roles ?? []).some((r) => r === "admin");
 }
 
 export function createMongoWebSocket(
@@ -50,7 +65,8 @@ export function createMongoWebSocket(
     realtimeService: MongoRealtimeService,
     driver: MongoDriver,
     authConfig?: RebaseAuthConfig,
-    admin?: DatabaseAdmin
+    admin?: DatabaseAdmin,
+    authAdapter?: AuthAdapter
 ) {
     // Scoped to this factory invocation rather than the module, so sessions do
     // not leak across hot reloads or a second server on the same process — the
@@ -70,12 +86,12 @@ export function createMongoWebSocket(
     // `resolveRequireAuth` for what this socket's local copy got wrong — most
     // importantly that a `false` here does not skip a check, it marks every
     // session `authenticated` at connect time.
-    const requireAuth = resolveRequireAuth(authConfig);
+    const requireAuth = !!authAdapter || resolveRequireAuth(authConfig);
 
-    if (requireAuth && !authConfig?.jwtSecret) {
+    if (requireAuth && !authAdapter && !authConfig?.jwtSecret) {
         logger.warn(
-            "🔐 [WebSocket Server] Authentication is required but no jwtSecret is configured — " +
-            "no client can complete AUTH, so every realtime message will be refused."
+            "🔐 [WebSocket Server] Authentication is required but no adapter or jwtSecret is " +
+            "configured — no client can complete AUTH, so every realtime message will be refused."
         );
     }
 
@@ -116,17 +132,52 @@ code } } }));
                         return;
                     }
 
-                    const user = extractUserFromToken(token);
-                    if (user) {
+                    // The adapter verifies when one is configured, exactly as the
+                    // HTTP routes do; the built-in JWT path is the fallback.
+                    let verifiedUser: WsUserIdentity | null = null;
+
+                    if (authAdapter) {
+                        try {
+                            const adapterUser = authAdapter.verifyToken
+                                ? await authAdapter.verifyToken(token)
+                                : await authAdapter.verifyRequest(new Request("http://localhost/_ws_auth", {
+                                    headers: { Authorization: `Bearer ${token}` }
+                                }));
+                            if (adapterUser) {
+                                verifiedUser = {
+                                    uid: adapterUser.uid,
+                                    email: adapterUser.email,
+                                    roles: adapterUser.roles ?? [],
+                                    isAdmin: !!adapterUser.isAdmin
+                                };
+                            }
+                        } catch {
+                            // Adapter threw — treat as invalid token
+                        }
+                    } else {
+                        const jwtPayload = extractUserFromToken(token);
+                        if (jwtPayload) {
+                            verifiedUser = {
+                                uid: jwtPayload.uid,
+                                email: jwtPayload.email,
+                                displayName: jwtPayload.displayName,
+                                photoURL: jwtPayload.photoURL,
+                                roles: jwtPayload.roles ?? [],
+                                isAdmin: (jwtPayload.roles ?? []).some((r: string) => r === "admin")
+                            };
+                        }
+                    }
+
+                    if (verifiedUser) {
                         const session = clientSessions.get(clientId);
                         if (session) {
-                            session.user = user;
+                            session.user = verifiedUser;
                             session.authenticated = true;
                         }
                         ws.send(JSON.stringify({ type: "AUTH_SUCCESS",
 requestId,
-payload: { uid: user.uid,
-roles: user.roles } }));
+payload: { uid: verifiedUser.uid,
+roles: verifiedUser.roles } }));
                     } else {
                         sendError("AUTH_ERROR", "INVALID_TOKEN", "Invalid or expired token");
                     }

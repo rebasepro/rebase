@@ -22,16 +22,17 @@ import {
     RebaseClient,
     RebaseData,
     RebaseSdkData,
-    SecurityRule
+    SecurityOperation
 } from "@rebasepro/types";
 import { MongoDataService } from "../db/MongoDataService";
 import { MongoRealtimeService } from "./MongoRealtimeService";
 import { MongoHistoryService } from "./MongoHistoryService";
-import { buildPropertyCallbacks, updateDateAutoValues, buildSdkData, checkOperation } from "@rebasepro/common";
+import { buildPropertyCallbacks, updateDateAutoValues, buildSdkData, checkOperation, PolicyClauses } from "@rebasepro/common";
 import { mergeDeep } from "@rebasepro/utils";
 import { Filter, Document } from "mongodb";
 import { ApiError } from "@rebasepro/server";
 import { MongoConditionBuilder } from "../db/MongoConditionBuilder";
+import { assertSecurityRulesEnforceable, buildMongoFilterFromSecurityRules } from "../db/securityRuleFilter";
 import { logger } from "@rebasepro/server";
 
 /**
@@ -167,7 +168,13 @@ propertyCallbacks: undefined };
     }
 
     /**
-     * Listen to collection changes
+     * Listen to collection changes.
+     *
+     * `authContext` is not part of `ListenCollectionProps`; it is supplied by
+     * {@link AuthenticatedMongoDriver}, which is the only caller that has one.
+     * It has to travel *into* the subscription config, because that config is
+     * what every re-fetch reads — the wrapper used to stamp the field on the
+     * `Subscription` object instead, and nothing has ever read that one.
      */
     listenCollection<M extends Record<string, any>>({
         path,
@@ -180,7 +187,7 @@ propertyCallbacks: undefined };
         order,
         onUpdate,
         onError
-    }: ListenCollectionProps<M>): () => void {
+    }: ListenCollectionProps<M>, authContext?: { uid: string; roles: string[] }): () => void {
         const subscriptionId = this.generateSubscriptionId();
 
         const callback = (rows: Record<string, unknown>[]) => {
@@ -204,7 +211,8 @@ propertyCallbacks: undefined };
                 order,
                 limit,
                 startAfter,
-                searchString
+                searchString,
+                authContext
             },
             callback
         );
@@ -276,7 +284,7 @@ propertyCallbacks: undefined };
         collection,
         onUpdate,
         onError
-    }: ListenOneProps<M>): () => void {
+    }: ListenOneProps<M>, authContext?: { uid: string; roles: string[] }): () => void {
         const subscriptionId = this.generateSubscriptionId();
 
         const callback = (row: Record<string, unknown> | null) => {
@@ -295,7 +303,8 @@ propertyCallbacks: undefined };
             {
                 clientId: "driver",
                 path,
-                id
+                id,
+                authContext
             },
             callback
         );
@@ -722,8 +731,13 @@ export class AuthenticatedMongoDriver implements DataDriver {
             return [];
         }
 
+        // `logical` belongs in this query, not in the props spread below: the
+        // repository reads `rawQuery ?? buildQuery(...)`, so a `logical` that
+        // travelled only in the spread was never consulted — and a dropped
+        // `or(...)` group does not fail, it widens.
         const userQuery = MongoConditionBuilder.buildQuery({
             filter: props.filter,
+            logical: props.logical,
             searchString: props.searchString,
             properties: resolvedCollection?.properties
         });
@@ -783,82 +797,103 @@ export class AuthenticatedMongoDriver implements DataDriver {
     }
 
     listenCollection<M extends Record<string, any>>(props: ListenCollectionProps<M>): () => void {
-        const unsubscribe = this.delegate.listenCollection(props);
-        const authContext = { uid: this.user.uid,
+        // Handed to the subscription rather than stamped on it afterwards: the
+        // config is what every re-fetch reads, and the stamp also landed after
+        // the initial fetch had already been dispatched unfiltered.
+        return this.delegate.listenCollection(props, this.authContext());
+    }
+
+    /** The acting user, in the shape the realtime subscriptions carry. */
+    private authContext(): { uid: string; roles: string[] } {
+        return { uid: this.user.uid,
 roles: this.user.roles ?? [] };
-        const subscriptions = this.delegate.getRealtimeService().getSubscriptions();
-        const lastEntry = Array.from(subscriptions.entries()).pop();
-        const lastSub = lastEntry?.[1];
-        if (lastSub && lastSub.config.clientId === "driver") {
-            lastSub.authContext = authContext;
-        }
-        return unsubscribe;
+    }
+
+    /**
+     * Evaluate the collection's rules for one row, fail-closed.
+     *
+     * A path with no resolvable collection has no declared rules — the same
+     * answer `buildMongoFilterFromSecurityRules` gives a listing on such a path,
+     * so the two never disagree about whether this engine has row security.
+     */
+    private authorize(
+        collection: CollectionConfig | undefined,
+        entity: Entity,
+        operation: SecurityOperation,
+        clauses?: PolicyClauses
+    ): boolean {
+        if (!collection) return true;
+        return checkOperation(collection, { user: this.user }, entity, operation, { onUnknown: "deny",
+clauses });
     }
 
     async fetchOne<M extends Record<string, any>>(props: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
+        assertSecurityRulesEnforceable(resolvedCollection, "select");
         const row = await this.delegate.fetchOne(props);
-        if (row) {
-            const authorized = checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToEntityForCheck(row, props.path), "select", { onUnknown: "deny" });
-            if (!authorized) {
-                return undefined;
-            }
+        if (row && !this.authorize(resolvedCollection, rowToEntityForCheck(row, props.path), "select")) {
+            return undefined;
         }
         return row;
     }
 
     listenOne<M extends Record<string, any>>(props: ListenOneProps<M>): () => void {
-        const unsubscribe = this.delegate.listenOne(props);
-        const authContext = { uid: this.user.uid,
-roles: this.user.roles ?? [] };
-        const subscriptions = this.delegate.getRealtimeService().getSubscriptions();
-        const lastEntry = Array.from(subscriptions.entries()).pop();
-        const lastSub = lastEntry?.[1];
-        if (lastSub && lastSub.config.clientId === "driver") {
-            lastSub.authContext = authContext;
-        }
-        return unsubscribe;
+        return this.delegate.listenOne(props, this.authContext());
     }
 
+    /**
+     * Save, with both halves of the rule checked *before* the write.
+     *
+     * There is no transaction here, so a check that runs after
+     * `delegate.save` cannot undo anything: the document is written, history is
+     * recorded and subscribers have been notified by then, and a 403 at that
+     * point only misleads the caller about what happened. Postgres evaluates
+     * `WITH CHECK` inside the transaction; the closest this driver can get is to
+     * evaluate it against the row as it *will* be, and refuse before writing.
+     */
     async save<M extends Record<string, any>>(props: SaveProps<M>): Promise<Record<string, unknown>> {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.path);
 
         if (props.status === "existing" && props.id) {
+            assertSecurityRulesEnforceable(resolvedCollection, "update");
             const existing = await this.delegate.fetchOne({ path: props.path,
 id: props.id,
 collection: resolvedCollection });
-            if (!existing || !checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToEntityForCheck(existing, props.path), "update", { onUnknown: "deny" })) {
+            // USING against the stored row, WITH CHECK against the row that
+            // will replace it — the split Postgres makes, and the reason
+            // `clauses` exists on `checkOperation`.
+            const projected = rowToEntityForCheck({ ...existing,
+...props.values,
+id: props.id }, props.path);
+            if (!existing ||
+                !this.authorize(resolvedCollection, rowToEntityForCheck(existing, props.path), "update", "using") ||
+                !this.authorize(resolvedCollection, projected, "update", "withCheck")) {
                 throw ApiError.forbidden("Forbidden");
             }
         } else {
+            assertSecurityRulesEnforceable(resolvedCollection, "insert");
             const tempEntity = { id: props.id || "new",
 path: props.path,
 values: props.values } as Entity;
-            if (!checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, tempEntity, "insert", { onUnknown: "deny" })) {
+            if (!this.authorize(resolvedCollection, tempEntity, "insert")) {
                 throw ApiError.forbidden("Forbidden");
             }
         }
 
-        const saved = await this.delegate.save({
+        return this.delegate.save({
             ...props,
             collection: resolvedCollection
         });
-
-        // After save / withCheck rules verification
-        if (!checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToEntityForCheck(saved, props.path), props.status === "existing" ? "update" : "insert", { onUnknown: "deny" })) {
-            throw ApiError.forbidden("Forbidden");
-        }
-
-        return saved;
     }
 
     async delete<M extends Record<string, any>>(props: DeleteProps<M>): Promise<void> {
         const { collection: resolvedCollection } = this.delegate.resolveCollectionCallbacks(props.collection, props.row.path);
+        assertSecurityRulesEnforceable(resolvedCollection, "delete");
 
         const existing = await this.delegate.fetchOne({ path: props.row.path,
 id: props.row.id,
 collection: resolvedCollection });
-        if (!existing || !checkOperation(resolvedCollection as CollectionConfig, { user: this.user }, rowToEntityForCheck(existing, props.row.path), "delete", { onUnknown: "deny" })) {
+        if (!existing || !this.authorize(resolvedCollection, rowToEntityForCheck(existing, props.row.path), "delete")) {
             throw ApiError.forbidden("Forbidden");
         }
 
@@ -886,8 +921,11 @@ collection: resolvedCollection });
             return 0;
         }
 
+        // Narrowed by exactly what the listing is narrowed by — `logical`
+        // included — or the total describes a different query than the rows.
         const userQuery = MongoConditionBuilder.buildQuery({
             filter: props.filter,
+            logical: props.logical,
             searchString: props.searchString,
             properties: resolvedCollection?.properties
         });
@@ -918,206 +956,4 @@ function rowToEntityForCheck(row: Record<string, unknown>, path: string): Entity
         path,
         values: row
     };
-}
-
-function getMongoFilterForSQL(sqlString: string, user: User): Filter<Document> | null {
-    let cleanedSQL = sqlString.trim();
-    while (cleanedSQL.startsWith("(") && cleanedSQL.endsWith(")")) {
-        let openCount = 0;
-        let isEnclosing = true;
-        for (let i = 0; i < cleanedSQL.length - 1; i++) {
-            if (cleanedSQL[i] === "(") openCount++;
-            else if (cleanedSQL[i] === ")") openCount--;
-            if (openCount === 0) {
-                isEnclosing = false;
-                break;
-            }
-        }
-        if (isEnclosing) {
-            cleanedSQL = cleanedSQL.substring(1, cleanedSQL.length - 1).trim();
-        } else {
-            break;
-        }
-    }
-
-    const splitByTopLevel = (str: string, delimiter: string) => {
-        const parts: string[] = [];
-        let current = "";
-        let openCount = 0;
-        let i = 0;
-        while (i < str.length) {
-            if (str[i] === "(") openCount++;
-            else if (str[i] === ")") openCount--;
-
-            if (openCount === 0 && str.substring(i).toUpperCase().startsWith(delimiter)) {
-                parts.push(current);
-                current = "";
-                i += delimiter.length;
-            } else {
-                current += str[i];
-                i++;
-            }
-        }
-        parts.push(current);
-        return parts;
-    };
-
-    const orParts = splitByTopLevel(cleanedSQL, " OR ");
-    if (orParts.length > 1) {
-        const subFilters = orParts.map(part => getMongoFilterForSQL(part, user)).filter(f => f !== null) as Filter<Document>[];
-        if (subFilters.length === 0) return null;
-        if (subFilters.length === 1) return subFilters[0];
-        return { $or: subFilters } as Filter<Document>;
-    }
-
-    const andParts = splitByTopLevel(cleanedSQL, " AND ");
-    if (andParts.length > 1) {
-        const subFilters = andParts.map(part => getMongoFilterForSQL(part, user)).filter(f => f !== null) as Filter<Document>[];
-        if (subFilters.length === 0) return null;
-        if (subFilters.length === 1) return subFilters[0];
-        return { $and: subFilters } as Filter<Document>;
-    }
-
-    const roleIntersectMatch = cleanedSQL.match(/string_to_array\s*\(\s*auth\.roles\(\)\s*,\s*','\s*\)\s*&&\s*ARRAY\[(.*?)\]/i);
-    if (roleIntersectMatch && roleIntersectMatch[1]) {
-        const requiredRoles = roleIntersectMatch[1].split(",").map(r => r.trim().replace(/'/g, ""));
-        const userRoles = user.roles || [];
-        const matches = requiredRoles.some(r => userRoles.includes(r));
-        return matches ? {} : { _id: { $exists: false } };
-    }
-
-    const roleContainMatch = cleanedSQL.match(/string_to_array\s*\(\s*auth\.roles\(\)\s*,\s*','\s*\)\s*@>\s*ARRAY\[(.*?)\]/i);
-    if (roleContainMatch && roleContainMatch[1]) {
-        const requiredRoles = roleContainMatch[1].split(",").map(r => r.trim().replace(/'/g, ""));
-        const userRoles = user.roles || [];
-        const matches = requiredRoles.every(r => userRoles.includes(r));
-        return matches ? {} : { _id: { $exists: false } };
-    }
-
-    const pattern1 = new RegExp("^\\{?([a-zA-Z0-9_]+)\\}?\\s*=\\s*(?:current_setting\\s*\\(\\s*'app\\.user_id'\\s*\\)|auth\\.uid\\(\\))");
-    const pattern2 = new RegExp("^(?:current_setting\\s*\\(\\s*'app\\.user_id'\\s*\\)|auth\\.uid\\(\\))\\s*=\\s*\\{?([a-zA-Z0-9_]+)\\}?");
-
-    const match1 = cleanedSQL.match(pattern1);
-    if (match1 && match1[1]) {
-        return { [match1[1]]: user.uid };
-    }
-
-    const match2 = cleanedSQL.match(pattern2);
-    if (match2 && match2[1]) {
-        return { [match2[1]]: user.uid };
-    }
-
-    const simpleEqualityMatch = cleanedSQL.match(/^\{?([\w_]+)\}?\s*(=|!=)\s*'([^']+)'$/i);
-    if (simpleEqualityMatch) {
-        const field = simpleEqualityMatch[1];
-        const operator = simpleEqualityMatch[2];
-        const value = simpleEqualityMatch[3];
-        if (operator === "=") return { [field]: value };
-        if (operator === "!=") return { [field]: { $ne: value } };
-    }
-
-    return {};
-}
-
-function getMongoFilterForRule(rule: SecurityRule, user: User): Filter<Document> | null {
-    if (rule.access === "public") return {};
-
-    const filters: Filter<Document>[] = [];
-
-    if (rule.ownerField) {
-        filters.push({ [rule.ownerField]: user.uid });
-    }
-
-    if (rule.using) {
-        const f = getMongoFilterForSQL(rule.using, user);
-        if (f) filters.push(f);
-    }
-
-    if (rule.withCheck) {
-        const f = getMongoFilterForSQL(rule.withCheck, user);
-        if (f) filters.push(f);
-    }
-
-    if (filters.length === 0) return {};
-    if (filters.length === 1) return filters[0];
-    return { $and: filters } as Filter<Document>;
-}
-
-function buildMongoFilterFromSecurityRules<M extends Record<string, any>>(
-    collection: CollectionConfig<M> | undefined,
-    user: User,
-    targetOperation: "select" | "insert" | "update" | "delete"
-): Filter<Document> | null {
-    if (!collection || !collection.securityRules || collection.securityRules.length === 0) {
-        return {};
-    }
-
-    const applicableRules = collection.securityRules.filter((r: SecurityRule) =>
-        r.operation === targetOperation ||
-        r.operation === "all" ||
-        r.operations?.includes(targetOperation) ||
-        r.operations?.includes("all")
-    );
-
-    if (applicableRules.length === 0) {
-        return null;
-    }
-
-    const userRoleIds = user.roles ?? [];
-    const userRoles = [...userRoleIds, "public"];
-    const roleApplicableRules = applicableRules.filter((rule: SecurityRule) => {
-        if (!rule.roles || rule.roles.length === 0) return true;
-        return rule.roles.some((r: string) => userRoles.includes(r));
-    });
-
-    if (roleApplicableRules.length === 0) {
-        return null;
-    }
-
-    const permissiveFilters: Filter<Document>[] = [];
-    const restrictiveFilters: Filter<Document>[] = [];
-
-    for (const rule of roleApplicableRules) {
-        const mode = rule.mode || "permissive";
-        const filter = getMongoFilterForRule(rule, user);
-        if (filter === null) {
-            if (mode === "restrictive") {
-                return null;
-            }
-            continue;
-        }
-
-        if (mode === "restrictive") {
-            restrictiveFilters.push(filter);
-        } else {
-            permissiveFilters.push(filter);
-        }
-    }
-
-    const finalAnds: Filter<Document>[] = [];
-
-    if (permissiveFilters.length > 0) {
-        const hasAlwaysTruePermissive = permissiveFilters.some(f => Object.keys(f).length === 0);
-        if (!hasAlwaysTruePermissive) {
-            if (permissiveFilters.length === 1) {
-                finalAnds.push(permissiveFilters[0]);
-            } else {
-                finalAnds.push({ $or: permissiveFilters } as Filter<Document>);
-            }
-        }
-    } else {
-        return null;
-    }
-
-    if (restrictiveFilters.length > 0) {
-        for (const rf of restrictiveFilters) {
-            if (Object.keys(rf).length > 0) {
-                finalAnds.push(rf);
-            }
-        }
-    }
-
-    if (finalAnds.length === 0) return {};
-    if (finalAnds.length === 1) return finalAnds[0];
-    return { $and: finalAnds } as Filter<Document>;
 }
