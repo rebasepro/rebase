@@ -47,9 +47,15 @@ This is typically invoked via the CLI (`npx rebase generate-sdk`) rather than ca
      names them, and `excludeFromApi` columns are absent.
    - `Insert` — what `create()` accepts. Server-assigned ids are optional; a
      `belongsTo` target may be named either way (`{ author: 5 }` or
-     `{ author_id: 5 }`); `excludeFromApi` columns are still writable.
+     `{ author_id: 5 }`); `excludeFromApi` columns are absent here too.
    - `Update` — what `update()` accepts. Everything optional, primary key
-     omitted.
+     omitted, `excludeFromApi` columns absent.
+
+`excludeFromApi` means one thing in all three: the API surface does not mention
+the property, in either direction. The server still accepts such a field on a
+write — this is what the generated types describe, not a new enforcement point —
+but nothing generated names it, so a generated client cannot offer a password
+hash as something to read, filter or send.
 
 2. **`README.md`** — Usage instructions (opt out with `includeReadme: false`)
 
