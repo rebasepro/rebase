@@ -17,7 +17,7 @@ import type { StorageController } from "./types";
 import type { StorageRegistry } from "./storage-registry";
 import { logger } from "../utils/logger.js";
 import { ApiError } from "../api/errors";
-import { canonicalStorageKey, InvalidStorageKeyError } from "./keys";
+import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError } from "./keys";
 
 /** Metadata for an in-progress resumable upload. */
 interface TusUpload {
@@ -32,8 +32,21 @@ interface TusUpload {
     createdAt: number;
     /** Absolute path to the temp file on disk. */
     filePath: string;
-    /** Target bucket (from metadata). */
+    /**
+     * Target bucket, canonicalized at creation, or undefined when the upload
+     * named none. Same discipline as {@link TusUpload.key}: resolved once, and
+     * both what the hook was shown and what `finalize` writes to.
+     */
     bucket?: string;
+    /**
+     * Target storage source, resolved at creation.
+     *
+     * It used to be resolved twice from two different places — the route asked
+     * the hook about `?storageId` from the query string while `finalize` wrote
+     * to `metadata.storageId` from the header — so one request could obtain
+     * approval for one source and deliver the bytes to another.
+     */
+    storageId?: string;
     /**
      * The canonical key this upload will be written to.
      *
@@ -79,8 +92,11 @@ export class TusHandler {
          * open. The target key lives in the `Upload-Metadata` header, which
          * only this class parses — hence the injection rather than a check in
          * the route. Rejects by throwing.
+         *
+         * Every routing value the write will use is passed in, because the hook
+         * can only answer for the destination it is told about.
          */
-        private authorizeUpload?: (c: Context, key: string, bucket: string) => Promise<void>
+        private authorizeUpload?: (c: Context, key: string, bucket: string, storageId?: string) => Promise<void>
     ) {
         this.tusDir = join(storageBaseDir, ".tus-uploads");
     }
@@ -98,6 +114,11 @@ export class TusHandler {
         this.cleanupTimer = setInterval(() => {
             void this.cleanupStale();
         }, 60_000); // every minute
+        // A sweeper is not a reason for the process to stay alive: unref'd, it
+        // runs while there is work and never holds the event loop open. It used
+        // to, so every `createStorageRoutes()` in a test run left Node running
+        // after the last assertion.
+        this.cleanupTimer.unref?.();
     }
 
     /** Remove uploads that have been idle for longer than UPLOAD_EXPIRY_MS. */
@@ -194,10 +215,27 @@ export class TusHandler {
             );
         }
 
+        // The other two routing values, resolved here and stored on the upload
+        // for the same reason the key is: `finalize` must not be able to reach
+        // a destination the hook below was not asked about. The header wins
+        // over the query string for `storageId` because the header is what
+        // `finalize` has always used — now the hook is asked about it too.
+        let bucket: string | undefined;
+        try {
+            bucket = canonicalStorageBucket(metadata.bucket);
+        } catch (err) {
+            throw new ApiError(
+                400,
+                "INVALID_STORAGE_BUCKET",
+                err instanceof InvalidStorageBucketError ? err.message : "Invalid storage bucket"
+            );
+        }
+        const storageId = metadata.storageId || c.req.query("storageId") || undefined;
+
         // Gate before any temp file exists, so a denied upload leaves nothing
         // behind to resume.
         if (this.authorizeUpload) {
-            await this.authorizeUpload(c, key, metadata.bucket || "default");
+            await this.authorizeUpload(c, key, bucket || "default", storageId);
         }
 
         const filePath = join(this.tusDir, id);
@@ -212,7 +250,8 @@ export class TusHandler {
             metadata,
             createdAt: Date.now(),
             filePath,
-            bucket: metadata.bucket || undefined,
+            bucket,
+            storageId,
             key,
             completed: false
         };
@@ -333,9 +372,10 @@ export class TusHandler {
     private async finalize(upload: TusUpload): Promise<void> {
         upload.completed = true;
 
-        // Resolve the target controller: prefer storageId from TUS metadata,
-        // then fall back to the registry default, then the single controller.
-        const storageId = upload.metadata.storageId;
+        // Resolve the target controller from the storage source decided — and
+        // authorized — in `create`. Reading `upload.metadata.storageId` here
+        // instead is how the hook's answer and the write came apart.
+        const storageId = upload.storageId;
         let targetController = this.storageController;
         if (this.storageRegistry) {
             targetController = storageId
