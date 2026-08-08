@@ -21,8 +21,13 @@
  * of "the user with this email" and picked between them on whether the backend
  * happened to be running.
  */
-import { describe, it, expect } from "vitest";
-import { selectUserForEmail } from "./auth";
+import { describe, it, expect, vi } from "vitest";
+import {
+    authCommand,
+    RESET_PASSWORD_FLAGS,
+    resolveResetPasswordArgs,
+    selectUserForEmail
+} from "./auth";
 
 describe("selectUserForEmail", () => {
     it("finds the user whose email matches exactly", () => {
@@ -77,5 +82,89 @@ describe("selectUserForEmail", () => {
         expect(selectUserForEmail(null, "bob@example.com")).toBeUndefined();
         expect(selectUserForEmail({ users: [] }, "bob@example.com")).toBeUndefined();
         expect(selectUserForEmail([{ id: "u1" }], "bob@example.com")).toBeUndefined();
+    });
+});
+
+/**
+ * Which password `rebase auth reset-password` is about to set.
+ *
+ * The parser ran `arg` permissively and read `_[1]`, so an undeclared flag was
+ * pushed into the positionals as a bare token and became the new password. Both
+ * ways in were things the product tells you to type: `--debug` is what
+ * `bin/rebase.js` prints after every failure ("Re-run with --debug for the stack
+ * trace"), and `-p` was advertised in this command's own help while never being
+ * declared — so following the help set the account's password to `-p`.
+ */
+describe("resolveResetPasswordArgs", () => {
+    /** A full `process.argv`, the way `cli.ts` hands it to a command. */
+    const line = (...rest: string[]): string[] =>
+        ["/usr/bin/node", "/usr/local/bin/rebase", "auth", "reset-password", ...rest];
+
+    it("reads the email and the password as positionals", () => {
+        expect(resolveResetPasswordArgs(line("bob@example.com", "S3cret!"))).toEqual({
+            email: "bob@example.com",
+            password: "S3cret!"
+        });
+    });
+
+    it("does not turn --debug into the new password", () => {
+        expect(resolveResetPasswordArgs(line("bob@example.com", "--debug"))).toEqual({
+            email: "bob@example.com",
+            password: undefined
+        });
+    });
+
+    it("honours -p, which the help has always advertised", () => {
+        expect(resolveResetPasswordArgs(line("bob@example.com", "-p", "S3cret!"))).toEqual({
+            email: "bob@example.com",
+            password: "S3cret!"
+        });
+        expect(resolveResetPasswordArgs(line("--email", "bob@example.com", "-p", "S3cret!"))).toEqual({
+            email: "bob@example.com",
+            password: "S3cret!"
+        });
+    });
+
+    it("refuses a flag nobody declared rather than resetting the account to it", () => {
+        expect(() => resolveResetPasswordArgs(line("bob@example.com", "--force")))
+            .toThrow(/unknown or unexpected option/);
+    });
+
+    it("is not shifted by a flag placed before the command", () => {
+        expect(resolveResetPasswordArgs([
+            "/usr/bin/node",
+            "/usr/local/bin/rebase",
+            "--debug",
+            "auth",
+            "reset-password",
+            "bob@example.com",
+            "S3cret!"
+        ])).toEqual({
+            email: "bob@example.com",
+            password: "S3cret!"
+        });
+    });
+
+    it("declares every short alias its own help advertises", async () => {
+        // Class 21 in reverse: `-p` was documented and unimplemented, so the
+        // help *was* the instruction that caused the bug. Keep the two in step.
+        const printed: string[] = [];
+        const spy = vi.spyOn(console, "log").mockImplementation(message => {
+            printed.push(String(message));
+        });
+        try {
+            await authCommand(undefined, []);
+        } finally {
+            spy.mockRestore();
+        }
+
+        // eslint-disable-next-line no-control-regex
+        const help = printed.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+        const advertised = [...help.matchAll(/--[a-z-]+, (-[a-z])/g)].map(match => match[1]);
+
+        expect(advertised.length).toBeGreaterThan(0);
+        for (const alias of advertised) {
+            expect(Object.keys(RESET_PASSWORD_FLAGS)).toContain(alias);
+        }
     });
 });

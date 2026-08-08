@@ -381,6 +381,28 @@ message: "name is reserved" });
 
     const storage = validateStorageSources(raw.storage, issues);
 
+    // Carried rather than dropped. This key is the only repository-wide privacy
+    // control the CLI honours, and a key that does not survive a parse does not
+    // survive a rewrite either: `writeManifest` builds its output from what this
+    // returned, so `rebase eject` deleted a committed `"telemetry": false` and
+    // every developer who had ever opted in silently resumed sending events.
+    //
+    // Only a boolean is a value here — `true` is ignored elsewhere, loudly, but
+    // it is still valid. A string `"false"` is the mistake that would leave
+    // sharing on while looking like it was off, so it is named rather than
+    // quietly discarded.
+    let telemetry: boolean | undefined;
+    if (raw.telemetry !== undefined) {
+        if (typeof raw.telemetry === "boolean") {
+            telemetry = raw.telemetry;
+        } else {
+            issues.push({
+                path: "telemetry",
+                message: "must be a boolean — only `false` does anything, and it opts this repository out of usage sharing"
+            });
+        }
+    }
+
     if (issues.length > 0) return { issues };
 
     return {
@@ -388,7 +410,8 @@ message: "name is reserved" });
             $schema: typeof raw.$schema === "string" ? raw.$schema : undefined,
             rebase: raw.rebase as string,
             apps,
-            ...(storage ? { storage } : {})
+            ...(storage ? { storage } : {}),
+            ...(telemetry !== undefined ? { telemetry } : {})
         },
         issues
     };
@@ -573,13 +596,62 @@ source: "file",
 filePath };
 }
 
-/** Write a manifest, with a trailing newline so it plays well with other tools. */
+/** The keys `writeManifest` knows how to write. Everything else is carried through. */
+const MODELLED_MANIFEST_KEYS = ["$schema", "rebase", "apps", "storage", "telemetry"];
+
+/**
+ * What is on disk right now, or `{}` — this is a *rewrite*, so the file that is
+ * about to be replaced is the only record of the keys the caller did not model.
+ * Unparseable is treated as absent: `loadManifest` refuses malformed JSON long
+ * before anything gets here, and a writer is not the place to fail on it.
+ */
+function readManifestObject(filePath: string): Record<string, unknown> {
+    try {
+        const parsed: unknown = JSON.parse(fs.readFileSync(filePath, "utf8"));
+        return isRecord(parsed) ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+/**
+ * Write a manifest, with a trailing newline so it plays well with other tools.
+ *
+ * **Every key on disk survives.** This used to emit exactly `$schema`, `rebase`
+ * and `apps`, so a rewrite deleted the rest of the file — and two commands with
+ * no visible relationship to either key rewrite it: `rebase eject` and
+ * `rebase apps init --force`. A repository that had committed
+ * `"telemetry": false` lost its opt-out, and a multi-bucket project lost its
+ * whole `storage` block, in a commit whose stated change was `runtime: custom`.
+ *
+ * So: the caller's manifest wins for what it models, the file supplies the rest.
+ * `storage` and `telemetry` fall back to the file because the callers that
+ * synthesize a manifest (`apps init --force`) cannot know them — they are
+ * authored, not inferred — and unknown top-level keys are copied verbatim
+ * rather than listed, since a hand-listed set loses the next key too.
+ */
 export function writeManifest(projectRoot: string, manifest: RebaseProjectManifest): string {
     const filePath = manifestPath(projectRoot);
+    const existing = readManifestObject(filePath);
+
+    const carried: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(existing)) {
+        if (!MODELLED_MANIFEST_KEYS.includes(key)) carried[key] = value;
+    }
+
+    const schema = manifest.$schema
+        ?? (typeof existing.$schema === "string" ? existing.$schema : undefined)
+        ?? "https://rebase.pro/schemas/rebase.json";
+    const storage = manifest.storage ?? (isRecord(existing.storage) ? existing.storage : undefined);
+    const telemetry = manifest.telemetry ?? (typeof existing.telemetry === "boolean" ? existing.telemetry : undefined);
+
     const ordered = {
-        $schema: manifest.$schema ?? "https://rebase.pro/schemas/rebase.json",
+        $schema: schema,
         rebase: manifest.rebase,
-        apps: manifest.apps
+        apps: manifest.apps,
+        ...(storage ? { storage } : {}),
+        ...(telemetry !== undefined ? { telemetry } : {}),
+        ...carried
     };
     fs.writeFileSync(filePath, `${JSON.stringify(ordered, null, 4)}\n`, "utf8");
     return filePath;

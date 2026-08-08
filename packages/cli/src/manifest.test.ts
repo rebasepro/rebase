@@ -1,6 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     assessManagedCompatibility,
@@ -13,6 +14,8 @@ import {
     validateManifest,
     writeManifest
 } from "./manifest";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 let scratch: string;
 
@@ -489,6 +492,121 @@ runtime: "managed" as const },
         writeManifest(scratch, original);
 
         expect(loadManifest(scratch).manifest.apps).toEqual(original.apps);
+    });
+});
+
+/**
+ * A rewrite must not delete what it did not write.
+ *
+ * `writeManifest` emitted exactly `$schema`, `rebase` and `apps`, and two
+ * commands with no visible relationship to either key rewrite this file:
+ * `rebase eject` (whose output announces `rebase.json … runtime: custom`) and
+ * `rebase apps init --force`. So an organisation's committed
+ * `"telemetry": false` — the only repository-wide privacy control the CLI
+ * honours, which overrides every developer's own opt-in — was silently deleted,
+ * and with it a multi-bucket project's whole `storage` topology.
+ *
+ * `parseManifest` dropped `telemetry` too, so the loss survived a load as well
+ * as a write.
+ */
+describe("writeManifest preserves the whole file", () => {
+    /**
+     * Every data key `RebaseProjectManifest` declares, read out of the type
+     * itself. A hand-listed set is exactly the mistake being fixed here: it
+     * would lose the *next* key added the same way it lost these two.
+     */
+    function declaredManifestKeys(): string[] {
+        const source = fs.readFileSync(
+            path.resolve(here, "../../types/src/types/project_manifest.ts"),
+            "utf8"
+        );
+        const body = /export interface RebaseProjectManifest \{([\s\S]*?)\n\}/.exec(source)?.[1];
+        expect(body, "RebaseProjectManifest not found — did the interface move?").toBeTruthy();
+        // Top-level members only: nested object literals are indented deeper.
+        return [...(body as string).matchAll(/^ {4}(\$?[a-zA-Z]+)\??:/gm)].map(m => m[1]);
+    }
+
+    const full = {
+        $schema: "https://rebase.pro/schemas/rebase.json",
+        rebase: "^1",
+        apps: {
+            backend: {
+                type: "backend" as const,
+                runtime: "managed" as const
+            }
+        },
+        storage: {
+            media: {
+                engine: "s3",
+                label: "Media"
+            }
+        },
+        telemetry: false
+    };
+
+    it("round-trips every key the type declares", () => {
+        // Guards the fixture: a key added to the type and not tested here would
+        // otherwise be lost silently, which is how these two were lost.
+        expect(Object.keys(full).sort()).toEqual(declaredManifestKeys().sort());
+
+        writeManifest(scratch, full);
+
+        expect(loadManifest(scratch).manifest).toEqual(full);
+    });
+
+    it("keeps the telemetry opt-out and the storage block a rewrite did not model", () => {
+        // `rebase apps init --force` writes a *synthesized* manifest: it cannot
+        // know either key, because both are authored rather than inferred.
+        fs.writeFileSync(
+            path.join(scratch, "rebase.json"),
+            `${JSON.stringify(full, null, 4)}\n`
+        );
+
+        writeManifest(scratch, {
+            rebase: "^1",
+            apps: {
+                backend: {
+                    type: "backend",
+                    runtime: "custom",
+                    dockerfile: "Dockerfile",
+                    port: 8080
+                }
+            }
+        });
+
+        const after = loadManifest(scratch).manifest;
+        expect(after.telemetry).toBe(false);
+        expect(after.storage).toEqual(full.storage);
+        expect(after.apps.backend).toMatchObject({ runtime: "custom" });
+    });
+
+    it("carries a key it has never heard of", () => {
+        fs.writeFileSync(
+            path.join(scratch, "rebase.json"),
+            `${JSON.stringify({
+                ...full,
+                someFutureKey: { kept: true }
+            }, null, 4)}\n`
+        );
+
+        writeManifest(scratch, full);
+
+        const raw = JSON.parse(fs.readFileSync(path.join(scratch, "rebase.json"), "utf8"));
+        expect(raw.someFutureKey).toEqual({ kept: true });
+    });
+
+    it("rejects a telemetry value that is not a boolean, rather than ignoring it", () => {
+        // `"telemetry": "false"` is the mistake that leaves sharing on while
+        // looking like it is off.
+        fs.writeFileSync(
+            path.join(scratch, "rebase.json"),
+            JSON.stringify({
+                ...full,
+                telemetry: "false"
+            })
+        );
+
+        expect(() => loadManifest(scratch)).toThrow(ManifestError);
     });
 });
 

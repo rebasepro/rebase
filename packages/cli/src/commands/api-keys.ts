@@ -12,6 +12,7 @@ import {
     requireProjectRoot,
     readEnvFile
 } from "../utils/project";
+import { wantsHelp } from "../utils/args";
 import fs from "fs";
 import path from "path";
 
@@ -53,7 +54,11 @@ function resolveBaseUrl(env: Record<string, string>, projectRoot?: string): stri
    ═══════════════════════════════════════════════════════════════ */
 
 export async function apiKeysCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
-    if (!subcommand || subcommand === "--help") {
+    // `--help` is answered before dispatch, never by a handler. `cli.ts` only
+    // rewrites the subcommand to `"--help"` when none was named, so
+    // `rebase api-keys list --help` used to *list the keys* and
+    // `rebase api-keys revoke --help` sent `DELETE /api/admin/api-keys/--help`.
+    if (!subcommand || subcommand === "--help" || wantsHelp(rawArgs)) {
         printApiKeysHelp();
         return;
     }

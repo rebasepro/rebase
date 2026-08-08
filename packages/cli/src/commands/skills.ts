@@ -4,6 +4,7 @@ import path from "path";
 import inquirer from "inquirer";
 import { createRequire } from "module";
 import { findProjectRoot } from "../utils/project";
+import { wantsHelp } from "../utils/args";
 
 const require = createRequire(import.meta.url);
 
@@ -128,6 +129,16 @@ function installForAgent(
 }
 
 export async function skillsCommand(subcommand: string | undefined, rawArgs: string[]) {
+    // `--help` cannot reach `skillsInstall`. `cli.ts` only rewrites the
+    // subcommand to `"--help"` when none was named, so `rebase skills install
+    // --help` used to run the install: it detected the agents and overwrote
+    // `.claude/skills/*/SKILL.md`, `.cursor/rules/*.mdc` and the rest. A flag
+    // that prints text must not write files.
+    if (wantsHelp(rawArgs)) {
+        printSkillsHelp();
+        return;
+    }
+
     switch (subcommand) {
         case "install":
             await skillsInstall(rawArgs);
