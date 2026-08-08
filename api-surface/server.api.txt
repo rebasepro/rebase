@@ -6,6 +6,7 @@
 
 ## @rebasepro/server
 class ApiError { badRequest, code, conflict, details, expected, forbidden, internal, notFound, serviceUnavailable, statusCode, unauthenticated, unauthorized }
+class BlockedUrlError
 class BundleError { hint }
 class CronScheduler { getJob, getJobLogs, getJobLogsFromDb, listJobs, registerJobs, setClient, setJobEnabled, setStore, start, stop, triggerJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
@@ -17,7 +18,7 @@ class S3StorageController { deleteObject, getObject, getSignedUrl, getType, list
 class SMTPEmailService { isConfigured, send, verifyConnection }
 class TransformCache { buildKey, get, set }
 class TusHandler { create, delete, head, options, patch, startCleanup }
-class WebhookDispatcher { onEntityChange, setWebhooks }
+class WebhookDispatcher { enqueueEntityChange, flush, onEntityChange, setWebhooks }
 const DEFAULT_DRIVER_ID
 const DEFAULT_MAX_FILE_SIZE
 const DEFAULT_STORAGE_ID
@@ -37,8 +38,10 @@ const requireAuth
 function _resetRebaseMock
 function _setRebaseMock
 function applyCollectionDefaults
+function assertAllowedOutboundUrl
 function assertCollectionConfigs
 function assertDistinctSuffixes
+function blockedAddressReason
 function bootFromBundle
 function classifySurface { collection, surface }
 function cleanupDevPortFile
@@ -184,6 +187,7 @@ interface MfaFactor { createdAt, factorType, friendlyName, id, uid, updatedAt, v
 interface MfaRepository { createMfaChallenge, createMfaFactor, createRecoveryCodes, deleteAllRecoveryCodes, deleteMfaFactor, getMfaChallengeById, getMfaFactorById, getMfaFactors, getUnusedRecoveryCodeCount, hasVerifiedMfaFactors, useRecoveryCode, verifyMfaChallenge, verifyMfaFactor }
 interface OAuthProvider { id, schema, verify }
 interface OAuthProviderProfile { displayName, email, emailVerified, photoUrl, providerId }
+interface OutboundUrlGuardOptions { allowPrivateNetworks, lookup }
 interface PaginatedUsersResult { limit, offset, total, users }
 interface PasswordResetTokenInfo { expiresAt, uid }
 interface PasswordValidationResult { errors, valid }
@@ -220,6 +224,7 @@ interface UserRepository { assignDefaultRole, createUser, deleteUser, getUserByE
 interface ValidateCollectionConfigOptions { unknownKeys }
 interface WebhookConfig { enabled, events, headers, id, secret, table, url }
 interface WebhookDeliveryResult { attemptNumber, event, payload, responseBody, statusCode, success, webhookId }
+interface WebhookDispatcherOptions { allowPrivateNetworks, lookup, onDelivery, timeoutMs }
 type ApiKeyOperation
 type AuthMethod
 type AuthResult
