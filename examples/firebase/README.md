@@ -1,5 +1,8 @@
-> This is a full-blown app that uses every feature of Rebase in one way or
-another.
+# Firebase example
+
+A React app exercising the `@rebasepro/firebase` adapter — `RebaseFirebaseApp`,
+a `FirebaseAccessGate`, and four collections (`blog`, `demo`, `products`,
+`users`).
 
 ## Testing the example
 
@@ -8,24 +11,33 @@ This example is used for development purposes.
 IMPORTANT: If you want to get started using Rebase it is advisable to check the
 [docs](https://rebase.pro/docs)
 
-You need to specify a valid **Firebase config** in the file `firebase_config.ts`
-which is not in VCS, but there is a template `firebase_config.ts.template`
+The Firebase project it points at is declared inline as `firebaseConfig` in
+`src/App.tsx`. Replace those values with your own project's web config to run it
+against your own Firebase.
 
-To run the app, in the main folder run: 
+If you enable App Check, copy `src/appcheck_config.ts.template` to
+`src/appcheck_config.ts` and fill in your reCAPTCHA site key.
 
+## Running
+
+This is a pnpm workspace package. Install once from the repo root, then run the
+example through the workspace filter:
+
+```bash
+# From the repo root
+pnpm install
+pnpm --filter rebase-firebase-example dev
 ```
-yarn
+
+Or from this folder, after the root install:
+
+```bash
+pnpm dev
 ```
 
-and in either in the root or the `example` folder, simply run:
+### Toolchain
 
-```
-yarn dev
-```
-
-
-### vite and react-scripts
-
-This project implements both vite, and react-scripts for testing purposes. Users
-of the library will only need one of them, most likely `react-scripts`. Vite is
-used for development and is a huge time saver.
+Vite only — `pnpm dev` for the dev server, `pnpm build` for a production build,
+`pnpm typecheck` for types. There is no `react-scripts` here, and the monorepo is
+pnpm-only: `yarn` and `npm install` cannot resolve the `workspace:*`
+dependencies this example declares.

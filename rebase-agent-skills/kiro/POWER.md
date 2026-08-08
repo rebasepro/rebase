@@ -21,8 +21,10 @@ Before using the Rebase MCP server, ensure Node.js and the required tools are in
   - Install if needed: `npm install -g pnpm`
 
 - **Rebase CLI**: For managing Rebase projects
-  - Check installation: `npx rebase --version`
-  - Install globally: `npm install -g rebase`
+  - The package is `@rebasepro/cli`; `rebase` is the *binary* it installs. The
+    unscoped `rebase` on npm is an unrelated third-party package — never install it.
+  - Check installation: `rebase --version` (or `npx @rebasepro/cli --version`)
+  - Install globally: `npm install -g @rebasepro/cli`
 
 - **Authentication**: Sign in to Rebase Cloud
   - Run: `rebase cloud login` (opens browser for Google OAuth)

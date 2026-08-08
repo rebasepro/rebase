@@ -41,6 +41,7 @@ rebase cloud deploy
 rebase cloud deploy --message "add search to posts"
 ```
 
+<!-- docs-verify: ignore -->
 > Every cloud command lives under the `cloud` namespace — there is no bare
 > `rebase deploy` or `rebase login`, and a mistyped one exits 1. Run
 > `rebase cloud --help` for the full list.

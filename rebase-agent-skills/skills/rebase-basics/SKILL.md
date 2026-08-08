@@ -204,7 +204,7 @@ rebase init my-app --yes --database-url "postgresql://user:pass@host:5432/db" --
 |--------|-------|-------------|
 | `--backend-only` | `-b` | Only start the backend server |
 | `--frontend-only` | `-f` | Only start the frontend server |
-| `--port` | `-p` | Set the backend port (default: deterministic per-project hash) |
+| `--port` | `-P` | Set the backend port (default: deterministic per-project hash) |
 | `--generate` | `-g` | Auto-regenerate schema + SDK on startup and file changes |
 
 > **IMPORTANT FOR AGENTS:** Each project automatically receives a **unique default port** derived from its directory path (range 3001–3999), preventing collisions when running multiple Rebase instances. The resolved port is saved to `.rebase-dev-port` for affinity across restarts. The backend URL is saved to `.rebase-dev-url` so scripts can read it. The frontend receives `VITE_API_URL` automatically.
@@ -232,18 +232,42 @@ rebase dev --generate
 
 ### `rebase build`
 
-Runs the build script across all workspace packages using the detected package manager (pnpm or npm). No options.
+Builds the apps declared in `rebase.json`. For the `backend` app this produces a **bundle** — compiled collections, functions and schema plus a manifest — which is the artifact the runtime (and `rebase start`) loads. For `static` apps it runs the declared build command and reports where the output landed.
+
+Takes an optional list of app names; with none, every app in the manifest is built.
+
+| Option | Alias | Description |
+|--------|-------|-------------|
+| `--output` | `--out` | Bundle output directory (default: `dist-bundle`) |
+| `--skip-type-check` | | Compile without type checking (iteration only) |
+| `--skip-schema` | | Do not regenerate the database schema from collections |
+| `--no-static` | | Do not fold the frontend assets into the backend bundle |
+| `--skip-static-build` | | Fold already-built assets without re-running the app's build |
+| `--legacy` | | Run every workspace's own `build` script instead of bundling |
+| `--help` | `-h` | Show build command help |
+
+> **IMPORTANT FOR AGENTS:** "Build for production" means the default (bundle) path. `--legacy` is the pre-bundle behaviour — it runs workspace build scripts and produces **no** bundle, so `rebase start` will have nothing to run. A project with no `rebase.json`, or one whose backend has been ejected, falls back to `--legacy` automatically.
 
 ```bash
+# Build every app declared in rebase.json
 rebase build
+
+# Only the backend bundle, into a custom directory
+rebase build backend --output build/bundle
 ```
 
 ### `rebase start`
 
-Starts the backend server in production mode. Automatically sets `DOTENV_CONFIG_PATH` if a `.env` file is found. No options.
+Runs a built bundle through the Rebase runtime — the same path the official container image takes. Automatically sets `DOTENV_CONFIG_PATH` if a `.env` file is found. With no bundle present it falls back to the backend workspace's own `start` script.
+
+| Option | Alias | Description |
+|--------|-------|-------------|
+| `--bundle` | | Bundle directory (default: `dist-bundle`) |
+| `--legacy` | | Run the backend workspace's own `start` script |
+| `--help` | `-h` | Show start command help |
 
 ```bash
-rebase start
+rebase build && rebase start
 ```
 
 ### Schema Commands
@@ -277,9 +301,15 @@ rebase start
 | `rebase db push` | Apply schema directly to database (development only) |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending SQL migrations |
-| `rebase db studio` | Open Drizzle Studio (visual database browser) |
 | `rebase db branch` | Database branching (create, list, delete, info) |
+| `rebase db backup` | Write a backup of the current database |
+| `rebase db backups` | List the backups taken so far |
+| `rebase db restore` | Restore the database from a backup |
 | `rebase db --help` | Show database command help |
+
+<!-- docs-verify: ignore -->
+> **IMPORTANT FOR AGENTS:** There is no `rebase db studio`. The driver accepts exactly
+> the subcommands above and exits 1 on anything else.
 
 > **IMPORTANT FOR AGENTS:** Like schema commands, database commands are delegated to the active database driver plugin. The plugin provides the actual implementation.
 

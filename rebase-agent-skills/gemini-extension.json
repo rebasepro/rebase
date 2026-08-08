@@ -5,8 +5,8 @@
   "contextFileName": "REBASE.md",
   "mcpServers": {
     "rebase": {
-      "command": "node",
-      "args": ["node_modules/@rebasepro/mcp/dist/cli.js"],
+      "command": "npx",
+      "args": ["-y", "@rebasepro/mcp"],
       "env": {
         "IS_GEMINI_CLI_EXTENSION": "true"
       }

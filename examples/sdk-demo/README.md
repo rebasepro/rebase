@@ -23,23 +23,29 @@ so), edits apply instantly and the sync pill counts what is unsaved. Hit
 
 ## Prerequisites
 
-Start the backend from the `app/` folder first:
+Install the workspace once from the repo root, then start the backend:
 
 ```bash
 # From the repo root
-cd app
 pnpm install
-pnpm run dev:backend
+cd app
+pnpm dev --backend-only --port 3001
 ```
 
-The backend must be running on `http://localhost:3001` (default).
+The demo falls back to `http://localhost:3001` when `VITE_API_URL` is unset, and
+`rebase dev` otherwise picks a deterministic per-project port in 3001–3999 — hence
+the explicit `--port 3001` above. To point the demo somewhere else instead, set
+`VITE_API_URL` when starting it.
 
 ## Running
 
+This example is a workspace package (`sdk-demo`), so its `@rebasepro/client`
+dependency resolves through pnpm — `npm install` inside this folder cannot
+resolve `workspace:*` and fails.
+
 ```bash
-cd examples/sdk-demo
-npm install
-npm run dev
+# From the repo root
+pnpm --filter sdk-demo dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.

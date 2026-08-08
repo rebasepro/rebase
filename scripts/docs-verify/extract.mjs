@@ -70,7 +70,10 @@ export const DEFAULT_GLOBS = [
     // covered by the cheaper identifier check instead.
     "website/src/content/docs/docs/**/*.md",
     "website/src/content/docs/docs/**/*.mdx",
-    "rebase-agent-skills/**/*.md"
+    "rebase-agent-skills/**/*.md",
+    // One level deep: every example has its own `node_modules` here, and a
+    // `**` glob would walk into it.
+    "examples/*/*.md"
 ];
 
 /**
