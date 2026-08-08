@@ -168,6 +168,11 @@
   "include": [
     "packages/admin/src",
     "packages/admin-types/src",
+    // `@rebasepro/app` has had a `paths` entry above for as long as this file
+    // has existed, but never a line here — so the package every admin project
+    // mounts was read only as far as something else imported it, and the files
+    // nothing imported were never opened at all. 147 files, and clean.
+    "packages/app/src",
     "packages/cli/src",
     "packages/client/src",
     "packages/firebase/src",
@@ -177,6 +182,12 @@
     "packages/mcp/src",
     "packages/plugin-ai/src",
     "packages/plugin-insights/src",
+    // `rls-check` was invisible from both directions: it has no workspace deps,
+    // so no `paths` entry pulls it in, and nothing in the tree imports it, so no
+    // other file dragged it into the program either. Its only check was the
+    // package's own `typecheck` script, which no CI job runs — and it is the one
+    // package meant to `npx` cold on a stranger's database.
+    "packages/rls-check/src",
     "packages/inference/src",
     "packages/codegen/src",
     "packages/server/src",

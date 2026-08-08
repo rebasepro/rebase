@@ -1,7 +1,7 @@
 {
   "//": "Type-checks test files. Run as the second half of `pnpm typecheck`.",
   "//why": "Nothing type-checked a test file until this existed. `tsconfig.typecheck.json` reaches only `packages/*/src`, and excludes test files on top of that — so a test could import a type that does not exist and stay green forever, because vitest's esbuild transform strips types without checking them. That is exactly what happened: admin-types' own test kept importing `type AdminCollectionConfig` for the whole refactor, after the type had been deliberately deleted, and the first thing to notice was a Docker build in an end-to-end run.",
-  "//scope": "Only the packages listed below, because the other 16 test directories carry 1493 pre-existing errors between them — worst are server-postgres (808), client (241), common (124) and server (111). Those are real debt and unrelated to the admin/BaaS split; fixing a package's test types is what earns it a line here. `packages/types/__tests__` is deliberately absent and should stay absent: the `bivariance/` files are probes that assert generics are *not* assignable, so they are supposed to error.",
+  "//scope": "Only the packages listed below, because what is left out carries 1617 pre-existing errors between six packages: server-postgres (1037), client (265), server (165), admin's remaining tests (87), the rest of app/test (52) and cli (11 — the closest to earning its line). Those are real debt; fixing a package's test types is what earns it a line here, and every line below names the drift that adding it exposed. Counts are per package measured on its own, `test` and any `src`-side `*.test.ts` together. `packages/types/__tests__` is deliberately absent and should stay absent: the `bivariance/` files are probes that assert generics are *not* assignable, so they are supposed to error.",
   "extends": "./tsconfig.typecheck.json",
   "compilerOptions": {
     // The parent pins `types: ["node"]`, which leaves `describe`/`it`/`expect`
@@ -58,6 +58,12 @@
     // `mockResolvedValue` argument to `never` — the rows this hook parses were
     // never checked against the shape it parses them into.
     "packages/studio/test",
+    // `parseSpec.test.ts` sits *under* `src`, so `src` is what has to be listed.
+    // Its `makeSpec` builder was annotated `: OpenApiSpec` while supplying
+    // neither of the two fields `OpenApiSpec` requires, and its parameter
+    // fixture widened `in: "path"` to `string` — so a suite about parsing
+    // OpenAPI documents was parsing things that are not OpenAPI documents.
+    "packages/studio/src",
     // `utils.test.ts` read `result.a.b.c` off a `setIn` that returns `unknown`
     // by contract (its return shape is not its argument's). Those assertions
     // compare whole objects now, which is both cast-free and stricter.
@@ -69,6 +75,25 @@
     // rejects: `React.memo` had pinned the component's type parameter, so the
     // exported component was not generic at all.
     "packages/ui/test",
+    // `src` joins `test` for the one `.test.tsx` that lives beside its code.
+    "packages/ui/src",
+    // The remaining directories that were already clean and cost nothing but a
+    // line each. `codegen` and `mcp` had never been read by any tsc program;
+    // `utils` is imported by everything, so its fixtures drifting is the kind
+    // of thing that surfaces four packages away.
+    "packages/codegen/test",
+    "packages/mcp/test",
+    "packages/utils/test",
+    // `rls-check` ships to strangers' databases and had no type check at all —
+    // no `paths` entry, no `include` line, and a package-local `typecheck`
+    // script no CI job invokes. `src` joins `test` because most of its tests
+    // sit beside the code.
+    "packages/rls-check/test",
+    "packages/rls-check/src",
+    // `util.test.ts` built an "EnumValueConfig values" fixture whose `color`
+    // widened to `string`, which `ColorKey | ColorScheme` does not admit — so
+    // the case the test is named after was not the shape it claimed to be.
+    "packages/inference/test",
     // The collection registry, permissions and policy tests.
     // `collection_registry_property_gates.test.ts` declared its fixtures with
     // `driver: "firestore"` / `driver: "mongodb"`. The field is `engine`; there
