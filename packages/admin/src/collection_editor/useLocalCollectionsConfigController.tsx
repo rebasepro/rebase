@@ -202,13 +202,18 @@ collectionData });
             await request("/collection/delete", { collectionId: id });
         },
 
+        // The follow-up write carries exactly one key, and `partial` is what says
+        // so. Read as a whole-collection save it deletes everything it does not
+        // mention — `securityRules` first, which then falls back to the
+        // directory default and widens who can read the collection.
         saveProperty: async ({ path, propertyKey, property, newPropertiesOrder }: SavePropertyParams) => {
             await request("/property/save", { collectionId: path,
 propertyKey,
 propertyConfig: property });
             if (newPropertiesOrder) {
                 await request("/collection/save", { collectionId: path,
-collectionData: { propertiesOrder: newPropertiesOrder } });
+collectionData: { propertiesOrder: newPropertiesOrder },
+partial: true });
             }
         },
         deleteProperty: async ({ path, propertyKey, newPropertiesOrder }: DeletePropertyParams) => {
@@ -216,14 +221,16 @@ collectionData: { propertiesOrder: newPropertiesOrder } });
 propertyKey });
             if (newPropertiesOrder) {
                 await request("/collection/save", { collectionId: path,
-collectionData: { propertiesOrder: newPropertiesOrder } });
+collectionData: { propertiesOrder: newPropertiesOrder },
+partial: true });
             }
         },
 
         updatePropertiesOrder: async ({ collection, fullPath, newPropertiesOrder }: UpdatePropertiesOrderParams) => {
             const collectionId = (collection as AdminCollection & { id?: string }).id || fullPath.split("/").pop();
             await request("/collection/save", { collectionId,
-collectionData: { propertiesOrder: newPropertiesOrder } });
+collectionData: { propertiesOrder: newPropertiesOrder },
+partial: true });
         },
         updateKanbanColumnsOrder: async () => {
             // Kanban order mapping logic can be added later if needed natively.

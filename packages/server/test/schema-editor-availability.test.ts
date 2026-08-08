@@ -70,7 +70,14 @@ function fakeBootstrapper(reports: CollectionConfig[] | undefined): BackendBoots
     } as unknown as BackendBootstrapper;
 }
 
-/** A real directory holding one real collection file, so the editor can load. */
+/**
+ * A real directory holding one real collection file, so the editor can load.
+ *
+ * Written the way `rebase init` writes one — `defineCollection`, default export.
+ * It used to name a `buildCollection` helper that no package exports, which the
+ * editor could not open; the admin's write then "succeeded" only because the
+ * writer's fallback recreated the file from the request payload.
+ */
 let collectionsDir: string;
 
 beforeEach(() => {
@@ -79,12 +86,15 @@ beforeEach(() => {
     fs.writeFileSync(
         path.join(collectionsDir, "posts.ts"),
         [
-            "import { buildCollection } from \"@rebasepro/types\";",
-            "export const postsCollection = buildCollection({",
+            "import { defineCollection } from \"@rebasepro/admin-types\";",
+            "",
+            "const postsCollection = defineCollection({",
             "    name: \"Posts\",",
             "    slug: \"posts\",",
             "    properties: {}",
             "});",
+            "",
+            "export default postsCollection;",
             ""
         ].join("\n")
     );

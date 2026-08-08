@@ -190,6 +190,24 @@ describe("toAdminCollectionConfig", () => {
         expect("admin" in (toAdminCollectionConfig(bare) as object)).toBe(false);
     });
 
+    it("keeps the edit the panel made, not the block it was loaded with", () => {
+        // What the editor's forms actually do: flatten for display, bind to the
+        // flat name (`setFieldValue("defaultViewMode", …)`), leave `values.admin`
+        // holding the copy the collection was loaded with, then nest on save.
+        // Resolving that conflict towards the block reverts every presentation
+        // edit, and the schema editor in `@rebasepro/server` — a second copy of
+        // this same nesting — used to do exactly that.
+        const edited = {
+            ...(resolveAdminCollection(nested()) as unknown as Record<string, unknown>),
+            defaultViewMode: "cards"
+        } as unknown as AdminCollection;
+
+        const authoring = toAdminCollectionConfig(edited) as unknown as Record<string, unknown>;
+        expect((authoring.admin as Record<string, unknown>).defaultViewMode).toBe("cards");
+        // The fields the user did not touch are still there.
+        expect((authoring.admin as Record<string, unknown>).icon).toBe("FileText");
+    });
+
     it("keeps a contract field that happens to sit next to admin fields", () => {
         const flat = {
             slug: "posts",

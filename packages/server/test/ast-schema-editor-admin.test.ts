@@ -57,16 +57,28 @@ describe("nestAdminKeys", () => {
         expect("admin" in result).toBe(false);
     });
 
-    it("prefers an existing nested value over a flattened duplicate", () => {
+    it("prefers the flattened value over the block it was loaded with", () => {
         // A collection that went through the panel carries both: the block it was
-        // authored with, and the flattened copy the view model added. The block is
-        // what the file said.
+        // loaded with, and the flat copy the forms bind to. The flat one is the
+        // edit — `setFieldValue("icon", …)` writes there and never touches
+        // `values.admin` — so preferring the block resolved every presentation
+        // edit in favour of the value the user had just changed away from, and
+        // the panel snapped back on reload.
         const result = nestAdminKeys({
             slug: "posts",
-            icon: "Flattened",
-            admin: { icon: "Authored" }
+            icon: "Edited",
+            admin: { icon: "Loaded" }
         });
-        expect((result.admin as Record<string, unknown>).icon).toBe("Authored");
+        expect((result.admin as Record<string, unknown>).icon).toBe("Edited");
+    });
+
+    it("keeps a block key the flat copy does not carry", () => {
+        const result = nestAdminKeys({
+            slug: "posts",
+            icon: "Edited",
+            admin: { icon: "Loaded", group: "Content" }
+        });
+        expect(result.admin).toEqual({ icon: "Edited", group: "Content" });
     });
 
     it("merges a flat key that the block does not already have", () => {

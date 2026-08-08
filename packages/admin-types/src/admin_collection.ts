@@ -31,7 +31,7 @@ import type {
     User
 } from "@rebasepro/types";
 // A value, not a type: the runtime list core owns.
-import { ADMIN_COLLECTION_KEYS as CORE_ADMIN_COLLECTION_KEYS } from "@rebasepro/types";
+import { ADMIN_COLLECTION_KEYS as CORE_ADMIN_COLLECTION_KEYS, nestAdminCollectionKeys } from "@rebasepro/types";
 
 import type {
     AdditionalFieldDelegate,
@@ -712,21 +712,15 @@ export function resolveAdminCollection<
  * collection to anything that expects the authoring shape. Any key in
  * {@link ADMIN_COLLECTION_KEYS} found at the top level is moved down, so a
  * round trip through the panel does not leave the file flat.
+ *
+ * The nesting itself lives in `@rebasepro/types` because the schema editor in
+ * `@rebasepro/server` — which cannot import this package — has to do exactly the
+ * same thing when it writes a collection file back to disk. Two copies of the
+ * rule disagreed on which side wins, and the disagreement was invisible.
  */
 export function toAdminCollectionConfig<
     M extends Record<string, unknown> = Record<string, unknown>,
     USER extends User = User
 >(collection: AdminCollection<M, USER> | CollectionConfig<M, USER>): CollectionConfig<M, USER> {
-    const source = collection as Record<string, unknown>;
-    const top: Record<string, unknown> = {};
-    const block: Record<string, unknown> = { ...(source.admin as object ?? {}) };
-
-    for (const [key, value] of Object.entries(source)) {
-        if (key === "admin") continue;
-        if ((ADMIN_COLLECTION_KEYS as readonly string[]).includes(key)) block[key] = value;
-        else top[key] = value;
-    }
-
-    if (Object.keys(block).length > 0) top.admin = block;
-    return top as unknown as CollectionConfig<M, USER>;
+    return nestAdminCollectionKeys(collection as Record<string, unknown>) as unknown as CollectionConfig<M, USER>;
 }

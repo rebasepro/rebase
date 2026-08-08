@@ -7,8 +7,11 @@ export function AdvancedPropertyValidation({ disabled }: {
     disabled: boolean
 }) {
 
-    const hideFromCollection = "ui.hideFromCollection";
-    const readOnly = "ui.readOnly";
+    // `ui` was renamed to `admin` in 0.11. Nothing reads `ui.*` — the toggles did
+    // nothing — and the boot validator treats the old name as a removed key, so a
+    // save through here left a project that would not start.
+    const hideFromCollection = "admin.hideFromCollection";
+    const readOnly = "admin.readOnly";
 
     return (
 
