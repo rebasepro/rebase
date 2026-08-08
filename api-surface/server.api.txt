@@ -28,10 +28,10 @@ const authRoles
 const authUid
 const errorHandler
 const fileTokenAuth
-const logger
+const logger { child, debug, error, info, warn }
 const optionalAuth
 const queryTokenAuth
-const rebase
+const rebase { admin, apiKeys, apiPath, auth, backups, baseUrl, call, createStorageSource, cron, dataAsAdmin, email, fetchStorageSources, functions, resolveToken, setAuthTokenGetter, setOnUnauthorized, setToken, sql, storage, storageRegistry, ws }
 const requireAdmin
 const requireAuth
 function _resetRebaseMock
@@ -130,14 +130,14 @@ interface ApiKey { admin, created_at, created_by, expires_at, id, key_hash, key_
 interface ApiKeyMasked { admin, created_at, created_by, expires_at, id, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiKeyPermission { collection, operations }
 interface ApiKeyStore { createApiKey, ensureTable, findByKeyHash, getApiKeyById, listApiKeys, revokeApiKey, updateApiKey, updateLastUsed }
-interface ApiKeyWithSecret { key }
+interface ApiKeyWithSecret { admin, created_at, created_by, expires_at, id, key, key_prefix, last_used_at, name, permissions, rate_limit, revoked_at, updated_at }
 interface ApiResponse { data, error, meta }
 interface AuthHooks { afterLogout, afterUserCreate, afterUserDelete, beforeLogin, beforeUserCreate, beforeUserDelete, customizeAccessToken, hashPassword, onAdminCreateUser, onAdminResetPassword, onAuthenticated, onMfaVerified, onPasswordReset, transformAuthResponse, validatePasswordStrength, verifyCredentials, verifyPassword }
 interface AuthMiddlewareOptions { apiKeyStore, driver, requireAuth, resolveDriver, serviceKey, validator }
-interface AuthRepository
+interface AuthRepository { assignDefaultRole, createMagicLinkToken, createMfaChallenge, createMfaFactor, createPasswordResetToken, createRecoveryCodes, createRefreshToken, createRole, createUser, deleteAllPasswordResetTokensForUser, deleteAllRecoveryCodes, deleteAllRefreshTokensForUser, deleteExpiredTokens, deleteMfaFactor, deleteRefreshToken, deleteRefreshTokenById, deleteRole, deleteUser, findRefreshTokenByHash, findValidMagicLinkToken, findValidPasswordResetToken, getMfaChallengeById, getMfaFactorById, getMfaFactors, getRoleById, getTokensValidAfter, getUnusedRecoveryCodeCount, getUserByEmail, getUserById, getUserByIdentity, getUserByVerificationToken, getUserIdentities, getUserRoleIds, getUserRoles, getUserWithRoles, hasVerifiedMfaFactors, linkUserIdentity, listRefreshTokensForUser, listRoles, listUsers, listUsersPaginated, markMagicLinkTokenUsed, markPasswordResetTokenUsed, markRefreshTokenRotated, pruneRefreshTokens, revokeRefreshTokenSession, setEmailVerified, setTokensValidAfter, setUserRoles, setVerificationToken, updatePassword, updateRole, updateUser, useRecoveryCode, verifyMfaChallenge, verifyMfaFactor }
 interface BaasOptions { unprotectedTables }
 interface BackendConfig { connection, schema, type }
-interface BackendInstance { admin, collectionRegistry, connection, entityRepository, realtimeProvider }
+interface BackendInstance { admin, collectionRegistry, connection, destroy, entityRepository, healthCheck, initialize, realtimeProvider }
 interface BackupRoutesConfig { getDestination, storage }
 interface BootOptions { bundle, bundleDir, handleSignals, listen }
 interface BootedRuntime { app, backend, bundle, dataSources, env, port, server, shutdown }
@@ -146,7 +146,7 @@ interface BundleConfigExports { callbacks, dataSources, storageAuthorize, storag
 interface BundleSchema { enums, relations, tables }
 interface CollectionDefaults { defaultSecurityRules }
 interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register }
-interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, order, orderBy, path, searchString, startAfter }
+interface CollectionSubscriptionConfig { clientId, databaseId, filter, limit, order, orderBy, path, searchExplain, searchString, startAfter }
 interface ConditionBuilder { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 interface ConfigProblem { message, path, severity }
 interface ContractRoutesConfig { collectionRegistry, runtimeVersion, schemaVersion }
@@ -170,8 +170,8 @@ interface GoogleProviderConfig { clientId, clientSecret }
 interface ImageTransformOptions { fit, format, height, quality, width }
 interface InitializedDataSource { bootstrapper, connection, driverPackage, driverVersion, engine, key }
 interface ListUsersOptions { limit, offset, orderBy, orderDir, roleId, search }
-interface ListenCollectionRequest { onError, onUpdate, subscriptionId }
-interface ListenEntityRequest { onError, onUpdate, subscriptionId }
+interface ListenCollectionRequest { collection, filter, limit, logical, offset, onError, onUpdate, order, orderBy, path, searchExplain, searchString, startAfter, subscriptionId, vectorSearch }
+interface ListenEntityRequest { collection, databaseId, id, onError, onUpdate, path, subscriptionId }
 interface LoadedBundle { collectionsDir, cronsDir, dir, functionsDir, manifest, staticApps }
 interface LoadedCronJob { definition, id }
 interface LoadedFunction { app, name }
