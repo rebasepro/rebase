@@ -108,7 +108,14 @@ const isIdProperty = (propName: string, prop: Property, collection: CollectionCo
     return !hasExplicitId && propName === "id";
 };
 
-const getDrizzleColumn = (propName: string, prop: Property, collection: CollectionConfig, collections: CollectionConfig[]): string | null => {
+/**
+ * The Drizzle column declaration a property compiles to, or `null` when the
+ * property puts no column on *this* table (an inverse relation, whose column
+ * lives on the target). Exported so it can be checked against its DDL twin
+ * `getSqlColumnType` directly — the two disagreeing is what left `geopoint`
+ * with a database column and no Drizzle key.
+ */
+export const getDrizzleColumn = (propName: string, prop: Property, collection: CollectionConfig, collections: CollectionConfig[]): string | null => {
 
     const colName = resolveColumnName(propName, prop);
     let columnDefinition: string;
@@ -232,6 +239,16 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             }
             break;
         }
+        case "geopoint": {
+            // `{ latitude, longitude }`, which is what the OpenAPI schema, the
+            // generated TS type and the admin's field binding all describe.
+            // This arm did not exist: `geopoint` fell to `default: return null`
+            // and the caller dropped the column, so the DDL generator created a
+            // column the Drizzle table had no key for — and every write to it
+            // was silently discarded with a 201.
+            columnDefinition = `jsonb(${quote(colName)})`;
+            break;
+        }
         case "array": {
             const arrayProp = prop as ArrayProperty;
             let colType = arrayProp.columnType;
@@ -341,7 +358,20 @@ const getDrizzleColumn = (propName: string, prop: Property, collection: Collecti
             return `    ${propKey(propName)}: ${columnDefinition}`;
         }
         default:
-            return null;
+            // Not `return null`. A `null` here means "this property puts no
+            // column on this table", which is true of an inverse relation and
+            // false of everything else — and the caller cannot tell the two
+            // apart, so a type this switch simply forgot produced a table
+            // missing a column while the DDL generator happily created one.
+            // That is how `geopoint` stayed unpersistable: writes to it were
+            // dropped before the SQL was built, forever, with a 201. A property
+            // type nobody mapped is a generator bug, and it says so here rather
+            // than at some caller's next INSERT.
+            throw new Error(
+                `No Postgres column mapping for property '${propName}' of type ` +
+                `'${(prop as Property).type}' in collection '${collection.slug}'. ` +
+                "Add a case to `getDrizzleColumn` (and to `getSqlColumnType`, which must agree)."
+            );
     }
 
     if (prop.validation?.required) {

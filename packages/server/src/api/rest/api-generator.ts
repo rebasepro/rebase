@@ -3,7 +3,7 @@ import { AuthAdapter, DataDriver, CollectionConfig, getCollectionDataPath } from
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { parseQueryOptions, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
-import { assertKnownWriteFields, projectResponseFields } from "./write-validation";
+import { assertKnownWriteFields, assertWriteValuesValid, projectResponseFields } from "./write-validation";
 import { httpMethodToOperation, isOperationAllowed } from "../../auth/api-keys/api-key-permission-guard";
 import type { ApiKeyMasked } from "../../auth/api-keys/api-key-types";
 import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
@@ -141,7 +141,7 @@ export class RestApiGenerator {
      * Needed so a nested write can be checked against a schema at all. Without
      * it these routes skipped `assertKnownWriteFields` entirely, which is why a
      * typo `POST /posts` rejected with a 400 while the same typo on
-     * `POST /authors/1/posts` reached the database.
+     * `POST /authors/1/posts` was dropped from the statement and answered 201.
      *
      * Returns `undefined` rather than throwing when the path cannot be walked:
      * the driver raises the authoritative error a moment later, and duplicating
@@ -391,8 +391,10 @@ export class RestApiGenerator {
             // Checked before the transaction opens, and named by row index: a
             // batch is all-or-nothing, so one bad field in ten thousand rows
             // should not be found by rolling the other 9,999 back.
-            rows.forEach((row, rowIndex) =>
-                assertKnownWriteFields(row, resolvedCollection, { rowIndex }));
+            rows.forEach((row, rowIndex) => {
+                assertKnownWriteFields(row, resolvedCollection, { rowIndex });
+                assertWriteValuesValid(row, resolvedCollection, { rowIndex });
+            });
 
             // A client that never sees the response cannot know whether the
             // batch committed, so it retries — and without a key the server
@@ -452,6 +454,7 @@ export class RestApiGenerator {
                     );
                 }
                 assertKnownWriteFields(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
+                assertWriteValuesValid(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
             });
 
             return withIdempotency(c, async () => {
@@ -544,12 +547,17 @@ export class RestApiGenerator {
             // answered 201, while the same typo on `posts` was a 400.
             if (!isAuthCollection) {
                 assertKnownWriteFields(body, resolvedCollection);
+                assertWriteValuesValid(body, resolvedCollection);
             } else {
                 const contract = this.authAdapter?.describeUserCreationContract?.(collectionAuthConfig);
                 if (contract?.validate) {
                     assertKnownWriteFields(body, resolvedCollection, {
                         extraKnownFields: contract.extraFields
                     });
+                    // Same condition as the key check above: with a custom
+                    // `onCreateUser` the adapter owns the body's shape, so the
+                    // collection's constraints do not describe what arrived.
+                    assertWriteValuesValid(body, resolvedCollection);
                 }
             }
 
@@ -667,6 +675,7 @@ values: entity as Record<string, unknown> },
 
             const body = await parseJsonBody(c);
             assertKnownWriteFields(body, resolvedCollection);
+            assertWriteValuesValid(body, resolvedCollection);
 
             const entity = await driver.save({
                 path: getCollectionDataPath(collection),
@@ -924,7 +933,10 @@ id: parsed.id });
             const body = await parseJsonBody(c);
 
             const targetCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
-            if (targetCollection) assertKnownWriteFields(body, targetCollection);
+            if (targetCollection) {
+                assertKnownWriteFields(body, targetCollection);
+                assertWriteValuesValid(body, targetCollection);
+            }
 
             const entity = await driver.save({
                 path: parsed.collectionPath,
@@ -956,7 +968,10 @@ id: parsed.id });
             const body = await parseJsonBody(c);
 
             const targetCollection = this.resolveNestedWriteCollection(parsed.collectionPath);
-            if (targetCollection) assertKnownWriteFields(body, targetCollection);
+            if (targetCollection) {
+                assertKnownWriteFields(body, targetCollection);
+                assertWriteValuesValid(body, targetCollection);
+            }
 
             const entity = await driver.save({
                 path: parsed.collectionPath,

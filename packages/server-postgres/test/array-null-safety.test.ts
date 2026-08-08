@@ -105,23 +105,49 @@ describe("serializePropertyToServer — array null safety", () => {
         expect(serializePropertyToServer(null, arrayOneOfProp)).toBeNull();
     });
 
-    // ── Non-array values (coerced to empty array) ──
-    it("coerces a non-array string to empty array for array property", () => {
-        expect(serializePropertyToServer("not-an-array", arrayOfStringsProp)).toEqual([]);
+    // ── Non-array values (rejected) ──
+    //
+    // These four used to assert `toEqual([])` — they pinned the coercion in
+    // place rather than the behaviour anyone wants. A caller that sends a
+    // scalar for an array column gets its value destroyed, a 201, and a row
+    // that reads back as an empty list forever. The write path refuses it now;
+    // the read path (below) still coerces, because a row already in the
+    // database is not this caller's fault.
+    it("rejects a non-array string for an array property, naming the field", () => {
+        expect(() => serializePropertyToServer("not-an-array", arrayOfStringsProp, "tags"))
+            .toThrow(/'tags' expects an array, but received a string/);
     });
 
-    it("coerces a non-array number to empty array for array property", () => {
-        expect(serializePropertyToServer(42, arrayOfStringsProp)).toEqual([]);
+    it("rejects a non-array number for an array property", () => {
+        expect(() => serializePropertyToServer(42, arrayOfStringsProp, "tags"))
+            .toThrow(/expects an array, but received a number/);
     });
 
-    it("coerces a non-array object to empty array for bare array property", () => {
-        const obj = { a: 1 };
-        expect(serializePropertyToServer(obj, bareArrayProp)).toEqual([]);
+    it("rejects a non-array object for a bare array property", () => {
+        expect(() => serializePropertyToServer({ a: 1 }, bareArrayProp, "tags"))
+            .toThrow(/expects an array, but received an object/);
     });
 
-    it("coerces a boolean to empty array for array property", () => {
-        expect(serializePropertyToServer(true, arrayOfStringsProp)).toEqual([]);
-        expect(serializePropertyToServer(false, arrayOfStringsProp)).toEqual([]);
+    it("rejects a boolean for an array property", () => {
+        expect(() => serializePropertyToServer(true, arrayOfStringsProp)).toThrow(/expects an array/);
+        expect(() => serializePropertyToServer(false, arrayOfStringsProp)).toThrow(/expects an array/);
+    });
+
+    it("reports the rejection as a 400, not a 500", () => {
+        try {
+            serializePropertyToServer("news", arrayOfStringsProp, "tags");
+            throw new Error("should have thrown");
+        } catch (error) {
+            expect((error as { statusCode?: number }).statusCode).toBe(400);
+            expect((error as { code?: string }).code).toBe("VALIDATION_INVALID_VALUE");
+        }
+    });
+
+    it("does not echo the rejected value back into the message", () => {
+        // Errors end up in logs and in error-reporting services, and the value
+        // in the wrong field may be the one worth keeping out of both.
+        expect(() => serializePropertyToServer("s3cret-token", arrayOfStringsProp, "tags"))
+            .toThrow(/^(?!.*s3cret-token).*$/);
     });
 
     // ── Arrays with null / undefined elements ──
