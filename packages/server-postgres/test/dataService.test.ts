@@ -17,7 +17,7 @@ function resolvesTo(rows: unknown[]) {
     const chain: Record<string, unknown> = {
         then: (resolve: Function) => resolve(rows)
     };
-    for (const method of ["limit", "offset", "orderBy", "where", "innerJoin", "$dynamic"]) {
+    for (const method of ["limit", "offset", "orderBy", "where", "from", "innerJoin", "$dynamic"]) {
         chain[method] = jest.fn(() => chain);
     }
     return chain;
@@ -176,6 +176,10 @@ describe("DataService", () => {
             innerJoin: jest.fn().mockReturnThis(),
             insert: jest.fn().mockReturnThis(),
             values: jest.fn().mockReturnThis(),
+            // Junction inserts land with ON CONFLICT DO NOTHING so that two
+            // editors adding the same link concurrently is a no-op rather than
+            // a unique violation.
+            onConflictDoNothing: jest.fn().mockReturnThis(),
             returning: jest.fn().mockResolvedValue([]),
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
@@ -326,25 +330,51 @@ describe("DataService", () => {
     });
 
     describe("save (update)", () => {
-        it("should update junction table for a 'many' relation", async () => {
+        // The junction is diffed, not rebuilt. Delete-all-then-reinsert lost a
+        // concurrent editor's links, and — because it deleted what the caller
+        // could *read* — an RLS-filtered read turned into a partial delete of
+        // rows the caller was never allowed to see.
+        it("adds only the links that arrived, and deletes only the ones that left", async () => {
             const updatedPost = { tags: [{ id: 11 }, { id: 12 }] };
             db.limit.mockResolvedValue([{
                 id: 5,
                 title: "Post with Tags"
             }]);
+            // Post 5 already links tag 11; 99 is about to lose its link.
+            // Scoped to the junction read by its projection, so the save's own
+            // `.where(...).limit(1)` fetch-back still resolves normally.
+            db.select.mockImplementation((fields?: unknown) => (
+                fields && typeof fields === "object" && "targetId" in fields
+                    ? resolvesTo([{ targetId: 11 }, { targetId: 99 }])
+                    : db
+            ) as never);
 
             await dataService.save("posts", updatedPost, 5);
 
-            expect(db.delete).toHaveBeenCalledWith(mockPostsTagsTable);
-            expect(db.where).toHaveBeenCalledWith(expect.any(Object));
+            // 12 is new, so it alone is inserted — 11 is left where it is.
             expect(db.insert).toHaveBeenCalledWith(mockPostsTagsTable);
             expect(db.values).toHaveBeenLastCalledWith([{
                 post_id: 5,
-                tag_id: 11
-            }, {
-                post_id: 5,
                 tag_id: 12
             }]);
+            // 99 is gone from the payload, so it alone is removed.
+            expect(db.delete).toHaveBeenCalledWith(mockPostsTagsTable);
+        });
+
+        it("issues no delete when every existing link survives", async () => {
+            db.limit.mockResolvedValue([{
+                id: 5,
+                title: "Post with Tags"
+            }]);
+            db.select.mockImplementation((fields?: unknown) => (
+                fields && typeof fields === "object" && "targetId" in fields
+                    ? resolvesTo([{ targetId: 11 }])
+                    : db
+            ) as never);
+
+            await dataService.save("posts", { tags: [{ id: 11 }, { id: 12 }] }, 5);
+
+            expect(db.delete).not.toHaveBeenCalled();
         });
     });
 
@@ -636,6 +666,10 @@ relationName: "children" }
             innerJoin: jest.fn().mockReturnThis(),
             insert: jest.fn().mockReturnThis(),
             values: jest.fn().mockReturnThis(),
+            // Junction inserts land with ON CONFLICT DO NOTHING so that two
+            // editors adding the same link concurrently is a no-op rather than
+            // a unique violation.
+            onConflictDoNothing: jest.fn().mockReturnThis(),
             returning: jest.fn().mockResolvedValue([]),
             update: jest.fn().mockReturnThis(),
             set: jest.fn().mockReturnThis(),
